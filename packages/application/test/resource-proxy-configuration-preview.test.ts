@@ -336,7 +336,7 @@ function createService(provider = new FakeEdgeProxyProvider()) {
 }
 
 describe("ResourceProxyConfigurationPreviewQueryService", () => {
-  test("renders latest provider configuration from deployment route snapshot", async () => {
+  test("[PROXY-OBS-002][PROXY-OBS-003] renders latest provider configuration from deployment route snapshot", async () => {
     const context = createTestContext();
     const { provider, service } = createService();
     const query = ResourceProxyConfigurationPreviewQuery.create({
@@ -365,7 +365,7 @@ describe("ResourceProxyConfigurationPreviewQueryService", () => {
     });
   });
 
-  test("[DEF-ACCESS-QRY-002][EDGE-PROXY-QRY-002] renders durable route before server-applied and generated routes", async () => {
+  test("[DEF-ACCESS-QRY-002][EDGE-PROXY-QRY-002][PROXY-OBS-001] renders durable route before server-applied and generated routes", async () => {
     const context = createTestContext();
     const provider = new FakeEdgeProxyProvider();
     const deployment = deploymentSummary();
@@ -465,7 +465,7 @@ describe("ResourceProxyConfigurationPreviewQueryService", () => {
     ]);
   });
 
-  test("[DEF-ACCESS-ROUTE-013][EDGE-PROXY-QRY-002] renders server-applied route before generated route", async () => {
+  test("[DEF-ACCESS-ROUTE-013][EDGE-PROXY-QRY-002][PROXY-OBS-001] renders server-applied route before generated route", async () => {
     const context = createTestContext();
     const provider = new FakeEdgeProxyProvider();
     const deployment = deploymentSummary();

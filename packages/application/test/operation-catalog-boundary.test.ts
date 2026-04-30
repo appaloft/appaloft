@@ -86,6 +86,33 @@ describe("operation catalog aggregate mutation boundary", () => {
     }
   });
 
+  test("[WEB-CLI-API-ACCESS-001][WEB-CLI-API-ACCESS-002] route and access observation reads share catalog transports", () => {
+    const observationOperationKeys = [
+      "resources.show",
+      "resources.health",
+      "resources.runtime-logs",
+      "resources.proxy-configuration.preview",
+      "resources.diagnostic-summary",
+    ];
+
+    const catalogEntries: readonly OperationCatalogEntry[] = operationCatalog;
+    const entriesByKey = new Map<string, OperationCatalogEntry>(
+      catalogEntries.map((entry) => [entry.key, entry]),
+    );
+
+    for (const key of observationOperationKeys) {
+      const entry = entriesByKey.get(key);
+
+      expect(entry, key).toMatchObject({
+        kind: "query",
+        domain: "resources",
+      });
+      expect(entry?.inputSchema, key).toBeDefined();
+      expect(entry?.transports.cli, key).toBeTruthy();
+      expect(entry?.transports.orpc, key).toBeDefined();
+    }
+  });
+
   test("[DEPLOY-PLAN-ENTRY-001] deployment plan preview is exposed as a read-only query", () => {
     const entry = operationCatalog.find((candidate) => candidate.key === "deployments.plan");
 

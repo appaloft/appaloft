@@ -64,6 +64,15 @@ Then:
 | RES-LOGS-QRY-007 | integration | Adapter unsupported | Runtime kind has no reader | Resolve context then fail open | Reader returns not-configured error | `resource_runtime_logs_not_configured` |
 | RES-LOGS-QRY-008 | integration | Secret masking | Source emits value known to redaction context | Mask before transport | Reader or service masks line | Line has `masked = true`; secret absent |
 
+## Access Diagnostic Relationship Matrix
+
+These rows are governed by
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+
+| Test ID | Preferred automation | Case | Input/read state | Expected result | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| HEALTH-ACCESS-002 | integration | Runtime logs unavailable as diagnostic context | Runtime log reader returns unavailable, not-configured, or unsupported | Resource diagnostics may include log unavailability, while route/access status comes from route/health/proxy observations | Runtime log absence is not used as the sole route readiness predicate. |
+
 ## Streaming Matrix
 
 | Test ID | Preferred automation | Case | Log source behavior | Expected stream result | Expected cleanup |

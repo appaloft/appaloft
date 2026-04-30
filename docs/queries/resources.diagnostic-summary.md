@@ -145,6 +145,12 @@ Required top-level behavior:
 - `copy` contains deterministic machine-readable JSON and optionally markdown/plain-text rendered
   from the same structured fields.
 
+Route/access fields in `access`, `proxy`, `sourceErrors`, and `copy.json` must align with the
+shared descriptor vocabulary from
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+Selected route and context route facts must preserve generated/durable/server-applied/deployment
+snapshot source labels and the route precedence contract.
+
 Copy payload:
 
 ```ts

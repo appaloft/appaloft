@@ -591,6 +591,9 @@ Required:
   config routes consistently win where specs require it.
 - [ ] Add dedicated route intent/status read or repair surfaces only where existing access, proxy,
   health, and diagnostic surfaces are insufficient.
+- [ ] Close the shared route intent/status and access failure diagnostic contract across generated
+  access, durable domain routes, server-applied routes, proxy preview, health, runtime logs, and
+  diagnostic copy before adding domain/certificate mutation lifecycle surfaces.
 - [ ] Add domain binding show/update/delete/retry lifecycle commands where specs allow mutation
   after creation.
 - [ ] Add certificate show/import/revoke/delete/retry semantics around provider-issued and imported

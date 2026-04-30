@@ -547,7 +547,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).not.toContain("databaseLocation");
   });
 
-  test("[EDGE-PROXY-ROUTE-005] includes server-applied route access in diagnostics", async () => {
+  test("[EDGE-PROXY-ROUTE-005][ACCESS-DIAG-002] includes server-applied route access in diagnostics", async () => {
     const context = createTestContext();
     const { service } = createService({
       resources: [
@@ -585,6 +585,10 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.access).toMatchObject({
       status: "available",
       serverAppliedUrl: "https://www.example.test/admin",
+      selectedRoute: {
+        source: "server-applied-route",
+        recommendedAction: "none",
+      },
       proxyRouteStatus: "ready",
       lastRouteRealizationDeploymentId: "dep_web",
     });
@@ -596,7 +600,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).toContain('"serverAppliedUrl": "https://www.example.test/admin"');
   });
 
-  test("[RES-DIAG-QRY-017] keeps durable route first for diagnostic proxy context", async () => {
+  test("[RES-DIAG-QRY-017][ROUTE-INTENT-002][ACCESS-DIAG-004] keeps durable route first for diagnostic proxy context", async () => {
     const context = createTestContext();
     const { service } = createService({
       resources: [
@@ -658,12 +662,23 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
       durableUrl: "https://durable.example.test",
       serverAppliedUrl: "https://server-applied.example.test",
       generatedUrl: "http://generated.example.test",
+      selectedRoute: {
+        source: "durable-domain-binding",
+        intent: {
+          host: "durable.example.test",
+        },
+      },
     });
+    expect(summary.access.routeIntentStatuses?.map((route) => route.source)).toEqual([
+      "durable-domain-binding",
+      "server-applied-route",
+      "generated-default-access",
+    ]);
     expect(summary.proxy.providerKey).toBe("caddy");
     expect(summary.copy.json).toContain('"durableUrl": "https://durable.example.test"');
   });
 
-  test("[RES-DIAG-QRY-018] reports non-ready durable domain without hiding fallback routes", async () => {
+  test("[RES-DIAG-QRY-018][ROUTE-STATUS-002][ACCESS-DIAG-003] reports non-ready durable domain without hiding fallback routes", async () => {
     const context = createTestContext();
     const { service } = createService({
       domainBindings: [
@@ -701,6 +716,11 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
       status: "unavailable",
       generatedUrl: "http://web.203.0.113.10.sslip.io",
       reasonCode: "resource_domain_binding_not_ready",
+      selectedRoute: {
+        source: "durable-domain-binding",
+        blockingReason: "domain_not_verified",
+        recommendedAction: "verify-domain",
+      },
     });
     expect(summary.sourceErrors).toContainEqual(
       expect.objectContaining({
@@ -785,7 +805,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).toContain('"appaloftCertificateManaged": false');
   });
 
-  test("keeps missing access and unrequested runtime logs as section state", async () => {
+  test("[HEALTH-ACCESS-002] keeps missing access and unrequested runtime logs as section state", async () => {
     const context = createTestContext();
     const resourceWithoutAccess = resourceSummary();
     delete resourceWithoutAccess.accessSummary;
@@ -815,7 +835,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     );
   });
 
-  test("keeps proxy and runtime source failures inside copyable diagnostics", async () => {
+  test("[ACCESS-DIAG-004] keeps proxy and runtime source failures inside copyable diagnostics", async () => {
     const context = createTestContext();
     const { service } = createService({
       runtimeLogEvents: [

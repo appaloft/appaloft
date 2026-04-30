@@ -29,6 +29,7 @@ async function createCommandCaptureHarness(requestId: string) {
   const { createExecutionContext } = await import("@appaloft/application");
   const { createCliProgram } = await import("../src");
   const commands: AppCommand<unknown>[] = [];
+  const queries: AppQuery<unknown>[] = [];
   const commandBus = {
     execute: async <T>(_context: unknown, command: AppCommand<T>) => {
       commands.push(command as AppCommand<unknown>);
@@ -36,7 +37,10 @@ async function createCommandCaptureHarness(requestId: string) {
     },
   } as unknown as CommandBus;
   const queryBus = {
-    execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+      queries.push(query as AppQuery<unknown>);
+      return ok({} as T);
+    },
   } as unknown as QueryBus;
   const executionContextFactory: ExecutionContextFactory = {
     create: (input) =>
@@ -53,7 +57,7 @@ async function createCommandCaptureHarness(requestId: string) {
     executionContextFactory,
   });
 
-  return { commands, program };
+  return { commands, queries, program };
 }
 
 async function parseCli(program: { parseAsync(args: string[]): Promise<unknown> }, args: string[]) {
@@ -523,6 +527,93 @@ describe("CLI resource commands", () => {
     expect(queries[0]).toBeInstanceOf(ResourceEffectiveConfigQuery);
     expect(queries[0]).toMatchObject({
       resourceId: "res_demo",
+    });
+  });
+
+  test("[WEB-CLI-API-ACCESS-002] resource health dispatches the shared resource health query", async () => {
+    const { ResourceHealthQuery } = await import("@appaloft/application");
+    const { program, queries } = await createCommandCaptureHarness("req_cli_resource_health_test");
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "health",
+      "res_demo",
+      "--live",
+      "--checks",
+      "--public-access-probe",
+      "--runtime-probe",
+    ]);
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(ResourceHealthQuery);
+    expect(queries[0]).toMatchObject({
+      resourceId: "res_demo",
+      mode: "live",
+      includeChecks: true,
+      includePublicAccessProbe: true,
+      includeRuntimeProbe: true,
+    });
+  });
+
+  test("[WEB-CLI-API-ACCESS-002] resource proxy-config dispatches the shared proxy preview query", async () => {
+    const { ResourceProxyConfigurationPreviewQuery } = await import("@appaloft/application");
+    const { program, queries } = await createCommandCaptureHarness("req_cli_resource_proxy_test");
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "proxy-config",
+      "res_demo",
+      "--deployment",
+      "dep_demo",
+      "--scope",
+      "deployment-snapshot",
+      "--diagnostics",
+    ]);
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(ResourceProxyConfigurationPreviewQuery);
+    expect(queries[0]).toMatchObject({
+      resourceId: "res_demo",
+      deploymentId: "dep_demo",
+      routeScope: "deployment-snapshot",
+      includeDiagnostics: true,
+    });
+  });
+
+  test("[WEB-CLI-API-ACCESS-002] resource diagnose dispatches the shared diagnostic summary query", async () => {
+    const { ResourceDiagnosticSummaryQuery } = await import("@appaloft/application");
+    const { program, queries } = await createCommandCaptureHarness(
+      "req_cli_resource_diagnose_test",
+    );
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "diagnose",
+      "res_demo",
+      "--deployment",
+      "dep_demo",
+      "--deployment-logs",
+      "--runtime-logs",
+      "--proxy-configuration",
+      "--tail",
+      "7",
+    ]);
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(ResourceDiagnosticSummaryQuery);
+    expect(queries[0]).toMatchObject({
+      resourceId: "res_demo",
+      deploymentId: "dep_demo",
+      includeDeploymentLogTail: true,
+      includeRuntimeLogTail: true,
+      includeProxyConfiguration: true,
+      tailLines: 7,
     });
   });
 

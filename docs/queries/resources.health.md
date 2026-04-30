@@ -218,6 +218,11 @@ provider-neutral envelope is available. The query maps those `resource_access_*`
 `publicAccess`, `proxy`, `checks`, and `sourceErrors` without changing deployment state and without
 classifying outer gateway failures as aggregate `domain` errors.
 
+Public-access and proxy sections must use the route/access blocking reason vocabulary from
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+Unsupported, stale, or unavailable route observation is represented inside `ok(ResourceHealthSummary)`
+as typed section/source-error state rather than a deployment failure.
+
 ## Error Contract
 
 Whole-query failures are limited to invalid input, missing resource, permission failures, and

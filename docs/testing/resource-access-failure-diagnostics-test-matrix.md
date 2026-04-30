@@ -97,6 +97,18 @@ Then:
 | RES-ACCESS-DIAG-OBS-002 | integration | Edge failure appears in health | Known resource has public access edge failure | `resources.health` reports degraded public/proxy access | Latest deployment success does not override the edge failure. |
 | RES-ACCESS-DIAG-OBS-003 | integration | Existing cause code preserved | Route realization or health has structured cause code | Edge diagnostic includes `causeCode` | Original operation-owned error code remains unchanged. |
 
+## Shared Access Diagnostic Contract Matrix
+
+These rows are governed by
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+
+| Test ID | Preferred automation | Case | Input/read state | Expected query relationship | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| ACCESS-DIAG-001 | integration | Runtime not ready or health failing | Runtime is starting/stopped or required health check fails | Health and diagnostic summary report `runtime_not_ready` or `health_check_failing` | Runtime logs are evidence only; log text is not parsed as readiness. |
+| ACCESS-DIAG-002 | integration | Proxy route missing or stale | Route exists but proxy status is missing/stale/unapplied/failed | Proxy preview, health, and diagnostic summary use `proxy_route_missing` or `proxy_route_stale` | State remains route/access observation unless deployment execution failed. |
+| ACCESS-DIAG-003 | integration | Domain, DNS, or TLS blocking reason | Durable/custom route is not usable because domain, DNS, or TLS state is not ready | Descriptor/source errors use `domain_not_verified`, `dns_points_elsewhere`, `certificate_missing`, or `certificate_expired_or_not_active` | Recommended action is diagnostic/fix guidance, not a hidden mutation. |
+| ACCESS-DIAG-004 | integration | Copy-safe diagnostic payload | Access diagnostic has provider/native/raw inputs that may contain secrets | Copy JSON contains stable ids, codes, phases, request ids, and safe route metadata only | Raw provider SDK payloads, private keys, env values, headers/cookies, internal coordinates, and raw command output are absent. |
+
 ## Redaction Matrix
 
 | Test ID | Preferred automation | Sensitive source | Expected result |

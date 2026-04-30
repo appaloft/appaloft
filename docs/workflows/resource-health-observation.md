@@ -172,6 +172,13 @@ Examples:
   health also proves an internal failure.
 - No health policy configured: `overall = unknown`, policy status is `not-configured`.
 
+Route/access blocking reasons must use the shared route intent/status vocabulary from
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+Runtime-not-ready, health-check-failing, proxy-route-missing/stale, domain-not-verified,
+certificate-missing/expired/not-active, DNS-points-elsewhere, server-applied-route-unavailable, and
+observation-unavailable cases are health/read-model diagnostics unless the deployment execution
+workflow itself failed.
+
 Whole-query `err(DomainError)` is reserved for:
 
 - invalid input;

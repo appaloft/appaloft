@@ -282,6 +282,14 @@ Consumers that need one current public route, such as `resources.health`,
 separately so Web, CLI, API, and future MCP clients can explain why a generated/default URL is
 present but not the current selected route.
 
+Route intent/status descriptors are governed by
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+The descriptor vocabulary is the shared read contract for generated access, durable domain routes,
+server-applied routes, deployment snapshot routes, proxy preview, health, runtime log availability,
+and diagnostic copy. Descriptor-compatible state is read-model observation: unavailable or
+unsupported route/access observations must become typed route status/source-error states rather
+than deployment failures unless the deployment workflow itself failed.
+
 ## Error Semantics
 
 Admission-time route resolution failures return `err(DomainError)` only when the deployment request cannot be safely accepted.

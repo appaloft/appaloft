@@ -276,6 +276,14 @@ The configuration view may include provider-specific sections such as:
 
 These sections are read-model output. They are not aggregate state and must not be accepted back as command input.
 
+The route list and route readiness/status in the configuration view must align with the shared
+route intent/status descriptor contract in
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+Provider-rendered sections may remain provider-specific, but the wrapper route source, selected
+route precedence, proxy applied status, blocking reason, recommended action, and copy-safe
+diagnostic fields must use the provider-neutral contract shared with `resources.health` and
+`resources.diagnostic-summary`.
+
 ## Edge Request Failure Diagnostics
 
 Concrete edge proxy providers may observe gateway-generated failures while serving public resource

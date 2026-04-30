@@ -106,6 +106,9 @@ Required behavior:
   `generatedAccessMode` and normalized generated route `pathPrefix`.
 - `accessSummary` reports resource-owned access state from read models. It must not infer domain
   ownership from deployment snapshots.
+- `accessSummary` may include descriptor-compatible route intent/status details for generated
+  access, durable domain routes, server-applied routes, and deployment snapshot context as governed
+  by [Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
 - `latestDeployment` is contextual history only. It must not override resource lifecycle or health.
 - `lifecycle.status` is one of `active`, `archived`, or `deleted` where deleted may only appear in
   retained audit/read models. Active read paths should normally return `not_found` after deletion.

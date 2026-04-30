@@ -93,6 +93,12 @@ When a durable domain binding exists but is not ready, diagnostic access must su
 as the blocking fact with a stable source error instead of quietly treating fallback generated or
 server-applied URLs as the selected public route.
 
+Access and proxy sections must use the shared route intent/status descriptor vocabulary governed by
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+The diagnostic summary may include selected-route and context-route facts, but canonical copy JSON
+must stay copy-safe and exclude secrets, raw provider SDK payloads, private keys, environment
+values, request headers/cookies, internal network coordinates, and raw command output.
+
 The query service may depend on existing query services or read-model ports, but Web components,
 CLI commands, and HTTP handlers must not manually reconstruct the diagnostic payload by calling many
 separate endpoints and merging ad hoc shapes.

@@ -115,6 +115,27 @@ Then:
 | DEF-ACCESS-QRY-004 | integration | New resource draft not persisted | Entry workflow has source/network draft but no resource id | No resource access summary exists yet | None | No `ResourceAccessSummary` projection | Entry may show draft values but must not claim a realized route | No |
 | DEF-ACCESS-QRY-005 | integration | Provider disabled before first deploy | Resource is persisted but provider returns disabled | Resource query succeeds | None | No planned generated route | UI shows no generated access URL and may point to domain binding workflow | No |
 
+## Route Intent Descriptor Matrix
+
+These rows are governed by
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+
+| Test ID | Preferred automation | Case | Input/state | Expected descriptor/selection | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| ROUTE-INTENT-001 | integration | Generated access route descriptor | Planned or latest generated access route exists | Descriptor source is `generated-default-access`; route remains context when a higher-precedence route exists | Generated route is visible but not treated as a durable domain binding. |
+| ROUTE-INTENT-002 | integration | Durable route descriptor wins | Ready durable, server-applied, and generated routes all exist | Selected route source is `durable-domain-binding` | Durable route wins current-route precedence across access summary consumers. |
+| ROUTE-INTENT-003 | integration | Server-applied route descriptor wins | Server-applied and generated routes exist, with no selected durable route | Selected route source is `server-applied-route` | Server-applied route wins over generated access without creating managed domain/certificate state. |
+| ROUTE-INTENT-004 | integration | Deployment snapshot route is historical | Caller requests deployment snapshot route scope | Descriptor source is `deployment-snapshot-route` and selected-current route remains resource-owned | Historical snapshot route does not overwrite current resource access. |
+
+## Route Status Diagnostic Matrix
+
+| Test ID | Preferred automation | Case | Input/state | Expected status | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| ROUTE-STATUS-001 | integration | Proxy route unavailable | Proxy route is missing, stale, not-ready, or failed | Descriptor status is typed as unavailable/stale/failed with `proxy_route_missing` or `proxy_route_stale` | State is read-model diagnostic, not deployment admission failure unless execution itself failed. |
+| ROUTE-STATUS-002 | integration | Non-ready durable route blocks access | Durable domain binding is pending/not ready and fallback routes exist | Selected descriptor has durable source and blocking reason `domain_not_verified` or owning durable-domain reason | Fallback routes stay context and do not hide the durable route. |
+| ROUTE-STATUS-003 | integration | TLS/certificate route status draft | Route needs certificate coverage but certificate is missing, expired, or inactive | Descriptor TLS state is `missing`, `expired`, `pending`, or `failed` with a stable blocking reason | Future certificate lifecycle can consume the same read contract without changing route precedence. |
+| ROUTE-STATUS-004 | integration | Observation unavailable | Provider/runtime/access observation cannot be read safely | Descriptor/source error uses `observation_unavailable` | Whole query still succeeds when safe route/resource context is available. |
+
 ## Provider Boundary Matrix
 
 | Test ID | Preferred automation | Case | Expected assertion |

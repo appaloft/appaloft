@@ -39,6 +39,7 @@ import { ResourceProxyConfigurationPreviewQuery } from "./resource-proxy-configu
 import { type ResourceProxyConfigurationPreviewQueryService } from "./resource-proxy-configuration-preview.query-service";
 import { ResourceRuntimeLogsQuery } from "./resource-runtime-logs.query";
 import { type ResourceRuntimeLogsQueryService } from "./resource-runtime-logs.query-service";
+import { routeIntentStatusDescriptors, selectedRouteIntentStatus } from "./route-intent-status";
 
 type DiagnosticSummaryCore = Omit<ResourceDiagnosticSummary, "copy">;
 
@@ -531,6 +532,16 @@ export class ResourceDiagnosticSummaryQueryService {
       );
     }
 
+    const selectedRoute = selectedRouteIntentStatus({
+      resourceId: resource.id,
+      accessSummary: access,
+      domainBindings: blockingDurableBinding ? [blockingDurableBinding] : [],
+    });
+    const routeIntentStatuses = routeIntentStatusDescriptors({
+      resourceId: resource.id,
+      accessSummary: access,
+    });
+
     return {
       status,
       ...(access?.latestGeneratedAccessRoute?.url
@@ -545,6 +556,8 @@ export class ResourceDiagnosticSummaryQueryService {
       ...(access?.plannedGeneratedAccessRoute?.url
         ? { plannedUrl: access.plannedGeneratedAccessRoute.url }
         : {}),
+      ...(selectedRoute ? { selectedRoute } : {}),
+      ...(routeIntentStatuses.length > 0 ? { routeIntentStatuses } : {}),
       ...(access?.proxyRouteStatus ? { proxyRouteStatus: access.proxyRouteStatus } : {}),
       ...(access?.lastRouteRealizationDeploymentId
         ? { lastRouteRealizationDeploymentId: access.lastRouteRealizationDeploymentId }

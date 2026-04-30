@@ -120,6 +120,13 @@ Raw provider logs, raw reverse-proxy error text, container names, internal IP ad
 ports that are not already part of safe route metadata, filesystem paths, headers, cookies, tokens,
 environment variables, and unredacted application output must not be included.
 
+When a route can be safely associated with the failure, the `route` object must align with the
+shared route intent/status descriptor contract in
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+Request-time diagnostics remain observation. They may set blocking reasons such as
+`proxy_route_missing`, `proxy_route_stale`, `runtime_not_ready`, or `observation_unavailable`, but
+they must not mutate deployment, route, domain binding, certificate, proxy, or health state.
+
 ## Classification Rules
 
 Classification starts from the provider-neutral signal, not from user-facing text.
