@@ -236,6 +236,17 @@ Runtime target-specific state must be normalized before it reaches existing read
 - `resources.diagnostic-summary` may include safe target identifiers and rendered command/manifest
   summaries for support, with secrets redacted.
 
+## Supported Catalog Acceptance Harness
+
+The zero-to-SSH supported catalog harness proves that every Phase 5 supported planner or
+container-native artifact path reaches the runtime target boundary through the same provider-neutral
+contract. Harness coverage must select target backends by `targetKind`, `providerKey`, and required
+capabilities before acceptance, then assert render/apply/verify/log observation expectations
+without making Docker, SSH, or provider-specific fields part of `deployments.create`.
+
+Default harness coverage may use fake/local/generic-SSH descriptors and typed command rendering.
+Real local Docker and generic-SSH execution remain opt-in smoke layers governed by the test matrix.
+
 ## Failure Semantics
 
 Target backend selection failure before safe deployment acceptance is an admission error in phase
