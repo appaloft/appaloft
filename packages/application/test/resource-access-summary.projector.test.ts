@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { projectResourceAccessSummary } from "../src/operations/resources/resource-access-summary.projector";
+import {
+  routeIntentStatusDescriptors,
+  selectedRouteIntentStatus,
+} from "../src/operations/resources/route-intent-status";
 
 describe("projectResourceAccessSummary", () => {
   test("projects the latest generated access route separately from deployment history", () => {
@@ -315,6 +319,102 @@ describe("projectResourceAccessSummary", () => {
       deploymentId: "dep_server_applied",
     });
     expect(summary?.lastRouteRealizationDeploymentId).toBe("dep_durable");
+  });
+
+  test("[ROUTE-INTENT-001][ROUTE-INTENT-002][ROUTE-INTENT-003] builds descriptor-compatible route sources in precedence order", () => {
+    const accessSummary = {
+      latestDurableDomainRoute: {
+        url: "https://durable.example.test",
+        hostname: "durable.example.test",
+        scheme: "https" as const,
+        deploymentId: "dep_durable",
+        deploymentStatus: "succeeded" as const,
+        pathPrefix: "/",
+        proxyKind: "traefik" as const,
+        targetPort: 3000,
+        updatedAt: "2026-01-01T00:00:03.000Z",
+      },
+      latestServerAppliedDomainRoute: {
+        url: "https://server-applied.example.test",
+        hostname: "server-applied.example.test",
+        scheme: "https" as const,
+        deploymentId: "dep_server_applied",
+        deploymentStatus: "succeeded" as const,
+        pathPrefix: "/",
+        proxyKind: "traefik" as const,
+        targetPort: 3000,
+        updatedAt: "2026-01-01T00:00:02.000Z",
+      },
+      latestGeneratedAccessRoute: {
+        url: "http://generated.example.test",
+        hostname: "generated.example.test",
+        scheme: "http" as const,
+        providerKey: "sslip",
+        deploymentId: "dep_generated",
+        deploymentStatus: "succeeded" as const,
+        pathPrefix: "/",
+        proxyKind: "traefik" as const,
+        targetPort: 3000,
+        updatedAt: "2026-01-01T00:00:01.000Z",
+      },
+      proxyRouteStatus: "ready" as const,
+      lastRouteRealizationDeploymentId: "dep_durable",
+    };
+
+    const descriptors = routeIntentStatusDescriptors({
+      resourceId: "res_web",
+      accessSummary,
+    });
+
+    expect(descriptors.map((descriptor) => descriptor.source)).toEqual([
+      "durable-domain-binding",
+      "server-applied-route",
+      "generated-default-access",
+    ]);
+    expect(selectedRouteIntentStatus({ resourceId: "res_web", accessSummary })).toMatchObject({
+      source: "durable-domain-binding",
+      intent: {
+        host: "durable.example.test",
+        protocol: "https",
+      },
+      proxy: {
+        applied: "ready",
+      },
+      recommendedAction: "none",
+    });
+  });
+
+  test("[ROUTE-STATUS-001][ROUTE-STATUS-004] maps route status observations to typed blocking reasons", () => {
+    const descriptor = selectedRouteIntentStatus({
+      resourceId: "res_web",
+      accessSummary: {
+        latestGeneratedAccessRoute: {
+          url: "http://generated.example.test",
+          hostname: "generated.example.test",
+          scheme: "http",
+          providerKey: "sslip",
+          deploymentId: "dep_generated",
+          deploymentStatus: "succeeded",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          targetPort: 3000,
+          updatedAt: "2026-01-01T00:00:01.000Z",
+        },
+        proxyRouteStatus: "failed",
+        lastRouteRealizationDeploymentId: "dep_generated",
+      },
+    });
+
+    expect(descriptor).toMatchObject({
+      source: "generated-default-access",
+      blockingReason: "proxy_route_stale",
+      recommendedAction: "inspect-proxy-preview",
+      copySafeSummary: {
+        status: "failed",
+        code: "proxy_route_stale",
+        phase: "route-status-observation",
+      },
+    });
   });
 
   test("[EDGE-PROXY-ROUTE-005] projects latest server-applied config domain route", () => {

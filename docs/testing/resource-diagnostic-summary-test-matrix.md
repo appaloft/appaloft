@@ -87,6 +87,21 @@ Then:
 | RES-DIAG-QRY-017 | integration | Access precedence summary | Durable ready, server-applied, and generated routes are all present | `ok` with access and proxy sections available | None | Copy payload preserves separate route URLs and proxy/provider context uses durable, server-applied, latest generated, then planned generated precedence for the selected route. |
 | RES-DIAG-QRY-018 | integration | Non-ready durable access | Durable domain binding exists but is not ready while generated or server-applied fallback route data exists | `ok` with access unavailable | `resource_domain_binding_not_ready` | Access section keeps fallback URLs as context but reports the non-ready durable binding as the blocking selected route. |
 
+## Shared Route/Access Diagnostic Matrix
+
+These rows are governed by
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+
+| Test ID | Preferred automation | Case | Input/read state | Expected result | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| ACCESS-DIAG-001 | integration | Runtime or health blocking reason | Runtime is not ready or required health check is failing | Diagnostic access/source error uses `runtime_not_ready` or `health_check_failing` when route cannot be confirmed | Diagnostic summary does not parse runtime log text as health proof. |
+| ACCESS-DIAG-002 | integration | Proxy route blocking reason | Proxy route missing, stale, unapplied, or failed | Diagnostic access/proxy/source error uses `proxy_route_missing` or `proxy_route_stale` | Proxy preview and diagnostics share route source/status. |
+| ACCESS-DIAG-003 | integration | Domain/DNS/TLS blocking reason | Domain verification, DNS, or certificate state blocks access | Diagnostic access/source error uses stable blocking reason and recommended action | Future domain/certificate lifecycle commands can attach without redefining copy shape. |
+| ACCESS-DIAG-004 | integration | Copy-safe route/access payload | Diagnostic inputs contain provider/native/raw or secret-bearing detail | `copy.json` omits unsafe material and preserves stable ids/codes/phases | Copy payload is safe for support/debug sharing. |
+| WEB-CLI-API-ACCESS-001 | e2e-preferred | API/oRPC route/access contract | HTTP/oRPC diagnostic, health, proxy, and resource reads are queried | Responses expose shared route/access fields and do not define transport-only business shapes | Generated/durable/server-applied/snapshot source labels are preserved. |
+| WEB-CLI-API-ACCESS-002 | e2e-preferred | CLI route/access contract | CLI show/health/proxy-config/diagnose commands run | CLI output is derived from shared query results | CLI does not invent separate precedence or route status names. |
+| WEB-CLI-API-ACCESS-003 | e2e-preferred | Web route/access contract | Web resource detail renders access/proxy/health/diagnostics | Web selects display route from shared helper/query fields | Business route precedence is not hidden in page-only Svelte logic. |
+
 ## Entrypoint Matrix
 
 | Test ID | Preferred automation | Entrypoint | Case | Expected behavior |

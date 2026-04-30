@@ -1566,6 +1566,101 @@ export interface ResourceAccessSummary {
   lastRouteRealizationDeploymentId?: string;
 }
 
+export type RouteIntentStatusSource =
+  | "generated-default-access"
+  | "durable-domain-binding"
+  | "server-applied-route"
+  | "deployment-snapshot-route";
+
+export type RouteAccessBlockingReason =
+  | "runtime_not_ready"
+  | "health_check_failing"
+  | "proxy_route_missing"
+  | "proxy_route_stale"
+  | "domain_not_verified"
+  | "certificate_missing"
+  | "certificate_expired_or_not_active"
+  | "dns_points_elsewhere"
+  | "server_applied_route_unavailable"
+  | "observation_unavailable";
+
+export interface RouteIntentStatusDescriptor {
+  schemaVersion: "route-intent-status/v1";
+  routeId: string;
+  diagnosticId: string;
+  source: RouteIntentStatusSource;
+  intent: {
+    host: string;
+    pathPrefix: string;
+    protocol: "http" | "https";
+    routeBehavior: "serve" | "redirect";
+    redirectTo?: string;
+    redirectStatus?: 301 | 302 | 307 | 308;
+  };
+  context: {
+    resourceId: string;
+    deploymentId?: string;
+    serverId?: string;
+    destinationId?: string;
+    runtimeTargetKind?: string;
+  };
+  proxy: {
+    intent: "not-required" | "required" | "unknown";
+    applied:
+      | "not-configured"
+      | "planned"
+      | "applied"
+      | "ready"
+      | "not-ready"
+      | "stale"
+      | "failed"
+      | "unknown";
+    providerKey?: string;
+  };
+  domainVerification: "not-applicable" | "pending" | "verified" | "failed" | "unknown";
+  tls:
+    | "not-applicable"
+    | "disabled"
+    | "pending"
+    | "active"
+    | "missing"
+    | "expired"
+    | "failed"
+    | "unknown";
+  runtimeHealth: ResourceHealthOverall;
+  latestObservation?: {
+    source:
+      | "resource-access-summary"
+      | "proxy-preview"
+      | "resource-health"
+      | "runtime-logs"
+      | "access-failure-diagnostic"
+      | "deployment-snapshot";
+    observedAt?: string;
+    requestId?: string;
+    deploymentId?: string;
+  };
+  blockingReason?: RouteAccessBlockingReason;
+  recommendedAction:
+    | "none"
+    | "wait"
+    | "check-health"
+    | "inspect-logs"
+    | "inspect-proxy-preview"
+    | "diagnostic-summary"
+    | "verify-domain"
+    | "fix-dns"
+    | "provide-certificate"
+    | "repair-proxy"
+    | "manual-review";
+  copySafeSummary: {
+    status: "available" | "unavailable" | "not-ready" | "failed" | "stale" | "unknown";
+    code?: string;
+    phase?: string;
+    message: string;
+  };
+}
+
 export interface ResourceDetailIdentity {
   id: string;
   projectId: string;
@@ -1815,6 +1910,7 @@ export interface ResourcePublicAccessHealthSection {
   kind?: "durable-domain" | "server-applied-domain" | "generated-latest" | "generated-planned";
   reasonCode?: string;
   phase?: string;
+  routeIntentStatus?: RouteIntentStatusDescriptor;
 }
 
 export interface ResourceProxyHealthSection {
@@ -2119,6 +2215,8 @@ export interface ResourceDiagnosticAccess {
   durableUrl?: string;
   serverAppliedUrl?: string;
   plannedUrl?: string;
+  selectedRoute?: RouteIntentStatusDescriptor;
+  routeIntentStatuses?: RouteIntentStatusDescriptor[];
   proxyRouteStatus?: ResourceAccessSummary["proxyRouteStatus"];
   lastRouteRealizationDeploymentId?: string;
   reasonCode?: string;

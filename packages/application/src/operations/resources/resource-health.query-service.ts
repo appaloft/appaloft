@@ -43,6 +43,7 @@ import {
 } from "./durable-domain-observation";
 import { type ListResourcesQueryService } from "./list-resources.query-service";
 import { type ResourceHealthQuery } from "./resource-health.query";
+import { selectedRouteIntentStatus } from "./route-intent-status";
 
 type DeploymentTerminalStatus = "succeeded" | "failed" | "canceled" | "rolled-back";
 
@@ -376,6 +377,12 @@ function publicAccessSection(
   const nonReadyDurableBinding = currentNonReadyDurableDomainBinding(domainBindings, access);
 
   if (nonReadyDurableBinding) {
+    const routeIntentStatus = selectedRouteIntentStatus({
+      resourceId: resource.id,
+      accessSummary: access,
+      domainBindings: [nonReadyDurableBinding],
+    });
+
     sourceErrors.push(
       sourceError({
         source: "domain-binding",
@@ -395,6 +402,7 @@ function publicAccessSection(
       kind: "durable-domain",
       reasonCode: "resource_domain_binding_not_ready",
       phase: "public-access-observation",
+      ...(routeIntentStatus ? { routeIntentStatus } : {}),
     };
   }
 
@@ -441,12 +449,18 @@ function publicAccessSection(
     };
   }
 
+  const routeIntentStatus = selectedRouteIntentStatus({
+    resourceId: resource.id,
+    accessSummary: access,
+  });
+
   switch (access?.proxyRouteStatus) {
     case "ready":
       return {
         status: "ready",
         url: route.url,
         ...(kind ? { kind } : {}),
+        ...(routeIntentStatus ? { routeIntentStatus } : {}),
       };
     case "failed":
       sourceErrors.push(
@@ -468,6 +482,7 @@ function publicAccessSection(
         ...(kind ? { kind } : {}),
         reasonCode: "resource_public_access_probe_failed",
         phase: "public-access-observation",
+        ...(routeIntentStatus ? { routeIntentStatus } : {}),
       };
     case "not-ready":
       return {
@@ -476,6 +491,7 @@ function publicAccessSection(
         ...(kind ? { kind } : {}),
         reasonCode: "resource_public_access_not_ready",
         phase: "public-access-observation",
+        ...(routeIntentStatus ? { routeIntentStatus } : {}),
       };
     case "unknown":
     case undefined:
@@ -484,6 +500,7 @@ function publicAccessSection(
         url: route.url,
         ...(kind ? { kind } : {}),
         reasonCode: "resource_public_access_not_observed",
+        ...(routeIntentStatus ? { routeIntentStatus } : {}),
       };
   }
 }

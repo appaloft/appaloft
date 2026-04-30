@@ -407,7 +407,7 @@ describe("ResourceHealthQueryService", () => {
     );
   });
 
-  test("[RES-HEALTH-QRY-020][EDGE-PROXY-ROUTE-005] reports server-applied domain before generated route", async () => {
+  test("[RES-HEALTH-QRY-020][EDGE-PROXY-ROUTE-005][HEALTH-ACCESS-001] reports server-applied domain before generated route", async () => {
     const service = createService({
       resources: [
         resourceSummary({
@@ -450,6 +450,10 @@ describe("ResourceHealthQueryService", () => {
       status: "ready",
       url: "https://www.example.test",
       kind: "server-applied-domain",
+      routeIntentStatus: {
+        source: "server-applied-route",
+        recommendedAction: "none",
+      },
     });
     expect(summary.proxy).toMatchObject({
       status: "ready",
@@ -514,7 +518,7 @@ describe("ResourceHealthQueryService", () => {
     });
   });
 
-  test("[RES-HEALTH-QRY-015] reports non-ready durable domain before generated fallback", async () => {
+  test("[RES-HEALTH-QRY-015][ROUTE-STATUS-002][HEALTH-ACCESS-001] reports non-ready durable domain before generated fallback", async () => {
     const service = createService({
       domainBindings: [
         {
@@ -546,6 +550,11 @@ describe("ResourceHealthQueryService", () => {
         url: "https://pending.example.test",
         kind: "durable-domain",
         reasonCode: "resource_domain_binding_not_ready",
+        routeIntentStatus: {
+          source: "durable-domain-binding",
+          blockingReason: "domain_not_verified",
+          recommendedAction: "verify-domain",
+        },
       },
     });
     expect(result._unsafeUnwrap().sourceErrors).toContainEqual(
@@ -558,7 +567,7 @@ describe("ResourceHealthQueryService", () => {
     );
   });
 
-  test("degrades current health when public access or proxy route state failed", async () => {
+  test("[ACCESS-DIAG-002][HEALTH-ACCESS-001][HEALTH-ACCESS-003] degrades current health when public access or proxy route state failed", async () => {
     const service = createService({
       resources: [
         resourceSummary({
@@ -588,6 +597,10 @@ describe("ResourceHealthQueryService", () => {
     const summary = result._unsafeUnwrap();
     expect(summary.overall).toBe("degraded");
     expect(summary.publicAccess.status).toBe("failed");
+    expect(summary.publicAccess.routeIntentStatus).toMatchObject({
+      blockingReason: "proxy_route_stale",
+      recommendedAction: "inspect-proxy-preview",
+    });
     expect(summary.proxy.status).toBe("failed");
     expect(summary.sourceErrors).toEqual(
       expect.arrayContaining([
@@ -698,7 +711,7 @@ describe("ResourceHealthQueryService", () => {
     });
   });
 
-  test("[RES-HEALTH-QRY-010] marks live HTTP policy failure as unhealthy", async () => {
+  test("[RES-HEALTH-QRY-010][ACCESS-DIAG-001] marks live HTTP policy failure as unhealthy", async () => {
     const probeRunner = new StaticResourceHealthProbeRunner({
       name: "health-policy",
       target: "runtime",
