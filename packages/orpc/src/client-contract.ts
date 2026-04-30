@@ -25,6 +25,7 @@ import {
   type DeleteServerCommandInput,
   type DeleteSshCredentialCommandInput,
   type DeploymentLogsQueryInput,
+  type DeploymentPlanQueryInput,
   type DeploymentRecoveryReadinessQueryInput,
   type DiffEnvironmentsQueryInput,
   type EnvironmentEffectivePrecedenceQueryInput,
@@ -98,6 +99,7 @@ import {
   type DeploymentEventStreamResponse,
   type DeploymentEventStreamStreamResponse,
   type DeploymentLogsResponse,
+  type DeploymentPlanResponse,
   type DeploymentProgressEvent,
   type DeploymentRecoveryReadinessResponse,
   type DiffEnvironmentResponse,
@@ -550,6 +552,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ShowDeploymentQueryInput,
       ShowDeploymentResponse,
+      AppaloftClientError
+    >;
+    plan: Client<
+      AppaloftClientContext,
+      DeploymentPlanQueryInput,
+      DeploymentPlanResponse,
       AppaloftClientError
     >;
     recoveryReadiness: Client<

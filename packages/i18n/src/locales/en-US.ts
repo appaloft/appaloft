@@ -696,6 +696,21 @@ export const enUS = {
       newDeploymentTargetDescription:
         "Choose only the server and destination for this deployment attempt.",
       newDeploymentTargetTitle: "Deployment target",
+      newDeploymentPlanAction: "Preview plan",
+      newDeploymentPlanPending: "Planning",
+      newDeploymentPlanTitle: "Plan preview",
+      newDeploymentPlanDescription:
+        "Read-only detect and plan output. This does not create a deployment or change runtime state.",
+      newDeploymentPlanErrorTitle: "Unable to preview plan",
+      newDeploymentPlanReady: "Ready to deploy",
+      newDeploymentPlanWarning: "Ready with warnings",
+      newDeploymentPlanBlocked: "Blocked",
+      newDeploymentPlanPlanner: "Planner",
+      newDeploymentPlanArtifact: "Artifact",
+      newDeploymentPlanCommands: "Commands",
+      newDeploymentPlanNoCommands: "No command specs in this plan.",
+      newDeploymentPlanNetworkHealth: "Network and health",
+      newDeploymentPlanReasons: "Warnings and unsupported reasons",
       openGeneratedAccess: "Open access URL",
       noDomainBindings:
         "This resource has no custom domain bindings yet. Default access appears in the access area.",

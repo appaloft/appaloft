@@ -303,6 +303,31 @@ export const publicDocsHelpTopics = {
     relatedOperation: "source-links.relink",
     aliases: ["relink", "source link", "move repository", "重新关联来源"],
   },
+  "deployment.plan-preview": {
+    id: "deployment.plan-preview",
+    title: "Deployment plan preview",
+    description:
+      "How to inspect detected framework evidence, planner selection, commands, network, health, access routing, and unsupported reasons before execution.",
+    page: {
+      "zh-CN": "deploy/lifecycle",
+      "en-US": "en/deploy/lifecycle",
+    },
+    anchor: "deployment-plan-preview",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "deployments.plan",
+    aliases: ["plan preview", "detect plan", "dry run", "部署计划预览", "部署前检查"],
+    specReferences: [
+      "docs/specs/013-deployment-plan-preview/spec.md",
+      "docs/queries/deployments.plan.md",
+      "docs/testing/deployment-plan-preview-test-matrix.md",
+      "docs/workflows/workload-framework-detection-and-planning.md",
+    ],
+    webSurfaces: ["apps/web deployment creation and resource detail plan preview surfaces"],
+  },
   "deployment.recovery-readiness": {
     id: "deployment.recovery-readiness",
     title: "Deployment recovery readiness",
@@ -1455,6 +1480,7 @@ export const publicDocsOperationCoverage = [
   { operationKey: "deployments.create", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.list", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.show", status: "documented", topicId: "deployment.lifecycle" },
+  { operationKey: "deployments.plan", status: "documented", topicId: "deployment.plan-preview" },
   {
     operationKey: "deployments.recovery-readiness",
     status: "documented",

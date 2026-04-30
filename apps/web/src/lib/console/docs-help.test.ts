@@ -41,6 +41,9 @@ describe("console docs help links", () => {
 
   test("[PUB-DOCS-010] Web help hrefs cover owner-scoped console surfaces", () => {
     expect(webDocsHrefs.deploymentLifecycle).toBe("/docs/deploy/lifecycle/#deployment-lifecycle");
+    expect(webDocsHrefs.deploymentPlanPreview).toBe(
+      "/docs/deploy/lifecycle/#deployment-plan-preview",
+    );
     expect(webDocsHrefs.serverProxyReadiness).toBe(
       "/docs/servers/operations/proxy-and-terminal/#server-proxy-readiness",
     );
@@ -118,6 +121,11 @@ describe("console docs help links", () => {
         "routes/projects/[projectId]/environments/[environmentId]/resources/[resourceId]/deployments/new/+page.svelte"
       ],
     ).toContain("deploymentLifecycle");
+    expect(
+      sourceByPath[
+        "routes/projects/[projectId]/environments/[environmentId]/resources/[resourceId]/deployments/new/+page.svelte"
+      ],
+    ).toContain("deploymentPlanPreview");
     expect(sourceByPath["routes/servers/+page.svelte"]).toContain("defaultAccessPolicy");
     expect(sourceByPath["routes/servers/+page.svelte"]).toContain(
       "orpcClient.defaultAccessDomainPolicies.show",

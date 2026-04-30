@@ -495,6 +495,8 @@ Already done:
 - [x] Web, CLI, and repository config now share the same Quick Deploy resource draft vocabulary for
   source/runtime/network/health profile fields, with acceptance coverage proving those fields enter
   `resources.create` or resource runtime configuration before ids-only deployment admission.
+- [x] `deployments.plan` is active as a read-only deployment plan preview query across application,
+  operation catalog, HTTP/oRPC, CLI, Web, and public docs/help.
 - [x] Fixture-by-fixture headless deploy smoke now proves the current supported
   JavaScript/TypeScript/Python fixture catalog resource profiles resolve to Docker/OCI image plans,
   generated Dockerfiles, docker-container execution metadata, internal HTTP verification steps, and
@@ -513,6 +515,10 @@ Required:
   planning as Docker/OCI artifact paths.
 - [x] Make Next.js first-class across SSR, standalone, and static-export modes.
 - [x] Add useful Next.js app/pages router and output detection where it affects planning.
+- [x] Implement `deployments.plan` across application, operation catalog, HTTP/oRPC, CLI, Web,
+  public docs/help, and targeted tests so users can inspect detected evidence, planner selection,
+  artifact kind, command specs, port/health/access plan, warnings, and unsupported reasons before
+  execution.
 - [ ] Promote JavaScript/TypeScript support to a tested catalog: Next.js, Remix, Nuxt, SvelteKit,
   Astro, Vite, React, Vue, Svelte, Solid, Angular, Express, Fastify, NestJS, Hono, Koa, and generic
   package scripts.

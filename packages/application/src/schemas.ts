@@ -6,6 +6,7 @@ export * from "./operations/default-access-domain-policies/list-default-access-d
 export * from "./operations/default-access-domain-policies/show-default-access-domain-policy.schema";
 export * from "./operations/deployments/create-deployment.schema";
 export * from "./operations/deployments/deployment-logs.schema";
+export * from "./operations/deployments/deployment-plan.schema";
 export * from "./operations/deployments/deployment-recovery-readiness.schema";
 export * from "./operations/deployments/list-deployments.schema";
 export * from "./operations/deployments/show-deployment.schema";
