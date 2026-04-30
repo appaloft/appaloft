@@ -829,6 +829,9 @@ function supportTier(
   ) {
     return "container-native";
   }
+  if (buildStrategy === "buildpack" || plannerKey === "buildpack") {
+    return "buildpack-accelerated";
+  }
   if (plannerKey === "custom") {
     return "custom";
   }
