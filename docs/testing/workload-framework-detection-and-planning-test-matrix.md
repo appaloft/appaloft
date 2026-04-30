@@ -335,8 +335,8 @@ catalog.
 Implemented planner code paths currently include Next.js, Vite static, Astro static, Nuxt generate
 static, explicit SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python,
 generic Java, and custom command fallback. Executable matrix coverage exists for the named fixtures
-and focused planner tests listed below; generic Java still lacks a matrix-named fixture or focused
-planner test and remains a coverage gap until one is added.
+and focused planner tests listed below; generic Java is now covered by the `generic-java-jar`
+fixture through `WF-PLAN-JVM-006`, `WF-PLAN-JVM-015`, and `ZSSH-CATALOG-012`.
 
 Executable coverage now includes first-slice `applicationShape` propagation for
 `WF-PLAN-DET-007`, Node manifest package-manager precedence coverage for `WF-PLAN-DET-001`, and

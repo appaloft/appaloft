@@ -25,7 +25,7 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
 - [x] Use this roadmap to choose the release version.
 - [x] Before the next release, verify package manifests, Release Please state, and the latest
   published release agree on the current version line. The roadmap starts from the current public
-  line `0.5.x` because the current release is `0.5.0`.
+  line `0.6.x` because the current release is `0.6.0`.
 
 Version selection rules:
 
@@ -43,11 +43,11 @@ Version selection rules:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-04-27, the latest public release is `v0.5.0`; root package
-  and Release Please manifest on `main` are `0.5.0`; the release PR target is
-  `0.6.0`.
-- [x] On 2026-04-27, the roadmap gate allows `Release-As: 0.6.0` because
-  Phase 0 through Phase 4 release rules, required items, and exit criteria are checked.
+- [x] On 2026-04-30, the latest public release is `v0.6.0`; root package
+  and Release Please manifest on `main` are `0.6.0`; the release PR target is
+  `0.7.0`.
+- [x] On 2026-04-30, the roadmap gate allows `Release-As: 0.7.0` because
+  Phase 0 through Phase 5 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
 Historical alignment notes:
@@ -477,7 +477,7 @@ Target: `0.7.0`.
 
 Release rule:
 
-- [ ] Select `0.7.0` only when all required Phase 5 items, earlier phase items, and exit criteria
+- [x] Select `0.7.0` only when all required Phase 5 items, earlier phase items, and exit criteria
   are checked. If any Phase 5 item remains unchecked, release a `0.6.x` patch instead.
 
 Already done:
@@ -560,6 +560,28 @@ Exit criteria:
   ambiguous build-tool evidence, missing build tool, missing runnable jar, actuator health
   defaults, and internal-port behavior to stable matrix ids, headless Docker/OCI fixture readiness
   tests, and `deployments.plan/v1` contract coverage.
+
+Phase 5 release-gate verification notes from 2026-04-30:
+
+- `0.7.0` is not published yet. The local package manifest, Release Please manifest, and latest
+  public GitHub Release all remain on `0.6.0`, and the Phase 5 gate base is PR #145
+  (`feat: add zero-to-ssh catalog acceptance harness`).
+- The supported catalog contract is closed by
+  `docs/specs/019-zero-to-ssh-supported-catalog-acceptance-harness`, the
+  `ZSSH-CATALOG-*`, `ZSSH-PREVIEW-*`, `ZSSH-CREATE-*`, and `ZSSH-RUNTIME-*` matrix rows, and the
+  hermetic `zero-to-SSH supported catalog acceptance harness` test.
+- `deployments.plan` remains the shared read-only preview contract for Web, CLI, HTTP/oRPC, and
+  future MCP/tool surfaces. It does not persist deployment records, publish deployment events,
+  execute runtime work, or add profile/framework/buildpack fields to ids-only
+  `deployments.create`.
+- Default release-gate confidence is hermetic: supported catalog acceptance, deployment plan
+  preview schema, framework fixture readiness, shared draft parity, unsupported/ambiguous planner
+  evidence, and public docs/help anchor checks. Real Docker and real SSH fixture smoke remain
+  opt-in gates.
+- Public docs/help coverage is anchored at `/docs/deploy/lifecycle/#deployment-plan-preview` and
+  the resource profile docs. Users can see which catalog entries are supported, preview detected
+  plan evidence before execution, and inspect blocked reasons, fixes, logs, health, access, and
+  diagnostics when a first deploy fails.
 
 ## Phase 6: Access Policy, Domain/TLS Lifecycle, And Observability Hardening
 
