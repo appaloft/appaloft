@@ -1006,13 +1006,8 @@ export class Resource extends AggregateRoot<ResourceState> {
 
   requiresInternalPort(): boolean {
     return (
-      this.state.kind.value === "application" ||
-      this.state.kind.value === "service" ||
-      this.state.kind.value === "static-site" ||
-      this.state.kind.value === "compose-stack" ||
-      this.state.services.some(
-        (service) => service.kind.value === "web" || service.kind.value === "api",
-      )
+      this.state.kind.requiresInternalPort() ||
+      this.state.services.some((service) => service.kind.requiresInternalPort())
     );
   }
 

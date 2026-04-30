@@ -996,6 +996,15 @@ export class ResourceKindValue extends EnumValueObject<
   allowsMultipleServices(): boolean {
     return this.isComposeStack();
   }
+
+  requiresInternalPort(): boolean {
+    return (
+      this.value === "application" ||
+      this.value === "service" ||
+      this.value === "static-site" ||
+      this.isComposeStack()
+    );
+  }
 }
 
 const resourceServiceKindBrand: unique symbol = Symbol("ResourceServiceKindValue");
@@ -1021,6 +1030,10 @@ export class ResourceServiceKindValue extends EnumValueObject<
     value: "web" | "api" | "worker" | "database" | "cache" | "service",
   ): ResourceServiceKindValue {
     return new ResourceServiceKindValue(value);
+  }
+
+  requiresInternalPort(): boolean {
+    return this.value === "web" || this.value === "api";
   }
 }
 

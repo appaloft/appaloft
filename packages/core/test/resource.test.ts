@@ -114,6 +114,8 @@ describe("Resource", () => {
     })._unsafeUnwrap();
 
     expect(resource.requiresInternalPort()).toBe(true);
+    expect(ResourceKindValue.rehydrate("static-site").requiresInternalPort()).toBe(true);
+    expect(ResourceServiceKindValue.rehydrate("api").requiresInternalPort()).toBe(true);
     expect(resource.shouldEnrichSourceFromDetector()).toBe(true);
 
     const source = resource.createDeploymentSourceDescriptor();
@@ -166,6 +168,27 @@ describe("Resource", () => {
       expect(profile.error.details?.phase).toBe("resource-network-resolution");
       expect(profile.error.details?.resourceKind).toBe("application");
     }
+  });
+
+  test("[DMBH-RES-001] Resource composes kind and service internal-port requirements", () => {
+    const external = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("external"),
+    })._unsafeUnwrap();
+    expect(external.requiresInternalPort()).toBe(false);
+    expect(ResourceKindValue.rehydrate("external").requiresInternalPort()).toBe(false);
+
+    const externalWithApiService = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("external"),
+      services: [
+        {
+          name: ResourceServiceName.rehydrate("api"),
+          kind: ResourceServiceKindValue.rehydrate("api"),
+        },
+      ],
+    })._unsafeUnwrap();
+    expect(externalWithApiService.requiresInternalPort()).toBe(true);
   });
 
   test("[RES-PROFILE-CONFIG-012] materializes effective environment snapshot with resource override precedence", () => {
