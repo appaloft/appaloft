@@ -325,4 +325,166 @@ describe("deployment plan preview contract", () => {
     expect(parsed.unsupportedReasons[0]?.code).toBe("ambiguous-python-app-target");
     expect(parsed.nextActions[0]?.targetOperation).toBe("resources.configure-runtime");
   });
+
+  test("[DPP-CATALOG-005][WF-PLAN-JVM-001][WF-PLAN-JVM-014] exposes ready JVM planner catalog output", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_spring",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+        resourceName: "Spring Boot App",
+      },
+      readiness: {
+        status: "ready",
+        ready: true,
+        reasonCodes: [],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "spring-boot-maven-wrapper",
+        locator: "/workspace/spring-boot-maven-wrapper",
+        runtimeFamily: "java",
+        framework: "spring-boot",
+        packageManager: "maven",
+        applicationShape: "serverful-http",
+        runtimeVersion: "21",
+        projectName: "spring-boot-maven-wrapper",
+        detectedFiles: ["pom-xml", "maven-wrapper", "spring-boot-actuator"],
+        detectedScripts: [],
+        reasoning: ["Spring Boot Maven wrapper evidence detected"],
+      },
+      planner: {
+        plannerKey: "spring-boot",
+        supportTier: "first-class",
+        buildStrategy: "workspace-commands",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      artifact: {
+        kind: "workspace-image",
+        runtimeArtifactKind: "image",
+        runtimeArtifactIntent: "build-image",
+        metadata: {
+          planner: "spring-boot",
+          baseImage: "eclipse-temurin:21-jdk",
+          applicationShape: "serverful-http",
+          packageManager: "maven",
+          jarPath: "target/spring-boot-maven-wrapper-0.0.1-SNAPSHOT.jar",
+        },
+      },
+      commands: [
+        { kind: "build", command: "./mvnw package -DskipTests", source: "planner" },
+        {
+          kind: "start",
+          command: "java -jar target/spring-boot-maven-wrapper-0.0.1-SNAPSHOT.jar",
+          source: "planner",
+        },
+      ],
+      network: {
+        internalPort: 8080,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: true,
+        kind: "http",
+        path: "/actuator/health",
+        port: 8080,
+      },
+      warnings: [],
+      unsupportedReasons: [],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "deployments.create",
+          label: "Deploy",
+          safeByDefault: true,
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.source.runtimeFamily).toBe("java");
+    expect(parsed.source.framework).toBe("spring-boot");
+    expect(parsed.planner.plannerKey).toBe("spring-boot");
+    expect(parsed.commands.map((command) => command.kind)).toEqual(["build", "start"]);
+  });
+
+  test("[DPP-CATALOG-006][WF-PLAN-JVM-011][WF-PLAN-JVM-012] exposes blocked JVM planner reasons", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_jvm",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+      },
+      readiness: {
+        status: "blocked",
+        ready: false,
+        reasonCodes: ["ambiguous-jvm-build-tool"],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "jvm-ambiguous-build-tool",
+        locator: "/workspace/jvm-ambiguous-build-tool",
+        runtimeFamily: "java",
+        applicationShape: "serverful-http",
+        detectedFiles: ["pom-xml", "gradle-build"],
+        detectedScripts: [],
+        reasoning: ["Maven and Gradle build files were both detected"],
+      },
+      planner: {
+        plannerKey: "unsupported",
+        supportTier: "unsupported",
+        buildStrategy: "workspace-commands",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      artifact: {
+        kind: "workspace-image",
+      },
+      commands: [],
+      network: {
+        internalPort: 8080,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: false,
+        kind: "none",
+      },
+      warnings: [],
+      unsupportedReasons: [
+        {
+          code: "ambiguous-jvm-build-tool",
+          category: "blocked",
+          phase: "runtime-plan-resolution",
+          message: "JVM build tool evidence is ambiguous.",
+          recommendation:
+            "Select a source root or configure explicit resource runtime build and start commands before deployment.",
+        },
+      ],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "resources.configure-runtime",
+          label: "Configure runtime",
+          safeByDefault: true,
+          blockedReasonCode: "ambiguous-jvm-build-tool",
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.readiness.ready).toBe(false);
+    expect(parsed.unsupportedReasons[0]?.code).toBe("ambiguous-jvm-build-tool");
+    expect(parsed.nextActions[0]?.targetOperation).toBe("resources.configure-runtime");
+  });
 });

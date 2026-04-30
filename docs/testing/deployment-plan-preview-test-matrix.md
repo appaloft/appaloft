@@ -57,6 +57,8 @@ creating a deployment attempt, publishing deployment events, or executing runtim
 | DPP-CATALOG-002 | contract/integration | Blocked unsupported or ambiguous JavaScript/TypeScript evidence | `deployments.plan/v1` can expose `blocked` readiness, stable reason code such as `unsupported-framework`, `ambiguous-framework`, `missing-production-start-command`, `missing-static-output`, or `internal-port-missing`, safe evidence, and remediation without returning transport failure. |
 | DPP-CATALOG-003 | contract/integration | Ready Python supported plan | `deployments.plan/v1` can expose Python source evidence, package tool, ASGI/WSGI target or framework metadata, planner key/support tier, artifact kind, install/build/start command specs, network, health, warnings, and next actions without deployment id or execution output. |
 | DPP-CATALOG-004 | contract/integration | Blocked unsupported, ambiguous, or missing Python evidence | `deployments.plan/v1` can expose `blocked` readiness, stable reason code such as `unsupported-framework`, `ambiguous-python-app-target`, `missing-asgi-app`, `missing-wsgi-app`, `missing-production-start-command`, or `internal-port-missing`, safe evidence, and remediation without returning transport failure. |
+| DPP-CATALOG-005 | contract/integration | Ready JVM/Spring supported plan | `deployments.plan/v1` can expose JVM source evidence, Spring Boot framework metadata, Maven/Gradle build tool, planner key/support tier, artifact kind, build/package/start command specs, network, health, warnings, and next actions without deployment id or execution output. |
+| DPP-CATALOG-006 | contract/integration | Blocked unsupported, ambiguous, or missing JVM evidence | `deployments.plan/v1` can expose `blocked` readiness, stable reason code such as `unsupported-framework`, `ambiguous-jvm-build-tool`, `missing-jvm-build-tool`, `missing-runnable-jar`, `missing-production-start-command`, or `internal-port-missing`, safe evidence, and remediation without returning transport failure. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -64,5 +66,7 @@ creating a deployment attempt, publishing deployment events, or executing runtim
 public surface, while `DPP-CATALOG-001` and `DPP-CATALOG-002` bind the JavaScript/TypeScript planner
 catalog to the shared preview response shape. `DPP-CATALOG-003` and `DPP-CATALOG-004` bind the
 Python planner catalog to the same preview response shape, including ASGI/WSGI app-target blocked
-reason codes. Full future MCP/tool descriptors remain a migration gap until MCP/tool surfaces are
-active.
+reason codes. `DPP-CATALOG-005` and `DPP-CATALOG-006` bind JVM/Spring Boot planner output to the
+same preview response shape, including Maven/Gradle ambiguity, missing runnable jar, missing
+production start, and unsupported JVM framework blocked reason codes. Full future MCP/tool
+descriptors remain a migration gap until MCP/tool surfaces are active.

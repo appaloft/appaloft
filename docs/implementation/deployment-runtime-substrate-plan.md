@@ -329,6 +329,16 @@ output, Dockerfile generation intent, internal HTTP verification, and headless D
 readiness. `deployments.plan/v1` contract coverage proves ready and blocked Python planner output
 uses the same preview shape and remediation language as the JavaScript/TypeScript closure.
 
+JVM/Spring Boot tested catalog closure now has stable rows for Spring Boot Maven with wrapper,
+Spring Boot Maven without wrapper, Spring Boot Gradle with wrapper, Spring Boot Gradle Kotlin DSL,
+generic JVM explicit start-command fallback, generic deterministic jar fallback, unsupported JVM
+framework evidence, ambiguous Maven/Gradle build-tool evidence, missing JVM build tool, missing
+runnable jar, actuator health defaults, and internal-port behavior. Runtime fixture tests bind
+these rows to source inspection, planner/base-image policy, command specs, artifact output,
+Dockerfile generation intent, internal HTTP verification, and headless Docker/OCI execution
+readiness. `deployments.plan/v1` contract coverage proves ready and blocked JVM planner output uses
+the same preview shape and remediation language as the JavaScript/TypeScript/Python closures.
+
 `build-requested`, resolved image ids/digests, runtime instance identity, rollback candidate
 capture, command specs on the durable runtime plan boundary, and richer source-file analysis are
 not yet fully implemented across the application and persistence boundary. The remaining generic

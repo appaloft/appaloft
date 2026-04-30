@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import {
   appaloftTraceAttributes,
@@ -48,6 +48,7 @@ interface LocalProjectProfile {
   applicationShape?: SourceApplicationShape;
   runtimeVersion?: string;
   projectName?: string;
+  jarPath?: string;
   detectedFiles: SourceDetectedFile[];
   detectedScripts: SourceDetectedScript[];
 }
@@ -471,6 +472,99 @@ function pythonDetectedFiles(path: string): SourceDetectedFile[] {
   ];
 }
 
+function detectJavaFramework(input: {
+  pom: string | null;
+  gradle: string | null;
+}): SourceFramework | undefined {
+  const manifests = `${input.pom ?? ""}\n${input.gradle ?? ""}`;
+
+  if (
+    textMentionsPackage(manifests, "org.springframework.boot") ||
+    manifests.includes("spring-boot-starter-web") ||
+    manifests.includes("spring-boot-maven-plugin") ||
+    /\bid\s*\(?\s*["']org\.springframework\.boot["']/u.test(manifests) ||
+    /<groupId>\s*org\.springframework\.boot\s*<\/groupId>/u.test(manifests)
+  ) {
+    return "spring-boot";
+  }
+
+  if (
+    textMentionsPackage(manifests, "io.quarkus") ||
+    /<groupId>\s*io\.quarkus\s*<\/groupId>/u.test(manifests)
+  ) {
+    return "quarkus";
+  }
+
+  if (
+    textMentionsPackage(manifests, "io.micronaut") ||
+    /<groupId>\s*io\.micronaut/u.test(manifests)
+  ) {
+    return "micronaut";
+  }
+
+  return undefined;
+}
+
+function detectJavaPackageManager(input: {
+  hasPom: boolean;
+  hasGradle: boolean;
+}): SourcePackageManager | undefined {
+  if (input.hasPom === input.hasGradle) {
+    return undefined;
+  }
+
+  return input.hasPom ? "maven" : "gradle";
+}
+
+function firstXmlText(text: string | null, tag: string): string | undefined {
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return text?.match(new RegExp(`<${escaped}>\\s*([^<]+?)\\s*</${escaped}>`, "u"))?.[1];
+}
+
+function gradleStringAssignment(text: string | null, key: string): string | undefined {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return text?.match(new RegExp(`\\b${escaped}\\s*=\\s*["']([^"']+)["']`, "u"))?.[1];
+}
+
+function findSingleJarUnder(path: string, directoryName: string): string | undefined {
+  const directoryPath = join(path, directoryName);
+
+  if (!existsSync(directoryPath)) {
+    return undefined;
+  }
+
+  const jarFiles = readdirSync(directoryPath)
+    .filter((fileName) => fileName.endsWith(".jar"))
+    .filter(
+      (fileName) =>
+        !/(?:^|[-.])(plain|sources|javadoc|tests?)(?:[-.]|$)/u.test(fileName.toLowerCase()),
+    );
+
+  return jarFiles.length === 1 ? `${directoryName}/${jarFiles[0]}` : undefined;
+}
+
+function deterministicJavaJarPath(input: {
+  path: string;
+  packageManager?: SourcePackageManager;
+  projectName?: string;
+  version?: string;
+}): string | undefined {
+  const explicitJar =
+    findSingleJarUnder(input.path, "target") ?? findSingleJarUnder(input.path, "build/libs");
+
+  if (explicitJar) {
+    return explicitJar;
+  }
+
+  if (!input.projectName || !input.version) {
+    return undefined;
+  }
+
+  return input.packageManager === "gradle"
+    ? `build/libs/${input.projectName}-${input.version}.jar`
+    : `target/${input.projectName}-${input.version}.jar`;
+}
+
 class NodeProjectProfileDetector implements LocalProjectProfileDetector {
   detect(path: string): LocalProjectProfile | null {
     const packageJsonPath = join(path, "package.json");
@@ -541,31 +635,56 @@ class JavaProjectProfileDetector implements LocalProjectProfileDetector {
     const pomPath = join(path, "pom.xml");
     const gradlePath = join(path, "build.gradle");
     const gradleKtsPath = join(path, "build.gradle.kts");
+    const hasPom = existsSync(pomPath);
+    const hasGradle = existsSync(gradlePath) || existsSync(gradleKtsPath);
+    const hasJar = Boolean(
+      findSingleJarUnder(path, "target") ?? findSingleJarUnder(path, "build/libs"),
+    );
+    const hasJavaVersion = existsSync(join(path, ".java-version"));
+    const hasJavaSources = existsSync(join(path, "src", "main", "java"));
 
-    if (!existsSync(pomPath) && !existsSync(gradlePath) && !existsSync(gradleKtsPath)) {
+    if (!hasPom && !hasGradle && !hasJar && !hasJavaVersion && !hasJavaSources) {
       return null;
     }
 
-    const pom = existsSync(pomPath) ? readText(pomPath) : null;
+    const pom = hasPom ? readText(pomPath) : null;
     const gradle = existsSync(gradlePath)
       ? readText(gradlePath)
       : existsSync(gradleKtsPath)
         ? readText(gradleKtsPath)
         : null;
+    const packageManager = detectJavaPackageManager({ hasPom, hasGradle });
     const projectName =
-      pom?.match(/<artifactId>([^<]+)<\/artifactId>/)?.[1] ??
+      firstXmlText(pom, "artifactId") ??
       gradle?.match(/rootProject\.name\s*=\s*["']([^"']+)["']/)?.[1];
+    const version = firstXmlText(pom, "version") ?? gradleStringAssignment(gradle, "version");
     const runtimeVersion = readFirstExistingVersion(path, [".java-version"]);
+    const framework = detectJavaFramework({ pom, gradle });
+    const jarPath = deterministicJavaJarPath({
+      path,
+      ...(packageManager ? { packageManager } : {}),
+      ...(projectName ? { projectName } : {}),
+      ...(version ? { version } : {}),
+    });
 
     return {
       runtimeFamily: "java",
+      ...(framework ? { framework } : {}),
+      ...(packageManager ? { packageManager } : {}),
+      applicationShape: "serverful-http",
       ...(runtimeVersion ? { runtimeVersion } : {}),
       ...(projectName ? { projectName } : {}),
+      ...(jarPath ? { jarPath } : {}),
       detectedFiles: [
-        ...(existsSync(pomPath) ? ["pom-xml" as const] : []),
-        ...(existsSync(gradlePath) || existsSync(gradleKtsPath) ? ["gradle-build" as const] : []),
+        ...(hasPom ? ["pom-xml" as const] : []),
+        ...(hasGradle ? ["gradle-build" as const] : []),
+        ...(existsSync(gradleKtsPath) ? ["gradle-kotlin-build" as const] : []),
         ...(existsSync(join(path, "mvnw")) ? ["maven-wrapper" as const] : []),
         ...(existsSync(join(path, "gradlew")) ? ["gradle-wrapper" as const] : []),
+        ...(jarPath ? ["jvm-runnable-jar" as const] : []),
+        ...(`${pom ?? ""}\n${gradle ?? ""}`.includes("spring-boot-starter-actuator")
+          ? ["spring-boot-actuator" as const]
+          : []),
       ],
       detectedScripts: [],
     };
@@ -619,6 +738,7 @@ function detectLocalInspection(path: string): SourceInspectionSnapshot {
     ...(profile?.projectName
       ? { projectName: DisplayNameText.rehydrate(profile.projectName) }
       : {}),
+    ...(profile?.jarPath ? { jarPath: FilePathText.rehydrate(profile.jarPath) } : {}),
     detectedFiles: detectedFiles.map((file) => SourceDetectedFileValue.rehydrate(file)),
     ...(profile?.detectedScripts
       ? {

@@ -91,7 +91,9 @@ export function resolveWorkspaceRuntimePlan(
 function plannerForExecution(execution: RuntimeExecutionPlan): WorkspaceRuntimePlanner {
   const plannerName = execution.metadata?.["workspace.planner"];
   return (
-    workspaceRuntimePlanners.find((planner) => planner.name === plannerName) ??
+    workspaceRuntimePlanners.find(
+      (planner) => planner.name === plannerName || (plannerName === "spring-boot" && planner.name === "java"),
+    ) ??
     customWorkspacePlanner
   );
 }

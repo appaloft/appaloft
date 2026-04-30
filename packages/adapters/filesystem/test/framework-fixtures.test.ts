@@ -31,7 +31,7 @@ interface FrameworkFixtureExpectation {
   fixture: string;
   runtimeFamily: SourceRuntimeFamily;
   framework?: SourceFramework;
-  packageManager: SourcePackageManager;
+  packageManager?: SourcePackageManager;
   applicationShape: SourceApplicationShape;
   detectedFiles?: SourceDetectedFile[];
   fixedVersions: FixedVersionExpectation;
@@ -43,6 +43,7 @@ interface FixedVersionExpectation {
   devDependencies?: Record<string, string>;
   pyprojectDependencies?: string[];
   requirements?: string[];
+  filesContain?: Record<string, string[]>;
 }
 
 const frameworkFixtures: FrameworkFixtureExpectation[] = [
@@ -458,6 +459,80 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
       requirements: ["waitress==3.0.2"],
     },
   },
+  {
+    matrixIds:
+      "WF-PLAN-CAT-013,WF-PLAN-JVM-001,WF-PLAN-JVM-007,WF-PLAN-JVM-008,WF-PLAN-JVM-009,WF-PLAN-JVM-014",
+    fixture: "spring-boot-maven-wrapper",
+    runtimeFamily: "java",
+    framework: "spring-boot",
+    packageManager: "maven",
+    applicationShape: "serverful-http",
+    detectedFiles: ["pom-xml", "maven-wrapper", "spring-boot-actuator", "jvm-runnable-jar"],
+    fixedVersions: {
+      filesContain: {
+        "pom.xml": ["spring-boot-starter-web", "3.4.4", "spring-boot-maven-plugin"],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-013,WF-PLAN-JVM-002,WF-PLAN-JVM-007,WF-PLAN-JVM-008,WF-PLAN-JVM-014",
+    fixture: "spring-boot-maven",
+    runtimeFamily: "java",
+    framework: "spring-boot",
+    packageManager: "maven",
+    applicationShape: "serverful-http",
+    detectedFiles: ["pom-xml", "jvm-runnable-jar"],
+    fixedVersions: {
+      filesContain: {
+        "pom.xml": ["spring-boot-starter-web", "3.4.4", "spring-boot-maven-plugin"],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-013,WF-PLAN-JVM-003,WF-PLAN-JVM-007,WF-PLAN-JVM-008,WF-PLAN-JVM-014",
+    fixture: "spring-boot-gradle-wrapper",
+    runtimeFamily: "java",
+    framework: "spring-boot",
+    packageManager: "gradle",
+    applicationShape: "serverful-http",
+    detectedFiles: ["gradle-build", "gradle-wrapper", "jvm-runnable-jar"],
+    fixedVersions: {
+      filesContain: {
+        "build.gradle": ["org.springframework.boot", "3.4.4", "spring-boot-starter-web"],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-013,WF-PLAN-JVM-004,WF-PLAN-JVM-007,WF-PLAN-JVM-008,WF-PLAN-JVM-014",
+    fixture: "spring-boot-gradle-kts",
+    runtimeFamily: "java",
+    framework: "spring-boot",
+    packageManager: "gradle",
+    applicationShape: "serverful-http",
+    detectedFiles: ["gradle-build", "gradle-kotlin-build", "gradle-wrapper", "jvm-runnable-jar"],
+    fixedVersions: {
+      filesContain: {
+        "build.gradle.kts": ["org.springframework.boot", "3.4.4", "spring-boot-starter-web"],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-JVM-005,WF-PLAN-JVM-007,WF-PLAN-JVM-014",
+    fixture: "jvm-explicit-start",
+    runtimeFamily: "java",
+    packageManager: "maven",
+    applicationShape: "serverful-http",
+    detectedFiles: ["pom-xml", "jvm-runnable-jar"],
+    fixedVersions: {},
+  },
+  {
+    matrixIds: "WF-PLAN-JVM-006,WF-PLAN-JVM-008,WF-PLAN-JVM-014",
+    fixture: "generic-java-jar",
+    runtimeFamily: "java",
+    applicationShape: "serverful-http",
+    detectedFiles: ["jvm-runnable-jar"],
+    fixedVersions: {},
+  },
 ];
 
 function objectRecord(value: unknown): Record<string, unknown> {
@@ -522,6 +597,13 @@ async function expectFixedVersions(
       .filter((line) => line.length > 0);
 
     expect(requirements).toEqual(expected.requirements);
+  }
+
+  for (const [fileName, snippets] of Object.entries(expected.filesContain ?? {})) {
+    const text = await Bun.file(join(fixturePath, fileName)).text();
+    for (const snippet of snippets) {
+      expect(text).toContain(snippet);
+    }
   }
 }
 
