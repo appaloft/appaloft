@@ -53,6 +53,7 @@
 | Continuous A | `DomainBinding` verification attempts | Move ownership-confirmation attempt selection, idempotent already-bound checks, and DNS verification context preparation into the binding aggregate. | `domain-bindings.confirm-ownership` |
 | Continuous B | `Resource` and `ResourceKindValue` service cardinality | Move resource-kind multi-service admission out of create-resource use case and into resource domain behavior. | `resources.create` |
 | Continuous C | `ResourceKindValue` and `ResourceServiceKindValue` internal-port predicates | Move inbound listener requirement literals out of the aggregate method and into owned value objects. | `Resource.requiresInternalPort()` |
+| Continuous D | `DomainBindingStatusValue` lifecycle gates | Move ready, route-failure, and verification-retry status sets into the status value object. | `DomainBinding` lifecycle methods |
 
 ## Roadmap And Compatibility
 
@@ -155,6 +156,12 @@
   - `DMBH-RES-001` in `packages/core/test/resource.test.ts`
 - Related application tests after Continuous C:
   - none; this is a core-internal predicate refactor covered by existing resource behavior tests.
+- Continuous D test bindings:
+  - `DMBH-DOMAIN-001` and route failure/retry rows in `packages/core/test/domain-binding.test.ts`
+  - Matrix rows: `ROUTE-TLS-EVT-012`, `ROUTE-TLS-EVT-014`, `ROUTE-TLS-CMD-023`
+- Related application tests after Continuous D:
+  - `packages/application/test/confirm-domain-binding-ownership.test.ts`
+  - `packages/application/test/domain-binding-lifecycle.test.ts`
 
 ## Risks And Migration Gaps
 
@@ -184,6 +191,8 @@
     behind `Resource` and `ResourceKindValue` behavior.
   - Continuous C migrates internal-port requirement literals behind `ResourceKindValue` and
     `ResourceServiceKindValue`.
+  - Continuous D migrates domain-binding lifecycle gate status sets behind
+    `DomainBindingStatusValue`.
   - Core value objects may compare their own primitive state internally. Those reads are not
     boundary leaks.
 - A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.
