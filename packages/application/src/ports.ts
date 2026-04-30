@@ -3117,6 +3117,39 @@ export interface DomainBindingSummary {
   createdAt: string;
 }
 
+export interface DomainBindingDeleteBlocker {
+  kind: "active-certificate" | "certificate-history";
+  severity: "blocking" | "warning";
+  message: string;
+  relatedEntityType?: string;
+  relatedEntityId?: string;
+  count?: number;
+}
+
+export interface DomainBindingDeleteSafety {
+  domainBindingId: string;
+  safeToDelete: boolean;
+  blockers: DomainBindingDeleteBlocker[];
+  warnings: DomainBindingDeleteBlocker[];
+  preservesGeneratedAccess: true;
+  preservesDeploymentSnapshots: true;
+  preservesServerAppliedRouteAudit: true;
+}
+
+export interface DomainBindingDetail {
+  binding: DomainBindingSummary;
+  routeReadiness: {
+    status: "ready" | "not-ready" | "pending" | "failed" | "deleted";
+    routeBehavior: "serve" | "redirect";
+    selectedRoute?: RouteIntentStatusDescriptor;
+    contextRoutes: RouteIntentStatusDescriptor[];
+  };
+  generatedAccessFallback?: ResourceAccessRouteSummary | PlannedResourceAccessRouteSummary;
+  proxyReadiness?: ResourceAccessSummary["proxyRouteStatus"];
+  certificates: CertificateSummary[];
+  deleteSafety: DomainBindingDeleteSafety;
+}
+
 export interface CertificateAttemptSummary {
   id: string;
   status: "requested" | "issuing" | "issued" | "failed" | "retry_scheduled";

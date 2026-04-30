@@ -11,6 +11,7 @@ searchAliases:
   - "domain verify"
 relatedOperations:
   - domain-bindings.confirm-ownership
+  - domain-bindings.retry-verification
 sidebar:
   label: "Ownership"
   order: 4
@@ -51,6 +52,8 @@ Retry when:
 - DNS records were just added or changed.
 - The DNS provider shows the record as saved.
 - Appaloft reported timeout or temporary resolution failure.
+
+`appaloft domain-binding retry-verification <domainBindingId>` creates a new ownership verification attempt. It keeps earlier attempts as history and does not retry certificate issuance, revoke certificates, repair proxy routes, redeploy, or roll back deployments.
 
 Fix before retrying when:
 

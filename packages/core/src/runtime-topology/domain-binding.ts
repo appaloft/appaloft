@@ -30,6 +30,7 @@ export const domainBindingStatuses = [
   "ready",
   "not_ready",
   "failed",
+  "deleted",
 ] as const;
 
 export type DomainBindingStatus = (typeof domainBindingStatuses)[number];
@@ -114,7 +115,11 @@ export class DomainBindingStatusValue extends ScalarValueObject<DomainBindingSta
   }
 
   isActive(): boolean {
-    return this.value !== "failed";
+    return this.value !== "failed" && this.value !== "deleted";
+  }
+
+  isDeleted(): boolean {
+    return this.value === "deleted";
   }
 }
 
@@ -699,6 +704,176 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     });
 
     return ok(undefined);
+  }
+
+  configureRoute(input: {
+    redirectTo?: PublicDomainName;
+    redirectStatus?: CanonicalRedirectStatusCode;
+    configuredAt: CreatedAt;
+    correlationId?: string;
+    causationId?: string;
+  }): Result<{ changed: boolean }> {
+    if (this.state.status.isDeleted()) {
+      return err(domainError.notFound("DomainBinding", this.state.id.value));
+    }
+
+    if (input.redirectStatus && !input.redirectTo) {
+      return err(
+        domainError.validation("Domain binding redirect status requires redirect target", {
+          phase: "domain-binding-route-configuration",
+          domainBindingId: this.state.id.value,
+        }),
+      );
+    }
+
+    if (input.redirectTo && input.redirectTo.value === this.state.domainName.value) {
+      return err(
+        domainError.validation("Domain binding canonical redirect cannot point to itself", {
+          phase: "domain-binding-route-configuration",
+          domainBindingId: this.state.id.value,
+          domainName: this.state.domainName.value,
+          redirectTo: input.redirectTo.value,
+        }),
+      );
+    }
+
+    const nextRedirectStatus = input.redirectTo
+      ? (input.redirectStatus ?? CanonicalRedirectStatusCode.rehydrate(308))
+      : undefined;
+    const changed =
+      this.state.redirectTo?.value !== input.redirectTo?.value ||
+      this.state.redirectStatus?.value !== nextRedirectStatus?.value;
+
+    if (!changed) {
+      return ok({ changed: false });
+    }
+
+    if (input.redirectTo) {
+      this.state.redirectTo = input.redirectTo;
+      this.state.redirectStatus =
+        input.redirectStatus ?? CanonicalRedirectStatusCode.rehydrate(308);
+    } else {
+      delete this.state.redirectTo;
+      delete this.state.redirectStatus;
+    }
+
+    this.recordDomainEvent("domain-binding-route-configured", input.configuredAt, {
+      domainBindingId: this.state.id.value,
+      domainName: this.state.domainName.value,
+      pathPrefix: this.state.pathPrefix.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceId: this.state.resourceId.value,
+      serverId: this.state.serverId.value,
+      destinationId: this.state.destinationId.value,
+      ...(this.state.redirectTo
+        ? {
+            redirectTo: this.state.redirectTo.value,
+            redirectStatus: this.state.redirectStatus?.value ?? 308,
+          }
+        : {}),
+      configuredAt: input.configuredAt.value,
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.causationId ? { causationId: input.causationId } : {}),
+    });
+
+    return ok({ changed: true });
+  }
+
+  retryVerification(input: {
+    verificationAttemptId: DomainVerificationAttemptId;
+    verificationExpectedTarget: MessageText;
+    dnsExpectedTargets?: MessageText[];
+    retryAt: CreatedAt;
+    correlationId?: string;
+    causationId?: string;
+  }): Result<{ verificationAttemptId: DomainVerificationAttemptId }> {
+    if (this.state.status.isDeleted()) {
+      return err(domainError.notFound("DomainBinding", this.state.id.value));
+    }
+
+    if (
+      this.state.status.value !== "pending_verification" &&
+      this.state.status.value !== "not_ready"
+    ) {
+      return err(
+        domainError.domainVerificationNotPending(
+          "Domain binding verification can only be retried while ownership or route readiness is not ready",
+          {
+            phase: "domain-verification",
+            domainBindingId: this.state.id.value,
+            relatedState: this.state.status.value,
+          },
+        ),
+      );
+    }
+
+    this.state.status = DomainBindingStatusValue.pendingVerification();
+    this.state.verificationAttempts = [
+      ...this.state.verificationAttempts,
+      {
+        id: input.verificationAttemptId,
+        method: DomainVerificationMethodValue.manual(),
+        status: DomainVerificationAttemptStatusValue.pending(),
+        expectedTarget: input.verificationExpectedTarget,
+        createdAt: input.retryAt,
+      },
+    ];
+    delete this.state.routeFailure;
+
+    if (input.dnsExpectedTargets) {
+      this.state.dnsObservation = {
+        status: DomainDnsObservationStatusValue.pending(),
+        expectedTargets: [...input.dnsExpectedTargets],
+        observedTargets: [],
+        checkedAt: input.retryAt,
+      };
+    }
+
+    this.recordDomainEvent("domain-binding-verification-retried", input.retryAt, {
+      domainBindingId: this.state.id.value,
+      domainName: this.state.domainName.value,
+      pathPrefix: this.state.pathPrefix.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceId: this.state.resourceId.value,
+      serverId: this.state.serverId.value,
+      destinationId: this.state.destinationId.value,
+      verificationAttemptId: input.verificationAttemptId.value,
+      retryAt: input.retryAt.value,
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.causationId ? { causationId: input.causationId } : {}),
+    });
+
+    return ok({ verificationAttemptId: input.verificationAttemptId });
+  }
+
+  delete(input: {
+    deletedAt: CreatedAt;
+    correlationId?: string;
+    causationId?: string;
+  }): Result<{ changed: boolean }> {
+    if (this.state.status.isDeleted()) {
+      return ok({ changed: false });
+    }
+
+    this.state.status = DomainBindingStatusValue.rehydrate("deleted");
+
+    this.recordDomainEvent("domain-binding-deleted", input.deletedAt, {
+      domainBindingId: this.state.id.value,
+      domainName: this.state.domainName.value,
+      pathPrefix: this.state.pathPrefix.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceId: this.state.resourceId.value,
+      serverId: this.state.serverId.value,
+      destinationId: this.state.destinationId.value,
+      deletedAt: input.deletedAt.value,
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.causationId ? { causationId: input.causationId } : {}),
+    });
+
+    return ok({ changed: true });
   }
 
   accept<TContext, TResult>(

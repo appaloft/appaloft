@@ -208,8 +208,22 @@ export const cliCommandDescriptions = {
   defaultAccessShow: withDocs("Show default access domain policy", "domain.generated-access-route"),
   domainBinding: withDocs("Domain binding operations", "domain.custom-domain-binding"),
   domainBindingCreate: withDocs("Create a durable domain binding", "domain.custom-domain-binding"),
+  domainBindingShow: withDocs("Show domain binding readiness", "domain.custom-domain-binding"),
+  domainBindingConfigureRoute: withDocs(
+    "Configure domain binding route behavior",
+    "domain.custom-domain-binding",
+  ),
   domainBindingConfirmOwnership: withDocs(
     "Confirm domain binding ownership",
+    "domain.ownership-check",
+  ),
+  domainBindingDeleteCheck: withDocs(
+    "Check whether a domain binding can be deleted safely",
+    "domain.custom-domain-binding",
+  ),
+  domainBindingDelete: withDocs("Delete a domain binding safely", "domain.custom-domain-binding"),
+  domainBindingRetryVerification: withDocs(
+    "Retry domain binding ownership verification",
     "domain.ownership-check",
   ),
   domainBindingList: withDocs("List domain bindings", "domain.custom-domain-binding"),

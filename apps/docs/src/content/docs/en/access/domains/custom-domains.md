@@ -11,6 +11,10 @@ searchAliases:
   - "hostname"
 relatedOperations:
   - domain-bindings.create
+  - domain-bindings.show
+  - domain-bindings.configure-route
+  - domain-bindings.delete-check
+  - domain-bindings.delete
 sidebar:
   label: "Custom domains"
   order: 3
@@ -42,11 +46,11 @@ A domain name should not replace resource, server, or environment identifiers.
 
 <h2 id="domain-binding-surfaces">Web, CLI, and API</h2>
 
-The Web console should allow binding from a resource or access page and immediately show ownership and TLS next steps.
+The Web console should allow binding from a resource or access page and immediately show ownership, route readiness, proxy readiness, diagnostics, and TLS next steps.
 
-The CLI fits automation and release scripts. CLI output should include binding id, hostname, current status, and next action.
+The CLI fits automation and release scripts. Use `appaloft domain-binding show <domainBindingId>` to read one binding, `configure-route` to switch between serving traffic and redirecting to a canonical binding, `delete-check` before deletion, and `delete --confirm <domainBindingId>` only after blockers are clear.
 
-The HTTP API should return binding status, ownership status, certificate status, and recoverable errors. DNS/TLS semantics should not be hidden inside deployment status.
+The HTTP API uses the same operation contracts. DNS/TLS semantics should not be hidden inside deployment status.
 
 <h2 id="domain-binding-output">What you see after creation</h2>
 
@@ -65,5 +69,7 @@ If binding fails, do not redeploy first. Check:
 2. Whether DNS points to the current server or proxy entrypoint.
 3. Whether ownership verification records exist.
 4. Whether certificate issue or import failed.
+
+Deleting a binding removes managed custom-domain route intent only. It does not revoke certificates, erase certificate history, delete generated access, rewrite deployment snapshots, or remove server-applied route audit. If active certificate state is attached, delete is blocked until certificate lifecycle operations exist.
 
 Related pages: [Domain ownership](/docs/en/access/domains/ownership/), [TLS certificates](/docs/en/access/tls/certificates/), and [Access troubleshooting](/docs/en/access/troubleshooting/).

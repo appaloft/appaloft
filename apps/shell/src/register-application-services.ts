@@ -12,6 +12,8 @@ import {
   type CertificateProviderSelectionInput,
   type CertificateProviderSelectionPolicy,
   CertificateRetryScheduler,
+  CheckDomainBindingDeleteSafetyQueryHandler,
+  CheckDomainBindingDeleteSafetyQueryService,
   CheckServerDeleteSafetyQueryHandler,
   CheckServerDeleteSafetyQueryService,
   CleanupPreviewCommandHandler,
@@ -20,6 +22,8 @@ import {
   CloneEnvironmentUseCase,
   ConfigureDefaultAccessDomainPolicyCommandHandler,
   ConfigureDefaultAccessDomainPolicyUseCase,
+  ConfigureDomainBindingRouteCommandHandler,
+  ConfigureDomainBindingRouteUseCase,
   ConfigureResourceAccessCommandHandler,
   ConfigureResourceAccessUseCase,
   ConfigureResourceHealthCommandHandler,
@@ -44,6 +48,8 @@ import {
   DbStatusQueryService,
   DeactivateServerCommandHandler,
   DeactivateServerUseCase,
+  DeleteDomainBindingCommandHandler,
+  DeleteDomainBindingUseCase,
   DeleteResourceCommandHandler,
   DeleteResourceUseCase,
   DeleteServerCommandHandler,
@@ -114,6 +120,8 @@ import {
   ResourceHealthQueryService,
   ResourceProxyConfigurationPreviewQueryService,
   ResourceRuntimeLogsQueryService,
+  RetryDomainBindingVerificationCommandHandler,
+  RetryDomainBindingVerificationUseCase,
   RotateSshCredentialCommandHandler,
   RotateSshCredentialUseCase,
   RuntimePlanResolutionInputBuilder,
@@ -124,6 +132,8 @@ import {
   ShowDefaultAccessDomainPolicyQueryService,
   ShowDeploymentQueryHandler,
   ShowDeploymentQueryService,
+  ShowDomainBindingQueryHandler,
+  ShowDomainBindingQueryService,
   ShowEnvironmentQueryService,
   ShowOperatorWorkQueryHandler,
   ShowProjectQueryHandler,
@@ -177,12 +187,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(LockEnvironmentCommandHandler);
   container.registerSingleton(UnlockEnvironmentCommandHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
+  container.registerSingleton(CheckDomainBindingDeleteSafetyQueryHandler);
   container.registerSingleton(CheckServerDeleteSafetyQueryHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
   container.registerSingleton(ConfigureDefaultAccessDomainPolicyCommandHandler);
   container.registerSingleton(ListDefaultAccessDomainPoliciesQueryHandler);
   container.registerSingleton(ShowDefaultAccessDomainPolicyQueryHandler);
   container.registerSingleton(ConfigureServerEdgeProxyCommandHandler);
+  container.registerSingleton(ConfigureDomainBindingRouteCommandHandler);
   container.registerSingleton(ConfigureResourceAccessCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
@@ -195,6 +207,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(DeactivateServerCommandHandler);
   container.registerSingleton(DeleteServerCommandHandler);
   container.registerSingleton(DeleteSshCredentialCommandHandler);
+  container.registerSingleton(DeleteDomainBindingCommandHandler);
   container.registerSingleton(RotateSshCredentialCommandHandler);
   container.registerSingleton(RenameServerCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
@@ -206,12 +219,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
+  container.registerSingleton(RetryDomainBindingVerificationCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
   container.registerSingleton(RenameProjectCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
   container.registerSingleton(ListOperatorWorkQueryHandler);
   container.registerSingleton(ShowOperatorWorkQueryHandler);
   container.registerSingleton(ShowProjectQueryHandler);
+  container.registerSingleton(ShowDomainBindingQueryHandler);
   container.registerSingleton(ShowSshCredentialQueryHandler);
   container.registerSingleton(InspectServerCapacityQueryHandler);
   container.registerSingleton(
@@ -338,12 +353,26 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.cleanupPreviewUseCase, CleanupPreviewUseCase);
   container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);
   container.registerSingleton(
+    tokens.configureDomainBindingRouteUseCase,
+    ConfigureDomainBindingRouteUseCase,
+  );
+  container.registerSingleton(
     tokens.confirmDomainBindingOwnershipUseCase,
     ConfirmDomainBindingOwnershipUseCase,
+  );
+  container.registerSingleton(tokens.deleteDomainBindingUseCase, DeleteDomainBindingUseCase);
+  container.registerSingleton(
+    tokens.retryDomainBindingVerificationUseCase,
+    RetryDomainBindingVerificationUseCase,
   );
   container.registerSingleton(
     tokens.listDomainBindingsQueryService,
     ListDomainBindingsQueryService,
+  );
+  container.registerSingleton(tokens.showDomainBindingQueryService, ShowDomainBindingQueryService);
+  container.registerSingleton(
+    tokens.checkDomainBindingDeleteSafetyQueryService,
+    CheckDomainBindingDeleteSafetyQueryService,
   );
   container.registerSingleton(tokens.importCertificateUseCase, ImportCertificateUseCase);
   container.registerSingleton(
