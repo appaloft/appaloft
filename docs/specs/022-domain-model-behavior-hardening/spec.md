@@ -47,6 +47,7 @@ helpers, providers, and adapters.
 | DMBH-SPEC-013 | Resource service cardinality is resource-owned | A resource kind and declared services are supplied for creation | resource admission validates whether multiple services are allowed | `ResourceKindValue` answers whether multiple services are allowed and `Resource` owns the admission error; the create-resource use case does not duplicate resource-kind branching. |
 | DMBH-SPEC-014 | Resource internal-port requirement is VO-owned | A resource kind and service kinds describe inbound runtime traffic | deployment admission asks whether the resource requires an internal listener port | `ResourceKindValue` and `ResourceServiceKindValue` answer inbound-port questions; `Resource.requiresInternalPort()` composes those methods without raw literal branching. |
 | DMBH-SPEC-015 | Domain binding lifecycle gates are status-owned | Domain binding status controls ready, route-failure, and verification-retry transitions | the aggregate handles ready marking, route failure, or verification retry | `DomainBindingStatusValue` answers lifecycle gate predicates; aggregate methods compose those predicates instead of repeating status literal sets. |
+| DMBH-SPEC-016 | Domain binding context ownership uses aggregate intent | Domain binding creation resolves project, environment, resource, destination, and server context | the use case validates owner consistency before creating a durable binding | `Environment`, `Resource`, and `Destination` answer ownership and placement questions through intention methods; the use case does not peel aggregate state ids for those decisions. |
 
 ## Domain Ownership
 
@@ -75,6 +76,8 @@ helpers, providers, and adapters.
   - `ResourceKindValue` and `ResourceServiceKindValue` own internal-port requirement predicates.
   - `DomainBindingStatusValue` owns binding lifecycle gate predicates used by binding aggregate
     transitions.
+  - `Environment`, `Resource`, and `Destination` ownership methods also govern
+    `domain-bindings.create` context consistency.
 - Upstream/downstream contexts: no new context relationship is introduced.
 
 ## Public Surfaces

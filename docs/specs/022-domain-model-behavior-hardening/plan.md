@@ -54,6 +54,7 @@
 | Continuous B | `Resource` and `ResourceKindValue` service cardinality | Move resource-kind multi-service admission out of create-resource use case and into resource domain behavior. | `resources.create` |
 | Continuous C | `ResourceKindValue` and `ResourceServiceKindValue` internal-port predicates | Move inbound listener requirement literals out of the aggregate method and into owned value objects. | `Resource.requiresInternalPort()` |
 | Continuous D | `DomainBindingStatusValue` lifecycle gates | Move ready, route-failure, and verification-retry status sets into the status value object. | `DomainBinding` lifecycle methods |
+| Continuous E | `Environment`, `Resource`, and `Destination` context ownership for domain bindings | Reuse aggregate ownership behavior for durable domain binding context admission. | `domain-bindings.create` |
 
 ## Roadmap And Compatibility
 
@@ -162,6 +163,12 @@
 - Related application tests after Continuous D:
   - `packages/application/test/confirm-domain-binding-ownership.test.ts`
   - `packages/application/test/domain-binding-lifecycle.test.ts`
+- Continuous E test bindings:
+  - Existing `DMBH-CONTEXT-001` ownership behavior tests in
+    `packages/core/test/context-ownership.test.ts`
+  - Matrix row: `ROUTE-TLS-CMD-006`
+- Related application tests after Continuous E:
+  - `packages/application/test/create-domain-binding.test.ts`
 
 ## Risks And Migration Gaps
 
@@ -193,6 +200,8 @@
     `ResourceServiceKindValue`.
   - Continuous D migrates domain-binding lifecycle gate status sets behind
     `DomainBindingStatusValue`.
+  - Continuous E migrates `domain-bindings.create` context ownership checks behind `Environment`,
+    `Resource`, and `Destination` ownership methods.
   - Core value objects may compare their own primitive state internally. Those reads are not
     boundary leaks.
 - A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.

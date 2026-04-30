@@ -497,6 +497,8 @@ Meaning:
 Rules:
 - names are unique within a project
 - environments answer whether they belong to a selected project context
+- `domain-bindings.create` and other cross-context commands must use the aggregate-owned
+  project membership question instead of re-reading environment state ids for policy decisions
 - snapshots are immutable
 - build-time variables must be explicitly public
 - lifecycle state is explicit; locked environments remain readable but reject new configuration
@@ -556,6 +558,8 @@ Meaning:
 Rules:
 - belongs to exactly one deployment target/server
 - destinations answer whether they belong to a selected deployment target/server context
+- `domain-bindings.create` must use the destination-owned server membership question when
+  validating binding placement
 - names are unique within a target
 - deployments reference the selected destination as well as the selected target
 
@@ -578,6 +582,8 @@ Rules:
 - owner scope is governed by ADR-005: project, environment, resource, destination, server, domain,
   path prefix, proxy kind, TLS mode, and certificate policy are explicit
 - active bindings must be unique by normalized project/environment/resource/domain/path scope
+- binding creation uses `Environment`, `Resource`, and `Destination` ownership behavior for
+  context admission before creating the durable binding
 - a binding may be a managed canonical redirect alias when `redirectTo` references an existing
   served binding in the same owner/path scope; redirect aliases still own their source hostname
 - bindings answer whether they can serve as a managed canonical redirect target; redirect aliases

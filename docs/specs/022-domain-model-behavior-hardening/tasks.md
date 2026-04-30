@@ -183,6 +183,17 @@
 - [x] Run `bun test packages/application/test/confirm-domain-binding-ownership.test.ts`.
 - [x] Run `bun test packages/application/test/domain-binding-lifecycle.test.ts`.
 
+## Continuous E: Domain Binding Context Ownership Behavior
+
+- [x] Reuse `DMBH-CONTEXT-001` ownership behavior tests at
+  `packages/core/test/context-ownership.test.ts`.
+- [x] Extend `create-domain-binding` application tests for context mismatch coverage.
+- [x] Refactor `create-domain-binding.use-case.ts` to call `Environment`, `Resource`, and
+  `Destination` ownership behavior instead of peeling aggregate ids from state for context
+  decisions.
+- [x] Run `bun test packages/core/test/context-ownership.test.ts`.
+- [x] Run `bun test packages/application/test/create-domain-binding.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.
