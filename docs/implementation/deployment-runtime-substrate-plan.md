@@ -214,6 +214,11 @@ Required coverage:
   planners, explicit custom commands, and explicit container-native profiles win; preview output
   exposes builder policy, detected buildpacks, limitations, unsupported/ambiguous/missing evidence
   reason codes, and fix paths without adding deployment input fields.
+- runtime plan resolution unsupported/override failures expose one shared pre-execution contract
+  across current and future planner families: support tier, phase, reason code, safe evidence, fix
+  path, override path, and affected resource profile field. Unsupported, ambiguous, and missing
+  evidence must fail before execution instead of becoming image build or runtime failures when the
+  problem is knowable during planning.
 - target backend registry selects local and generic-SSH backends by provider key/capabilities
   without expanding transport input schemas;
 - unsupported target/provider/capability combinations return structured `runtime-target-resolution`
@@ -350,6 +355,11 @@ evidence, missing internal port, explicit override precedence, environment/secre
 future MCP/tool metadata parity. The first Code Round should use a hermetic fake adapter-owned
 resolver/contract test and must not wire real `pack` or lifecycle execution until a later
 adapter/runtime spec and tests govern it.
+
+Runtime plan resolution unsupported/override guardrails have a Phase 5 contract artifact at
+`docs/specs/018-runtime-plan-resolution-unsupported-override-contract`. The intended Code Round is
+contract-level hardening with hermetic fake resolver/planner fixtures, shared reason codes,
+fix/override path preview parity, and no real Docker/buildpack/lifecycle execution.
 
 `build-requested`, resolved image ids/digests, runtime instance identity, rollback candidate
 capture, command specs on the durable runtime plan boundary, and richer source-file analysis are

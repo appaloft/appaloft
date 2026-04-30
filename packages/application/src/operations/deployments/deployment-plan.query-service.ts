@@ -1,4 +1,5 @@
 import {
+  type DomainError,
   domainError,
   err,
   ok,
@@ -496,18 +497,206 @@ function reason(input: {
   phase: string;
   message: string;
   recommendation?: string;
+  evidence?: DeploymentPlanReason["evidence"];
+  fixPath?: DeploymentPlanReason["fixPath"];
+  overridePath?: DeploymentPlanReason["overridePath"];
+  affectedProfileField?: string;
   relatedEntityId?: string;
   relatedEntityType?: string;
 }): DeploymentPlanReason {
   return {
     code: input.code,
+    reasonCode: input.code,
     category: input.category ?? "blocked",
     phase: input.phase,
     message: input.message,
     ...(input.recommendation ? { recommendation: input.recommendation } : {}),
+    ...(input.evidence ? { evidence: input.evidence } : {}),
+    ...(input.fixPath ? { fixPath: input.fixPath } : {}),
+    ...(input.overridePath ? { overridePath: input.overridePath } : {}),
+    ...(input.affectedProfileField ? { affectedProfileField: input.affectedProfileField } : {}),
     ...(input.relatedEntityId ? { relatedEntityId: input.relatedEntityId } : {}),
     ...(input.relatedEntityType ? { relatedEntityType: input.relatedEntityType } : {}),
   };
+}
+
+function knownReasonCode(value: string | undefined): DeploymentPlanReasonCode | undefined {
+  switch (value) {
+    case "resource-source-missing":
+    case "resource-source-unnormalized":
+    case "runtime-profile-missing":
+    case "network-profile-missing":
+    case "internal-port-missing":
+    case "missing-internal-port":
+    case "static-publish-directory-missing":
+    case "compose-target-service-missing":
+    case "unsupported-framework":
+    case "unsupported-runtime-family":
+    case "ambiguous-framework":
+    case "ambiguous-framework-evidence":
+    case "ambiguous-build-tool":
+    case "ambiguous-jvm-build-tool":
+    case "ambiguous-python-app-target":
+    case "missing-asgi-app":
+    case "missing-build-tool":
+    case "missing-jvm-build-tool":
+    case "missing-runnable-jar":
+    case "missing-wsgi-app":
+    case "missing-python-app-target":
+    case "missing-start-intent":
+    case "missing-build-intent":
+    case "missing-production-start-command":
+    case "missing-static-output":
+    case "missing-source-root":
+    case "missing-artifact-output":
+    case "incompatible-source-strategy":
+    case "runtime-target-unsupported":
+    case "unsupported-runtime-target":
+    case "unsupported-container-native-profile":
+    case "access-plan-unavailable":
+    case "buildpack-disabled":
+    case "buildpack-target-unavailable":
+    case "unsupported-buildpack-builder":
+    case "unsupported-buildpack-lifecycle-feature":
+    case "ambiguous-buildpack-evidence":
+    case "missing-buildpack-evidence":
+    case "buildpack-start-intent-missing":
+    case "buildpack-preview-limited":
+      return value;
+  }
+}
+
+function sharedPlanReasonCode(error: DomainError): DeploymentPlanReasonCode {
+  const detailReason =
+    typeof error.details?.reasonCode === "string" ? error.details.reasonCode : undefined;
+  const direct = knownReasonCode(detailReason);
+  if (direct) {
+    switch (direct) {
+      case "ambiguous-framework":
+      case "ambiguous-python-app-target":
+        return "ambiguous-framework-evidence";
+      case "ambiguous-jvm-build-tool":
+        return "ambiguous-build-tool";
+      case "missing-jvm-build-tool":
+        return "missing-build-tool";
+      case "missing-runnable-jar":
+      case "missing-static-output":
+      case "static-publish-directory-missing":
+        return "missing-artifact-output";
+      case "missing-asgi-app":
+      case "missing-wsgi-app":
+      case "missing-python-app-target":
+      case "missing-production-start-command":
+      case "buildpack-start-intent-missing":
+        return "missing-start-intent";
+      case "internal-port-missing":
+        return "missing-internal-port";
+      case "runtime-target-unsupported":
+        return "unsupported-runtime-target";
+      default:
+        return direct;
+    }
+  }
+
+  const phase = typeof error.details?.phase === "string" ? error.details.phase : undefined;
+  if (phase === "resource-network-resolution") {
+    return "missing-internal-port";
+  }
+  if (phase === "runtime-target-resolution" || error.code === "runtime_target_unsupported") {
+    return "unsupported-runtime-target";
+  }
+  if (phase === "resource-source-resolution") {
+    return "resource-source-missing";
+  }
+  if (phase === "runtime-plan-resolution") {
+    return "unsupported-framework";
+  }
+  return "unsupported-framework";
+}
+
+function affectedProfileField(reasonCode: DeploymentPlanReasonCode): string | undefined {
+  switch (reasonCode) {
+    case "ambiguous-framework-evidence":
+    case "missing-source-root":
+      return "source.baseDirectory";
+    case "ambiguous-build-tool":
+    case "missing-build-tool":
+    case "missing-build-intent":
+    case "missing-artifact-output":
+      return "runtime.buildCommand";
+    case "missing-start-intent":
+    case "unsupported-framework":
+    case "unsupported-runtime-family":
+      return "runtime.startCommand";
+    case "missing-internal-port":
+    case "internal-port-missing":
+      return "network.internalPort";
+    case "unsupported-container-native-profile":
+      return "runtime.dockerfilePath";
+  }
+}
+
+function fixOperation(reasonCode: DeploymentPlanReasonCode): string {
+  switch (reasonCode) {
+    case "missing-internal-port":
+    case "internal-port-missing":
+    case "network-profile-missing":
+      return "resources.configure-network";
+    case "resource-source-missing":
+    case "resource-source-unnormalized":
+    case "missing-source-root":
+    case "ambiguous-framework-evidence":
+      return "resources.configure-source";
+    default:
+      return "resources.configure-runtime";
+  }
+}
+
+function blockedReasonFromError(error: DomainError): DeploymentPlanReason {
+  const reasonCode = sharedPlanReasonCode(error);
+  const phase =
+    typeof error.details?.phase === "string" ? error.details.phase : "runtime-plan-resolution";
+  const profileField = affectedProfileField(reasonCode);
+  const targetOperation = fixOperation(reasonCode);
+  const fixPath = [
+    {
+      kind: "command" as const,
+      targetOperation,
+      label: "Fix resource profile",
+      ...(profileField ? { profileField } : {}),
+      safeByDefault: true,
+    },
+  ];
+  const overridePath =
+    reasonCode === "missing-internal-port" || reasonCode === "internal-port-missing"
+      ? []
+      : [
+          {
+            kind: "command" as const,
+            targetOperation: "resources.configure-runtime",
+            label: "Use explicit runtime or container-native profile",
+            profileField: "runtime.startCommand",
+            safeByDefault: true,
+          },
+        ];
+
+  return reason({
+    code: reasonCode,
+    phase,
+    message: error.message,
+    recommendation: "Fix the resource profile or provide an explicit override before deploying.",
+    evidence: Object.entries(error.details ?? {})
+      .filter(([key]) => key !== "phase" && key !== "reasonCode")
+      .map(([key, value]) => ({
+        kind: key,
+        label: key,
+        value: Array.isArray(value) ? value.join(",") : String(value),
+        source: "runtime-plan-resolution",
+      })),
+    fixPath,
+    overridePath,
+    ...(profileField ? { affectedProfileField: profileField } : {}),
+  });
 }
 
 @injectable()
@@ -587,7 +776,22 @@ export class DeploymentPlanQueryService {
       }
 
       const snapshot = yield* deploymentSnapshotFactory.create(environment, resource);
-      const requestedDeploymentBase = yield* requestedDeploymentFromResource(resource);
+      const requestedDeploymentBaseResult = requestedDeploymentFromResource(resource);
+      if (requestedDeploymentBaseResult.isErr()) {
+        return ok(
+          blockedDeploymentPlanPreview({
+            destination,
+            environment,
+            error: requestedDeploymentBaseResult.error,
+            project,
+            resource,
+            server,
+            source: detected.source,
+            sourceReasoning: detected.reasoning,
+          }),
+        );
+      }
+      const requestedDeploymentBase = requestedDeploymentBaseResult.value;
       const targetContext = {
         projectId: project.toState().id.value,
         environmentId: environment.toState().id.value,
@@ -634,26 +838,55 @@ export class DeploymentPlanQueryService {
         detectedReasoning: detected.reasoning,
         requestedDeployment: requestedDeploymentWithRuntimeMetadata,
       });
-      const runtimePlan = yield* await runtimePlanResolver.resolve(context, runtimePlanInput);
+      const runtimePlanResult = await runtimePlanResolver.resolve(context, runtimePlanInput);
+      if (runtimePlanResult.isErr()) {
+        return ok(
+          blockedDeploymentPlanPreview({
+            destination,
+            environment,
+            error: runtimePlanResult.error,
+            project,
+            resource,
+            server,
+            source: detected.source,
+            sourceReasoning: detected.reasoning,
+          }),
+        );
+      }
+      const runtimePlan = runtimePlanResult.value;
       const runtimeTargetBackend = runtimeTargetBackendRegistry.find({
         targetKind: runtimePlan.target.kind,
         providerKey: runtimePlan.target.providerKey,
         requiredCapabilities: requiredRuntimeTargetCapabilities(runtimePlan),
       });
       if (runtimeTargetBackend.isErr()) {
-        return err(
-          domainError.runtimeTargetUnsupported(runtimeTargetBackend.error.message, {
-            ...(runtimeTargetBackend.error.details ?? {}),
-            queryName: "deployments.plan",
-            phase: "runtime-target-resolution",
-            projectId: targetContext.projectId,
-            environmentId: targetContext.environmentId,
-            resourceId: targetContext.resourceId,
-            serverId: targetContext.serverId,
-            destinationId: targetContext.destinationId,
-            runtimePlanStrategy: requestedDeploymentWithRuntimeMetadata.method,
-            targetKind: runtimePlan.target.kind,
-            targetProviderKey: runtimePlan.target.providerKey,
+        return ok(
+          deploymentPlanPreview({
+            destination,
+            environment,
+            includeCommandSpecs: query.includeCommandSpecs,
+            project,
+            resource,
+            runtimePlan,
+            sourceReasoning: detected.reasoning,
+            server,
+            unsupportedReasons: [
+              blockedReasonFromError(
+                domainError.runtimeTargetUnsupported(runtimeTargetBackend.error.message, {
+                  ...(runtimeTargetBackend.error.details ?? {}),
+                  queryName: "deployments.plan",
+                  phase: "runtime-target-resolution",
+                  projectId: targetContext.projectId,
+                  environmentId: targetContext.environmentId,
+                  resourceId: targetContext.resourceId,
+                  serverId: targetContext.serverId,
+                  destinationId: targetContext.destinationId,
+                  runtimePlanStrategy: requestedDeploymentWithRuntimeMetadata.method,
+                  targetKind: runtimePlan.target.kind,
+                  targetProviderKey: runtimePlan.target.providerKey,
+                }),
+              ),
+            ],
           }),
         );
       }
@@ -674,6 +907,128 @@ export class DeploymentPlanQueryService {
   }
 }
 
+function blockedDeploymentPlanPreview(input: {
+  project: import("@appaloft/core").Project;
+  environment: import("@appaloft/core").Environment;
+  resource: Resource;
+  server: Parameters<RuntimePlanResolutionInputBuilder["build"]>[0]["server"];
+  destination: import("@appaloft/core").Destination;
+  source: SourceDescriptor;
+  sourceReasoning: string[];
+  error: DomainError;
+}): DeploymentPlanPreview {
+  const projectState = input.project.toState();
+  const environmentState = input.environment.toState();
+  const resourceState = input.resource.toState();
+  const serverState = input.server.toState();
+  const destinationState = input.destination.toState();
+  const sourceState = input.source.toState();
+  const sourceInspection = sourceState.inspection;
+  const unsupportedReason = blockedReasonFromError(input.error);
+  const runtimeStrategy = resourceState.runtimeProfile?.strategy.value;
+
+  return {
+    schemaVersion: "deployments.plan/v1",
+    context: {
+      projectId: projectState.id.value,
+      environmentId: environmentState.id.value,
+      resourceId: resourceState.id.value,
+      serverId: serverState.id.value,
+      destinationId: destinationState.id.value,
+      projectName: projectState.name.value,
+      environmentName: environmentState.name.value,
+      resourceName: resourceState.name.value,
+      serverName: serverState.name.value,
+    },
+    readiness: {
+      status: "blocked",
+      ready: false,
+      reasonCodes: [unsupportedReason.code],
+    },
+    source: {
+      kind: sourceState.kind.value,
+      displayName: sourceState.displayName.value,
+      locator: sourceState.locator.value,
+      ...(sourceInspection?.runtimeFamily ? { runtimeFamily: sourceInspection.runtimeFamily } : {}),
+      ...(sourceInspection?.framework ? { framework: sourceInspection.framework } : {}),
+      ...(sourceInspection?.packageManager
+        ? { packageManager: sourceInspection.packageManager }
+        : {}),
+      ...(sourceInspection?.applicationShape
+        ? { applicationShape: sourceInspection.applicationShape }
+        : {}),
+      ...(sourceInspection?.runtimeVersion
+        ? { runtimeVersion: sourceInspection.runtimeVersion }
+        : {}),
+      ...(sourceInspection?.projectName ? { projectName: sourceInspection.projectName } : {}),
+      detectedFiles: sourceInspection?.detectedFiles ?? [],
+      detectedScripts: sourceInspection?.detectedScripts ?? [],
+      ...(sourceInspection?.dockerfilePath
+        ? { dockerfilePath: sourceInspection.dockerfilePath }
+        : {}),
+      ...(sourceInspection?.composeFilePath
+        ? { composeFilePath: sourceInspection.composeFilePath }
+        : {}),
+      ...(sourceInspection?.jarPath ? { jarPath: sourceInspection.jarPath } : {}),
+      reasoning: input.sourceReasoning,
+    },
+    planner: {
+      plannerKey: "unsupported",
+      supportTier:
+        unsupportedReason.code === "ambiguous-framework-evidence" ||
+        unsupportedReason.code === "ambiguous-build-tool"
+          ? "requires-override"
+          : "unsupported",
+      buildStrategy:
+        runtimeStrategy === "dockerfile"
+          ? "dockerfile"
+          : runtimeStrategy === "docker-compose"
+            ? "compose-deploy"
+            : runtimeStrategy === "prebuilt-image"
+              ? "prebuilt-image"
+              : runtimeStrategy === "static"
+                ? "static-artifact"
+                : "workspace-commands",
+      packagingMode: "all-in-one-docker",
+      targetKind: serverState.targetKind.value,
+      targetProviderKey: serverState.providerKey.value,
+    },
+    artifact: {
+      kind: "workspace-image",
+    },
+    commands: [],
+    network: {
+      ...(resourceState.networkProfile?.internalPort
+        ? { internalPort: resourceState.networkProfile.internalPort.value }
+        : {}),
+      ...(resourceState.networkProfile
+        ? {
+            upstreamProtocol: resourceState.networkProfile.upstreamProtocol.value,
+            exposureMode: resourceState.networkProfile.exposureMode.value,
+            ...(resourceState.networkProfile.hostPort
+              ? { hostPort: resourceState.networkProfile.hostPort.value }
+              : {}),
+            ...(resourceState.networkProfile.targetServiceName
+              ? { targetServiceName: resourceState.networkProfile.targetServiceName.value }
+              : {}),
+          }
+        : {}),
+    },
+    health: {
+      enabled: false,
+      kind: "none",
+    },
+    warnings: [],
+    unsupportedReasons: [unsupportedReason],
+    nextActions: nextActions([unsupportedReason]),
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+/*
+ * The remaining preview builder is used once runtime plan resolution succeeds. Unsupported
+ * reasons may still be supplied for target-capability blockers discovered after planning.
+ */
 function deploymentPlanPreview(input: {
   project: import("@appaloft/core").Project;
   environment: import("@appaloft/core").Environment;
@@ -683,6 +1038,7 @@ function deploymentPlanPreview(input: {
   runtimePlan: import("@appaloft/core").RuntimePlan;
   sourceReasoning: string[];
   includeCommandSpecs: boolean;
+  unsupportedReasons?: DeploymentPlanReason[];
 }): DeploymentPlanPreview {
   const projectState = input.project.toState();
   const environmentState = input.environment.toState();
@@ -700,7 +1056,7 @@ function deploymentPlanPreview(input: {
     metadata["workspace.planner"] ??
     runtimeArtifact?.metadata?.planner ??
     runtimePlanState.buildStrategy.value;
-  const unsupportedReasons: DeploymentPlanReason[] = [];
+  const unsupportedReasons: DeploymentPlanReason[] = [...(input.unsupportedReasons ?? [])];
   const warnings: DeploymentPlanReason[] = [];
   const access = accessSummary(executionState.metadata);
 
@@ -833,7 +1189,7 @@ function supportTier(
     return "buildpack-accelerated";
   }
   if (plannerKey === "custom") {
-    return "custom";
+    return "explicit-custom";
   }
   if (
     plannerKey.startsWith("generic-") ||
@@ -925,7 +1281,9 @@ function nextActions(
   return unsupportedReasons.map((item) => ({
     kind: "command",
     targetOperation:
-      item.code === "internal-port-missing" || item.code === "network-profile-missing"
+      item.code === "internal-port-missing" ||
+      item.code === "missing-internal-port" ||
+      item.code === "network-profile-missing"
         ? "resources.configure-network"
         : "resources.configure-runtime",
     label: item.recommendation ?? "Fix resource profile",

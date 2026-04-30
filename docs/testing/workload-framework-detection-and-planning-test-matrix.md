@@ -229,6 +229,27 @@ Code Round governs execution.
 | WF-PLAN-BP-009 | contract/integration | Environment and variable boundary | Buildpack candidate needs build/runtime variables, including secret-bearing values and build-time/public values | Preview masks secrets, preserves build-time `PUBLIC_`/`VITE_` rules, and never creates deployment-owned environment overrides. |
 | WF-PLAN-BP-010 | contract / future | MCP/tool metadata parity | Future tool descriptor exposes deployment planning | Tool metadata maps to `deployments.plan` and preserves buildpack evidence, tier, limitation, reason-code, and next-action shape. |
 
+## Runtime Plan Resolution Failure Matrix
+
+These rows govern the shared unsupported/override contract used by current JavaScript/TypeScript,
+Python, JVM/buildpack preview rows and future Go, Ruby, PHP, .NET, Rust, and Elixir planner rows.
+Test names must include the matrix id they prove.
+
+| Test ID | Preferred automation | Case | Expected result |
+| --- | --- | --- | --- |
+| WF-PLAN-FAIL-001 | contract/integration | Unsupported framework | A source detects a framework with no first-class planner and no explicit fallback commands | Planning is blocked before execution with support tier `unsupported`, reason `unsupported-framework`, safe evidence, fix path, override path, and phase `runtime-plan-resolution`. |
+| WF-PLAN-FAIL-002 | contract/integration | Unsupported runtime family | A source detects a runtime family with no active Appaloft planner path | Planning is blocked with `unsupported-runtime-family` and points to explicit custom commands, Dockerfile, Compose, or prebuilt image profile. |
+| WF-PLAN-FAIL-003 | contract/integration | Ambiguous framework evidence | Multiple frameworks or runnable apps are detected under the selected source root | Planning is blocked or requires override with `ambiguous-framework-evidence`, affected field `source.baseDirectory` or a runtime strategy/profile field, and no guessed planner. |
+| WF-PLAN-FAIL-004 | contract/integration | Ambiguous build tool | Maven/Gradle, npm/pnpm/yarn/bun, or another runtime-family build-tool choice is ambiguous | Planning is blocked with `ambiguous-build-tool` and a fix/override path that selects source root or explicit build tool/profile. |
+| WF-PLAN-FAIL-005 | contract/integration | Missing build tool | Runtime family evidence exists but no supported build tool/package manager/artifact evidence exists | Planning is blocked with `missing-build-tool`, safe file evidence, and a resource runtime/profile fix path. |
+| WF-PLAN-FAIL-006 | contract/integration | Missing start or build intent repaired by explicit command | Source evidence lacks safe production start/build intent | Planning blocks with `missing-start-intent` or `missing-build-intent`; when explicit runtime commands are supplied, support tier becomes `explicit-custom` and inferred commands do not win. |
+| WF-PLAN-FAIL-007 | integration | Missing internal port for serverful HTTP/SSR | Serverful HTTP or SSR shape has no persisted or deterministic resource network port | Planning is blocked with `missing-internal-port` in `resource-network-resolution`; no deployment-owned port field is produced. |
+| WF-PLAN-FAIL-008 | integration | Static shape default port | Static shape has deterministic output or explicit publish directory | Planning uses Appaloft static-server internal port `80` and does not require user port input. |
+| WF-PLAN-FAIL-009 | contract/integration | Missing source root/base directory | Source-root evidence is ambiguous or the requested base directory cannot be resolved safely | Planning is blocked with `missing-source-root` and points to `source.baseDirectory`. |
+| WF-PLAN-FAIL-010 | contract/integration | Missing artifact output | Static, jar, binary, publish, or packaged artifact output cannot be selected | Planning is blocked with `missing-artifact-output` and points to publish directory, artifact output, or explicit commands. |
+| WF-PLAN-FAIL-011 | contract/integration | Unsupported runtime target | Workload plan requires a backend capability the selected runtime target lacks | Planning blocks before execution with `unsupported-runtime-target` or command admission fails with `runtime_target_unsupported` in `runtime-target-resolution`. |
+| WF-PLAN-FAIL-012 | contract/integration | Unsupported container-native profile | Dockerfile, Compose, or prebuilt image profile is explicit but unsupported, inconsistent, or missing required target service/image metadata | Planning is blocked with `unsupported-container-native-profile`; framework/buildpack evidence cannot replace the explicit profile. |
+
 ## Boundary Matrix
 
 | Test ID | Preferred automation | Case | Expected result |
