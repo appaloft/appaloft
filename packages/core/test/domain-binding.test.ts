@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  CanonicalRedirectStatusCode,
   CertificatePolicyValue,
   CreatedAt,
   DeploymentTargetId,
@@ -24,6 +25,8 @@ function domainBinding(input?: {
   status?: "bound" | "certificate_pending" | "ready" | "not_ready" | "pending_verification";
   tlsMode?: "auto" | "disabled";
   certificatePolicy?: "auto" | "manual" | "disabled";
+  domainName?: string;
+  redirectTo?: string;
 }) {
   return DomainBinding.rehydrate({
     id: DomainBindingId.rehydrate("dom_demo"),
@@ -32,11 +35,17 @@ function domainBinding(input?: {
     resourceId: ResourceId.rehydrate("res_demo"),
     serverId: DeploymentTargetId.rehydrate("srv_demo"),
     destinationId: DestinationId.rehydrate("dst_demo"),
-    domainName: PublicDomainName.rehydrate("app.example.com"),
+    domainName: PublicDomainName.rehydrate(input?.domainName ?? "app.example.com"),
     pathPrefix: RoutePathPrefix.rehydrate("/"),
     proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
     tlsMode: TlsModeValue.rehydrate(input?.tlsMode ?? "auto"),
     certificatePolicy: CertificatePolicyValue.rehydrate(input?.certificatePolicy ?? "auto"),
+    ...(input?.redirectTo
+      ? {
+          redirectTo: PublicDomainName.rehydrate(input.redirectTo),
+          redirectStatus: CanonicalRedirectStatusCode.rehydrate(308),
+        }
+      : {}),
     status: DomainBindingStatusValue.rehydrate(input?.status ?? "bound"),
     verificationAttempts: [
       {
@@ -152,5 +161,43 @@ describe("DomainBinding", () => {
       certificatePolicy: "disabled",
     });
     expect(recoveredRoute.canBecomeReadyAfterRouteRealization()).toBe(true);
+  });
+
+  test("[DMBH-DOMAIN-002] answers canonical redirect target eligibility", () => {
+    const servedTarget = domainBinding({ domainName: "app.example.com" });
+    expect(servedTarget.canServeCanonicalRedirectTarget()).toBe(true);
+
+    const redirectAlias = domainBinding({
+      domainName: "www.example.com",
+      redirectTo: "app.example.com",
+    });
+    expect(redirectAlias.canServeCanonicalRedirectTarget()).toBe(false);
+
+    const source = domainBinding({ domainName: "docs.example.com" });
+    const eligible = source.ensureCanonicalRedirectTarget({
+      redirectTo: PublicDomainName.rehydrate("app.example.com"),
+      target: servedTarget,
+      phase: "domain-binding-route-configuration",
+    });
+    expect(eligible.isOk()).toBe(true);
+
+    const missingTarget = source.ensureCanonicalRedirectTarget({
+      redirectTo: PublicDomainName.rehydrate("missing.example.com"),
+      phase: "domain-binding-route-configuration",
+    });
+    expect(missingTarget.isErr()).toBe(true);
+    if (missingTarget.isErr()) {
+      expect(missingTarget.error.details).toMatchObject({
+        phase: "domain-binding-route-configuration",
+        redirectTo: "missing.example.com",
+      });
+    }
+
+    const redirectTarget = source.ensureCanonicalRedirectTarget({
+      redirectTo: PublicDomainName.rehydrate("www.example.com"),
+      target: redirectAlias,
+      phase: "domain-binding-route-configuration",
+    });
+    expect(redirectTarget.isErr()).toBe(true);
   });
 });

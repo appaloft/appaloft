@@ -371,6 +371,12 @@ export interface DomainBindingCertificateIssueContext {
   certificatePolicy: CertificatePolicyValue;
 }
 
+export interface DomainBindingCanonicalRedirectTargetInput {
+  redirectTo: PublicDomainName;
+  target?: DomainBinding | null;
+  phase?: string;
+}
+
 export interface DomainBindingVisitor<TContext, TResult> {
   visitDomainBinding(domainBinding: DomainBinding, context: TContext): TResult;
 }
@@ -596,6 +602,44 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
 
   isReady(): boolean {
     return this.state.status.isReady();
+  }
+
+  get id(): DomainBindingId {
+    return this.state.id;
+  }
+
+  get projectId(): ProjectId {
+    return this.state.projectId;
+  }
+
+  get environmentId(): EnvironmentId {
+    return this.state.environmentId;
+  }
+
+  get resourceId(): ResourceId {
+    return this.state.resourceId;
+  }
+
+  get pathPrefix(): RoutePathPrefix {
+    return this.state.pathPrefix;
+  }
+
+  canServeCanonicalRedirectTarget(): boolean {
+    return this.state.status.isActive() && !this.state.redirectTo;
+  }
+
+  ensureCanonicalRedirectTarget(input: DomainBindingCanonicalRedirectTargetInput): Result<void> {
+    if (!input.target?.canServeCanonicalRedirectTarget()) {
+      return err(
+        domainError.validation("Canonical redirect target must be an active served binding", {
+          phase: input.phase ?? "domain-binding-route-configuration",
+          domainBindingId: this.state.id.value,
+          redirectTo: input.redirectTo.value,
+        }),
+      );
+    }
+
+    return ok(undefined);
   }
 
   recordDnsObservation(input: {
