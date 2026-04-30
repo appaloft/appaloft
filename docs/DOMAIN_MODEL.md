@@ -591,6 +591,8 @@ Rules:
   served binding in the same owner/path scope; redirect aliases still own their source hostname
 - bindings answer whether they can serve as a managed canonical redirect target; redirect aliases
   cannot serve as redirect targets for other bindings
+- binding route admission uses edge-proxy kind predicates and value-object equality for redirect
+  target/self-target/change detection
 - durable bindings require an edge proxy kind; `none` is only valid for deployment runtime
   access-route hints
 - command success means the request is accepted and pending verification, not traffic readiness

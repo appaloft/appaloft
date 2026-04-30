@@ -225,6 +225,54 @@ describe("DomainBinding", () => {
       phase: "domain-binding-route-configuration",
     });
     expect(redirectTarget.isErr()).toBe(true);
+
+    const disabledProxy = DomainBinding.create({
+      id: DomainBindingId.rehydrate("dom_disabled_proxy"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      resourceId: ResourceId.rehydrate("res_demo"),
+      serverId: DeploymentTargetId.rehydrate("srv_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+      domainName: PublicDomainName.rehydrate("disabled.example.com"),
+      pathPrefix: RoutePathPrefix.rehydrate("/"),
+      proxyKind: EdgeProxyKindValue.rehydrate("none"),
+      tlsMode: TlsModeValue.rehydrate("disabled"),
+      verificationAttemptId: DomainVerificationAttemptId.rehydrate("dva_disabled_proxy"),
+      verificationExpectedTarget: MessageText.rehydrate("Verify DNS ownership"),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    });
+    const createSelfRedirect = DomainBinding.create({
+      id: DomainBindingId.rehydrate("dom_self_redirect"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      resourceId: ResourceId.rehydrate("res_demo"),
+      serverId: DeploymentTargetId.rehydrate("srv_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+      domainName: PublicDomainName.rehydrate("self.example.com"),
+      pathPrefix: RoutePathPrefix.rehydrate("/"),
+      proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
+      tlsMode: TlsModeValue.rehydrate("auto"),
+      redirectTo: PublicDomainName.rehydrate("self.example.com"),
+      verificationAttemptId: DomainVerificationAttemptId.rehydrate("dva_self_redirect"),
+      verificationExpectedTarget: MessageText.rehydrate("Verify DNS ownership"),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    });
+    const routeSelfRedirect = source.configureRoute({
+      redirectTo: PublicDomainName.rehydrate("docs.example.com"),
+      configuredAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    });
+    const unchangedRoute = redirectAlias.configureRoute({
+      redirectTo: PublicDomainName.rehydrate("app.example.com"),
+      redirectStatus: CanonicalRedirectStatusCode.rehydrate(308),
+      configuredAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    });
+
+    expect(EdgeProxyKindValue.rehydrate("none").isDisabled()).toBe(true);
+    expect(disabledProxy.isErr()).toBe(true);
+    expect(createSelfRedirect.isErr()).toBe(true);
+    expect(routeSelfRedirect.isErr()).toBe(true);
+    expect(unchangedRoute.isOk()).toBe(true);
+    expect(unchangedRoute._unsafeUnwrap().changed).toBe(false);
   });
 
   test("[DMBH-DOMAIN-003] prepares ownership confirmation context without caller-owned attempt branching", () => {

@@ -50,6 +50,7 @@ helpers, providers, and adapters.
 | DMBH-SPEC-016 | Domain binding context ownership uses aggregate intent | Domain binding creation resolves project, environment, resource, destination, and server context | the use case validates owner consistency before creating a durable binding | `Environment`, `Resource`, and `Destination` answer ownership and placement questions through intention methods; the use case does not peel aggregate state ids for those decisions. |
 | DMBH-SPEC-017 | Runtime plan VO admission uses owned predicates | Runtime plan access routes and artifact snapshots validate route/proxy and artifact requirements | `AccessRoute` or `RuntimeArtifactSnapshot` is created | The owning VO composes `EdgeProxyKindValue`, `RuntimeArtifactKindValue`, and `RuntimeArtifactIntentValue` predicates instead of branching on raw primitive values. |
 | DMBH-SPEC-018 | Resource binding scope/injection coherence is aggregate-owned | A resource binding has a scope and injection mode | binding creation validates whether runtime references are allowed | `ResourceBinding` coordinates scope and injection mode predicates; it does not expose the cross-VO rule as raw string branching. |
+| DMBH-SPEC-019 | Domain binding route admission uses VO equality and proxy predicates | A durable domain binding is created or route behavior is configured | the aggregate validates proxy kind, redirect self-targeting, and route-change detection | `DomainBinding` composes `EdgeProxyKindValue.isDisabled()` and value-object equality; it does not compare route primitives directly. |
 
 ## Domain Ownership
 
@@ -84,6 +85,8 @@ helpers, providers, and adapters.
     admission predicates for route domains and artifact prerequisites.
   - `ResourceBinding` owns scope/injection-mode coherence while `ResourceBindingScopeValue` and
     `ResourceInjectionModeValue` answer single-value predicates.
+  - `DomainBinding` owns route admission/change predicates for proxy kind, redirect target, and
+    optional redirect state equality.
 - Upstream/downstream contexts: no new context relationship is introduced.
 
 ## Public Surfaces
