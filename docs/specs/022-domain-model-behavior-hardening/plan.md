@@ -73,6 +73,14 @@
   - `packages/application/test/server-edge-proxy-bootstrap.test.ts`
   - `packages/application/test/create-deployment.test.ts`
   - `packages/contracts/test/deployment-plan-preview-contract.test.ts`
+- Slice 3 test bindings:
+  - `DMBH-DOMAIN-001` in `packages/core/test/domain-binding.test.ts`
+  - Existing behavioral rows: `ROUTE-TLS-CMD-011`, `ROUTE-TLS-CMD-014`,
+    `ROUTE-TLS-EVT-004`, `ROUTE-TLS-EVT-008`, `ROUTE-TLS-EVT-009`,
+    `ROUTE-TLS-EVT-014`
+- Related application tests after slice 3:
+  - `packages/application/test/confirm-domain-binding-ownership.test.ts`
+  - `packages/application/test/issue-or-renew-certificate.test.ts`
 
 ## Risks And Migration Gaps
 

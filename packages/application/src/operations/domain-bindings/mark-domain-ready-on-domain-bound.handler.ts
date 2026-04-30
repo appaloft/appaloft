@@ -54,21 +54,19 @@ export class MarkDomainReadyOnDomainBoundHandler implements EventHandlerContract
         return ok(undefined);
       }
 
-      const state = domainBinding.toState();
-      if (state.status.value === "ready") {
+      if (domainBinding.isReady()) {
         return ok(undefined);
       }
 
-      if (state.status.value !== "bound") {
+      if (!domainBinding.canBecomeReadyWhenDomainBound()) {
+        const state = domainBinding.toState();
         logger.debug("domain_ready.skipped_not_bound", {
           requestId: context.requestId,
           domainBindingId: domainBindingId.value,
           status: state.status.value,
+          tlsMode: state.tlsMode.value,
+          certificatePolicy: state.certificatePolicy.value,
         });
-        return ok(undefined);
-      }
-
-      if (state.tlsMode.value !== "disabled" && state.certificatePolicy.value !== "disabled") {
         return ok(undefined);
       }
 

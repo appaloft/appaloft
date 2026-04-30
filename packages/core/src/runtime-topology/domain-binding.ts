@@ -114,12 +114,38 @@ export class DomainBindingStatusValue extends ScalarValueObject<DomainBindingSta
     return new DomainBindingStatusValue("pending_verification");
   }
 
+  allowsCertificateIssue(): boolean {
+    return this.value === "bound" || this.value === "certificate_pending" || this.value === "ready";
+  }
+
+  allowsCertificateImport(): boolean {
+    return this.value === "bound" || this.value === "ready" || this.value === "not_ready";
+  }
+
+  allowsCertificateReadiness(): boolean {
+    return this.value === "bound" || this.value === "certificate_pending";
+  }
+
+  allowsRouteReadiness(): boolean {
+    return (
+      this.value === "bound" || this.value === "certificate_pending" || this.value === "not_ready"
+    );
+  }
+
   isActive(): boolean {
     return this.value !== "failed" && this.value !== "deleted";
   }
 
+  isBound(): boolean {
+    return this.value === "bound";
+  }
+
   isDeleted(): boolean {
     return this.value === "deleted";
+  }
+
+  isReady(): boolean {
+    return this.value === "ready";
   }
 }
 
@@ -227,6 +253,18 @@ export class CertificatePolicyValue extends ScalarValueObject<CertificatePolicy>
   static defaultForTlsMode(tlsMode: TlsModeValue): CertificatePolicyValue {
     return new CertificatePolicyValue(tlsMode.value === "disabled" ? "disabled" : "auto");
   }
+
+  isDisabled(): boolean {
+    return this.value === "disabled";
+  }
+
+  isManual(): boolean {
+    return this.value === "manual";
+  }
+
+  requiresCertificateFor(tlsMode: TlsModeValue): boolean {
+    return !tlsMode.isDisabled() && !this.isDisabled();
+  }
 }
 
 const domainRouteFailurePhaseBrand: unique symbol = Symbol("DomainRouteFailurePhaseValue");
@@ -324,6 +362,13 @@ export interface DomainBindingState {
   routeFailure?: DomainRouteFailureState;
   createdAt: CreatedAt;
   idempotencyKey?: IdempotencyKeyValue;
+}
+
+export interface DomainBindingCertificateIssueContext {
+  domainBindingId: DomainBindingId;
+  domainName: PublicDomainName;
+  tlsMode: TlsModeValue;
+  certificatePolicy: CertificatePolicyValue;
 }
 
 export interface DomainBindingVisitor<TContext, TResult> {
@@ -470,6 +515,87 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
           }
         : {}),
     });
+  }
+
+  requiresCertificateForReadiness(): boolean {
+    return this.state.certificatePolicy.requiresCertificateFor(this.state.tlsMode);
+  }
+
+  resolveCertificateIssueContext(input?: {
+    phase?: string;
+  }): Result<DomainBindingCertificateIssueContext> {
+    if (!this.requiresCertificateForReadiness() || !this.state.status.allowsCertificateIssue()) {
+      return err(
+        domainError.certificateNotAllowed("Domain binding does not allow certificate issuance", {
+          phase: input?.phase ?? "certificate-admission",
+          domainBindingId: this.state.id.value,
+          tlsMode: this.state.tlsMode.value,
+          certificatePolicy: this.state.certificatePolicy.value,
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    return ok({
+      domainBindingId: this.state.id,
+      domainName: this.state.domainName,
+      tlsMode: this.state.tlsMode,
+      certificatePolicy: this.state.certificatePolicy,
+    });
+  }
+
+  resolveCertificateImportContext(input?: {
+    phase?: string;
+  }): Result<DomainBindingCertificateIssueContext> {
+    if (
+      this.state.tlsMode.isDisabled() ||
+      !this.state.certificatePolicy.isManual() ||
+      !this.state.status.allowsCertificateImport()
+    ) {
+      return err(
+        domainError.certificateImportNotAllowed(
+          "Domain binding does not allow manual certificate import",
+          {
+            phase: input?.phase ?? "certificate-admission",
+            domainBindingId: this.state.id.value,
+            tlsMode: this.state.tlsMode.value,
+            certificatePolicy: this.state.certificatePolicy.value,
+            relatedState: this.state.status.value,
+          },
+        ),
+      );
+    }
+
+    return ok({
+      domainBindingId: this.state.id,
+      domainName: this.state.domainName,
+      tlsMode: this.state.tlsMode,
+      certificatePolicy: this.state.certificatePolicy,
+    });
+  }
+
+  canBecomeReadyWhenDomainBound(): boolean {
+    return this.state.status.isBound() && !this.requiresCertificateForReadiness();
+  }
+
+  canBecomeReadyAfterCertificateIssued(): boolean {
+    return this.state.status.allowsCertificateReadiness() && this.requiresCertificateForReadiness();
+  }
+
+  canBecomeReadyAfterCertificateImported(): boolean {
+    return (
+      this.state.status.allowsCertificateReadiness() &&
+      this.state.certificatePolicy.isManual() &&
+      !this.state.tlsMode.isDisabled()
+    );
+  }
+
+  canBecomeReadyAfterRouteRealization(): boolean {
+    return this.state.status.allowsRouteReadiness() && !this.requiresCertificateForReadiness();
+  }
+
+  isReady(): boolean {
+    return this.state.status.isReady();
   }
 
   recordDnsObservation(input: {

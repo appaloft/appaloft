@@ -120,6 +120,7 @@ Then:
 | ROUTE-TLS-CMD-021 | integration | Configure domain binding route behavior | Active binding and optional served canonical target in the same owner/path scope | `ok({ id })` | None | `domain-binding-route-configured` when changed | Binding route behavior switches between serve and redirect without deployment/certificate side effects | No |
 | ROUTE-TLS-CMD-022 | integration | Delete domain binding safely | Binding has no active certificate blockers and exact id confirmation is supplied | `ok({ id })` | None | `domain-binding-deleted` | Binding becomes inactive/deleted; generated access, deployment snapshots, certificate history, and server-applied audit remain | No |
 | ROUTE-TLS-CMD-023 | integration | Retry ownership verification | Binding is pending verification or not ready after DNS/evidence changes | `ok({ id, verificationAttemptId })` | None | `domain-binding-verification-retried` | New verification attempt exists; old attempts remain historical; no certificate retry is dispatched | No |
+| DMBH-DOMAIN-001 | unit + integration | Domain binding owns certificate and ready gates | Binding status, TLS mode, and certificate policy vary across bound, certificate-pending, ready, not-ready, TLS-disabled, manual, auto, and disabled-policy cases | Certificate and ready callers ask `DomainBinding` intention methods | Same errors/events/state as the existing command/event rows | No new event | Public behavior unchanged; only behavior placement changes | No |
 
 ## Event Matrix
 
@@ -294,6 +295,12 @@ slice.
 
 Current tests cover `ROUTE-TLS-EVT-004`, `ROUTE-TLS-READMODEL-001`,
 `ROUTE-TLS-READMODEL-002`, `ROUTE-TLS-READMODEL-003`, and `ROUTE-TLS-ENTRY-012`.
+
+`DMBH-DOMAIN-001` is the domain-model hardening row for the no-behavior-change certificate
+admission and ready-gate refactor. It is bound to `packages/core/test/domain-binding.test.ts` and
+verified with `packages/application/test/confirm-domain-binding-ownership.test.ts`,
+`packages/application/test/issue-or-renew-certificate.test.ts`, and
+`packages/application/test/import-certificate.test.ts`.
 
 Current tests also cover `ROUTE-TLS-CMD-011`, `ROUTE-TLS-CMD-012`,
 `ROUTE-TLS-CMD-013`, `ROUTE-TLS-CMD-014`, `ROUTE-TLS-CMD-015`,

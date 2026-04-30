@@ -176,29 +176,16 @@ export class IssueOrRenewCertificateUseCase {
         return err(notFoundInCertificateContext("Domain binding", domainBindingId.value));
       }
 
+      const certificateContext = yield* domainBinding.resolveCertificateIssueContext({
+        phase: "certificate-admission",
+      });
       const domainBindingState = domainBinding.toState();
-      const allowedBindingStates = ["bound", "certificate_pending", "ready"];
-      if (
-        domainBindingState.tlsMode.value === "disabled" ||
-        domainBindingState.certificatePolicy.value === "disabled" ||
-        !allowedBindingStates.includes(domainBindingState.status.value)
-      ) {
-        return err(
-          domainError.certificateNotAllowed("Domain binding does not allow certificate issuance", {
-            phase: "certificate-admission",
-            domainBindingId: domainBindingId.value,
-            tlsMode: domainBindingState.tlsMode.value,
-            certificatePolicy: domainBindingState.certificatePolicy.value,
-            relatedState: domainBindingState.status.value,
-          }),
-        );
-      }
 
       const providerSelectionResult = await certificateProviderSelectionPolicy.select(context, {
-        domainBindingId: domainBindingState.id.value,
-        domainName: domainBindingState.domainName.value,
-        tlsMode: domainBindingState.tlsMode.value,
-        certificatePolicy: domainBindingState.certificatePolicy.value,
+        domainBindingId: certificateContext.domainBindingId.value,
+        domainName: certificateContext.domainName.value,
+        tlsMode: certificateContext.tlsMode.value,
+        certificatePolicy: certificateContext.certificatePolicy.value,
         ...(input.providerKey ? { providerKey: input.providerKey } : {}),
         ...(input.challengeType ? { challengeType: input.challengeType } : {}),
       });
@@ -247,7 +234,7 @@ export class IssueOrRenewCertificateUseCase {
         : yield* Certificate.request({
             id: certificateId,
             domainBindingId,
-            domainName: domainBindingState.domainName,
+            domainName: certificateContext.domainName,
             attemptId,
             reason,
             providerKey,
