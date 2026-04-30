@@ -96,6 +96,12 @@ test expectations in the same change.
 | `generic-wsgi-pip` | `WF-PLAN-PY-005` | `gunicorn 23.0.0`, pip requirements | `python`, generic WSGI evidence, `pip`, `serverful-http` | `generic-wsgi` or generic `python`, workspace image, deterministic WSGI start default |
 | `python-poetry-web` | `WF-PLAN-PY-006` | Poetry metadata/lock marker plus supported web evidence | `python`, detected framework or ASGI/WSGI evidence, `poetry`, `serverful-http` | workspace image, Poetry install/start commands |
 | `python-explicit-start` | `WF-PLAN-PY-007` | Python package evidence plus explicit resource runtime start command | `python`, no unsafe framework selection required, selected package tool, `serverful-http` | generic `python` or custom fallback workspace image using explicit commands |
+| `spring-boot-maven-wrapper` | `WF-PLAN-JVM-001` | Spring Boot `3.4.4`, Maven wrapper marker, `.java-version` 21 | `java`, `spring-boot`, `maven`, `serverful-http`, `maven-wrapper`, Spring Boot dependency/plugin evidence | `spring-boot`, workspace image, `./mvnw package -DskipTests`, deterministic `java -jar` start, Java base image from `.java-version` |
+| `spring-boot-maven` | `WF-PLAN-JVM-002` | Spring Boot `3.4.4`, Maven project without wrapper | `java`, `spring-boot`, `maven`, `serverful-http`, `pom.xml`, Spring Boot dependency/plugin evidence | `spring-boot`, workspace image, `mvn package -DskipTests`, deterministic `java -jar` start |
+| `spring-boot-gradle-wrapper` | `WF-PLAN-JVM-003` | Spring Boot `3.4.4`, Gradle wrapper marker, Groovy DSL | `java`, `spring-boot`, `gradle`, `serverful-http`, `gradle-wrapper`, Spring Boot plugin/dependency evidence | `spring-boot`, workspace image, `./gradlew bootJar -x test`, deterministic `java -jar` start from `build/libs` |
+| `spring-boot-gradle-kts` | `WF-PLAN-JVM-004` | Spring Boot `3.4.4`, Gradle wrapper marker, Kotlin DSL | `java`, `spring-boot`, `gradle`, `serverful-http`, `gradle-wrapper`, `build.gradle.kts`, Spring Boot plugin/dependency evidence | `spring-boot`, workspace image, `./gradlew bootJar -x test`, deterministic `java -jar` start from `build/libs` |
+| `jvm-explicit-start` | `WF-PLAN-JVM-005` | JVM project evidence plus explicit resource runtime start command | `java`, selected build tool or generic JVM evidence, `serverful-http` | generic JVM/custom fallback workspace image using explicit commands |
+| `generic-java-jar` | `WF-PLAN-JVM-006` | Generic Java/JVM project with exactly one deterministic runnable jar evidence item | `java`, no named framework, selected build tool or jar evidence, `serverful-http` | generic JVM planner, workspace image, deterministic `java -jar` start |
 
 ## Detection Evidence Matrix
 
@@ -180,6 +186,30 @@ do not claim full fixture-by-fixture real Docker or SSH execution; those remain 
 | WF-PLAN-PY-012 | integration | Internal port behavior | Python serverful planners use the resource network profile port and do not add deployment-owned `port` input; missing required port is blocked in `resource-network-resolution` when no deterministic persisted profile value exists. |
 | WF-PLAN-PY-013 | contract/integration | Preview parity | `deployments.plan/v1` exposes ready and blocked Python planner output with source evidence, planner key/support tier, artifact kind, command specs, network, health, warnings, unsupported reasons, and next actions without creating a deployment attempt. |
 
+## JVM Tested Catalog Closure Matrix
+
+These rows close the Phase 5 JVM/Spring Boot tested catalog at the headless Docker/OCI readiness
+layer. They do not claim full fixture-by-fixture real Docker or SSH execution; those remain tracked
+by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`.
+
+| Test ID | Preferred automation | Case | Expected result |
+| --- | --- | --- | --- |
+| WF-PLAN-JVM-001 | integration | Spring Boot Maven project with `mvnw` | `spring-boot-maven-wrapper` records Spring Boot Maven dependency/plugin evidence, Maven wrapper evidence, Java version, `spring-boot` planner metadata, Java base image policy, package/start command specs, workspace image artifact, and resource-owned internal port. |
+| WF-PLAN-JVM-002 | integration | Spring Boot Maven project without wrapper | `spring-boot-maven` records Spring Boot Maven evidence and uses system Maven command rendering without requiring wrapper files. |
+| WF-PLAN-JVM-003 | integration | Spring Boot Gradle project with `gradlew` | `spring-boot-gradle-wrapper` records Gradle wrapper and Spring Boot plugin/dependency evidence, emits Gradle `bootJar` command specs, and starts the deterministic jar from `build/libs`. |
+| WF-PLAN-JVM-004 | integration | Spring Boot Gradle Kotlin DSL project | `spring-boot-gradle-kts` records Kotlin DSL Gradle evidence and uses the same Spring Boot planner contract as Groovy DSL Gradle projects. |
+| WF-PLAN-JVM-005 | integration | Generic JVM explicit start-command fallback | JVM source with missing or unsupported framework evidence plans only when explicit resource runtime profile install/build/start commands make a Docker/OCI image plan possible. |
+| WF-PLAN-JVM-006 | integration | Generic deterministic runnable jar fallback | Generic JVM source with one deterministic runnable jar evidence item selects a generic JVM planner path, emits `java -jar` start command specs, and avoids framework-specific deployment fields. |
+| WF-PLAN-JVM-007 | unit/integration | JVM build tool precedence | Explicit tool selection wins when supported; otherwise Maven wrapper/Maven and Gradle wrapper/Gradle evidence select their owning tool. Maven/Gradle ambiguity is diagnostic or blocked when no source root/profile selection resolves it. |
+| WF-PLAN-JVM-008 | integration | Runnable jar discovery | Spring Boot and generic JVM planners emit `java -jar` only when jar path selection is deterministic from explicit profile, artifact naming, or exactly one safe jar evidence item. |
+| WF-PLAN-JVM-009 | integration | Spring Boot actuator health evidence | Spring Boot fixtures with actuator dependency may default health to an actuator endpoint; non-actuator Spring Boot fixtures use the generic HTTP default unless resource health policy wins. |
+| WF-PLAN-JVM-010 | integration | Unsupported JVM framework without fallback | Quarkus, Micronaut, or another unsupported JVM framework is blocked with `unsupported-framework` unless explicit fallback commands produce a containerizable image plan. |
+| WF-PLAN-JVM-011 | integration | Ambiguous Maven/Gradle evidence | Source root with both Maven and Gradle runnable project evidence and no explicit selection is blocked with `ambiguous-jvm-build-tool`. |
+| WF-PLAN-JVM-012 | integration | Missing runnable jar or production start command | JVM evidence without deterministic jar path and without explicit start command is rejected with `missing-runnable-jar` or `missing-production-start-command` in `runtime-plan-resolution`. |
+| WF-PLAN-JVM-013 | integration | Missing JVM build tool evidence | Generic JVM source without Maven, Gradle, jar, or explicit command evidence is rejected with `missing-jvm-build-tool` or `unsupported-framework` in `runtime-plan-resolution`. |
+| WF-PLAN-JVM-014 | integration | Internal port behavior | JVM serverful planners use the resource network profile port and do not add deployment-owned `port` input; missing required port is blocked in `resource-network-resolution` when no deterministic persisted profile value exists. |
+| WF-PLAN-JVM-015 | contract/integration | Preview parity | `deployments.plan/v1` exposes ready and blocked JVM planner output with source evidence, build tool, planner key/support tier, artifact kind, command specs, network, health, warnings, unsupported reasons, and next actions without creating a deployment attempt. |
+
 ## Boundary Matrix
 
 | Test ID | Preferred automation | Case | Expected result |
@@ -202,7 +232,7 @@ asserts the equivalent Dockerfile/build/run/verification evidence without execut
 | --- | --- | --- | --- | --- |
 | WF-PLAN-SMOKE-001 | integration, opt-in Docker e2e | Static frontend | Next static export, Vite, React, Vue, Svelte, Solid, Angular, Nuxt generate, Astro static, and SvelteKit static fixtures start from source/runtime/network resource profile fields | Planner selects a static image artifact, generated Dockerfile packages the publish directory into the adapter-owned static server, internal port is 80 unless the resource profile overrides it, and typed Docker build/run commands are renderable from the plan. Representative opt-in real Docker coverage is tracked by `WF-PLAN-SMOKE-005`; full real Docker/SSH coverage for every static catalog fixture remains a migration gap. |
 | WF-PLAN-SMOKE-002 | integration, opt-in Docker e2e | Node HTTP and SSR server | Next SSR/standalone, Remix, Express, Fastify, NestJS, Hono, Koa, and generic Node fixtures start from the same profile vocabulary | Planner selects a workspace-command image artifact with Node/Bun base policy, install/build/start commands, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. Representative opt-in real Docker coverage is tracked by `WF-PLAN-SMOKE-005`; full real Docker/SSH coverage for every Node catalog fixture remains a migration gap. |
-| WF-PLAN-SMOKE-003 | integration, opt-in Docker e2e | Python HTTP server | FastAPI, Django, Flask, and generic Python fixtures when present start from the same profile vocabulary | Planner selects a workspace-command image artifact with Python base policy, package-manager install/start command, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. Representative opt-in real Docker coverage is tracked by `WF-PLAN-SMOKE-005`; full real Docker/SSH coverage for every Python catalog fixture remains a migration gap. |
+| WF-PLAN-SMOKE-003 | integration, opt-in Docker e2e | Python and JVM HTTP server | FastAPI, Django, Flask, generic Python, Spring Boot, and generic JVM fixtures when present start from the same profile vocabulary | Planner selects a workspace-command image artifact with language-family base policy, package/build-tool install/build/start command, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. Representative opt-in real Docker coverage is tracked by `WF-PLAN-SMOKE-005`; full real Docker/SSH coverage for every Python/JVM catalog fixture remains a migration gap. |
 | WF-PLAN-SMOKE-004 | integration | Unsupported or ambiguous fixture boundary | Unsupported framework evidence or ambiguous hybrid evidence lacks explicit fallback commands | Planning fails with `validation_error` in phase `runtime-plan-resolution`; explicit fallback commands may instead produce a Docker/OCI image plan without adding deployment command fields. |
 | WF-PLAN-SMOKE-005 | opt-in local Docker e2e | Representative real local Docker fixture slice | Vite or Next static export plus Angular SPA, React SPA, or SvelteKit static; Next SSR or Remix plus one Node HTTP framework; FastAPI plus Django or Flask when dependency installation is available, otherwise Django plus Flask with the FastAPI dependency gap recorded | The same resource source/runtime/network profile draft used by Quick Deploy is persisted before ids-only `deployments.create` or equivalent shell workflow; Docker really builds an image, starts a container, resolves the published internal HTTP verification URL, records runtime metadata/logs, and exposes typed Docker build/run command evidence without framework/base-image/buildpack deployment fields. |
 | WF-PLAN-SMOKE-006 | opt-in SSH e2e or contract with migration gap | Representative generic-SSH fixture slice | The same representative fixture descriptors used by `WF-PLAN-SMOKE-005`, executed through generic-SSH when a real target is configured | The harness selects the generic-SSH backend from the same resource profile and proves remote Docker build/run/verification when enabled. Without a configured SSH target, contract coverage may prove backend selection, but real SSH fixture execution remains an explicit migration gap. |
@@ -243,7 +273,10 @@ the current Next.js, Remix, Nuxt generate, SvelteKit static/ambiguous, Astro sta
 Node HTTP framework, generic package-script, missing evidence, and internal-port behavior to
 executable fixture tests. Python tested catalog closure rows `WF-PLAN-PY-001` through
 `WF-PLAN-PY-013` bind the Python ASGI/WSGI hardening round to executable fixture and contract
-tests.
+tests. JVM tested catalog closure rows `WF-PLAN-JVM-001` through `WF-PLAN-JVM-015` bind Spring Boot
+Maven/Gradle, generic JVM fallback, unsupported JVM framework, ambiguous build-tool, missing build
+tool, missing runnable jar, actuator health, internal-port, and preview parity behavior to
+executable fixture and contract tests.
 Fixed-version framework fixture tests now cover detector evidence for the table above, enforce exact
 manifest/requirements versions, and feed supported fixtures through runtime planning without
 installing dependencies or executing framework CLIs. Planner fixture coverage includes Next.js SSR,
@@ -251,6 +284,7 @@ Next.js standalone output, Next.js static export, Vite, React SPA static, Vue SP
 static, Solid SPA static, SvelteKit adapter-static, Nuxt generate, Astro static, Remix, Express,
 Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI, Django, Flask, deterministic
 generic ASGI, deterministic generic WSGI, Poetry Python web projects, and explicit Python start
+fallbacks, Spring Boot Maven/Gradle, generic deterministic JVM jar, and explicit JVM start
 fallbacks, including Angular `angular.json` output-path planning.
 `WF-PLAN-BOUND-001` has command-schema coverage for rejecting framework/package/base-image/buildpack
 deployment fields. `WF-PLAN-ENTRY-005` and `WF-PLAN-ENTRY-006` govern the current Web/CLI/repository
@@ -259,12 +293,14 @@ unsupported catalog families, SvelteKit server-adapter start inference, Astro SS
 full browser-level Web/CLI entry parity for every catalog fixture.
 
 `WF-PLAN-SMOKE-001` through `WF-PLAN-SMOKE-003` cover the current supported
-JavaScript/TypeScript/Python fixture catalog through headless Docker/OCI execution readiness. They
+JavaScript/TypeScript/Python/JVM fixture catalog through headless Docker/OCI execution readiness. They
 prove the resource source/runtime/network profile can resolve to generated Dockerfile evidence,
 image artifact intent, docker-container execution, internal HTTP verification, and typed Docker
 command rendering without adding framework-specific deployment fields. Python coverage includes
 FastAPI with `uv`, Django and Flask with pip/requirements, deterministic generic ASGI/WSGI, Poetry,
-explicit start fallback, missing ASGI app, and ambiguous app-target rejection. Full real Docker/SSH
+explicit start fallback, missing ASGI app, and ambiguous app-target rejection. JVM coverage includes
+Spring Boot Maven/Gradle, generic deterministic jar, explicit start fallback, unsupported framework,
+ambiguous build-tool, missing build tool, and missing runnable jar rejection. Full real Docker/SSH
 execution for every catalog fixture remains a migration gap until opt-in environment coverage is
 broadened.
 
@@ -290,4 +326,4 @@ artifact output, network/readiness behavior, and absence of deployment command f
 ## Open Questions
 
 - Which unsupported catalog families should be implemented first after the current JavaScript,
-  Python, Java, static, and custom-command slices?
+  Python, Spring Boot/JVM, static, and custom-command slices?

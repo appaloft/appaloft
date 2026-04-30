@@ -3,10 +3,12 @@ import { join } from "node:path";
 import type { ExecutionContext } from "@appaloft/application";
 import {
   ConfigScopeValue,
+  DeploymentTargetId,
   EnvironmentConfigSnapshot,
   EnvironmentId,
   EnvironmentSnapshotId,
   GeneratedAt,
+  ProviderKey,
 } from "@appaloft/core";
 import { RuntimeCommandBuilder, renderRuntimeCommandString } from "../src/runtime-commands";
 import { pinnedBunAlpineImage } from "../src/workspace-planners/bun";
@@ -66,6 +68,13 @@ function createEnvironmentSnapshot(snapshotId: string) {
   });
 }
 
+function createTarget(id: string) {
+  return {
+    id: DeploymentTargetId.rehydrate(id),
+    providerKey: ProviderKey.rehydrate("local-shell"),
+  };
+}
+
 const fixturesRoot = join(import.meta.dir, "../../filesystem/test/fixtures/frameworks");
 
 interface PlannerFixtureExpectation {
@@ -83,6 +92,7 @@ interface PlannerFixtureExpectation {
   installCommand?: string;
   buildCommand?: string;
   startCommand?: string;
+  healthCheckPath?: string;
 }
 
 const plannerFixtures: PlannerFixtureExpectation[] = [
@@ -452,6 +462,74 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     installCommand: "pip install --no-cache-dir poetry && poetry install --only main --no-root",
     startCommand: "poetry run python -m flask --app app:app run --host 0.0.0.0 --port 3000",
   },
+  {
+    matrixIds: "WF-PLAN-CAT-013,WF-PLAN-JVM-001,WF-PLAN-JVM-007,WF-PLAN-JVM-008,WF-PLAN-JVM-009,WF-PLAN-JVM-014",
+    fixture: "spring-boot-maven-wrapper",
+    port: 8080,
+    buildStrategy: "workspace-commands",
+    planner: "spring-boot",
+    runtimeKind: "spring-boot",
+    applicationShape: "serverful-http",
+    framework: "spring-boot",
+    packageManager: "maven",
+    baseImage: "eclipse-temurin:21-jdk",
+    buildCommand: "./mvnw package -DskipTests",
+    startCommand: "java -jar target/spring-boot-maven-wrapper-0.0.1-SNAPSHOT.jar",
+    healthCheckPath: "/actuator/health",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-013,WF-PLAN-JVM-002,WF-PLAN-JVM-007,WF-PLAN-JVM-008,WF-PLAN-JVM-014",
+    fixture: "spring-boot-maven",
+    port: 8080,
+    buildStrategy: "workspace-commands",
+    planner: "spring-boot",
+    runtimeKind: "spring-boot",
+    applicationShape: "serverful-http",
+    framework: "spring-boot",
+    packageManager: "maven",
+    baseImage: "eclipse-temurin:21-jdk",
+    buildCommand: "mvn package -DskipTests",
+    startCommand: "java -jar target/spring-boot-maven-0.0.1-SNAPSHOT.jar",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-013,WF-PLAN-JVM-003,WF-PLAN-JVM-007,WF-PLAN-JVM-008,WF-PLAN-JVM-014",
+    fixture: "spring-boot-gradle-wrapper",
+    port: 8080,
+    buildStrategy: "workspace-commands",
+    planner: "spring-boot",
+    runtimeKind: "spring-boot",
+    applicationShape: "serverful-http",
+    framework: "spring-boot",
+    packageManager: "gradle",
+    baseImage: "eclipse-temurin:21-jdk",
+    buildCommand: "./gradlew bootJar -x test",
+    startCommand: "java -jar build/libs/spring-boot-gradle-wrapper-0.0.1-SNAPSHOT.jar",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-013,WF-PLAN-JVM-004,WF-PLAN-JVM-007,WF-PLAN-JVM-008,WF-PLAN-JVM-014",
+    fixture: "spring-boot-gradle-kts",
+    port: 8080,
+    buildStrategy: "workspace-commands",
+    planner: "spring-boot",
+    runtimeKind: "spring-boot",
+    applicationShape: "serverful-http",
+    framework: "spring-boot",
+    packageManager: "gradle",
+    baseImage: "eclipse-temurin:21-jdk",
+    buildCommand: "./gradlew bootJar -x test",
+    startCommand: "java -jar build/libs/spring-boot-gradle-kts-0.0.1-SNAPSHOT.jar",
+  },
+  {
+    matrixIds: "WF-PLAN-JVM-006,WF-PLAN-JVM-008,WF-PLAN-JVM-014",
+    fixture: "generic-java-jar",
+    port: 8080,
+    buildStrategy: "workspace-commands",
+    planner: "java",
+    runtimeKind: "java",
+    applicationShape: "serverful-http",
+    baseImage: "eclipse-temurin:21-jdk",
+    startCommand: "java -jar target/generic-java-jar-1.0.0.jar",
+  },
 ];
 
 type ResourceRuntimeStrategy = "auto" | "static" | "workspace-commands";
@@ -488,6 +566,7 @@ interface ResourceProfileDeploySmoke {
     installCommand?: string;
     buildCommand?: string;
     startCommand?: string;
+    healthCheckPath?: string;
   };
 }
 
@@ -527,7 +606,9 @@ function smokeMatrixIdFor(fixture: PlannerFixtureExpectation): string {
     fixture.runtimeKind === "django" ||
     fixture.runtimeKind === "flask" ||
     fixture.runtimeKind === "generic-asgi" ||
-    fixture.runtimeKind === "generic-wsgi"
+    fixture.runtimeKind === "generic-wsgi" ||
+    fixture.runtimeKind === "spring-boot" ||
+    fixture.runtimeKind === "java"
   ) {
     return "WF-PLAN-SMOKE-003";
   }
@@ -557,6 +638,7 @@ const resourceProfileDeploySmokes: ResourceProfileDeploySmoke[] = plannerFixture
     ...(fixture.installCommand ? { installCommand: fixture.installCommand } : {}),
     ...(fixture.buildCommand ? { buildCommand: fixture.buildCommand } : {}),
     ...(fixture.startCommand ? { startCommand: fixture.startCommand } : {}),
+    ...(fixture.healthCheckPath ? { healthCheckPath: fixture.healthCheckPath } : {}),
   },
 }));
 
@@ -584,10 +666,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
       const result = await new DefaultRuntimePlanResolver().resolve(context, {
         id: `plan_${fixture.fixture}`,
         source: sourceResult._unsafeUnwrap().source,
-        server: {
-          id: `srv_${fixture.fixture}`,
-          providerKey: "local-shell",
-        },
+        server: createTarget(`srv_${fixture.fixture}`),
         environmentSnapshot: createEnvironmentSnapshot(`snap_${fixture.fixture}`),
         detectedReasoning: [`detected ${fixture.fixture}`],
         requestedDeployment: {
@@ -617,11 +696,12 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
       expect(plan.execution.installCommand).toBe(fixture.installCommand);
       expect(plan.execution.buildCommand).toBe(fixture.buildCommand);
       expect(plan.execution.startCommand).toBe(fixture.startCommand);
+      expect(plan.execution.healthCheckPath).toBe(fixture.healthCheckPath);
 
       if (fixture.buildStrategy === "workspace-commands" && fixture.baseImage) {
         const dockerBuild = generateWorkspaceDockerBuild({
           execution: plan.execution,
-          sourceInspection: plan.source.inspection,
+          ...(plan.source.inspection ? { sourceInspection: plan.source.inspection } : {}),
         });
 
         expect(dockerBuild?.dockerfile).toContain(`FROM ${fixture.baseImage}`);
@@ -639,7 +719,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
       if (fixture.buildStrategy === "static-artifact" && fixture.baseImage) {
         const dockerBuild = generateStaticSiteDockerBuild({
           execution: plan.execution,
-          sourceInspection: plan.source.inspection,
+          ...(plan.source.inspection ? { sourceInspection: plan.source.inspection } : {}),
         });
 
         expect(dockerBuild?.dockerfile).toContain(`FROM ${fixture.baseImage} AS build`);
@@ -724,10 +804,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
       const result = await new DefaultRuntimePlanResolver().resolve(context, {
         id: `plan_smoke_${smoke.fixture}`,
         source,
-        server: {
-          id: deploymentCreateInput.serverId,
-          providerKey: "local-shell",
-        },
+        server: createTarget(deploymentCreateInput.serverId),
         environmentSnapshot: createEnvironmentSnapshot(`snap_smoke_${smoke.fixture}`),
         detectedReasoning: [`quick deploy smoke detected ${smoke.fixture}`],
         requestedDeployment,
@@ -742,11 +819,11 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
         plan.buildStrategy === "static-artifact"
           ? generateStaticSiteDockerBuild({
               execution: plan.execution,
-              sourceInspection: plan.source.inspection,
+              ...(plan.source.inspection ? { sourceInspection: plan.source.inspection } : {}),
             })
           : generateWorkspaceDockerBuild({
               execution: plan.execution,
-              sourceInspection: plan.source.inspection,
+              ...(plan.source.inspection ? { sourceInspection: plan.source.inspection } : {}),
             });
 
       expect(plan.buildStrategy).toBe(smoke.expected.buildStrategy);
@@ -844,10 +921,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
     const result = await new DefaultRuntimePlanResolver().resolve(context, {
       id: "plan_sveltekit_ambiguous_fixture",
       source: sourceResult._unsafeUnwrap().source,
-      server: {
-        id: "srv_sveltekit_ambiguous_fixture",
-        providerKey: "local-shell",
-      },
+      server: createTarget("srv_sveltekit_ambiguous_fixture"),
       environmentSnapshot: createEnvironmentSnapshot("snap_sveltekit_ambiguous_fixture"),
       detectedReasoning: ["detected sveltekit ambiguous fixture"],
       requestedDeployment: {
@@ -891,10 +965,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
     const result = await new DefaultRuntimePlanResolver().resolve(context, {
       id: "plan_python_explicit_start",
       source: sourceResult._unsafeUnwrap().source,
-      server: {
-        id: "srv_python_explicit_start",
-        providerKey: "local-shell",
-      },
+      server: createTarget("srv_python_explicit_start"),
       environmentSnapshot: createEnvironmentSnapshot("snap_python_explicit_start"),
       detectedReasoning: ["detected explicit Python fallback fixture"],
       requestedDeployment: {
@@ -923,7 +994,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
     expect(
       generateWorkspaceDockerBuild({
         execution: plan.execution,
-        sourceInspection: plan.source.inspection,
+        ...(plan.source.inspection ? { sourceInspection: plan.source.inspection } : {}),
       })?.dockerfile,
     ).toContain("python -m waitress --listen=0.0.0.0:4317 service:application");
   });
@@ -945,10 +1016,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
     const result = await new DefaultRuntimePlanResolver().resolve(context, {
       id: "plan_fastapi_missing_app",
       source: sourceResult._unsafeUnwrap().source,
-      server: {
-        id: "srv_fastapi_missing_app",
-        providerKey: "local-shell",
-      },
+      server: createTarget("srv_fastapi_missing_app"),
       environmentSnapshot: createEnvironmentSnapshot("snap_fastapi_missing_app"),
       detectedReasoning: ["detected FastAPI missing app fixture"],
       requestedDeployment: {
@@ -988,10 +1056,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
     const result = await new DefaultRuntimePlanResolver().resolve(context, {
       id: "plan_python_ambiguous_app",
       source: sourceResult._unsafeUnwrap().source,
-      server: {
-        id: "srv_python_ambiguous_app",
-        providerKey: "local-shell",
-      },
+      server: createTarget("srv_python_ambiguous_app"),
       environmentSnapshot: createEnvironmentSnapshot("snap_python_ambiguous_app"),
       detectedReasoning: ["detected ambiguous Python app fixture"],
       requestedDeployment: {
@@ -1009,6 +1074,217 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
         phase: "runtime-plan-resolution",
         runtimeFamily: "python",
         reasonCode: "ambiguous-python-app-target",
+      }),
+    );
+  });
+
+  test("[WF-PLAN-JVM-005][WF-PLAN-JVM-014] accepts explicit JVM start-command fallback", async () => {
+    ensureReflectMetadata();
+    const [
+      { FileSystemSourceDetector },
+      { DefaultRuntimePlanResolver },
+      { generateWorkspaceDockerBuild },
+    ] = await Promise.all([
+      import("@appaloft/adapter-filesystem"),
+      import("../src"),
+      import("../src/workspace-planners"),
+    ]);
+    const context = createTestExecutionContext();
+    const sourceResult = await new FileSystemSourceDetector().detect(
+      context,
+      join(fixturesRoot, "jvm-explicit-start"),
+    );
+
+    expect(sourceResult.isOk()).toBe(true);
+
+    const result = await new DefaultRuntimePlanResolver().resolve(context, {
+      id: "plan_jvm_explicit_start",
+      source: sourceResult._unsafeUnwrap().source,
+      server: createTarget("srv_jvm_explicit_start"),
+      environmentSnapshot: createEnvironmentSnapshot("snap_jvm_explicit_start"),
+      detectedReasoning: ["detected explicit JVM fallback fixture"],
+      requestedDeployment: {
+        method: "auto",
+        port: 4318,
+        buildCommand: "./mvnw package -DskipTests",
+        startCommand: "java -jar target/app.jar --server.port=4318",
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "java",
+        runtimeKind: "java",
+        packageManager: "maven",
+        applicationShape: "serverful-http",
+      }),
+    );
+    expect(plan.execution.port).toBe(4318);
+    expect(plan.execution.startCommand).toBe("java -jar target/app.jar --server.port=4318");
+    expect(
+      generateWorkspaceDockerBuild({
+        execution: plan.execution,
+        ...(plan.source.inspection ? { sourceInspection: plan.source.inspection } : {}),
+      })?.dockerfile,
+    ).toContain("java -jar target/app.jar --server.port=4318");
+  });
+
+  test("[WF-PLAN-JVM-010] blocks unsupported JVM framework without explicit fallback", async () => {
+    ensureReflectMetadata();
+    const [{ FileSystemSourceDetector }, { DefaultRuntimePlanResolver }] = await Promise.all([
+      import("@appaloft/adapter-filesystem"),
+      import("../src"),
+    ]);
+    const context = createTestExecutionContext();
+    const sourceResult = await new FileSystemSourceDetector().detect(
+      context,
+      join(fixturesRoot, "quarkus-unsupported"),
+    );
+
+    expect(sourceResult.isOk()).toBe(true);
+
+    const result = await new DefaultRuntimePlanResolver().resolve(context, {
+      id: "plan_quarkus_unsupported",
+      source: sourceResult._unsafeUnwrap().source,
+      server: createTarget("srv_quarkus_unsupported"),
+      environmentSnapshot: createEnvironmentSnapshot("snap_quarkus_unsupported"),
+      detectedReasoning: ["detected unsupported JVM fixture"],
+      requestedDeployment: {
+        method: "auto",
+        port: 8080,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toEqual(
+      expect.objectContaining({
+        phase: "runtime-plan-resolution",
+        runtimeFamily: "java",
+        framework: "quarkus",
+        reasonCode: "unsupported-framework",
+      }),
+    );
+  });
+
+  test("[WF-PLAN-JVM-011] blocks ambiguous JVM build tool evidence", async () => {
+    ensureReflectMetadata();
+    const [{ FileSystemSourceDetector }, { DefaultRuntimePlanResolver }] = await Promise.all([
+      import("@appaloft/adapter-filesystem"),
+      import("../src"),
+    ]);
+    const context = createTestExecutionContext();
+    const sourceResult = await new FileSystemSourceDetector().detect(
+      context,
+      join(fixturesRoot, "jvm-ambiguous-build-tool"),
+    );
+
+    expect(sourceResult.isOk()).toBe(true);
+
+    const result = await new DefaultRuntimePlanResolver().resolve(context, {
+      id: "plan_jvm_ambiguous_build_tool",
+      source: sourceResult._unsafeUnwrap().source,
+      server: createTarget("srv_jvm_ambiguous_build_tool"),
+      environmentSnapshot: createEnvironmentSnapshot("snap_jvm_ambiguous_build_tool"),
+      detectedReasoning: ["detected ambiguous JVM build tool fixture"],
+      requestedDeployment: {
+        method: "auto",
+        port: 8080,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toEqual(
+      expect.objectContaining({
+        phase: "runtime-plan-resolution",
+        runtimeFamily: "java",
+        reasonCode: "ambiguous-jvm-build-tool",
+      }),
+    );
+  });
+
+  test("[WF-PLAN-JVM-012] blocks JVM project without deterministic runnable jar", async () => {
+    ensureReflectMetadata();
+    const [{ FileSystemSourceDetector }, { DefaultRuntimePlanResolver }] = await Promise.all([
+      import("@appaloft/adapter-filesystem"),
+      import("../src"),
+    ]);
+    const context = createTestExecutionContext();
+    const sourceResult = await new FileSystemSourceDetector().detect(
+      context,
+      join(fixturesRoot, "jvm-missing-jar"),
+    );
+
+    expect(sourceResult.isOk()).toBe(true);
+
+    const result = await new DefaultRuntimePlanResolver().resolve(context, {
+      id: "plan_jvm_missing_jar",
+      source: sourceResult._unsafeUnwrap().source,
+      server: createTarget("srv_jvm_missing_jar"),
+      environmentSnapshot: createEnvironmentSnapshot("snap_jvm_missing_jar"),
+      detectedReasoning: ["detected JVM missing jar fixture"],
+      requestedDeployment: {
+        method: "auto",
+        port: 8080,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toEqual(
+      expect.objectContaining({
+        phase: "runtime-plan-resolution",
+        runtimeFamily: "java",
+        reasonCode: "missing-runnable-jar",
+      }),
+    );
+  });
+
+  test("[WF-PLAN-JVM-013] blocks JVM evidence without build tool or runnable jar", async () => {
+    ensureReflectMetadata();
+    const [{ FileSystemSourceDetector }, { DefaultRuntimePlanResolver }] = await Promise.all([
+      import("@appaloft/adapter-filesystem"),
+      import("../src"),
+    ]);
+    const context = createTestExecutionContext();
+    const sourceResult = await new FileSystemSourceDetector().detect(
+      context,
+      join(fixturesRoot, "jvm-missing-build-tool"),
+    );
+
+    expect(sourceResult.isOk()).toBe(true);
+
+    const result = await new DefaultRuntimePlanResolver().resolve(context, {
+      id: "plan_jvm_missing_build_tool",
+      source: sourceResult._unsafeUnwrap().source,
+      server: createTarget("srv_jvm_missing_build_tool"),
+      environmentSnapshot: createEnvironmentSnapshot("snap_jvm_missing_build_tool"),
+      detectedReasoning: ["detected JVM missing build tool fixture"],
+      requestedDeployment: {
+        method: "auto",
+        port: 8080,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toEqual(
+      expect.objectContaining({
+        phase: "runtime-plan-resolution",
+        runtimeFamily: "java",
+        reasonCode: "missing-jvm-build-tool",
       }),
     );
   });

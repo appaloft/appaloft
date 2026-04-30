@@ -359,6 +359,36 @@ closure. A Python catalog row is complete only when tests prove:
   internal port cases return structured blocked reasons or `validation_error` in the governed
   phases instead of guessing.
 
+### JVM Planner Contract
+
+JVM planners follow the same shared planner contract used by the JavaScript/TypeScript and Python
+catalog closures. A JVM catalog row is complete only when tests prove:
+
+- runtime family, Spring Boot or generic JVM shape, safe project/artifact name, build tool,
+  detected files, detected scripts, runtime version, and runnable artifact evidence are represented
+  as typed evidence;
+- build tool resolution follows explicit resource profile choice when that profile exists, then
+  source-root-specific Maven/Gradle evidence. Maven wrapper and Gradle wrapper select wrapper
+  command rendering for their owning tool; ambiguous Maven/Gradle roots require explicit
+  selection instead of guessing;
+- `.java-version` controls Java base image policy when present, otherwise the planner uses the
+  default Java version policy;
+- Spring Boot evidence comes from Maven/Gradle dependencies/plugins, wrapper files, and
+  deterministic jar metadata where available. Buildpack-style detection may add adapter-owned
+  acceleration later, but it is not the only Spring Boot support path;
+- runnable jar discovery is deterministic before `java -jar` is emitted. If a jar path cannot be
+  selected from explicit profile, deterministic artifact naming, or exactly one safe jar evidence
+  item, the planner requires an explicit production start command;
+- explicit resource runtime profile commands win over inferred framework defaults and are the only
+  fallback for unsupported frameworks or ambiguous JVM app/artifact targets;
+- all successful plans produce Docker/OCI workspace image artifact intent with generated
+  Dockerfile evidence, internal HTTP verification, and resource-owned network/health behavior;
+- Spring Boot actuator evidence may default health to an actuator path. Non-actuator projects use
+  the generic HTTP health default unless explicit resource health policy wins;
+- unsupported, ambiguous, missing build tool, missing runnable jar, missing production start, and
+  missing internal port cases return structured blocked reasons or `validation_error` in the
+  governed phases instead of guessing.
+
 ## Planner Selection
 
 Planner selection order:
@@ -515,6 +545,14 @@ Current typed detection is limited to:
   are bound to source-inspection tests, fixture planner tests, headless Docker/OCI smoke assertions,
   and `deployments.plan/v1` preview contract tests. Full real Docker/SSH execution for every Python
   fixture and deeper Django collectstatic/static handling remain migration gaps.
+- JVM/Spring Boot tested catalog closure has stable rows for Spring Boot Maven with wrapper, Spring
+  Boot Maven without wrapper, Spring Boot Gradle with wrapper, Spring Boot Gradle Kotlin DSL,
+  generic JVM explicit start-command fallback, generic deterministic jar fallback, unsupported JVM
+  framework evidence, ambiguous Maven/Gradle build-tool evidence, missing JVM build tool, missing
+  runnable jar, actuator health defaults, and internal-port behavior. These rows are bound to
+  source-inspection tests, fixture planner tests, headless Docker/OCI smoke assertions, and
+  `deployments.plan/v1` preview contract tests. Full real Docker/SSH execution for every JVM
+  fixture and Quarkus/Micronaut planners remain migration gaps.
 
 The following are migration gaps before the mainstream support catalog is complete:
 

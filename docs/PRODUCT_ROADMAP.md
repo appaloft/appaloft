@@ -524,7 +524,7 @@ Required:
   package scripts.
 - [x] Harden Python support for FastAPI, Django, Flask, generic ASGI/WSGI apps, `uv`, Poetry, pip,
   and explicit start-command fallback.
-- [ ] Add Spring Boot as the first named JVM web framework.
+- [x] Add Spring Boot as the first named JVM web framework.
 - [x] Add framework-family matrix rows for detection, base image policy, install/build/start/package
   commands, artifact outputs, internal port behavior, unsupported evidence, and Web/CLI draft
   parity.
@@ -548,6 +548,12 @@ Exit criteria:
   Angular static SPA, Express/Fastify/NestJS/Hono/Koa, and generic package scripts to stable
   matrix ids, headless Docker/OCI fixture readiness tests, and `deployments.plan/v1` contract
   coverage.
+- [x] JVM/Spring Boot tested catalog closure binds Spring Boot Maven with wrapper, Spring Boot
+  Maven without wrapper, Spring Boot Gradle with wrapper, Spring Boot Gradle Kotlin DSL, generic
+  JVM explicit-command fallback, generic deterministic jar fallback, unsupported JVM frameworks,
+  ambiguous build-tool evidence, missing build tool, missing runnable jar, actuator health
+  defaults, and internal-port behavior to stable matrix ids, headless Docker/OCI fixture readiness
+  tests, and `deployments.plan/v1` contract coverage.
 
 ## Phase 6: Access Policy, Domain/TLS Lifecycle, And Observability Hardening
 
@@ -855,7 +861,8 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
 - [ ] Python: harden collectstatic/static handling and broaden real Docker/SSH smoke beyond the
   representative slice.
 - [x] Java/JVM: generic Maven/Gradle planner exists.
-- [ ] Java/JVM: add Spring Boot first, then Quarkus/Micronaut if demand justifies it.
+- [x] Java/JVM: add Spring Boot first.
+- [ ] Java/JVM: add Quarkus/Micronaut if demand justifies it.
 - [ ] Ruby: add Rails and generic Rack/Sinatra planners or explicit fallback errors.
 - [ ] PHP: add Composer app planner with PHP-FPM or app-server policy.
 - [ ] Go: add generic Go build plus common HTTP framework detection as metadata/defaults.

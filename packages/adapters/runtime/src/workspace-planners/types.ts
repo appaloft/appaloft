@@ -41,7 +41,8 @@ export type WorkspaceRuntimeKind =
   | "nextjs"
   | "node"
   | "python"
-  | "remix";
+  | "remix"
+  | "spring-boot";
 
 export interface WorkspacePlannerInput {
   source: SourceDescriptor;
@@ -57,6 +58,7 @@ export interface WorkspaceRuntimePlan {
   installCommand?: string;
   buildCommand?: string;
   startCommand: string;
+  healthCheckPath?: string;
   metadata: Record<string, string>;
 }
 
