@@ -727,6 +727,8 @@ Meaning:
 Rules:
 - binding scope and injection mode must remain coherent
 - build-only bindings must not leak runtime references
+- scope and injection mode value objects answer single-value predicates, while `ResourceBinding`
+  owns the cross-VO coherence rule
 
 Current scope:
 - foundational aggregate in `core`

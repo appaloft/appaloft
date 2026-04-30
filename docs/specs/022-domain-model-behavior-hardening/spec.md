@@ -49,6 +49,7 @@ helpers, providers, and adapters.
 | DMBH-SPEC-015 | Domain binding lifecycle gates are status-owned | Domain binding status controls ready, route-failure, and verification-retry transitions | the aggregate handles ready marking, route failure, or verification retry | `DomainBindingStatusValue` answers lifecycle gate predicates; aggregate methods compose those predicates instead of repeating status literal sets. |
 | DMBH-SPEC-016 | Domain binding context ownership uses aggregate intent | Domain binding creation resolves project, environment, resource, destination, and server context | the use case validates owner consistency before creating a durable binding | `Environment`, `Resource`, and `Destination` answer ownership and placement questions through intention methods; the use case does not peel aggregate state ids for those decisions. |
 | DMBH-SPEC-017 | Runtime plan VO admission uses owned predicates | Runtime plan access routes and artifact snapshots validate route/proxy and artifact requirements | `AccessRoute` or `RuntimeArtifactSnapshot` is created | The owning VO composes `EdgeProxyKindValue`, `RuntimeArtifactKindValue`, and `RuntimeArtifactIntentValue` predicates instead of branching on raw primitive values. |
+| DMBH-SPEC-018 | Resource binding scope/injection coherence is aggregate-owned | A resource binding has a scope and injection mode | binding creation validates whether runtime references are allowed | `ResourceBinding` coordinates scope and injection mode predicates; it does not expose the cross-VO rule as raw string branching. |
 
 ## Domain Ownership
 
@@ -81,6 +82,8 @@ helpers, providers, and adapters.
     `domain-bindings.create` context consistency.
   - `AccessRoute`, `RuntimeArtifactKindValue`, and `RuntimeArtifactIntentValue` own runtime-plan
     admission predicates for route domains and artifact prerequisites.
+  - `ResourceBinding` owns scope/injection-mode coherence while `ResourceBindingScopeValue` and
+    `ResourceInjectionModeValue` answer single-value predicates.
 - Upstream/downstream contexts: no new context relationship is introduced.
 
 ## Public Surfaces

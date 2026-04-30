@@ -203,6 +203,14 @@
   predicates instead of branching on raw primitive values.
 - [x] Run `bun test packages/core/test/runtime-plan.test.ts`.
 
+## Continuous G: Resource Binding Scope/Injection Behavior
+
+- [x] Add resource binding behavior tests at `packages/core/test/resource-binding.test.ts`.
+- [x] Add single-VO predicates for binding scope and injection mode.
+- [x] Refactor `ResourceBinding.create` to ask aggregate-owned behavior for scope/injection
+  coherence.
+- [x] Run `bun test packages/core/test/resource-binding.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.
