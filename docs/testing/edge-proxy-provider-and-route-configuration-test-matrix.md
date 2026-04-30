@@ -124,6 +124,17 @@ Then:
 | EDGE-PROXY-QRY-006 | integration | Sensitive diagnostic values | Provider returns secrets in diagnostics | `ok` | None | Values redacted. |
 | EDGE-PROXY-QRY-007 | integration | Canonical redirect visible | Latest or planned route state contains an alias redirect | `ok`, status `planned` or `applied` | None | Route view includes `routeBehavior = redirect`, `redirectTo`, and `redirectStatus`; provider-specific redirect syntax appears only in read-only sections. |
 
+## Proxy Observation Contract Matrix
+
+These rows are governed by
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+
+| Test ID | Preferred automation | Case | Input/state | Expected result | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| PROXY-OBS-001 | integration | Proxy preview selected route | Planned/latest route state includes durable, server-applied, and generated routes | Proxy preview renders the selected route using durable, server-applied, latest generated, then planned generated precedence | Provider-specific content stays in sections; wrapper route source is provider-neutral. |
+| PROXY-OBS-002 | integration | Hermetic fake route apply/readback | Fake provider/runtime reports applied, not-ready, stale, and failed route states | Route descriptor/proxy preview exposes typed status without real DNS/TLS/SSH/proxy | Default CI does not require a real reverse proxy. |
+| PROXY-OBS-003 | integration | Deployment snapshot route scope | `routeScope = deployment-snapshot` with a historical route | Query labels the route as deployment snapshot/historical | Historical scope does not become current resource route. |
+
 ## Entry Surface Matrix
 
 | Test ID | Preferred automation | Entry | Required assertion |

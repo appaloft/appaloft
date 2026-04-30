@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { selectCurrentResourceAccessRoute } from "./resource-access-route";
 
 describe("resource access route precedence", () => {
-  test("[DEF-ACCESS-ENTRY-008] selects durable route before server-applied and generated routes", () => {
+  test("[DEF-ACCESS-ENTRY-008][WEB-CLI-API-ACCESS-003] selects durable route before server-applied and generated routes", () => {
     const selected = selectCurrentResourceAccessRoute({
       latestDurableDomainRoute: {
         url: "https://durable.example.test",
@@ -47,7 +47,7 @@ describe("resource access route precedence", () => {
     });
   });
 
-  test("[DEF-ACCESS-ENTRY-008] selects server-applied route before generated routes", () => {
+  test("[DEF-ACCESS-ENTRY-008][WEB-CLI-API-ACCESS-003] selects server-applied route before generated routes", () => {
     const selected = selectCurrentResourceAccessRoute({
       latestServerAppliedDomainRoute: {
         url: "https://server-applied.example.test",
@@ -89,7 +89,7 @@ describe("resource access route precedence", () => {
     });
   });
 
-  test("[DEF-ACCESS-ENTRY-008] selects latest generated route before planned generated route", () => {
+  test("[DEF-ACCESS-ENTRY-008][WEB-CLI-API-ACCESS-003] selects latest generated route before planned generated route", () => {
     const selected = selectCurrentResourceAccessRoute({
       latestGeneratedAccessRoute: {
         url: "https://generated.example.test",

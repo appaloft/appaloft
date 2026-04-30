@@ -91,6 +91,17 @@ Then:
 | RES-HEALTH-QRY-019 | integration | Edge proxy route unavailable observed | Latest deployment exists, edge failure is `resource_access_route_unavailable` or `resource_access_proxy_unavailable` | `ok(overall = "degraded")` | Proxy/public access sections use `resource_access_*` code and keep category out of `domain`. |
 | RES-HEALTH-QRY-020 | integration | Server-applied route ready | Server-applied config domain and generated route both exist, with no ready durable binding | `ok` uses server-applied domain as public access target | Server-applied route precedes generated default route and reports `kind = server-applied-domain`. |
 
+## Shared Route/Access Health Matrix
+
+These rows are governed by
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+
+| Test ID | Preferred automation | Case | Input/read state | Expected result | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| HEALTH-ACCESS-001 | integration | Shared selected route and blocking reason | Access summary/proxy/domain state selects a route with a blocking reason | `resources.health` public/proxy/check/source-error sections use the same route source and reason vocabulary as diagnostics | Health and diagnostic summaries do not disagree on current route. |
+| HEALTH-ACCESS-002 | integration | Runtime logs unavailable | Runtime log observation is unsupported or no instance can be resolved | Health/access state remains based on runtime/proxy/access facts and records log unavailability only as diagnostic context | Missing logs do not prove runtime failure by themselves. |
+| HEALTH-ACCESS-003 | integration | Edge access failure degrades health | Latest safe edge failure envelope is associated with the resource | Health reports degraded public/proxy access without mutating deployment state | Source errors preserve `resource_access_*` code, phase, request id, and retriable flag. |
+
 ## Status Aggregation Matrix
 
 | Test ID | Preferred automation | Signals | Expected overall |

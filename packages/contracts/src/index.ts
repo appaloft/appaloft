@@ -563,6 +563,109 @@ export const resourceHealthOverallSchema = z.enum([
   "unknown",
 ]);
 
+export const routeAccessBlockingReasonSchema = z.enum([
+  "runtime_not_ready",
+  "health_check_failing",
+  "proxy_route_missing",
+  "proxy_route_stale",
+  "domain_not_verified",
+  "certificate_missing",
+  "certificate_expired_or_not_active",
+  "dns_points_elsewhere",
+  "server_applied_route_unavailable",
+  "observation_unavailable",
+]);
+
+export const routeIntentStatusDescriptorSchema = z.object({
+  schemaVersion: z.literal("route-intent-status/v1"),
+  routeId: z.string(),
+  diagnosticId: z.string(),
+  source: z.enum([
+    "generated-default-access",
+    "durable-domain-binding",
+    "server-applied-route",
+    "deployment-snapshot-route",
+  ]),
+  intent: z.object({
+    host: z.string(),
+    pathPrefix: z.string(),
+    protocol: z.enum(["http", "https"]),
+    routeBehavior: z.enum(["serve", "redirect"]),
+    redirectTo: z.string().optional(),
+    redirectStatus: z
+      .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
+      .optional(),
+  }),
+  context: z.object({
+    resourceId: z.string(),
+    deploymentId: z.string().optional(),
+    serverId: z.string().optional(),
+    destinationId: z.string().optional(),
+    runtimeTargetKind: z.string().optional(),
+  }),
+  proxy: z.object({
+    intent: z.enum(["not-required", "required", "unknown"]),
+    applied: z.enum([
+      "not-configured",
+      "planned",
+      "applied",
+      "ready",
+      "not-ready",
+      "stale",
+      "failed",
+      "unknown",
+    ]),
+    providerKey: z.string().optional(),
+  }),
+  domainVerification: z.enum(["not-applicable", "pending", "verified", "failed", "unknown"]),
+  tls: z.enum([
+    "not-applicable",
+    "disabled",
+    "pending",
+    "active",
+    "missing",
+    "expired",
+    "failed",
+    "unknown",
+  ]),
+  runtimeHealth: resourceHealthOverallSchema,
+  latestObservation: z
+    .object({
+      source: z.enum([
+        "resource-access-summary",
+        "proxy-preview",
+        "resource-health",
+        "runtime-logs",
+        "access-failure-diagnostic",
+        "deployment-snapshot",
+      ]),
+      observedAt: z.string().optional(),
+      requestId: z.string().optional(),
+      deploymentId: z.string().optional(),
+    })
+    .optional(),
+  blockingReason: routeAccessBlockingReasonSchema.optional(),
+  recommendedAction: z.enum([
+    "none",
+    "wait",
+    "check-health",
+    "inspect-logs",
+    "inspect-proxy-preview",
+    "diagnostic-summary",
+    "verify-domain",
+    "fix-dns",
+    "provide-certificate",
+    "repair-proxy",
+    "manual-review",
+  ]),
+  copySafeSummary: z.object({
+    status: z.enum(["available", "unavailable", "not-ready", "failed", "stale", "unknown"]),
+    code: z.string().optional(),
+    phase: z.string().optional(),
+    message: z.string(),
+  }),
+});
+
 export const resourceHealthSourceErrorSchema = z.object({
   source: z.enum([
     "deployment",
@@ -669,6 +772,7 @@ export const resourceHealthSummarySchema = z.object({
       .optional(),
     reasonCode: z.string().optional(),
     phase: z.string().optional(),
+    routeIntentStatus: routeIntentStatusDescriptorSchema.optional(),
   }),
   proxy: z.object({
     status: z.enum(["ready", "not-ready", "failed", "unknown", "not-configured"]),
@@ -2716,6 +2820,8 @@ export const resourceDiagnosticAccessSchema = z.object({
   durableUrl: z.string().optional(),
   serverAppliedUrl: z.string().optional(),
   plannedUrl: z.string().optional(),
+  selectedRoute: routeIntentStatusDescriptorSchema.optional(),
+  routeIntentStatuses: z.array(routeIntentStatusDescriptorSchema).optional(),
   proxyRouteStatus: z.enum(["unknown", "ready", "not-ready", "failed"]).optional(),
   lastRouteRealizationDeploymentId: z.string().optional(),
   reasonCode: z.string().optional(),
@@ -2913,6 +3019,8 @@ export type PlannedResourceAccessRouteSummary = z.infer<
 export type ResourceAccessSummary = z.infer<typeof resourceAccessSummarySchema>;
 export type ResourceAccessProfile = z.infer<typeof resourceAccessProfileSchema>;
 export type ResourceHealthOverall = z.infer<typeof resourceHealthOverallSchema>;
+export type RouteAccessBlockingReason = z.infer<typeof routeAccessBlockingReasonSchema>;
+export type RouteIntentStatusDescriptor = z.infer<typeof routeIntentStatusDescriptorSchema>;
 export type ResourceHealthSummary = z.infer<typeof resourceHealthSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type ResourceDetail = z.infer<typeof resourceDetailSchema>;

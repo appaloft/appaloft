@@ -95,6 +95,11 @@ When `routeBehavior = "redirect"`, `url` is the redirect source URL and `redirec
 provider-neutral target host. The query may include provider-specific redirect syntax only in
 read-only sections; Web, CLI, and API clients must not reconstruct redirect middleware locally.
 
+The route view is descriptor-compatible with
+[Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+The query may return additional route intent/status descriptor fields when they are available, but
+provider-specific details must remain inside read-only sections or redacted diagnostics.
+
 Provider-rendered sections use this shape:
 
 ```ts
