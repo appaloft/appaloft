@@ -2453,21 +2453,32 @@ export type DeploymentPlanReasonCode =
   | "runtime-profile-missing"
   | "network-profile-missing"
   | "internal-port-missing"
+  | "missing-internal-port"
   | "static-publish-directory-missing"
   | "compose-target-service-missing"
   | "unsupported-framework"
+  | "unsupported-runtime-family"
   | "ambiguous-framework"
+  | "ambiguous-framework-evidence"
+  | "ambiguous-build-tool"
   | "ambiguous-jvm-build-tool"
   | "ambiguous-python-app-target"
   | "missing-asgi-app"
+  | "missing-build-tool"
   | "missing-jvm-build-tool"
   | "missing-runnable-jar"
   | "missing-wsgi-app"
   | "missing-python-app-target"
+  | "missing-start-intent"
+  | "missing-build-intent"
   | "missing-production-start-command"
   | "missing-static-output"
+  | "missing-source-root"
+  | "missing-artifact-output"
   | "incompatible-source-strategy"
   | "runtime-target-unsupported"
+  | "unsupported-runtime-target"
+  | "unsupported-container-native-profile"
   | "access-plan-unavailable"
   | "buildpack-disabled"
   | "buildpack-target-unavailable"
@@ -2480,10 +2491,34 @@ export type DeploymentPlanReasonCode =
 
 export interface DeploymentPlanReason {
   code: DeploymentPlanReasonCode;
+  reasonCode?: DeploymentPlanReasonCode;
   category: "blocked" | "warning" | "info";
   phase: string;
   message: string;
   recommendation?: string;
+  evidence?: Array<{
+    kind: string;
+    label: string;
+    value?: string;
+    source?: string;
+  }>;
+  fixPath?: Array<{
+    kind: "query" | "command" | "workflow-action" | "docs";
+    targetOperation?: string;
+    label: string;
+    profileField?: string;
+    docsAnchor?: string;
+    safeByDefault?: boolean;
+  }>;
+  overridePath?: Array<{
+    kind: "query" | "command" | "workflow-action" | "docs";
+    targetOperation?: string;
+    label: string;
+    profileField?: string;
+    docsAnchor?: string;
+    safeByDefault?: boolean;
+  }>;
+  affectedProfileField?: string;
   relatedEntityId?: string;
   relatedEntityType?: string;
 }
@@ -2529,6 +2564,7 @@ export interface DeploymentPlanPreview {
       | "first-class"
       | "generic"
       | "custom"
+      | "explicit-custom"
       | "container-native"
       | "buildpack-accelerated"
       | "unsupported"

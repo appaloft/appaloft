@@ -48,7 +48,9 @@ The plan should summarize build, start, health check, and access routing decisio
 
 Plan preview runs only `detect -> plan`. It does not create a deployment attempt, write deployment events, or run build, run, verify, or proxy changes.
 
-The preview shows detected framework/runtime evidence, selected planner, artifact kind, install/build/start/package commands, internal port, health check, access route summary, warnings, and unsupported reasons. Fix resource source/runtime/network/health/access profiles first, then run the deployment.
+The preview shows detected framework/runtime evidence, selected planner, support tier, artifact kind, install/build/start/package commands, internal port, health check, access route summary, warnings, and unsupported reasons. Blocked previews include the phase, reason code, safe evidence, fix path, override path, and affected resource profile field when Appaloft can identify one. Fix resource source/runtime/network/health/access profiles first, then run the deployment.
+
+Explicit planner/profile choices win over inference. Custom install/build/start commands, Dockerfile, Compose, prebuilt image, source base directory, internal port, and explicit health policy can repair unsupported, ambiguous, or missing evidence before you run `deployments.create`. Static deployments use the Appaloft static server on internal port `80`; server-rendered or HTTP services need an internal port in the resource network profile.
 
 <h3 id="deployment-execute">Execute</h3>
 

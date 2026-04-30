@@ -50,6 +50,7 @@ This workflow inherits:
 - [Deployment Runtime Substrate Implementation Plan](../implementation/deployment-runtime-substrate-plan.md)
 - [Deployment Plan Preview Implementation Plan](../implementation/deployment-plan-preview-plan.md)
 - [Buildpack Accelerator Contract And Preview Guardrails](../specs/017-buildpack-accelerator-contract-and-preview-guardrails/spec.md)
+- [Runtime Plan Resolution Unsupported/Override Contract](../specs/018-runtime-plan-resolution-unsupported-override-contract/spec.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -78,6 +79,12 @@ behind this workload-planning contract. A new ADR is required before buildpack b
 fields become public command input, before a concrete buildpack implementation becomes the
 canonical support path for mainstream frameworks, or before buildpack output changes deployment
 admission or runtime substrate semantics.
+
+The runtime plan resolution unsupported/override contract does not require a new ADR while it
+hardens the existing source/runtime/network/profile boundary. A new ADR is required before the
+failure contract adds a deployment admission command, adds public source/runtime/framework fields to
+`deployments.create`, changes the Docker/OCI workload substrate, or makes Web/CLI/future tool
+entrypoints own planner business logic.
 
 ## Boundary
 
@@ -437,20 +444,22 @@ catalog closures. A JVM catalog row is complete only when tests prove:
 
 Planner selection order:
 
-1. Explicit `RuntimePlanStrategy = dockerfile`, `docker-compose`, `prebuilt-image`, or `static`
-   uses the strategy-specific planner and must not be overridden by framework detection.
-2. Explicit custom/resource runtime commands select custom or generic planner fallback when they
-   make the source containerizable and must not be overridden by buildpack evidence.
-3. Explicit framework/runtime hints in `ResourceRuntimeProfile`, when accepted by future profile
-   specs, take precedence over inferred evidence.
-4. Framework-specific planners run before generic language planners.
-5. Generic language planners may run only when required install/build/start/package information can
-   be derived or was supplied explicitly.
-6. Custom planner fallback is allowed only when explicit runtime profile commands make the result
-   containerizable.
-7. Buildpack accelerator candidate may run only after the explicit profile, first-class planner,
-   generic planner, and custom fallback checks decline or block without an explicit user-selected
-   plan. It must report why it won or why it was non-winning.
+1. Explicit first-class Appaloft planner selection or accepted future runtime-profile hint, when a
+   governing spec exists for that hint.
+2. Explicit custom or container-native profile: Dockerfile, Docker Compose, prebuilt image, static
+   strategy, or explicit install/build/start commands that make the source containerizable.
+3. Framework-specific planners before generic language planners when no explicit profile owns the
+   artifact path.
+4. Generic language planners only when required install/build/start/package information can be
+   derived or was supplied explicitly.
+5. Buildpack accelerator candidate only after the explicit planner/profile and generic planner
+   paths decline or block without an explicit user-selected plan.
+6. Unsupported failure.
+
+Explicit container-native strategies still win over inferred framework detection for artifact
+construction. If a future explicit framework hint conflicts with an explicit container-native
+artifact profile, planning must block with `requires-override` or `incompatible-source-strategy`
+instead of silently picking one.
 
 When multiple frameworks are detected, the planner must prefer the framework attached to the source
 base directory and the selected runtime strategy. If the result is ambiguous, entry workflows must
@@ -527,6 +536,56 @@ Error details should include safe evidence fields such as `runtimeFamily`, `fram
 `packageManager`, `projectName`, `plannerKey`, `baseImage`, `resourceSourceKind`,
 `runtimePlanStrategy`, and detected file/script identifiers. Details must not include secret values
 or unbounded command output.
+
+### Runtime Plan Resolution Failure Contract
+
+Unsupported, ambiguous, and missing planner evidence must use the shared runtime plan resolution
+blocked-preview contract from
+[Runtime Plan Resolution Unsupported/Override Contract](../specs/018-runtime-plan-resolution-unsupported-override-contract/spec.md).
+
+The canonical support tiers are:
+
+- `first-class`
+- `explicit-custom`
+- `container-native`
+- `buildpack-accelerated`
+- `unsupported`
+- `ambiguous`
+- `requires-override`
+
+The canonical shared reason codes are:
+
+- `unsupported-framework`
+- `unsupported-runtime-family`
+- `ambiguous-framework-evidence`
+- `ambiguous-build-tool`
+- `missing-build-tool`
+- `missing-start-intent`
+- `missing-build-intent`
+- `missing-internal-port`
+- `missing-source-root`
+- `missing-artifact-output`
+- `unsupported-runtime-target`
+- `unsupported-container-native-profile`
+
+Blocked preview output must include `phase`, `reasonCode`, `message`, safe `evidence`, `fixPath`,
+`overridePath`, and optional `affectedProfileField`. Existing family-specific reasons such as
+`ambiguous-jvm-build-tool`, `missing-jvm-build-tool`, `missing-runnable-jar`,
+`missing-asgi-app`, or `ambiguous-python-app-target` may remain as evidence/detail codes only when
+they also map to the shared reason code.
+
+Explicit override rules are shared by every planner family:
+
+- explicit install/build/start commands win over inferred commands;
+- explicit Dockerfile, Compose, and prebuilt image profiles win over framework and buildpack
+  evidence;
+- explicit `ResourceNetworkProfile.internalPort` wins over detected/default port hints;
+- explicit `ResourceSourceBinding.baseDirectory` wins over root-level ambiguous evidence;
+- explicit resource health policy wins over planner or buildpack health hints.
+
+Static application shapes default to the Appaloft static server on internal port `80`. Serverful
+HTTP and SSR shapes block with `missing-internal-port` when no persisted or deterministic resource
+network port exists.
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -607,6 +666,12 @@ Current typed detection is limited to:
   policy, limitations, unsupported/ambiguous/missing evidence, internal-port behavior, and
   `deployments.plan/v1` ready/blocked parity. Executable coverage is currently contract-level with
   hermetic preview payloads; real `pack`/lifecycle execution is not wired.
+- Runtime plan resolution unsupported/override guardrails now have a Phase 5 feature artifact and
+  stable matrix rows for shared support tiers, reason codes, blocked preview shape, fix paths,
+  override paths, static default port behavior, explicit custom/container-native precedence,
+  buildpack non-winning behavior, and future MCP/tool metadata parity. Code coverage should reuse
+  hermetic fake resolver/planner fixtures and must not wire real Docker/buildpack execution in this
+  slice.
 
 The following are migration gaps before the mainstream support catalog is complete:
 

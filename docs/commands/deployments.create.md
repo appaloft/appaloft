@@ -34,6 +34,7 @@ This command inherits the shared platform contracts:
 - [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [resources.archive Command Spec](./resources.archive.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
+- [Runtime Plan Resolution Unsupported/Override Contract](../specs/018-runtime-plan-resolution-unsupported-override-contract/spec.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Error Model](../errors/model.md)
@@ -226,6 +227,28 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 Missing or explicitly disabled edge proxy intent makes generated default access unavailable rather than required. The command may continue without a generated route, and it must not publish a direct host-port fallback.
 
 Runtime/build/deploy/verify failures after acceptance are workflow failures and must be represented by deployment state plus `deployment-failed`.
+
+Unsupported, ambiguous, and missing runtime-plan evidence that can be known before safe acceptance
+is an admission failure. It must reject with `validation_error` in `runtime-plan-resolution` or the
+matching resource profile phase, and it must use the same shared reason-code contract exposed by
+`deployments.plan/v1`:
+
+- `unsupported-framework`
+- `unsupported-runtime-family`
+- `ambiguous-framework-evidence`
+- `ambiguous-build-tool`
+- `missing-build-tool`
+- `missing-start-intent`
+- `missing-build-intent`
+- `missing-internal-port`
+- `missing-source-root`
+- `missing-artifact-output`
+- `unsupported-container-native-profile`
+
+The command must not accept source, runtime, network, framework, buildpack, base image, or
+orchestrator fields to fix those errors. Users fix them by editing the resource profile, source
+base directory, runtime commands, container-native profile, network internal port, health policy,
+or repository config workflow input before dispatching ids-only `deployments.create` again.
 
 ## Docker/OCI Runtime Substrate
 

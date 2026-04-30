@@ -1032,4 +1032,425 @@ describe("deployment plan preview contract", () => {
       "internal-port-missing",
     );
   });
+
+  test("[DPP-PLAN-FAIL-001][WF-PLAN-FAIL-001][WF-PLAN-FAIL-002][WF-PLAN-FAIL-003][WF-PLAN-FAIL-009] exposes shared blocked preview shape", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_unsupported",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+      },
+      readiness: {
+        status: "blocked",
+        ready: false,
+        reasonCodes: ["unsupported-runtime-family", "ambiguous-framework-evidence"],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "unsupported-multi-app",
+        locator: "/workspace/unsupported-multi-app",
+        runtimeFamily: "rust",
+        applicationShape: "serverful-http",
+        detectedFiles: ["Cargo.toml", "mix.exs"],
+        detectedScripts: [],
+        reasoning: ["Multiple unsupported app roots were detected"],
+      },
+      planner: {
+        plannerKey: "unsupported",
+        supportTier: "requires-override",
+        buildStrategy: "workspace-commands",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      artifact: {
+        kind: "workspace-image",
+      },
+      commands: [],
+      network: {
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: false,
+        kind: "none",
+      },
+      warnings: [],
+      unsupportedReasons: [
+        {
+          code: "unsupported-runtime-family",
+          reasonCode: "unsupported-runtime-family",
+          category: "blocked",
+          phase: "runtime-plan-resolution",
+          message: "Rust and Elixir framework evidence is not yet first-class.",
+          recommendation:
+            "Configure explicit custom commands or provide a container-native profile.",
+          evidence: [
+            {
+              kind: "runtime-family",
+              label: "Detected runtime family",
+              value: "rust",
+              source: "Cargo.toml",
+            },
+          ],
+          fixPath: [
+            {
+              kind: "command",
+              targetOperation: "resources.configure-runtime",
+              label: "Configure runtime commands",
+              profileField: "runtime.startCommand",
+              safeByDefault: true,
+            },
+          ],
+          overridePath: [
+            {
+              kind: "command",
+              targetOperation: "resources.configure-runtime",
+              label: "Use explicit Dockerfile profile",
+              profileField: "runtime.dockerfilePath",
+              safeByDefault: true,
+            },
+          ],
+          affectedProfileField: "runtime.startCommand",
+        },
+        {
+          code: "ambiguous-framework-evidence",
+          reasonCode: "ambiguous-framework-evidence",
+          category: "blocked",
+          phase: "source-detection",
+          message: "Multiple source roots could own the deployment.",
+          recommendation: "Select a source base directory before planning.",
+          evidence: [
+            {
+              kind: "detected-file",
+              label: "Ambiguous app roots",
+              value: "Cargo.toml,mix.exs",
+              source: "source-inspection",
+            },
+          ],
+          fixPath: [
+            {
+              kind: "command",
+              targetOperation: "resources.configure-source",
+              label: "Set source base directory",
+              profileField: "source.baseDirectory",
+              safeByDefault: true,
+            },
+          ],
+          overridePath: [
+            {
+              kind: "workflow-action",
+              label: "Choose source root in draft",
+              profileField: "source.baseDirectory",
+              safeByDefault: true,
+            },
+          ],
+          affectedProfileField: "source.baseDirectory",
+        },
+      ],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "resources.configure-runtime",
+          label: "Configure runtime commands",
+          safeByDefault: true,
+          blockedReasonCode: "unsupported-runtime-family",
+        },
+        {
+          kind: "command",
+          targetOperation: "resources.configure-source",
+          label: "Configure source",
+          safeByDefault: true,
+          blockedReasonCode: "ambiguous-framework-evidence",
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.unsupportedReasons[0]?.reasonCode).toBe("unsupported-runtime-family");
+    expect(parsed.unsupportedReasons[0]?.fixPath?.[0]?.profileField).toBe("runtime.startCommand");
+    expect(parsed.unsupportedReasons[1]?.affectedProfileField).toBe("source.baseDirectory");
+  });
+
+  test("[DPP-PLAN-FAIL-002][DPP-PLAN-FAIL-003][DPP-PLAN-FAIL-004][WF-PLAN-FAIL-006][WF-PLAN-FAIL-008] preserves explicit override and static ready parity", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_static",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+      },
+      readiness: {
+        status: "ready",
+        ready: true,
+        reasonCodes: [],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "static-explicit",
+        locator: "/workspace/static-explicit",
+        runtimeFamily: "node",
+        framework: "vite",
+        packageManager: "pnpm",
+        applicationShape: "static",
+        detectedFiles: ["package.json", "vite.config.ts", "project.toml"],
+        detectedScripts: ["build"],
+        reasoning: ["Explicit static profile wins; buildpack evidence is non-winning"],
+      },
+      planner: {
+        plannerKey: "custom",
+        supportTier: "explicit-custom",
+        buildStrategy: "static-artifact",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      buildpack: {
+        status: "non-winning",
+        supportTier: "buildpack-accelerated",
+        evidence: {
+          platformFiles: ["project.toml"],
+          languageFamilies: ["node"],
+          frameworkHints: ["vite"],
+          builderEvidence: ["default-builder-policy"],
+          detectedBuildpacks: [{ id: "paketo-buildpacks/nodejs" }],
+        },
+        builderPolicy: {
+          defaultBuilder: "paketobuildpacks/builder-jammy-base",
+          override: "none",
+          blockedBuilders: [],
+        },
+        artifactIntent: "build-image",
+        limitations: [
+          {
+            code: "buildpack-non-winning",
+            message: "Explicit static/custom profile takes precedence.",
+          },
+        ],
+      },
+      artifact: {
+        kind: "static-server-image",
+        runtimeArtifactKind: "image",
+        runtimeArtifactIntent: "build-image",
+      },
+      commands: [
+        { kind: "install", command: "pnpm install", source: "resource-runtime-profile" },
+        { kind: "build", command: "pnpm build", source: "resource-runtime-profile" },
+      ],
+      network: {
+        internalPort: 80,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: true,
+        kind: "http",
+        path: "/",
+        port: 80,
+      },
+      warnings: [],
+      unsupportedReasons: [],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "deployments.create",
+          label: "Deploy",
+          safeByDefault: true,
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.planner.supportTier).toBe("explicit-custom");
+    expect(parsed.network.internalPort).toBe(80);
+    expect(parsed.buildpack?.status).toBe("non-winning");
+  });
+
+  test("[DPP-PLAN-FAIL-005][DPP-PLAN-FAIL-006][WF-PLAN-FAIL-004][WF-PLAN-FAIL-005][WF-PLAN-FAIL-007][WF-PLAN-FAIL-010][WF-PLAN-FAIL-011][WF-PLAN-FAIL-012] exposes fix and override paths for missing configuration", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_missing",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+      },
+      readiness: {
+        status: "blocked",
+        ready: false,
+        reasonCodes: [
+          "ambiguous-build-tool",
+          "missing-build-tool",
+          "missing-internal-port",
+          "missing-artifact-output",
+          "unsupported-runtime-target",
+          "unsupported-container-native-profile",
+        ],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "missing-config",
+        locator: "/workspace/missing-config",
+        runtimeFamily: "java",
+        applicationShape: "serverful-http",
+        detectedFiles: ["pom.xml", "build.gradle", "Dockerfile"],
+        detectedScripts: [],
+        reasoning: ["Build tool and container-native profile evidence require explicit selection"],
+      },
+      planner: {
+        plannerKey: "unsupported",
+        supportTier: "requires-override",
+        buildStrategy: "workspace-commands",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      artifact: {
+        kind: "workspace-image",
+      },
+      commands: [],
+      network: {
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: false,
+        kind: "none",
+      },
+      warnings: [
+        {
+          code: "buildpack-preview-limited",
+          reasonCode: "buildpack-preview-limited",
+          category: "warning",
+          phase: "runtime-plan-resolution",
+          message: "Planner and buildpack health hints are not app-level health policy.",
+          evidence: [
+            {
+              kind: "health-policy",
+              label: "Health source",
+              value: "none",
+              source: "resource-health-policy",
+            },
+            {
+              kind: "variable-boundary",
+              label: "Secret variable",
+              value: "masked",
+              source: "environment-snapshot",
+            },
+          ],
+        },
+      ],
+      unsupportedReasons: [
+        {
+          code: "ambiguous-build-tool",
+          reasonCode: "ambiguous-build-tool",
+          category: "blocked",
+          phase: "runtime-plan-resolution",
+          message: "Maven and Gradle evidence both exist.",
+          recommendation: "Choose a build tool or source root.",
+          evidence: [
+            {
+              kind: "build-tool",
+              label: "Detected build tools",
+              value: "maven,gradle",
+              source: "source-inspection",
+            },
+          ],
+          fixPath: [
+            {
+              kind: "command",
+              targetOperation: "resources.configure-runtime",
+              label: "Select build command",
+              profileField: "runtime.buildCommand",
+              safeByDefault: true,
+            },
+          ],
+          overridePath: [
+            {
+              kind: "command",
+              targetOperation: "resources.configure-runtime",
+              label: "Use explicit start command",
+              profileField: "runtime.startCommand",
+              safeByDefault: true,
+            },
+          ],
+          affectedProfileField: "runtime.buildCommand",
+        },
+        {
+          code: "missing-internal-port",
+          reasonCode: "missing-internal-port",
+          category: "blocked",
+          phase: "resource-network-resolution",
+          message: "Serverful HTTP resources require an internal port.",
+          recommendation: "Configure ResourceNetworkProfile.internalPort.",
+          fixPath: [
+            {
+              kind: "command",
+              targetOperation: "resources.configure-network",
+              label: "Configure internal port",
+              profileField: "network.internalPort",
+              safeByDefault: true,
+            },
+          ],
+          overridePath: [],
+          affectedProfileField: "network.internalPort",
+        },
+        {
+          code: "unsupported-container-native-profile",
+          reasonCode: "unsupported-container-native-profile",
+          category: "blocked",
+          phase: "runtime-plan-resolution",
+          message: "The explicit Dockerfile profile cannot be planned safely.",
+          recommendation: "Fix Dockerfile path or switch to explicit commands.",
+          fixPath: [
+            {
+              kind: "command",
+              targetOperation: "resources.configure-runtime",
+              label: "Fix Dockerfile path",
+              profileField: "runtime.dockerfilePath",
+              safeByDefault: true,
+            },
+          ],
+          overridePath: [
+            {
+              kind: "command",
+              targetOperation: "resources.configure-runtime",
+              label: "Use Compose profile",
+              profileField: "runtime.dockerComposeFilePath",
+              safeByDefault: true,
+            },
+          ],
+          affectedProfileField: "runtime.dockerfilePath",
+        },
+      ],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "resources.configure-runtime",
+          label: "Configure runtime",
+          safeByDefault: true,
+          blockedReasonCode: "ambiguous-build-tool",
+        },
+        {
+          kind: "command",
+          targetOperation: "resources.configure-network",
+          label: "Configure network",
+          safeByDefault: true,
+          blockedReasonCode: "missing-internal-port",
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.readiness.reasonCodes).toContain("missing-artifact-output");
+    expect(parsed.unsupportedReasons[1]?.affectedProfileField).toBe("network.internalPort");
+    expect(parsed.warnings[0]?.evidence?.[1]?.value).toBe("masked");
+    expect(parsed.nextActions[1]?.blockedReasonCode).toBe("missing-internal-port");
+  });
 });

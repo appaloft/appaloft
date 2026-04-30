@@ -26,6 +26,7 @@ deployment lifecycle events, or execute build/run/verify/proxy work.
 - [Deployment Plan Preview Error Spec](../errors/deployments.plan.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
 - [Buildpack Accelerator Contract And Preview Guardrails](../specs/017-buildpack-accelerator-contract-and-preview-guardrails/spec.md)
+- [Runtime Plan Resolution Unsupported/Override Contract](../specs/018-runtime-plan-resolution-unsupported-override-contract/spec.md)
 - [Deployment Runtime Substrate Plan](../implementation/deployment-runtime-substrate-plan.md)
 - ADR-010, ADR-012, ADR-014, ADR-016, ADR-021, ADR-023
 - [Error Model](../errors/model.md)
@@ -71,6 +72,34 @@ type DeploymentPlanQueryResult = Result<DeploymentPlanPreview, DomainError>;
 - access/proxy route planning summary when already available;
 - warnings, unsupported reasons, next actions, and `generatedAt`.
 
+Blocked previews must include a stable blocked reason shape for every known
+unsupported/ambiguous/missing configuration:
+
+```ts
+type DeploymentPlanBlockedReason = {
+  phase:
+    | "source-detection"
+    | "runtime-plan-resolution"
+    | "runtime-artifact-resolution"
+    | "resource-network-resolution"
+    | "runtime-target-resolution";
+  reasonCode: string;
+  message: string;
+  evidence: unknown[];
+  fixPath: DeploymentPlanNextAction[];
+  overridePath: DeploymentPlanNextAction[];
+  affectedProfileField?: string;
+};
+```
+
+`reasonCode` must use the shared runtime plan resolution code when possible:
+`unsupported-framework`, `unsupported-runtime-family`, `ambiguous-framework-evidence`,
+`ambiguous-build-tool`, `missing-build-tool`, `missing-start-intent`, `missing-build-intent`,
+`missing-internal-port`, `missing-source-root`, `missing-artifact-output`,
+`unsupported-runtime-target`, or `unsupported-container-native-profile`. Family-specific detail
+codes may appear in evidence/details only when the shared code is also present for parity across
+CLI, API, Web, and future MCP/tool metadata.
+
 ## Failure Semantics
 
 Whole-query `err` results are reserved for invalid input, missing/invisible context, permission
@@ -105,6 +134,9 @@ known unsupported plan as transport failure.
   buildpack-accelerated candidates and blocked buildpack candidates. This does not claim real
   `pack`/lifecycle execution and does not make buildpack the canonical support path for mainstream
   frameworks.
+- The runtime plan resolution unsupported/override contract adds shared blocked reason, fix path,
+  override path, and affected profile field semantics for unsupported, ambiguous, and missing
+  planner evidence across current and future framework families.
 - Access plan summary may initially report unavailable when existing read models cannot provide a
   safe summary.
 - Draft profile preview before `resources.create` remains out of scope.

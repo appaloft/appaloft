@@ -159,14 +159,25 @@ Initial stable unsupported or blocked reason codes:
 - `runtime-profile-missing`
 - `network-profile-missing`
 - `internal-port-missing`
+- `missing-internal-port`
 - `static-publish-directory-missing`
 - `compose-target-service-missing`
 - `unsupported-framework`
+- `unsupported-runtime-family`
 - `ambiguous-framework`
+- `ambiguous-framework-evidence`
+- `ambiguous-build-tool`
+- `missing-build-tool`
+- `missing-start-intent`
+- `missing-build-intent`
 - `missing-production-start-command`
 - `missing-static-output`
+- `missing-source-root`
+- `missing-artifact-output`
 - `incompatible-source-strategy`
 - `runtime-target-unsupported`
+- `unsupported-runtime-target`
+- `unsupported-container-native-profile`
 - `access-plan-unavailable`
 - `buildpack-disabled`
 - `buildpack-target-unavailable`
@@ -191,6 +202,7 @@ Initial stable unsupported or blocked reason codes:
 | DPP-SPEC-008 | Entrypoint parity | Web, CLI, HTTP/oRPC, and future MCP/tool ask for the same ids | Each surface calls the query | They receive the same schema and do not reimplement planner rules locally. |
 | DPP-SPEC-009 | Buildpack-accelerated candidate | No explicit Appaloft planner or explicit profile owns the source, but adapter-owned buildpack evidence can produce an OCI image intent | User requests plan | Result exposes buildpack evidence, `buildpack-accelerated` support tier, builder policy, limitations, and no deployment input overrides. |
 | DPP-SPEC-010 | Blocked buildpack candidate | Buildpack acceleration is disabled, unavailable, ambiguous, missing required evidence, or blocked by unsupported builder/lifecycle policy | User requests plan | Result is `blocked` with stable reason codes and next actions pointing to resource runtime/network configuration or explicit fallback commands. |
+| DPP-SPEC-011 | Shared unsupported/override preview | Unsupported, ambiguous, or missing runtime-plan evidence blocks planning | User requests plan | Result includes shared phase, reason code, safe evidence, fix path, override path, and affected resource profile field when applicable. |
 
 ## Public Surfaces
 

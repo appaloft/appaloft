@@ -73,7 +73,7 @@ Current status:
 - `PUB-DOCS-011` has expanded CLI coverage for high-confusion operations including deployment
   source, preview cleanup, source relink, SSH credentials, server connectivity, terminal sessions,
   project lifecycle, resource profiles, environment variables, domains, certificates, logs, health,
-  and diagnostics.
+  diagnostics, and deployment plan preview blocked/fix/override guidance.
 - `PUB-DOCS-012` has expanded HTTP/API route-description coverage for high-confusion operations
   including deployment source, SSH credentials, server connectivity, resource profiles, environment
   variables, project lifecycle, domains, certificates, logs, health, diagnostics, and terminal
@@ -93,6 +93,11 @@ Current status:
 There is still no dedicated automated public documentation checker for every product help
 affordance, complete link resolution in built output, search alias freshness, or future MCP/tool
 descriptions.
+
+Deployment plan preview public docs now describe blocked preview phase/reason/evidence/fix/override
+fields under the stable `deploy/lifecycle#deployment-plan-preview` anchor. Dedicated automated docs
+link coverage for the new blocked/fix/override copy remains part of the broader public docs checker
+gap above.
 
 The next help integration Code Rounds should expand `PUB-DOCS-003` and `PUB-DOCS-010` from the
 current high-confusion Web coverage to full owner-scoped form-field coverage, then close remaining
