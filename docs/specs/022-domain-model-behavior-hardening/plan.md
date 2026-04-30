@@ -56,6 +56,7 @@
 | Continuous D | `DomainBindingStatusValue` lifecycle gates | Move ready, route-failure, and verification-retry status sets into the status value object. | `DomainBinding` lifecycle methods |
 | Continuous E | `Environment`, `Resource`, and `Destination` context ownership for domain bindings | Reuse aggregate ownership behavior for durable domain binding context admission. | `domain-bindings.create` |
 | Continuous F | `AccessRoute`, `RuntimeArtifactKindValue`, and `RuntimeArtifactIntentValue` | Move runtime-plan route/artifact prerequisite checks into VO predicates. | `AccessRoute.create`, `RuntimeArtifactSnapshot.create` |
+| Continuous G | `ResourceBinding`, `ResourceBindingScopeValue`, and `ResourceInjectionModeValue` | Move binding scope/injection coherence into the aggregate with single-VO predicates. | `ResourceBinding.create` |
 
 ## Roadmap And Compatibility
 
@@ -175,6 +176,11 @@
 - Related application tests after Continuous F:
   - none; this is core runtime-plan admission behavior already exercised by higher-level deployment
     tests.
+- Continuous G test bindings:
+  - `DMBH-BINDING-001` in `packages/core/test/resource-binding.test.ts`
+- Related application tests after Continuous G:
+  - none; `ResourceBinding` is currently core foundational model behavior without public command
+    exposure.
 
 ## Risks And Migration Gaps
 
@@ -210,6 +216,8 @@
     `Resource`, and `Destination` ownership methods.
   - Continuous F migrates runtime-plan access-route and artifact prerequisite checks behind owned
     VO predicates.
+  - Continuous G migrates resource binding scope/injection-mode coherence behind
+    `ResourceBinding` behavior.
   - Core value objects may compare their own primitive state internally. Those reads are not
     boundary leaks.
 - A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.

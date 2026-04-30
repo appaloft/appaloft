@@ -1199,6 +1199,10 @@ export class ResourceBindingScopeValue extends EnumValueObject<
   ): ResourceBindingScopeValue {
     return new ResourceBindingScopeValue(value);
   }
+
+  isBuildOnly(): boolean {
+    return this.value === "build-only";
+  }
 }
 
 const resourceInjectionModeBrand: unique symbol = Symbol("ResourceInjectionModeValue");
@@ -1220,6 +1224,10 @@ export class ResourceInjectionModeValue extends EnumValueObject<"env" | "file" |
 
   static rehydrate(value: "env" | "file" | "reference"): ResourceInjectionModeValue {
     return new ResourceInjectionModeValue(value);
+  }
+
+  isRuntimeReference(): boolean {
+    return this.value === "reference";
   }
 }
 
