@@ -306,6 +306,15 @@ Angular SPA and SvelteKit static remain fixture-hardening gaps for real Docker e
 failing during dependency/build execution before container start. The headless planner/catalog
 coverage for those fixtures remains intact.
 
+JavaScript/TypeScript tested catalog closure now has stable fixture-specific rows for Next.js
+SSR/standalone/static export, Remix, Nuxt generate, SvelteKit static and ambiguous mode, Astro
+static, Vite/React/Vue/Svelte/Solid/Angular static SPA, Express/Fastify/NestJS/Hono/Koa, generic
+package scripts, missing evidence, and internal-port behavior. Runtime fixture tests bind these
+rows to source inspection, planner/base-image policy, command specs, artifact output, Dockerfile
+generation intent, and headless Docker/OCI execution readiness. `deployments.plan/v1` contract
+coverage proves the same catalog shape can be returned through the public read-only preview
+without deployment execution.
+
 `build-requested`, resolved image ids/digests, runtime instance identity, rollback candidate
 capture, command specs on the durable runtime plan boundary, and richer source-file analysis are
 not yet fully implemented across the application and persistence boundary. The remaining generic

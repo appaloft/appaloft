@@ -519,13 +519,13 @@ Required:
   public docs/help, and targeted tests so users can inspect detected evidence, planner selection,
   artifact kind, command specs, port/health/access plan, warnings, and unsupported reasons before
   execution.
-- [ ] Promote JavaScript/TypeScript support to a tested catalog: Next.js, Remix, Nuxt, SvelteKit,
+- [x] Promote JavaScript/TypeScript support to a tested catalog: Next.js, Remix, Nuxt, SvelteKit,
   Astro, Vite, React, Vue, Svelte, Solid, Angular, Express, Fastify, NestJS, Hono, Koa, and generic
   package scripts.
 - [ ] Harden Python support for FastAPI, Django, Flask, generic ASGI/WSGI apps, `uv`, Poetry, pip,
   and explicit start-command fallback.
 - [ ] Add Spring Boot as the first named JVM web framework.
-- [ ] Add framework-family matrix rows for detection, base image policy, install/build/start/package
+- [x] Add framework-family matrix rows for detection, base image policy, install/build/start/package
   commands, artifact outputs, internal port behavior, unsupported evidence, and Web/CLI draft
   parity.
 - [ ] Keep buildpack-style detection as an adapter-owned accelerator, not the only way Appaloft
@@ -543,6 +543,11 @@ Exit criteria:
   unless explicit custom commands make a Docker/OCI image plan possible.
 - [x] Web and CLI can collect the same draft fields for source base directory, publish directory,
   Dockerfile path, Compose path, build target, install/build/start commands, and internal port.
+- [x] JavaScript/TypeScript tested catalog closure binds Next.js SSR/standalone/static export,
+  Remix, Nuxt generate, SvelteKit static/ambiguous mode, Astro static, Vite/React/Vue/Svelte/Solid/
+  Angular static SPA, Express/Fastify/NestJS/Hono/Koa, and generic package scripts to stable
+  matrix ids, headless Docker/OCI fixture readiness tests, and `deployments.plan/v1` contract
+  coverage.
 
 ## Phase 6: Access Policy, Domain/TLS Lifecycle, And Observability Hardening
 
@@ -823,8 +828,9 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
 - [ ] Static sites: add common static generators and generic static generator fallback with explicit
   publish directory.
 - [x] Next.js: baseline `nextjs` planner builds and starts with package manager defaults.
-- [ ] Next.js: complete first-class SSR/standalone/static-export support with app/pages/output
-  detection, package manager parity, internal port defaults, and Docker/SSH smoke.
+- [x] Next.js: complete tested SSR/standalone/static-export support with app/pages/output
+  detection, package manager parity, internal port defaults, headless Docker/OCI readiness, and
+  representative opt-in Docker smoke.
 - [x] Angular SPA: detects `angular.json` output path and routes static output through the
   `angular-static` planner.
 - [x] React/Vue/Svelte/Solid/Angular SPA baseline: Vite static and generic Node/static coverage
@@ -893,6 +899,8 @@ Recommended next Spec Rounds before broad Code Rounds:
   headless coverage for the current supported JavaScript/TypeScript/Python catalog.
 - [x] Framework support tier matrix: add and run the first representative opt-in real local Docker
   fixture smoke slice for static/frontend, Node/server, and Python/server fixtures.
+- [x] Framework support tier matrix: promote JavaScript/TypeScript catalog closure rows and
+  `deployments.plan/v1` catalog preview contract rows for tested headless Docker/OCI readiness.
 - [ ] Framework support tier matrix: broaden fixture-by-fixture real Docker/SSH deployment smoke
   rows for the full JavaScript/TypeScript/Python catalog.
 - [ ] Deployment observation and recovery: harden `deployments.stream-events` reconnect/gap/CLI

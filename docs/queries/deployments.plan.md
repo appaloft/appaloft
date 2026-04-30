@@ -8,7 +8,7 @@
 - Handler: `DeploymentPlanQueryHandler`
 - Query service: `DeploymentPlanQueryService`
 - Domain / bounded context: Release orchestration / workload planning read model
-- Current status: planned active read-only query; Code Round pending
+- Current status: active read-only query
 - Source classification: normative contract
 
 ## Intent
@@ -81,15 +81,17 @@ known unsupported plan as transport failure.
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Quick Deploy or Resource detail read-only plan preview. | Planned |
-| CLI | `appaloft deployments plan --project <id> --environment <id> --resource <id> --server <id> [--destination <id>] [--json]`. | Planned |
-| oRPC / HTTP | `GET /api/deployments/plan` using the query schema. | Planned |
+| Web | Resource new-deployment read-only plan preview. | Active |
+| CLI | `appaloft deployments plan --project <id> --environment <id> --resource <id> --server <id> [--destination <id>] [--json]`. | Active |
+| oRPC / HTTP | `GET /api/deployments/plan` using the query schema. | Active |
 | Automation / MCP | Future read-only plan inspection tool over the same operation key. | Future |
 
 ## Current Implementation Notes And Migration Gaps
 
-- Code Round must share the runtime planning boundary with `deployments.create` and stop before
-  attempt creation.
+- `deployments.plan` is active across application, operation catalog, HTTP/oRPC, CLI, Web, public
+  docs/help, and targeted contract coverage.
+- The query shares the runtime planning boundary with `deployments.create` and stops before attempt
+  creation, event publication, or runtime execution.
 - Access plan summary may initially report unavailable when existing read models cannot provide a
   safe summary.
 - Draft profile preview before `resources.create` remains out of scope.

@@ -87,7 +87,7 @@ interface PlannerFixtureExpectation {
 
 const plannerFixtures: PlannerFixtureExpectation[] = [
   {
-    matrixIds: "WF-PLAN-CAT-001",
+    matrixIds: "WF-PLAN-CAT-001,WF-PLAN-JS-001,WF-PLAN-JS-013",
     fixture: "next-ssr",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -102,7 +102,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "pnpm start",
   },
   {
-    matrixIds: "WF-PLAN-CAT-001",
+    matrixIds: "WF-PLAN-CAT-001,WF-PLAN-JS-002,WF-PLAN-JS-013",
     fixture: "next-standalone",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -117,7 +117,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "node .next/standalone/server.js",
   },
   {
-    matrixIds: "WF-PLAN-CAT-002",
+    matrixIds: "WF-PLAN-CAT-002,WF-PLAN-JS-003,WF-PLAN-JS-013",
     fixture: "next-static-export",
     port: 80,
     buildStrategy: "static-artifact",
@@ -132,7 +132,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     buildCommand: "pnpm build",
   },
   {
-    matrixIds: "WF-PLAN-CAT-007",
+    matrixIds: "WF-PLAN-CAT-007,WF-PLAN-JS-009,WF-PLAN-JS-013",
     fixture: "vite-spa",
     port: 80,
     buildStrategy: "static-artifact",
@@ -147,7 +147,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     buildCommand: "bun run build",
   },
   {
-    matrixIds: "WF-PLAN-CAT-007",
+    matrixIds: "WF-PLAN-CAT-007,WF-PLAN-JS-009,WF-PLAN-JS-013",
     fixture: "react-spa",
     port: 80,
     buildStrategy: "static-artifact",
@@ -162,7 +162,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     buildCommand: "npm run build",
   },
   {
-    matrixIds: "WF-PLAN-CAT-007",
+    matrixIds: "WF-PLAN-CAT-007,WF-PLAN-JS-009,WF-PLAN-JS-013",
     fixture: "vue-spa",
     port: 80,
     buildStrategy: "static-artifact",
@@ -177,7 +177,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     buildCommand: "pnpm build",
   },
   {
-    matrixIds: "WF-PLAN-CAT-007",
+    matrixIds: "WF-PLAN-CAT-007,WF-PLAN-JS-009,WF-PLAN-JS-013",
     fixture: "svelte-spa",
     port: 80,
     buildStrategy: "static-artifact",
@@ -192,7 +192,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     buildCommand: "yarn build",
   },
   {
-    matrixIds: "WF-PLAN-CAT-007",
+    matrixIds: "WF-PLAN-CAT-007,WF-PLAN-JS-009,WF-PLAN-JS-013",
     fixture: "solid-spa",
     port: 80,
     buildStrategy: "static-artifact",
@@ -207,7 +207,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     buildCommand: "bun run build",
   },
   {
-    matrixIds: "WF-PLAN-CAT-007",
+    matrixIds: "WF-PLAN-CAT-007,WF-PLAN-JS-009,WF-PLAN-JS-013",
     fixture: "angular-spa",
     port: 80,
     buildStrategy: "static-artifact",
@@ -222,7 +222,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     buildCommand: "npm run build",
   },
   {
-    matrixIds: "WF-PLAN-CAT-005",
+    matrixIds: "WF-PLAN-CAT-005,WF-PLAN-JS-006,WF-PLAN-JS-013",
     fixture: "sveltekit-static",
     port: 80,
     buildStrategy: "static-artifact",
@@ -237,7 +237,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     buildCommand: "pnpm build",
   },
   {
-    matrixIds: "WF-PLAN-CAT-004",
+    matrixIds: "WF-PLAN-CAT-004,WF-PLAN-JS-005,WF-PLAN-JS-013",
     fixture: "nuxt-generate",
     port: 80,
     buildStrategy: "static-artifact",
@@ -252,7 +252,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     buildCommand: "pnpm generate",
   },
   {
-    matrixIds: "WF-PLAN-CAT-006",
+    matrixIds: "WF-PLAN-CAT-006,WF-PLAN-JS-008,WF-PLAN-JS-013",
     fixture: "astro-static",
     port: 80,
     buildStrategy: "static-artifact",
@@ -267,7 +267,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     buildCommand: "npm run build",
   },
   {
-    matrixIds: "WF-PLAN-CAT-003",
+    matrixIds: "WF-PLAN-CAT-003,WF-PLAN-JS-004,WF-PLAN-JS-013",
     fixture: "remix-ssr",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -282,7 +282,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "npm run start",
   },
   {
-    matrixIds: "WF-PLAN-CAT-008",
+    matrixIds: "WF-PLAN-CAT-008,WF-PLAN-JS-010,WF-PLAN-JS-013",
     fixture: "express-server",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -297,7 +297,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "npm run start",
   },
   {
-    matrixIds: "WF-PLAN-CAT-008",
+    matrixIds: "WF-PLAN-CAT-008,WF-PLAN-JS-010,WF-PLAN-JS-013",
     fixture: "fastify-server",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -312,7 +312,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "pnpm start",
   },
   {
-    matrixIds: "WF-PLAN-CAT-008",
+    matrixIds: "WF-PLAN-CAT-008,WF-PLAN-JS-010,WF-PLAN-JS-013",
     fixture: "nestjs-server",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -327,7 +327,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "npm run start:built",
   },
   {
-    matrixIds: "WF-PLAN-CAT-008",
+    matrixIds: "WF-PLAN-CAT-008,WF-PLAN-JS-010,WF-PLAN-JS-013",
     fixture: "hono-server",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -342,7 +342,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "bun run start",
   },
   {
-    matrixIds: "WF-PLAN-CAT-008",
+    matrixIds: "WF-PLAN-CAT-008,WF-PLAN-JS-010,WF-PLAN-JS-013",
     fixture: "koa-server",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -357,7 +357,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "yarn start",
   },
   {
-    matrixIds: "WF-PLAN-CAT-008",
+    matrixIds: "WF-PLAN-CAT-008,WF-PLAN-JS-011,WF-PLAN-JS-013",
     fixture: "generic-node-server",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -785,7 +785,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
     });
   }
 
-  test("[WF-PLAN-CAT-005][WF-PLAN-DET-007] rejects pinned ambiguous SvelteKit fixture", async () => {
+  test("[WF-PLAN-CAT-005][WF-PLAN-DET-007][WF-PLAN-JS-007][WF-PLAN-JS-012] rejects pinned ambiguous SvelteKit fixture", async () => {
     ensureReflectMetadata();
     const [{ FileSystemSourceDetector }, { DefaultRuntimePlanResolver }] = await Promise.all([
       import("@appaloft/adapter-filesystem"),

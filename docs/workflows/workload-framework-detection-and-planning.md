@@ -476,6 +476,12 @@ Current typed detection is limited to:
   and structured `runtime-plan-resolution` errors when production start evidence is missing.
 - SvelteKit ambiguous auto planning is rejected unless the workflow selects static explicitly or
   provides an explicit start command.
+- JavaScript/TypeScript tested catalog closure has stable rows for Next.js SSR/standalone/static
+  export, Remix, Nuxt generate, SvelteKit static/ambiguous mode, Astro static, Vite/React/Vue/
+  Svelte/Solid/Angular SPA, Express/Fastify/NestJS/Hono/Koa, generic package scripts, missing
+  evidence, and internal-port behavior. These rows are bound to fixture planner tests and
+  `deployments.plan/v1` preview contract tests. Full real Docker/SSH execution for every fixture is
+  still a migration gap, distinct from the headless Docker/OCI catalog closure.
 
 The following are migration gaps before the mainstream support catalog is complete:
 
