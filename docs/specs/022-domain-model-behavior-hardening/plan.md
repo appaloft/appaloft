@@ -50,6 +50,7 @@
 | 9 | `DomainBinding` canonical redirect target behavior | Move served redirect target eligibility into the binding aggregate. | domain binding create and route configuration |
 | 10 | `Certificate` and owned attempt status values | Move certificate-requested worker attempt selection, terminal skip, and issue-context preparation into the certificate aggregate. | `certificate-requested` event handler |
 | 11 | `Organization`, `OrganizationMember`, and `OrganizationPlan` | Move duplicate membership and seat-capacity calculations into identity-governance domain behavior. | core organization aggregate |
+| Continuous A | `DomainBinding` verification attempts | Move ownership-confirmation attempt selection, idempotent already-bound checks, and DNS verification context preparation into the binding aggregate. | `domain-bindings.confirm-ownership` |
 
 ## Roadmap And Compatibility
 
@@ -138,6 +139,11 @@
     core-only model state in this release line.
 - Related application tests after slice 11:
   - none; no application operation currently exposes organization membership or plan changes.
+- Continuous A test bindings:
+  - `DMBH-DOMAIN-003` in `packages/core/test/domain-binding.test.ts`
+  - Matrix rows: `ROUTE-TLS-CMD-007`, `ROUTE-TLS-CMD-010`, `ROUTE-TLS-CMD-016`
+- Related application tests after Continuous A:
+  - `packages/application/test/confirm-domain-binding-ownership.test.ts`
 
 ## Risks And Migration Gaps
 
@@ -161,8 +167,8 @@
   - Slice 11 migrates identity-governance membership/seat calculations in
     `packages/core/src/identity-governance/organization.ts` behind `Organization`,
     `OrganizationMember`, and `OrganizationPlan` behavior.
-  - No remaining hotspot from the original model-hardening boundary audit is open in this
-    artifact.
+  - Continuous A migrates domain-binding ownership-confirmation attempt selection in
+    `confirm-domain-binding-ownership.use-case.ts` behind `DomainBinding` behavior.
   - Core value objects may compare their own primitive state internally. Those reads are not
     boundary leaks.
 - A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.

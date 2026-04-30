@@ -8,7 +8,10 @@ import {
   DomainBinding,
   DomainBindingId,
   DomainBindingStatusValue,
+  type DomainDnsObservationState,
+  DomainDnsObservationStatusValue,
   DomainVerificationAttemptId,
+  type DomainVerificationAttemptState,
   DomainVerificationAttemptStatusValue,
   DomainVerificationMethodValue,
   EdgeProxyKindValue,
@@ -27,6 +30,8 @@ function domainBinding(input?: {
   certificatePolicy?: "auto" | "manual" | "disabled";
   domainName?: string;
   redirectTo?: string;
+  verificationAttempts?: DomainVerificationAttemptState[];
+  dnsObservation?: DomainDnsObservationState;
 }) {
   return DomainBinding.rehydrate({
     id: DomainBindingId.rehydrate("dom_demo"),
@@ -47,7 +52,7 @@ function domainBinding(input?: {
         }
       : {}),
     status: DomainBindingStatusValue.rehydrate(input?.status ?? "bound"),
-    verificationAttempts: [
+    verificationAttempts: input?.verificationAttempts ?? [
       {
         id: DomainVerificationAttemptId.rehydrate("dva_demo"),
         method: DomainVerificationMethodValue.rehydrate("manual"),
@@ -56,8 +61,22 @@ function domainBinding(input?: {
         createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
       },
     ],
+    ...(input?.dnsObservation ? { dnsObservation: input.dnsObservation } : {}),
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   });
+}
+
+function verificationAttempt(input: {
+  id: string;
+  status: "requested" | "pending" | "verified" | "failed" | "retry_scheduled";
+}): DomainVerificationAttemptState {
+  return {
+    id: DomainVerificationAttemptId.rehydrate(input.id),
+    method: DomainVerificationMethodValue.rehydrate("manual"),
+    status: DomainVerificationAttemptStatusValue.rehydrate(input.status),
+    expectedTarget: MessageText.rehydrate("Verify DNS ownership"),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  };
 }
 
 describe("DomainBinding", () => {
@@ -199,5 +218,71 @@ describe("DomainBinding", () => {
       phase: "domain-binding-route-configuration",
     });
     expect(redirectTarget.isErr()).toBe(true);
+  });
+
+  test("[DMBH-DOMAIN-003] prepares ownership confirmation context without caller-owned attempt branching", () => {
+    const binding = domainBinding({
+      status: "pending_verification",
+      verificationAttempts: [
+        verificationAttempt({ id: "dva_old", status: "failed" }),
+        verificationAttempt({ id: "dva_pending", status: "pending" }),
+      ],
+      dnsObservation: {
+        status: DomainDnsObservationStatusValue.rehydrate("pending"),
+        expectedTargets: [MessageText.rehydrate("203.0.113.10")],
+        observedTargets: [],
+        checkedAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      },
+    });
+
+    const latest = binding.resolveOwnershipConfirmationContext({});
+    expect(latest.isOk()).toBe(true);
+    if (latest.isOk()) {
+      expect(latest.value.kind).toBe("pending");
+      if (latest.value.kind === "pending") {
+        expect(latest.value.verificationAttemptId.value).toBe("dva_pending");
+        expect(latest.value.domainName.value).toBe("app.example.com");
+        expect(latest.value.expectedDnsTargets.map((target) => target.value)).toEqual([
+          "203.0.113.10",
+        ]);
+      }
+    }
+
+    const explicit = binding.resolveOwnershipConfirmationContext({
+      verificationAttemptId: DomainVerificationAttemptId.rehydrate("dva_pending"),
+    });
+    expect(explicit.isOk()).toBe(true);
+    if (explicit.isOk()) {
+      expect(explicit.value.verificationAttemptId.value).toBe("dva_pending");
+    }
+  });
+
+  test("[DMBH-DOMAIN-003] answers already confirmed and non-pending ownership attempts", () => {
+    const alreadyBound = domainBinding({
+      status: "bound",
+      verificationAttempts: [verificationAttempt({ id: "dva_verified", status: "verified" })],
+    });
+    const confirmed = alreadyBound.resolveOwnershipConfirmationContext({
+      verificationAttemptId: DomainVerificationAttemptId.rehydrate("dva_verified"),
+    });
+    expect(confirmed.isOk()).toBe(true);
+    if (confirmed.isOk()) {
+      expect(confirmed.value.kind).toBe("already_confirmed");
+      expect(confirmed.value.verificationAttemptId.value).toBe("dva_verified");
+    }
+
+    const failed = domainBinding({
+      status: "pending_verification",
+      verificationAttempts: [verificationAttempt({ id: "dva_failed", status: "failed" })],
+    });
+    const rejected = failed.resolveOwnershipConfirmationContext({
+      verificationAttemptId: DomainVerificationAttemptId.rehydrate("dva_failed"),
+    });
+    expect(rejected.isErr()).toBe(true);
+    if (rejected.isErr()) {
+      expect(rejected.error.code).toBe("domain_verification_not_pending");
+      expect(rejected.error.details?.verificationAttemptId).toBe("dva_failed");
+      expect(rejected.error.details?.relatedState).toBe("failed");
+    }
   });
 });

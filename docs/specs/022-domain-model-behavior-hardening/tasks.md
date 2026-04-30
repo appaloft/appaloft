@@ -141,6 +141,17 @@
   instead of peeling child state through `toState()` for domain decisions.
 - [x] Run `bun test packages/core/test/organization.test.ts`.
 
+## Continuous A: Domain Binding Ownership Confirmation Behavior
+
+- [x] `DMBH-DOMAIN-003`: add DomainBinding ownership-confirmation selection behavior tests at
+  `packages/core/test/domain-binding.test.ts`.
+- [x] Add `DomainBinding` and owned verification-attempt behavior for explicit/latest pending
+  manual attempt selection, already-bound idempotency, and DNS verification context preparation.
+- [x] Refactor `confirm-domain-binding-ownership.use-case.ts` to ask `DomainBinding` for
+  confirmation intent instead of peeling verification attempt status/method primitives.
+- [x] Run `bun test packages/core/test/domain-binding.test.ts`.
+- [x] Run `bun test packages/application/test/confirm-domain-binding-ownership.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.
