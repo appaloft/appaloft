@@ -54,6 +54,7 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 | SRV-LIFE-PROXY-CONFIG-005 | `servers.configure-edge-proxy` | integration | Inactive server is configured through the ordinary entrypoint. | Returns `server_inactive`, `phase = server-lifecycle-guard`, does not mutate edge proxy state, and does not publish `server-edge-proxy-configured`. |
 | SRV-LIFE-PROXY-CONFIG-006 | `servers.configure-edge-proxy` | integration | Deleted server tombstone is configured through the ordinary entrypoint. | Returns `not_found`, `phase = server-admission`, does not change tombstone state, and does not publish `server-edge-proxy-configured`. |
 | SRV-LIFE-PROXY-CONFIG-007 | `servers.list` / `servers.show` | integration | Edge proxy was configured successfully. | Normal list and show return the new edge proxy kind/status while retaining the same server id and lifecycle status. |
+| DMBH-TARGET-001 | `DeploymentTarget` | unit | Domain behavior answers whether an edge proxy can be used for generated routes or bootstrap repair. | `DeploymentTarget` exposes intention methods for route proxy selection and bootstrap provider selection; callers do not duplicate `kind = none` or `status = disabled` checks in application/domain behavior. Public command/query behavior is unchanged. |
 | SRV-LIFE-DEACT-001 | `servers.deactivate` | integration | Active server is deactivated. | Returns `ok({ id })`, persists lifecycle status `inactive`, stores `deactivatedAt`, publishes `server-deactivated`, and leaves credentials/proxy/deployment/domain state intact. |
 | SRV-LIFE-DEACT-002 | `servers.deactivate` | integration | Already inactive server is deactivated again. | Returns idempotent `ok({ id })`, preserves original `deactivatedAt` and reason, and does not publish a duplicate event. |
 | SRV-LIFE-DEACT-003 | `servers.deactivate` | integration | Missing server id. | Returns `not_found`, `phase = server-admission`, and does not publish `server-deactivated`. |
@@ -138,6 +139,13 @@ rows for the server rename Code Round.
 
 `SRV-LIFE-PROXY-CONFIG-*` and `SRV-LIFE-ENTRY-017` through `SRV-LIFE-ENTRY-020` are the required
 coverage rows for the server edge proxy configure Code Round.
+
+`DMBH-TARGET-001` is the domain-model hardening row for the no-behavior-change edge proxy behavior
+placement refactor. It is bound to `packages/core/test/deployment-target.test.ts` and verified with
+`packages/application/test/bootstrap-server-proxy.test.ts`,
+`packages/application/test/server-edge-proxy-bootstrap.test.ts`,
+`packages/application/test/create-deployment.test.ts`, and
+`packages/contracts/test/deployment-plan-preview-contract.test.ts`.
 
 ## Open Questions
 

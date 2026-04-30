@@ -3,7 +3,7 @@
 ## Status
 
 - Round: Spec Round
-- Artifact state: ready for first Code Round slice
+- Artifact state: slices 1 and 2 implemented; ready for slice 3 Spec/Code Round
 - Behavior type: no-behavior-change domain model refactor
 - Public behavior impact: none
 
@@ -85,5 +85,6 @@ DDD tactical rules to move existing behavior into the objects that already own i
 
 ## Open Questions
 
-- Should the project keep the local DDD skill under `.agents/skills/domain-driven-develop`, or also
-  maintain a `.codex/skills/domain-driven-develop` copy for compatibility with older prompts?
+- None for slice 2. The project-local DDD skill remains under
+  `.agents/skills/domain-driven-develop`; no `.codex/skills/domain-driven-develop` copy exists in
+  this repository.

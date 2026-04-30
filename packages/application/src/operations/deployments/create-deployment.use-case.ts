@@ -318,13 +318,7 @@ function domainBindingRouteGroups(
 function proxyKindFromServer(
   server: Parameters<RuntimePlanResolutionInputBuilder["build"]>[0]["server"],
 ): NonNullable<RequestedDeploymentConfig["proxyKind"]> | undefined {
-  const edgeProxy = server.toState().edgeProxy;
-
-  if (!edgeProxy || edgeProxy.kind.value === "none" || edgeProxy.status.value === "disabled") {
-    return undefined;
-  }
-
-  return edgeProxy.kind.value;
+  return server.selectEdgeProxyKindForGeneratedRoutes()?.value;
 }
 
 interface ServerAppliedRouteGroup {

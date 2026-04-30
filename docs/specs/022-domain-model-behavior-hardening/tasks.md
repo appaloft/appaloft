@@ -18,9 +18,25 @@
 - [x] Run `bun test packages/application/test/create-deployment.test.ts`.
 - [x] Run `bun test packages/contracts/test/deployment-plan-preview-contract.test.ts`.
 
+## Slice 2: Deployment Target Edge Proxy Behavior
+
+- [x] `DMBH-TARGET-001`: add DeploymentTarget behavior tests at
+  `packages/core/test/deployment-target.test.ts`.
+- [x] Add `DeploymentTarget` or owned edge-proxy value behavior for generated-route and bootstrap
+  proxy eligibility.
+- [x] Refactor deployment create/plan generated-route callers to ask `DeploymentTarget` for route
+  proxy selection.
+- [x] Refactor default access route resolution to ask `DeploymentTarget` for proxy route eligibility.
+- [x] Refactor proxy bootstrap use case and registration handler to ask `DeploymentTarget` for
+  bootstrap eligibility.
+- [x] Run `bun test packages/core/test/deployment-target.test.ts`.
+- [x] Run `bun test packages/application/test/bootstrap-server-proxy.test.ts`.
+- [x] Run `bun test packages/application/test/server-edge-proxy-bootstrap.test.ts`.
+- [x] Run `bun test packages/application/test/create-deployment.test.ts`.
+- [x] Run `bun test packages/contracts/test/deployment-plan-preview-contract.test.ts`.
+
 ## Later Slices
 
-- [ ] Slice 2: harden `DeploymentTarget` edge proxy behavior.
 - [ ] Slice 3: harden `DomainBinding` readiness/certificate/route behavior.
 - [ ] Slice 4: harden `EnvironmentConfigSet` identity/precedence/diff behavior.
 - [ ] Slice 5: harden `Deployment` execution-continuation/supersede behavior.
