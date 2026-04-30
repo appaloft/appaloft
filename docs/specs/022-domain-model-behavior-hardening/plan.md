@@ -57,6 +57,7 @@
 | Continuous E | `Environment`, `Resource`, and `Destination` context ownership for domain bindings | Reuse aggregate ownership behavior for durable domain binding context admission. | `domain-bindings.create` |
 | Continuous F | `AccessRoute`, `RuntimeArtifactKindValue`, and `RuntimeArtifactIntentValue` | Move runtime-plan route/artifact prerequisite checks into VO predicates. | `AccessRoute.create`, `RuntimeArtifactSnapshot.create` |
 | Continuous G | `ResourceBinding`, `ResourceBindingScopeValue`, and `ResourceInjectionModeValue` | Move binding scope/injection coherence into the aggregate with single-VO predicates. | `ResourceBinding.create` |
+| Continuous H | `DomainBinding` route admission values | Move durable binding proxy/redirect admission and route-change equality behind VO predicates. | `DomainBinding.create`, `DomainBinding.configureRoute` |
 
 ## Roadmap And Compatibility
 
@@ -181,6 +182,11 @@
 - Related application tests after Continuous G:
   - none; `ResourceBinding` is currently core foundational model behavior without public command
     exposure.
+- Continuous H test bindings:
+  - `DMBH-DOMAIN-002` in `packages/core/test/domain-binding.test.ts`
+- Related application tests after Continuous H:
+  - none; this is a core-internal route admission predicate refactor already covered by route
+    configuration tests in earlier slices.
 
 ## Risks And Migration Gaps
 
@@ -218,6 +224,8 @@
     VO predicates.
   - Continuous G migrates resource binding scope/injection-mode coherence behind
     `ResourceBinding` behavior.
+  - Continuous H migrates domain-binding route proxy/redirect primitive comparisons behind
+    `EdgeProxyKindValue` predicates and value-object equality.
   - Core value objects may compare their own primitive state internally. Those reads are not
     boundary leaks.
 - A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.

@@ -211,6 +211,13 @@
   coherence.
 - [x] Run `bun test packages/core/test/resource-binding.test.ts`.
 
+## Continuous H: Domain Binding Route Admission Value Behavior
+
+- [x] Extend domain binding route behavior tests at `packages/core/test/domain-binding.test.ts`.
+- [x] Refactor durable binding proxy and redirect self-target checks to use VO predicates/equality.
+- [x] Refactor route-change detection to use optional value-object equality.
+- [x] Run `bun test packages/core/test/domain-binding.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.

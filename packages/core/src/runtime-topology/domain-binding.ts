@@ -35,6 +35,17 @@ export const domainBindingStatuses = [
 
 export type DomainBindingStatus = (typeof domainBindingStatuses)[number];
 
+function optionalValueObjectEquals<TValue extends { equals(other: TValue): boolean }>(
+  left: TValue | undefined,
+  right: TValue | undefined,
+): boolean {
+  if (!left || !right) {
+    return !left && !right;
+  }
+
+  return left.equals(right);
+}
+
 export const domainVerificationAttemptStatuses = [
   "requested",
   "pending",
@@ -288,7 +299,7 @@ export class CertificatePolicyValue extends ScalarValueObject<CertificatePolicy>
   }
 
   static defaultForTlsMode(tlsMode: TlsModeValue): CertificatePolicyValue {
-    return new CertificatePolicyValue(tlsMode.value === "disabled" ? "disabled" : "auto");
+    return new CertificatePolicyValue(tlsMode.isDisabled() ? "disabled" : "auto");
   }
 
   isDisabled(): boolean {
@@ -457,7 +468,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     correlationId?: string;
     causationId?: string;
   }): Result<DomainBinding> {
-    if (input.proxyKind.value === "none") {
+    if (input.proxyKind.isDisabled()) {
       return err(
         domainError.domainBindingProxyRequired({
           phase: "domain-binding-admission",
@@ -475,12 +486,13 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       );
     }
 
-    if (input.redirectTo && input.redirectTo.value === input.domainName.value) {
+    const redirectTo = input.redirectTo;
+    if (redirectTo?.equals(input.domainName)) {
       return err(
         domainError.validation("Domain binding canonical redirect cannot point to itself", {
           phase: "domain-binding-admission",
           domainName: input.domainName.value,
-          redirectTo: input.redirectTo.value,
+          redirectTo: redirectTo.value,
         }),
       );
     }
@@ -994,13 +1006,14 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       );
     }
 
-    if (input.redirectTo && input.redirectTo.value === this.state.domainName.value) {
+    const redirectTo = input.redirectTo;
+    if (redirectTo?.equals(this.state.domainName)) {
       return err(
         domainError.validation("Domain binding canonical redirect cannot point to itself", {
           phase: "domain-binding-route-configuration",
           domainBindingId: this.state.id.value,
           domainName: this.state.domainName.value,
-          redirectTo: input.redirectTo.value,
+          redirectTo: redirectTo.value,
         }),
       );
     }
@@ -1009,8 +1022,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       ? (input.redirectStatus ?? CanonicalRedirectStatusCode.rehydrate(308))
       : undefined;
     const changed =
-      this.state.redirectTo?.value !== input.redirectTo?.value ||
-      this.state.redirectStatus?.value !== nextRedirectStatus?.value;
+      !optionalValueObjectEquals(this.state.redirectTo, input.redirectTo) ||
+      !optionalValueObjectEquals(this.state.redirectStatus, nextRedirectStatus);
 
     if (!changed) {
       return ok({ changed: false });
