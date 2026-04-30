@@ -9,6 +9,8 @@ import {
   djangoWorkspacePlanner,
   fastapiWorkspacePlanner,
   flaskWorkspacePlanner,
+  genericAsgiWorkspacePlanner,
+  genericWsgiWorkspacePlanner,
 } from "./python/web-frameworks";
 import {
   DockerfileBuilder,
@@ -42,6 +44,8 @@ const workspaceRuntimePlanners: WorkspaceRuntimePlanner[] = [
   fastapiWorkspacePlanner,
   djangoWorkspacePlanner,
   flaskWorkspacePlanner,
+  genericAsgiWorkspacePlanner,
+  genericWsgiWorkspacePlanner,
   pythonWorkspacePlanner,
   javaWorkspacePlanner,
   customWorkspacePlanner,

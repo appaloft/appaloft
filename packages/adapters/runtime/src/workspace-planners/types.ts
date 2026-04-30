@@ -35,6 +35,8 @@ export type WorkspaceRuntimeKind =
   | "django"
   | "fastapi"
   | "flask"
+  | "generic-asgi"
+  | "generic-wsgi"
   | "java"
   | "nextjs"
   | "node"

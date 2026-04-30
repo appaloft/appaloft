@@ -440,6 +440,27 @@ function detectPythonFramework(input: {
   return undefined;
 }
 
+function hasPythonWebEvidence(input: {
+  path: string;
+  pyproject: string | null;
+  requirements: string | null;
+  framework: SourceFramework | undefined;
+}): boolean {
+  if (input.framework) {
+    return true;
+  }
+
+  const manifests = `${input.pyproject ?? ""}\n${input.requirements ?? ""}`;
+
+  return (
+    textMentionsPackage(manifests, "uvicorn") ||
+    textMentionsPackage(manifests, "gunicorn") ||
+    textMentionsPackage(manifests, "waitress") ||
+    existsSync(join(input.path, "asgi.py")) ||
+    existsSync(join(input.path, "wsgi.py"))
+  );
+}
+
 function pythonDetectedFiles(path: string): SourceDetectedFile[] {
   return [
     ...(existsSync(join(path, "pyproject.toml")) ? ["pyproject-toml" as const] : []),
@@ -498,7 +519,9 @@ class PythonProjectProfileDetector implements LocalProjectProfileDetector {
     const projectName = pyproject?.match(/^\s*name\s*=\s*"([^"]+)"/m)?.[1];
     const runtimeVersion = readFirstExistingVersion(path, [".python-version"]);
     const framework = detectPythonFramework({ path, pyproject, requirements });
-    const applicationShape = applicationShapeForFramework(framework);
+    const applicationShape = hasPythonWebEvidence({ path, pyproject, requirements, framework })
+      ? "serverful-http"
+      : applicationShapeForFramework(framework);
 
     return {
       runtimeFamily: "python",

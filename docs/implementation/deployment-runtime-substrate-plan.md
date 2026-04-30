@@ -267,16 +267,21 @@ Compatibility command text for workspace install/build/start steps remains a she
 until runtime profile command fields are modeled as command specs end to end.
 
 Current framework/runtime planning supports Next.js, Vite static, Astro static, Nuxt generate
-static, explicit SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python,
-generic Java, and custom command fallback. Current typed source inspection has been widened for
-the target catalog vocabulary, and local JavaScript/TypeScript detection recognizes common
-framework dependencies/config files and package-manager lockfiles. Local Python detection now
-recognizes FastAPI, Django, Flask, `uv`, Poetry, pip, lockfiles, and `manage.py`. The broader
-mainstream framework catalog in the workflow spec remains target contract and requires future Code
-Rounds for unsupported planner families and fixture-by-fixture real deployment smoke. Web, CLI, and
-repository config now share the current JavaScript/TypeScript/Python draft vocabulary for resource
-source, runtime, network, and health profile fields; full browser-level entry parity for every
-catalog fixture remains a follow-up hardening gap.
+static, explicit SvelteKit static, Remix, FastAPI, Django, Flask, deterministic generic ASGI,
+deterministic generic WSGI, generic Node, generic Python explicit-command fallback, generic Java,
+and custom command fallback. Current typed source inspection has been widened for the target
+catalog vocabulary, and local JavaScript/TypeScript detection recognizes common framework
+dependencies/config files and package-manager lockfiles. Local Python detection now recognizes
+FastAPI, Django, Flask, `uv`, Poetry, pip, lockfiles, `manage.py`, generic ASGI/WSGI entrypoint
+files, and Python package evidence that needs explicit fallback commands. Python planner hardening
+now validates deterministic ASGI/WSGI app targets before emitting inferred start commands and
+returns structured `runtime-plan-resolution` details such as `missing-asgi-app`,
+`missing-wsgi-app`, and `ambiguous-python-app-target` instead of guessing. The broader mainstream
+framework catalog in the workflow spec remains target contract and requires future Code Rounds for
+unsupported planner families and fixture-by-fixture real deployment smoke. Web, CLI, and repository
+config now share the current JavaScript/TypeScript/Python draft vocabulary for resource source,
+runtime, network, and health profile fields; full browser-level entry parity for every catalog
+fixture remains a follow-up hardening gap.
 
 The fixture deploy smoke slice is headless for CI portability. The current supported
 JavaScript/TypeScript/Python fixture catalog now proves that the shared resource
@@ -314,6 +319,15 @@ rows to source inspection, planner/base-image policy, command specs, artifact ou
 generation intent, and headless Docker/OCI execution readiness. `deployments.plan/v1` contract
 coverage proves the same catalog shape can be returned through the public read-only preview
 without deployment execution.
+
+Python tested catalog closure now has stable rows for FastAPI with `uv`, Django with
+pip/requirements, Flask with pip/requirements, deterministic generic ASGI, deterministic generic
+WSGI, Poetry, explicit start-command fallback, package-tool precedence, missing ASGI/WSGI app
+target, ambiguous app target, missing production start, and internal-port behavior. Runtime fixture
+tests bind these rows to source inspection, planner/base-image policy, command specs, artifact
+output, Dockerfile generation intent, internal HTTP verification, and headless Docker/OCI execution
+readiness. `deployments.plan/v1` contract coverage proves ready and blocked Python planner output
+uses the same preview shape and remediation language as the JavaScript/TypeScript closure.
 
 `build-requested`, resolved image ids/digests, runtime instance identity, rollback candidate
 capture, command specs on the durable runtime plan boundary, and richer source-file analysis are

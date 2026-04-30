@@ -371,7 +371,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "npm run start:built",
   },
   {
-    matrixIds: "WF-PLAN-CAT-009",
+    matrixIds: "WF-PLAN-CAT-009,WF-PLAN-PY-001,WF-PLAN-PY-008,WF-PLAN-PY-012",
     fixture: "fastapi-uv",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -385,7 +385,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "uv run python -m uvicorn main:app --host 0.0.0.0 --port 3000",
   },
   {
-    matrixIds: "WF-PLAN-CAT-010",
+    matrixIds: "WF-PLAN-CAT-010,WF-PLAN-PY-002,WF-PLAN-PY-008,WF-PLAN-PY-012",
     fixture: "django-pip",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -399,7 +399,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "python manage.py runserver 0.0.0.0:3000",
   },
   {
-    matrixIds: "WF-PLAN-CAT-010",
+    matrixIds: "WF-PLAN-CAT-010,WF-PLAN-PY-003,WF-PLAN-PY-008,WF-PLAN-PY-012",
     fixture: "flask-pip",
     port: 3000,
     buildStrategy: "workspace-commands",
@@ -410,7 +410,47 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     packageManager: "pip",
     baseImage: "python:3.12-slim",
     installCommand: "pip install --no-cache-dir -r requirements.txt",
-    startCommand: "python -m flask run --host 0.0.0.0 --port 3000",
+    startCommand: "python -m flask --app app:app run --host 0.0.0.0 --port 3000",
+  },
+  {
+    matrixIds: "WF-PLAN-PY-004,WF-PLAN-PY-008,WF-PLAN-PY-012",
+    fixture: "generic-asgi-uv",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "generic-asgi",
+    runtimeKind: "generic-asgi",
+    applicationShape: "serverful-http",
+    packageManager: "uv",
+    baseImage: "python:3.12-slim",
+    installCommand: "pip install --no-cache-dir uv && uv sync --frozen --no-dev",
+    startCommand: "uv run python -m uvicorn asgi:app --host 0.0.0.0 --port 3000",
+  },
+  {
+    matrixIds: "WF-PLAN-PY-005,WF-PLAN-PY-008,WF-PLAN-PY-012",
+    fixture: "generic-wsgi-pip",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "generic-wsgi",
+    runtimeKind: "generic-wsgi",
+    applicationShape: "serverful-http",
+    packageManager: "pip",
+    baseImage: "python:3.12-slim",
+    installCommand: "pip install --no-cache-dir -r requirements.txt",
+    startCommand: "python -m gunicorn wsgi:app --bind 0.0.0.0:3000",
+  },
+  {
+    matrixIds: "WF-PLAN-PY-006,WF-PLAN-PY-008,WF-PLAN-PY-012",
+    fixture: "python-poetry-web",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "flask",
+    runtimeKind: "flask",
+    applicationShape: "serverful-http",
+    framework: "flask",
+    packageManager: "poetry",
+    baseImage: "python:3.12-slim",
+    installCommand: "pip install --no-cache-dir poetry && poetry install --only main --no-root",
+    startCommand: "poetry run python -m flask --app app:app run --host 0.0.0.0 --port 3000",
   },
 ];
 
@@ -485,7 +525,9 @@ function smokeMatrixIdFor(fixture: PlannerFixtureExpectation): string {
   if (
     fixture.runtimeKind === "fastapi" ||
     fixture.runtimeKind === "django" ||
-    fixture.runtimeKind === "flask"
+    fixture.runtimeKind === "flask" ||
+    fixture.runtimeKind === "generic-asgi" ||
+    fixture.runtimeKind === "generic-wsgi"
   ) {
     return "WF-PLAN-SMOKE-003";
   }
@@ -823,6 +865,150 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
         phase: "runtime-plan-resolution",
         framework: "sveltekit",
         applicationShape: "hybrid-static-server",
+      }),
+    );
+  });
+
+  test("[WF-PLAN-PY-007][WF-PLAN-PY-011][WF-PLAN-PY-012] accepts explicit Python start-command fallback", async () => {
+    ensureReflectMetadata();
+    const [
+      { FileSystemSourceDetector },
+      { DefaultRuntimePlanResolver },
+      { generateWorkspaceDockerBuild },
+    ] = await Promise.all([
+      import("@appaloft/adapter-filesystem"),
+      import("../src"),
+      import("../src/workspace-planners"),
+    ]);
+    const context = createTestExecutionContext();
+    const sourceResult = await new FileSystemSourceDetector().detect(
+      context,
+      join(fixturesRoot, "python-explicit-start"),
+    );
+
+    expect(sourceResult.isOk()).toBe(true);
+
+    const result = await new DefaultRuntimePlanResolver().resolve(context, {
+      id: "plan_python_explicit_start",
+      source: sourceResult._unsafeUnwrap().source,
+      server: {
+        id: "srv_python_explicit_start",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_python_explicit_start"),
+      detectedReasoning: ["detected explicit Python fallback fixture"],
+      requestedDeployment: {
+        method: "auto",
+        port: 4317,
+        installCommand: "pip install --no-cache-dir -r requirements.txt",
+        startCommand: "python -m waitress --listen=0.0.0.0:4317 service:application",
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "generic-python",
+        runtimeKind: "python",
+        packageManager: "pip",
+        applicationShape: "serverful-http",
+      }),
+    );
+    expect(plan.execution.port).toBe(4317);
+    expect(plan.execution.startCommand).toBe(
+      "python -m waitress --listen=0.0.0.0:4317 service:application",
+    );
+    expect(
+      generateWorkspaceDockerBuild({
+        execution: plan.execution,
+        sourceInspection: plan.source.inspection,
+      })?.dockerfile,
+    ).toContain("python -m waitress --listen=0.0.0.0:4317 service:application");
+  });
+
+  test("[WF-PLAN-PY-009] blocks FastAPI when ASGI app target is missing", async () => {
+    ensureReflectMetadata();
+    const [{ FileSystemSourceDetector }, { DefaultRuntimePlanResolver }] = await Promise.all([
+      import("@appaloft/adapter-filesystem"),
+      import("../src"),
+    ]);
+    const context = createTestExecutionContext();
+    const sourceResult = await new FileSystemSourceDetector().detect(
+      context,
+      join(fixturesRoot, "fastapi-missing-app"),
+    );
+
+    expect(sourceResult.isOk()).toBe(true);
+
+    const result = await new DefaultRuntimePlanResolver().resolve(context, {
+      id: "plan_fastapi_missing_app",
+      source: sourceResult._unsafeUnwrap().source,
+      server: {
+        id: "srv_fastapi_missing_app",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_fastapi_missing_app"),
+      detectedReasoning: ["detected FastAPI missing app fixture"],
+      requestedDeployment: {
+        method: "auto",
+        port: 3000,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toEqual(
+      expect.objectContaining({
+        phase: "runtime-plan-resolution",
+        runtimeFamily: "python",
+        framework: "fastapi",
+        reasonCode: "missing-asgi-app",
+      }),
+    );
+  });
+
+  test("[WF-PLAN-PY-010] blocks ambiguous Python ASGI app target evidence", async () => {
+    ensureReflectMetadata();
+    const [{ FileSystemSourceDetector }, { DefaultRuntimePlanResolver }] = await Promise.all([
+      import("@appaloft/adapter-filesystem"),
+      import("../src"),
+    ]);
+    const context = createTestExecutionContext();
+    const sourceResult = await new FileSystemSourceDetector().detect(
+      context,
+      join(fixturesRoot, "generic-python-ambiguous"),
+    );
+
+    expect(sourceResult.isOk()).toBe(true);
+
+    const result = await new DefaultRuntimePlanResolver().resolve(context, {
+      id: "plan_python_ambiguous_app",
+      source: sourceResult._unsafeUnwrap().source,
+      server: {
+        id: "srv_python_ambiguous_app",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_python_ambiguous_app"),
+      detectedReasoning: ["detected ambiguous Python app fixture"],
+      requestedDeployment: {
+        method: "auto",
+        port: 3000,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toEqual(
+      expect.objectContaining({
+        phase: "runtime-plan-resolution",
+        runtimeFamily: "python",
+        reasonCode: "ambiguous-python-app-target",
       }),
     );
   });

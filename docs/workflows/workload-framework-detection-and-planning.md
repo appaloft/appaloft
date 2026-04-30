@@ -314,6 +314,7 @@ The target support catalog for mainstream web application deployment is:
 | FastAPI | `serverful-http` | Python project metadata plus FastAPI dependency, ASGI module hint, or explicit start command | Install with detected Python tool; package Docker/OCI image | Start with `uvicorn` only when ASGI module/app can be safely identified; otherwise require explicit start command. |
 | Django | `serverful-http` | `manage.py`, Django dependency, settings/module evidence | Install with detected Python tool; collect/static/package as needed; Docker/OCI image | Start with supported WSGI/ASGI command only when project module is known; otherwise explicit start required. |
 | Flask | `serverful-http` | Flask dependency plus app module or explicit start command | Install with detected Python tool; package Docker/OCI image | Start with supported WSGI command only when module/app object is known; otherwise explicit start required. |
+| Generic ASGI/WSGI Python apps | `serverful-http` | Python package metadata plus deterministic `module:app` ASGI or WSGI evidence, or explicit start command | Install with detected Python tool; package Docker/OCI image | Start with Uvicorn/Gunicorn only when module/app target is unambiguous; otherwise explicit start required. |
 | Rails, Sinatra, Rack | `serverful-http` | `Gemfile`, Rails/Rack/Sinatra dependencies, `config.ru` or Rails app files | `bundle install`, optional asset build when configured, package Docker/OCI image | Start with Puma/Rails/Rack command when framework output is deterministic; port hint may be 3000 for Rails but resource network profile wins. |
 | Laravel, Symfony, generic PHP web apps | `serverful-http` | `composer.json`, framework files such as `artisan` or Symfony kernel/config | Composer install; package PHP runtime plus web server or PHP-FPM profile into Docker/OCI image | Planner owns PHP server/FPM boundary; resource network endpoint targets the served HTTP port, not PHP internals unless a future profile says otherwise. |
 | Go HTTP services | `serverful-http` | `go.mod`, selected module/package, optional known framework dependency | Compile binary in build stage; package runtime image with binary | Start binary; internal port required unless explicit profile or deterministic binary config provides it. |
@@ -336,6 +337,27 @@ Support is complete for a catalog entry only when all of these are specified and
 - failure code/phase when evidence is missing, ambiguous, or unsupported;
 - runtime adapter Dockerfile/build/run behavior;
 - Quick Deploy/Web/CLI parity for draft collection or explicit command fallback.
+
+### Python Planner Contract
+
+Python planners follow the shared planner contract used by the JavaScript/TypeScript catalog
+closure. A Python catalog row is complete only when tests prove:
+
+- runtime family, framework or generic ASGI/WSGI shape, package/project name, package tool,
+  detected files, and detected scripts are represented as typed evidence;
+- package tool resolution follows explicit resource profile choice, then `uv.lock`, Poetry
+  metadata or `poetry.lock`, PEP 621 `pyproject.toml`, `requirements.txt`, and generic pip fallback;
+- `uv`, Poetry, and pip command rendering is deterministic and does not install multiple Python
+  dependency toolchains unless the selected planner owns that behavior;
+- ASGI/WSGI module/app discovery is deterministic before a framework-derived start command is
+  emitted;
+- explicit resource runtime profile commands win over inferred framework defaults and are the only
+  fallback for missing or ambiguous Python app targets;
+- all successful plans produce Docker/OCI workspace image artifact intent with generated Dockerfile
+  evidence, internal HTTP verification, and resource-owned network/health behavior;
+- unsupported, ambiguous, missing ASGI/WSGI app, missing production start command, and missing
+  internal port cases return structured blocked reasons or `validation_error` in the governed
+  phases instead of guessing.
 
 ## Planner Selection
 
@@ -447,7 +469,9 @@ Implemented planner families:
 - `fastapi`;
 - `django`;
 - `flask`;
-- generic `python`;
+- `generic-asgi`;
+- `generic-wsgi`;
+- generic `python` explicit-command fallback;
 - generic `java`;
 - custom command fallback.
 
@@ -463,11 +487,13 @@ Current typed detection is limited to:
   evidence, `output: "standalone"`,
   `output: "export"`/export-script, Nuxt `generate`, and SvelteKit `adapter-static`
   classification as `static`;
-- local Python detection for FastAPI, Django, Flask, `uv`, Poetry, pip, lockfiles, and `manage.py`;
+- local Python detection for FastAPI, Django, Flask, `uv`, Poetry, pip, lockfiles, `manage.py`,
+  generic ASGI/WSGI entrypoint files, and explicit-command fallback evidence;
 - local Java project detection;
 - fixed-version fixture coverage for Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix,
-  Express, Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI, Django, and Flask
-  source inspection;
+  Express, Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI, Django, Flask,
+  deterministic generic ASGI, deterministic generic WSGI, Poetry Python web projects, and explicit
+  Python start fallback source inspection;
 - Vite, React SPA, Vue SPA, Svelte SPA, Solid SPA, Angular, Astro, Nuxt generate, Next.js
   standalone/static export, and SvelteKit adapter-static artifact planning.
 - Node API framework and generic package-script fixtures plan through the generic Node workspace
@@ -482,6 +508,13 @@ Current typed detection is limited to:
   evidence, and internal-port behavior. These rows are bound to fixture planner tests and
   `deployments.plan/v1` preview contract tests. Full real Docker/SSH execution for every fixture is
   still a migration gap, distinct from the headless Docker/OCI catalog closure.
+- Python tested catalog closure has stable rows for FastAPI with `uv`, Django with
+  pip/requirements, Flask with pip/requirements, deterministic generic ASGI, deterministic generic
+  WSGI, Poetry, explicit start-command fallback, package-tool precedence, missing ASGI/WSGI app
+  target, ambiguous app target, missing production start, and internal-port behavior. These rows
+  are bound to source-inspection tests, fixture planner tests, headless Docker/OCI smoke assertions,
+  and `deployments.plan/v1` preview contract tests. Full real Docker/SSH execution for every Python
+  fixture and deeper Django collectstatic/static handling remain migration gaps.
 
 The following are migration gaps before the mainstream support catalog is complete:
 

@@ -1329,8 +1329,9 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.buildStrategy).toBe("workspace-commands");
     expect(plan.runtimeArtifact?.metadata).toEqual(
       expect.objectContaining({
-        planner: "python",
+        planner: "generic-python",
         runtimeKind: "python",
+        packageManager: "pip",
         baseImage: "python:3.12-slim",
       }),
     );
@@ -1501,7 +1502,7 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.execution).toEqual(
       expect.objectContaining({
         installCommand: "pip install --no-cache-dir -r requirements.txt",
-        startCommand: "python -m flask run --host 0.0.0.0 --port 4320",
+        startCommand: "python -m flask --app app:app run --host 0.0.0.0 --port 4320",
         port: 4320,
       }),
     );

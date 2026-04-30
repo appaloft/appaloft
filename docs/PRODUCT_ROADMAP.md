@@ -522,7 +522,7 @@ Required:
 - [x] Promote JavaScript/TypeScript support to a tested catalog: Next.js, Remix, Nuxt, SvelteKit,
   Astro, Vite, React, Vue, Svelte, Solid, Angular, Express, Fastify, NestJS, Hono, Koa, and generic
   package scripts.
-- [ ] Harden Python support for FastAPI, Django, Flask, generic ASGI/WSGI apps, `uv`, Poetry, pip,
+- [x] Harden Python support for FastAPI, Django, Flask, generic ASGI/WSGI apps, `uv`, Poetry, pip,
   and explicit start-command fallback.
 - [ ] Add Spring Boot as the first named JVM web framework.
 - [x] Add framework-family matrix rows for detection, base image policy, install/build/start/package
@@ -850,8 +850,10 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
 - [x] Node API frameworks: add explicit Express, Fastify, NestJS, Hono, and Koa detection/start
   defaults with internal port behavior, plus generic package-script fixture coverage.
 - [x] Python: FastAPI, Django, Flask, generic Python, `uv`, Poetry, and pip baseline exist.
-- [ ] Python: harden ASGI/WSGI app discovery, module/app target selection, collectstatic/static
-  handling, and Docker/SSH smoke.
+- [x] Python: harden ASGI/WSGI app discovery, module/app target selection, package-tool command
+  rendering, explicit fallback, and headless Docker/OCI fixture readiness.
+- [ ] Python: harden collectstatic/static handling and broaden real Docker/SSH smoke beyond the
+  representative slice.
 - [x] Java/JVM: generic Maven/Gradle planner exists.
 - [ ] Java/JVM: add Spring Boot first, then Quarkus/Micronaut if demand justifies it.
 - [ ] Ruby: add Rails and generic Rack/Sinatra planners or explicit fallback errors.
