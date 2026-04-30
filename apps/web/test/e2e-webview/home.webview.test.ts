@@ -1749,8 +1749,8 @@ describe("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["View projects", "查看项目"]);
     await expectAnyText(view, ["View deployments", "查看部署"]);
     await expectText(view, "Demo");
-    await expectText(view, "succeeded");
-    await expectText(view, "v0.1.0-test");
+    await expectAnyText(view, ["succeeded", "SUCCEEDED"]);
+    await expectAnyText(view, ["v0.1.0-test", "V0.1.0-TEST"]);
 
     await view.navigate(`${previewUrl}/projects`);
     await expectAnyText(view, ["Projects", "项目"]);
@@ -1762,7 +1762,7 @@ describe("console e2e with Bun.WebView", () => {
     await expectText(view, "workspace");
     await expectText(view, "Demo");
     await expectText(view, "production");
-    await expectText(view, "succeeded");
+    await expectAnyText(view, ["succeeded", "SUCCEEDED"]);
 
     await clickButtonByAnyText(view, ["New deployment", "新部署"]);
     await expectAnyText(view, ["Local folder", "本地目录"]);
@@ -1988,7 +1988,11 @@ describe("console e2e with Bun.WebView", () => {
       await view.navigate(`${previewUrl}/resources/res_demo`);
 
       await expectText(view, "https://server-applied.example.test");
-      await expectAnyText(view, ["Server-applied domain access", "服务器应用域名访问"]);
+      await expectAnyText(view, [
+        "Server-applied domain access",
+        "SERVER-APPLIED DOMAIN ACCESS",
+        "服务器应用域名访问",
+      ]);
 
       const content = await pageText(view);
       expect(content).not.toContain("https://generated.example.test");
@@ -2254,7 +2258,8 @@ describe("console e2e with Bun.WebView", () => {
 
     await expectText(view, "edge");
     await expectText(view, "traefik");
-    await expectAnyText(view, ["Related deployments", "关联部署"]);
+    await view.navigate(`${previewUrl}/servers/srv_demo?tab=deployments`);
+    await expectAnyText(view, ["Related deployments", "RELATED DEPLOYMENTS", "关联部署"]);
 
     const showRequest = await waitForRecordedRequest("/api/rpc/servers/show");
     expect(showRequest.method).toBe("POST");
@@ -2369,7 +2374,7 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/servers/srv_zero_usage`);
+      await view.navigate(`${previewUrl}/servers/srv_zero_usage?tab=credentials`);
 
       await expectAnyText(view, ["SSH credential detail", "SSH 凭据详情"]);
       await expectText(view, "Unused deploy key");
@@ -2386,7 +2391,7 @@ describe("console e2e with Bun.WebView", () => {
       });
 
       resetRecordedApiRequests();
-      await view.navigate(`${previewUrl}/servers/srv_usage_unavailable`);
+      await view.navigate(`${previewUrl}/servers/srv_usage_unavailable?tab=credentials`);
 
       await expectAnyText(view, ["Credential usage unavailable", "凭据使用情况暂不可用"]);
 
@@ -3003,7 +3008,7 @@ describe("console e2e with Bun.WebView", () => {
 
       await expectText(view, "crt_manual");
       await expectAnyText(view, ["Imported", "已导入"]);
-      await expectAnyText(view, ["Ready", "已就绪", "就绪"]);
+      await expectAnyText(view, ["Ready", "READY", "已就绪", "就绪"]);
       await expectText(view, "api.manual.example.test");
     } finally {
       if (previousImportRoute === undefined) {
@@ -3084,7 +3089,7 @@ describe("console e2e with Bun.WebView", () => {
     await expectText(view, "https://github.com/acme/platform.git");
     await clickButtonByAnyText(view, ["Next", "下一步"]);
     await expectAnyText(view, ["Project", "项目"]);
-    await expectText(view, "octocat");
+    await expectText(view, "acme/platform");
   }, 15_000);
 
   test("[QUICK-DEPLOY-ENTRY-008] maps Web static site draft fields through resources.create", async () => {
