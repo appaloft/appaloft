@@ -526,7 +526,7 @@ export class CreateDeploymentUseCase {
     const activeState = activeDeployment.toState();
     const supersedingDeploymentId = supersedingDeployment.toState().id;
 
-    if (activeState.status.value === "running") {
+    if (activeDeployment.requiresRuntimeCancellationForSupersede()) {
       const requestResult = this.deploymentLifecycleService.requestCancellationForSupersede(
         activeDeployment,
         supersedingDeploymentId,

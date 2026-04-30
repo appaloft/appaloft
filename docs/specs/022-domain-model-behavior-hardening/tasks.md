@@ -62,9 +62,21 @@
 - [x] Run `bun test packages/application/test/environment-effective-precedence.test.ts`.
 - [x] Run `bun test packages/application/test/resource-config.test.ts`.
 
+## Slice 5: Deployment Execution Continuation And Supersede Behavior
+
+- [x] `DMBH-DEPLOY-001`: add Deployment behavior tests at
+  `packages/core/test/deployment.test.ts`.
+- [x] Add `Deployment` or `DeploymentStatusValue` behavior for execution-continuation and
+  supersede cancellation questions.
+- [x] Refactor deployment execution guard to call deployment behavior instead of branching on raw
+  status values.
+- [x] Refactor deployment create supersede flow to ask the active deployment whether runtime
+  cancellation is required.
+- [x] Run `bun test packages/core/test/deployment.test.ts`.
+- [x] Run `bun test packages/application/test/create-deployment.test.ts`.
+
 ## Later Slices
 
-- [ ] Slice 5: harden `Deployment` execution-continuation/supersede behavior.
 - [ ] Slice 6: harden `Workload` and `RuntimeSpec` compatibility behavior.
 - [ ] Slice 7: audit remaining `toState()` usage and classify boundary allowances.
 

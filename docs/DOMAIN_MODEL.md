@@ -670,6 +670,8 @@ Current scope:
 - belongs to exactly one `Resource`
 - carries both `destinationId` and `serverId`; `serverId` remains in persisted shape for transport
   compatibility and efficient target lookup
+- owns execution-continuation and supersede runtime-cancellation questions; application guards and
+  deployment use cases should ask `Deployment` instead of branching on raw deployment status values
 
 ### ResourceBinding
 

@@ -674,6 +674,14 @@ export class DeploymentStatusValue extends StateMachineValueObject<
     );
   }
 
+  allowsExecutionContinuation(): boolean {
+    return this.value !== "cancel-requested" && this.value !== "canceled";
+  }
+
+  requiresRuntimeCancellationForSupersede(): boolean {
+    return this.value === "running";
+  }
+
   cancel(): Result<DeploymentStatusValue> {
     return this.ensureCurrent(
       ["created", "planning", "planned", "running", "cancel-requested"],
