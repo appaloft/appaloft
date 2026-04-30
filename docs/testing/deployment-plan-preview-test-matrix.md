@@ -49,7 +49,16 @@ creating a deployment attempt, publishing deployment events, or executing runtim
 | DPP-WEB-001 | e2e-preferred | Web read-only preview | Quick Deploy or Resource detail displays plan preview and remediation links without dispatching `deployments.create`. |
 | DPP-MCP-001 | contract / future | Future MCP/tool | Tool descriptor maps to `deployments.plan` and preserves typed reason codes. |
 
+## Catalog Preview Matrix
+
+| Test ID | Preferred automation | Case | Expected result |
+| --- | --- | --- | --- |
+| DPP-CATALOG-001 | contract/integration | Ready JavaScript/TypeScript supported plan | `deployments.plan/v1` can expose JS/TS source evidence, planner key/support tier, artifact kind, install/build/start command specs, network, health, warnings, and next actions without deployment id or execution output. |
+| DPP-CATALOG-002 | contract/integration | Blocked unsupported or ambiguous JavaScript/TypeScript evidence | `deployments.plan/v1` can expose `blocked` readiness, stable reason code such as `unsupported-framework`, `ambiguous-framework`, `missing-production-start-command`, `missing-static-output`, or `internal-port-missing`, safe evidence, and remediation without returning transport failure. |
+
 ## Current Implementation Notes And Migration Gaps
 
-This matrix is new for the deployment plan preview behavior. Code Round must bind executable tests
-to the stable ids above before the operation is considered complete.
+`deployments.plan` is active. Executable operation/catalog/API/Web/CLI coverage exists for the
+public surface, while `DPP-CATALOG-001` and `DPP-CATALOG-002` bind the JavaScript/TypeScript planner
+catalog to the shared preview response shape. Full future MCP/tool descriptors remain a migration
+gap until MCP/tool surfaces are active.

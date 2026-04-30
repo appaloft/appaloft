@@ -132,6 +132,28 @@ test expectations in the same change.
 | WF-PLAN-CAT-015 | integration | Phoenix, Axum, Actix Web, Rocket | Build release/binary, package runtime image, and require resource network port unless deterministic profile evidence supplies it. |
 | WF-PLAN-CAT-016 | integration | Dockerfile, Docker Compose, prebuilt image | Explicit container-native strategy bypasses framework artifact inference while preserving diagnostics and resource network/health rules. |
 
+## JavaScript/TypeScript Tested Catalog Closure Matrix
+
+These rows close the Phase 5 JavaScript/TypeScript tested catalog at the headless Docker/OCI
+readiness layer. They do not claim full fixture-by-fixture real Docker or SSH execution; those
+remain tracked by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`.
+
+| Test ID | Preferred automation | Case | Expected result |
+| --- | --- | --- | --- |
+| WF-PLAN-JS-001 | integration | Next.js SSR | `next-ssr` records Next/App Router evidence, `pnpm`, `ssr`, `nextjs`, Node base image policy, install/build/start commands, workspace image artifact, and resource-owned port 3000. |
+| WF-PLAN-JS-002 | integration | Next.js standalone | `next-standalone` records standalone output evidence, Pages Router evidence, deterministic `node .next/standalone/server.js` start, workspace image artifact, and resource-owned port 3000. |
+| WF-PLAN-JS-003 | integration | Next.js static export | `next-static-export` records export output evidence, `nextjs-static`, publish `/out`, static-server image artifact, and default internal port 80. |
+| WF-PLAN-JS-004 | integration | Remix server | `remix-ssr` records Remix evidence, package manager, build/start scripts, `remix` planner, workspace image artifact, and resource-owned port. |
+| WF-PLAN-JS-005 | integration | Nuxt generate static | `nuxt-generate` records generate/static evidence, `.output/public`, `nuxt-static`, static-server image artifact, and default internal port 80. |
+| WF-PLAN-JS-006 | integration | SvelteKit static | `sveltekit-static` records adapter-static evidence, publish `/build`, `sveltekit-static`, static-server image artifact, and default internal port 80. |
+| WF-PLAN-JS-007 | integration | SvelteKit ambiguous server/static mode | `sveltekit-ambiguous` records `hybrid-static-server` evidence and rejects auto planning with `validation_error` in `runtime-plan-resolution` unless explicit static strategy or start command is supplied. |
+| WF-PLAN-JS-008 | integration | Astro static | `astro-static` records Astro static evidence, publish `/dist`, `astro-static`, static-server image artifact, and default internal port 80. |
+| WF-PLAN-JS-009 | integration | Vite/React/Vue/Svelte/Solid/Angular static SPA | SPA fixtures record framework-specific static evidence, package manager, publish output, planner key, static-server image artifact, and default internal port 80. |
+| WF-PLAN-JS-010 | integration | Express/Fastify/NestJS/Hono/Koa | Node HTTP fixtures record framework metadata, package manager/base image policy, build/start command specs, generic `node` workspace image planner, and resource-owned internal port. |
+| WF-PLAN-JS-011 | integration | Generic package scripts | `generic-node-server` uses production package scripts with generic `node` planner, workspace image artifact, and no named framework field. |
+| WF-PLAN-JS-012 | integration | Missing production start command or static output | JS/TS evidence without safe production start or static output is rejected with `validation_error` in `runtime-plan-resolution`; explicit custom commands may produce a containerizable image plan. |
+| WF-PLAN-JS-013 | integration | Internal port behavior | Static JS/TS planners default to port 80; serverful/SSR planners use the resource network profile port and do not add deployment-owned `port` input. |
+
 ## Boundary Matrix
 
 | Test ID | Preferred automation | Case | Expected result |
@@ -190,6 +212,10 @@ with `WF-PLAN-CAT-001`, `WF-PLAN-CAT-002`, `WF-PLAN-CAT-003`, `WF-PLAN-CAT-005`,
 planner records `static`, `serverful-http`, `hybrid-static-server`, or `ssr` classification metadata
 where covered. `WF-PLAN-DET-013` binds Next.js output/router evidence to planner metadata without
 adding framework-specific deployment command fields.
+JavaScript/TypeScript tested catalog closure rows `WF-PLAN-JS-001` through `WF-PLAN-JS-013` bind
+the current Next.js, Remix, Nuxt generate, SvelteKit static/ambiguous, Astro static, SPA static,
+Node HTTP framework, generic package-script, missing evidence, and internal-port behavior to
+executable fixture tests.
 Fixed-version framework fixture tests now cover detector evidence for the table above, enforce exact
 manifest/requirements versions, and feed supported fixtures through runtime planning without
 installing dependencies or executing framework CLIs. Planner fixture coverage includes Next.js SSR,

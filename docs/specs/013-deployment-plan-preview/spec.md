@@ -2,8 +2,8 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: planned public read-only query; Code Round pending
+- Round: Post-Implementation Sync
+- Artifact state: active public read-only query with remaining targeted query-test hardening gaps
 - Roadmap target: Phase 5 First-Deploy Engine And Framework Breadth (`0.7.0` gate)
 - Compatibility impact: `pre-1.0-policy`; adds a public read surface for deployment planning output
 
@@ -33,7 +33,7 @@ This Spec Round accepts one public operation boundary:
 
 | Operation | Kind | Role | Code Round state |
 | --- | --- | --- | --- |
-| `deployments.plan` | Query | Read the current resource profile and selected target context, run source inspection and runtime planning, and return a safe plan preview without execution. | Pending active query. |
+| `deployments.plan` | Query | Read the current resource profile and selected target context, run source inspection and runtime planning, and return a safe plan preview without execution. | Active query. |
 
 `deployments.plan` is read-only. It must not:
 
@@ -211,8 +211,8 @@ Initial stable unsupported or blocked reason codes:
 
 ## Current Implementation Notes And Migration Gaps
 
-- Current `deployments.create` already resolves runtime plans, but its result is observable only
-  after admission/execution starts.
+- `deployments.plan` is active across application, operation catalog, HTTP/oRPC, CLI, Web, public
+  docs/help, and targeted contract coverage.
 - Runtime command specs still include compatibility shell-script leaves for user-authored
   install/build/start steps.
 - Some access route planning data is available through resource access/proxy read models; the first
