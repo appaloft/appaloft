@@ -12,6 +12,7 @@ import {
   type DomainBindingSummary,
   type ProxyConfigurationStatus,
   type ProxyConfigurationView,
+  type ResourceAccessFailureDiagnostic,
   type ResourceDiagnosticAccess,
   type ResourceDiagnosticContext,
   type ResourceDiagnosticCopyPayload,
@@ -160,6 +161,25 @@ function sourceErrorFromUnknown(input: {
     ...(input.relatedEntityId ? { relatedEntityId: input.relatedEntityId } : {}),
     ...(input.relatedState ? { relatedState: input.relatedState } : {}),
     message: messageFromUnknown(input.error),
+  });
+}
+
+function sourceErrorFromAccessFailure(input: {
+  diagnostic: ResourceAccessFailureDiagnostic;
+  redactions: readonly string[];
+}): ResourceDiagnosticSourceError {
+  return sourceError({
+    source: "access",
+    code: input.diagnostic.code,
+    category: input.diagnostic.category,
+    phase: input.diagnostic.phase,
+    retryable: input.diagnostic.retriable,
+    redactions: input.redactions,
+    ...(input.diagnostic.route?.resourceId
+      ? { relatedEntityId: input.diagnostic.route.resourceId }
+      : {}),
+    relatedState: input.diagnostic.nextAction,
+    message: `Latest edge access failure ${input.diagnostic.requestId}`,
   });
 }
 
@@ -502,6 +522,13 @@ export class ResourceDiagnosticSummaryQueryService {
     const access = resource.accessSummary;
     const blockingDurableBinding = currentNonReadyDurableDomainBinding(domainBindings, access);
     const status = accessStatus(resource, domainBindings);
+    const latestAccessFailure = access?.latestAccessFailureDiagnostic;
+
+    if (latestAccessFailure) {
+      sourceErrors.push(
+        sourceErrorFromAccessFailure({ diagnostic: latestAccessFailure, redactions }),
+      );
+    }
 
     if (blockingDurableBinding) {
       sourceErrors.push(
@@ -543,7 +570,7 @@ export class ResourceDiagnosticSummaryQueryService {
     });
 
     return {
-      status,
+      status: latestAccessFailure ? "failed" : status,
       ...(access?.latestGeneratedAccessRoute?.url
         ? { generatedUrl: access.latestGeneratedAccessRoute.url }
         : {}),
@@ -556,6 +583,7 @@ export class ResourceDiagnosticSummaryQueryService {
       ...(access?.plannedGeneratedAccessRoute?.url
         ? { plannedUrl: access.plannedGeneratedAccessRoute.url }
         : {}),
+      ...(latestAccessFailure ? { latestAccessFailure } : {}),
       ...(selectedRoute ? { selectedRoute } : {}),
       ...(routeIntentStatuses.length > 0 ? { routeIntentStatuses } : {}),
       ...(access?.proxyRouteStatus ? { proxyRouteStatus: access.proxyRouteStatus } : {}),
@@ -564,9 +592,11 @@ export class ResourceDiagnosticSummaryQueryService {
         : {}),
       ...(blockingDurableBinding
         ? { reasonCode: "resource_domain_binding_not_ready", phase: "access-summary" }
-        : status === "unavailable"
-          ? { reasonCode: "default_access_route_unavailable", phase: "access-summary" }
-          : {}),
+        : latestAccessFailure
+          ? { reasonCode: latestAccessFailure.code, phase: latestAccessFailure.phase }
+          : status === "unavailable"
+            ? { reasonCode: "default_access_route_unavailable", phase: "access-summary" }
+            : {}),
     };
   }
 

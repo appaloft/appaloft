@@ -232,6 +232,7 @@
     return resourceHealth?.overall ?? "unknown";
   });
   const currentAccessRoute = $derived(selectCurrentResourceAccessRoute(resource?.accessSummary));
+  const latestAccessFailure = $derived(resource?.accessSummary?.latestAccessFailureDiagnostic);
   const defaultDestinationId = $derived(
     resource?.destinationId ?? latestDeployment?.destinationId ?? "",
   );
@@ -3199,6 +3200,48 @@
                         <p class="text-sm leading-6 text-muted-foreground">
                           {$t(i18nKeys.console.resources.accessUrlEmpty)}
                         </p>
+                      {/if}
+                      {#if latestAccessFailure}
+                        <div
+                          class="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+                        >
+                          <div class="flex flex-wrap items-center gap-2">
+                            <p class="font-medium text-destructive">
+                              {$t(i18nKeys.console.resources.accessFailureTitle)}
+                            </p>
+                            <Badge variant="destructive">{latestAccessFailure.code}</Badge>
+                            <DocsHelpLink
+                              href={webDocsHrefs.diagnosticsSafeSupportPayload}
+                              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                              className="size-5"
+                            />
+                          </div>
+                          <dl class="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+                            <div class="min-w-0">
+                              <dt class="text-muted-foreground">
+                                {$t(i18nKeys.console.resources.accessFailureRequestId)}
+                              </dt>
+                              <dd class="break-all font-medium">{latestAccessFailure.requestId}</dd>
+                            </div>
+                            <div class="min-w-0">
+                              <dt class="text-muted-foreground">
+                                {$t(i18nKeys.console.resources.accessFailureAffected)}
+                              </dt>
+                              <dd class="break-all font-medium">
+                                {latestAccessFailure.affected?.hostname ?? latestAccessFailure.affected?.url ?? "-"}
+                                {latestAccessFailure.affected?.path
+                                  ? ` ${latestAccessFailure.affected.path}`
+                                  : ""}
+                              </dd>
+                            </div>
+                            <div class="min-w-0">
+                              <dt class="text-muted-foreground">
+                                {$t(i18nKeys.console.resources.accessFailureNextAction)}
+                              </dt>
+                              <dd class="break-all font-medium">{latestAccessFailure.nextAction}</dd>
+                            </div>
+                          </dl>
+                        </div>
                       {/if}
                       <p class="text-xs leading-5 text-muted-foreground">
                         {$t(i18nKeys.console.resources.accessUrlDescription)}

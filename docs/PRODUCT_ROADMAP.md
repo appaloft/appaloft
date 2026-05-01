@@ -625,9 +625,10 @@ Required:
 - [ ] Broaden API/Web/CLI regression coverage for provider-rendered proxy configuration preview.
 - [ ] Broaden API/Web/CLI regression coverage for server-applied domains and durable domain routes.
 - [ ] Broaden API/Web/CLI regression coverage for diagnostic copy.
-- [ ] Close `resource-access-failure` diagnostics: real Traefik error-middleware e2e, request-id
-  envelope lookup, health/diagnostic-summary composition, and companion/static renderer support for
-  one-shot CLI or remote SSH runtimes without a reachable Appaloft backend service.
+- [ ] Close `resource-access-failure` diagnostics: real Traefik error-middleware e2e,
+  short-retention request-id envelope lookup, automatic route/resource context lookup from applied
+  provider metadata, and companion/static renderer support for one-shot CLI or remote SSH runtimes
+  without a reachable Appaloft backend service.
 - [ ] Keep access/proxy/log/health failures visible through read models, proxy preview, and
   diagnostics.
 
@@ -651,6 +652,12 @@ Phase 6 verification notes from 2026-04-30:
 
 Phase 6 verification notes from 2026-05-01:
 
+- The access failure diagnostic baseline slice strengthened the existing
+  `resource-access-failure/v1` envelope with safe affected request metadata, related domain binding
+  id support, stable `nextAction`, and optional latest edge-failure composition through
+  `ResourceAccessSummary`, `resources.health`, and `resources.diagnostic-summary`. It deliberately
+  did not add a new public operation, route repair command, real Traefik error-middleware e2e, or
+  companion/static renderer.
 - The certificate lifecycle closure slice added `certificates.show`, `certificates.retry`,
   `certificates.revoke`, and `certificates.delete` across source-of-truth specs, operation catalog,
   application handlers, persistence safe read models, oRPC/OpenAPI, CLI, Web resource affordances,

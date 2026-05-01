@@ -69,6 +69,7 @@ Then:
 | RES-ACCESS-DIAG-CLASS-007 | contract | Upstream reset | Provider reports reset before complete response | `resource_access_upstream_reset`, phase `upstream-response` | HTTP status is 502. |
 | RES-ACCESS-DIAG-CLASS-008 | contract | Upstream TLS/protocol failure | Provider reports TLS/protocol negotiation failure | `resource_access_upstream_tls_failed`, phase `upstream-connection` | Owner hint is `operator-config`. |
 | RES-ACCESS-DIAG-CLASS-009 | contract | Unknown provider signal | Provider cannot safely classify the signal | `resource_access_unknown` | Response still includes request id and redacted generic guidance. |
+| RES-ACCESS-DIAG-CLASS-010 | contract | Stable diagnostic envelope fields | Safe provider signal includes affected URL/host/path, route/source descriptor, related ids, request/correlation ids, and cause code | `resource-access-failure/v1` diagnostic includes stable code/category/phase/status, `nextAction`, affected request descriptor, related resource/deployment/domain binding/server/destination/route ids, and request/correlation ids | Raw provider payloads, headers, cookies, query strings, internal addresses, and command output are absent. |
 
 ## Rendering Matrix
 
@@ -96,6 +97,7 @@ Then:
 | RES-ACCESS-DIAG-OBS-001 | integration | Edge failure appears in diagnostic summary | Known resource has latest edge failure envelope | `resources.diagnostic-summary` includes access/proxy source error | Source error reuses `resource_access_*` code and phase. |
 | RES-ACCESS-DIAG-OBS-002 | integration | Edge failure appears in health | Known resource has public access edge failure | `resources.health` reports degraded public/proxy access | Latest deployment success does not override the edge failure. |
 | RES-ACCESS-DIAG-OBS-003 | integration | Existing cause code preserved | Route realization or health has structured cause code | Edge diagnostic includes `causeCode` | Original operation-owned error code remains unchanged. |
+| RES-ACCESS-DIAG-OBS-004 | contract | Cross-surface schema parity | Latest safe edge failure is present in resource access read state | `resources.show`, `resources.health`, and `resources.diagnostic-summary` expose the same optional diagnostic envelope fields through shared contracts | API/oRPC, CLI, and Web consume the shared schema rather than transport-only shapes. |
 
 ## Shared Access Diagnostic Contract Matrix
 
@@ -124,6 +126,7 @@ Executable tests now cover:
 
 - `RES-ACCESS-DIAG-CLASS-001`;
 - `RES-ACCESS-DIAG-CLASS-006`;
+- `RES-ACCESS-DIAG-CLASS-010`;
 - parser/status fallback coverage for safe codes, signals, and HTTP status inputs;
 - `RES-ACCESS-DIAG-RENDER-001`;
 - `RES-ACCESS-DIAG-RENDER-002`;
@@ -132,12 +135,16 @@ Executable tests now cover:
 - `RES-ACCESS-DIAG-ROUTE-002` through the same provider route-label assertion;
 - `RES-ACCESS-DIAG-ROUTE-003`;
 - `RES-ACCESS-DIAG-ROUTE-004`;
+- `RES-ACCESS-DIAG-OBS-001` through the resource diagnostic summary query-service baseline;
+- `RES-ACCESS-DIAG-OBS-002` through the resource health query-service baseline;
+- `RES-ACCESS-DIAG-OBS-003` through safe cause-code preservation on the diagnostic envelope;
+- `RES-ACCESS-DIAG-OBS-004` through contracts/schema and resource read-model fixtures;
 - `EDGE-PROXY-PROVIDER-010` as the Traefik provider contract row.
 
 Remaining gaps include broader classification rows, a companion/static renderer path for one-shot
-CLI remote SSH execution, real Traefik end-to-end error-middleware probing, route/resource context
-lookup, resource health/diagnostic summary composition rows `RES-ACCESS-DIAG-OBS-001` through
-`RES-ACCESS-DIAG-OBS-003`, and redaction rows beyond the current renderer-level assertions.
+CLI remote SSH execution, real Traefik end-to-end error-middleware probing, automatic
+route/resource context lookup from applied provider metadata, short-retention request persistence,
+and redaction rows beyond the current renderer-level assertions.
 
 ## Open Questions
 

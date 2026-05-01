@@ -354,10 +354,13 @@ Current boundary:
   shared route/access contract; a dedicated route read or repair operation remains future work only
   if a later Spec Round proves the current surfaces are insufficient.
 - edge-rendered resource access failure diagnostics are internal transport/read behavior, not a new
-  public business operation. Gateway-generated 502, 503, and 504 failures may be classified with
+  public business operation. Gateway-generated 404, 502, 503, and 504 failures may be classified with
   stable Appaloft codes and rendered as safe HTML or problem responses, while owner-facing detail
   continues through `resources.health`, `resources.diagnostic-summary`, and
-  `resources.proxy-configuration.preview`.
+  `resources.proxy-configuration.preview`. The 2026-05-01 baseline keeps request-id lookup on
+  existing read surfaces by allowing `ResourceAccessSummary` to carry an optional latest safe
+  `resource-access-failure/v1` envelope with affected host/path, related ids, and a stable next
+  action.
 - resource health is resource-owned observation governed by
   [ADR-020: Resource Health Observation](./decisions/ADR-020-resource-health-observation.md).
   `resources.health` is the active current health source for resource detail, project resource

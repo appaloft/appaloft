@@ -345,9 +345,11 @@ Boundary rule:
   not `Resource` aggregate state
 - edge request access failure diagnostics are adapter/read-model observations over public access
   failures. They map concrete proxy/upstream failures into stable `ResourceAccessFailureDiagnostic`
-  codes and optional owner hints, but they are not `Resource` aggregate state and are not
-  `domain`-category errors unless they reference a true aggregate invariant failure from another
-  operation.
+  codes, safe affected request descriptors, optional owner hints, related ids, request/correlation
+  ids, and stable next actions. A latest safe envelope may be composed through
+  `ResourceAccessSummary`, `ResourceHealthSummary`, and `ResourceDiagnosticSummary`, but it is not
+  `Resource` aggregate state and is not a `domain`-category error unless it references a true
+  aggregate invariant failure from another operation.
 
 ### Dependency Resources
 

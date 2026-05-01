@@ -127,6 +127,10 @@ required before domain/certificate mutation lifecycle work.
   copy, health, and proxy preview can explain the same selected/context routes.
 - `packages/contracts/src/index.ts` exposes the same route intent/status schema for API/oRPC, CLI,
   Web, and future tool surfaces.
+- The 2026-05-01 access-failure baseline adds an optional latest safe
+  `resource-access-failure/v1` envelope to resource access read state so health and diagnostic
+  summary can expose request id, affected host/path, related ids, cause code, and next action
+  without adding a new route operation.
 - No persistence migration was added; the descriptor is composed from existing read-model state.
 - Existing fake provider/query fixtures were sufficient for the hermetic route preview and
   deployment-snapshot acceptance coverage.

@@ -600,6 +600,99 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).toContain('"serverAppliedUrl": "https://www.example.test/admin"');
   });
 
+  test("[RES-ACCESS-DIAG-OBS-001][RES-ACCESS-DIAG-OBS-004] includes latest edge access failure in copy-safe diagnostics", async () => {
+    const context = createTestContext();
+    const { service } = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestGeneratedAccessRoute: {
+              url: "http://web.203.0.113.10.sslip.io",
+              hostname: "web.203.0.113.10.sslip.io",
+              scheme: "http",
+              providerKey: "sslip",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            proxyRouteStatus: "ready",
+            latestAccessFailureDiagnostic: {
+              schemaVersion: "resource-access-failure/v1",
+              requestId: "req_access_timeout",
+              generatedAt: "2026-01-01T00:00:08.000Z",
+              code: "resource_access_upstream_timeout",
+              category: "timeout",
+              phase: "upstream-connection",
+              httpStatus: 504,
+              retriable: true,
+              ownerHint: "resource",
+              nextAction: "check-health",
+              affected: {
+                url: "https://web.example.test/private",
+                hostname: "web.example.test",
+                path: "/private",
+                method: "GET",
+              },
+              route: {
+                resourceId: "res_web",
+                deploymentId: "dep_web",
+                domainBindingId: "dbnd_web",
+                serverId: "srv_web",
+                destinationId: "dst_demo",
+                providerKey: "traefik",
+                routeId: "route_web",
+                routeSource: "generated-default",
+                routeStatus: "ready",
+              },
+              causeCode: "resource_public_access_probe_failed",
+              correlationId: "corr_access_timeout",
+            },
+          },
+        }),
+      ],
+    });
+    const query = ResourceDiagnosticSummaryQuery.create({
+      resourceId: "res_web",
+      includeDeploymentLogTail: false,
+      includeRuntimeLogTail: false,
+      includeProxyConfiguration: false,
+      tailLines: 10,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.access.latestAccessFailure).toMatchObject({
+      requestId: "req_access_timeout",
+      code: "resource_access_upstream_timeout",
+      nextAction: "check-health",
+      causeCode: "resource_public_access_probe_failed",
+      route: {
+        domainBindingId: "dbnd_web",
+      },
+    });
+    expect(summary.sourceErrors).toContainEqual(
+      expect.objectContaining({
+        source: "access",
+        code: "resource_access_upstream_timeout",
+        category: "timeout",
+        phase: "upstream-connection",
+        retryable: true,
+        relatedEntityId: "res_web",
+        relatedState: "check-health",
+      }),
+    );
+    expect(summary.copy.json).toContain('"requestId": "req_access_timeout"');
+    expect(summary.copy.json).toContain('"nextAction": "check-health"');
+    expect(summary.copy.json).toContain('"domainBindingId": "dbnd_web"');
+    expect(summary.copy.json).not.toContain("secret-token");
+    expect(summary.copy.json).not.toContain("Authorization");
+  });
+
   test("[RES-DIAG-QRY-017][ROUTE-INTENT-002][ACCESS-DIAG-004] keeps durable route first for diagnostic proxy context", async () => {
     const context = createTestContext();
     const { service } = createService({

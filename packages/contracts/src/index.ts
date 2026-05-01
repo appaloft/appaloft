@@ -545,6 +545,76 @@ export const plannedResourceAccessRouteSummarySchema = z.object({
   targetPort: z.number().int().positive(),
 });
 
+export const resourceAccessFailureDiagnosticSchema = z.object({
+  schemaVersion: z.literal("resource-access-failure/v1"),
+  requestId: z.string(),
+  generatedAt: z.string(),
+  code: z.enum([
+    "resource_access_route_not_found",
+    "resource_access_proxy_unavailable",
+    "resource_access_route_unavailable",
+    "resource_access_upstream_unavailable",
+    "resource_access_upstream_connect_failed",
+    "resource_access_upstream_timeout",
+    "resource_access_upstream_reset",
+    "resource_access_upstream_tls_failed",
+    "resource_access_edge_error",
+    "resource_access_unknown",
+  ]),
+  category: z.enum(["infra", "integration", "timeout", "not-found", "async-processing"]),
+  phase: z.enum([
+    "edge-request-routing",
+    "proxy-route-observation",
+    "upstream-connection",
+    "upstream-response",
+    "proxy-route-realization",
+    "public-route-verification",
+    "diagnostic-page-render",
+  ]),
+  httpStatus: z.union([z.literal(404), z.literal(502), z.literal(503), z.literal(504)]),
+  retriable: z.boolean(),
+  ownerHint: z.enum(["platform", "resource", "operator-config", "unknown"]),
+  nextAction: z.enum([
+    "check-health",
+    "inspect-runtime-logs",
+    "inspect-deployment-logs",
+    "inspect-proxy-preview",
+    "diagnostic-summary",
+    "verify-domain",
+    "fix-dns",
+    "repair-proxy",
+    "manual-review",
+  ]),
+  affected: z
+    .object({
+      url: z.string().optional(),
+      hostname: z.string().optional(),
+      path: z.string().optional(),
+      method: z.string().optional(),
+    })
+    .optional(),
+  route: z
+    .object({
+      host: z.string().optional(),
+      pathPrefix: z.string().optional(),
+      resourceId: z.string().optional(),
+      deploymentId: z.string().optional(),
+      domainBindingId: z.string().optional(),
+      serverId: z.string().optional(),
+      destinationId: z.string().optional(),
+      providerKey: z.string().optional(),
+      routeId: z.string().optional(),
+      routeSource: z
+        .enum(["generated-default", "durable-domain", "server-applied", "deployment-snapshot"])
+        .optional(),
+      routeStatus: z.string().optional(),
+    })
+    .optional(),
+  causeCode: z.string().optional(),
+  correlationId: z.string().optional(),
+  causationId: z.string().optional(),
+});
+
 export const resourceAccessSummarySchema = z.object({
   plannedGeneratedAccessRoute: plannedResourceAccessRouteSummarySchema.optional(),
   latestGeneratedAccessRoute: resourceAccessRouteSummarySchema.optional(),
@@ -552,6 +622,7 @@ export const resourceAccessSummarySchema = z.object({
   latestServerAppliedDomainRoute: resourceAccessRouteSummarySchema.optional(),
   proxyRouteStatus: z.enum(["unknown", "ready", "not-ready", "failed"]).optional(),
   lastRouteRealizationDeploymentId: z.string().optional(),
+  latestAccessFailureDiagnostic: resourceAccessFailureDiagnosticSchema.optional(),
 });
 
 export const resourceHealthOverallSchema = z.enum([
@@ -774,6 +845,7 @@ export const resourceHealthSummarySchema = z.object({
     reasonCode: z.string().optional(),
     phase: z.string().optional(),
     routeIntentStatus: routeIntentStatusDescriptorSchema.optional(),
+    latestAccessFailure: resourceAccessFailureDiagnosticSchema.optional(),
   }),
   proxy: z.object({
     status: z.enum(["ready", "not-ready", "failed", "unknown", "not-configured"]),
@@ -2930,6 +3002,7 @@ export const resourceDiagnosticAccessSchema = z.object({
   durableUrl: z.string().optional(),
   serverAppliedUrl: z.string().optional(),
   plannedUrl: z.string().optional(),
+  latestAccessFailure: resourceAccessFailureDiagnosticSchema.optional(),
   selectedRoute: routeIntentStatusDescriptorSchema.optional(),
   routeIntentStatuses: z.array(routeIntentStatusDescriptorSchema).optional(),
   proxyRouteStatus: z.enum(["unknown", "ready", "not-ready", "failed"]).optional(),
@@ -3149,6 +3222,7 @@ export type ResourceAccessRouteSummary = z.infer<typeof resourceAccessRouteSumma
 export type PlannedResourceAccessRouteSummary = z.infer<
   typeof plannedResourceAccessRouteSummarySchema
 >;
+export type ResourceAccessFailureDiagnostic = z.infer<typeof resourceAccessFailureDiagnosticSchema>;
 export type ResourceAccessSummary = z.infer<typeof resourceAccessSummarySchema>;
 export type ResourceAccessProfile = z.infer<typeof resourceAccessProfileSchema>;
 export type ResourceHealthOverall = z.infer<typeof resourceHealthOverallSchema>;
