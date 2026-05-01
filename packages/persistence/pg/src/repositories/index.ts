@@ -15,6 +15,7 @@ export * from "./environment-repository";
 export * from "./process-attempt-journal";
 export * from "./project-read-model";
 export * from "./project-repository";
+export * from "./resource-access-failure-evidence-projection";
 export * from "./resource-deletion-blocker-reader";
 export * from "./resource-read-model";
 export * from "./resource-repository";

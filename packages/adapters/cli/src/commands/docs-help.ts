@@ -33,6 +33,9 @@ export const cliDocsHrefs = {
   observabilityRuntimeLogs: resolvePublicDocsHelpHref("observability.runtime-logs"),
   observabilityHealthSummary: resolvePublicDocsHelpHref("observability.health-summary"),
   diagnosticsSafeSupportPayload: resolvePublicDocsHelpHref("diagnostics.safe-support-payload"),
+  diagnosticsAccessFailureRequestId: resolvePublicDocsHelpHref(
+    "diagnostics.access-failure-request-id",
+  ),
   diagnosticsRuntimeTargetCapacity: resolvePublicDocsHelpHref(
     "diagnostics.runtime-target-capacity",
   ),
@@ -175,6 +178,10 @@ export const cliCommandDescriptions = {
   resourceDiagnose: withDocs(
     "Copy resource diagnostic summary context",
     "diagnostics.safe-support-payload",
+  ),
+  resourceAccessFailure: withDocs(
+    "Look up safe access failure evidence by request id",
+    "diagnostics.access-failure-request-id",
   ),
   environment: withDocs("Environment operations", "environment.concept"),
   environmentCreate: withDocs("Create an environment", "environment.concept"),

@@ -41,6 +41,7 @@ import { environmentLockLifecycleMigration } from "./migrations/033_environment_
 import { resourceAccessProfileMigration } from "./migrations/034_resource_access_profile";
 import { processAttemptJournalMigration } from "./migrations/035_process_attempt_journal";
 import { domainBindingDeletedStatusMigration } from "./migrations/036_domain_binding_deleted_status";
+import { resourceAccessFailureEvidenceMigration } from "./migrations/037_resource_access_failure_evidence";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -171,6 +172,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "034_resource_access_profile": resourceAccessProfileMigration,
       "035_process_attempt_journal": processAttemptJournalMigration,
       "036_domain_binding_deleted_status": domainBindingDeletedStatusMigration,
+      "037_resource_access_failure_evidence": resourceAccessFailureEvidenceMigration,
     };
   }
 }

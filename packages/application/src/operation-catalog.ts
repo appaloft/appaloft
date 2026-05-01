@@ -54,6 +54,7 @@ import { configureResourceSourceCommandInputSchema } from "./operations/resource
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
 import { deleteResourceCommandInputSchema } from "./operations/resources/delete-resource.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
+import { resourceAccessFailureEvidenceLookupQueryInputSchema } from "./operations/resources/resource-access-failure-evidence-lookup.query";
 import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resources/resource-diagnostic-summary.query";
 import { resourceEffectiveConfigQueryInputSchema } from "./operations/resources/resource-effective-config.query";
 import { resourceHealthQueryInputSchema } from "./operations/resources/resource-health.query";
@@ -669,6 +670,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource diagnose <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/diagnostic-summary" },
+    },
+  },
+  {
+    key: "resources.access-failure-evidence.lookup",
+    kind: "query",
+    domain: "resources",
+    messageName: "ResourceAccessFailureEvidenceLookupQuery",
+    handlerName: "ResourceAccessFailureEvidenceLookupQueryHandler",
+    serviceName: "ResourceAccessFailureEvidenceLookupQueryService",
+    inputSchema: resourceAccessFailureEvidenceLookupQueryInputSchema,
+    serviceToken: tokens.resourceAccessFailureEvidenceLookupQueryService,
+    transports: {
+      cli: "appaloft resource access-failure <requestId>",
+      orpc: { method: "GET", path: "/api/resource-access-failures/{requestId}" },
     },
   },
   {

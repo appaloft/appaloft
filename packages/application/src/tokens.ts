@@ -41,6 +41,12 @@ export const tokens = {
   serverReadModel: Symbol.for("appaloft.server_read_model"),
   environmentReadModel: Symbol.for("appaloft.environment_read_model"),
   resourceReadModel: Symbol.for("appaloft.resource_read_model"),
+  resourceAccessFailureEvidenceRecorder: Symbol.for(
+    "appaloft.resource_access_failure_evidence_recorder",
+  ),
+  resourceAccessFailureEvidenceReadModel: Symbol.for(
+    "appaloft.resource_access_failure_evidence_read_model",
+  ),
   deploymentReadModel: Symbol.for("appaloft.deployment_read_model"),
   domainBindingReadModel: Symbol.for("appaloft.domain_binding_read_model"),
   certificateReadModel: Symbol.for("appaloft.certificate_read_model"),
@@ -109,6 +115,9 @@ export const tokens = {
   ),
   resourceDiagnosticSummaryQueryService: Symbol.for(
     "appaloft.resource_diagnostic_summary_query_service",
+  ),
+  resourceAccessFailureEvidenceLookupQueryService: Symbol.for(
+    "appaloft.resource_access_failure_evidence_lookup_query_service",
   ),
   resourceHealthQueryService: Symbol.for("appaloft.resource_health_query_service"),
   resourceHealthProbeRunner: Symbol.for("appaloft.resource_health_probe_runner"),
