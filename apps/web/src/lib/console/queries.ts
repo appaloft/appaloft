@@ -1,6 +1,7 @@
 import {
   type AuthSessionResponse,
   type CertificateSummary,
+  type ConsoleOverviewResponse,
   type DeploymentSummary,
   type DomainBindingSummary,
   type EnvironmentSummary,
@@ -32,6 +33,7 @@ type ConsoleQueryKey =
   | "health"
   | "readiness"
   | "version"
+  | "consoleOverview"
   | "authSession"
   | "projects"
   | "servers"
@@ -74,6 +76,14 @@ export function createConsoleQueries(enabled: boolean, overrides: ConsoleQueryOv
       queryKey: ["system", "auth-session"],
       queryFn: () => request<AuthSessionResponse>("/api/auth/session"),
       enabled: queryEnabled("authSession"),
+    }),
+  );
+  const consoleOverviewQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["console", "overview"],
+      queryFn: () => request<ConsoleOverviewResponse>("/api/console-overview"),
+      enabled: queryEnabled("consoleOverview"),
+      refetchInterval: 10_000,
     }),
   );
   const projectsQuery = createQuery(() =>
@@ -137,6 +147,7 @@ export function createConsoleQueries(enabled: boolean, overrides: ConsoleQueryOv
     healthQuery,
     readinessQuery,
     versionQuery,
+    consoleOverviewQuery,
     authSessionQuery,
     projectsQuery,
     serversQuery,
