@@ -31,6 +31,7 @@ sidebar:
 - source/runtime/health/network 的安全摘要。
 - 服务器和代理 readiness 摘要。
 - 访问地址、域名和证书状态。
+- 访问失败诊断的 request id、受影响 hostname/path、安全 related ids 和下一步动作。
 - 已屏蔽的 secret key 名和是否存在，不包含值。
 
 <h2 id="runtime-target-capacity-inspect">Runtime target capacity inspect</h2>
@@ -89,6 +90,12 @@ appaloft resource diagnose res_web \
   "deploymentId": "dep_123",
   "failedPhase": "verify",
   "errorCode": "health_check_failed",
+  "accessFailure": {
+    "requestId": "req_abc123",
+    "code": "resource_access_upstream_timeout",
+    "affected": { "hostname": "web.example.com", "path": "/" },
+    "nextAction": "check-health"
+  },
   "secrets": [
     { "key": "DATABASE_URL", "value": "***" }
   ],

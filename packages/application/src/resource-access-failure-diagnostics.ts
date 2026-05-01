@@ -46,17 +46,36 @@ export type ResourceAccessFailureOwnerHint =
   | "operator-config"
   | "unknown";
 
+export type ResourceAccessFailureNextAction =
+  | "check-health"
+  | "inspect-runtime-logs"
+  | "inspect-deployment-logs"
+  | "inspect-proxy-preview"
+  | "diagnostic-summary"
+  | "verify-domain"
+  | "fix-dns"
+  | "repair-proxy"
+  | "manual-review";
+
 export type ResourceAccessRouteSource =
   | "generated-default"
   | "durable-domain"
   | "server-applied"
   | "deployment-snapshot";
 
+export interface ResourceAccessFailureAffectedRequest {
+  url?: string;
+  hostname?: string;
+  path?: string;
+  method?: string;
+}
+
 export interface ResourceAccessFailureRouteContext {
   host?: string;
   pathPrefix?: string;
   resourceId?: string;
   deploymentId?: string;
+  domainBindingId?: string;
   serverId?: string;
   destinationId?: string;
   providerKey?: string;
@@ -75,6 +94,8 @@ export interface ResourceAccessFailureDiagnostic {
   httpStatus: ResourceAccessFailureHttpStatus;
   retriable: boolean;
   ownerHint: ResourceAccessFailureOwnerHint;
+  nextAction: ResourceAccessFailureNextAction;
+  affected?: ResourceAccessFailureAffectedRequest;
   route?: ResourceAccessFailureRouteContext;
   causeCode?: string;
   correlationId?: string;
@@ -94,6 +115,7 @@ export interface ClassifyResourceAccessFailureInput {
   signal?: ResourceAccessFailureSignal;
   requestId: string;
   generatedAt?: string;
+  affected?: ResourceAccessFailureAffectedRequest;
   route?: ResourceAccessFailureRouteContext;
   causeCode?: string;
   correlationId?: string;
@@ -101,6 +123,7 @@ export interface ClassifyResourceAccessFailureInput {
 }
 
 const defaultGeneratedAt = "1970-01-01T00:00:00.000Z";
+const safeTokenPattern = /[^A-Za-z0-9._:-]/g;
 
 const codeDefaults: Record<ResourceAccessFailureCode, ResourceAccessFailureDefaults> = {
   resource_access_route_not_found: {
@@ -174,6 +197,116 @@ const codeDefaults: Record<ResourceAccessFailureCode, ResourceAccessFailureDefau
     retriable: true,
   },
 };
+
+const nextActionByCode: Record<ResourceAccessFailureCode, ResourceAccessFailureNextAction> = {
+  resource_access_route_not_found: "inspect-proxy-preview",
+  resource_access_proxy_unavailable: "inspect-proxy-preview",
+  resource_access_route_unavailable: "inspect-proxy-preview",
+  resource_access_upstream_unavailable: "check-health",
+  resource_access_upstream_connect_failed: "check-health",
+  resource_access_upstream_timeout: "check-health",
+  resource_access_upstream_reset: "inspect-runtime-logs",
+  resource_access_upstream_tls_failed: "inspect-proxy-preview",
+  resource_access_edge_error: "diagnostic-summary",
+  resource_access_unknown: "diagnostic-summary",
+};
+
+function safeToken(input: string | undefined): string | undefined {
+  const normalized = input?.trim().replaceAll(safeTokenPattern, "_");
+  return normalized ? normalized.slice(0, 160) : undefined;
+}
+
+function safePath(input: string | undefined): string | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  const withoutQuery = input.split("?")[0]?.split("#")[0]?.trim();
+  if (!withoutQuery) {
+    return undefined;
+  }
+
+  return withoutQuery.startsWith("/") ? withoutQuery : `/${withoutQuery}`;
+}
+
+function safeMethod(input: string | undefined): string | undefined {
+  const method = input?.trim().toUpperCase();
+  return method && /^[A-Z]{1,16}$/.test(method) ? method : undefined;
+}
+
+function safeUrl(input: string | undefined): string | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(input);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return undefined;
+    }
+
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, url.pathname === "/" ? "/" : "");
+  } catch {
+    return undefined;
+  }
+}
+
+function sanitizeAffectedRequest(
+  affected: ResourceAccessFailureAffectedRequest | undefined,
+): ResourceAccessFailureAffectedRequest | undefined {
+  if (!affected) {
+    return undefined;
+  }
+
+  const url = safeUrl(affected.url);
+  const hostname = safeToken(affected.hostname);
+  const path = safePath(affected.path);
+  const method = safeMethod(affected.method);
+  const sanitized = {
+    ...(url ? { url } : {}),
+    ...(hostname ? { hostname } : {}),
+    ...(path ? { path } : {}),
+    ...(method ? { method } : {}),
+  };
+
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+}
+
+function sanitizeRouteContext(
+  route: ResourceAccessFailureRouteContext | undefined,
+): ResourceAccessFailureRouteContext | undefined {
+  if (!route) {
+    return undefined;
+  }
+
+  const host = safeToken(route.host);
+  const pathPrefix = safePath(route.pathPrefix);
+  const resourceId = safeToken(route.resourceId);
+  const deploymentId = safeToken(route.deploymentId);
+  const domainBindingId = safeToken(route.domainBindingId);
+  const serverId = safeToken(route.serverId);
+  const destinationId = safeToken(route.destinationId);
+  const providerKey = safeToken(route.providerKey);
+  const routeId = safeToken(route.routeId);
+  const routeStatus = safeToken(route.routeStatus);
+  const sanitized: ResourceAccessFailureRouteContext = {
+    ...(host ? { host } : {}),
+    ...(pathPrefix ? { pathPrefix } : {}),
+    ...(resourceId ? { resourceId } : {}),
+    ...(deploymentId ? { deploymentId } : {}),
+    ...(domainBindingId ? { domainBindingId } : {}),
+    ...(serverId ? { serverId } : {}),
+    ...(destinationId ? { destinationId } : {}),
+    ...(providerKey ? { providerKey } : {}),
+    ...(routeId ? { routeId } : {}),
+    ...(route.routeSource ? { routeSource: route.routeSource } : {}),
+    ...(routeStatus ? { routeStatus } : {}),
+  };
+
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+}
 
 export function parseResourceAccessFailureCode(
   input: string | null | undefined,
@@ -264,10 +397,15 @@ export function classifyResourceAccessFailure(
 ): ResourceAccessFailureDiagnostic {
   const code = input.code ?? resourceAccessFailureCodeFromSignal(input.signal ?? "unknown");
   const defaults = codeDefaults[code];
+  const affected = sanitizeAffectedRequest(input.affected);
+  const route = sanitizeRouteContext(input.route);
+  const causeCode = safeToken(input.causeCode);
+  const correlationId = safeToken(input.correlationId);
+  const causationId = safeToken(input.causationId);
 
   return {
     schemaVersion: "resource-access-failure/v1",
-    requestId: input.requestId,
+    requestId: safeToken(input.requestId) ?? "req_unknown",
     generatedAt: input.generatedAt ?? defaultGeneratedAt,
     code,
     category: defaults.category,
@@ -275,9 +413,11 @@ export function classifyResourceAccessFailure(
     httpStatus: defaults.httpStatus,
     retriable: defaults.retriable,
     ownerHint: defaults.ownerHint,
-    ...(input.route ? { route: input.route } : {}),
-    ...(input.causeCode ? { causeCode: input.causeCode } : {}),
-    ...(input.correlationId ? { correlationId: input.correlationId } : {}),
-    ...(input.causationId ? { causationId: input.causationId } : {}),
+    nextAction: nextActionByCode[code],
+    ...(affected ? { affected } : {}),
+    ...(route ? { route } : {}),
+    ...(causeCode ? { causeCode } : {}),
+    ...(correlationId ? { correlationId } : {}),
+    ...(causationId ? { causationId } : {}),
   };
 }

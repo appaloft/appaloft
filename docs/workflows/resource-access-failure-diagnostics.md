@@ -98,11 +98,18 @@ type ResourceAccessFailureDiagnostic = {
   httpStatus: 404 | 502 | 503 | 504;
   retriable: boolean;
   ownerHint: "platform" | "resource" | "operator-config" | "unknown";
+  affected?: {
+    url?: string;
+    hostname?: string;
+    path?: string;
+    method?: string;
+  };
   route?: {
     host?: string;
     pathPrefix?: string;
     resourceId?: string;
     deploymentId?: string;
+    domainBindingId?: string;
     serverId?: string;
     destinationId?: string;
     providerKey?: string;
@@ -110,6 +117,16 @@ type ResourceAccessFailureDiagnostic = {
     routeSource?: "generated-default" | "durable-domain" | "server-applied" | "deployment-snapshot";
     routeStatus?: string;
   };
+  nextAction:
+    | "check-health"
+    | "inspect-runtime-logs"
+    | "inspect-deployment-logs"
+    | "inspect-proxy-preview"
+    | "diagnostic-summary"
+    | "verify-domain"
+    | "fix-dns"
+    | "repair-proxy"
+    | "manual-review";
   causeCode?: string;
   correlationId?: string;
   causationId?: string;
@@ -123,6 +140,10 @@ environment variables, and unredacted application output must not be included.
 When a route can be safely associated with the failure, the `route` object must align with the
 shared route intent/status descriptor contract in
 [Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
+`affected.url`, `affected.path`, and `affected.method` are request descriptors only; they must be
+normalized and must not include query strings, headers, cookies, authorization material, or raw
+provider error payloads. `nextAction` is stable product guidance for the owner-facing follow-up
+surface. It must point to an observation or explicitly modeled workflow, not to a hidden mutation.
 Request-time diagnostics remain observation. They may set blocking reasons such as
 `proxy_route_missing`, `proxy_route_stale`, `runtime_not_ready`, or `observation_unavailable`, but
 they must not mutate deployment, route, domain binding, certificate, proxy, or health state.
@@ -221,6 +242,14 @@ The current slice classifies from safe code, signal, or status inputs. It does n
 request failure envelopes, read route/resource context from applied proxy metadata, automatically
 derive a diagnostic renderer service URL for one-shot CLI remote SSH execution, or attach the
 latest edge failure to resource health and diagnostic summary read models.
+
+The 2026-05-01 baseline adds the additive envelope fields `nextAction`, affected request
+descriptor, and optional `domainBindingId`, and allows an existing resource access read model to
+carry `latestAccessFailureDiagnostic`. `resources.health` and `resources.diagnostic-summary` may
+compose that latest safe envelope into source errors and copyable diagnostic payloads. This is a
+request-id lookup structure for existing read surfaces; short-retention persistence, real Traefik
+e2e probing, companion/static renderer support, and automatic route/resource lookup remain future
+hardening gaps.
 
 Existing `resources.health`, `resources.diagnostic-summary`, and
 `resources.proxy-configuration.preview` already provide the owner-facing read surfaces that the

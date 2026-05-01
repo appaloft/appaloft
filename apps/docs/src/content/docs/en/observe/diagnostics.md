@@ -30,6 +30,7 @@ Diagnostic summaries should include:
 - Safe source/runtime/health/network summaries.
 - Server and proxy readiness summary.
 - Access URL, domain, and certificate status.
+- Access-failure request id, affected hostname/path, safe related ids, and next action.
 - Masked secret key names and presence, without values.
 
 <h2 id="runtime-target-capacity-inspect">Runtime target capacity inspect</h2>
@@ -91,6 +92,12 @@ Diagnostic summary shape:
   "deploymentId": "dep_123",
   "failedPhase": "verify",
   "errorCode": "health_check_failed",
+  "accessFailure": {
+    "requestId": "req_abc123",
+    "code": "resource_access_upstream_timeout",
+    "affected": { "hostname": "web.example.com", "path": "/" },
+    "nextAction": "check-health"
+  },
   "secrets": [
     { "key": "DATABASE_URL", "value": "***" }
   ],
