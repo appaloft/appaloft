@@ -248,6 +248,24 @@ export const domainError = {
     retryable = true,
   ): DomainError =>
     createError("certificate_import_storage_failed", "infra", message, details, retryable),
+  certificateRetryNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_retry_not_allowed", "user", message, details),
+  certificateRevokeNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_revoke_not_allowed", "user", message, details),
+  certificateRevokeFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("certificate_revoke_failed", "provider", message, details, retryable),
+  certificateDeleteNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_delete_not_allowed", "user", message, details),
   proxyProviderUnavailable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

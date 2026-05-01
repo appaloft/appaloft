@@ -18,6 +18,8 @@ export const certificateStatuses = [
   "failed",
   "expired",
   "disabled",
+  "revoked",
+  "deleted",
 ] as const;
 
 export type CertificateStatus = (typeof certificateStatuses)[number];
@@ -173,6 +175,32 @@ export class CertificateAttemptStatusValue extends ScalarValueObject<Certificate
 
   isTerminalForIssuanceWorker(): boolean {
     return this.isIssued() || this.isFailedOutcome();
+  }
+}
+
+const certificateLifecycleReasonBrand: unique symbol = Symbol("CertificateLifecycleReasonValue");
+export class CertificateLifecycleReasonValue extends ScalarValueObject<string> {
+  private [certificateLifecycleReasonBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<CertificateLifecycleReasonValue> {
+    return createRequiredText(
+      value,
+      "Certificate lifecycle reason",
+      (normalized) => new CertificateLifecycleReasonValue(normalized),
+    );
+  }
+
+  static fromOptional(value?: string): Result<CertificateLifecycleReasonValue | undefined> {
+    const normalized = value?.trim();
+    return normalized ? CertificateLifecycleReasonValue.create(normalized) : ok(undefined);
+  }
+
+  static rehydrate(value: string): CertificateLifecycleReasonValue {
+    return new CertificateLifecycleReasonValue(value.trim());
   }
 }
 
@@ -567,6 +595,15 @@ export interface CertificateIssueAttemptContext {
   requestedAt: CreatedAt;
 }
 
+export interface CertificateRetryContext {
+  certificateId: CertificateId;
+  domainBindingId: DomainBindingId;
+  attemptId: CertificateAttemptId;
+  reason: CertificateIssueReasonValue;
+  providerKey: ProviderKey;
+  challengeType: CertificateChallengeTypeValue;
+}
+
 export type CertificateIssueAttemptClaim =
   | { kind: "claimed"; context: CertificateIssueAttemptContext }
   | { kind: "terminal" };
@@ -799,6 +836,124 @@ export class Certificate extends AggregateRoot<CertificateState> {
     return this.state.attempts.some(
       (attempt) => attempt.reason.equals(reason) && attempt.status.isInFlight(),
     );
+  }
+
+  resolveRetryContext(): Result<CertificateRetryContext> {
+    if (this.state.source.value === "imported") {
+      return err(
+        domainError.certificateRetryNotAllowed("Imported certificates must be replaced by import", {
+          phase: "certificate-admission",
+          certificateId: this.state.id.value,
+          certificateSource: this.state.source.value,
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    const latestAttempt = this.state.attempts[this.state.attempts.length - 1];
+    if (!latestAttempt || latestAttempt.status.value !== "retry_scheduled") {
+      return err(
+        domainError.certificateRetryNotAllowed("Certificate has no retryable latest attempt", {
+          phase: "certificate-admission",
+          certificateId: this.state.id.value,
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    return ok({
+      certificateId: this.state.id,
+      domainBindingId: this.state.domainBindingId,
+      attemptId: latestAttempt.id,
+      reason: latestAttempt.reason,
+      providerKey: latestAttempt.providerKey,
+      challengeType: latestAttempt.challengeType,
+    });
+  }
+
+  revoke(input: {
+    revokedAt: CreatedAt;
+    externalRevocation: "provider" | "appaloft-local";
+    reason?: CertificateLifecycleReasonValue;
+    correlationId?: string;
+    causationId?: string;
+  }): Result<{ changed: boolean }> {
+    if (this.state.status.value === "revoked" || this.state.status.value === "deleted") {
+      return ok({ changed: false });
+    }
+
+    if (this.state.status.value !== "active") {
+      return err(
+        domainError.certificateRevokeNotAllowed("Certificate is not active for TLS", {
+          phase: "certificate-admission",
+          certificateId: this.state.id.value,
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    this.state.status = CertificateStatusValue.rehydrate("revoked");
+    this.recordDomainEvent("certificate-revoked", input.revokedAt, {
+      certificateId: this.state.id.value,
+      domainBindingId: this.state.domainBindingId.value,
+      domainName: this.state.domainName.value,
+      source: this.state.source.value,
+      revokedAt: input.revokedAt.value,
+      providerKey: this.state.providerKey.value,
+      externalRevocation: input.externalRevocation,
+      ...(input.reason ? { reason: input.reason.value } : {}),
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.causationId ? { causationId: input.causationId } : {}),
+    });
+
+    return ok({ changed: true });
+  }
+
+  delete(input: {
+    deletedAt: CreatedAt;
+    correlationId?: string;
+    causationId?: string;
+  }): Result<{ changed: boolean }> {
+    if (this.state.status.value === "deleted") {
+      return ok({ changed: false });
+    }
+
+    if (this.state.status.value === "active") {
+      return err(
+        domainError.certificateDeleteNotAllowed(
+          "Active certificate must be revoked before delete",
+          {
+            phase: "certificate-delete",
+            certificateId: this.state.id.value,
+            relatedState: this.state.status.value,
+          },
+        ),
+      );
+    }
+
+    if (this.state.status.value === "pending" || this.state.status.value === "issuing") {
+      return err(
+        domainError.certificateDeleteNotAllowed("In-flight certificate cannot be deleted", {
+          phase: "certificate-delete",
+          certificateId: this.state.id.value,
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    this.state.status = CertificateStatusValue.rehydrate("deleted");
+    this.recordDomainEvent("certificate-deleted", input.deletedAt, {
+      certificateId: this.state.id.value,
+      domainBindingId: this.state.domainBindingId.value,
+      domainName: this.state.domainName.value,
+      source: this.state.source.value,
+      deletedAt: input.deletedAt.value,
+      preservedAudit: true,
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.causationId ? { causationId: input.causationId } : {}),
+    });
+
+    return ok({ changed: true });
   }
 
   claimAttemptForIssuance(input: {

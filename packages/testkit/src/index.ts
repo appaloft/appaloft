@@ -143,6 +143,7 @@ export class PassThroughMutationCoordinator implements MutationCoordinator {
 
 export class FakeCertificateProvider implements CertificateProviderPort {
   readonly inputs: CertificateProviderIssueInput[] = [];
+  readonly revokeInputs: Parameters<CertificateProviderPort["revoke"]>[1][] = [];
 
   constructor(private result: Result<CertificateProviderIssueResult, DomainError>) {}
 
@@ -158,11 +159,25 @@ export class FakeCertificateProvider implements CertificateProviderPort {
     this.inputs.push(input);
     return this.result;
   }
+
+  async revoke(
+    context: Parameters<CertificateProviderPort["revoke"]>[0],
+    input: Parameters<CertificateProviderPort["revoke"]>[1],
+  ): ReturnType<CertificateProviderPort["revoke"]> {
+    void context;
+    this.revokeInputs.push(input);
+    return ok({
+      certificateId: input.certificateId,
+      revokedAt: input.revokedAt,
+      externalRevocation: "provider",
+    });
+  }
 }
 
 export class FakeCertificateSecretStore implements CertificateSecretStore {
   readonly stored: CertificateProviderIssueResult[] = [];
   readonly importedStored: ImportedCertificateSecretStoreInput[] = [];
+  readonly deactivated: Parameters<CertificateSecretStore["deactivate"]>[1][] = [];
 
   constructor(private secretRefPrefix = "secret") {}
 
@@ -192,6 +207,15 @@ export class FakeCertificateSecretStore implements CertificateSecretStore {
           }
         : {}),
     });
+  }
+
+  async deactivate(
+    context: Parameters<CertificateSecretStore["deactivate"]>[0],
+    input: Parameters<CertificateSecretStore["deactivate"]>[1],
+  ): ReturnType<CertificateSecretStore["deactivate"]> {
+    void context;
+    this.deactivated.push(input);
+    return ok(undefined);
   }
 }
 
@@ -1289,6 +1313,22 @@ export class MemoryCertificateReadModel implements CertificateReadModel {
       )
       .map((certificate): CertificateSummary => {
         const latestAttempt = certificate.attempts[certificate.attempts.length - 1];
+        const attempts = certificate.attempts.map((attempt) => ({
+          id: attempt.id.value,
+          status: attempt.status.value,
+          reason: attempt.reason.value,
+          providerKey: attempt.providerKey.value,
+          challengeType: attempt.challengeType.value,
+          requestedAt: attempt.requestedAt.value,
+          ...(attempt.issuedAt ? { issuedAt: attempt.issuedAt.value } : {}),
+          ...(attempt.expiresAt ? { expiresAt: attempt.expiresAt.value } : {}),
+          ...(attempt.failedAt ? { failedAt: attempt.failedAt.value } : {}),
+          ...(attempt.failureCode ? { errorCode: attempt.failureCode.value } : {}),
+          ...(attempt.failurePhase ? { failurePhase: attempt.failurePhase.value } : {}),
+          ...(attempt.failureMessage ? { failureMessage: attempt.failureMessage.value } : {}),
+          ...(attempt.retriable === undefined ? {} : { retriable: attempt.retriable }),
+          ...(attempt.retryAfter ? { retryAfter: attempt.retryAfter.value } : {}),
+        }));
 
         return {
           id: certificate.id.value,
@@ -1315,37 +1355,21 @@ export class MemoryCertificateReadModel implements CertificateReadModel {
             : {}),
           ...(latestAttempt
             ? {
-                latestAttempt: {
-                  id: latestAttempt.id.value,
-                  status: latestAttempt.status.value,
-                  reason: latestAttempt.reason.value,
-                  providerKey: latestAttempt.providerKey.value,
-                  challengeType: latestAttempt.challengeType.value,
-                  requestedAt: latestAttempt.requestedAt.value,
-                  ...(latestAttempt.issuedAt ? { issuedAt: latestAttempt.issuedAt.value } : {}),
-                  ...(latestAttempt.expiresAt ? { expiresAt: latestAttempt.expiresAt.value } : {}),
-                  ...(latestAttempt.failedAt ? { failedAt: latestAttempt.failedAt.value } : {}),
-                  ...(latestAttempt.failureCode
-                    ? { errorCode: latestAttempt.failureCode.value }
-                    : {}),
-                  ...(latestAttempt.failurePhase
-                    ? { failurePhase: latestAttempt.failurePhase.value }
-                    : {}),
-                  ...(latestAttempt.failureMessage
-                    ? { failureMessage: latestAttempt.failureMessage.value }
-                    : {}),
-                  ...(latestAttempt.retriable === undefined
-                    ? {}
-                    : { retriable: latestAttempt.retriable }),
-                  ...(latestAttempt.retryAfter
-                    ? { retryAfter: latestAttempt.retryAfter.value }
-                    : {}),
-                },
+                latestAttempt: attempts[attempts.length - 1],
               }
             : {}),
+          attempts,
           createdAt: certificate.createdAt.value,
         };
       });
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    input: { certificateId: string },
+  ): Promise<CertificateSummary | null> {
+    const items = await this.list(context);
+    return items.find((item) => item.id === input.certificateId) ?? null;
   }
 }
 

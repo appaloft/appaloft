@@ -1564,6 +1564,10 @@ export const publicDocsOperationCoverage = [
     topicId: "certificate.readiness",
   },
   { operationKey: "certificates.list", status: "documented", topicId: "certificate.readiness" },
+  { operationKey: "certificates.show", status: "documented", topicId: "certificate.readiness" },
+  { operationKey: "certificates.retry", status: "documented", topicId: "certificate.readiness" },
+  { operationKey: "certificates.revoke", status: "documented", topicId: "certificate.readiness" },
+  { operationKey: "certificates.delete", status: "documented", topicId: "certificate.readiness" },
   {
     operationKey: "system.providers.list",
     status: "documented",

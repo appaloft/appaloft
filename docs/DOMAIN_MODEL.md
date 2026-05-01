@@ -85,7 +85,9 @@ Allowed mutation names are specific to the aggregate language, for example:
 - `domain-bindings.confirm-ownership`, `domain-bindings.configure-route`,
   `domain-bindings.delete`, and `domain-bindings.retry-verification` instead of
   `domain-bindings.update`;
-- `certificates.issue-or-renew` instead of `certificates.update`.
+- `certificates.issue-or-renew`, `certificates.retry`, `certificates.revoke`, and
+  `certificates.delete` instead of `certificates.update`;
+- `certificates.show` instead of a transport-specific certificate detail read.
 
 If a future behavior appears to require one broad update command, the model is not specific enough.
 The behavior must be split into separate domain commands or first receive an ADR/spec that defines a
@@ -615,6 +617,9 @@ Current scope:
   verification context prepared from its current verification attempts and DNS observation
 - `Certificate` owns certificate attempt worker selection, including missing/terminal attempt
   handling and the provider issue context prepared from the selected attempt
+- `Certificate` owns retry admission, revocation eligibility, Appaloft-local imported certificate
+  revocation, and guarded delete eligibility. Provider revocation and secret-store deactivation are
+  application/provider boundary work coordinated after the aggregate admits the transition.
 - DNS verification, certificate issuance/import, route failure, and domain-ready transitions are
   implemented through explicit command/event workflows while the binding remains the owner of its
   own lifecycle predicates
