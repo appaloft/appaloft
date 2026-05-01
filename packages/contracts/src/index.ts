@@ -3065,9 +3065,32 @@ export const listGitHubRepositoriesResponseSchema = z.object({
   items: z.array(githubRepositorySummarySchema),
 });
 
+export const consoleOverviewResponseSchema = z.object({
+  schemaVersion: z.literal("console.overview/v1"),
+  generatedAt: z.string(),
+  counts: z.object({
+    projects: z.number().int().nonnegative(),
+    environments: z.number().int().nonnegative(),
+    resources: z.number().int().nonnegative(),
+    deploymentTargets: z.number().int().nonnegative(),
+    deployments: z.number().int().nonnegative(),
+    activeDeployments: z.number().int().nonnegative(),
+    failedDeployments: z.number().int().nonnegative(),
+  }),
+  readiness: readinessResponseSchema,
+  version: versionResponseSchema,
+  latestDeployment: deploymentSummarySchema.optional(),
+  recentDeployments: z.array(deploymentSummarySchema),
+  projects: z.array(projectSummarySchema),
+  environments: z.array(environmentSummarySchema),
+  resources: z.array(resourceSummarySchema),
+  deploymentTargets: z.array(serverSummarySchema),
+});
+
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export type ReadinessResponse = z.infer<typeof readinessResponseSchema>;
 export type VersionResponse = z.infer<typeof versionResponseSchema>;
+export type ConsoleOverviewResponse = z.infer<typeof consoleOverviewResponseSchema>;
 export type AuthProviderStatus = z.infer<typeof authProviderStatusSchema>;
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>;
 export type GitHubRepositorySummary = z.infer<typeof githubRepositorySummarySchema>;
