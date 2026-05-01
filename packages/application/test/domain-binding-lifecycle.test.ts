@@ -78,6 +78,16 @@ class StaticCertificateReadModel implements CertificateReadModel {
       input?.domainBindingId ? certificate.domainBindingId === input.domainBindingId : true,
     );
   }
+
+  async findOne(
+    context: RepositoryContext,
+    input: {
+      certificateId: string;
+    },
+  ): Promise<CertificateSummary | null> {
+    void context;
+    return this.certificates.find((certificate) => certificate.id === input.certificateId) ?? null;
+  }
 }
 
 function createTestContext(): ExecutionContext {

@@ -64,9 +64,13 @@ import {
   CertificateRetryScheduler,
   ConfirmDomainBindingOwnershipUseCase,
   CreateDomainBindingUseCase,
+  DeleteCertificateUseCase,
   IssueCertificateOnCertificateRequestedHandler,
   IssueOrRenewCertificateUseCase,
   ListCertificatesQueryService,
+  RetryCertificateUseCase,
+  RevokeCertificateUseCase,
+  ShowCertificateQueryService,
 } from "../src/use-cases";
 
 function createTestContext(): ExecutionContext {
@@ -362,6 +366,38 @@ describe("IssueOrRenewCertificateUseCase", () => {
     ]);
   });
 
+  test("[ROUTE-TLS-READMODEL-013] shows one certificate without exposing secret material", async () => {
+    const { context, domainBindingId, issueUseCase, readModel } = await seedCertificateContext();
+
+    const result = await issueUseCase.execute(context, {
+      domainBindingId,
+      reason: "issue",
+    });
+    expect(result.isOk()).toBe(true);
+
+    const shown = await new ShowCertificateQueryService(readModel).execute(context, {
+      certificateId: result._unsafeUnwrap().certificateId,
+    });
+
+    expect(shown.isOk()).toBe(true);
+    expect(shown._unsafeUnwrap()).toEqual(
+      expect.objectContaining({
+        id: "crt_0003",
+        domainBindingId,
+        domainName: "secure.example.com",
+        status: "pending",
+        attempts: [
+          expect.objectContaining({
+            id: "cat_0004",
+            status: "requested",
+          }),
+        ],
+      }),
+    );
+    expect(JSON.stringify(shown._unsafeUnwrap())).not.toContain("BEGIN PRIVATE KEY");
+    expect(JSON.stringify(shown._unsafeUnwrap())).not.toContain("secret://");
+  });
+
   test("[ROUTE-TLS-CMD-013] rejects certificate issuance for a missing domain binding", async () => {
     const { context, eventBus, issueUseCase } = await seedCertificateContext();
 
@@ -576,6 +612,180 @@ describe("IssueOrRenewCertificateUseCase", () => {
         }),
       }),
     ]);
+  });
+
+  test("[ROUTE-TLS-CMD-025][ROUTE-TLS-CMD-026] retries a retry-scheduled provider-issued certificate", async () => {
+    const seed = await seedCertificateContext();
+    const failed = await recordRetryableProviderFailure(seed);
+    const useCase = new RetryCertificateUseCase(seed.certificates, seed.issueUseCase);
+
+    const result = await useCase.execute(seed.context, {
+      certificateId: failed.certificateId,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({
+      certificateId: "crt_0003",
+      attemptId: "cat_0005",
+    });
+    const persisted = await seed.certificates.findOne(
+      seed.repositoryContext,
+      CertificateByIdSpec.create(CertificateId.rehydrate("crt_0003")),
+    );
+    expect(persisted?.toState().attempts).toHaveLength(2);
+    expect(persisted?.toState().attempts[1]?.idempotencyKey?.value).toBe(
+      "certificates.retry:crt_0003:cat_0004",
+    );
+    expect(eventsByType(seed.eventBus.events, "certificate-requested")).toHaveLength(2);
+  });
+
+  test("[ROUTE-TLS-CMD-027][ROUTE-TLS-CMD-028][ROUTE-TLS-EVT-015] revokes a provider-issued certificate through the provider boundary", async () => {
+    const seed = await seedCertificateContext();
+    const requested = await seed.issueUseCase.execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      reason: "issue",
+    });
+    expect(requested.isOk()).toBe(true);
+    const requestedEvent = eventsByType(seed.eventBus.events, "certificate-requested")[0];
+    if (!requestedEvent) {
+      throw new Error("certificate-requested event was not published");
+    }
+
+    const provider = new FakeCertificateProvider(
+      ok({
+        certificateId: "crt_0003",
+        attemptId: "cat_0004",
+        domainBindingId: seed.domainBindingId,
+        domainName: "secure.example.com",
+        providerKey: "acme",
+        issuedAt: "2026-01-01T00:01:00.000Z",
+        expiresAt: "2026-04-01T00:01:00.000Z",
+        fingerprint: "sha256:managed",
+        certificatePem: "-----BEGIN CERTIFICATE-----\nmanaged\n-----END CERTIFICATE-----",
+        privateKeyPem: "-----BEGIN PRIVATE KEY-----\nmanaged\n-----END PRIVATE KEY-----",
+      }),
+    );
+    const secretStore = new FakeCertificateSecretStore();
+    const handler = new IssueCertificateOnCertificateRequestedHandler(
+      seed.certificates,
+      provider,
+      secretStore,
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+    expect((await handler.handle(seed.context, requestedEvent)).isOk()).toBe(true);
+
+    const revokeUseCase = new RevokeCertificateUseCase(
+      seed.certificates,
+      provider,
+      secretStore,
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+    const revoked = await revokeUseCase.execute(seed.context, {
+      certificateId: "crt_0003",
+      reason: "operator-requested",
+    });
+
+    expect(revoked.isOk()).toBe(true);
+    expect(provider.revokeInputs).toEqual([
+      expect.objectContaining({
+        certificateId: "crt_0003",
+        domainBindingId: seed.domainBindingId,
+        providerKey: "acme",
+        reason: "operator-requested",
+      }),
+    ]);
+    expect(secretStore.deactivated).toEqual([
+      expect.objectContaining({
+        certificateId: "crt_0003",
+        reason: "revoked",
+      }),
+    ]);
+    const persisted = await seed.certificates.findOne(
+      seed.repositoryContext,
+      CertificateByIdSpec.create(CertificateId.rehydrate("crt_0003")),
+    );
+    expect(persisted?.toState().status.value).toBe("revoked");
+    expect(eventsByType(seed.eventBus.events, "certificate-revoked")).toHaveLength(1);
+  });
+
+  test("[ROUTE-TLS-CMD-029][ROUTE-TLS-CMD-030][ROUTE-TLS-EVT-016] deletes only non-active certificate lifecycle state", async () => {
+    const seed = await seedCertificateContext();
+    const requested = await seed.issueUseCase.execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      reason: "issue",
+    });
+    expect(requested.isOk()).toBe(true);
+    const requestedEvent = eventsByType(seed.eventBus.events, "certificate-requested")[0];
+    if (!requestedEvent) {
+      throw new Error("certificate-requested event was not published");
+    }
+
+    const provider = new FakeCertificateProvider(
+      ok({
+        certificateId: "crt_0003",
+        attemptId: "cat_0004",
+        domainBindingId: seed.domainBindingId,
+        domainName: "secure.example.com",
+        providerKey: "acme",
+        issuedAt: "2026-01-01T00:01:00.000Z",
+        expiresAt: "2026-04-01T00:01:00.000Z",
+        certificatePem: "-----BEGIN CERTIFICATE-----\nmanaged\n-----END CERTIFICATE-----",
+        privateKeyPem: "-----BEGIN PRIVATE KEY-----\nmanaged\n-----END PRIVATE KEY-----",
+      }),
+    );
+    const secretStore = new FakeCertificateSecretStore();
+    const handler = new IssueCertificateOnCertificateRequestedHandler(
+      seed.certificates,
+      provider,
+      secretStore,
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+    expect((await handler.handle(seed.context, requestedEvent)).isOk()).toBe(true);
+
+    const deleteUseCase = new DeleteCertificateUseCase(
+      seed.certificates,
+      secretStore,
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+    const activeDelete = await deleteUseCase.execute(seed.context, {
+      certificateId: "crt_0003",
+      confirmation: { certificateId: "crt_0003" },
+    });
+    expect(activeDelete.isErr()).toBe(true);
+    expect(activeDelete._unsafeUnwrapErr().code).toBe("certificate_delete_not_allowed");
+
+    const revokeUseCase = new RevokeCertificateUseCase(
+      seed.certificates,
+      provider,
+      secretStore,
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+    expect((await revokeUseCase.execute(seed.context, { certificateId: "crt_0003" })).isOk()).toBe(
+      true,
+    );
+
+    const deleted = await deleteUseCase.execute(seed.context, {
+      certificateId: "crt_0003",
+      confirmation: { certificateId: "crt_0003" },
+    });
+
+    expect(deleted.isOk()).toBe(true);
+    const persisted = await seed.certificates.findOne(
+      seed.repositoryContext,
+      CertificateByIdSpec.create(CertificateId.rehydrate("crt_0003")),
+    );
+    expect(persisted?.toState().status.value).toBe("deleted");
+    expect(eventsByType(seed.eventBus.events, "certificate-deleted")).toHaveLength(1);
   });
 
   test("[ROUTE-TLS-SCHED-001] dispatches a due retry-scheduled attempt", async () => {

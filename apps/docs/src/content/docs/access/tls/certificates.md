@@ -12,6 +12,11 @@ searchAliases:
   - "证书"
 relatedOperations:
   - certificates.issue-or-renew
+  - certificates.import
+  - certificates.show
+  - certificates.retry
+  - certificates.revoke
+  - certificates.delete
 sidebar:
   label: "Certificates"
   order: 5
@@ -58,5 +63,15 @@ sidebar:
 2. DNS 是否还指向当前代理入口。
 3. 证书材料是否过期、链不完整或 key 不匹配。
 4. 代理是否成功 reload 新证书。
+
+<h2 id="certificate-lifecycle">证书生命周期操作</h2>
+
+`certificate show` 只返回安全元数据、状态和 attempt history，不返回 certificate PEM、private key、passphrase 或 secret ref。
+
+`certificate retry` 只用于 provider-issued certificate 的 retryable 签发或续期失败。它会创建新的证书 attempt，不会重试 domain ownership verification。
+
+`certificate revoke` 让 active certificate 不再用于 Appaloft 托管 TLS。Provider-issued certificate 会通过 provider boundary 执行 provider revocation；imported certificate 只在 Appaloft 本地撤出使用，因为 Appaloft 不一定有外部 CA 的吊销权限。
+
+`certificate delete` 只把非 active certificate 移出可见活跃生命周期，并保留必要审计历史。删除 domain binding 不会自动 revoke 或 delete certificate；反过来，certificate revoke/delete 也不会删除 domain binding。
 
 相关页面：[Domain ownership](/docs/access/domains/ownership/) 和 [Access troubleshooting](/docs/access/troubleshooting/)。

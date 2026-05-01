@@ -39,6 +39,7 @@ import {
 import {
   CapturedEventBus,
   FakeCertificateMaterialValidator,
+  FakeCertificateProvider,
   FakeCertificateSecretStore,
   FixedClock,
   MemoryCertificateReadModel,
@@ -61,6 +62,8 @@ import {
   ImportCertificateUseCase,
   ListCertificatesQueryService,
   MarkDomainReadyOnCertificateImportedHandler,
+  RetryCertificateUseCase,
+  RevokeCertificateUseCase,
   toRepositoryContext,
 } from "../src";
 
@@ -461,5 +464,92 @@ describe("ImportCertificateUseCase", () => {
       readyAt: "2026-01-01T00:00:00.000Z",
       causationId: "cat_demo",
     });
+  });
+
+  test("[ROUTE-TLS-CMD-025][CERT-IMPORT-CMD-014] rejects retry for imported certificates", async () => {
+    const seed = await seedImportContext();
+    const importUseCase = new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+    );
+    const imported = await importUseCase.execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+    });
+    expect(imported.isOk()).toBe(true);
+
+    const retryUseCase = new RetryCertificateUseCase(seed.certificates, {
+      execute: async () => {
+        throw new Error("imported certificate retry must not delegate to issue use case");
+      },
+    } as unknown as ConstructorParameters<typeof RetryCertificateUseCase>[1]);
+    const retried = await retryUseCase.execute(seed.context, {
+      certificateId: imported._unsafeUnwrap().certificateId,
+    });
+
+    expect(retried.isErr()).toBe(true);
+    expect(retried._unsafeUnwrapErr().code).toBe("certificate_retry_not_allowed");
+  });
+
+  test("[ROUTE-TLS-CMD-027][ROUTE-TLS-CMD-028] revokes imported certificates locally without provider calls", async () => {
+    const seed = await seedImportContext();
+    const secretStore = new FakeCertificateSecretStore();
+    const importUseCase = new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      secretStore,
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+    );
+    const imported = await importUseCase.execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+    });
+    expect(imported.isOk()).toBe(true);
+
+    const provider = new FakeCertificateProvider(
+      err(
+        domainError.certificateProviderUnavailable("Provider should not be called", {
+          phase: "provider-request",
+        }),
+      ),
+    );
+    const revokeUseCase = new RevokeCertificateUseCase(
+      seed.certificates,
+      provider,
+      secretStore,
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+    const revoked = await revokeUseCase.execute(seed.context, {
+      certificateId: imported._unsafeUnwrap().certificateId,
+    });
+
+    expect(revoked.isOk()).toBe(true);
+    expect(provider.revokeInputs).toHaveLength(0);
+    expect(secretStore.deactivated).toEqual([
+      expect.objectContaining({
+        certificateId: "crt_0003",
+        reason: "revoked",
+      }),
+    ]);
+    const persisted = await seed.certificates.findOne(
+      seed.repositoryContext,
+      CertificateByIdSpec.create(CertificateId.rehydrate("crt_0003")),
+    );
+    expect(persisted?.toState().source.value).toBe("imported");
+    expect(persisted?.toState().status.value).toBe("revoked");
   });
 });

@@ -329,6 +329,8 @@ renewing
 failed
 expired
 disabled
+revoked
+deleted
 ```
 
 Certificate attempt state:
@@ -346,6 +348,22 @@ Certificate source:
 ```text
 managed
 imported
+```
+
+Certificate lifecycle closure:
+
+```text
+certificates.show
+  -> safe certificate readback
+
+certificates.retry
+  -> certificate-requested, only for latest retryable managed failure
+
+certificates.revoke
+  -> certificate-revoked
+
+certificates.delete
+  -> certificate-deleted, only after the certificate is not active for TLS
 ```
 
 ## Imported Certificate Minimum State
@@ -377,6 +395,8 @@ models, or structured error details.
 | `certificate-issued` | Certificate state is active. | Certificate moves to `active`; domain may move to `ready`. |
 | `certificate-imported` | Manual certificate import completed successfully. | Certificate moves to `active` with `source = imported`; domain may move to `ready` when route gates are satisfied. |
 | `certificate-issuance-failed` | Certificate attempt failed. | Certificate attempt moves to `failed` or `retry_scheduled`; domain remains not ready if TLS is required. |
+| `certificate-revoked` | Certificate is no longer usable for Appaloft-managed TLS. | Certificate moves to `revoked`; domain/resource access projections must not use it for future TLS route realization. |
+| `certificate-deleted` | Certificate was removed from visible active lifecycle while audit history remains. | Certificate moves to `deleted`; domain bindings, deployment snapshots, generated access, and server-applied audit are preserved. |
 | `domain-route-realization-failed` | Route/proxy realization failed for an active durable domain binding. | Domain binding moves to `not_ready` with safe route failure metadata. |
 | `domain-ready` | All routing and TLS gates are satisfied. | Domain binding read model reports ready. |
 
@@ -554,6 +574,41 @@ The scheduler must not replay `certificate-requested` or `certificate-issuance-f
 retry mechanism. It may run from a shell timer, hosted worker, cron job, or future durable scheduler
 adapter, but each execution observes and mutates state only through application ports/use cases.
 
+## Public Certificate Retry
+
+`certificates.retry` is the public operator retry command. It follows the same attempt rules as the
+internal scheduler:
+
+- retry creates a new certificate attempt id;
+- retry uses the previous retryable managed attempt's reason, provider key, and challenge type;
+- retry dispatches through the same issue/renew use-case path and publishes `certificate-requested`;
+- retry does not replay old events;
+- retry does not retry domain binding ownership verification or route repair;
+- imported certificates are not retried through this command. Operators replace imported material
+  by running `certificates.import` again.
+
+## Certificate Revocation And Delete
+
+`certificates.revoke` and `certificates.delete` are separate operations.
+
+Revocation means Appaloft must not use the certificate for managed TLS:
+
+- provider-issued certificates coordinate through the certificate provider boundary when supported;
+- imported certificates record Appaloft-local TLS disablement only and must not claim external CA
+  revocation;
+- revocation publishes `certificate-revoked` only after durable state is recorded;
+- revocation must not delete the domain binding, generated access, deployment snapshots, or
+  server-applied route audit.
+
+Delete means removing a certificate from visible active lifecycle while retaining necessary audit
+history:
+
+- delete does not revoke a certificate;
+- active certificates must be revoked, expired, failed, disabled, or otherwise non-active before
+  delete is admitted;
+- delete publishes `certificate-deleted` only after durable state is recorded;
+- delete must preserve attempt history and safe metadata required for audit and troubleshooting.
+
 ## Manual Certificate Import Boundary
 
 `certificates.import` is the manual-certificate path for bindings whose certificate policy is
@@ -627,6 +682,11 @@ private key, and optional passphrase through secret-safe UI/transport handling, 
 secret values back to the user, and must not expose the import affordance for bindings whose policy
 is not `manual`.
 
+Web/CLI/API may expose `certificates.show`, `certificates.retry`, `certificates.revoke`, and
+`certificates.delete` from certificate and resource-scoped domain surfaces. Those entrypoints must
+reuse the command/query schemas, show retry/revoke/delete affordances only when the read model
+indicates eligibility, and still rely on write-side command admission for the final decision.
+
 API must expose strict command inputs and read-model status; it must not prompt.
 
 Automation and future MCP tools must dispatch the same command semantics rather than mutating deployment runtime plans directly.
@@ -677,6 +737,9 @@ Current code implements `certificates.import`, `certificate-imported`, imported-
 persistence/read models, and manual certificate entrypoints across CLI, HTTP/oRPC, and the
 resource-scoped Web surface. Manual certificate policy is now a business-code-supported path with
 durable secret-store persistence rather than a spec-only branch.
+
+Current code implements certificate show/retry/revoke/delete through the Phase 6 certificate
+lifecycle closure slice governed by ADR-035.
 
 Current code implements HTTP-01 challenge token serving through an injected challenge token store
 and the HTTP adapter path `/.well-known/acme-challenge/{token}`.

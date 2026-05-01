@@ -23,6 +23,7 @@ import {
   type CreateResourceCommandInput,
   type CreateSshCredentialCommandInput,
   type DeactivateServerCommandInput,
+  type DeleteCertificateCommandInput,
   type DeleteDomainBindingCommandInput,
   type DeleteResourceCommandInput,
   type DeleteServerCommandInput,
@@ -55,10 +56,13 @@ import {
   type ResourceHealthQueryInput,
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
+  type RetryCertificateCommandInput,
   type RetryDomainBindingVerificationCommandInput,
+  type RevokeCertificateCommandInput,
   type RotateSshCredentialCommandInput,
   type SetEnvironmentVariableCommandInput,
   type SetResourceVariableCommandInput,
+  type ShowCertificateQueryInput,
   type ShowDefaultAccessDomainPolicyQueryInput,
   type ShowDeploymentQueryInput,
   type ShowDomainBindingQueryInput,
@@ -99,6 +103,7 @@ import {
   type CreateResourceResponse,
   type CreateSshCredentialResponse,
   type DeactivateServerResponse,
+  type DeleteCertificateResponse,
   type DeleteDomainBindingResponse,
   type DeleteResourceResponse,
   type DeleteServerResponse,
@@ -142,9 +147,12 @@ import {
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
+  type RetryCertificateResponse,
   type RetryDomainBindingVerificationResponse,
+  type RevokeCertificateResponse,
   type RotateSshCredentialResponse,
   type SetResourceVariableResponse,
+  type ShowCertificateResponse,
   type ShowDefaultAccessDomainPolicyResponse,
   type ShowDeploymentResponse,
   type ShowDomainBindingResponse,
@@ -578,6 +586,30 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       IssueOrRenewCertificateCommandInput,
       IssueOrRenewCertificateResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowCertificateQueryInput,
+      ShowCertificateResponse,
+      AppaloftClientError
+    >;
+    retry: Client<
+      AppaloftClientContext,
+      RetryCertificateCommandInput,
+      RetryCertificateResponse,
+      AppaloftClientError
+    >;
+    revoke: Client<
+      AppaloftClientContext,
+      RevokeCertificateCommandInput,
+      RevokeCertificateResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeleteCertificateCommandInput,
+      DeleteCertificateResponse,
       AppaloftClientError
     >;
   };

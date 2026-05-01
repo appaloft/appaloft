@@ -1,3 +1,5 @@
+export * from "./operations/certificates/delete-certificate.handler";
+export * from "./operations/certificates/delete-certificate.use-case";
 export * from "./operations/certificates/import-certificate.handler";
 export * from "./operations/certificates/import-certificate.use-case";
 export * from "./operations/certificates/issue-certificate-on-certificate-requested.handler";
@@ -5,3 +7,9 @@ export * from "./operations/certificates/issue-or-renew-certificate.handler";
 export * from "./operations/certificates/issue-or-renew-certificate.use-case";
 export * from "./operations/certificates/list-certificates.handler";
 export * from "./operations/certificates/list-certificates.query-service";
+export * from "./operations/certificates/retry-certificate.handler";
+export * from "./operations/certificates/retry-certificate.use-case";
+export * from "./operations/certificates/revoke-certificate.handler";
+export * from "./operations/certificates/revoke-certificate.use-case";
+export * from "./operations/certificates/show-certificate.handler";
+export * from "./operations/certificates/show-certificate.query-service";

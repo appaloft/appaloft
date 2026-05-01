@@ -237,4 +237,8 @@ export const cliCommandDescriptions = {
     "certificate.readiness",
   ),
   certificateList: withDocs("List certificate lifecycle state", "certificate.readiness"),
+  certificateShow: withDocs("Show certificate lifecycle state", "certificate.readiness"),
+  certificateRetry: withDocs("Retry provider certificate issuance", "certificate.readiness"),
+  certificateRevoke: withDocs("Revoke an active certificate", "certificate.readiness"),
+  certificateDelete: withDocs("Delete certificate active lifecycle state", "certificate.readiness"),
 } as const;

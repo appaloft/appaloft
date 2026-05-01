@@ -81,6 +81,15 @@ class StaticCertificateReadModel implements CertificateReadModel {
   async list(): Promise<CertificateSummary[]> {
     return this.certificates;
   }
+
+  async findOne(
+    _context: RepositoryContext,
+    input: {
+      certificateId: string;
+    },
+  ): Promise<CertificateSummary | null> {
+    return this.certificates.find((certificate) => certificate.id === input.certificateId) ?? null;
+  }
 }
 
 class StaticProcessAttemptReadModel implements ProcessAttemptReadModel {
