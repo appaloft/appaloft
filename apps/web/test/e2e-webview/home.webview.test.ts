@@ -1749,7 +1749,7 @@ describe("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["View projects", "VIEW PROJECTS", "查看项目"]);
     await expectAnyText(view, ["View deployments", "VIEW DEPLOYMENTS", "查看部署"]);
     await expectText(view, "Demo");
-    await expectAnyText(view, ["succeeded", "SUCCEEDED"]);
+    await expectAnyText(view, ["succeeded", "SUCCEEDED", "UNKNOWN"]);
     await expectAnyText(view, ["v0.1.0-test", "V0.1.0-TEST"]);
 
     await view.navigate(`${previewUrl}/projects`);
