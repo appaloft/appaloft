@@ -297,7 +297,7 @@
     ? "[&_[data-slot=sidebar-container]]:!transition-none [&_[data-slot=sidebar-gap]]:!transition-none"
     : ""}
 >
-  <Sidebar variant="inset" collapsible="icon">
+  <Sidebar variant="sidebar" collapsible="icon">
     <SidebarHeader class="gap-3">
       <a class="flex items-center gap-3 px-2 py-2" href="/">
         <img
