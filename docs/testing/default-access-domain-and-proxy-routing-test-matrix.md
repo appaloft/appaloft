@@ -83,6 +83,7 @@ Then:
 | DEF-ACCESS-ROUTE-006 | integration | Provider disabled result | Provider returns no-route by policy | Deployment accepted without generated route when public route is optional | None or non-retriable policy result | No generated route | No proxy route unless durable binding exists | No |
 | DEF-ACCESS-ROUTE-007 | integration | Missing target public address | Policy enabled but target has no usable public address | Reject or no-route according to policy requirement | `validation_error` or policy error, phase `default-access-policy-resolution` | No generated route | No proxy route | No until target configured |
 | DEF-ACCESS-ROUTE-008 | integration | Proxy disabled or missing intent | Policy enabled, resource reverse-proxy, target has no proxy intent or proxy disabled | Deployment accepted without generated public URL | None | No generated route | No proxy route and no direct host-port fallback | No |
+| DMBH-TARGET-001 | unit + integration | Target-owned proxy route eligibility | Deployment target edge proxy is missing, disabled, or provider-backed | Generated-route callers ask the target for route proxy selection | None | Same generated-route/no-route decision as before | Runtime behavior unchanged; only behavior placement changes | No |
 | DEF-ACCESS-ROUTE-009 | integration | Proxy not ready | Policy enabled, resource reverse-proxy, edge proxy failed/not ready | Reject or persist deployment failure according to detection phase | `proxy_not_ready` or proxy lifecycle error, phase `proxy-readiness` | No usable generated route | No direct host-port fallback | Depends |
 | DEF-ACCESS-ROUTE-010 | integration | Resource has no internal port | Inbound app lacks `networkProfile.internalPort` | Command rejects | `validation_error`, phase `resource-network-resolution` | No generated route | No deployment | No |
 | DEF-ACCESS-ROUTE-011 | integration | Direct-port exposure | Resource has `exposureMode = direct-port` and `hostPort` | Generated route resolver skipped | None | No generated reverse-proxy route | Direct-port behavior belongs to separate path | No |
@@ -191,6 +192,11 @@ These rows are governed by
 ## Current Implementation Notes And Migration Gaps
 
 Existing tests cover runtime-plan access routes, proxy bootstrap plans, Traefik/Caddy label generation, and public route health URL derivation.
+
+`DMBH-TARGET-001` adds focused domain behavior coverage for target-owned route proxy eligibility
+while preserving existing `DEF-ACCESS-ROUTE-001` and `DEF-ACCESS-ROUTE-008` observable behavior.
+The row is implemented by `packages/core/test/deployment-target.test.ts` and covered through the
+deployment create and deployment plan preview regression tests.
 
 Provider-neutral default access domain generation is covered by the concrete provider test.
 

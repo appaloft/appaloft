@@ -285,6 +285,14 @@ export class EdgeProxyKindValue extends EnumValueObject<(typeof edgeProxyKinds)[
   static rehydrate(value: (typeof edgeProxyKinds)[number]): EdgeProxyKindValue {
     return new EdgeProxyKindValue(value);
   }
+
+  isDisabled(): boolean {
+    return this.value === "none";
+  }
+
+  isProviderBacked(): boolean {
+    return !this.isDisabled();
+  }
 }
 
 const edgeProxyStatusBrand: unique symbol = Symbol("EdgeProxyStatusValue");
@@ -311,13 +319,21 @@ export class EdgeProxyStatusValue extends StateMachineValueObject<
   }
 
   static initialForKind(kind: EdgeProxyKindValue): EdgeProxyStatusValue {
-    return kind.value === "none"
+    return kind.isDisabled()
       ? new EdgeProxyStatusValue("disabled")
       : new EdgeProxyStatusValue("pending");
   }
 
+  isDisabled(): boolean {
+    return this.value === "disabled";
+  }
+
+  canSelectProvider(kind: EdgeProxyKindValue): boolean {
+    return kind.isProviderBacked() && !this.isDisabled();
+  }
+
   beginBootstrap(kind: EdgeProxyKindValue): Result<EdgeProxyStatusValue> {
-    if (kind.value === "none" || this.value === "disabled") {
+    if (!this.canSelectProvider(kind)) {
       return err(domainError.invariant("Disabled edge proxy cannot be bootstrapped"));
     }
 
@@ -404,6 +420,10 @@ export class TlsModeValue extends EnumValueObject<(typeof tlsModes)[number]> {
   static rehydrate(value: (typeof tlsModes)[number]): TlsModeValue {
     return new TlsModeValue(value);
   }
+
+  isDisabled(): boolean {
+    return this.value === "disabled";
+  }
 }
 
 const healthCheckTypeBrand: unique symbol = Symbol("HealthCheckTypeValue");
@@ -425,6 +445,10 @@ export class HealthCheckTypeValue extends EnumValueObject<(typeof healthCheckTyp
 
   static rehydrate(value: (typeof healthCheckTypes)[number]): HealthCheckTypeValue {
     return new HealthCheckTypeValue(value);
+  }
+
+  isHttp(): boolean {
+    return this.value === "http";
   }
 }
 
@@ -652,6 +676,14 @@ export class DeploymentStatusValue extends StateMachineValueObject<
       this.value === "canceled" ||
       this.value === "rolled-back"
     );
+  }
+
+  allowsExecutionContinuation(): boolean {
+    return this.value !== "cancel-requested" && this.value !== "canceled";
+  }
+
+  requiresRuntimeCancellationForSupersede(): boolean {
+    return this.value === "running";
   }
 
   cancel(): Result<DeploymentStatusValue> {
@@ -960,6 +992,23 @@ export class ResourceKindValue extends EnumValueObject<
   ): ResourceKindValue {
     return new ResourceKindValue(value);
   }
+
+  isComposeStack(): boolean {
+    return this.value === "compose-stack";
+  }
+
+  allowsMultipleServices(): boolean {
+    return this.isComposeStack();
+  }
+
+  requiresInternalPort(): boolean {
+    return (
+      this.value === "application" ||
+      this.value === "service" ||
+      this.value === "static-site" ||
+      this.isComposeStack()
+    );
+  }
 }
 
 const resourceServiceKindBrand: unique symbol = Symbol("ResourceServiceKindValue");
@@ -985,6 +1034,10 @@ export class ResourceServiceKindValue extends EnumValueObject<
     value: "web" | "api" | "worker" | "database" | "cache" | "service",
   ): ResourceServiceKindValue {
     return new ResourceServiceKindValue(value);
+  }
+
+  requiresInternalPort(): boolean {
+    return this.value === "web" || this.value === "api";
   }
 }
 
@@ -1033,6 +1086,10 @@ export class ResourceExposureModeValue extends EnumValueObject<
 
   static rehydrate(value: (typeof resourceExposureModes)[number]): ResourceExposureModeValue {
     return new ResourceExposureModeValue(value);
+  }
+
+  isDirectPort(): boolean {
+    return this.value === "direct-port";
   }
 }
 
@@ -1150,6 +1207,10 @@ export class ResourceBindingScopeValue extends EnumValueObject<
   ): ResourceBindingScopeValue {
     return new ResourceBindingScopeValue(value);
   }
+
+  isBuildOnly(): boolean {
+    return this.value === "build-only";
+  }
 }
 
 const resourceInjectionModeBrand: unique symbol = Symbol("ResourceInjectionModeValue");
@@ -1171,6 +1232,10 @@ export class ResourceInjectionModeValue extends EnumValueObject<"env" | "file" |
 
   static rehydrate(value: "env" | "file" | "reference"): ResourceInjectionModeValue {
     return new ResourceInjectionModeValue(value);
+  }
+
+  isRuntimeReference(): boolean {
+    return this.value === "reference";
   }
 }
 
@@ -1200,6 +1265,14 @@ export class WorkloadKindValue extends EnumValueObject<
   ): WorkloadKindValue {
     return new WorkloadKindValue(value);
   }
+
+  isStaticSite(): boolean {
+    return this.value === "static_site";
+  }
+
+  isWorker(): boolean {
+    return this.value === "worker";
+  }
 }
 
 const runtimeKindBrand: unique symbol = Symbol("RuntimeKindValue");
@@ -1223,6 +1296,18 @@ export class RuntimeKindValue extends EnumValueObject<
 
   static rehydrate(value: "web-server" | "worker" | "scheduler" | "static-site"): RuntimeKindValue {
     return new RuntimeKindValue(value);
+  }
+
+  isStaticSite(): boolean {
+    return this.value === "static-site";
+  }
+
+  isWebServer(): boolean {
+    return this.value === "web-server";
+  }
+
+  requiresPort(): boolean {
+    return this.isWebServer();
   }
 }
 

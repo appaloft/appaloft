@@ -60,17 +60,7 @@ function precedenceIndex(scope: ConfigScopeValue): number {
 }
 
 function compareByPrecedence(left: EnvironmentConfigEntry, right: EnvironmentConfigEntry): number {
-  return precedenceIndex(left.toState().scope) - precedenceIndex(right.toState().scope);
-}
-
-function variableIdentity(variable: Pick<EnvironmentConfigEntryState, "key" | "exposure">): string {
-  return `${variable.key.value}:${variable.exposure.value}`;
-}
-
-function snapshotIdentity(
-  variable: Pick<EnvironmentConfigSnapshotEntryState, "key" | "exposure">,
-): string {
-  return `${variable.key.value}:${variable.exposure.value}`;
+  return left.comparePrecedenceTo(right);
 }
 
 function normalizeSnapshotEntry(
@@ -134,6 +124,41 @@ export class EnvironmentConfigEntry extends ValueObject<EnvironmentConfigEntrySt
     return this.state.updatedAt.value;
   }
 
+  variableIdentity(): string {
+    return `${this.state.key.value}:${this.state.exposure.value}`;
+  }
+
+  belongsToScope(scope: ConfigScopeValue): boolean {
+    return this.state.scope.equals(scope);
+  }
+
+  matchesVariable(input: {
+    key: ConfigKey;
+    exposure: VariableExposureValue;
+    scope?: ConfigScopeValue;
+  }): boolean {
+    return (
+      this.state.key.equals(input.key) &&
+      this.state.exposure.equals(input.exposure) &&
+      (input.scope ? this.belongsToScope(input.scope) : true)
+    );
+  }
+
+  comparePrecedenceTo(other: EnvironmentConfigEntry): number {
+    return precedenceIndex(this.state.scope) - precedenceIndex(other.state.scope);
+  }
+
+  toSnapshotEntry(): EnvironmentConfigSnapshotEntry {
+    return EnvironmentConfigSnapshotEntry.rehydrate({
+      key: this.state.key,
+      value: this.state.value,
+      kind: this.state.kind,
+      exposure: this.state.exposure,
+      scope: this.state.scope,
+      isSecret: this.state.isSecret,
+    });
+  }
+
   toState(): EnvironmentConfigEntryState {
     return { ...this.state };
   }
@@ -178,6 +203,18 @@ export class EnvironmentConfigSnapshotEntry extends ValueObject<EnvironmentConfi
     return this.state.isSecret;
   }
 
+  variableIdentity(): string {
+    return `${this.state.key.value}:${this.state.exposure.value}`;
+  }
+
+  hasSameSnapshotValueAs(other: EnvironmentConfigSnapshotEntry): boolean {
+    return (
+      this.state.value.equals(other.state.value) &&
+      this.state.scope.equals(other.state.scope) &&
+      this.state.isSecret === other.state.isSecret
+    );
+  }
+
   toState(): EnvironmentConfigSnapshotEntryState {
     return { ...this.state };
   }
@@ -202,6 +239,10 @@ export class EnvironmentConfigSnapshot extends ValueObject<EnvironmentConfigSnap
 
   get id(): string {
     return this.state.id.value;
+  }
+
+  get snapshotId(): EnvironmentSnapshotId {
+    return this.state.id;
   }
 
   get environmentId(): string {
@@ -291,11 +332,11 @@ export class EnvironmentConfigSet {
       isSecret: input.isSecret ?? false,
       updatedAt: input.updatedAt,
     }).map((nextEntry) => {
-      const identity = variableIdentity(nextEntry.toState());
-      const existingIndex = this.entries.findIndex((variable) => {
-        const state = variable.toState();
-        return variableIdentity(state) === identity && state.scope.equals(scope);
-      });
+      const existingIndex = this.entries.findIndex(
+        (variable) =>
+          variable.variableIdentity() === nextEntry.variableIdentity() &&
+          variable.belongsToScope(scope),
+      );
 
       if (existingIndex >= 0) {
         this.entries.splice(existingIndex, 1, nextEntry);
@@ -313,14 +354,13 @@ export class EnvironmentConfigSet {
     scope?: ConfigScopeValue;
   }): Result<void> {
     const scope = input.scope ?? ConfigScopeValue.rehydrate("environment");
-    const existingIndex = this.entries.findIndex((variable) => {
-      const state = variable.toState();
-      return (
-        state.key.equals(input.key) &&
-        state.exposure.equals(input.exposure) &&
-        state.scope.equals(scope)
-      );
-    });
+    const existingIndex = this.entries.findIndex((variable) =>
+      variable.matchesVariable({
+        key: input.key,
+        exposure: input.exposure,
+        scope,
+      }),
+    );
 
     if (existingIndex < 0) {
       return err(domainError.notFound("environment_variable", `${input.key.value}:${scope.value}`));
@@ -340,22 +380,11 @@ export class EnvironmentConfigSet {
 
     for (const inherited of input.inherited ?? []) {
       const entry = normalizeSnapshotEntry(inherited);
-      merged.set(snapshotIdentity(entry.toState()), entry);
+      merged.set(entry.variableIdentity(), entry);
     }
 
     for (const variable of [...this.entries].sort(compareByPrecedence)) {
-      const state = variable.toState();
-      merged.set(
-        snapshotIdentity(state),
-        EnvironmentConfigSnapshotEntry.rehydrate({
-          key: state.key,
-          value: state.value,
-          kind: state.kind,
-          exposure: state.exposure,
-          scope: state.scope,
-          isSecret: state.isSecret,
-        }),
-      );
+      merged.set(variable.variableIdentity(), variable.toSnapshotEntry());
     }
 
     return EnvironmentConfigSnapshot.rehydrate({
@@ -394,7 +423,7 @@ export class EnvironmentConfigSet {
       })
         .toState()
         .variables.map((variable) => [
-          snapshotIdentity(variable),
+          EnvironmentConfigSnapshotEntry.rehydrate(variable).variableIdentity(),
           EnvironmentConfigSnapshotEntry.rehydrate(variable),
         ]),
     );
@@ -402,7 +431,7 @@ export class EnvironmentConfigSet {
       other
         .toState()
         .variables.map((variable) => [
-          snapshotIdentity(variable),
+          EnvironmentConfigSnapshotEntry.rehydrate(variable).variableIdentity(),
           EnvironmentConfigSnapshotEntry.rehydrate(variable),
         ]),
     );
@@ -439,16 +468,10 @@ export class EnvironmentConfigSet {
       }
 
       const leftState = leftVariable.toState();
-      const rightState = rightVariable.toState();
       diff.push({
         key: leftState.key,
         exposure: leftState.exposure,
-        change:
-          leftState.value.equals(rightState.value) &&
-          leftState.scope.equals(rightState.scope) &&
-          leftState.isSecret === rightState.isSecret
-            ? "unchanged"
-            : "changed",
+        change: leftVariable.hasSameSnapshotValueAs(rightVariable) ? "unchanged" : "changed",
         left: leftVariable,
         right: rightVariable,
       });

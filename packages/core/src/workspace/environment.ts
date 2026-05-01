@@ -450,6 +450,18 @@ export class Environment extends AggregateRoot<EnvironmentState> {
     return this.ensureCanAcceptMutation("deployments.create");
   }
 
+  get id(): EnvironmentId {
+    return this.state.id;
+  }
+
+  get projectId(): ProjectId {
+    return this.state.projectId;
+  }
+
+  belongsToProject(projectId: ProjectId): boolean {
+    return this.state.projectId.equals(projectId);
+  }
+
   private ensureCanAcceptMutation(commandName: string): Result<void> {
     if (this.state.lifecycleStatus.isActive()) {
       return ok(undefined);

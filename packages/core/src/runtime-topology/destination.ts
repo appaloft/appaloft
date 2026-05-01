@@ -56,6 +56,18 @@ export class Destination extends AggregateRoot<DestinationState> {
     return visitor.visitDestination(this, context);
   }
 
+  get id(): DestinationId {
+    return this.state.id;
+  }
+
+  get serverId(): DeploymentTargetId {
+    return this.state.serverId;
+  }
+
+  belongsToServer(serverId: DeploymentTargetId): boolean {
+    return this.state.serverId.equals(serverId);
+  }
+
   toState(): DestinationState {
     return { ...this.state };
   }

@@ -35,6 +35,17 @@ export const domainBindingStatuses = [
 
 export type DomainBindingStatus = (typeof domainBindingStatuses)[number];
 
+function optionalValueObjectEquals<TValue extends { equals(other: TValue): boolean }>(
+  left: TValue | undefined,
+  right: TValue | undefined,
+): boolean {
+  if (!left || !right) {
+    return !left && !right;
+  }
+
+  return left.equals(right);
+}
+
 export const domainVerificationAttemptStatuses = [
   "requested",
   "pending",
@@ -114,12 +125,63 @@ export class DomainBindingStatusValue extends ScalarValueObject<DomainBindingSta
     return new DomainBindingStatusValue("pending_verification");
   }
 
+  allowsCertificateIssue(): boolean {
+    return this.value === "bound" || this.value === "certificate_pending" || this.value === "ready";
+  }
+
+  allowsCertificateImport(): boolean {
+    return this.value === "bound" || this.value === "ready" || this.value === "not_ready";
+  }
+
+  allowsCertificateReadiness(): boolean {
+    return this.value === "bound" || this.value === "certificate_pending";
+  }
+
+  allowsRouteReadiness(): boolean {
+    return (
+      this.value === "bound" || this.value === "certificate_pending" || this.value === "not_ready"
+    );
+  }
+
+  allowsReadyMarking(): boolean {
+    return this.allowsRouteReadiness();
+  }
+
+  allowsRouteFailureRecording(): boolean {
+    return (
+      this.value === "bound" ||
+      this.value === "certificate_pending" ||
+      this.value === "ready" ||
+      this.value === "not_ready"
+    );
+  }
+
+  allowsVerificationRetry(): boolean {
+    return this.value === "pending_verification" || this.value === "not_ready";
+  }
+
   isActive(): boolean {
     return this.value !== "failed" && this.value !== "deleted";
   }
 
+  isBound(): boolean {
+    return this.value === "bound";
+  }
+
   isDeleted(): boolean {
     return this.value === "deleted";
+  }
+
+  isReady(): boolean {
+    return this.value === "ready";
+  }
+
+  isNotReady(): boolean {
+    return this.value === "not_ready";
+  }
+
+  isPendingVerification(): boolean {
+    return this.value === "pending_verification";
   }
 }
 
@@ -149,6 +211,14 @@ export class DomainVerificationAttemptStatusValue extends ScalarValueObject<Doma
   static pending(): DomainVerificationAttemptStatusValue {
     return new DomainVerificationAttemptStatusValue("pending");
   }
+
+  isPending(): boolean {
+    return this.value === "pending";
+  }
+
+  isVerified(): boolean {
+    return this.value === "verified";
+  }
 }
 
 const domainVerificationMethodBrand: unique symbol = Symbol("DomainVerificationMethodValue");
@@ -174,6 +244,10 @@ export class DomainVerificationMethodValue extends ScalarValueObject<DomainVerif
 
   static manual(): DomainVerificationMethodValue {
     return new DomainVerificationMethodValue("manual");
+  }
+
+  isManual(): boolean {
+    return this.value === "manual";
   }
 }
 
@@ -225,7 +299,19 @@ export class CertificatePolicyValue extends ScalarValueObject<CertificatePolicy>
   }
 
   static defaultForTlsMode(tlsMode: TlsModeValue): CertificatePolicyValue {
-    return new CertificatePolicyValue(tlsMode.value === "disabled" ? "disabled" : "auto");
+    return new CertificatePolicyValue(tlsMode.isDisabled() ? "disabled" : "auto");
+  }
+
+  isDisabled(): boolean {
+    return this.value === "disabled";
+  }
+
+  isManual(): boolean {
+    return this.value === "manual";
+  }
+
+  requiresCertificateFor(tlsMode: TlsModeValue): boolean {
+    return !tlsMode.isDisabled() && !this.isDisabled();
   }
 }
 
@@ -326,6 +412,31 @@ export interface DomainBindingState {
   idempotencyKey?: IdempotencyKeyValue;
 }
 
+export interface DomainBindingCertificateIssueContext {
+  domainBindingId: DomainBindingId;
+  domainName: PublicDomainName;
+  tlsMode: TlsModeValue;
+  certificatePolicy: CertificatePolicyValue;
+}
+
+export interface DomainBindingCanonicalRedirectTargetInput {
+  redirectTo: PublicDomainName;
+  target?: DomainBinding | null;
+  phase?: string;
+}
+
+export type DomainBindingOwnershipConfirmationContext =
+  | {
+      kind: "pending";
+      verificationAttemptId: DomainVerificationAttemptId;
+      domainName: PublicDomainName;
+      expectedDnsTargets: MessageText[];
+    }
+  | {
+      kind: "already_confirmed";
+      verificationAttemptId: DomainVerificationAttemptId;
+    };
+
 export interface DomainBindingVisitor<TContext, TResult> {
   visitDomainBinding(domainBinding: DomainBinding, context: TContext): TResult;
 }
@@ -357,7 +468,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     correlationId?: string;
     causationId?: string;
   }): Result<DomainBinding> {
-    if (input.proxyKind.value === "none") {
+    if (input.proxyKind.isDisabled()) {
       return err(
         domainError.domainBindingProxyRequired({
           phase: "domain-binding-admission",
@@ -375,12 +486,13 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       );
     }
 
-    if (input.redirectTo && input.redirectTo.value === input.domainName.value) {
+    const redirectTo = input.redirectTo;
+    if (redirectTo?.equals(input.domainName)) {
       return err(
         domainError.validation("Domain binding canonical redirect cannot point to itself", {
           phase: "domain-binding-admission",
           domainName: input.domainName.value,
-          redirectTo: input.redirectTo.value,
+          redirectTo: redirectTo.value,
         }),
       );
     }
@@ -472,6 +584,125 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     });
   }
 
+  requiresCertificateForReadiness(): boolean {
+    return this.state.certificatePolicy.requiresCertificateFor(this.state.tlsMode);
+  }
+
+  resolveCertificateIssueContext(input?: {
+    phase?: string;
+  }): Result<DomainBindingCertificateIssueContext> {
+    if (!this.requiresCertificateForReadiness() || !this.state.status.allowsCertificateIssue()) {
+      return err(
+        domainError.certificateNotAllowed("Domain binding does not allow certificate issuance", {
+          phase: input?.phase ?? "certificate-admission",
+          domainBindingId: this.state.id.value,
+          tlsMode: this.state.tlsMode.value,
+          certificatePolicy: this.state.certificatePolicy.value,
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    return ok({
+      domainBindingId: this.state.id,
+      domainName: this.state.domainName,
+      tlsMode: this.state.tlsMode,
+      certificatePolicy: this.state.certificatePolicy,
+    });
+  }
+
+  resolveCertificateImportContext(input?: {
+    phase?: string;
+  }): Result<DomainBindingCertificateIssueContext> {
+    if (
+      this.state.tlsMode.isDisabled() ||
+      !this.state.certificatePolicy.isManual() ||
+      !this.state.status.allowsCertificateImport()
+    ) {
+      return err(
+        domainError.certificateImportNotAllowed(
+          "Domain binding does not allow manual certificate import",
+          {
+            phase: input?.phase ?? "certificate-admission",
+            domainBindingId: this.state.id.value,
+            tlsMode: this.state.tlsMode.value,
+            certificatePolicy: this.state.certificatePolicy.value,
+            relatedState: this.state.status.value,
+          },
+        ),
+      );
+    }
+
+    return ok({
+      domainBindingId: this.state.id,
+      domainName: this.state.domainName,
+      tlsMode: this.state.tlsMode,
+      certificatePolicy: this.state.certificatePolicy,
+    });
+  }
+
+  canBecomeReadyWhenDomainBound(): boolean {
+    return this.state.status.isBound() && !this.requiresCertificateForReadiness();
+  }
+
+  canBecomeReadyAfterCertificateIssued(): boolean {
+    return this.state.status.allowsCertificateReadiness() && this.requiresCertificateForReadiness();
+  }
+
+  canBecomeReadyAfterCertificateImported(): boolean {
+    return (
+      this.state.status.allowsCertificateReadiness() &&
+      this.state.certificatePolicy.isManual() &&
+      !this.state.tlsMode.isDisabled()
+    );
+  }
+
+  canBecomeReadyAfterRouteRealization(): boolean {
+    return this.state.status.allowsRouteReadiness() && !this.requiresCertificateForReadiness();
+  }
+
+  isReady(): boolean {
+    return this.state.status.isReady();
+  }
+
+  get id(): DomainBindingId {
+    return this.state.id;
+  }
+
+  get projectId(): ProjectId {
+    return this.state.projectId;
+  }
+
+  get environmentId(): EnvironmentId {
+    return this.state.environmentId;
+  }
+
+  get resourceId(): ResourceId {
+    return this.state.resourceId;
+  }
+
+  get pathPrefix(): RoutePathPrefix {
+    return this.state.pathPrefix;
+  }
+
+  canServeCanonicalRedirectTarget(): boolean {
+    return this.state.status.isActive() && !this.state.redirectTo;
+  }
+
+  ensureCanonicalRedirectTarget(input: DomainBindingCanonicalRedirectTargetInput): Result<void> {
+    if (!input.target?.canServeCanonicalRedirectTarget()) {
+      return err(
+        domainError.validation("Canonical redirect target must be an active served binding", {
+          phase: input.phase ?? "domain-binding-route-configuration",
+          domainBindingId: this.state.id.value,
+          redirectTo: input.redirectTo.value,
+        }),
+      );
+    }
+
+    return ok(undefined);
+  }
+
   recordDnsObservation(input: {
     status: DomainDnsObservationStatusValue;
     observedTargets?: MessageText[];
@@ -493,35 +724,93 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     return ok(undefined);
   }
 
+  resolveOwnershipConfirmationContext(input: {
+    verificationAttemptId?: DomainVerificationAttemptId;
+  }): Result<DomainBindingOwnershipConfirmationContext> {
+    const attemptIndex = this.findOwnershipConfirmationAttemptIndex(input.verificationAttemptId);
+
+    if (attemptIndex < 0) {
+      return err(
+        domainError.domainVerificationNotPending("No pending verification attempt exists", {
+          phase: "domain-verification",
+          domainBindingId: this.state.id.value,
+          ...(input.verificationAttemptId
+            ? { verificationAttemptId: input.verificationAttemptId.value }
+            : {}),
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    const attempt = this.state.verificationAttempts[attemptIndex];
+    if (!attempt) {
+      return err(
+        domainError.domainVerificationNotPending("No pending verification attempt exists", {
+          phase: "domain-verification",
+          domainBindingId: this.state.id.value,
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    if (attempt.status.isVerified() && this.state.status.isBound()) {
+      return ok({
+        kind: "already_confirmed",
+        verificationAttemptId: attempt.id,
+      });
+    }
+
+    if (!this.isPendingManualVerificationAttempt(attempt)) {
+      return err(
+        domainError.domainVerificationNotPending(
+          "Verification attempt is not pending confirmation",
+          {
+            phase: "domain-verification",
+            domainBindingId: this.state.id.value,
+            verificationAttemptId: attempt.id.value,
+            relatedState: attempt.status.value,
+          },
+        ),
+      );
+    }
+
+    if (!this.state.status.isPendingVerification()) {
+      return err(
+        domainError.invariant("Domain binding cannot be marked bound from its current state", {
+          phase: "domain-verification",
+          domainBindingId: this.state.id.value,
+          verificationAttemptId: attempt.id.value,
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    return ok({
+      kind: "pending",
+      verificationAttemptId: attempt.id,
+      domainName: this.state.domainName,
+      expectedDnsTargets: [...(this.state.dnsObservation?.expectedTargets ?? [])],
+    });
+  }
+
   confirmOwnership(input: {
     confirmedAt: CreatedAt;
     verificationAttemptId?: DomainVerificationAttemptId;
     correlationId?: string;
     causationId?: string;
   }): Result<{ verificationAttemptId: DomainVerificationAttemptId }> {
-    let existingAttemptIndex = -1;
-    const requestedAttemptId = input.verificationAttemptId;
-
-    if (requestedAttemptId) {
-      existingAttemptIndex = this.state.verificationAttempts.findIndex((attempt) =>
-        attempt.id.equals(requestedAttemptId),
-      );
-    } else {
-      for (let index = this.state.verificationAttempts.length - 1; index >= 0; index -= 1) {
-        const attempt = this.state.verificationAttempts[index];
-        if (attempt?.method.value === "manual" && attempt.status.value === "pending") {
-          existingAttemptIndex = index;
-          break;
-        }
-      }
-    }
+    const existingAttemptIndex = this.findOwnershipConfirmationAttemptIndex(
+      input.verificationAttemptId,
+    );
 
     if (existingAttemptIndex < 0) {
       return err(
         domainError.domainVerificationNotPending("No pending manual verification attempt exists", {
           phase: "domain-verification",
           domainBindingId: this.state.id.value,
-          ...(requestedAttemptId ? { verificationAttemptId: requestedAttemptId.value } : {}),
+          ...(input.verificationAttemptId
+            ? { verificationAttemptId: input.verificationAttemptId.value }
+            : {}),
           relatedState: this.state.status.value,
         }),
       );
@@ -538,11 +827,11 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       );
     }
 
-    if (attempt.status.value === "verified" && this.state.status.value === "bound") {
+    if (attempt.status.isVerified() && this.state.status.isBound()) {
       return ok({ verificationAttemptId: attempt.id });
     }
 
-    if (attempt.status.value !== "pending" || attempt.method.value !== "manual") {
+    if (!this.isPendingManualVerificationAttempt(attempt)) {
       return err(
         domainError.domainVerificationNotPending(
           "Verification attempt is not pending manual confirmation",
@@ -556,7 +845,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       );
     }
 
-    if (this.state.status.value !== "pending_verification") {
+    if (!this.state.status.isPendingVerification()) {
       return err(
         domainError.invariant("Domain binding cannot be marked bound from its current state", {
           phase: "domain-verification",
@@ -605,15 +894,11 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     correlationId?: string;
     causationId?: string;
   }): Result<void> {
-    if (this.state.status.value === "ready") {
+    if (this.state.status.isReady()) {
       return ok(undefined);
     }
 
-    if (
-      this.state.status.value !== "bound" &&
-      this.state.status.value !== "certificate_pending" &&
-      this.state.status.value !== "not_ready"
-    ) {
+    if (!this.state.status.allowsReadyMarking()) {
       return err(
         domainError.invariant("Domain binding cannot be marked ready from its current state", {
           phase: "domain-ready",
@@ -656,18 +941,13 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     correlationId?: string;
     causationId?: string;
   }): Result<void> {
-    if (
-      this.state.status.value !== "bound" &&
-      this.state.status.value !== "certificate_pending" &&
-      this.state.status.value !== "ready" &&
-      this.state.status.value !== "not_ready"
-    ) {
+    if (!this.state.status.allowsRouteFailureRecording()) {
       return ok(undefined);
     }
 
     const existingFailure = this.state.routeFailure;
     if (
-      this.state.status.value === "not_ready" &&
+      this.state.status.isNotReady() &&
       existingFailure?.deploymentId.equals(input.deploymentId) &&
       existingFailure.failurePhase.equals(input.failurePhase)
     ) {
@@ -726,13 +1006,14 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       );
     }
 
-    if (input.redirectTo && input.redirectTo.value === this.state.domainName.value) {
+    const redirectTo = input.redirectTo;
+    if (redirectTo?.equals(this.state.domainName)) {
       return err(
         domainError.validation("Domain binding canonical redirect cannot point to itself", {
           phase: "domain-binding-route-configuration",
           domainBindingId: this.state.id.value,
           domainName: this.state.domainName.value,
-          redirectTo: input.redirectTo.value,
+          redirectTo: redirectTo.value,
         }),
       );
     }
@@ -741,8 +1022,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       ? (input.redirectStatus ?? CanonicalRedirectStatusCode.rehydrate(308))
       : undefined;
     const changed =
-      this.state.redirectTo?.value !== input.redirectTo?.value ||
-      this.state.redirectStatus?.value !== nextRedirectStatus?.value;
+      !optionalValueObjectEquals(this.state.redirectTo, input.redirectTo) ||
+      !optionalValueObjectEquals(this.state.redirectStatus, nextRedirectStatus);
 
     if (!changed) {
       return ok({ changed: false });
@@ -792,10 +1073,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       return err(domainError.notFound("DomainBinding", this.state.id.value));
     }
 
-    if (
-      this.state.status.value !== "pending_verification" &&
-      this.state.status.value !== "not_ready"
-    ) {
+    if (!this.state.status.allowsVerificationRetry()) {
       return err(
         domainError.domainVerificationNotPending(
           "Domain binding verification can only be retried while ownership or route readiness is not ready",
@@ -897,5 +1175,28 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
           }
         : {}),
     };
+  }
+
+  private findOwnershipConfirmationAttemptIndex(
+    requestedAttemptId?: DomainVerificationAttemptId,
+  ): number {
+    if (requestedAttemptId) {
+      return this.state.verificationAttempts.findIndex((attempt) =>
+        attempt.id.equals(requestedAttemptId),
+      );
+    }
+
+    for (let index = this.state.verificationAttempts.length - 1; index >= 0; index -= 1) {
+      const attempt = this.state.verificationAttempts[index];
+      if (attempt && this.isPendingManualVerificationAttempt(attempt)) {
+        return index;
+      }
+    }
+
+    return -1;
+  }
+
+  private isPendingManualVerificationAttempt(attempt: DomainVerificationAttemptState): boolean {
+    return attempt.method.isManual() && attempt.status.isPending();
   }
 }

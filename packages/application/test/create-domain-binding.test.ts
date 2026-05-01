@@ -80,6 +80,9 @@ function domainBindingRequestedEvent(events: unknown[]): DomainEvent {
 }
 
 async function seedRoutingContext(input?: {
+  environmentProjectId?: string;
+  resourceEnvironmentId?: string;
+  resourceProjectId?: string;
   destinationServerId?: string;
   resourceDestinationId?: string;
 }) {
@@ -102,7 +105,7 @@ async function seedRoutingContext(input?: {
   })._unsafeUnwrap();
   const environment = Environment.create({
     id: EnvironmentId.rehydrate("env_demo"),
-    projectId: ProjectId.rehydrate("prj_demo"),
+    projectId: ProjectId.rehydrate(input?.environmentProjectId ?? "prj_demo"),
     name: EnvironmentName.rehydrate("production"),
     kind: EnvironmentKindValue.rehydrate("production"),
     createdAt: CreatedAt.rehydrate(clock.now()),
@@ -124,8 +127,8 @@ async function seedRoutingContext(input?: {
   })._unsafeUnwrap();
   const resource = Resource.create({
     id: ResourceId.rehydrate("res_demo"),
-    projectId: ProjectId.rehydrate("prj_demo"),
-    environmentId: EnvironmentId.rehydrate("env_demo"),
+    projectId: ProjectId.rehydrate(input?.resourceProjectId ?? "prj_demo"),
+    environmentId: EnvironmentId.rehydrate(input?.resourceEnvironmentId ?? "env_demo"),
     destinationId: DestinationId.rehydrate(input?.resourceDestinationId ?? "dst_demo"),
     name: ResourceName.rehydrate("web"),
     kind: ResourceKindValue.rehydrate("application"),
@@ -368,6 +371,56 @@ describe("CreateDomainBindingUseCase", () => {
       redirectTo: "example.com",
     });
     expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[DMBH-CONTEXT-002] rejects domain binding owner context mismatches", async () => {
+    const cases = [
+      {
+        name: "environment project",
+        seed: { environmentProjectId: "prj_other" },
+        detail: "environmentId",
+      },
+      {
+        name: "resource project",
+        seed: { resourceProjectId: "prj_other" },
+        detail: "resourceId",
+      },
+      {
+        name: "resource environment",
+        seed: { resourceEnvironmentId: "env_other" },
+        detail: "environmentId",
+      },
+      {
+        name: "resource destination",
+        seed: { resourceDestinationId: "dst_other" },
+        detail: "resourceDestinationId",
+      },
+      {
+        name: "destination server",
+        seed: { destinationServerId: "srv_other" },
+        detail: "destinationId",
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      const { context, eventBus, useCase } = await seedRoutingContext(testCase.seed);
+
+      const result = await useCase.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+        domainName: `${testCase.name.replaceAll(" ", "-")}.example.com`,
+        proxyKind: "traefik",
+      });
+
+      expect(result.isErr()).toBe(true);
+      expect(result._unsafeUnwrapErr().code).toBe("domain_binding_context_mismatch");
+      expect(result._unsafeUnwrapErr().details?.phase).toBe("context-resolution");
+      expect(result._unsafeUnwrapErr().details?.[testCase.detail]).toBeDefined();
+      expect(eventBus.events).toHaveLength(0);
+    }
   });
 
   test("rejects destination and server context mismatch", async () => {

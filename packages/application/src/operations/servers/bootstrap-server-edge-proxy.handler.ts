@@ -131,11 +131,11 @@ export class BootstrapServerEdgeProxyOnTargetRegisteredHandler
         return ok(undefined);
       }
 
-      const state = server.toState();
-      const edgeProxy = state.edgeProxy;
-      if (!edgeProxy || edgeProxy.kind.value === "none") {
+      const edgeProxyKind = server.selectEdgeProxyKindForBootstrapIntent();
+      if (!edgeProxyKind) {
         return ok(undefined);
       }
+      const edgeProxyProviderKey = edgeProxyKind.value;
 
       const attemptId = idGenerator.next("pxy");
       const attemptedAt = yield* UpdatedAt.create(clock.now());
@@ -152,7 +152,7 @@ export class BootstrapServerEdgeProxyOnTargetRegisteredHandler
         requestId: context.requestId,
         attemptId,
         serverId: serverId.value,
-        edgeProxyProviderKey: edgeProxy.kind.value,
+        edgeProxyProviderKey,
         status: "running",
         phase: "proxy-bootstrap",
         step: "starting",
@@ -179,7 +179,7 @@ export class BootstrapServerEdgeProxyOnTargetRegisteredHandler
           requestId: context.requestId,
           attemptId,
           serverId: serverId.value,
-          edgeProxyProviderKey: edgeProxy.kind.value,
+          edgeProxyProviderKey,
           status: "failed",
           phase: "proxy-bootstrap",
           step: "failed",
@@ -198,7 +198,7 @@ export class BootstrapServerEdgeProxyOnTargetRegisteredHandler
           requestId: context.requestId,
           attemptId,
           serverId: serverId.value,
-          edgeProxyProviderKey: edgeProxy.kind.value,
+          edgeProxyProviderKey,
           status: "succeeded",
           phase: "server-ready",
           step: "ready",
@@ -221,7 +221,7 @@ export class BootstrapServerEdgeProxyOnTargetRegisteredHandler
           requestId: context.requestId,
           attemptId,
           serverId: serverId.value,
-          edgeProxyProviderKey: edgeProxy.kind.value,
+          edgeProxyProviderKey,
           status: "failed",
           phase: "proxy-bootstrap",
           step: "failed",

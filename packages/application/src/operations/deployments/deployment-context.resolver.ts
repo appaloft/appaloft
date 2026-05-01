@@ -90,7 +90,7 @@ export class DeploymentContextResolver {
         if (explicitEnvironment) {
           const implicitProjectResult = await self.loadProject(
             repositoryContext,
-            explicitEnvironment.toState().projectId.value,
+            explicitEnvironment.projectId.value,
           );
           project = yield* implicitProjectResult;
         }
@@ -105,11 +105,11 @@ export class DeploymentContextResolver {
         return err(domainError.validation("environmentId is required for this deployment context"));
       }
 
-      if (!environment.toState().projectId.equals(project.toState().id)) {
+      if (!environment.belongsToProject(project.id)) {
         return err(
           domainError.validation("Environment does not belong to the selected project", {
-            environmentId: environment.toState().id.value,
-            projectId: project.toState().id.value,
+            environmentId: environment.id.value,
+            projectId: project.id.value,
           }),
         );
       }
@@ -120,20 +120,20 @@ export class DeploymentContextResolver {
         return err(domainError.validation("resourceId is required for this deployment context"));
       }
 
-      if (!resource.toState().projectId.equals(project.toState().id)) {
+      if (!resource.belongsToProject(project.id)) {
         return err(
           domainError.validation("Resource does not belong to the selected project", {
-            resourceId: resource.toState().id.value,
-            projectId: project.toState().id.value,
+            resourceId: resource.id.value,
+            projectId: project.id.value,
           }),
         );
       }
 
-      if (!resource.toState().environmentId.equals(environment.toState().id)) {
+      if (!resource.belongsToEnvironment(environment.id)) {
         return err(
           domainError.validation("Resource does not belong to the selected environment", {
-            resourceId: resource.toState().id.value,
-            environmentId: environment.toState().id.value,
+            resourceId: resource.id.value,
+            environmentId: environment.id.value,
           }),
         );
       }
@@ -151,21 +151,21 @@ export class DeploymentContextResolver {
         return err(domainError.validation("destinationId is required for this deployment context"));
       }
 
-      if (!destination.toState().serverId.equals(server.toState().id)) {
+      if (!destination.belongsToServer(server.id)) {
         return err(
           domainError.validation("Destination does not belong to the selected server", {
-            destinationId: destination.toState().id.value,
-            serverId: server.toState().id.value,
+            destinationId: destination.id.value,
+            serverId: server.id.value,
           }),
         );
       }
 
-      const resourceDestinationId = resource.toState().destinationId;
-      if (resourceDestinationId && !resourceDestinationId.equals(destination.toState().id)) {
+      const resourceDestinationId = resource.defaultDestinationId;
+      if (resourceDestinationId && !resource.canDeployToDestination(destination.id)) {
         return err(
           domainError.validation("Resource does not deploy to the selected destination", {
-            resourceId: resource.toState().id.value,
-            destinationId: destination.toState().id.value,
+            resourceId: resource.id.value,
+            destinationId: destination.id.value,
           }),
         );
       }

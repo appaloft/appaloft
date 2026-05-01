@@ -120,6 +120,11 @@ Then:
 | ROUTE-TLS-CMD-021 | integration | Configure domain binding route behavior | Active binding and optional served canonical target in the same owner/path scope | `ok({ id })` | None | `domain-binding-route-configured` when changed | Binding route behavior switches between serve and redirect without deployment/certificate side effects | No |
 | ROUTE-TLS-CMD-022 | integration | Delete domain binding safely | Binding has no active certificate blockers and exact id confirmation is supplied | `ok({ id })` | None | `domain-binding-deleted` | Binding becomes inactive/deleted; generated access, deployment snapshots, certificate history, and server-applied audit remain | No |
 | ROUTE-TLS-CMD-023 | integration | Retry ownership verification | Binding is pending verification or not ready after DNS/evidence changes | `ok({ id, verificationAttemptId })` | None | `domain-binding-verification-retried` | New verification attempt exists; old attempts remain historical; no certificate retry is dispatched | No |
+| DMBH-DOMAIN-001 | unit + integration | Domain binding owns certificate and ready gates | Binding status, TLS mode, and certificate policy vary across bound, certificate-pending, ready, not-ready, TLS-disabled, manual, auto, and disabled-policy cases | Certificate and ready callers ask `DomainBinding` intention methods | Same errors/events/state as the existing command/event rows | No new event | Public behavior unchanged; only behavior placement changes | No |
+| DMBH-DOMAIN-002 | unit + integration | Domain binding owns canonical redirect target and route admission value behavior | Served and redirect bindings are evaluated during route configuration; proxy kind and redirect values vary | Route configuration callers ask `DomainBinding` whether a target can serve redirects; the aggregate composes VO predicates/equality for proxy, self-redirect, and change detection | Same errors/events/state as `ROUTE-TLS-CMD-021` and redirect entry rows | No new event | Public behavior unchanged; only behavior placement changes | No |
+| DMBH-DOMAIN-003 | unit + integration | Domain binding owns ownership-confirmation attempt selection | Binding has explicit, latest pending, already verified, or non-pending verification attempts | Ownership confirmation callers ask `DomainBinding` for confirmation intent and DNS verification context | Same errors/events/state as `ROUTE-TLS-CMD-007`, `ROUTE-TLS-CMD-010`, and `ROUTE-TLS-CMD-016` | No new event | Public behavior unchanged; only behavior placement changes | No |
+| DMBH-CONTEXT-002 | unit + integration | Domain binding creation uses aggregate context ownership | Environment, resource, destination, and server context ids are resolved for binding creation | The use case asks `Environment`, `Resource`, and `Destination` ownership methods instead of peeling ids from aggregate state | Same errors/events/state as `ROUTE-TLS-CMD-006` | No new event | Public behavior unchanged; only behavior placement changes | No |
+| DMBH-CERT-001 | unit + integration | Certificate owns attempt worker selection | Certificate attempts are requested, issuing, issued, failed, retry-scheduled, or missing | Certificate-requested worker asks `Certificate` to claim or skip the attempt and to provide issue context | Same errors/events/state as `ROUTE-TLS-EVT-005`, `ROUTE-TLS-EVT-006`, `ROUTE-TLS-EVT-007`, and `ROUTE-TLS-EVT-010` | No new event | Public behavior unchanged; only behavior placement changes | No |
 
 ## Event Matrix
 
@@ -294,6 +299,16 @@ slice.
 
 Current tests cover `ROUTE-TLS-EVT-004`, `ROUTE-TLS-READMODEL-001`,
 `ROUTE-TLS-READMODEL-002`, `ROUTE-TLS-READMODEL-003`, and `ROUTE-TLS-ENTRY-012`.
+
+`DMBH-DOMAIN-001` is the domain-model hardening row for the no-behavior-change certificate
+admission and ready-gate refactor. It is bound to `packages/core/test/domain-binding.test.ts` and
+verified with `packages/application/test/confirm-domain-binding-ownership.test.ts`,
+`packages/application/test/issue-or-renew-certificate.test.ts`, and
+`packages/application/test/import-certificate.test.ts`.
+
+`DMBH-DOMAIN-002` is the domain-model hardening row for managed canonical redirect target behavior
+placement. It is bound to `packages/core/test/domain-binding.test.ts` and verified with
+`packages/application/test/domain-binding-lifecycle.test.ts`.
 
 Current tests also cover `ROUTE-TLS-CMD-011`, `ROUTE-TLS-CMD-012`,
 `ROUTE-TLS-CMD-013`, `ROUTE-TLS-CMD-014`, `ROUTE-TLS-CMD-015`,

@@ -158,6 +158,22 @@ export class CertificateAttemptStatusValue extends ScalarValueObject<Certificate
   isInFlight(): boolean {
     return this.value === "requested" || this.value === "issuing";
   }
+
+  isIssuing(): boolean {
+    return this.value === "issuing";
+  }
+
+  isIssued(): boolean {
+    return this.value === "issued";
+  }
+
+  isFailedOutcome(): boolean {
+    return this.value === "failed" || this.value === "retry_scheduled";
+  }
+
+  isTerminalForIssuanceWorker(): boolean {
+    return this.isIssued() || this.isFailedOutcome();
+  }
 }
 
 const certificateIssueReasonBrand: unique symbol = Symbol("CertificateIssueReasonValue");
@@ -179,6 +195,10 @@ export class CertificateIssueReasonValue extends ScalarValueObject<CertificateIs
 
   static rehydrate(value: CertificateIssueReason): CertificateIssueReasonValue {
     return new CertificateIssueReasonValue(value);
+  }
+
+  isRenewal(): boolean {
+    return this.value === "renew";
   }
 }
 
@@ -536,6 +556,21 @@ export interface CertificateAttemptState {
   materialFingerprint?: CertificateMaterialFingerprintValue;
 }
 
+export interface CertificateIssueAttemptContext {
+  certificateId: CertificateId;
+  domainBindingId: DomainBindingId;
+  domainName: PublicDomainName;
+  attemptId: CertificateAttemptId;
+  reason: CertificateIssueReasonValue;
+  providerKey: ProviderKey;
+  challengeType: CertificateChallengeTypeValue;
+  requestedAt: CreatedAt;
+}
+
+export type CertificateIssueAttemptClaim =
+  | { kind: "claimed"; context: CertificateIssueAttemptContext }
+  | { kind: "terminal" };
+
 export interface ImportedCertificateMetadataState {
   subjectAlternativeNames: PublicDomainName[];
   notBefore: CertificateNotBeforeValue;
@@ -724,10 +759,9 @@ export class Certificate extends AggregateRoot<CertificateState> {
       );
     }
 
-    this.state.status =
-      input.reason.value === "renew"
-        ? CertificateStatusValue.rehydrate("renewing")
-        : CertificateStatusValue.rehydrate("pending");
+    this.state.status = input.reason.isRenewal()
+      ? CertificateStatusValue.rehydrate("renewing")
+      : CertificateStatusValue.rehydrate("pending");
     this.state.providerKey = input.providerKey;
     this.state.challengeType = input.challengeType;
     this.state.attempts = [
@@ -767,7 +801,9 @@ export class Certificate extends AggregateRoot<CertificateState> {
     );
   }
 
-  markAttemptIssuing(input: { attemptId: CertificateAttemptId }): Result<{ terminal: boolean }> {
+  claimAttemptForIssuance(input: {
+    attemptId: CertificateAttemptId;
+  }): Result<CertificateIssueAttemptClaim> {
     const attemptIndex = this.findAttemptIndex(input.attemptId);
     if (attemptIndex < 0) {
       return err(domainError.notFound("Certificate attempt", input.attemptId.value));
@@ -778,28 +814,30 @@ export class Certificate extends AggregateRoot<CertificateState> {
       return err(domainError.invariant("Certificate attempt is missing after lookup"));
     }
 
-    if (
-      attempt.status.value === "issued" ||
-      attempt.status.value === "failed" ||
-      attempt.status.value === "retry_scheduled"
-    ) {
-      return ok({ terminal: true });
+    if (attempt.status.isTerminalForIssuanceWorker()) {
+      return ok({ kind: "terminal" });
     }
 
-    if (attempt.status.value === "issuing") {
-      return ok({ terminal: false });
+    const context = this.createIssueAttemptContext(attempt);
+    if (attempt.status.isIssuing()) {
+      return ok({ kind: "claimed", context });
     }
 
-    this.state.status =
-      attempt.reason.value === "renew"
-        ? CertificateStatusValue.rehydrate("renewing")
-        : CertificateStatusValue.rehydrate("issuing");
+    this.state.status = attempt.reason.isRenewal()
+      ? CertificateStatusValue.rehydrate("renewing")
+      : CertificateStatusValue.rehydrate("issuing");
     this.state.attempts = this.replaceAttempt(attemptIndex, {
       ...attempt,
       status: CertificateAttemptStatusValue.rehydrate("issuing"),
     });
 
-    return ok({ terminal: false });
+    return ok({ kind: "claimed", context });
+  }
+
+  markAttemptIssuing(input: { attemptId: CertificateAttemptId }): Result<{ terminal: boolean }> {
+    return this.claimAttemptForIssuance(input).map((claim) => ({
+      terminal: claim.kind === "terminal",
+    }));
   }
 
   markIssued(input: {
@@ -821,11 +859,11 @@ export class Certificate extends AggregateRoot<CertificateState> {
       return err(domainError.invariant("Certificate attempt is missing after lookup"));
     }
 
-    if (attempt.status.value === "issued") {
+    if (attempt.status.isIssued()) {
       return ok(undefined);
     }
 
-    if (attempt.status.value === "failed" || attempt.status.value === "retry_scheduled") {
+    if (attempt.status.isFailedOutcome()) {
       return err(
         domainError.invariant("Failed certificate attempt cannot be marked issued", {
           certificateId: this.state.id.value,
@@ -972,7 +1010,7 @@ export class Certificate extends AggregateRoot<CertificateState> {
       return err(domainError.invariant("Certificate attempt is missing after lookup"));
     }
 
-    if (attempt.status.value === "issued") {
+    if (attempt.status.isIssued()) {
       return err(
         domainError.invariant("Issued certificate attempt cannot be marked failed", {
           certificateId: this.state.id.value,
@@ -982,7 +1020,7 @@ export class Certificate extends AggregateRoot<CertificateState> {
       );
     }
 
-    if (attempt.status.value === "failed" || attempt.status.value === "retry_scheduled") {
+    if (attempt.status.isFailedOutcome()) {
       return ok(undefined);
     }
 
@@ -1098,6 +1136,21 @@ export class Certificate extends AggregateRoot<CertificateState> {
 
   private findAttemptIndex(attemptId: CertificateAttemptId): number {
     return this.state.attempts.findIndex((attempt) => attempt.id.equals(attemptId));
+  }
+
+  private createIssueAttemptContext(
+    attempt: CertificateAttemptState,
+  ): CertificateIssueAttemptContext {
+    return {
+      certificateId: this.state.id,
+      domainBindingId: this.state.domainBindingId,
+      domainName: this.state.domainName,
+      attemptId: attempt.id,
+      reason: attempt.reason,
+      providerKey: attempt.providerKey,
+      challengeType: attempt.challengeType,
+      requestedAt: attempt.requestedAt,
+    };
   }
 
   private replaceAttempt(

@@ -35,13 +35,13 @@ export class ResourceBinding extends AggregateRoot<ResourceBindingState> {
   }
 
   static create(input: ResourceBindingState): Result<ResourceBinding> {
-    if (input.scope.value === "build-only" && input.injectionMode.value === "reference") {
+    const binding = new ResourceBinding(input);
+    if (!binding.canUseInjectionMode()) {
       return err(
         domainError.validation("Build-only resource bindings cannot use runtime references"),
       );
     }
 
-    const binding = new ResourceBinding(input);
     binding.recordDomainEvent("resource.binding_created", input.createdAt, {
       scope: input.scope.value,
       injectionMode: input.injectionMode.value,
@@ -58,6 +58,10 @@ export class ResourceBinding extends AggregateRoot<ResourceBindingState> {
     context: TContext,
   ): TResult {
     return visitor.visitResourceBinding(this, context);
+  }
+
+  canUseInjectionMode(): boolean {
+    return !this.state.scope.isBuildOnly() || !this.state.injectionMode.isRuntimeReference();
   }
 
   toState(): ResourceBindingState {

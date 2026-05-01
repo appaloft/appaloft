@@ -67,6 +67,7 @@ This matrix inherits:
 | SOURCE-LINK-STATE-009 | integration | Relink idempotent same target | Existing link already matches requested target ids | Command returns ok with existing mapping | None | No duplicate link or audit event beyond idempotent record policy |
 | SOURCE-LINK-STATE-010 | integration | Relink optimistic guard conflict | Command includes `expectedCurrentResourceId`, but current link points elsewhere | Command rejects without mutation | `source_link_conflict`, phase `source-link-resolution` | Existing link unchanged |
 | SOURCE-LINK-STATE-011 | integration | Relink validates context | Target resource does not belong to target project/environment or destination does not belong to target server | Command rejects without mutation | `source_link_context_mismatch`, phase `source-link-admission` | Existing link unchanged |
+| DMBH-CONTEXT-001 | unit + integration | Relink context ownership is model-owned | Relink validates environment/project, resource/project/environment, destination/server, and resource/destination relationships | Existing relink context mismatch behavior remains unchanged | Existing errors remain unchanged | Core tests prove ownership predicates; relink application tests prove unchanged admission behavior |
 | SOURCE-LINK-STATE-012 | integration | Relink uses source-link coordination | Another relink or source-link mutation currently owns the same source fingerprint while a different source fingerprint exists on the same state backend | Command may wait for a bounded retry window on the same logical source-link scope, then fails with retriable coordination timeout if it still cannot acquire it; unrelated source fingerprints must not be blocked only because they share a server or state root | `coordination_timeout`, phase `operation-coordination` when the same source-link scope cannot be acquired within the retry window |
 | SOURCE-LINK-STATE-012A | integration | SSH final upload merges disjoint source-link state changes | `ssh-pglite` relink runs against a local mirror and another command advances the remote revision with disjoint authoritative rows | Relink still completes after final upload retries against the fresher remote snapshot | None | Updated source link and unrelated remote rows both remain present |
 
@@ -105,6 +106,10 @@ Current implementation has application command and CLI dispatch coverage for `so
 in `packages/application/test/relink-source-link.test.ts` and
 `packages/adapters/cli/test/source-link-command.test.ts`. Shell startup plans the same SSH remote
 PGlite mirror for relink in `apps/shell/test/remote-pglite-state-sync.test.ts`.
+
+`DMBH-CONTEXT-001` is covered by `packages/core/test/context-ownership.test.ts` for
+Environment/Resource/Destination ownership predicates and by
+`packages/application/test/relink-source-link.test.ts` for unchanged relink context validation.
 
 `SOURCE-LINK-STATE-012A` currently relies on the shared shell-level SSH mirror coverage in
 `apps/shell/test/remote-pglite-state-sync.test.ts`; a relink-specific overlapping fixture remains

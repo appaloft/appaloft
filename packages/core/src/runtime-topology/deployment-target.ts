@@ -61,6 +61,16 @@ export interface DeploymentTargetState {
   createdAt: CreatedAt;
 }
 
+export type DeploymentTargetEdgeProxyRouteSelection =
+  | {
+      kind: "enabled";
+      proxyKind: EdgeProxyKindValue;
+    }
+  | {
+      kind: "disabled";
+      reason: "edge-proxy-missing" | "edge-proxy-disabled";
+    };
+
 export type DeploymentTargetRehydrateState = Omit<
   DeploymentTargetState,
   "deactivatedAt" | "deletedAt" | "deactivationReason" | "lifecycleStatus"
@@ -281,6 +291,60 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     return ok(undefined);
   }
 
+  selectEdgeProxyKindForGeneratedRoutes(): EdgeProxyKindValue | undefined {
+    const selection = this.resolveEdgeProxyForGeneratedRoutes();
+
+    return selection.kind === "enabled" ? selection.proxyKind : undefined;
+  }
+
+  resolveEdgeProxyForGeneratedRoutes(): DeploymentTargetEdgeProxyRouteSelection {
+    const edgeProxy = this.state.edgeProxy;
+
+    if (!edgeProxy) {
+      return {
+        kind: "disabled",
+        reason: "edge-proxy-missing",
+      };
+    }
+
+    if (!edgeProxy.status.canSelectProvider(edgeProxy.kind)) {
+      return {
+        kind: "disabled",
+        reason: "edge-proxy-disabled",
+      };
+    }
+
+    return {
+      kind: "enabled",
+      proxyKind: edgeProxy.kind,
+    };
+  }
+
+  selectEdgeProxyKindForBootstrapIntent(): EdgeProxyKindValue | undefined {
+    const edgeProxy = this.state.edgeProxy;
+
+    return edgeProxy?.kind.isProviderBacked() ? edgeProxy.kind : undefined;
+  }
+
+  requireEdgeProxyKindForBootstrap(input?: {
+    phase?: string;
+    commandName?: string;
+  }): Result<EdgeProxyKindValue> {
+    const edgeProxy = this.state.edgeProxy;
+
+    if (!edgeProxy?.status.canSelectProvider(edgeProxy.kind)) {
+      return err(
+        domainError.invariant("Server edge proxy is disabled", {
+          serverId: this.state.id.value,
+          phase: input?.phase ?? "proxy-bootstrap",
+          ...(input?.commandName ? { commandName: input.commandName } : {}),
+        }),
+      );
+    }
+
+    return ok(edgeProxy.kind);
+  }
+
   beginEdgeProxyBootstrap(input: { attemptedAt: UpdatedAt }): Result<void> {
     const lifecycleGuard = this.ensureCanAcceptNewWork("servers.bootstrap-proxy");
     if (lifecycleGuard.isErr()) {
@@ -376,6 +440,10 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     context: TContext,
   ): TResult {
     return visitor.visitDeploymentTarget(this, context);
+  }
+
+  get id(): DeploymentTargetId {
+    return this.state.id;
   }
 
   toState(): DeploymentTargetState {
