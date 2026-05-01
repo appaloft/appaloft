@@ -54,6 +54,17 @@ dispatching explicit operations. The final deployment write remains `deployments
 - aggregate root mutations are domain operations, not generic updates; public commands must use
   intention-revealing names governed by
   [ADR-026: Aggregate Mutation Command Boundary](./decisions/ADR-026-aggregate-mutation-command-boundary.md)
+- domain behavior must live on the object that owns the rule. Value-object-only rules belong on the
+  value object; rules that coordinate multiple value objects owned by one entity belong on the
+  entity; rules that coordinate owned entities/value objects inside one consistency boundary belong
+  on the aggregate root. Domain services may coordinate across aggregate roots, but must not peel
+  one object's state and reimplement that object's own policy.
+- `toState()` is a serialization boundary tool. It is allowed for persistence, read-model mapping,
+  adapter/runtime rendering, DTO/schema translation, fixtures, and assertions. Domain behavior,
+  application services, domain services, providers, and helpers should ask intention-revealing
+  methods such as `requiresInternalPort()`, `canAcceptNewWork(...)`, `canUseGeneratedAccessRoutes()`,
+  or `canMarkReadyFrom...(...)` instead of branching on `.toState().x.value` or `.value === ...`
+  when the answer belongs to the domain object.
 
 ## Aggregate Mutation Command Boundary
 
@@ -84,6 +95,49 @@ Repository methods, persistence adapters, read-model projectors, and migrations 
 terms such as update/upsert internally. Those technical verbs must not leak into business operation
 keys, command names, domain events, Web/API/CLI entrypoints, future MCP tools, or aggregate method
 names.
+
+## Domain Behavior Placement
+
+No-behavior-change refactors that harden the model are governed by
+[Domain Model Behavior Hardening](./specs/022-domain-model-behavior-hardening/spec.md).
+
+When existing code needs to answer a business question, start from the ubiquitous language and the
+owning object rather than from a search for primitive state reads. For example:
+
+- a `Resource` should answer whether it needs an internal listener port, whether its source binding
+  can be enriched from source inspection, and how its profile contributes to deployment admission;
+- a `DeploymentTarget` should answer whether its edge proxy can participate in generated or
+  server-applied route planning and whether it can be selected for proxy bootstrap/repair;
+- a `DomainBinding` should answer whether ownership, route, and certificate readiness transitions
+  apply, including certificate issue/import admission and whether a domain-bound, certificate, or
+  route realization event may make the binding ready. It should also answer whether it can serve
+  as the target of a managed canonical redirect alias;
+- `EnvironmentConfigSet` and its entries should answer identity, scope matching, precedence,
+  effective snapshot, and snapshot diff questions;
+- a `Deployment` should answer execution-continuation and supersede-related status questions;
+- `Workload` and `RuntimeSpec` should answer workload/runtime compatibility questions.
+  `RuntimeSpec` owns single-runtime requirements such as whether a web-server runtime needs a
+  port; `Workload` owns compatibility across its workload kind and owned runtime spec.
+- `Environment`, `Resource`, and `Destination` should answer deployment context ownership
+  questions such as whether an environment belongs to a project, whether a resource belongs to the
+  selected project/environment, and whether a destination belongs to a selected server.
+
+Remaining `toState()` usage must be classified as a boundary read or migrated behind
+intention-revealing methods during the relevant slice.
+
+Current boundary audit state:
+
+- allowed boundary reads remain in persistence repositories, repository mutation specs, read-model
+  and query DTO mapping, runtime adapters, transport/contract rendering, fixtures, and assertions;
+- low-risk `Deployment`/`RuntimePlan` state reads found during the audit were moved behind
+  intention methods;
+- remaining model-hardening hotspots are future slices, not part of a mechanical rewrite:
+  context ownership checks in deployment/source-link orchestration have been moved behind aggregate
+  behavior; domain-binding redirect target checks have been moved behind aggregate behavior;
+  certificate attempt selection has been moved behind certificate aggregate behavior;
+  identity-governance membership/seat calculations have been moved behind organization aggregate
+  behavior. No hotspot from the original model-hardening boundary audit remains open in this
+  artifact.
 
 ## Bounded Contexts
 
@@ -254,8 +308,13 @@ Boundary rule:
 - runtime command composition belongs to the runtime plan language as typed command specs. Rendered
   shell strings are adapter execution artifacts for local shell, SSH shell, or another executor,
   and must not become the domain object that workflow logic branches on.
+- runtime plan value objects own their own admission predicates: access routes ask edge proxy kind
+  whether domains are allowed/required, and artifact snapshots ask artifact kind/intent whether an
+  image reference or Compose file is required.
 - `ResourceNetworkProfile` owns the resource's internal workload endpoint: `internalPort`,
   upstream protocol, exposure mode, and target service selection
+- network exposure mode and health-check type value objects expose direct-port and HTTP predicates;
+  `Resource` composes those predicates for network and health admission
 - the generic user-facing label `port` must map to the domain field
   `ResourceNetworkProfile.internalPort` before dispatching a command
 - resource detail is the owner-scoped console surface for new deployment, deployment history,
@@ -442,6 +501,9 @@ Meaning:
 
 Rules:
 - names are unique within a project
+- environments answer whether they belong to a selected project context
+- `domain-bindings.create` and other cross-context commands must use the aggregate-owned
+  project membership question instead of re-reading environment state ids for policy decisions
 - snapshots are immutable
 - build-time variables must be explicitly public
 - lifecycle state is explicit; locked environments remain readable but reject new configuration
@@ -451,6 +513,8 @@ Rules:
 Current scope:
 - variables and snapshot logic are inside the aggregate
 - `EnvironmentConfigSet` is modeled as a value object used by `Environment`
+- configuration entries own key/exposure identity, scope matching, precedence comparison, and
+  snapshot equality; callers should not rebuild those comparisons from primitive entry state
 - `EnvironmentLifecycleStatus`, `LockedAt`, optional `LockReason`, `ArchivedAt`, and optional
   `ArchiveReason` are part of the aggregate state
 
@@ -477,6 +541,8 @@ Current scope:
   layer; provider SDK specifics remain outside the aggregate
 - owns current edge proxy intent/status summary for server readiness and proxy-backed deployment
   admission/read-model display
+- owns generated-route proxy selection and proxy bootstrap provider selection; application services
+  should call target behavior instead of branching on edge proxy kind/status primitives
 - changes to current edge proxy intent are deployment-target lifecycle mutations through
   `servers.configure-edge-proxy`; they must not change server identity, host, provider,
   credential, lifecycle state, historical deployment/domain/route/audit references, or
@@ -496,6 +562,9 @@ Meaning:
 
 Rules:
 - belongs to exactly one deployment target/server
+- destinations answer whether they belong to a selected deployment target/server context
+- `domain-bindings.create` must use the destination-owned server membership question when
+  validating binding placement
 - names are unique within a target
 - deployments reference the selected destination as well as the selected target
 
@@ -518,8 +587,14 @@ Rules:
 - owner scope is governed by ADR-005: project, environment, resource, destination, server, domain,
   path prefix, proxy kind, TLS mode, and certificate policy are explicit
 - active bindings must be unique by normalized project/environment/resource/domain/path scope
+- binding creation uses `Environment`, `Resource`, and `Destination` ownership behavior for
+  context admission before creating the durable binding
 - a binding may be a managed canonical redirect alias when `redirectTo` references an existing
   served binding in the same owner/path scope; redirect aliases still own their source hostname
+- bindings answer whether they can serve as a managed canonical redirect target; redirect aliases
+  cannot serve as redirect targets for other bindings
+- binding route admission uses edge-proxy kind predicates and value-object equality for redirect
+  target/self-target/change detection
 - durable bindings require an edge proxy kind; `none` is only valid for deployment runtime
   access-route hints
 - command success means the request is accepted and pending verification, not traffic readiness
@@ -531,7 +606,18 @@ Current scope:
 - publishes `domain-binding-requested`
 - records pending verification state and first manual verification attempt
 - records optional canonical redirect target/status metadata for redirect-only route realization
-- DNS verification, certificate issuance, and domain-ready transitions remain future workflow work
+- owns certificate issue/import admission and certificate-required readiness gates
+- owns whether domain-bound, certificate-issued/imported, and route realization events may mark the
+  binding ready; application handlers coordinate repositories/events and call aggregate behavior
+- binding status value owns lifecycle gates for ready marking, route-failure recording, and
+  verification retry eligibility
+- owns ownership-confirmation attempt selection, idempotent already-bound confirmation, and the DNS
+  verification context prepared from its current verification attempts and DNS observation
+- `Certificate` owns certificate attempt worker selection, including missing/terminal attempt
+  handling and the provider issue context prepared from the selected attempt
+- DNS verification, certificate issuance/import, route failure, and domain-ready transitions are
+  implemented through explicit command/event workflows while the binding remains the owner of its
+  own lifecycle predicates
 
 ### SSH Credential
 
@@ -560,6 +646,8 @@ Meaning:
 Rules:
 - workload kind, build spec, and runtime spec must remain compatible
 - static sites cannot declare worker runtimes
+- static-site workloads must declare static-site runtimes, worker workloads must not declare
+  web-server runtimes, and web-server runtimes must declare their listener port
 
 Current scope:
 - foundational aggregate in `core`
@@ -576,11 +664,16 @@ Meaning:
 
 Rules:
 - names are unique within a project environment
-- compose-stack resources may contain multiple named services
+- compose-stack resources may contain multiple named services; `ResourceKindValue` answers whether
+  multiple services are allowed and `Resource` owns the admission error
 - a resource may point at a default destination
+- resources answer whether they belong to a selected project/environment context and whether a
+  selected destination is compatible with their default destination placement
 - deployments belong to a resource, not directly to a raw source locator
 - inbound application resources must have a resource-owned network endpoint before deployment
   admission can resolve reverse-proxy upstream targets
+- resource kind and service kind value objects own whether inbound traffic requires an internal
+  listener port
 - `internalPort` means the workload listener inside the runtime environment or container network;
   it is not the server host-published port
 - reverse-proxy resources may share the same `internalPort` on one deployment target because the
@@ -627,6 +720,8 @@ Current scope:
 - belongs to exactly one `Resource`
 - carries both `destinationId` and `serverId`; `serverId` remains in persisted shape for transport
   compatibility and efficient target lookup
+- owns execution-continuation and supersede runtime-cancellation questions; application guards and
+  deployment use cases should ask `Deployment` instead of branching on raw deployment status values
 
 ### ResourceBinding
 
@@ -636,6 +731,8 @@ Meaning:
 Rules:
 - binding scope and injection mode must remain coherent
 - build-only bindings must not leak runtime references
+- scope and injection mode value objects answer single-value predicates, while `ResourceBinding`
+  owns the cross-VO coherence rule
 
 Current scope:
 - foundational aggregate in `core`
@@ -662,6 +759,8 @@ Meaning:
 Rules:
 - at least one owner must exist at creation time
 - plan changes cannot invalidate the current member count
+- membership identity is owned by `OrganizationMember`; seat capacity is owned by
+  `OrganizationPlan`; `Organization` coordinates those rules across its owned members and plan
 
 Current scope:
 - foundational aggregate in `core`

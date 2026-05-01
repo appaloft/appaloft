@@ -81,24 +81,16 @@ export class MarkDomainReadyOnCertificateIssuedHandler
         return ok(undefined);
       }
 
-      const state = domainBinding.toState();
-      if (state.status.value === "ready") {
+      if (domainBinding.isReady()) {
         return ok(undefined);
       }
 
-      if (state.status.value !== "bound" && state.status.value !== "certificate_pending") {
+      if (!domainBinding.canBecomeReadyAfterCertificateIssued()) {
+        const state = domainBinding.toState();
         logger.debug("certificate_domain_ready.skipped_not_bound", {
           requestId: context.requestId,
           domainBindingId: domainBindingId.value,
           status: state.status.value,
-        });
-        return ok(undefined);
-      }
-
-      if (state.tlsMode.value === "disabled" || state.certificatePolicy.value === "disabled") {
-        logger.debug("certificate_domain_ready.skipped_certificate_not_required", {
-          requestId: context.requestId,
-          domainBindingId: domainBindingId.value,
           tlsMode: state.tlsMode.value,
           certificatePolicy: state.certificatePolicy.value,
         });

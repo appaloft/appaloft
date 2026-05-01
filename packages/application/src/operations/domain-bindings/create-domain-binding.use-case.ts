@@ -156,7 +156,7 @@ export class CreateDomainBindingUseCase {
       if (!environment) {
         return err(domainError.notFound("Environment", environmentId.value));
       }
-      if (!environment.toState().projectId.equals(projectId)) {
+      if (!environment.belongsToProject(projectId)) {
         return contextMismatch("Environment does not belong to project", {
           projectId: projectId.value,
           environmentId: environmentId.value,
@@ -170,24 +170,23 @@ export class CreateDomainBindingUseCase {
       if (!resource) {
         return err(domainError.notFound("Resource", resourceId.value));
       }
-      const resourceState = resource.toState();
-      if (!resourceState.projectId.equals(projectId)) {
+      if (!resource.belongsToProject(projectId)) {
         return contextMismatch("Resource does not belong to project", {
           projectId: projectId.value,
           resourceId: resourceId.value,
         });
       }
-      if (!resourceState.environmentId.equals(environmentId)) {
+      if (!resource.belongsToEnvironment(environmentId)) {
         return contextMismatch("Resource does not belong to environment", {
           environmentId: environmentId.value,
           resourceId: resourceId.value,
         });
       }
-      if (resourceState.destinationId && !resourceState.destinationId.equals(destinationId)) {
+      if (!resource.canDeployToDestination(destinationId)) {
         return contextMismatch("Resource default destination does not match binding destination", {
           resourceId: resourceId.value,
           destinationId: destinationId.value,
-          resourceDestinationId: resourceState.destinationId.value,
+          resourceDestinationId: resource.defaultDestinationId?.value ?? "",
         });
       }
 
@@ -207,7 +206,7 @@ export class CreateDomainBindingUseCase {
       if (!destination) {
         return err(domainError.notFound("Destination", destinationId.value));
       }
-      if (!destination.toState().serverId.equals(serverId)) {
+      if (!destination.belongsToServer(serverId)) {
         return contextMismatch("Destination does not belong to server", {
           serverId: serverId.value,
           destinationId: destinationId.value,
@@ -259,8 +258,7 @@ export class CreateDomainBindingUseCase {
           );
         }
 
-        const redirectTargetState = redirectTarget.toState();
-        if (redirectTargetState.redirectTo) {
+        if (!redirectTarget.canServeCanonicalRedirectTarget()) {
           return err(
             domainError.validation(
               "Canonical redirect target must be a served domain binding, not another redirect",

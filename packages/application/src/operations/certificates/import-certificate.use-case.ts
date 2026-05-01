@@ -189,29 +189,13 @@ export class ImportCertificateUseCase {
         return err(notFoundInCertificateContext("Domain binding", domainBindingId.value));
       }
 
+      const certificateContext = yield* domainBinding.resolveCertificateImportContext({
+        phase: "certificate-admission",
+      });
       const domainBindingState = domainBinding.toState();
-      const allowedBindingStates = ["bound", "ready", "not_ready"];
-      if (
-        domainBindingState.tlsMode.value === "disabled" ||
-        domainBindingState.certificatePolicy.value !== "manual" ||
-        !allowedBindingStates.includes(domainBindingState.status.value)
-      ) {
-        return err(
-          domainError.certificateImportNotAllowed(
-            "Domain binding does not allow manual certificate import",
-            {
-              phase: "certificate-admission",
-              domainBindingId: domainBindingId.value,
-              tlsMode: domainBindingState.tlsMode.value,
-              certificatePolicy: domainBindingState.certificatePolicy.value,
-              relatedState: domainBindingState.status.value,
-            },
-          ),
-        );
-      }
 
       const validation = yield* await certificateMaterialValidator.validateImported(context, {
-        domainName: domainBindingState.domainName.value,
+        domainName: certificateContext.domainName.value,
         certificateChain: input.certificateChain,
         privateKey: input.privateKey,
         ...(input.passphrase ? { passphrase: input.passphrase } : {}),

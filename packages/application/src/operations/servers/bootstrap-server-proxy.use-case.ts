@@ -241,19 +241,11 @@ export class BootstrapServerProxyUseCase {
         return err(domainError.notFound("server", input.serverId));
       }
 
-      const state = server.toState();
-      const edgeProxy = state.edgeProxy;
-
-      if (!edgeProxy || edgeProxy.kind.value === "none" || edgeProxy.status.value === "disabled") {
-        return err(
-          domainError.invariant("Server edge proxy is disabled", {
-            serverId: input.serverId,
-            phase: "proxy-bootstrap",
-          }),
-        );
-      }
-
-      const edgeProxyProviderKey = edgeProxy.kind.value;
+      const edgeProxyKind = yield* server.requireEdgeProxyKindForBootstrap({
+        phase: "proxy-bootstrap",
+        commandName: "servers.bootstrap-proxy",
+      });
+      const edgeProxyProviderKey = edgeProxyKind.value;
 
       if (input.edgeProxyProviderKey && input.edgeProxyProviderKey !== edgeProxyProviderKey) {
         return err(
@@ -273,6 +265,7 @@ export class BootstrapServerProxyUseCase {
       const attemptedAt = yield* UpdatedAt.create(clock.now());
 
       yield* server.beginEdgeProxyBootstrap({ attemptedAt });
+      const state = server.toState();
       await serverRepository.upsert(
         repositoryContext,
         server,

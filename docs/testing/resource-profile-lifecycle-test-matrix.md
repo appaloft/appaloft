@@ -72,6 +72,7 @@ generic `resources.update`.
 | RES-PROFILE-NETWORK-004 | `resources.configure-network` | Command use case | `direct-port` requested without implemented placement guards. | Rejects before persistence. |
 | RES-PROFILE-NETWORK-005 | `resources.configure-network` | Command use case | Two reverse-proxy resources share the same `internalPort`. | Command accepts; no port-collision failure for reverse proxy. |
 | RES-PROFILE-NETWORK-006 | `resources.configure-network` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
+| DMBH-RES-001 | `Resource` | Domain unit | Resource source/runtime/network questions are evaluated for deployment admission and plan preview. | Core domain tests prove `Resource` answers source descriptor availability, source detector enrichment eligibility, internal-port requirement, and profile-derived deployment request behavior without callers peeling primitive state. |
 | RES-PROFILE-ACCESS-001 | `resources.configure-access` | Command use case | Valid profile disables generated default access. | Persists `accessProfile.generatedAccessMode = "disabled"`, publishes `resource-access-configured`, and returns `ok({ id })`. |
 | RES-PROFILE-ACCESS-002 | `resources.configure-access` / `resources.show` | Command/query service | Disabled generated access is changed back to inherit. | Persists `generatedAccessMode = "inherit"` and `resources.show` returns the resource access profile. |
 | RES-PROFILE-ACCESS-003 | `resources.configure-access` / planned access / deployment route snapshot | Command and read model | Valid path prefix `/app` is supplied. | Planned generated access and future generated route snapshots use `/app`; historical snapshots remain unchanged. |
@@ -91,6 +92,7 @@ generic `resources.update`.
 | RES-PROFILE-CONFIG-010 | `resources.effective-config` | Query service | Resource inherits environment-only variable. | Returns environment-owned effective entry and no resource-owned entry. |
 | RES-PROFILE-CONFIG-011 | `resources.effective-config` | Query service | Secret values are present. | Returns masked values only; no plaintext secret in owned or effective entries. |
 | RES-PROFILE-CONFIG-012 | `deployments.create` | Snapshot boundary | Resource-scoped variable exists at deployment admission. | Immutable deployment snapshot includes the resource-owned effective entry and retains `scope = "resource"` on the resolved snapshot variable. |
+| DMBH-RES-NET-001 | `Resource` | Core domain unit | Resource network exposure mode and health-check type vary across direct-port, reverse-proxy, HTTP, and unsupported health checks. | `Resource` owns admission while exposure mode and health-check type value objects answer single-value predicates. |
 | RES-PROFILE-ARCHIVE-001 | `resources.archive` | Command use case | Active resource archived. | Persists archived lifecycle, publishes `resource-archived`, returns `ok({ id })`. |
 | RES-PROFILE-ARCHIVE-002 | `resources.archive` | Command use case | Already archived resource. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event. |
 | RES-PROFILE-ARCHIVE-003 | `resources.archive` | Command use case | Resource has deployment history or runtime logs. | Archive succeeds and retains history; no cleanup side effects. |
@@ -102,6 +104,7 @@ generic `resources.update`.
 | RES-PROFILE-DELETE-004 | `resources.delete` | Command use case | Archived resource has deployment history. | Rejects with `resource_delete_blocked`, `deletionBlockers` includes `deployment-history`, and no event. |
 | RES-PROFILE-DELETE-005 | `resources.delete` | Command use case | Archived resource has domain, certificate, access route, or proxy route state. | Rejects with `resource_delete_blocked` and safe blocker details. |
 | RES-PROFILE-DELETE-006 | `resources.delete` | Command use case | Archived resource has source link, dependency binding, terminal session, runtime-log retention, or audit retention. | Rejects with `resource_delete_blocked` and safe blocker details. |
+| DMBH-BINDING-001 | `ResourceBinding` | Core domain unit | Binding scope and injection mode vary across build-only/runtime-reference and allowed combinations. | `ResourceBinding` owns scope/injection coherence; public behavior is unchanged. |
 | RES-PROFILE-DELETE-007 | `resources.delete` | Command use case | Already deleted tombstone is retried. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event when tombstone can be resolved. |
 | RES-PROFILE-DELETE-008 | `resources.show` / `resources.list` | Read model | Deleted resource queried by normal active read paths. | `resources.show` returns `not_found`; list omits the resource. |
 | RES-PROFILE-DELETE-009 | `resource-deleted` | Event payload | Delete succeeds. | Event includes resource ids, `resourceSlug`, deleted timestamp, and no secrets, logs, certificate material, or provider configs. |
@@ -194,6 +197,11 @@ Automated coverage now exists for:
 - CLI dispatch coverage for source/runtime/network/access/health/config/archive/delete profile
   commands in `packages/adapters/cli/test/resource-command.test.ts` under `RES-PROFILE-ENTRY-003`,
   `RES-PROFILE-ENTRY-006`, and `RES-PROFILE-ENTRY-010`.
+
+`DMBH-RES-001` is covered in `packages/core/test/resource.test.ts` as part of
+[Domain Model Behavior Hardening](../specs/022-domain-model-behavior-hardening/spec.md). It is a
+no-behavior-change domain unit row that supports existing deployment admission and plan-preview
+rows rather than a new public capability.
 
 `RES-PROFILE-SOURCE-006` remains future event-consumer projection work. `RES-PROFILE-DELETE-009`
 event payload coverage is asserted through the successful delete command test.

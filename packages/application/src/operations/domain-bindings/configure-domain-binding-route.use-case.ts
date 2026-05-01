@@ -68,30 +68,25 @@ export class ConfigureDomainBindingRouteUseCase {
         return err(domainBindingNotFound(input.domainBindingId));
       }
 
-      const state = domainBinding.toState();
       let redirectTo: PublicDomainName | undefined;
       if (input.redirectTo) {
         redirectTo = yield* PublicDomainName.create(input.redirectTo);
         const redirectTarget = await domainBindingRepository.findOne(
           repositoryContext,
           ActiveDomainBindingByOwnerAndRouteSpec.create({
-            projectId: state.projectId,
-            environmentId: state.environmentId,
-            resourceId: state.resourceId,
+            projectId: domainBinding.projectId,
+            environmentId: domainBinding.environmentId,
+            resourceId: domainBinding.resourceId,
             domainName: redirectTo,
-            pathPrefix: state.pathPrefix,
+            pathPrefix: domainBinding.pathPrefix,
           }),
         );
 
-        if (!redirectTarget || redirectTarget.toState().redirectTo) {
-          return err(
-            domainError.validation("Canonical redirect target must be an active served binding", {
-              phase: "domain-binding-route-configuration",
-              domainBindingId: domainBindingId.value,
-              redirectTo: redirectTo.value,
-            }),
-          );
-        }
+        yield* domainBinding.ensureCanonicalRedirectTarget({
+          redirectTo,
+          target: redirectTarget,
+          phase: "domain-binding-route-configuration",
+        });
       }
 
       const redirectStatus = input.redirectStatus

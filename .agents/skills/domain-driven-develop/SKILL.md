@@ -23,6 +23,152 @@ Domain Driven Develop has three layers:
 
 Keep these layers separate. This skill defines method and code shape. The project defines the actual domain language, bounded contexts, aggregate ownership, lifecycle rules, and entrypoint contracts.
 
+## Tactical Behavior Placement
+
+Domain Driven Develop prefers rich tactical models over anemic data holders. Aggregate roots,
+entities, and value objects should expose intention-revealing behavior in the ubiquitous language.
+Application services, domain services, providers, helpers, handlers, adapters, and repositories
+should not peel domain objects into primitive state and then make the object's own decisions from
+outside.
+
+Place behavior by ownership:
+
+- A rule about one value belongs on that value object.
+- A rule coordinating multiple value objects owned by one entity belongs on that entity.
+- A rule coordinating entities and value objects inside one consistency boundary belongs on the
+  aggregate root.
+- A domain service coordinates rules that genuinely span multiple aggregate roots or domain
+  concepts and can be evaluated from already-loaded domain objects or explicit domain values.
+- An application service loads aggregates, coordinates repositories, transactions, ports, and side
+  effects, then calls domain behavior.
+- Providers and adapters translate to external systems. They may evaluate provider capabilities or
+  external response shapes, but they must not own aggregate invariants or value-object policy.
+
+Use names that reveal the business question or command, such as `isActive()`, `canCaptureAt(...)`,
+`appliesTo(...)`, `canApplyTo(...)`, `bypasses(...)`, `isSelectedBy(...)`, `increase(...)`,
+`decrease(...)`, `capAt(...)`, `combineWith(...)`, and `compareTo(...)`.
+
+Do not treat `toState()` or public `value` fields as the default way to ask a domain question.
+`toState()` is for serialization, persistence, read-model mapping, DTO/schema boundaries, fixtures,
+and assertions. It should not be used by domain behavior or application/domain services to branch on
+another object's internals. Primitive reads such as `.toState().status.value === "authorized"` or
+`.value > 0` are acceptable only inside the owning value object/entity/aggregate or at a boundary
+that is translating to a non-domain representation.
+
+Value object collaboration should not be scattered through helpers or services. If the calculation
+uses one value object, put it on that value object. If it combines several value objects held by an
+entity, put it on the entity. If it combines several child entities or owned values inside an
+aggregate root, put it on the aggregate root. A domain service may call those methods while
+coordinating across aggregate roots, but it should not reimplement their internals with primitive
+comparisons.
+
+### TypeScript Example: Order Payment
+
+Do not write this:
+
+```ts
+// Application or domain service peels value objects into primitives and owns Order policy.
+class PaymentService {
+  canCapture(order: Order): boolean {
+    const state = order.toState();
+
+    return (
+      state.status.value === "authorized" &&
+      state.amount.value > 0 &&
+      state.paymentDeadline.value > Date.now()
+    );
+  }
+
+  capture(order: Order): Result<Order, DomainError> {
+    if (!this.canCapture(order)) {
+      return err(DomainError.create("order.payment.cannot_capture"));
+    }
+
+    return ok(Order.rehydrate({ ...order.toState(), status: OrderStatus.captured() }));
+  }
+}
+```
+
+Write this instead:
+
+```ts
+class OrderAmount {
+  private constructor(public readonly value: number) {}
+
+  isPositive(): boolean {
+    return this.value > 0;
+  }
+}
+
+class PaymentWindow {
+  private constructor(private readonly deadline: PaymentTime) {}
+
+  includes(now: PaymentTime): boolean {
+    return this.deadline.isAfter(now);
+  }
+}
+
+class OrderStatus {
+  private constructor(public readonly value: "draft" | "authorized" | "captured") {}
+
+  isAuthorized(): boolean {
+    return this.value === "authorized";
+  }
+
+  capture(): Result<OrderStatus, DomainError> {
+    if (!this.isAuthorized()) {
+      return err(DomainError.create("order.payment.not_authorized"));
+    }
+
+    return ok(new OrderStatus("captured"));
+  }
+}
+
+class Order {
+  canCaptureAt(now: PaymentTime): boolean {
+    return (
+      this.status.isAuthorized() &&
+      this.totalAmount.isPositive() &&
+      this.paymentWindow.includes(now)
+    );
+  }
+
+  capture(now: PaymentTime): Result<Order, DomainError> {
+    if (!this.canCaptureAt(now)) {
+      return err(DomainError.create("order.payment.cannot_capture"));
+    }
+
+    return this.status.capture().map((status) => this.withStatus(status));
+  }
+}
+
+class PaymentService {
+  capture(order: Order, now: PaymentTime): Result<Order, DomainError> {
+    return order.capture(now);
+  }
+}
+```
+
+Do not write this:
+
+```ts
+// A helper compares unrelated primitive state that belongs inside the order line.
+function isLinePayable(line: OrderLine): boolean {
+  const state = line.toState();
+  return state.quantity.value > 0 && state.unitPrice.value > 0;
+}
+```
+
+Write this instead:
+
+```ts
+class OrderLine {
+  hasChargeableAmount(): boolean {
+    return this.quantity.isPositive() && this.unitPrice.isPositive();
+  }
+}
+```
+
 ## First Steps
 
 1. Identify the requested behavior or modeling question.

@@ -127,7 +127,7 @@ export class RelinkSourceLinkUseCase {
       if (!environment) {
         return err(domainError.notFound("Environment", environmentId.value));
       }
-      if (!environment.toState().projectId.equals(projectId)) {
+      if (!environment.belongsToProject(projectId)) {
         return err(
           sourceLinkContextMismatch("Environment does not belong to project", {
             projectId: projectId.value,
@@ -143,8 +143,7 @@ export class RelinkSourceLinkUseCase {
       if (!resource) {
         return err(domainError.notFound("Resource", resourceId.value));
       }
-      const resourceState = resource.toState();
-      if (!resourceState.projectId.equals(projectId)) {
+      if (!resource.belongsToProject(projectId)) {
         return err(
           sourceLinkContextMismatch("Resource does not belong to project", {
             projectId: projectId.value,
@@ -152,7 +151,7 @@ export class RelinkSourceLinkUseCase {
           }),
         );
       }
-      if (!resourceState.environmentId.equals(environmentId)) {
+      if (!resource.belongsToEnvironment(environmentId)) {
         return err(
           sourceLinkContextMismatch("Resource does not belong to environment", {
             environmentId: environmentId.value,
@@ -179,7 +178,7 @@ export class RelinkSourceLinkUseCase {
         if (!destination) {
           return err(domainError.notFound("Destination", destinationId.value));
         }
-        if (serverId && !destination.toState().serverId.equals(serverId)) {
+        if (serverId && !destination.belongsToServer(serverId)) {
           return err(
             sourceLinkContextMismatch("Destination does not belong to server", {
               serverId: serverId.value,
@@ -187,26 +186,27 @@ export class RelinkSourceLinkUseCase {
             }),
           );
         }
-        if (resourceState.destinationId && !resourceState.destinationId.equals(destinationId)) {
+        const resourceDestinationId = resource.defaultDestinationId;
+        if (resourceDestinationId && !resource.canDeployToDestination(destinationId)) {
           return err(
             sourceLinkContextMismatch("Resource does not deploy to destination", {
               resourceId: resourceId.value,
               destinationId: destinationId.value,
-              resourceDestinationId: resourceState.destinationId.value,
+              resourceDestinationId: resourceDestinationId.value,
             }),
           );
         }
-      } else if (serverId && resourceState.destinationId) {
+      } else if (serverId && resource.defaultDestinationId) {
         const resourceDestination = await destinationRepository.findOne(
           repositoryContext,
-          DestinationByIdSpec.create(resourceState.destinationId),
+          DestinationByIdSpec.create(resource.defaultDestinationId),
         );
-        if (resourceDestination && !resourceDestination.toState().serverId.equals(serverId)) {
+        if (resourceDestination && !resourceDestination.belongsToServer(serverId)) {
           return err(
             sourceLinkContextMismatch("Resource destination does not belong to server", {
               serverId: serverId.value,
               resourceId: resourceId.value,
-              resourceDestinationId: resourceState.destinationId.value,
+              resourceDestinationId: resource.defaultDestinationId.value,
             }),
           );
         }

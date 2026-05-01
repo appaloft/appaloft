@@ -357,6 +357,13 @@ export interface ResourceSourceBindingState {
   metadata?: Record<string, string>;
 }
 
+export interface DeploymentSourceDescriptorState {
+  kind: SourceKindValue;
+  locator: SourceLocator;
+  displayName: DisplayNameText;
+  metadata?: Record<string, string>;
+}
+
 export class ResourceSourceBinding extends ValueObject<ResourceSourceBindingState> {
   private constructor(state: ResourceSourceBindingState) {
     super(state);
@@ -433,6 +440,21 @@ export class ResourceSourceBinding extends ValueObject<ResourceSourceBindingStat
     };
 
     return Object.keys(metadata).length > 0 ? metadata : undefined;
+  }
+
+  canBeEnrichedFromSourceInspection(): boolean {
+    const kind = this.state.kind.value;
+    return kind === "local-folder" || kind === "local-git" || kind === "compose";
+  }
+
+  toDeploymentSourceDescriptorState(): DeploymentSourceDescriptorState {
+    const metadata = ResourceSourceBinding.metadataFromState(this.state);
+    return {
+      kind: this.state.kind,
+      locator: this.state.locator,
+      displayName: this.state.displayName,
+      ...(metadata ? { metadata } : {}),
+    };
   }
 
   toState(): ResourceSourceBindingState {

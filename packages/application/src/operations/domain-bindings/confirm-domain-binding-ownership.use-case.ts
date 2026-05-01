@@ -72,71 +72,27 @@ export class ConfirmDomainBindingOwnershipUseCase {
         });
       }
 
-      const bindingState = domainBinding.toState();
-      const selectedAttempt = verificationAttemptId
-        ? bindingState.verificationAttempts.find((attempt) =>
-            attempt.id.equals(verificationAttemptId),
-          )
-        : [...bindingState.verificationAttempts]
-            .reverse()
-            .find(
-              (attempt) => attempt.method.value === "manual" && attempt.status.value === "pending",
-            );
+      const confirmationContext = yield* domainBinding.resolveOwnershipConfirmationContext({
+        ...(verificationAttemptId ? { verificationAttemptId } : {}),
+      });
 
-      if (!selectedAttempt) {
-        return err(
-          domainError.domainVerificationNotPending("No pending verification attempt exists", {
-            phase: "domain-verification",
-            domainBindingId: domainBindingId.value,
-            ...(verificationAttemptId
-              ? { verificationAttemptId: verificationAttemptId.value }
-              : {}),
-            relatedState: bindingState.status.value,
-          }),
-        );
-      }
-
-      if (selectedAttempt.status.value === "verified" && bindingState.status.value === "bound") {
+      if (confirmationContext.kind === "already_confirmed") {
         return ok({
           id: domainBindingId.value,
-          verificationAttemptId: selectedAttempt.id.value,
+          verificationAttemptId: confirmationContext.verificationAttemptId.value,
         });
-      }
-
-      if (selectedAttempt.status.value !== "pending" || selectedAttempt.method.value !== "manual") {
-        return err(
-          domainError.domainVerificationNotPending(
-            "Verification attempt is not pending confirmation",
-            {
-              phase: "domain-verification",
-              domainBindingId: domainBindingId.value,
-              verificationAttemptId: selectedAttempt.id.value,
-              relatedState: selectedAttempt.status.value,
-            },
-          ),
-        );
-      }
-
-      if (bindingState.status.value !== "pending_verification") {
-        return err(
-          domainError.invariant("Domain binding cannot be marked bound from its current state", {
-            phase: "domain-verification",
-            domainBindingId: domainBindingId.value,
-            verificationAttemptId: selectedAttempt.id.value,
-            relatedState: bindingState.status.value,
-          }),
-        );
       }
 
       if ((input.verificationMode ?? "dns") === "dns") {
         const checkedAt = yield* CreatedAt.create(clock.now());
-        const expectedTargets =
-          bindingState.dnsObservation?.expectedTargets.map((target) => target.value) ?? [];
+        const expectedTargets = confirmationContext.expectedDnsTargets.map(
+          (target) => target.value,
+        );
 
         const verificationResult = await verifyDnsOwnership(
           context,
           domainOwnershipVerifier,
-          bindingState.domainName.value,
+          confirmationContext.domainName.value,
           expectedTargets,
         );
         const observedTargets: MessageText[] = [];
@@ -168,8 +124,8 @@ export class ConfirmDomainBindingOwnershipUseCase {
                 {
                   phase: "domain-verification",
                   domainBindingId: domainBindingId.value,
-                  verificationAttemptId: selectedAttempt.id.value,
-                  domainName: bindingState.domainName.value,
+                  verificationAttemptId: confirmationContext.verificationAttemptId.value,
+                  domainName: confirmationContext.domainName.value,
                   expectedTargets: expectedTargets.join(","),
                   observedTargets: verificationResult.observedTargets.join(","),
                   relatedState: verificationResult.status,
@@ -185,8 +141,8 @@ export class ConfirmDomainBindingOwnershipUseCase {
               {
                 phase: "domain-verification",
                 domainBindingId: domainBindingId.value,
-                verificationAttemptId: selectedAttempt.id.value,
-                domainName: bindingState.domainName.value,
+                verificationAttemptId: confirmationContext.verificationAttemptId.value,
+                domainName: confirmationContext.domainName.value,
                 expectedTargets: expectedTargets.join(","),
                 observedTargets: verificationResult.observedTargets.join(","),
                 relatedState: verificationResult.status,
@@ -199,7 +155,7 @@ export class ConfirmDomainBindingOwnershipUseCase {
       const confirmedAt = yield* CreatedAt.create(clock.now());
       const confirmation = yield* domainBinding.confirmOwnership({
         confirmedAt,
-        verificationAttemptId: selectedAttempt.id,
+        verificationAttemptId: confirmationContext.verificationAttemptId,
         correlationId: context.requestId,
       });
 

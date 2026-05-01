@@ -29,6 +29,7 @@ creating a deployment attempt, publishing deployment events, or executing runtim
 | DPP-QUERY-007 | integration | Prebuilt image path | Returns artifact kind `prebuilt-image`, sanitized image identity, and no build command specs. |
 | DPP-QUERY-008 | integration | Custom command image path | Returns custom/workspace command image intent with sanitized install/build/start command specs. |
 | DPP-QUERY-009 | integration | Access plan unavailable | Returns plan readiness independently from access warning `access-plan-unavailable` when route planning summary cannot be read. |
+| DMBH-RES-DPP-001 | unit/integration | Resource-owned preview predicates | Plan preview evaluates the same resource source, source inspection enrichment, and internal-port requirements as deployment admission. |
 
 ## Side-Effect Matrix
 
@@ -111,3 +112,8 @@ acceptance harness in
 `packages/adapters/runtime/test/zero-to-ssh-supported-catalog-acceptance.test.ts`. The harness
 constructs ready preview payloads and blocked controls for the Phase 5 supported catalog while
 keeping `deployments.plan` read-only and side-effect free.
+
+`DMBH-RES-DPP-001` is covered by `packages/core/test/resource.test.ts` for Resource-owned
+predicates. Existing preview contract output remains covered by
+`packages/contracts/test/deployment-plan-preview-contract.test.ts`; there is no
+`packages/application/test/deployment-plan-preview.test.ts` file in the current tree.
