@@ -38,8 +38,13 @@ type ResourceAccessFailureErrorDetails = {
   requestId: string;
   httpStatus: 404 | 502 | 503 | 504;
   ownerHint: "platform" | "resource" | "operator-config" | "unknown";
+  affectedUrl?: string;
+  affectedHostname?: string;
+  affectedPath?: string;
+  method?: string;
   resourceId?: string;
   deploymentId?: string;
+  domainBindingId?: string;
   projectId?: string;
   environmentId?: string;
   serverId?: string;
@@ -49,6 +54,16 @@ type ResourceAccessFailureErrorDetails = {
   routeStatus?: string;
   providerKey?: string;
   causeCode?: string;
+  nextAction?:
+    | "check-health"
+    | "inspect-runtime-logs"
+    | "inspect-deployment-logs"
+    | "inspect-proxy-preview"
+    | "diagnostic-summary"
+    | "verify-domain"
+    | "fix-dns"
+    | "repair-proxy"
+    | "manual-review";
   correlationId?: string;
   causationId?: string;
 };
@@ -57,6 +72,10 @@ type ResourceAccessFailureErrorDetails = {
 Error details must not include raw proxy logs, internal IP addresses, raw upstream URLs, headers,
 cookies, tokens, source credentials, provider access tokens, private filesystem paths, command
 strings, or unredacted application output.
+
+Affected request fields are safe lookup hints only. They must exclude query strings and request
+headers. `nextAction` is a stable observation/recovery pointer and must not imply that a hidden
+mutation happened.
 
 ## Diagnostic Codes
 
@@ -106,6 +125,7 @@ API/problem responses must:
 
 - keep the HTTP status aligned with the diagnostic code;
 - include `code`, `phase`, `requestId`, and `retriable`;
+- include `nextAction` and safe affected request metadata when available;
 - omit HTML and localized explanatory text from machine fields.
 
 Owner-facing Web, CLI, and future MCP tooling should map the same codes into i18n/user-facing
@@ -143,6 +163,12 @@ Existing health and diagnostic summary source errors cover several owner-facing 
 is no persisted edge request failure envelope, no short-retention request diagnostic read model,
 no renderer target for one-shot CLI remote SSH execution, and no resource-context lookup from a
 request id yet.
+
+The 2026-05-01 baseline adds stable `nextAction`, affected request descriptor, and optional domain
+binding id fields to the safe envelope and lets resource access read models expose one latest safe
+edge failure for owner-facing `resources.health` and `resources.diagnostic-summary` composition.
+This keeps request-id lookup on existing read surfaces; persistence/retention and real provider
+e2e lookup remain future work.
 
 ## Open Questions
 

@@ -99,6 +99,13 @@ The diagnostic summary may include selected-route and context-route facts, but c
 must stay copy-safe and exclude secrets, raw provider SDK payloads, private keys, environment
 values, request headers/cookies, internal network coordinates, and raw command output.
 
+When `ResourceAccessSummary` carries a latest safe
+`resource-access-failure/v1` envelope, diagnostic summary must include it as access context and add
+a source error with the same `resource_access_*` code, phase, request id, related ids, and
+`nextAction`. The summary must preserve any `causeCode` from route realization, health, or
+deployment observation instead of replacing the operation-owned error. Absence of a latest envelope
+is normal and must be represented as no request-id evidence, not as a failed diagnostic query.
+
 The query service may depend on existing query services or read-model ports, but Web components,
 CLI commands, and HTTP handlers must not manually reconstruct the diagnostic payload by calling many
 separate endpoints and merging ad hoc shapes.
@@ -152,6 +159,11 @@ the action directly.
 
 Desktop uses the Web resource detail action, but desktop-client-specific safe context is not yet
 appended to the copied payload.
+
+The 2026-05-01 access-failure baseline composes optional latest edge-failure envelopes from the
+resource access read model into this summary. Short-retention request persistence, automatic
+route/resource lookup from provider metadata, and real proxy error-middleware e2e remain future
+hardening gaps.
 
 ## Open Questions
 

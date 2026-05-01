@@ -65,12 +65,21 @@ function buildDiagnostic(request: Request, now: () => string): ResourceAccessFai
   const status = parseStatus(firstQueryValue(url.searchParams, "status"));
   const statusCode = status === null ? null : resourceAccessFailureCodeFromHttpStatus(status);
   const selectedCode = code ?? (signal ? null : statusCode);
+  const affectedUrl = firstQueryValue(url.searchParams, "affectedUrl");
+  const affectedHostname = firstQueryValue(url.searchParams, "host");
+  const affectedPath = firstQueryValue(url.searchParams, "path");
 
   return classifyResourceAccessFailure({
     ...(selectedCode ? { code: selectedCode } : {}),
     ...(signal && !code ? { signal } : {}),
     requestId: resolveRequestId(request, url.searchParams),
     generatedAt: now(),
+    affected: {
+      ...(affectedUrl ? { url: affectedUrl } : {}),
+      ...(affectedHostname ? { hostname: affectedHostname } : {}),
+      ...(affectedPath ? { path: affectedPath } : {}),
+      method: request.method,
+    },
     ...(firstQueryValue(url.searchParams, "causeCode")
       ? { causeCode: safeToken(firstQueryValue(url.searchParams, "causeCode"), "") }
       : {}),
@@ -98,6 +107,7 @@ function renderHtml(diagnostic: ResourceAccessFailureDiagnostic): string {
   const requestId = escapeHtml(diagnostic.requestId);
   const generatedAt = escapeHtml(diagnostic.generatedAt);
   const message = escapeHtml(publicMessage(diagnostic));
+  const nextAction = escapeHtml(diagnostic.nextAction);
   const edgeStatus = diagnostic.ownerHint === "platform" ? "Error" : "Working";
   const resourceStatus = diagnostic.ownerHint === "platform" ? "Unknown" : "Error";
 
@@ -207,6 +217,7 @@ function renderHtml(diagnostic: ResourceAccessFailureDiagnostic): string {
         </div>
       </section>
       <p>Try again shortly. If you own this app, use the request id below in resource health or diagnostics.</p>
+      <p class="meta">Next action: ${nextAction}</p>
       <p class="meta">Request ID: ${requestId}<br />Time: ${generatedAt}</p>
     </main>
   </body>
@@ -225,6 +236,9 @@ function problemDetails(diagnostic: ResourceAccessFailureDiagnostic): Record<str
     generatedAt: diagnostic.generatedAt,
     retriable: diagnostic.retriable,
     ownerHint: diagnostic.ownerHint,
+    nextAction: diagnostic.nextAction,
+    ...(diagnostic.affected ? { affected: diagnostic.affected } : {}),
+    ...(diagnostic.route ? { route: diagnostic.route } : {}),
     ...(diagnostic.causeCode ? { causeCode: diagnostic.causeCode } : {}),
   };
 }

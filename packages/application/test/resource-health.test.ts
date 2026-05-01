@@ -616,6 +616,144 @@ describe("ResourceHealthQueryService", () => {
     );
   });
 
+  test("[RES-ACCESS-DIAG-OBS-002][RES-ACCESS-DIAG-OBS-004] degrades health from the latest edge access failure envelope", async () => {
+    const service = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestGeneratedAccessRoute: {
+              url: "http://web.203.0.113.10.sslip.io",
+              hostname: "web.203.0.113.10.sslip.io",
+              scheme: "http",
+              providerKey: "sslip",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_web",
+            latestAccessFailureDiagnostic: {
+              schemaVersion: "resource-access-failure/v1",
+              requestId: "req_access_timeout",
+              generatedAt: "2026-01-01T00:00:08.000Z",
+              code: "resource_access_upstream_timeout",
+              category: "timeout",
+              phase: "upstream-connection",
+              httpStatus: 504,
+              retriable: true,
+              ownerHint: "resource",
+              nextAction: "check-health",
+              affected: {
+                url: "https://web.example.test/",
+                hostname: "web.example.test",
+                path: "/",
+                method: "GET",
+              },
+              route: {
+                resourceId: "res_web",
+                deploymentId: "dep_web",
+                serverId: "srv_demo",
+                destinationId: "dst_demo",
+                providerKey: "traefik",
+                routeId: "route_web",
+                routeSource: "generated-default",
+                routeStatus: "ready",
+              },
+              causeCode: "resource_public_access_probe_failed",
+            },
+          },
+        }),
+      ],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.overall).toBe("degraded");
+    expect(summary.publicAccess).toMatchObject({
+      status: "failed",
+      reasonCode: "resource_access_upstream_timeout",
+      phase: "upstream-connection",
+      latestAccessFailure: {
+        requestId: "req_access_timeout",
+        nextAction: "check-health",
+        causeCode: "resource_public_access_probe_failed",
+      },
+    });
+    expect(summary.sourceErrors).toContainEqual(
+      expect.objectContaining({
+        source: "public-access",
+        code: "resource_access_upstream_timeout",
+        category: "timeout",
+        phase: "upstream-connection",
+        retriable: true,
+        relatedEntityId: "res_web",
+        relatedState: "check-health",
+      }),
+    );
+  });
+
+  test("[RES-ACCESS-DIAG-OBS-002][RES-ACCESS-DIAG-OBS-004] preserves latest access failure even when route read models are unavailable", async () => {
+    const service = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestAccessFailureDiagnostic: {
+              schemaVersion: "resource-access-failure/v1",
+              requestId: "req_access_route_missing",
+              generatedAt: "2026-01-01T00:00:08.000Z",
+              code: "resource_access_route_not_found",
+              category: "not-found",
+              phase: "edge-request-routing",
+              httpStatus: 404,
+              retriable: true,
+              ownerHint: "platform",
+              nextAction: "inspect-proxy-preview",
+              affected: {
+                url: "https://web.example.test/missing",
+                hostname: "web.example.test",
+                path: "/missing",
+                method: "GET",
+              },
+              route: {
+                resourceId: "res_web",
+                deploymentId: "dep_web",
+                serverId: "srv_demo",
+                routeSource: "generated-default",
+                routeStatus: "missing",
+              },
+            },
+          },
+        }),
+      ],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.publicAccess).toMatchObject({
+      status: "failed",
+      url: "https://web.example.test/missing",
+      reasonCode: "resource_access_route_not_found",
+      latestAccessFailure: {
+        requestId: "req_access_route_missing",
+        nextAction: "inspect-proxy-preview",
+      },
+    });
+    expect(summary.sourceErrors).toContainEqual(
+      expect.objectContaining({
+        source: "public-access",
+        code: "resource_access_route_not_found",
+        relatedEntityId: "res_web",
+      }),
+    );
+  });
+
   test("reports starting while the latest deployment is still in flight", async () => {
     const deployment = deploymentSummary({
       status: "running",

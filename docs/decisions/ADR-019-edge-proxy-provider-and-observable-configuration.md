@@ -173,6 +173,7 @@ provider-neutral failure envelope before Web, CLI, HTTP, or future MCP consumers
 
 ```ts
 type ResourceAccessFailureDiagnostic = {
+  schemaVersion: "resource-access-failure/v1";
   code: string;
   category: "infra" | "integration" | "timeout" | "not-found" | "async-processing";
   phase:
@@ -186,9 +187,26 @@ type ResourceAccessFailureDiagnostic = {
   httpStatus: 404 | 502 | 503 | 504;
   retriable: boolean;
   ownerHint: "platform" | "resource" | "operator-config" | "unknown";
+  affected?: {
+    url?: string;
+    hostname?: string;
+    path?: string;
+    method?: string;
+  };
+  nextAction:
+    | "check-health"
+    | "inspect-runtime-logs"
+    | "inspect-deployment-logs"
+    | "inspect-proxy-preview"
+    | "diagnostic-summary"
+    | "verify-domain"
+    | "fix-dns"
+    | "repair-proxy"
+    | "manual-review";
   requestId: string;
   resourceId?: string;
   deploymentId?: string;
+  domainBindingId?: string;
   serverId?: string;
   destinationId?: string;
   providerKey?: string;
@@ -198,7 +216,7 @@ type ResourceAccessFailureDiagnostic = {
 
 The page may show a three-hop status such as browser, Appaloft edge, and resource deployment. The
 machine contract is still the stable diagnostic code, category, phase, retriable flag, request id,
-and safe related ids.
+safe affected URL/host/path metadata, the next owner action, and safe related ids.
 
 The diagnostic taxonomy maps outer gateway failures into the shared platform error model:
 
@@ -295,6 +313,14 @@ diagnostic command plans for server connectivity checks. Traefik diagnostics inc
 compatibility, Docker provider log scanning, and a bounded Docker-label route probe. Persisted
 provider log collection and richer long-running diagnostic history remain future provider
 capabilities.
+
+The 2026-05-01 Phase 6 access-failure baseline keeps the edge diagnostic page as an internal
+transport/read workflow and adds an additive envelope/read-model bridge: the safe diagnostic
+envelope carries affected host/path, optional domain binding id, and a stable next action, while
+resource access summaries may expose a latest safe access-failure diagnostic for
+`resources.health` and `resources.diagnostic-summary` composition. This does not create a public
+route repair operation, does not persist raw provider payloads, and does not change deployment
+admission.
 
 ## Open Questions
 

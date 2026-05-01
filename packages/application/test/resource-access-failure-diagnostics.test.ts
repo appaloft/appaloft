@@ -57,6 +57,68 @@ describe("resource access failure diagnostics", () => {
     expect(diagnostic.category).not.toBe("domain");
   });
 
+  test("[RES-ACCESS-DIAG-CLASS-010][RES-ACCESS-DIAG-OBS-003] builds a copy-safe envelope with affected request, related ids, next action, and cause code", () => {
+    const diagnostic = classifyResourceAccessFailure({
+      signal: "upstream-timeout",
+      requestId: "req access timeout",
+      generatedAt: "2026-04-20T00:00:00.000Z",
+      affected: {
+        url: "https://web.example.test/private?token=secret-token#fragment",
+        hostname: "web.example.test",
+        path: "/private?token=secret-token",
+        method: "get",
+      },
+      route: {
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+        domainBindingId: "dbnd_web",
+        serverId: "srv_web",
+        destinationId: "dst_web",
+        providerKey: "traefik",
+        routeId: "route_web",
+        routeSource: "durable-domain",
+        routeStatus: "failed",
+      },
+      causeCode: "resource_public_access_probe_failed",
+      correlationId: "corr_access_timeout",
+      causationId: "cause_access_timeout",
+    });
+
+    expect(diagnostic).toMatchObject({
+      schemaVersion: "resource-access-failure/v1",
+      requestId: "req_access_timeout",
+      code: "resource_access_upstream_timeout",
+      category: "timeout",
+      phase: "upstream-connection",
+      httpStatus: 504,
+      retriable: true,
+      ownerHint: "resource",
+      nextAction: "check-health",
+      affected: {
+        url: "https://web.example.test/private",
+        hostname: "web.example.test",
+        path: "/private",
+        method: "GET",
+      },
+      route: {
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+        domainBindingId: "dbnd_web",
+        serverId: "srv_web",
+        destinationId: "dst_web",
+        providerKey: "traefik",
+        routeId: "route_web",
+        routeSource: "durable-domain",
+        routeStatus: "failed",
+      },
+      causeCode: "resource_public_access_probe_failed",
+      correlationId: "corr_access_timeout",
+      causationId: "cause_access_timeout",
+    });
+    expect(JSON.stringify(diagnostic)).not.toContain("secret-token");
+    expect(JSON.stringify(diagnostic)).not.toContain("Authorization");
+  });
+
   test("parses known codes, signals, and gateway status fallbacks", () => {
     expect(parseResourceAccessFailureCode("resource_access_upstream_reset")).toBe(
       "resource_access_upstream_reset",

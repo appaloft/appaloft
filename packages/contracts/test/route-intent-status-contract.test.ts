@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { routeIntentStatusDescriptorSchema } from "../src/index";
+import {
+  resourceAccessSummarySchema,
+  resourceDiagnosticSummarySchema,
+  resourceHealthSummarySchema,
+  routeIntentStatusDescriptorSchema,
+} from "../src/index";
 
 describe("route intent/status contract", () => {
   test("[ROUTE-INTENT-001][ACCESS-DIAG-001][WEB-CLI-API-ACCESS-001] validates provider-neutral route diagnostic descriptors", () => {
@@ -84,5 +89,146 @@ describe("route intent/status contract", () => {
 
     expect(descriptor.tls).toBe("expired");
     expect(descriptor.recommendedAction).toBe("provide-certificate");
+  });
+
+  test("[RES-ACCESS-DIAG-OBS-004][WEB-CLI-API-ACCESS-001] validates latest access failure envelope across read contracts", () => {
+    const latestAccessFailureDiagnostic = {
+      schemaVersion: "resource-access-failure/v1",
+      requestId: "req_access_timeout",
+      generatedAt: "2026-01-01T00:00:08.000Z",
+      code: "resource_access_upstream_timeout",
+      category: "timeout",
+      phase: "upstream-connection",
+      httpStatus: 504,
+      retriable: true,
+      ownerHint: "resource",
+      nextAction: "check-health",
+      affected: {
+        url: "https://web.example.test/",
+        hostname: "web.example.test",
+        path: "/",
+        method: "GET",
+      },
+      route: {
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+        domainBindingId: "dbnd_web",
+        serverId: "srv_web",
+        destinationId: "dst_web",
+        providerKey: "traefik",
+        routeId: "route_web",
+        routeSource: "generated-default",
+        routeStatus: "ready",
+      },
+      causeCode: "resource_public_access_probe_failed",
+      correlationId: "corr_access_timeout",
+    };
+
+    const accessSummary = resourceAccessSummarySchema.parse({
+      latestGeneratedAccessRoute: {
+        url: "http://web.203.0.113.10.sslip.io",
+        hostname: "web.203.0.113.10.sslip.io",
+        scheme: "http",
+        providerKey: "sslip",
+        deploymentId: "dep_web",
+        deploymentStatus: "succeeded",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        targetPort: 3000,
+        updatedAt: "2026-01-01T00:00:05.000Z",
+      },
+      proxyRouteStatus: "ready",
+      latestAccessFailureDiagnostic,
+    });
+
+    const health = resourceHealthSummarySchema.parse({
+      schemaVersion: "resources.health/v1",
+      resourceId: "res_web",
+      generatedAt: "2026-01-01T00:00:10.000Z",
+      overall: "degraded",
+      runtime: {
+        lifecycle: "running",
+        health: "healthy",
+      },
+      healthPolicy: {
+        status: "configured",
+        enabled: true,
+      },
+      publicAccess: {
+        status: "failed",
+        reasonCode: "resource_access_upstream_timeout",
+        phase: "upstream-connection",
+        latestAccessFailure: latestAccessFailureDiagnostic,
+      },
+      proxy: {
+        status: "ready",
+      },
+      checks: [],
+      sourceErrors: [
+        {
+          source: "public-access",
+          code: "resource_access_upstream_timeout",
+          category: "timeout",
+          phase: "upstream-connection",
+          retriable: true,
+          relatedEntityId: "res_web",
+          relatedState: "check-health",
+        },
+      ],
+    });
+
+    const diagnostic = resourceDiagnosticSummarySchema.parse({
+      schemaVersion: "resources.diagnostic-summary/v1",
+      generatedAt: "2026-01-01T00:00:10.000Z",
+      focus: {
+        resourceId: "res_web",
+      },
+      context: {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceName: "Web",
+        resourceSlug: "web",
+        resourceKind: "application",
+        services: [],
+      },
+      access: {
+        status: "failed",
+        latestAccessFailure: latestAccessFailureDiagnostic,
+      },
+      proxy: {
+        status: "available",
+        configurationIncluded: false,
+      },
+      deploymentLogs: {
+        status: "not-requested",
+        tailLimit: 0,
+        lineCount: 0,
+        lines: [],
+      },
+      runtimeLogs: {
+        status: "not-requested",
+        tailLimit: 0,
+        lineCount: 0,
+        lines: [],
+      },
+      system: {
+        entrypoint: "system",
+        requestId: "req_system",
+        locale: "en-US",
+      },
+      sourceErrors: [],
+      redaction: {
+        policy: "deployment-environment-secrets",
+        masked: false,
+        maskedValueCount: 0,
+      },
+      copy: {
+        json: "{}",
+      },
+    });
+
+    expect(accessSummary.latestAccessFailureDiagnostic?.requestId).toBe("req_access_timeout");
+    expect(health.publicAccess.latestAccessFailure?.nextAction).toBe("check-health");
+    expect(diagnostic.access.latestAccessFailure?.route?.domainBindingId).toBe("dbnd_web");
   });
 });
