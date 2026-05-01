@@ -14,8 +14,10 @@ import {
   ListResourcesQuery,
   ListServersQuery,
   type QueryBus,
+  type ResourceAccessFailureEvidenceRecorder,
   type TerminalSession,
   type TerminalSessionGateway,
+  toRepositoryContext,
 } from "@appaloft/application";
 import { type AppConfig } from "@appaloft/config";
 import { apiVersion, type ConsoleOverviewResponse } from "@appaloft/contracts";
@@ -449,6 +451,7 @@ export function createHttpApp(input: {
   embeddedWebAssets?: EmbeddedStaticAssets;
   embeddedDocsAssets?: EmbeddedStaticAssets;
   certificateHttpChallengeTokenStore?: CertificateHttpChallengeTokenStore;
+  resourceAccessFailureEvidenceRecorder?: ResourceAccessFailureEvidenceRecorder;
 }) {
   const pluginMiddlewares = input.pluginRuntime?.listHttpMiddlewares() ?? [];
   const pluginRoutes = input.pluginRuntime?.listHttpRoutes() ?? [];
@@ -936,7 +939,35 @@ export function createHttpApp(input: {
     )
     .get("/api/schemas/appaloft-config.json", () => appaloftDeploymentConfigJsonSchema)
     .get("/.appaloft/resource-access-failure", ({ request }) =>
-      resourceAccessFailureDiagnosticResponse(request),
+      resourceAccessFailureDiagnosticResponse(request, {
+        recordEvidence: async (diagnostic, capturedAt, expiresAt) => {
+          if (!input.resourceAccessFailureEvidenceRecorder) {
+            return;
+          }
+
+          const context = input.executionContextFactory.create({
+            entrypoint: "http",
+            locale: resolveAppaloftLocaleFromHeaders(request.headers),
+            requestId: diagnostic.requestId,
+          });
+          const result = await input.resourceAccessFailureEvidenceRecorder.record(
+            toRepositoryContext(context),
+            {
+              diagnostic,
+              capturedAt,
+              expiresAt,
+            },
+          );
+
+          if (result.isErr()) {
+            input.logger.warn("resource_access_failure_evidence_record_failed", {
+              requestId: diagnostic.requestId,
+              code: result.error.code,
+              category: result.error.category,
+            });
+          }
+        },
+      }),
     )
     .get("/api/deployment-progress/:requestId", ({ request, params }) =>
       deploymentProgressStream(request, params.requestId),

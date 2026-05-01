@@ -1599,6 +1599,240 @@ export interface ResourceAccessSummary {
   latestAccessFailureDiagnostic?: ResourceAccessFailureDiagnostic;
 }
 
+export type ResourceAccessFailureEvidenceMatchedSource = "short-retention-evidence-read-model";
+
+export interface ResourceAccessFailureEvidenceRelatedIds {
+  resourceId?: string;
+  deploymentId?: string;
+  domainBindingId?: string;
+  serverId?: string;
+  destinationId?: string;
+  routeId?: string;
+}
+
+export interface ResourceAccessFailureEvidenceRecord {
+  requestId: string;
+  diagnostic: ResourceAccessFailureDiagnostic;
+  capturedAt: string;
+  expiresAt: string;
+}
+
+export interface ResourceAccessFailureEvidenceLookupFilters {
+  resourceId?: string;
+  hostname?: string;
+  path?: string;
+}
+
+export interface ResourceAccessFailureEvidenceLookupNotFound {
+  code: "resource_access_failure_evidence_not_found";
+  phase: "evidence-lookup";
+  message: string;
+}
+
+export type ResourceAccessFailureEvidenceLookup =
+  | {
+      schemaVersion: "resources.access-failure-evidence.lookup/v1";
+      requestId: string;
+      status: "found";
+      generatedAt: string;
+      filters?: ResourceAccessFailureEvidenceLookupFilters;
+      matchedSource: ResourceAccessFailureEvidenceMatchedSource;
+      evidence: ResourceAccessFailureDiagnostic;
+      relatedIds?: ResourceAccessFailureEvidenceRelatedIds;
+      nextAction: ResourceAccessFailureDiagnostic["nextAction"];
+      capturedAt: string;
+      expiresAt: string;
+    }
+  | {
+      schemaVersion: "resources.access-failure-evidence.lookup/v1";
+      requestId: string;
+      status: "not-found";
+      generatedAt: string;
+      filters?: ResourceAccessFailureEvidenceLookupFilters;
+      nextAction: "diagnostic-summary";
+      notFound: ResourceAccessFailureEvidenceLookupNotFound;
+    };
+
+export interface ResourceAccessFailureEvidenceRecordInput {
+  diagnostic: ResourceAccessFailureDiagnostic;
+  capturedAt: string;
+  expiresAt: string;
+}
+
+export interface ResourceAccessFailureEvidenceSelectionSpecVisitor<TResult> {
+  visitResourceAccessFailureEvidenceByRequestId(
+    query: TResult,
+    spec: ResourceAccessFailureEvidenceByRequestIdSpec,
+  ): TResult;
+  visitResourceAccessFailureEvidenceByResourceId(
+    query: TResult,
+    spec: ResourceAccessFailureEvidenceByResourceIdSpec,
+  ): TResult;
+  visitResourceAccessFailureEvidenceByHostname(
+    query: TResult,
+    spec: ResourceAccessFailureEvidenceByHostnameSpec,
+  ): TResult;
+  visitResourceAccessFailureEvidenceByPath(
+    query: TResult,
+    spec: ResourceAccessFailureEvidenceByPathSpec,
+  ): TResult;
+  visitResourceAccessFailureEvidenceUnexpiredAt(
+    query: TResult,
+    spec: ResourceAccessFailureEvidenceUnexpiredAtSpec,
+  ): TResult;
+  visitAndResourceAccessFailureEvidenceSelectionSpec(
+    query: TResult,
+    spec: AndResourceAccessFailureEvidenceSelectionSpec,
+  ): TResult;
+}
+
+export interface ResourceAccessFailureEvidenceSelectionSpec {
+  accept<TResult>(
+    query: TResult,
+    visitor: ResourceAccessFailureEvidenceSelectionSpecVisitor<TResult>,
+  ): TResult;
+  and(
+    other: ResourceAccessFailureEvidenceSelectionSpec,
+  ): ResourceAccessFailureEvidenceSelectionSpec;
+}
+
+abstract class BaseResourceAccessFailureEvidenceSelectionSpec
+  implements ResourceAccessFailureEvidenceSelectionSpec
+{
+  abstract accept<TResult>(
+    query: TResult,
+    visitor: ResourceAccessFailureEvidenceSelectionSpecVisitor<TResult>,
+  ): TResult;
+
+  and(
+    other: ResourceAccessFailureEvidenceSelectionSpec,
+  ): ResourceAccessFailureEvidenceSelectionSpec {
+    return AndResourceAccessFailureEvidenceSelectionSpec.create(this, other);
+  }
+}
+
+export class ResourceAccessFailureEvidenceByRequestIdSpec extends BaseResourceAccessFailureEvidenceSelectionSpec {
+  private constructor(public readonly requestId: string) {
+    super();
+  }
+
+  static create(requestId: string): ResourceAccessFailureEvidenceByRequestIdSpec {
+    return new ResourceAccessFailureEvidenceByRequestIdSpec(requestId);
+  }
+
+  accept<TResult>(
+    query: TResult,
+    visitor: ResourceAccessFailureEvidenceSelectionSpecVisitor<TResult>,
+  ): TResult {
+    return visitor.visitResourceAccessFailureEvidenceByRequestId(query, this);
+  }
+}
+
+export class ResourceAccessFailureEvidenceByResourceIdSpec extends BaseResourceAccessFailureEvidenceSelectionSpec {
+  private constructor(public readonly resourceId: string) {
+    super();
+  }
+
+  static create(resourceId: string): ResourceAccessFailureEvidenceByResourceIdSpec {
+    return new ResourceAccessFailureEvidenceByResourceIdSpec(resourceId);
+  }
+
+  accept<TResult>(
+    query: TResult,
+    visitor: ResourceAccessFailureEvidenceSelectionSpecVisitor<TResult>,
+  ): TResult {
+    return visitor.visitResourceAccessFailureEvidenceByResourceId(query, this);
+  }
+}
+
+export class ResourceAccessFailureEvidenceByHostnameSpec extends BaseResourceAccessFailureEvidenceSelectionSpec {
+  private constructor(public readonly hostname: string) {
+    super();
+  }
+
+  static create(hostname: string): ResourceAccessFailureEvidenceByHostnameSpec {
+    return new ResourceAccessFailureEvidenceByHostnameSpec(hostname);
+  }
+
+  accept<TResult>(
+    query: TResult,
+    visitor: ResourceAccessFailureEvidenceSelectionSpecVisitor<TResult>,
+  ): TResult {
+    return visitor.visitResourceAccessFailureEvidenceByHostname(query, this);
+  }
+}
+
+export class ResourceAccessFailureEvidenceByPathSpec extends BaseResourceAccessFailureEvidenceSelectionSpec {
+  private constructor(public readonly path: string) {
+    super();
+  }
+
+  static create(path: string): ResourceAccessFailureEvidenceByPathSpec {
+    return new ResourceAccessFailureEvidenceByPathSpec(path);
+  }
+
+  accept<TResult>(
+    query: TResult,
+    visitor: ResourceAccessFailureEvidenceSelectionSpecVisitor<TResult>,
+  ): TResult {
+    return visitor.visitResourceAccessFailureEvidenceByPath(query, this);
+  }
+}
+
+export class ResourceAccessFailureEvidenceUnexpiredAtSpec extends BaseResourceAccessFailureEvidenceSelectionSpec {
+  private constructor(public readonly at: string) {
+    super();
+  }
+
+  static create(at: string): ResourceAccessFailureEvidenceUnexpiredAtSpec {
+    return new ResourceAccessFailureEvidenceUnexpiredAtSpec(at);
+  }
+
+  accept<TResult>(
+    query: TResult,
+    visitor: ResourceAccessFailureEvidenceSelectionSpecVisitor<TResult>,
+  ): TResult {
+    return visitor.visitResourceAccessFailureEvidenceUnexpiredAt(query, this);
+  }
+}
+
+export class AndResourceAccessFailureEvidenceSelectionSpec extends BaseResourceAccessFailureEvidenceSelectionSpec {
+  private constructor(
+    public readonly left: ResourceAccessFailureEvidenceSelectionSpec,
+    public readonly right: ResourceAccessFailureEvidenceSelectionSpec,
+  ) {
+    super();
+  }
+
+  static create(
+    left: ResourceAccessFailureEvidenceSelectionSpec,
+    right: ResourceAccessFailureEvidenceSelectionSpec,
+  ): AndResourceAccessFailureEvidenceSelectionSpec {
+    return new AndResourceAccessFailureEvidenceSelectionSpec(left, right);
+  }
+
+  accept<TResult>(
+    query: TResult,
+    visitor: ResourceAccessFailureEvidenceSelectionSpecVisitor<TResult>,
+  ): TResult {
+    return visitor.visitAndResourceAccessFailureEvidenceSelectionSpec(query, this);
+  }
+}
+
+export interface ResourceAccessFailureEvidenceRecorder {
+  record(
+    context: RepositoryContext,
+    input: ResourceAccessFailureEvidenceRecordInput,
+  ): Promise<Result<ResourceAccessFailureEvidenceRecord>>;
+}
+
+export interface ResourceAccessFailureEvidenceReadModel {
+  findOne(
+    context: RepositoryContext,
+    spec: ResourceAccessFailureEvidenceSelectionSpec,
+  ): Promise<Result<ResourceAccessFailureEvidenceRecord | null>>;
+}
+
 export type RouteIntentStatusSource =
   | "generated-default-access"
   | "durable-domain-binding"

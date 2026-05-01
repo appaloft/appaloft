@@ -7,6 +7,7 @@ export * from "./operations/resources/configure-resource-source.handler";
 export * from "./operations/resources/create-resource.handler";
 export * from "./operations/resources/delete-resource.handler";
 export * from "./operations/resources/list-resources.handler";
+export * from "./operations/resources/resource-access-failure-evidence-lookup.handler";
 export * from "./operations/resources/resource-diagnostic-summary.handler";
 export * from "./operations/resources/resource-effective-config.handler";
 export * from "./operations/resources/resource-health.handler";

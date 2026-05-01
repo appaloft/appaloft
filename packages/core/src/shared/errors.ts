@@ -110,6 +110,18 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("resource_diagnostic_redaction_failed", "infra", message, details),
+  resourceAccessFailureEvidenceUnavailable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError(
+      "resource_access_failure_evidence_unavailable",
+      "infra",
+      message,
+      details,
+      retryable,
+    ),
   resourceHealthUnavailable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

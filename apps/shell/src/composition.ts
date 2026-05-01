@@ -21,6 +21,7 @@ import {
   MarkServerAppliedRouteAppliedSpec,
   MarkServerAppliedRouteFailedSpec,
   type QueryBus,
+  type ResourceAccessFailureEvidenceRecorder,
   ServerAppliedRouteStateByRouteSetIdSpec,
   ServerAppliedRouteStateBySourceFingerprintSpec,
   ServerAppliedRouteStateByTargetSpec,
@@ -362,6 +363,10 @@ export async function createAppComposition(
     childContainer,
     tokens.certificateHttpChallengeTokenStore,
   );
+  const resourceAccessFailureEvidenceRecorder = resolveToken<ResourceAccessFailureEvidenceRecorder>(
+    childContainer,
+    tokens.resourceAccessFailureEvidenceRecorder,
+  );
   const certificateRetryScheduler = resolveToken<CertificateRetryScheduler>(
     childContainer,
     tokens.certificateRetryScheduler,
@@ -388,6 +393,7 @@ export async function createAppComposition(
     deploymentProgressObserver: deploymentProgressReporter,
     terminalSessionGateway,
     certificateHttpChallengeTokenStore,
+    resourceAccessFailureEvidenceRecorder,
     pluginRuntime,
     authRuntime,
     requestContextRunner,

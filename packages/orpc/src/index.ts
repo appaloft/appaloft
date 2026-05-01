@@ -114,6 +114,7 @@ import {
   RenameEnvironmentCommand,
   RenameProjectCommand,
   RenameServerCommand,
+  ResourceAccessFailureEvidenceLookupQuery,
   ResourceDiagnosticSummaryQuery,
   ResourceEffectiveConfigQuery,
   ResourceHealthQuery,
@@ -130,6 +131,7 @@ import {
   renameEnvironmentCommandInputSchema,
   renameProjectCommandInputSchema,
   renameServerCommandInputSchema,
+  resourceAccessFailureEvidenceLookupQueryInputSchema,
   resourceDiagnosticSummaryQueryInputSchema,
   resourceEffectiveConfigQueryInputSchema,
   resourceHealthQueryInputSchema,
@@ -238,6 +240,7 @@ import {
   renameEnvironmentResponseSchema,
   renameProjectResponseSchema,
   renameServerResponseSchema,
+  resourceAccessFailureEvidenceLookupSchema,
   resourceDetailSchema,
   resourceDiagnosticSummarySchema,
   resourceEffectiveConfigResponseSchema,
@@ -331,6 +334,7 @@ export const apiDocsHrefs = {
   runtimeLogs: resolvePublicDocsHelpHref("observability.runtime-logs"),
   healthSummary: resolvePublicDocsHelpHref("observability.health-summary"),
   diagnosticSummary: resolvePublicDocsHelpHref("diagnostics.safe-support-payload"),
+  accessFailureEvidenceLookup: resolvePublicDocsHelpHref("diagnostics.access-failure-request-id"),
   operatorWorkLedger: resolvePublicDocsHelpHref("operator.work-ledger"),
   terminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
@@ -546,6 +550,10 @@ export const apiRouteDescriptions = {
   resourceDiagnosticSummary: routeDescription(
     "Returns a support-safe diagnostic summary.",
     "diagnostics.safe-support-payload",
+  ),
+  resourceAccessFailureEvidenceLookup: routeDescription(
+    "Looks up short-retention, support-safe access failure evidence by request id.",
+    "diagnostics.access-failure-request-id",
   ),
   resourceHealth: routeDescription(
     "Reads current resource health.",
@@ -2074,6 +2082,19 @@ export const resourceDiagnosticSummaryProcedure = base
     executeQuery(context, ResourceDiagnosticSummaryQuery.create(input)),
   );
 
+export const resourceAccessFailureEvidenceLookupProcedure = base
+  .route({
+    method: "GET",
+    path: "/resource-access-failures/{requestId}",
+    description: apiRouteDescriptions.resourceAccessFailureEvidenceLookup,
+    successStatus: 200,
+  })
+  .input(resourceAccessFailureEvidenceLookupQueryInputSchema)
+  .output(resourceAccessFailureEvidenceLookupSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ResourceAccessFailureEvidenceLookupQuery.create(input)),
+  );
+
 export const resourceHealthProcedure = base
   .route({
     method: "GET",
@@ -2207,6 +2228,7 @@ export const appaloftOrpcRouter = {
     unsetVariable: unsetResourceVariableProcedure,
     effectiveConfig: resourceEffectiveConfigProcedure,
     diagnosticSummary: resourceDiagnosticSummaryProcedure,
+    accessFailureEvidence: resourceAccessFailureEvidenceLookupProcedure,
     health: resourceHealthProcedure,
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
     logs: resourceRuntimeLogsProcedure,
@@ -2413,6 +2435,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/proxy-configuration",
     "/api/resources/:resourceId/runtime-logs",
     "/api/resources/:resourceId/runtime-logs/stream",
+    "/api/resource-access-failures/:requestId",
     "/api/terminal-sessions",
     "/api/domain-bindings",
     "/api/domain-bindings/:domainBindingId",

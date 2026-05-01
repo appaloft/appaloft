@@ -3,6 +3,7 @@ import {
   parseResourceAccessFailureCode,
   parseResourceAccessFailureSignal,
   type ResourceAccessFailureDiagnostic,
+  type ResourceAccessRouteSource,
   resourceAccessFailureCodeFromHttpStatus,
 } from "@appaloft/application";
 
@@ -20,6 +21,18 @@ function parseStatus(input: string | null): number | null {
 
   const status = Number(input);
   return Number.isInteger(status) ? status : null;
+}
+
+function parseRouteSource(input: string | null): ResourceAccessRouteSource | null {
+  switch (input) {
+    case "generated-default":
+    case "durable-domain":
+    case "server-applied":
+    case "deployment-snapshot":
+      return input;
+    default:
+      return null;
+  }
 }
 
 function safeToken(input: string | null, fallback: string): string {
@@ -68,6 +81,17 @@ function buildDiagnostic(request: Request, now: () => string): ResourceAccessFai
   const affectedUrl = firstQueryValue(url.searchParams, "affectedUrl");
   const affectedHostname = firstQueryValue(url.searchParams, "host");
   const affectedPath = firstQueryValue(url.searchParams, "path");
+  const routeSource = parseRouteSource(firstQueryValue(url.searchParams, "routeSource"));
+  const routeHost = firstQueryValue(url.searchParams, "routeHost");
+  const pathPrefix = firstQueryValue(url.searchParams, "pathPrefix");
+  const resourceId = firstQueryValue(url.searchParams, "resourceId");
+  const deploymentId = firstQueryValue(url.searchParams, "deploymentId");
+  const domainBindingId = firstQueryValue(url.searchParams, "domainBindingId");
+  const serverId = firstQueryValue(url.searchParams, "serverId");
+  const destinationId = firstQueryValue(url.searchParams, "destinationId");
+  const providerKey = firstQueryValue(url.searchParams, "providerKey");
+  const routeId = firstQueryValue(url.searchParams, "routeId");
+  const routeStatus = firstQueryValue(url.searchParams, "routeStatus");
 
   return classifyResourceAccessFailure({
     ...(selectedCode ? { code: selectedCode } : {}),
@@ -79,6 +103,19 @@ function buildDiagnostic(request: Request, now: () => string): ResourceAccessFai
       ...(affectedHostname ? { hostname: affectedHostname } : {}),
       ...(affectedPath ? { path: affectedPath } : {}),
       method: request.method,
+    },
+    route: {
+      ...(routeHost ? { host: routeHost } : {}),
+      ...(pathPrefix ? { pathPrefix } : {}),
+      ...(resourceId ? { resourceId } : {}),
+      ...(deploymentId ? { deploymentId } : {}),
+      ...(domainBindingId ? { domainBindingId } : {}),
+      ...(serverId ? { serverId } : {}),
+      ...(destinationId ? { destinationId } : {}),
+      ...(providerKey ? { providerKey } : {}),
+      ...(routeId ? { routeId } : {}),
+      ...(routeSource ? { routeSource } : {}),
+      ...(routeStatus ? { routeStatus } : {}),
     },
     ...(firstQueryValue(url.searchParams, "causeCode")
       ? { causeCode: safeToken(firstQueryValue(url.searchParams, "causeCode"), "") }
@@ -243,13 +280,31 @@ function problemDetails(diagnostic: ResourceAccessFailureDiagnostic): Record<str
   };
 }
 
-export function resourceAccessFailureDiagnosticResponse(
+export async function resourceAccessFailureDiagnosticResponse(
   request: Request,
   input?: {
     now?: () => string;
+    retentionMs?: number;
+    recordEvidence?: (
+      diagnostic: ResourceAccessFailureDiagnostic,
+      capturedAt: string,
+      expiresAt: string,
+    ) => Promise<void>;
   },
-): Response {
+): Promise<Response> {
   const diagnostic = buildDiagnostic(request, input?.now ?? (() => new Date().toISOString()));
+  const capturedAt = diagnostic.generatedAt;
+  const expiresAt = new Date(
+    Date.parse(capturedAt) + (input?.retentionMs ?? 10 * 60 * 1000),
+  ).toISOString();
+
+  if (input?.recordEvidence) {
+    try {
+      await input.recordEvidence(diagnostic, capturedAt, expiresAt);
+    } catch {
+      // The renderer must still explain the failed request if short-retention evidence is unavailable.
+    }
+  }
 
   if (requestAcceptsHtml(request)) {
     return new Response(renderHtml(diagnostic), {

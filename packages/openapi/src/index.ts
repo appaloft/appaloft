@@ -436,6 +436,7 @@ function isDeploymentObservabilityPath(path: string): boolean {
 
 function isResourceObservabilityPath(path: string): boolean {
   return (
+    path.startsWith("/resource-access-failures") ||
     path.endsWith("/runtime-logs") ||
     path.endsWith("/runtime-logs/stream") ||
     path.endsWith("/diagnostic-summary") ||

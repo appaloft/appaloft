@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  resourceAccessFailureEvidenceLookupSchema,
   resourceAccessSummarySchema,
   resourceDiagnosticSummarySchema,
   resourceHealthSummarySchema,
@@ -230,5 +231,73 @@ describe("route intent/status contract", () => {
     expect(accessSummary.latestAccessFailureDiagnostic?.requestId).toBe("req_access_timeout");
     expect(health.publicAccess.latestAccessFailure?.nextAction).toBe("check-health");
     expect(diagnostic.access.latestAccessFailure?.route?.domainBindingId).toBe("dbnd_web");
+  });
+
+  test("[RES-ACCESS-DIAG-EVIDENCE-001][RES-ACCESS-DIAG-EVIDENCE-004] validates request-id evidence lookup contract", () => {
+    const lookup = resourceAccessFailureEvidenceLookupSchema.parse({
+      schemaVersion: "resources.access-failure-evidence.lookup/v1",
+      requestId: "req_access_timeout",
+      status: "found",
+      generatedAt: "2026-01-01T00:00:10.000Z",
+      matchedSource: "short-retention-evidence-read-model",
+      evidence: {
+        schemaVersion: "resource-access-failure/v1",
+        requestId: "req_access_timeout",
+        generatedAt: "2026-01-01T00:00:08.000Z",
+        code: "resource_access_upstream_timeout",
+        category: "timeout",
+        phase: "upstream-connection",
+        httpStatus: 504,
+        retriable: true,
+        ownerHint: "resource",
+        nextAction: "check-health",
+        affected: {
+          url: "https://web.example.test/private",
+          hostname: "web.example.test",
+          path: "/private",
+          method: "GET",
+        },
+        route: {
+          resourceId: "res_web",
+          deploymentId: "dep_web",
+          domainBindingId: "dbnd_web",
+          serverId: "srv_web",
+          destinationId: "dst_web",
+          providerKey: "traefik",
+          routeId: "route_web",
+          routeSource: "generated-default",
+          routeStatus: "ready",
+        },
+      },
+      relatedIds: {
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+        domainBindingId: "dbnd_web",
+      },
+      nextAction: "check-health",
+      capturedAt: "2026-01-01T00:00:08.000Z",
+      expiresAt: "2026-01-01T00:10:08.000Z",
+    });
+
+    const notFound = resourceAccessFailureEvidenceLookupSchema.parse({
+      schemaVersion: "resources.access-failure-evidence.lookup/v1",
+      requestId: "req_access_timeout",
+      status: "not-found",
+      generatedAt: "2026-01-01T00:00:10.000Z",
+      filters: {
+        resourceId: "res_other",
+      },
+      nextAction: "diagnostic-summary",
+      notFound: {
+        code: "resource_access_failure_evidence_not_found",
+        phase: "evidence-lookup",
+        message: "No retained access failure evidence matched the request id.",
+      },
+    });
+
+    expect(lookup.relatedIds?.resourceId).toBe("res_web");
+    expect(notFound.status).toBe("not-found");
+    expect(JSON.stringify(lookup)).not.toContain("Authorization");
+    expect(JSON.stringify(lookup)).not.toContain("token=secret");
   });
 });

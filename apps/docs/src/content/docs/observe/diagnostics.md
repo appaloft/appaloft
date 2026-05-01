@@ -12,6 +12,7 @@ searchAliases:
   - "诊断"
 relatedOperations:
   - resources.diagnostic-summary
+  - resources.access-failure-evidence.lookup
   - servers.capacity.inspect
 sidebar:
   label: "Diagnostics"
@@ -33,6 +34,26 @@ sidebar:
 - 访问地址、域名和证书状态。
 - 访问失败诊断的 request id、受影响 hostname/path、安全 related ids 和下一步动作。
 - 已屏蔽的 secret key 名和是否存在，不包含值。
+
+<h2 id="access-failure-request-id-lookup">用 Request ID 查询访问失败</h2>
+
+如果访问 Appaloft 生成 URL 或自定义域失败，错误页会显示 request id。资源所有者可以用这个
+request id 查询短期保留的安全证据：
+
+```bash title="查询访问失败证据"
+appaloft resource access-failure req_abc123
+```
+
+可以用资源、hostname 或 path 缩小范围：
+
+```bash title="按资源和路径收窄"
+appaloft resource access-failure req_abc123 --resource res_web --host web.example.com --path /
+```
+
+结果只包含安全 envelope、matched source、related ids、下一步动作、capturedAt 和 expiresAt。
+如果证据过期或筛选条件不匹配，Appaloft 返回稳定的 not-found 结果，而不是泄露其他资源信息。
+不要把截图、SSH 输出、Traefik 原始日志、cookie、Authorization header 或 provider raw payload
+当作诊断证据分享。
 
 <h2 id="runtime-target-capacity-inspect">Runtime target capacity inspect</h2>
 
