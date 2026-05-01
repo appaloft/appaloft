@@ -59,6 +59,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-032: Environment Lock Lifecycle](./ADR-032-environment-lock-lifecycle.md) | Accepted | Defines reversible environment lock/unlock lifecycle semantics and locked-environment mutation/admission guards. |
 | [ADR-033: Error Knowledge Contract](./ADR-033-error-knowledge-contract.md) | Accepted | Defines how structured errors link to human docs, agent-readable guides, responsibility, actionability, and remedies. |
 | [ADR-034: Deployment Recovery Readiness](./ADR-034-deployment-recovery-readiness.md) | Accepted | Defines shared readiness, retry, redeploy, rollback candidate, rollback, event, and error semantics before ADR-016 recovery operations become public again. |
+| [ADR-035: Certificate Lifecycle Closure](./ADR-035-certificate-lifecycle-closure.md) | Accepted | Defines certificate show, retry, revoke, and delete semantics, durable revoked/deleted states, and provider/imported behavior differences. |
 
 ## Authoring Rules
 

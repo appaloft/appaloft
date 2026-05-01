@@ -263,6 +263,12 @@
     title: string;
     detail: string;
   } | null>(null);
+  let certificateActionFeedback = $state<{
+    bindingId: string;
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
   let importBindingId = $state("");
   let importCertificateChain = $state("");
   let importPrivateKey = $state("");
@@ -576,6 +582,72 @@
         bindingId: variables?.domainBindingId ?? importBindingId,
         kind: "error",
         title: $t(i18nKeys.console.resources.certificateImportErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const retryCertificateMutation = createMutation(() => ({
+    mutationFn: (input: { certificateId: string }) => orpcClient.certificates.retry(input),
+    onSuccess: (result, variables) => {
+      certificateActionFeedback = {
+        bindingId: certificateBindingId(variables.certificateId),
+        kind: "success",
+        title: $t(i18nKeys.console.resources.certificateRetrySuccessTitle),
+        detail: result.attemptId,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["certificates"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+    },
+    onError: (error, variables) => {
+      certificateActionFeedback = {
+        bindingId: certificateBindingId(variables?.certificateId),
+        kind: "error",
+        title: $t(i18nKeys.console.resources.certificateRetryErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const revokeCertificateMutation = createMutation(() => ({
+    mutationFn: (input: { certificateId: string }) => orpcClient.certificates.revoke(input),
+    onSuccess: (result, variables) => {
+      certificateActionFeedback = {
+        bindingId: certificateBindingId(variables.certificateId),
+        kind: "success",
+        title: $t(i18nKeys.console.resources.certificateRevokeSuccessTitle),
+        detail: result.certificateId,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["certificates"] });
+      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+    },
+    onError: (error, variables) => {
+      certificateActionFeedback = {
+        bindingId: certificateBindingId(variables?.certificateId),
+        kind: "error",
+        title: $t(i18nKeys.console.resources.certificateRevokeErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const deleteCertificateMutation = createMutation(() => ({
+    mutationFn: (input: { certificateId: string; confirmation: { certificateId: string } }) =>
+      orpcClient.certificates.delete(input),
+    onSuccess: (result, variables) => {
+      certificateActionFeedback = {
+        bindingId: certificateBindingId(variables.certificateId),
+        kind: "success",
+        title: $t(i18nKeys.console.resources.certificateDeleteSuccessTitle),
+        detail: result.certificateId,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["certificates"] });
+      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+    },
+    onError: (error, variables) => {
+      certificateActionFeedback = {
+        bindingId: certificateBindingId(variables?.certificateId),
+        kind: "error",
+        title: $t(i18nKeys.console.resources.certificateDeleteErrorTitle),
         detail: readErrorMessage(error),
       };
     },
@@ -1671,6 +1743,52 @@
     });
   }
 
+  function certificateBindingId(certificateId: string | undefined): string {
+    return certificates.find((certificate) => certificate.id === certificateId)?.domainBindingId ?? "";
+  }
+
+  function retryCertificate(certificate: CertificateSummary): void {
+    if (
+      certificate.source !== "managed" ||
+      certificate.latestAttempt?.status !== "retry_scheduled" ||
+      retryCertificateMutation.isPending
+    ) {
+      return;
+    }
+
+    certificateActionFeedback = null;
+    retryCertificateMutation.mutate({ certificateId: certificate.id });
+  }
+
+  function revokeCertificate(certificate: CertificateSummary): void {
+    if (certificate.status !== "active" || revokeCertificateMutation.isPending) {
+      return;
+    }
+
+    certificateActionFeedback = null;
+    revokeCertificateMutation.mutate({ certificateId: certificate.id });
+  }
+
+  function deleteCertificate(certificate: CertificateSummary): void {
+    if (
+      !canDeleteCertificate(certificate) ||
+      deleteCertificateMutation.isPending ||
+      !window.confirm(
+        $t(i18nKeys.console.resources.certificateDeleteConfirm, {
+          certificateId: certificate.id,
+        }),
+      )
+    ) {
+      return;
+    }
+
+    certificateActionFeedback = null;
+    deleteCertificateMutation.mutate({
+      certificateId: certificate.id,
+      confirmation: { certificateId: certificate.id },
+    });
+  }
+
   function domainBindingHref(binding: DomainBindingSummary): string {
     const normalizedPath = binding.pathPrefix.startsWith("/")
       ? binding.pathPrefix
@@ -1930,6 +2048,8 @@
     switch (status) {
       case "active":
         return $t(i18nKeys.console.resources.certificateStatusActive);
+      case "deleted":
+        return $t(i18nKeys.console.resources.certificateStatusDeleted);
       case "disabled":
         return $t(i18nKeys.console.resources.certificateStatusDisabled);
       case "expired":
@@ -1942,7 +2062,13 @@
         return $t(i18nKeys.console.resources.certificateStatusPending);
       case "renewing":
         return $t(i18nKeys.console.resources.certificateStatusRenewing);
+      case "revoked":
+        return $t(i18nKeys.console.resources.certificateStatusRevoked);
     }
+  }
+
+  function canDeleteCertificate(certificate: CertificateSummary): boolean {
+    return !["active", "issuing", "pending", "renewing", "deleted"].includes(certificate.status);
   }
 
   function certificateStatusVariant(
@@ -1959,6 +2085,8 @@
       case "renewing":
         return "secondary";
       case "disabled":
+      case "deleted":
+      case "revoked":
         return "outline";
     }
   }
@@ -3776,6 +3904,56 @@
                                 </p>
                               </div>
                             </div>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                              {#if bindingCertificate.source === "managed" && bindingCertificate.latestAttempt?.status === "retry_scheduled"}
+                                <Button
+                                  id={`resource-domain-binding-certificate-retry-${bindingCertificate.id}`}
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onclick={() => retryCertificate(bindingCertificate)}
+                                  disabled={retryCertificateMutation.isPending}
+                                >
+                                  {$t(i18nKeys.console.resources.certificateRetry)}
+                                </Button>
+                              {/if}
+                              {#if bindingCertificate.status === "active"}
+                                <Button
+                                  id={`resource-domain-binding-certificate-revoke-${bindingCertificate.id}`}
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onclick={() => revokeCertificate(bindingCertificate)}
+                                  disabled={revokeCertificateMutation.isPending}
+                                >
+                                  {$t(i18nKeys.console.resources.certificateRevoke)}
+                                </Button>
+                              {/if}
+                              {#if canDeleteCertificate(bindingCertificate)}
+                                <Button
+                                  id={`resource-domain-binding-certificate-delete-${bindingCertificate.id}`}
+                                  type="button"
+                                  size="sm"
+                                  variant="destructive"
+                                  onclick={() => deleteCertificate(bindingCertificate)}
+                                  disabled={deleteCertificateMutation.isPending}
+                                >
+                                  {$t(i18nKeys.console.resources.certificateDelete)}
+                                </Button>
+                              {/if}
+                            </div>
+                            {#if certificateActionFeedback?.bindingId === binding.id}
+                              <div
+                                class={`mt-3 rounded-md border px-3 py-2 text-sm ${
+                                  certificateActionFeedback.kind === "success"
+                                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+                                    : "border-destructive/40 bg-destructive/10 text-destructive"
+                                }`}
+                              >
+                                <p class="font-medium">{certificateActionFeedback.title}</p>
+                                <p class="mt-1 break-all text-xs">{certificateActionFeedback.detail}</p>
+                              </div>
+                            {/if}
                           {:else}
                             <div class="mt-3 rounded-md bg-background px-3 py-2 text-sm text-muted-foreground">
                               {$t(i18nKeys.console.resources.certificateSummaryEmpty)}

@@ -146,6 +146,25 @@ class UnavailableCertificateProvider implements CertificateProviderPort {
       ),
     );
   }
+
+  async revoke(
+    context: ExecutionContext,
+    input: Parameters<CertificateProviderPort["revoke"]>[1],
+  ): ReturnType<CertificateProviderPort["revoke"]> {
+    void context;
+    return err(
+      domainError.certificateProviderUnavailable(
+        "Certificate provider is not configured",
+        {
+          phase: "provider-request",
+          providerKey: input.providerKey,
+          certificateId: input.certificateId,
+          domainBindingId: input.domainBindingId,
+        },
+        true,
+      ),
+    );
+  }
 }
 
 const supportedImportedKeyAlgorithms = new Set(["rsa", "ec", "ed25519", "ed448"]);

@@ -8,7 +8,7 @@ import {
   type ExecutionContext,
   type ProviderDescriptor,
 } from "@appaloft/application";
-import { type DomainError, err, ok, type Result } from "@appaloft/core";
+import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import acme from "acme-client";
 
 const providerKey = "acme";
@@ -494,6 +494,26 @@ export class AcmeCertificateProvider implements CertificateProviderPort {
     } finally {
       await this.cleanupChallenges(context, [...publishedChallenges.values()]);
     }
+  }
+
+  async revoke(
+    context: ExecutionContext,
+    input: Parameters<CertificateProviderPort["revoke"]>[1],
+  ): ReturnType<CertificateProviderPort["revoke"]> {
+    void context;
+    void input;
+    return err(
+      domainError.certificateRevokeFailed(
+        "ACME revocation is not configured for this provider adapter",
+        {
+          phase: "provider-request",
+          providerKey,
+          certificateId: input.certificateId,
+          domainBindingId: input.domainBindingId,
+        },
+        true,
+      ),
+    );
   }
 
   private async publishChallenge(

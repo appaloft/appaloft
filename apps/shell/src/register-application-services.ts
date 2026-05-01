@@ -48,6 +48,8 @@ import {
   DbStatusQueryService,
   DeactivateServerCommandHandler,
   DeactivateServerUseCase,
+  DeleteCertificateCommandHandler,
+  DeleteCertificateUseCase,
   DeleteDomainBindingCommandHandler,
   DeleteDomainBindingUseCase,
   DeleteResourceCommandHandler,
@@ -120,14 +122,20 @@ import {
   ResourceHealthQueryService,
   ResourceProxyConfigurationPreviewQueryService,
   ResourceRuntimeLogsQueryService,
+  RetryCertificateCommandHandler,
+  RetryCertificateUseCase,
   RetryDomainBindingVerificationCommandHandler,
   RetryDomainBindingVerificationUseCase,
+  RevokeCertificateCommandHandler,
+  RevokeCertificateUseCase,
   RotateSshCredentialCommandHandler,
   RotateSshCredentialUseCase,
   RuntimePlanResolutionInputBuilder,
   SetEnvironmentVariableUseCase,
   SetResourceVariableCommandHandler,
   SetResourceVariableUseCase,
+  ShowCertificateQueryHandler,
+  ShowCertificateQueryService,
   ShowDefaultAccessDomainPolicyQueryHandler,
   ShowDefaultAccessDomainPolicyQueryService,
   ShowDeploymentQueryHandler,
@@ -219,10 +227,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
+  container.registerSingleton(RetryCertificateCommandHandler);
+  container.registerSingleton(RevokeCertificateCommandHandler);
+  container.registerSingleton(DeleteCertificateCommandHandler);
   container.registerSingleton(RetryDomainBindingVerificationCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
   container.registerSingleton(RenameProjectCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
+  container.registerSingleton(ShowCertificateQueryHandler);
   container.registerSingleton(ListOperatorWorkQueryHandler);
   container.registerSingleton(ShowOperatorWorkQueryHandler);
   container.registerSingleton(ShowProjectQueryHandler);
@@ -379,8 +391,12 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.issueOrRenewCertificateUseCase,
     IssueOrRenewCertificateUseCase,
   );
+  container.registerSingleton(tokens.retryCertificateUseCase, RetryCertificateUseCase);
+  container.registerSingleton(tokens.revokeCertificateUseCase, RevokeCertificateUseCase);
+  container.registerSingleton(tokens.deleteCertificateUseCase, DeleteCertificateUseCase);
   container.registerSingleton(tokens.certificateRetryScheduler, CertificateRetryScheduler);
   container.registerSingleton(tokens.listCertificatesQueryService, ListCertificatesQueryService);
+  container.registerSingleton(tokens.showCertificateQueryService, ShowCertificateQueryService);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
   container.registerSingleton(tokens.showDeploymentQueryService, ShowDeploymentQueryService);
   container.registerSingleton(tokens.deploymentPlanQueryService, DeploymentPlanQueryService);

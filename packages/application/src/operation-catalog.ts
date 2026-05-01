@@ -1,7 +1,11 @@
 import { type ZodTypeAny } from "zod";
+import { deleteCertificateCommandInputSchema } from "./operations/certificates/delete-certificate.command";
 import { importCertificateCommandInputSchema } from "./operations/certificates/import-certificate.command";
 import { issueOrRenewCertificateCommandInputSchema } from "./operations/certificates/issue-or-renew-certificate.command";
 import { listCertificatesQueryInputSchema } from "./operations/certificates/list-certificates.query";
+import { retryCertificateCommandInputSchema } from "./operations/certificates/retry-certificate.command";
+import { revokeCertificateCommandInputSchema } from "./operations/certificates/revoke-certificate.command";
+import { showCertificateQueryInputSchema } from "./operations/certificates/show-certificate.query";
 import { configureDefaultAccessDomainPolicyCommandInputSchema } from "./operations/default-access-domain-policies/configure-default-access-domain-policy.command";
 import { listDefaultAccessDomainPoliciesQueryInputSchema } from "./operations/default-access-domain-policies/list-default-access-domain-policies.query";
 import { showDefaultAccessDomainPolicyQueryInputSchema } from "./operations/default-access-domain-policies/show-default-access-domain-policy.query";
@@ -1231,6 +1235,62 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft certificate list",
       orpc: { method: "GET", path: "/api/certificates" },
+    },
+  },
+  {
+    key: "certificates.show",
+    kind: "query",
+    domain: "certificates",
+    messageName: "ShowCertificateQuery",
+    handlerName: "ShowCertificateQueryHandler",
+    serviceName: "ShowCertificateQueryService",
+    inputSchema: showCertificateQueryInputSchema,
+    serviceToken: tokens.showCertificateQueryService,
+    transports: {
+      cli: "appaloft certificate show <certificateId>",
+      orpc: { method: "GET", path: "/api/certificates/{certificateId}" },
+    },
+  },
+  {
+    key: "certificates.retry",
+    kind: "command",
+    domain: "certificates",
+    messageName: "RetryCertificateCommand",
+    handlerName: "RetryCertificateCommandHandler",
+    serviceName: "RetryCertificateUseCase",
+    inputSchema: retryCertificateCommandInputSchema,
+    serviceToken: tokens.retryCertificateUseCase,
+    transports: {
+      cli: "appaloft certificate retry <certificateId>",
+      orpc: { method: "POST", path: "/api/certificates/{certificateId}/retries" },
+    },
+  },
+  {
+    key: "certificates.revoke",
+    kind: "command",
+    domain: "certificates",
+    messageName: "RevokeCertificateCommand",
+    handlerName: "RevokeCertificateCommandHandler",
+    serviceName: "RevokeCertificateUseCase",
+    inputSchema: revokeCertificateCommandInputSchema,
+    serviceToken: tokens.revokeCertificateUseCase,
+    transports: {
+      cli: "appaloft certificate revoke <certificateId>",
+      orpc: { method: "POST", path: "/api/certificates/{certificateId}/revoke" },
+    },
+  },
+  {
+    key: "certificates.delete",
+    kind: "command",
+    domain: "certificates",
+    messageName: "DeleteCertificateCommand",
+    handlerName: "DeleteCertificateCommandHandler",
+    serviceName: "DeleteCertificateUseCase",
+    inputSchema: deleteCertificateCommandInputSchema,
+    serviceToken: tokens.deleteCertificateUseCase,
+    transports: {
+      cli: "appaloft certificate delete <certificateId> --confirm <certificateId>",
+      orpc: { method: "DELETE", path: "/api/certificates/{certificateId}" },
     },
   },
   {

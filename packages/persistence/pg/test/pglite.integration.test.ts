@@ -1424,6 +1424,29 @@ describe("pglite persistence integration", () => {
         issuedAt: "2026-01-01T00:00:01.000Z",
         expiresAt: "2026-02-01T00:00:01.000Z",
       });
+
+      const deactivated = await store.deactivate(createTestExecutionContext(), {
+        certificateId: "crt_managed",
+        domainBindingId: "dmb_cert_secret_managed",
+        reason: "revoked",
+        deactivatedAt: "2026-01-01T00:10:00.000Z",
+      });
+      expect(deactivated.isOk()).toBe(true);
+
+      const deactivatedRow = await database.db
+        .selectFrom("certificate_secrets")
+        .selectAll()
+        .where("ref", "=", "appaloft+pg://certificate/crt_managed/cat_managed/managed-bundle")
+        .executeTakeFirstOrThrow();
+
+      expect(deactivatedRow.metadata).toEqual({
+        providerKey: "acme",
+        domainName: "managed.example.test",
+        issuedAt: "2026-01-01T00:00:01.000Z",
+        expiresAt: "2026-02-01T00:00:01.000Z",
+        deactivatedAt: "2026-01-01T00:10:00.000Z",
+        deactivationReason: "revoked",
+      });
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });
@@ -1502,6 +1525,95 @@ describe("pglite persistence integration", () => {
         { value: "private-key" },
       ]);
       expect(rows.every((row) => row.source === "imported")).toBe(true);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[ROUTE-TLS-READMODEL-013][ROUTE-TLS-READMODEL-014] pg certificate read model shows safe lifecycle metadata", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-certificate-read-model-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgCertificateReadModel } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "cert-read-model");
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_cert_read_model",
+        domainName: "read.example.test",
+        status: "bound",
+        tlsMode: "auto",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+
+      await database.db
+        .insertInto("certificates")
+        .values({
+          id: "crt_read_model",
+          domain_binding_id: "dmb_cert_read_model",
+          domain_name: "read.example.test",
+          status: "revoked",
+          source: "managed",
+          provider_key: "acme",
+          challenge_type: "http-01",
+          issued_at: "2026-01-01T00:01:00.000Z",
+          expires_at: "2026-04-01T00:01:00.000Z",
+          fingerprint: "sha256:read-model",
+          secret_ref: "appaloft+pg://certificate/crt_read_model/cat_read_model/managed-bundle",
+          safe_metadata: {},
+          secret_refs: {},
+          attempts: [
+            {
+              id: "cat_read_model",
+              status: "issued",
+              reason: "issue",
+              providerKey: "acme",
+              challengeType: "http-01",
+              requestedAt: "2026-01-01T00:00:00.000Z",
+              issuedAt: "2026-01-01T00:01:00.000Z",
+              expiresAt: "2026-04-01T00:01:00.000Z",
+            },
+          ],
+          created_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+
+      const readModel = new PgCertificateReadModel(database.db);
+      const shown = await readModel.findOne(toRepositoryContext(createTestExecutionContext()), {
+        certificateId: "crt_read_model",
+      });
+
+      expect(shown).toEqual(
+        expect.objectContaining({
+          id: "crt_read_model",
+          domainBindingId: "dmb_cert_read_model",
+          status: "revoked",
+          fingerprint: "sha256:read-model",
+          latestAttempt: expect.objectContaining({
+            id: "cat_read_model",
+            status: "issued",
+          }),
+          attempts: [
+            expect.objectContaining({
+              id: "cat_read_model",
+              status: "issued",
+            }),
+          ],
+        }),
+      );
+      expect(JSON.stringify(shown)).not.toContain("managed-bundle");
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });

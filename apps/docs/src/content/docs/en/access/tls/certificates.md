@@ -11,6 +11,11 @@ searchAliases:
   - "https"
 relatedOperations:
   - certificates.issue-or-renew
+  - certificates.import
+  - certificates.show
+  - certificates.retry
+  - certificates.revoke
+  - certificates.delete
 sidebar:
   label: "Certificates"
   order: 5
@@ -57,5 +62,15 @@ If renewal fails, do not redeploy the app first. Check:
 2. DNS still points to the current proxy entrypoint.
 3. Certificate material is not expired, incomplete, or mismatched.
 4. The proxy reloaded the new certificate.
+
+<h2 id="certificate-lifecycle">Certificate lifecycle operations</h2>
+
+`certificate show` returns only safe metadata, status, and attempt history. It does not return certificate PEM, private key, passphrase, or secret refs.
+
+`certificate retry` is only for retryable provider-issued certificate issue or renewal failures. It creates a new certificate attempt and does not retry domain ownership verification.
+
+`certificate revoke` stops an active certificate from being used for Appaloft-managed TLS. Provider-issued certificates go through the provider boundary for provider revocation. Imported certificates are revoked locally in Appaloft because Appaloft may not have revocation authority with the external CA.
+
+`certificate delete` removes only a non-active certificate from visible active lifecycle while retaining necessary audit history. Deleting a domain binding does not automatically revoke or delete certificates, and certificate revoke/delete does not delete the domain binding.
 
 Related pages: [Domain ownership](/docs/en/access/domains/ownership/) and [Access troubleshooting](/docs/en/access/troubleshooting/).

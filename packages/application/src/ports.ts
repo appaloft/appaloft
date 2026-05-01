@@ -837,11 +837,31 @@ export interface CertificateProviderIssueResult {
   certificateChainPem?: string;
 }
 
+export interface CertificateProviderRevokeInput {
+  certificateId: string;
+  domainBindingId: string;
+  domainName: string;
+  providerKey: string;
+  fingerprint?: string;
+  reason?: string;
+  revokedAt: string;
+}
+
+export interface CertificateProviderRevokeResult {
+  certificateId: string;
+  revokedAt: string;
+  externalRevocation: "provider";
+}
+
 export interface CertificateProviderPort {
   issue(
     context: ExecutionContext,
     input: CertificateProviderIssueInput,
   ): Promise<Result<CertificateProviderIssueResult, DomainError>>;
+  revoke(
+    context: ExecutionContext,
+    input: CertificateProviderRevokeInput,
+  ): Promise<Result<CertificateProviderRevokeResult, DomainError>>;
 }
 
 export interface ImportedCertificateMaterialValidationInput {
@@ -897,6 +917,15 @@ export interface CertificateSecretStore {
     context: ExecutionContext,
     input: ImportedCertificateSecretStoreInput,
   ): Promise<Result<ImportedCertificateSecretStoreResult, DomainError>>;
+  deactivate(
+    context: ExecutionContext,
+    input: {
+      certificateId: string;
+      domainBindingId: string;
+      reason: "revoked" | "deleted";
+      deactivatedAt: string;
+    },
+  ): Promise<Result<void, DomainError>>;
 }
 
 export interface CertificateHttpChallengeToken {
@@ -3183,6 +3212,7 @@ export interface CertificateSummary {
   keyAlgorithm?: string;
   subjectAlternativeNames?: string[];
   latestAttempt?: CertificateAttemptSummary;
+  attempts?: CertificateAttemptSummary[];
   createdAt: string;
 }
 
@@ -3263,6 +3293,10 @@ export interface CertificateReadModel {
       domainBindingId?: string;
     },
   ): Promise<CertificateSummary[]>;
+  findOne(
+    context: RepositoryContext,
+    input: { certificateId: string },
+  ): Promise<CertificateSummary | null>;
 }
 
 export interface SourceDetectionResult {

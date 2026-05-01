@@ -50,6 +50,7 @@ import {
   createResourceCommandInputSchema,
   createSshCredentialCommandInputSchema,
   DeactivateServerCommand,
+  DeleteCertificateCommand,
   DeleteDomainBindingCommand,
   DeleteResourceCommand,
   DeleteServerCommand,
@@ -62,6 +63,7 @@ import {
   DeploymentRecoveryReadinessQuery,
   DiffEnvironmentsQuery,
   deactivateServerCommandInputSchema,
+  deleteCertificateCommandInputSchema,
   deleteDomainBindingCommandInputSchema,
   deleteResourceCommandInputSchema,
   deleteServerCommandInputSchema,
@@ -120,7 +122,9 @@ import {
   ResourceRuntimeLogsQuery,
   type ResourceRuntimeLogsQueryInput,
   type ResourceRuntimeLogsResult,
+  RetryCertificateCommand,
   RetryDomainBindingVerificationCommand,
+  RevokeCertificateCommand,
   RotateSshCredentialCommand,
   registerServerCommandInputSchema,
   renameEnvironmentCommandInputSchema,
@@ -131,10 +135,13 @@ import {
   resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
+  retryCertificateCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
+  revokeCertificateCommandInputSchema,
   rotateSshCredentialCommandInputSchema,
   SetEnvironmentVariableCommand,
   SetResourceVariableCommand,
+  ShowCertificateQuery,
   ShowDefaultAccessDomainPolicyQuery,
   ShowDeploymentQuery,
   ShowDomainBindingQuery,
@@ -149,6 +156,7 @@ import {
   type StreamDeploymentEventsResult,
   setEnvironmentVariableCommandInputSchema,
   setResourceVariableCommandInputSchema,
+  showCertificateQueryInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
   showDeploymentQueryInputSchema,
   showDomainBindingQueryInputSchema,
@@ -193,6 +201,7 @@ import {
   createResourceResponseSchema,
   createSshCredentialResponseSchema,
   deactivateServerResponseSchema,
+  deleteCertificateResponseSchema,
   deleteDomainBindingResponseSchema,
   deleteResourceResponseSchema,
   deleteServerResponseSchema,
@@ -236,9 +245,12 @@ import {
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
+  retryCertificateResponseSchema,
   retryDomainBindingVerificationResponseSchema,
+  revokeCertificateResponseSchema,
   rotateSshCredentialResponseSchema,
   setResourceVariableResponseSchema,
+  showCertificateResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
   showDeploymentResponseSchema,
   showDomainBindingResponseSchema,
@@ -472,6 +484,22 @@ export const apiRouteDescriptions = {
   ),
   importCertificate: routeDescription(
     "Imports a manual certificate for a domain binding.",
+    "certificate.readiness",
+  ),
+  showCertificate: routeDescription(
+    "Reads safe certificate metadata and attempt history.",
+    "certificate.readiness",
+  ),
+  retryCertificate: routeDescription(
+    "Creates a new retry attempt for a retryable provider-issued certificate failure.",
+    "certificate.readiness",
+  ),
+  revokeCertificate: routeDescription(
+    "Stops Appaloft from using a certificate for managed TLS.",
+    "certificate.readiness",
+  ),
+  deleteCertificate: routeDescription(
+    "Removes a non-active certificate from visible active lifecycle while retaining audit history.",
     "certificate.readiness",
   ),
   setEnvironmentVariable: routeDescription(
@@ -1653,6 +1681,56 @@ export const listCertificatesProcedure = base
     executeQuery(context, ListCertificatesQuery.create(input)),
   );
 
+export const showCertificateProcedure = base
+  .route({
+    method: "GET",
+    path: "/certificates/{certificateId}",
+    description: apiRouteDescriptions.showCertificate,
+    successStatus: 200,
+  })
+  .input(showCertificateQueryInputSchema)
+  .output(showCertificateResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowCertificateQuery.create(input)));
+
+export const retryCertificateProcedure = base
+  .route({
+    method: "POST",
+    path: "/certificates/{certificateId}/retries",
+    description: apiRouteDescriptions.retryCertificate,
+    successStatus: 202,
+  })
+  .input(retryCertificateCommandInputSchema)
+  .output(retryCertificateResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RetryCertificateCommand.create(input)),
+  );
+
+export const revokeCertificateProcedure = base
+  .route({
+    method: "POST",
+    path: "/certificates/{certificateId}/revoke",
+    description: apiRouteDescriptions.revokeCertificate,
+    successStatus: 200,
+  })
+  .input(revokeCertificateCommandInputSchema)
+  .output(revokeCertificateResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RevokeCertificateCommand.create(input)),
+  );
+
+export const deleteCertificateProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/certificates/{certificateId}",
+    description: apiRouteDescriptions.deleteCertificate,
+    successStatus: 200,
+  })
+  .input(deleteCertificateCommandInputSchema)
+  .output(deleteCertificateResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteCertificateCommand.create(input)),
+  );
+
 export const showEnvironmentProcedure = base
   .route({
     method: "GET",
@@ -2150,7 +2228,11 @@ export const appaloftOrpcRouter = {
   certificates: {
     import: importCertificateProcedure,
     list: listCertificatesProcedure,
+    show: showCertificateProcedure,
     issueOrRenew: issueOrRenewCertificateProcedure,
+    retry: retryCertificateProcedure,
+    revoke: revokeCertificateProcedure,
+    delete: deleteCertificateProcedure,
   },
   deployments: {
     list: listDeploymentsProcedure,
@@ -2339,8 +2421,11 @@ export function mountAppaloftOrpcRoutes(
     "/api/domain-bindings/:domainBindingId/delete-check",
     "/api/domain-bindings/:domainBindingId/verification-retries",
     "/api/certificates",
+    "/api/certificates/:certificateId",
     "/api/certificates/import",
     "/api/certificates/issue-or-renew",
+    "/api/certificates/:certificateId/retries",
+    "/api/certificates/:certificateId/revoke",
     "/api/deployments",
     "/api/deployments/plan",
     "/api/deployments/:deploymentId",

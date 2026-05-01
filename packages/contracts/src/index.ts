@@ -1640,7 +1640,17 @@ export const certificateSummarySchema = z.object({
   id: z.string(),
   domainBindingId: z.string(),
   domainName: z.string(),
-  status: z.enum(["pending", "issuing", "active", "renewing", "failed", "expired", "disabled"]),
+  status: z.enum([
+    "pending",
+    "issuing",
+    "active",
+    "renewing",
+    "failed",
+    "expired",
+    "disabled",
+    "revoked",
+    "deleted",
+  ]),
   source: z.enum(["managed", "imported"]),
   providerKey: z.string(),
   challengeType: z.string(),
@@ -1652,11 +1662,27 @@ export const certificateSummarySchema = z.object({
   keyAlgorithm: z.string().optional(),
   subjectAlternativeNames: z.array(z.string()).optional(),
   latestAttempt: certificateAttemptSummarySchema.optional(),
+  attempts: z.array(certificateAttemptSummarySchema).optional(),
   createdAt: z.string(),
 });
 
 export const listCertificatesResponseSchema = z.object({
   items: z.array(certificateSummarySchema),
+});
+
+export const showCertificateResponseSchema = certificateSummarySchema;
+
+export const retryCertificateResponseSchema = z.object({
+  certificateId: z.string(),
+  attemptId: z.string(),
+});
+
+export const revokeCertificateResponseSchema = z.object({
+  certificateId: z.string(),
+});
+
+export const deleteCertificateResponseSchema = z.object({
+  certificateId: z.string(),
 });
 
 export const createEnvironmentInputSchema = z.object({
@@ -3213,6 +3239,10 @@ export type ImportCertificateResponse = z.infer<typeof importCertificateResponse
 export type CertificateAttemptSummary = z.infer<typeof certificateAttemptSummarySchema>;
 export type CertificateSummary = z.infer<typeof certificateSummarySchema>;
 export type ListCertificatesResponse = z.infer<typeof listCertificatesResponseSchema>;
+export type ShowCertificateResponse = z.infer<typeof showCertificateResponseSchema>;
+export type RetryCertificateResponse = z.infer<typeof retryCertificateResponseSchema>;
+export type RevokeCertificateResponse = z.infer<typeof revokeCertificateResponseSchema>;
+export type DeleteCertificateResponse = z.infer<typeof deleteCertificateResponseSchema>;
 export type SetEnvironmentVariableInput = z.infer<typeof setEnvironmentVariableInputSchema>;
 export type PromoteEnvironmentInput = z.infer<typeof promoteEnvironmentInputSchema>;
 export type PromoteEnvironmentResponse = z.infer<typeof promoteEnvironmentResponseSchema>;

@@ -115,6 +115,18 @@ describe("console docs help links", () => {
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "serverTerminalSession",
     );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "certificateReadiness",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "orpcClient.certificates.retry",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "orpcClient.certificates.revoke",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "orpcClient.certificates.delete",
+    );
 
     expect(
       sourceByPath[

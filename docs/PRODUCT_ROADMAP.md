@@ -619,7 +619,7 @@ Required:
 - [x] Add domain binding show/configure-route/delete-check/delete/retry-verification lifecycle
   commands where specs allow mutation
   after creation.
-- [ ] Add certificate show/import/revoke/delete/retry semantics around provider-issued and imported
+- [x] Add certificate show/import/revoke/delete/retry semantics around provider-issued and imported
   certificates.
 - [ ] Broaden API/Web/CLI regression coverage for generated access display.
 - [ ] Broaden API/Web/CLI regression coverage for provider-rendered proxy configuration preview.
@@ -648,6 +648,19 @@ Phase 6 verification notes from 2026-04-30:
   `domain-bindings.configure-route` instead of forbidden generic `domain-bindings.update`, keeps
   certificate readiness read-only, and does not start certificate revoke/delete/retry or deployment
   retry/redeploy/rollback.
+
+Phase 6 verification notes from 2026-05-01:
+
+- The certificate lifecycle closure slice added `certificates.show`, `certificates.retry`,
+  `certificates.revoke`, and `certificates.delete` across source-of-truth specs, operation catalog,
+  application handlers, persistence safe read models, oRPC/OpenAPI, CLI, Web resource affordances,
+  i18n, and public TLS docs under `docs/specs/023-certificate-lifecycle-closure`.
+- Imported certificate import was already implemented; this slice verified and preserved
+  `certificate-imported` semantics, then added imported retry rejection and Appaloft-local imported
+  revoke behavior. Provider-issued revoke goes through the certificate provider boundary; imported
+  revoke does not call provider revocation.
+- Domain binding delete remains separate from certificate revoke/delete. Active certificate state
+  still blocks domain binding delete until explicit certificate lifecycle actions are taken.
 
 Exit criteria:
 
