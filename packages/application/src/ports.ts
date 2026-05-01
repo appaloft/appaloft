@@ -66,6 +66,9 @@ import {
   type VariableKind,
 } from "@appaloft/core";
 import { type ExecutionContext, type RepositoryContext } from "./execution-context";
+import { type ResourceAccessFailureDiagnostic } from "./resource-access-failure-diagnostics";
+
+export type { ResourceAccessFailureDiagnostic } from "./resource-access-failure-diagnostics";
 
 export interface Clock {
   now(): string;
@@ -1593,6 +1596,7 @@ export interface ResourceAccessSummary {
   latestServerAppliedDomainRoute?: ResourceAccessRouteSummary;
   proxyRouteStatus?: "unknown" | "ready" | "not-ready" | "failed";
   lastRouteRealizationDeploymentId?: string;
+  latestAccessFailureDiagnostic?: ResourceAccessFailureDiagnostic;
 }
 
 export type RouteIntentStatusSource =
@@ -1940,6 +1944,7 @@ export interface ResourcePublicAccessHealthSection {
   reasonCode?: string;
   phase?: string;
   routeIntentStatus?: RouteIntentStatusDescriptor;
+  latestAccessFailure?: ResourceAccessFailureDiagnostic;
 }
 
 export interface ResourceProxyHealthSection {
@@ -2244,6 +2249,7 @@ export interface ResourceDiagnosticAccess {
   durableUrl?: string;
   serverAppliedUrl?: string;
   plannedUrl?: string;
+  latestAccessFailure?: ResourceAccessFailureDiagnostic;
   selectedRoute?: RouteIntentStatusDescriptor;
   routeIntentStatuses?: RouteIntentStatusDescriptor[];
   proxyRouteStatus?: ResourceAccessSummary["proxyRouteStatus"];

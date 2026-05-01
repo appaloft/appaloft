@@ -16,6 +16,7 @@ import {
   type DeploymentSummary,
   type DomainBindingReadModel,
   type DomainBindingSummary,
+  type ResourceAccessFailureDiagnostic,
   type ResourceAccessSummary,
   type ResourceHealthCheck,
   type ResourceHealthDeploymentContext,
@@ -119,6 +120,27 @@ function proxyProviderKey(accessSummary: ResourceAccessSummary | undefined): str
     accessSummary?.latestGeneratedAccessRoute?.proxyKind ??
     accessSummary?.plannedGeneratedAccessRoute?.proxyKind
   );
+}
+
+function latestAccessFailureSource(
+  diagnostic: ResourceAccessFailureDiagnostic,
+): ResourceHealthSource {
+  return diagnostic.phase === "proxy-route-observation" ? "proxy" : "public-access";
+}
+
+function sourceErrorFromAccessFailure(
+  diagnostic: ResourceAccessFailureDiagnostic,
+): ResourceHealthSourceError {
+  return sourceError({
+    source: latestAccessFailureSource(diagnostic),
+    code: diagnostic.code,
+    category: diagnostic.category,
+    phase: diagnostic.phase,
+    retriable: diagnostic.retriable,
+    ...(diagnostic.route?.resourceId ? { relatedEntityId: diagnostic.route.resourceId } : {}),
+    relatedState: diagnostic.nextAction,
+    message: `Latest edge access failure ${diagnostic.requestId}`,
+  });
 }
 
 function latestDeploymentContext(
@@ -375,6 +397,7 @@ function publicAccessSection(
 ): ResourcePublicAccessHealthSection {
   const access = resource.accessSummary;
   const nonReadyDurableBinding = currentNonReadyDurableDomainBinding(domainBindings, access);
+  const latestAccessFailure = access?.latestAccessFailureDiagnostic;
 
   if (nonReadyDurableBinding) {
     const routeIntentStatus = selectedRouteIntentStatus({
@@ -422,6 +445,49 @@ function publicAccessSection(
             ? "generated-planned"
             : undefined;
 
+  const routeIntentStatus = selectedRouteIntentStatus({
+    resourceId: resource.id,
+    accessSummary: access,
+  });
+
+  if (latestAccessFailure) {
+    sourceErrors.push(sourceErrorFromAccessFailure(latestAccessFailure));
+
+    return {
+      status: "failed",
+      ...(latestAccessFailure.affected?.url
+        ? { url: latestAccessFailure.affected.url }
+        : route?.url
+          ? { url: route.url }
+          : {}),
+      ...(kind ? { kind } : {}),
+      reasonCode: latestAccessFailure.code,
+      phase: latestAccessFailure.phase,
+      latestAccessFailure,
+      ...(routeIntentStatus
+        ? {
+            routeIntentStatus: {
+              ...routeIntentStatus,
+              latestObservation: {
+                source: "access-failure-diagnostic",
+                observedAt: latestAccessFailure.generatedAt,
+                requestId: latestAccessFailure.requestId,
+                ...(latestAccessFailure.route?.deploymentId
+                  ? { deploymentId: latestAccessFailure.route.deploymentId }
+                  : {}),
+              },
+              copySafeSummary: {
+                status: "failed",
+                code: latestAccessFailure.code,
+                phase: latestAccessFailure.phase,
+                message: `Latest edge access failure ${latestAccessFailure.requestId}`,
+              },
+            },
+          }
+        : {}),
+    };
+  }
+
   if (!route) {
     if (resource.networkProfile?.exposureMode === "reverse-proxy") {
       sourceErrors.push(
@@ -448,11 +514,6 @@ function publicAccessSection(
       reasonCode: "resource_public_access_not_configured",
     };
   }
-
-  const routeIntentStatus = selectedRouteIntentStatus({
-    resourceId: resource.id,
-    accessSummary: access,
-  });
 
   switch (access?.proxyRouteStatus) {
     case "ready":

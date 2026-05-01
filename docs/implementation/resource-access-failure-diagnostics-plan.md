@@ -168,6 +168,11 @@ The first Code Round slice is implemented:
   gateway entry;
 - `APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL` is retained as an optional topology override when
   the proxy manager knows a different reachable backend URL.
+- the 2026-05-01 baseline adds safe affected URL/host/path, optional related domain binding id,
+  stable `nextAction`, and request/correlation id normalization to the envelope;
+- `ResourceAccessSummary` may carry `latestAccessFailureDiagnostic`, and
+  `resources.health`/`resources.diagnostic-summary` compose that safe envelope into source errors,
+  public access state, and copyable diagnostic JSON without mutating route or deployment state.
 
 Still deferred:
 
@@ -176,10 +181,8 @@ Still deferred:
 - real Traefik end-to-end probing of the error middleware path;
 - request id propagation from the external edge request into the renderer when the provider can
   supply it;
-- route/resource/deployment context lookup for owner-facing details;
+- automatic route/resource/deployment context lookup from applied provider metadata;
 - short-retention persistence or trace/log lookup for edge failure envelopes;
-- `resources.health` and `resources.diagnostic-summary` source composition from latest edge
-  failures.
 
 ## Open Questions
 
