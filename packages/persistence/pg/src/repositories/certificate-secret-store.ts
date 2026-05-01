@@ -7,7 +7,7 @@ import {
   type ImportedCertificateSecretStoreResult,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
-import { type Insertable, type Kysely, type Transaction } from "kysely";
+import { type Insertable, type Kysely, sql, type Transaction } from "kysely";
 
 import { type Database } from "../schema";
 
@@ -190,6 +190,47 @@ export class PgCertificateSecretStore implements CertificateSecretStore {
           phase: "certificate-import-storage",
           error,
         }),
+      );
+    }
+  }
+
+  async deactivate(
+    context: ExecutionContext,
+    input: {
+      certificateId: string;
+      domainBindingId: string;
+      reason: "revoked" | "deleted";
+      deactivatedAt: string;
+    },
+  ): Promise<Result<void>> {
+    void context;
+    try {
+      await this.db
+        .updateTable("certificate_secrets")
+        .set({
+          metadata: sql`metadata || ${JSON.stringify({
+            deactivatedAt: input.deactivatedAt,
+            deactivationReason: input.reason,
+          })}::jsonb`,
+          updated_at: input.deactivatedAt,
+        })
+        .where("certificate_id", "=", input.certificateId)
+        .where("domain_binding_id", "=", input.domainBindingId)
+        .execute();
+
+      return ok(undefined);
+    } catch (error) {
+      return err(
+        domainError.certificateStorageFailed(
+          "Certificate secret references could not be deactivated",
+          {
+            phase: "certificate-storage",
+            adapter: "persistence.pg",
+            certificateId: input.certificateId,
+            errorMessage: error instanceof Error ? error.message : String(error),
+          },
+          true,
+        ),
       );
     }
   }

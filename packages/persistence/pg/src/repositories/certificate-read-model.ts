@@ -44,6 +44,22 @@ export class PgCertificateReadModel implements CertificateReadModel {
           const attempts = (row.attempts ?? []) as unknown as SerializedCertificateAttempt[];
           const safeMetadata = (row.safe_metadata ?? {}) as SerializedImportedCertificateMetadata;
           const latestAttempt = attempts[attempts.length - 1];
+          const attemptSummaries = attempts.map((attempt) => ({
+            id: attempt.id,
+            status: attempt.status,
+            reason: attempt.reason,
+            providerKey: attempt.providerKey,
+            challengeType: attempt.challengeType,
+            requestedAt: attempt.requestedAt,
+            ...(attempt.issuedAt ? { issuedAt: attempt.issuedAt } : {}),
+            ...(attempt.expiresAt ? { expiresAt: attempt.expiresAt } : {}),
+            ...(attempt.failedAt ? { failedAt: attempt.failedAt } : {}),
+            ...(attempt.failureCode ? { errorCode: attempt.failureCode } : {}),
+            ...(attempt.failurePhase ? { failurePhase: attempt.failurePhase } : {}),
+            ...(attempt.failureMessage ? { failureMessage: attempt.failureMessage } : {}),
+            ...(attempt.retriable === undefined ? {} : { retriable: attempt.retriable }),
+            ...(attempt.retryAfter ? { retryAfter: attempt.retryAfter } : {}),
+          }));
 
           return {
             id: row.id,
@@ -70,34 +86,22 @@ export class PgCertificateReadModel implements CertificateReadModel {
               : {}),
             ...(latestAttempt
               ? {
-                  latestAttempt: {
-                    id: latestAttempt.id,
-                    status: latestAttempt.status,
-                    reason: latestAttempt.reason,
-                    providerKey: latestAttempt.providerKey,
-                    challengeType: latestAttempt.challengeType,
-                    requestedAt: latestAttempt.requestedAt,
-                    ...(latestAttempt.issuedAt ? { issuedAt: latestAttempt.issuedAt } : {}),
-                    ...(latestAttempt.expiresAt ? { expiresAt: latestAttempt.expiresAt } : {}),
-                    ...(latestAttempt.failedAt ? { failedAt: latestAttempt.failedAt } : {}),
-                    ...(latestAttempt.failureCode ? { errorCode: latestAttempt.failureCode } : {}),
-                    ...(latestAttempt.failurePhase
-                      ? { failurePhase: latestAttempt.failurePhase }
-                      : {}),
-                    ...(latestAttempt.failureMessage
-                      ? { failureMessage: latestAttempt.failureMessage }
-                      : {}),
-                    ...(latestAttempt.retriable === undefined
-                      ? {}
-                      : { retriable: latestAttempt.retriable }),
-                    ...(latestAttempt.retryAfter ? { retryAfter: latestAttempt.retryAfter } : {}),
-                  },
+                  latestAttempt: attemptSummaries[attemptSummaries.length - 1],
                 }
               : {}),
+            attempts: attemptSummaries,
             createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
           };
         });
       },
     );
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    input: { certificateId: string },
+  ): Promise<CertificateSummary | null> {
+    const items = await this.list(context);
+    return items.find((item) => item.id === input.certificateId) ?? null;
   }
 }

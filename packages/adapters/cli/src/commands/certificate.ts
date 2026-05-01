@@ -1,7 +1,11 @@
 import {
+  DeleteCertificateCommand,
   ImportCertificateCommand,
   IssueOrRenewCertificateCommand,
   ListCertificatesQuery,
+  RetryCertificateCommand,
+  RevokeCertificateCommand,
+  ShowCertificateQuery,
 } from "@appaloft/application";
 import { certificateIssueReasons } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
@@ -11,10 +15,13 @@ import { optionalValue, runCommand, runQuery } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const domainBindingIdArg = Args.text({ name: "domainBindingId" });
+const certificateIdArg = Args.text({ name: "certificateId" });
 const reasonOption = Options.choice("reason", certificateIssueReasons).pipe(
   Options.withDefault("issue"),
 );
+const revokeReasonOption = Options.text("reason").pipe(Options.optional);
 const certificateIdOption = Options.text("certificate-id").pipe(Options.optional);
+const confirmOption = Options.text("confirm");
 const providerKeyOption = Options.text("provider").pipe(Options.optional);
 const challengeTypeOption = Options.text("challenge").pipe(Options.optional);
 const idempotencyKeyOption = Options.text("idempotency-key").pipe(Options.optional);
@@ -91,7 +98,68 @@ const listCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.certificateList));
 
+const showCommand = EffectCommand.make(
+  "show",
+  { certificateId: certificateIdArg },
+  ({ certificateId }) => runQuery(ShowCertificateQuery.create({ certificateId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.certificateShow));
+
+const retryCommand = EffectCommand.make(
+  "retry",
+  {
+    certificateId: certificateIdArg,
+    idempotencyKey: idempotencyKeyOption,
+  },
+  ({ certificateId, idempotencyKey }) =>
+    runCommand(
+      RetryCertificateCommand.create({
+        certificateId,
+        idempotencyKey: optionalValue(idempotencyKey),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.certificateRetry));
+
+const revokeCommand = EffectCommand.make(
+  "revoke",
+  {
+    certificateId: certificateIdArg,
+    reason: revokeReasonOption,
+    idempotencyKey: idempotencyKeyOption,
+  },
+  ({ certificateId, idempotencyKey, reason }) =>
+    runCommand(
+      RevokeCertificateCommand.create({
+        certificateId,
+        reason: optionalValue(reason),
+        idempotencyKey: optionalValue(idempotencyKey),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.certificateRevoke));
+
+const deleteCommand = EffectCommand.make(
+  "delete",
+  {
+    certificateId: certificateIdArg,
+    confirm: confirmOption,
+  },
+  ({ certificateId, confirm }) =>
+    runCommand(
+      DeleteCertificateCommand.create({
+        certificateId,
+        confirmation: { certificateId: confirm },
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.certificateDelete));
+
 export const certificateCommand = EffectCommand.make("certificate").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.certificate),
-  EffectCommand.withSubcommands([importCommand, issueOrRenewCommand, listCommand]),
+  EffectCommand.withSubcommands([
+    deleteCommand,
+    importCommand,
+    issueOrRenewCommand,
+    listCommand,
+    retryCommand,
+    revokeCommand,
+    showCommand,
+  ]),
 );

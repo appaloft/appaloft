@@ -12,6 +12,8 @@ import {
   CertificateId,
   CertificateIssuedAtValue,
   CertificateIssueReasonValue,
+  CertificateKeyAlgorithmValue,
+  CertificateNotBeforeValue,
   CertificateSecretRefValue,
   CreatedAt,
   DomainBindingId,
@@ -62,6 +64,27 @@ function markFailed(certificate: Certificate, retriable: boolean) {
       providerKey: ProviderKey.rehydrate("acme"),
     })
     ._unsafeUnwrap();
+}
+
+function importedCertificate() {
+  return Certificate.importCertificate({
+    id: CertificateId.rehydrate("crt_imported"),
+    domainBindingId: DomainBindingId.rehydrate("dom_demo"),
+    domainName: PublicDomainName.rehydrate("secure.example.com"),
+    attemptId: CertificateAttemptId.rehydrate("cat_imported"),
+    reason: CertificateIssueReasonValue.rehydrate("issue"),
+    providerKey: ProviderKey.rehydrate("manual"),
+    challengeType: CertificateChallengeTypeValue.rehydrate("manual"),
+    importedAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    notBefore: CertificateNotBeforeValue.rehydrate("2025-12-01T00:00:00.000Z"),
+    expiresAt: CertificateExpiresAtValue.rehydrate("2026-06-01T00:00:00.000Z"),
+    subjectAlternativeNames: [PublicDomainName.rehydrate("secure.example.com")],
+    keyAlgorithm: CertificateKeyAlgorithmValue.rehydrate("rsa"),
+    certificateChainRef: CertificateSecretRefValue.rehydrate(
+      "secret://certificates/crt_imported/chain",
+    ),
+    privateKeyRef: CertificateSecretRefValue.rehydrate("secret://certificates/crt_imported/key"),
+  })._unsafeUnwrap();
 }
 
 describe("Certificate", () => {
@@ -134,5 +157,91 @@ describe("Certificate", () => {
       expect(missing.error.code).toBe("not_found");
     }
     expect(certificate.toState().attempts[0]?.status.value).toBe("requested");
+  });
+
+  test("[ROUTE-TLS-CMD-025] exposes provider retry context only for retry-scheduled managed certificates", () => {
+    const certificate = requestedCertificate();
+    markFailed(certificate, true);
+
+    const context = certificate.resolveRetryContext();
+
+    expect(context.isOk()).toBe(true);
+    expect(context._unsafeUnwrap().attemptId.value).toBe("cat_demo");
+    expect(context._unsafeUnwrap().certificateId.value).toBe("crt_demo");
+    expect(context._unsafeUnwrap().providerKey.value).toBe("acme");
+
+    const imported = importedCertificate();
+    const importedRetry = imported.resolveRetryContext();
+    expect(importedRetry.isErr()).toBe(true);
+    expect(importedRetry._unsafeUnwrapErr().code).toBe("certificate_retry_not_allowed");
+  });
+
+  test("[ROUTE-TLS-CMD-027][ROUTE-TLS-EVT-015] revokes active certificates without exposing secret material", () => {
+    const managed = requestedCertificate();
+    markIssued(managed);
+
+    const revoked = managed.revoke({
+      revokedAt: CreatedAt.rehydrate("2026-01-02T00:00:00.000Z"),
+      externalRevocation: "provider",
+    });
+
+    expect(revoked.isOk()).toBe(true);
+    expect(managed.toState().status.value).toBe("revoked");
+    expect(managed.pullDomainEvents()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "certificate-revoked",
+          payload: expect.objectContaining({
+            certificateId: "crt_demo",
+            externalRevocation: "provider",
+          }),
+        }),
+      ]),
+    );
+
+    const imported = importedCertificate();
+    const importedRevoked = imported.revoke({
+      revokedAt: CreatedAt.rehydrate("2026-01-02T00:00:00.000Z"),
+      externalRevocation: "appaloft-local",
+    });
+
+    expect(importedRevoked.isOk()).toBe(true);
+    expect(imported.toState().status.value).toBe("revoked");
+  });
+
+  test("[ROUTE-TLS-CMD-029][ROUTE-TLS-EVT-016] blocks active delete and preserves audit state after revoke", () => {
+    const certificate = requestedCertificate();
+    markIssued(certificate);
+
+    const activeDelete = certificate.delete({
+      deletedAt: CreatedAt.rehydrate("2026-01-02T00:00:00.000Z"),
+    });
+    expect(activeDelete.isErr()).toBe(true);
+    expect(activeDelete._unsafeUnwrapErr().code).toBe("certificate_delete_not_allowed");
+
+    certificate
+      .revoke({
+        revokedAt: CreatedAt.rehydrate("2026-01-02T00:00:00.000Z"),
+        externalRevocation: "provider",
+      })
+      ._unsafeUnwrap();
+
+    const deleted = certificate.delete({
+      deletedAt: CreatedAt.rehydrate("2026-01-03T00:00:00.000Z"),
+    });
+
+    expect(deleted.isOk()).toBe(true);
+    expect(certificate.toState().status.value).toBe("deleted");
+    expect(certificate.pullDomainEvents()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "certificate-deleted",
+          payload: expect.objectContaining({
+            certificateId: "crt_demo",
+            preservedAudit: true,
+          }),
+        }),
+      ]),
+    );
   });
 });

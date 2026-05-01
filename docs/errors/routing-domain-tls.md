@@ -38,7 +38,10 @@ type RoutingDomainTlsErrorDetails = {
     | "domain-bindings.delete"
     | "domain-bindings.retry-verification"
     | "certificates.issue-or-renew"
-    | "certificates.import";
+    | "certificates.import"
+    | "certificates.retry"
+    | "certificates.revoke"
+    | "certificates.delete";
   eventName?:
     | "domain-binding-requested"
     | "domain-binding-route-configured"
@@ -49,6 +52,8 @@ type RoutingDomainTlsErrorDetails = {
     | "certificate-issued"
     | "certificate-issuance-failed"
     | "certificate-imported"
+    | "certificate-revoked"
+    | "certificate-deleted"
     | "domain-ready";
   phase:
     | "command-validation"
@@ -68,6 +73,7 @@ type RoutingDomainTlsErrorDetails = {
     | "certificate-storage"
     | "certificate-import-validation"
     | "certificate-import-storage"
+    | "certificate-delete"
     | "renewal-window"
     | "domain-ready"
     | "event-publication"
@@ -122,6 +128,10 @@ Admission errors reject the command and return `err(DomainError)`.
 | `certificate_import_unsupported_algorithm` | `certificate-import-validation` | No | Imported certificate/key algorithm is not supported by policy. |
 | `certificate_import_malformed_chain` | `certificate-import-validation` | No | Imported chain is malformed or cannot be parsed into a valid leaf/intermediate sequence. |
 | `certificate_import_storage_failed` | `certificate-import-storage` | Yes | Secret storage or durable state recording failed before import success could be recorded. |
+| `certificate_retry_not_allowed` | `certificate-admission` | No | Certificate source, status, or latest attempt does not allow public retry. |
+| `certificate_revoke_not_allowed` | `certificate-admission` | No | Certificate state is not active or cannot be revoked. |
+| `certificate_revoke_failed` | `provider-request` or `certificate-storage` | Conditional | Provider revocation or secret-store deactivation failed safely. |
+| `certificate_delete_not_allowed` | `certificate-delete` | No | Certificate is still active for TLS or otherwise not deletable. |
 | `infra_error` | persistence, import storage, or event publication phase | Conditional | State or event could not be safely recorded. |
 
 ## Async Error Profile
@@ -141,6 +151,10 @@ Admission errors reject the command and return `err(DomainError)`.
 | Imported certificate is expired or not yet valid | Import command returns `err` with `code = certificate_import_expired` or `certificate_import_not_yet_valid`, `phase = certificate-import-validation`. | No until certificate material changes or time crosses the validity window. |
 | Imported certificate chain is malformed or algorithm is unsupported | Import command returns `err` with `code = certificate_import_malformed_chain` or `certificate_import_unsupported_algorithm`, `phase = certificate-import-validation`. | No until certificate material changes. |
 | Imported certificate secret storage fails | Import command returns `err` with `code = certificate_import_storage_failed`, `phase = certificate-import-storage`. | Yes when storage can recover. |
+| Public retry targets imported or non-retryable certificate | Retry command returns `err` with `code = certificate_retry_not_allowed`, `phase = certificate-admission`. | No until a managed retryable failure exists. |
+| Provider-issued certificate revocation provider unavailable | Revoke command returns `err` with `code = certificate_provider_unavailable`, `phase = provider-request`. | Yes when provider can recover. |
+| Imported certificate revoke | Revoke command records Appaloft-local `revoked` state and publishes `certificate-revoked`; no provider revocation is attempted. | No |
+| Active certificate delete | Delete command returns `err` with `code = certificate_delete_not_allowed`, `phase = certificate-delete`; no revocation is attempted. | No |
 | Renewal window invalid | `certificate-issuance-failed` with `code = certificate_renewal_window_invalid`, `failurePhase = renewal-window`. | No unless time/policy changes. |
 | Event handler crashes before terminal state | Persist event-processing failure or retryable attempt state; do not publish terminal success/failure until state is known. | Yes |
 | Duplicate event consumed | No new side effect; return `ok`. | Not applicable |
@@ -199,15 +213,15 @@ into durable failed or retry-scheduled certificate attempt state and publishes
 Current code consumes `certificate-issued` for certificate-backed domain readiness and publishes
 `domain-ready` after the referenced bound domain binding is marked ready.
 
-`certificates.import`, `certificate-imported`, and import-specific validation/storage error mapping
-are not implemented yet.
+Current code implements `certificates.import`, `certificate-imported`, and import-specific
+validation/storage error mapping.
 
 Current code serves HTTP-01 challenge tokens through an injected challenge token store. Missing,
 expired, removed, or host-mismatched challenge requests return HTTP `404` and do not mutate
 certificate or domain binding state.
 
-Route realization failure state, DNS-provider verification failure state, and import-specific
-business-code error mapping are not implemented yet.
+Current code implements certificate show/retry/revoke/delete error handling. Route realization
+failure state and DNS-provider verification failure state remain separate workflow gaps.
 
 ## Open Questions
 

@@ -728,6 +728,10 @@ Implemented operations:
 | Retry domain binding ownership verification | Command | `domain-bindings.retry-verification` | `RetryDomainBindingVerificationCommand` | `RetryDomainBindingVerificationCommandInput` | `appaloft domain-binding retry-verification <domainBindingId>` | `POST /api/domain-bindings/{domainBindingId}/verification-retries` |
 | Issue or renew certificate | Command | `certificates.issue-or-renew` | `IssueOrRenewCertificateCommand` | `IssueOrRenewCertificateCommandInput` | `appaloft certificate issue-or-renew <domainBindingId>` | `POST /api/certificates/issue-or-renew` |
 | List certificates | Query | `certificates.list` | `ListCertificatesQuery` | `ListCertificatesQueryInput` | `appaloft certificate list` | `GET /api/certificates` |
+| Show certificate | Query | `certificates.show` | `ShowCertificateQuery` | `ShowCertificateQueryInput` | `appaloft certificate show <certificateId>` | `GET /api/certificates/{certificateId}` |
+| Retry certificate | Command | `certificates.retry` | `RetryCertificateCommand` | `RetryCertificateCommandInput` | `appaloft certificate retry <certificateId>` | `POST /api/certificates/{certificateId}/retries` |
+| Revoke certificate | Command | `certificates.revoke` | `RevokeCertificateCommand` | `RevokeCertificateCommandInput` | `appaloft certificate revoke <certificateId>` | `POST /api/certificates/{certificateId}/revoke` |
+| Delete certificate | Command | `certificates.delete` | `DeleteCertificateCommand` | `DeleteCertificateCommandInput` | `appaloft certificate delete <certificateId> --confirm <certificateId>` | `DELETE /api/certificates/{certificateId}` |
 
 Current boundary:
 - `domain-bindings.create` creates durable binding state, persists the first manual verification
@@ -773,6 +777,21 @@ Current boundary:
   state after accepted issue requests rather than pretending HTTPS is active
 - `certificates.list` exposes certificate and latest attempt state for CLI, API, and future Web
   readiness views
+- `certificates.show` exposes one certificate's safe metadata, source, active lifecycle status, and
+  attempt history without exposing PEM, private keys, passphrases, secret refs, provider
+  credentials, or raw provider responses
+- `certificates.retry` creates a new provider-issued certificate attempt from the latest retryable
+  managed failure by reusing the `certificates.issue-or-renew` path and publishing
+  `certificate-requested`; it does not retry domain binding ownership verification and does not
+  replay old events
+- imported certificates are not retried by `certificates.retry`; operators replace imported
+  material by running `certificates.import` again with new secret-bearing input
+- `certificates.revoke` stops Appaloft from using a certificate for managed TLS. Provider-issued
+  certificates coordinate through the provider boundary when supported; imported certificates record
+  Appaloft-local TLS disablement and must not claim external CA revocation
+- `certificates.delete` removes a non-active certificate from visible active lifecycle while
+  retaining necessary audit history. It does not revoke certificates, delete domain bindings,
+  generated access, deployment snapshots, or server-applied route audit
 - `deployments.create` must not carry domain, proxy, path prefix, or TLS fields
 - duplicate active bindings are rejected for the same project/environment/resource/domain/path
   owner scope
@@ -825,7 +844,7 @@ Current boundary:
 
 Core next operations expected here:
 - preview/show resource proxy configuration
-- certificate revoke/delete/retry lifecycle around provider-issued/imported certificates
+- live CA revocation coverage beyond the provider-neutral `certificates.revoke` port implementation
 - route repair/reconcile lifecycle when provider route attempts need an explicit public operation
 
 ## System Operations
