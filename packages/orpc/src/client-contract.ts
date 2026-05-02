@@ -51,6 +51,7 @@ import {
   type RenameEnvironmentCommandInput,
   type RenameProjectCommandInput,
   type RenameServerCommandInput,
+  type ResourceAccessFailureEvidenceLookupQueryInput,
   type ResourceDiagnosticSummaryQueryInput,
   type ResourceEffectiveConfigQueryInput,
   type ResourceHealthQueryInput,
@@ -140,6 +141,7 @@ import {
   type RenameEnvironmentResponse,
   type RenameProjectResponse,
   type RenameServerResponse,
+  type ResourceAccessFailureEvidenceLookup,
   type ResourceDetail,
   type ResourceDiagnosticSummary,
   type ResourceEffectiveConfigResponse,
@@ -484,6 +486,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ResourceDiagnosticSummaryQueryInput,
       ResourceDiagnosticSummary,
+      AppaloftClientError
+    >;
+    accessFailureEvidence: Client<
+      AppaloftClientContext,
+      ResourceAccessFailureEvidenceLookupQueryInput,
+      ResourceAccessFailureEvidenceLookup,
       AppaloftClientError
     >;
     health: Client<

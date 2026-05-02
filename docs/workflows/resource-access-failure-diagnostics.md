@@ -58,6 +58,8 @@ This workflow sits at the edge adapter boundary. It observes:
 It produces:
 
 - a provider-neutral `ResourceAccessFailureDiagnostic`;
+- a short-retention safe evidence record for request-id lookup when an evidence recorder is
+  available;
 - a safe HTML diagnostic page for browser navigation requests;
 - a structured problem response for API or non-HTML requests;
 - logs/metrics/traces keyed by request id and stable failure code.
@@ -147,6 +149,37 @@ surface. It must point to an observation or explicitly modeled workflow, not to 
 Request-time diagnostics remain observation. They may set blocking reasons such as
 `proxy_route_missing`, `proxy_route_stale`, `runtime_not_ready`, or `observation_unavailable`, but
 they must not mutate deployment, route, domain binding, certificate, proxy, or health state.
+
+## Request-ID Evidence Lookup
+
+The request-id lookup baseline is the public read query:
+
+```text
+resources.access-failure-evidence.lookup
+```
+
+The query input starts from `requestId`. Optional `resourceId`, `hostname`, and `path` filters may
+narrow the match. Filters must not expand visibility; when the retained evidence exists but does not
+match a supplied filter, the query returns stable safe not-found copy.
+
+The query returns:
+
+- the safe `resource-access-failure/v1` envelope;
+- `matchedSource`, initially `short-retention-evidence-read-model`;
+- safe related ids from the envelope route context;
+- `nextAction`;
+- `capturedAt`;
+- `expiresAt`.
+
+When no retained, non-expired evidence matches, it returns a non-secret not-found result containing
+the requested id, filter echo, stable code `resource_access_failure_evidence_not_found`, and
+`nextAction = diagnostic-summary`.
+
+The evidence projection is a short-retention read model, not aggregate state or an aggregate
+repository. Capturing evidence must not block the public error page if persistence is temporarily
+unavailable. Stored evidence must not contain query strings, headers, cookies, authorization
+material, SSH credentials, private keys, provider raw payloads, raw remote logs, command output,
+internal IP addresses, or unredacted application output.
 
 ## Classification Rules
 
@@ -238,8 +271,8 @@ The first implementation slice exists:
 - `APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL` remains an explicit topology override for
   deployments where the proxy manager knows a different reachable backend URL.
 
-The current slice classifies from safe code, signal, or status inputs. It does not yet persist edge
-request failure envelopes, read route/resource context from applied proxy metadata, automatically
+The current slice classifies from safe code, signal, or status inputs. It does not yet read
+route/resource context from applied proxy metadata, automatically
 derive a diagnostic renderer service URL for one-shot CLI remote SSH execution, or attach the
 latest edge failure to resource health and diagnostic summary read models.
 
@@ -247,9 +280,12 @@ The 2026-05-01 baseline adds the additive envelope fields `nextAction`, affected
 descriptor, and optional `domainBindingId`, and allows an existing resource access read model to
 carry `latestAccessFailureDiagnostic`. `resources.health` and `resources.diagnostic-summary` may
 compose that latest safe envelope into source errors and copyable diagnostic payloads. This is a
-request-id lookup structure for existing read surfaces; short-retention persistence, real Traefik
-e2e probing, companion/static renderer support, and automatic route/resource lookup remain future
-hardening gaps.
+latest-failure composition structure for existing read surfaces; real Traefik e2e probing,
+companion/static renderer support, and automatic route/resource lookup remain future hardening gaps.
+
+The request-id evidence lookup slice adds `resources.access-failure-evidence.lookup` and a
+short-retention evidence read model. Automatic provider metadata context lookup, real Traefik e2e
+probing, and companion/static renderer support remain future hardening gaps.
 
 Existing `resources.health`, `resources.diagnostic-summary`, and
 `resources.proxy-configuration.preview` already provide the owner-facing read surfaces that the

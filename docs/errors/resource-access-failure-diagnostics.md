@@ -91,6 +91,7 @@ mutation happened.
 | `resource_access_upstream_tls_failed` | `integration` | `upstream-connection` | 502 | Conditional | `operator-config` | The proxy could not negotiate the configured upstream protocol or TLS mode. |
 | `resource_access_edge_error` | `infra` | `diagnostic-page-render` | 503 | Yes | `platform` | The diagnostic renderer or edge error service failed. |
 | `resource_access_unknown` | `infra` | `diagnostic-page-render` | 503 | Conditional | `unknown` | The request failed at the edge, but the provider could not classify the failure safely. |
+| `resource_access_failure_evidence_not_found` | `not-found` | `evidence-lookup` | 200 | No | `unknown` | No retained access failure evidence matched the request id and optional filters. |
 
 `ownerHint` is a support/debug hint, not an authorization or billing boundary. Product surfaces
 must not imply blame when the hint is `unknown` or based only on partial evidence.
@@ -128,6 +129,11 @@ API/problem responses must:
 - include `nextAction` and safe affected request metadata when available;
 - omit HTML and localized explanatory text from machine fields.
 
+Request-id evidence lookup responses must return safe not-found copy instead of raw storage errors
+for ordinary no-match or expired evidence cases. Infrastructure failures while reading the evidence
+store use `resource_access_failure_evidence_unavailable`, category `infra`, phase
+`evidence-lookup`, and must not expose raw database or provider details.
+
 Owner-facing Web, CLI, and future MCP tooling should map the same codes into i18n/user-facing
 guidance and avoid branching on provider-native messages.
 
@@ -160,15 +166,15 @@ The first implementation slice covers:
   override when the proxy manager knows a different reachable backend URL.
 
 Existing health and diagnostic summary source errors cover several owner-facing causes, but there
-is no persisted edge request failure envelope, no short-retention request diagnostic read model,
-no renderer target for one-shot CLI remote SSH execution, and no resource-context lookup from a
-request id yet.
+is no renderer target for one-shot CLI remote SSH execution and no automatic resource-context lookup
+from applied provider metadata yet.
 
 The 2026-05-01 baseline adds stable `nextAction`, affected request descriptor, and optional domain
 binding id fields to the safe envelope and lets resource access read models expose one latest safe
 edge failure for owner-facing `resources.health` and `resources.diagnostic-summary` composition.
-This keeps request-id lookup on existing read surfaces; persistence/retention and real provider
-e2e lookup remain future work.
+This keeps latest-failure composition on existing read surfaces; real provider e2e lookup remains
+future work. The request-id evidence lookup slice adds short-retention persistence and safe lookup
+for retained envelopes without exposing raw provider payloads.
 
 ## Open Questions
 

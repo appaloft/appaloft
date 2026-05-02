@@ -116,6 +116,8 @@ import {
   RenameProjectUseCase,
   RenameServerCommandHandler,
   RenameServerUseCase,
+  ResourceAccessFailureEvidenceLookupQueryHandler,
+  ResourceAccessFailureEvidenceLookupQueryService,
   ResourceDiagnosticSummaryQueryService,
   ResourceEffectiveConfigQueryHandler,
   ResourceEffectiveConfigQueryService,
@@ -220,6 +222,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(RenameServerCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
+  container.registerSingleton(ResourceAccessFailureEvidenceLookupQueryHandler);
   container.registerSingleton(EnvironmentEffectivePrecedenceQueryHandler);
   container.registerSingleton(ShowDeploymentQueryHandler);
   container.registerSingleton(DeploymentPlanQueryHandler);
@@ -414,6 +417,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.resourceDiagnosticSummaryQueryService,
     ResourceDiagnosticSummaryQueryService,
+  );
+  container.registerSingleton(
+    tokens.resourceAccessFailureEvidenceLookupQueryService,
+    ResourceAccessFailureEvidenceLookupQueryService,
   );
   container.registerSingleton(tokens.resourceHealthQueryService, ResourceHealthQueryService);
   container.registerSingleton(

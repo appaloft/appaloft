@@ -626,9 +626,10 @@ Required:
 - [ ] Broaden API/Web/CLI regression coverage for server-applied domains and durable domain routes.
 - [ ] Broaden API/Web/CLI regression coverage for diagnostic copy.
 - [ ] Close `resource-access-failure` diagnostics: real Traefik error-middleware e2e,
-  short-retention request-id envelope lookup, automatic route/resource context lookup from applied
-  provider metadata, and companion/static renderer support for one-shot CLI or remote SSH runtimes
-  without a reachable Appaloft backend service.
+  automatic route/resource context lookup from applied provider metadata, and companion/static
+  renderer support for one-shot CLI or remote SSH runtimes without a reachable Appaloft backend
+  service. The short-retention request-id envelope lookup baseline is implemented, but the broader
+  row remains open until the real edge and automatic-context slices close.
 - [ ] Keep access/proxy/log/health failures visible through read models, proxy preview, and
   diagnostics.
 
@@ -668,6 +669,13 @@ Phase 6 verification notes from 2026-05-01:
   revoke does not call provider revocation.
 - Domain binding delete remains separate from certificate revoke/delete. Active certificate state
   still blocks domain binding delete until explicit certificate lifecycle actions are taken.
+- The request-id evidence lookup slice added `resources.access-failure-evidence.lookup`, a
+  short-retention PG/PGlite evidence projection/read model, renderer capture of sanitized
+  `resource-access-failure/v1` envelopes, CLI `appaloft resource access-failure <requestId>`, and
+  HTTP/oRPC `GET /api/resource-access-failures/{requestId}`. This closes the lookup baseline while
+  leaving real Traefik middleware e2e, automatic route/resource context lookup from applied
+  provider metadata, companion/static renderer support, and a Web lookup form as remaining Phase 6
+  work.
 
 Exit criteria:
 

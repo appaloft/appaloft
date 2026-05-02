@@ -625,6 +625,49 @@ export const resourceAccessSummarySchema = z.object({
   latestAccessFailureDiagnostic: resourceAccessFailureDiagnosticSchema.optional(),
 });
 
+export const resourceAccessFailureEvidenceLookupFiltersSchema = z.object({
+  resourceId: z.string().optional(),
+  hostname: z.string().optional(),
+  path: z.string().optional(),
+});
+
+export const resourceAccessFailureEvidenceRelatedIdsSchema = z.object({
+  resourceId: z.string().optional(),
+  deploymentId: z.string().optional(),
+  domainBindingId: z.string().optional(),
+  serverId: z.string().optional(),
+  destinationId: z.string().optional(),
+  routeId: z.string().optional(),
+});
+
+const resourceAccessFailureEvidenceLookupBaseSchema = z.object({
+  schemaVersion: z.literal("resources.access-failure-evidence.lookup/v1"),
+  requestId: z.string(),
+  generatedAt: z.string(),
+  filters: resourceAccessFailureEvidenceLookupFiltersSchema.optional(),
+});
+
+export const resourceAccessFailureEvidenceLookupSchema = z.discriminatedUnion("status", [
+  resourceAccessFailureEvidenceLookupBaseSchema.extend({
+    status: z.literal("found"),
+    matchedSource: z.literal("short-retention-evidence-read-model"),
+    evidence: resourceAccessFailureDiagnosticSchema,
+    relatedIds: resourceAccessFailureEvidenceRelatedIdsSchema.optional(),
+    nextAction: resourceAccessFailureDiagnosticSchema.shape.nextAction,
+    capturedAt: z.string(),
+    expiresAt: z.string(),
+  }),
+  resourceAccessFailureEvidenceLookupBaseSchema.extend({
+    status: z.literal("not-found"),
+    nextAction: z.literal("diagnostic-summary"),
+    notFound: z.object({
+      code: z.literal("resource_access_failure_evidence_not_found"),
+      phase: z.literal("evidence-lookup"),
+      message: z.string(),
+    }),
+  }),
+]);
+
 export const resourceHealthOverallSchema = z.enum([
   "healthy",
   "degraded",
@@ -3223,6 +3266,9 @@ export type PlannedResourceAccessRouteSummary = z.infer<
   typeof plannedResourceAccessRouteSummarySchema
 >;
 export type ResourceAccessFailureDiagnostic = z.infer<typeof resourceAccessFailureDiagnosticSchema>;
+export type ResourceAccessFailureEvidenceLookup = z.infer<
+  typeof resourceAccessFailureEvidenceLookupSchema
+>;
 export type ResourceAccessSummary = z.infer<typeof resourceAccessSummarySchema>;
 export type ResourceAccessProfile = z.infer<typeof resourceAccessProfileSchema>;
 export type ResourceHealthOverall = z.infer<typeof resourceHealthOverallSchema>;

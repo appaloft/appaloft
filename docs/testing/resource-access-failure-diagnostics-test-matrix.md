@@ -99,6 +99,15 @@ Then:
 | RES-ACCESS-DIAG-OBS-003 | integration | Existing cause code preserved | Route realization or health has structured cause code | Edge diagnostic includes `causeCode` | Original operation-owned error code remains unchanged. |
 | RES-ACCESS-DIAG-OBS-004 | contract | Cross-surface schema parity | Latest safe edge failure is present in resource access read state | `resources.show`, `resources.health`, and `resources.diagnostic-summary` expose the same optional diagnostic envelope fields through shared contracts | API/oRPC, CLI, and Web consume the shared schema rather than transport-only shapes. |
 
+## Evidence Lookup Matrix
+
+| Test ID | Preferred automation | Case | Input/read state | Expected query relationship | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| RES-ACCESS-DIAG-EVIDENCE-001 | integration | Request id lookup returns retained evidence | Short-retention read model has a non-expired safe `resource-access-failure/v1` envelope | `resources.access-failure-evidence.lookup` returns `found` | Response includes safe envelope, matched source, related ids, next action, `capturedAt`, and `expiresAt`. |
+| RES-ACCESS-DIAG-EVIDENCE-002 | integration | Optional filters narrow lookup | Read model has request id evidence but supplied `resourceId`, `hostname`, or `path` does not match | `resources.access-failure-evidence.lookup` returns safe `not-found` copy | Mismatch does not leak another resource's evidence or related ids. |
+| RES-ACCESS-DIAG-EVIDENCE-003 | integration | Retention expiry hides evidence | Read model has evidence whose `expiresAt` is earlier than lookup time | `resources.access-failure-evidence.lookup` returns safe `not-found` copy | Expired evidence is not returned and may be pruned. |
+| RES-ACCESS-DIAG-EVIDENCE-004 | contract + adapter integration | Capture and lookup stay redacted | Renderer receives unsafe query strings, headers, cookies, provider raw payload hints, or secret-like values | Captured evidence and lookup response include only sanitized envelope fields | Raw provider payloads, authorization/cookie headers, sensitive query strings, SSH credentials, private keys, and raw remote logs are absent. |
+
 ## Shared Access Diagnostic Contract Matrix
 
 These rows are governed by
@@ -139,12 +148,17 @@ Executable tests now cover:
 - `RES-ACCESS-DIAG-OBS-002` through the resource health query-service baseline;
 - `RES-ACCESS-DIAG-OBS-003` through safe cause-code preservation on the diagnostic envelope;
 - `RES-ACCESS-DIAG-OBS-004` through contracts/schema and resource read-model fixtures;
+- `RES-ACCESS-DIAG-EVIDENCE-001` through application query service, contract, CLI, HTTP/oRPC, and
+  PG/PGlite lookup coverage;
+- `RES-ACCESS-DIAG-EVIDENCE-002` through application filter mismatch safe not-found coverage;
+- `RES-ACCESS-DIAG-EVIDENCE-003` through PG/PGlite retention expiry coverage;
+- `RES-ACCESS-DIAG-EVIDENCE-004` through contract redaction and renderer capture coverage;
 - `EDGE-PROXY-PROVIDER-010` as the Traefik provider contract row.
 
 Remaining gaps include broader classification rows, a companion/static renderer path for one-shot
 CLI remote SSH execution, real Traefik end-to-end error-middleware probing, automatic
-route/resource context lookup from applied provider metadata, short-retention request persistence,
-and redaction rows beyond the current renderer-level assertions.
+route/resource context lookup from applied provider metadata, a Web lookup form, and redaction rows
+beyond the current renderer-level assertions.
 
 ## Open Questions
 

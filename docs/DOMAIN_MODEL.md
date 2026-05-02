@@ -350,6 +350,10 @@ Boundary rule:
   `ResourceAccessSummary`, `ResourceHealthSummary`, and `ResourceDiagnosticSummary`, but it is not
   `Resource` aggregate state and is not a `domain`-category error unless it references a true
   aggregate invariant failure from another operation.
+- access failure evidence lookup is short-retention resource access observation state keyed by
+  request id. It stores and returns only safe `resource-access-failure/v1` envelope fields plus
+  capture/expiry metadata for `resources.access-failure-evidence.lookup`; it is not aggregate state,
+  not provider-native log storage, and not a route repair lifecycle.
 
 ### Dependency Resources
 
