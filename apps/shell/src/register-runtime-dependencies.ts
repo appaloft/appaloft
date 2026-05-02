@@ -79,6 +79,7 @@ import {
   PgProcessAttemptJournal,
   PgProjectReadModel,
   PgProjectRepository,
+  PgResourceAccessFailureEvidenceProjection,
   PgResourceDeletionBlockerReader,
   PgResourceReadModel,
   PgResourceRepository,
@@ -823,6 +824,16 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.resourceReadModel, {
     useFactory: instanceCachingFactory(() => new PgResourceReadModel(input.database.db)),
+  });
+  container.register(tokens.resourceAccessFailureEvidenceRecorder, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceAccessFailureEvidenceProjection(input.database.db),
+    ),
+  });
+  container.register(tokens.resourceAccessFailureEvidenceReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceAccessFailureEvidenceProjection(input.database.db),
+    ),
   });
   container.register(tokens.deploymentReadModel, {
     useFactory: instanceCachingFactory(() => new PgDeploymentReadModel(input.database.db)),

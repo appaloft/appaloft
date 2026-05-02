@@ -343,6 +343,21 @@ export interface ProcessAttemptJournalTable {
   safe_details: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
 }
 
+export interface ResourceAccessFailureEvidenceTable {
+  request_id: string;
+  diagnostic: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  resource_id: string | null;
+  deployment_id: string | null;
+  domain_binding_id: string | null;
+  server_id: string | null;
+  destination_id: string | null;
+  route_id: string | null;
+  hostname: string | null;
+  path: string | null;
+  captured_at: UpdatableTimestampColumn;
+  expires_at: UpdatableTimestampColumn;
+}
+
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
@@ -363,4 +378,5 @@ export interface Database {
   server_applied_route_states: ServerAppliedRouteStatesTable;
   mutation_coordinations: MutationCoordinationsTable;
   process_attempt_journal: ProcessAttemptJournalTable;
+  resource_access_failure_evidence: ResourceAccessFailureEvidenceTable;
 }

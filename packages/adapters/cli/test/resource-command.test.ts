@@ -617,6 +617,36 @@ describe("CLI resource commands", () => {
     });
   });
 
+  test("[RES-ACCESS-DIAG-EVIDENCE-001] resource access-failure dispatches request-id lookup query", async () => {
+    const { ResourceAccessFailureEvidenceLookupQuery } = await import("@appaloft/application");
+    const { program, queries } = await createCommandCaptureHarness(
+      "req_cli_resource_access_failure_test",
+    );
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "access-failure",
+      "req_access_timeout",
+      "--resource",
+      "res_web",
+      "--host",
+      "web.example.test",
+      "--path",
+      "/private",
+    ]);
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(ResourceAccessFailureEvidenceLookupQuery);
+    expect(queries[0]).toMatchObject({
+      requestId: "req_access_timeout",
+      resourceId: "res_web",
+      hostname: "web.example.test",
+      path: "/private",
+    });
+  });
+
   test("[RES-PROFILE-ENTRY-006] resource delete dispatches the application command", async () => {
     ensureReflectMetadata();
     const { DeleteResourceCommand, createExecutionContext } = await import("@appaloft/application");

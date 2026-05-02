@@ -11,6 +11,7 @@ searchAliases:
   - "secret masking"
 relatedOperations:
   - resources.diagnostic-summary
+  - resources.access-failure-evidence.lookup
   - servers.capacity.inspect
 sidebar:
   label: "Diagnostics"
@@ -32,6 +33,26 @@ Diagnostic summaries should include:
 - Access URL, domain, and certificate status.
 - Access-failure request id, affected hostname/path, safe related ids, and next action.
 - Masked secret key names and presence, without values.
+
+<h2 id="access-failure-request-id-lookup">Look up an access failure by Request ID</h2>
+
+When an Appaloft generated URL or custom domain fails, the error page shows a request id. Resource
+owners can use that request id to find the short-retention safe evidence:
+
+```bash title="Look up access failure evidence"
+appaloft resource access-failure req_abc123
+```
+
+Narrow the lookup with a resource, hostname, or path when useful:
+
+```bash title="Narrow by resource and path"
+appaloft resource access-failure req_abc123 --resource res_web --host web.example.com --path /
+```
+
+The result contains only the safe envelope, matched source, related ids, next action, `capturedAt`,
+and `expiresAt`. If the evidence expired or filters do not match, Appaloft returns a stable
+not-found result instead of leaking other resource details. Do not share screenshots, SSH output,
+raw Traefik logs, cookies, Authorization headers, or provider raw payloads as diagnostic evidence.
 
 <h2 id="runtime-target-capacity-inspect">Runtime target capacity inspect</h2>
 

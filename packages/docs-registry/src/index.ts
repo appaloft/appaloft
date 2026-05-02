@@ -926,6 +926,36 @@ export const publicDocsHelpTopics = {
     relatedOperation: "resources.diagnostic-summary",
     aliases: ["diagnostic", "support payload", "logs", "secret masking", "诊断"],
   },
+  "diagnostics.access-failure-request-id": {
+    id: "diagnostics.access-failure-request-id",
+    title: "Access failure request-id lookup",
+    description:
+      "How to look up short-retention, support-safe access failure evidence by request id.",
+    page: {
+      "zh-CN": "observe/diagnostics",
+      "en-US": "en/observe/diagnostics",
+    },
+    anchor: "access-failure-request-id-lookup",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "resources.access-failure-evidence.lookup",
+    specReferences: [
+      "docs/specs/024-access-failure-evidence-lookup/spec.md",
+      "docs/queries/resources.access-failure-evidence.lookup.md",
+      "docs/testing/resource-access-failure-diagnostics-test-matrix.md",
+    ],
+    aliases: [
+      "request id",
+      "access failure",
+      "failure evidence",
+      "edge error",
+      "访问失败",
+      "请求编号",
+    ],
+  },
   "diagnostics.runtime-target-capacity": {
     id: "diagnostics.runtime-target-capacity",
     title: "Runtime target capacity inspect",
@@ -1398,6 +1428,11 @@ export const publicDocsOperationCoverage = [
     operationKey: "resources.diagnostic-summary",
     status: "documented",
     topicId: "diagnostics.safe-support-payload",
+  },
+  {
+    operationKey: "resources.access-failure-evidence.lookup",
+    status: "documented",
+    topicId: "diagnostics.access-failure-request-id",
   },
   {
     operationKey: "resources.health",

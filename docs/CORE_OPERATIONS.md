@@ -282,6 +282,7 @@ Implemented operations:
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
 | Preview resource proxy configuration | Query | `resources.proxy-configuration.preview` | `ResourceProxyConfigurationPreviewQuery` | `ResourceProxyConfigurationPreviewQueryInput` | `appaloft resource proxy-config <resourceId>` | `GET /api/resources/{resourceId}/proxy-configuration` |
 | Read resource diagnostic summary | Query | `resources.diagnostic-summary` | `ResourceDiagnosticSummaryQuery` | `ResourceDiagnosticSummaryQueryInput` | `appaloft resource diagnose <resourceId>` | `GET /api/resources/{resourceId}/diagnostic-summary` |
+| Lookup resource access failure evidence | Query | `resources.access-failure-evidence.lookup` | `ResourceAccessFailureEvidenceLookupQuery` | `ResourceAccessFailureEvidenceLookupQueryInput` | `appaloft resource access-failure <requestId>` | `GET /api/resource-access-failures/{requestId}` |
 | Read resource health | Query | `resources.health` | `ResourceHealthQuery` | `ResourceHealthQueryInput` | `appaloft resource health <resourceId>` | `GET /api/resources/{resourceId}/health` |
 | Open resource terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft resource terminal <resourceId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
@@ -361,6 +362,12 @@ Current boundary:
   existing read surfaces by allowing `ResourceAccessSummary` to carry an optional latest safe
   `resource-access-failure/v1` envelope with affected host/path, related ids, and a stable next
   action.
+- `resources.access-failure-evidence.lookup` is the additive Phase 6 request-id lookup query for
+  short-retention access failure evidence. It returns only safe `resource-access-failure/v1`
+  envelope fields plus matched source, related ids, next action, `capturedAt`, and `expiresAt`.
+  Optional `resourceId`, `hostname`, and `path` filters narrow lookup and return stable safe
+  not-found copy on mismatch. It does not repair routes, mutate resources, read raw provider logs,
+  or expose secrets.
 - resource health is resource-owned observation governed by
   [ADR-020: Resource Health Observation](./decisions/ADR-020-resource-health-observation.md).
   `resources.health` is the active current health source for resource detail, project resource

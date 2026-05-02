@@ -9,6 +9,7 @@ import {
   DeleteResourceCommand,
   ListResourcesQuery,
   OpenTerminalSessionCommand,
+  ResourceAccessFailureEvidenceLookupQuery,
   ResourceDiagnosticSummaryQuery,
   ResourceEffectiveConfigQuery,
   ResourceHealthQuery,
@@ -40,6 +41,7 @@ import {
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const resourceIdArg = Args.text({ name: "resourceId" });
+const accessFailureRequestIdArg = Args.text({ name: "requestId" });
 const projectOption = Options.text("project").pipe(Options.optional);
 const environmentOption = Options.text("environment").pipe(Options.optional);
 const createProjectOption = Options.text("project");
@@ -49,6 +51,9 @@ const kindOption = Options.choice("kind", resourceKinds).pipe(Options.withDefaul
 const destinationOption = Options.text("destination").pipe(Options.optional);
 const descriptionOption = Options.text("description").pipe(Options.optional);
 const archiveReasonOption = Options.text("reason").pipe(Options.optional);
+const accessFailureResourceOption = Options.text("resource").pipe(Options.optional);
+const accessFailureHostOption = Options.text("host").pipe(Options.optional);
+const accessFailurePathOption = Options.text("path").pipe(Options.optional);
 const confirmSlugOption = Options.text("confirm-slug");
 const internalPortOption = Options.text("internal-port").pipe(Options.optional);
 const configureNetworkInternalPortOption = Options.text("internal-port");
@@ -385,6 +390,28 @@ const diagnoseCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDiagnose));
 
+const accessFailureCommand = EffectCommand.make(
+  "access-failure",
+  {
+    requestId: accessFailureRequestIdArg,
+    resource: accessFailureResourceOption,
+    host: accessFailureHostOption,
+    path: accessFailurePathOption,
+    json: jsonOption,
+  },
+  ({ host, json, path, requestId, resource }) => {
+    void json;
+    return runQuery(
+      ResourceAccessFailureEvidenceLookupQuery.create({
+        requestId,
+        resourceId: optionalValue(resource),
+        hostname: optionalValue(host),
+        path: optionalValue(path),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceAccessFailure));
+
 const healthCommand = EffectCommand.make(
   "health",
   {
@@ -674,6 +701,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     unsetVariableCommand,
     terminalCommand,
     logsCommand,
+    accessFailureCommand,
     healthCommand,
     configureSourceCommand,
     configureRuntimeCommand,

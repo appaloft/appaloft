@@ -6,8 +6,13 @@ import {
   type CommandBus,
   createExecutionContext,
   type QueryBus,
+  type RepositoryContext,
+  type ResourceAccessFailureDiagnostic,
+  type ResourceAccessFailureEvidenceRecord,
+  type ResourceAccessFailureEvidenceRecorder,
 } from "@appaloft/application";
 import { resolveConfig } from "@appaloft/config";
+import { ok, type Result } from "@appaloft/core";
 import { createHttpApp } from "../src";
 
 class SilentLogger implements AppLogger {
@@ -17,7 +22,29 @@ class SilentLogger implements AppLogger {
   error(): void {}
 }
 
-function createTestApp() {
+class RecordingEvidenceRecorder implements ResourceAccessFailureEvidenceRecorder {
+  records: ResourceAccessFailureEvidenceRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    input: {
+      diagnostic: ResourceAccessFailureDiagnostic;
+      capturedAt: string;
+      expiresAt: string;
+    },
+  ): Promise<Result<ResourceAccessFailureEvidenceRecord>> {
+    const record = {
+      requestId: input.diagnostic.requestId,
+      diagnostic: input.diagnostic,
+      capturedAt: input.capturedAt,
+      expiresAt: input.expiresAt,
+    };
+    this.records.push(record);
+    return ok(record);
+  }
+}
+
+function createTestApp(input?: { evidenceRecorder?: ResourceAccessFailureEvidenceRecorder }) {
   return createHttpApp({
     config: resolveConfig({
       flags: {
@@ -34,6 +61,7 @@ function createTestApp() {
         return createExecutionContext(input);
       },
     },
+    resourceAccessFailureEvidenceRecorder: input?.evidenceRecorder,
   });
 }
 
@@ -137,5 +165,43 @@ describe("resource access failure diagnostics HTTP renderer", () => {
       phase: "diagnostic-page-render",
       requestId: "req_bad_gateway",
     });
+  });
+
+  test("[RES-ACCESS-DIAG-EVIDENCE-004] captures sanitized evidence without leaking unsafe request data", async () => {
+    const evidenceRecorder = new RecordingEvidenceRecorder();
+    const app = createTestApp({ evidenceRecorder });
+    const response = await app.handle(
+      new Request(
+        "http://localhost/.appaloft/resource-access-failure?signal=route-not-found&requestId=req route missing&affectedUrl=https%3A%2F%2Fweb.example.test%2Fprivate%3Ftoken%3Dsecret&host=web.example.test&path=/private?token=secret&resourceId=res_web&deploymentId=dep_web&providerKey=traefik",
+        {
+          headers: {
+            accept: "application/json",
+            authorization: "Bearer secret-token",
+            cookie: "session=secret",
+          },
+        },
+      ),
+    );
+
+    expect(response.status).toBe(404);
+    expect(evidenceRecorder.records).toHaveLength(1);
+    expect(evidenceRecorder.records[0]).toMatchObject({
+      requestId: "req_route_missing",
+      diagnostic: {
+        affected: {
+          url: "https://web.example.test/private",
+          path: "/private",
+        },
+        route: {
+          resourceId: "res_web",
+          deploymentId: "dep_web",
+          providerKey: "traefik",
+        },
+      },
+    });
+    const serialized = JSON.stringify(evidenceRecorder.records[0]);
+    expect(serialized).not.toContain("secret-token");
+    expect(serialized).not.toContain("session=secret");
+    expect(serialized).not.toContain("token=secret");
   });
 });
