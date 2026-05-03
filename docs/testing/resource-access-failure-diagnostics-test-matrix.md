@@ -108,6 +108,21 @@ Then:
 | RES-ACCESS-DIAG-EVIDENCE-003 | integration | Retention expiry hides evidence | Read model has evidence whose `expiresAt` is earlier than lookup time | `resources.access-failure-evidence.lookup` returns safe `not-found` copy | Expired evidence is not returned and may be pruned. |
 | RES-ACCESS-DIAG-EVIDENCE-004 | contract + adapter integration | Capture and lookup stay redacted | Renderer receives unsafe query strings, headers, cookies, provider raw payload hints, or secret-like values | Captured evidence and lookup response include only sanitized envelope fields | Raw provider payloads, authorization/cookie headers, sensitive query strings, SSH credentials, private keys, and raw remote logs are absent. |
 
+## Automatic Route Context Lookup Matrix
+
+These rows are governed by
+[Automatic Route Context Lookup Baseline](../specs/025-automatic-route-context-lookup/spec.md).
+
+| Test ID | Preferred automation | Case | Input/read state | Expected query relationship | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| RES-ACCESS-DIAG-CONTEXT-001 | application unit | Generated access route match | `ResourceAccessSummary.latestGeneratedAccessRoute` matches hostname/path | Automatic lookup returns `found` with generated route context | Safe related `resourceId`, `deploymentId`, `destinationId`, route source/status, confidence, and next action are present. |
+| RES-ACCESS-DIAG-CONTEXT-002 | application unit | Durable domain binding route match | Ready durable domain binding and route summary match hostname/path | Automatic lookup returns `found` with durable domain context | `domainBindingId`, `serverId`, `destinationId`, resource id, and route status are safe and no provider raw payload is present. |
+| RES-ACCESS-DIAG-CONTEXT-003 | application unit | Server-applied route match | Server-applied route summary matches hostname/path | Automatic lookup returns `found` with server-applied route context | `server-applied` context wins over generated access for the same hostname/path when no ready durable route matches. |
+| RES-ACCESS-DIAG-CONTEXT-004 | application unit | Stable precedence and confidence | Multiple sources match the same hostname/path | Lookup chooses durable domain, then server-applied, then latest generated, then planned generated | Longest matching path prefix wins within the same source and route-source hints do not override precedence. |
+| RES-ACCESS-DIAG-CONTEXT-005 | application unit | Safe not-found | No existing route summary or binding matches hostname/path | Lookup returns safe `not-found` copy | Response includes no unrelated ids and recommends `diagnostic-summary` or route/proxy inspection. |
+| RES-ACCESS-DIAG-CONTEXT-006 | adapter integration | Evidence capture enriches missing ids | Renderer captures provider-neutral failure with hostname/path but no route ids | Capture calls automatic lookup before recording evidence | Stored `resource-access-failure/v1` envelope includes only safe related ids from lookup. |
+| RES-ACCESS-DIAG-CONTEXT-007 | application unit + adapter integration | Lookup and enriched capture remain redacted | Host/path request includes query strings, cookies, auth headers, provider raw payload hints, or secret-like values | Lookup and capture normalize to safe hostname/path and route ids only | Sensitive query values, auth/cookie headers, SSH credentials, private keys, provider raw payloads, and raw remote logs are absent. |
+
 ## Shared Access Diagnostic Contract Matrix
 
 These rows are governed by
@@ -153,12 +168,19 @@ Executable tests now cover:
 - `RES-ACCESS-DIAG-EVIDENCE-002` through application filter mismatch safe not-found coverage;
 - `RES-ACCESS-DIAG-EVIDENCE-003` through PG/PGlite retention expiry coverage;
 - `RES-ACCESS-DIAG-EVIDENCE-004` through contract redaction and renderer capture coverage;
+- `RES-ACCESS-DIAG-CONTEXT-001` through generated access route context lookup coverage;
+- `RES-ACCESS-DIAG-CONTEXT-002` through durable domain route context lookup coverage;
+- `RES-ACCESS-DIAG-CONTEXT-003` through server-applied route context lookup coverage;
+- `RES-ACCESS-DIAG-CONTEXT-004` through precedence and confidence coverage;
+- `RES-ACCESS-DIAG-CONTEXT-005` through safe not-found coverage;
+- `RES-ACCESS-DIAG-CONTEXT-006` through renderer evidence capture enrichment coverage;
+- `RES-ACCESS-DIAG-CONTEXT-007` through lookup and enriched-capture redaction coverage;
 - `EDGE-PROXY-PROVIDER-010` as the Traefik provider contract row.
 
 Remaining gaps include broader classification rows, a companion/static renderer path for one-shot
-CLI remote SSH execution, real Traefik end-to-end error-middleware probing, automatic
-route/resource context lookup from applied provider metadata, a Web lookup form, and redaction rows
-beyond the current renderer-level assertions.
+CLI remote SSH execution, real Traefik end-to-end error-middleware probing, provider-native
+metadata lookup beyond existing read models, a Web lookup form, and redaction rows beyond the
+current renderer-level assertions.
 
 ## Open Questions
 

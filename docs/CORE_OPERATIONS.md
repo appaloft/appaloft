@@ -368,6 +368,11 @@ Current boundary:
   Optional `resourceId`, `hostname`, and `path` filters narrow lookup and return stable safe
   not-found copy on mismatch. It does not repair routes, mutate resources, read raw provider logs,
   or expose secrets.
+- automatic route context lookup is an internal read-model service under existing access failure
+  diagnostics. It resolves hostname/path to safe resource/deployment/domain/server/route context
+  for evidence capture and diagnostic composition, reusing existing resource access, domain binding,
+  and deployment read models. It does not add a public operation, operation-catalog row, CLI/API/Web
+  surface, or route repair command.
 - resource health is resource-owned observation governed by
   [ADR-020: Resource Health Observation](./decisions/ADR-020-resource-health-observation.md).
   `resources.health` is the active current health source for resource detail, project resource

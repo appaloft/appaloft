@@ -3,8 +3,10 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   type AppLogger,
+  type AutomaticRouteContextLookup,
   type CommandBus,
   createExecutionContext,
+  type ExecutionContext,
   type QueryBus,
   type RepositoryContext,
   type ResourceAccessFailureDiagnostic,
@@ -44,7 +46,36 @@ class RecordingEvidenceRecorder implements ResourceAccessFailureEvidenceRecorder
   }
 }
 
-function createTestApp(input?: { evidenceRecorder?: ResourceAccessFailureEvidenceRecorder }) {
+class StaticRouteContextLookup implements AutomaticRouteContextLookup {
+  calls: Array<{ hostname: string; path: string }> = [];
+
+  async lookup(_context: ExecutionContext, input: { hostname: string; path: string }) {
+    this.calls.push({ hostname: input.hostname, path: input.path });
+    return {
+      schemaVersion: "automatic-route-context-lookup/v1" as const,
+      status: "found" as const,
+      matchedSource: "durable-domain-binding-route" as const,
+      hostname: input.hostname,
+      pathPrefix: "/",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      domainBindingId: "dbnd_web",
+      serverId: "srv_web",
+      destinationId: "dst_web",
+      providerKey: "traefik",
+      routeId: "route_web",
+      routeSource: "durable-domain" as const,
+      routeStatus: "ready",
+      confidence: "high" as const,
+      nextAction: "diagnostic-summary" as const,
+    };
+  }
+}
+
+function createTestApp(input?: {
+  evidenceRecorder?: ResourceAccessFailureEvidenceRecorder;
+  routeContextLookup?: AutomaticRouteContextLookup;
+}) {
   return createHttpApp({
     config: resolveConfig({
       flags: {
@@ -62,6 +93,7 @@ function createTestApp(input?: { evidenceRecorder?: ResourceAccessFailureEvidenc
       },
     },
     resourceAccessFailureEvidenceRecorder: input?.evidenceRecorder,
+    resourceAccessRouteContextLookup: input?.routeContextLookup,
   });
 }
 
@@ -196,6 +228,50 @@ describe("resource access failure diagnostics HTTP renderer", () => {
           resourceId: "res_web",
           deploymentId: "dep_web",
           providerKey: "traefik",
+        },
+      },
+    });
+    const serialized = JSON.stringify(evidenceRecorder.records[0]);
+    expect(serialized).not.toContain("secret-token");
+    expect(serialized).not.toContain("session=secret");
+    expect(serialized).not.toContain("token=secret");
+  });
+
+  test("[RES-ACCESS-DIAG-CONTEXT-006] enriches captured evidence with automatic route context", async () => {
+    const evidenceRecorder = new RecordingEvidenceRecorder();
+    const routeContextLookup = new StaticRouteContextLookup();
+    const app = createTestApp({ evidenceRecorder, routeContextLookup });
+    const response = await app.handle(
+      new Request(
+        "http://localhost/.appaloft/resource-access-failure?signal=route-not-found&requestId=req_lookup&affectedUrl=https%3A%2F%2Fapp.example.test%2Fprivate%3Ftoken%3Dsecret&host=app.example.test&path=/private?token=secret",
+        {
+          headers: {
+            accept: "application/json",
+            authorization: "Bearer secret-token",
+            cookie: "session=secret",
+          },
+        },
+      ),
+    );
+
+    expect(response.status).toBe(404);
+    expect(routeContextLookup.calls).toEqual([{ hostname: "app.example.test", path: "/private" }]);
+    expect(evidenceRecorder.records).toHaveLength(1);
+    expect(evidenceRecorder.records[0]).toMatchObject({
+      requestId: "req_lookup",
+      diagnostic: {
+        affected: {
+          hostname: "app.example.test",
+          path: "/private",
+        },
+        route: {
+          resourceId: "res_web",
+          deploymentId: "dep_web",
+          domainBindingId: "dbnd_web",
+          serverId: "srv_web",
+          destinationId: "dst_web",
+          routeSource: "durable-domain",
+          routeStatus: "ready",
         },
       },
     });
