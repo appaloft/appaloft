@@ -1,10 +1,13 @@
 import {
+  type AppliedRouteContextMetadata,
+  appliedRouteContextToDiagnosticRoute,
   classifyResourceAccessFailure,
   parseResourceAccessFailureCode,
   parseResourceAccessFailureSignal,
   type ResourceAccessFailureDiagnostic,
   type ResourceAccessRouteSource,
   resourceAccessFailureCodeFromHttpStatus,
+  sanitizeAppliedRouteContextMetadata,
 } from "@appaloft/application";
 
 const routeFailureSignalHeader = "x-appaloft-resource-access-signal";
@@ -32,6 +35,18 @@ function parseRouteSource(input: string | null): ResourceAccessRouteSource | nul
       return input;
     default:
       return null;
+  }
+}
+
+function parseAppliedRouteContext(input: string | null): AppliedRouteContextMetadata | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  try {
+    return sanitizeAppliedRouteContextMetadata(JSON.parse(input));
+  } catch {
+    return undefined;
   }
 }
 
@@ -92,6 +107,9 @@ function buildDiagnostic(request: Request, now: () => string): ResourceAccessFai
   const providerKey = firstQueryValue(url.searchParams, "providerKey");
   const routeId = firstQueryValue(url.searchParams, "routeId");
   const routeStatus = firstQueryValue(url.searchParams, "routeStatus");
+  const appliedRouteContext = parseAppliedRouteContext(
+    firstQueryValue(url.searchParams, "appliedRouteContext"),
+  );
 
   return classifyResourceAccessFailure({
     ...(selectedCode ? { code: selectedCode } : {}),
@@ -104,19 +122,21 @@ function buildDiagnostic(request: Request, now: () => string): ResourceAccessFai
       ...(affectedPath ? { path: affectedPath } : {}),
       method: request.method,
     },
-    route: {
-      ...(routeHost ? { host: routeHost } : {}),
-      ...(pathPrefix ? { pathPrefix } : {}),
-      ...(resourceId ? { resourceId } : {}),
-      ...(deploymentId ? { deploymentId } : {}),
-      ...(domainBindingId ? { domainBindingId } : {}),
-      ...(serverId ? { serverId } : {}),
-      ...(destinationId ? { destinationId } : {}),
-      ...(providerKey ? { providerKey } : {}),
-      ...(routeId ? { routeId } : {}),
-      ...(routeSource ? { routeSource } : {}),
-      ...(routeStatus ? { routeStatus } : {}),
-    },
+    route: appliedRouteContext
+      ? appliedRouteContextToDiagnosticRoute(appliedRouteContext)
+      : {
+          ...(routeHost ? { host: routeHost } : {}),
+          ...(pathPrefix ? { pathPrefix } : {}),
+          ...(resourceId ? { resourceId } : {}),
+          ...(deploymentId ? { deploymentId } : {}),
+          ...(domainBindingId ? { domainBindingId } : {}),
+          ...(serverId ? { serverId } : {}),
+          ...(destinationId ? { destinationId } : {}),
+          ...(providerKey ? { providerKey } : {}),
+          ...(routeId ? { routeId } : {}),
+          ...(routeSource ? { routeSource } : {}),
+          ...(routeStatus ? { routeStatus } : {}),
+        },
     ...(firstQueryValue(url.searchParams, "causeCode")
       ? { causeCode: safeToken(firstQueryValue(url.searchParams, "causeCode"), "") }
       : {}),
@@ -287,6 +307,7 @@ export async function resourceAccessFailureDiagnosticResponse(
     retentionMs?: number;
     enrichEvidence?: (
       diagnostic: ResourceAccessFailureDiagnostic,
+      appliedRouteContext?: AppliedRouteContextMetadata,
     ) => Promise<ResourceAccessFailureDiagnostic>;
     recordEvidence?: (
       diagnostic: ResourceAccessFailureDiagnostic,
@@ -295,7 +316,11 @@ export async function resourceAccessFailureDiagnosticResponse(
     ) => Promise<void>;
   },
 ): Promise<Response> {
-  const diagnostic = buildDiagnostic(request, input?.now ?? (() => new Date().toISOString()));
+  const now = input?.now ?? (() => new Date().toISOString());
+  const diagnostic = buildDiagnostic(request, now);
+  const appliedRouteContext = parseAppliedRouteContext(
+    firstQueryValue(new URL(request.url).searchParams, "appliedRouteContext"),
+  );
   const capturedAt = diagnostic.generatedAt;
   const expiresAt = new Date(
     Date.parse(capturedAt) + (input?.retentionMs ?? 10 * 60 * 1000),
@@ -304,7 +329,7 @@ export async function resourceAccessFailureDiagnosticResponse(
   if (input?.recordEvidence) {
     try {
       const evidenceDiagnostic = input.enrichEvidence
-        ? await input.enrichEvidence(diagnostic)
+        ? await input.enrichEvidence(diagnostic, appliedRouteContext)
         : diagnostic;
       await input.recordEvidence(evidenceDiagnostic, capturedAt, expiresAt);
     } catch {

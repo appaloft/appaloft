@@ -80,8 +80,27 @@ export interface ResourceAccessFailureRouteContext {
   destinationId?: string;
   providerKey?: string;
   routeId?: string;
+  diagnosticId?: string;
   routeSource?: ResourceAccessRouteSource;
   routeStatus?: string;
+}
+
+export interface AppliedRouteContextMetadata {
+  schemaVersion: "applied-route-context/v1";
+  resourceId: string;
+  deploymentId?: string;
+  domainBindingId?: string;
+  serverId?: string;
+  destinationId?: string;
+  routeId: string;
+  diagnosticId: string;
+  routeSource: ResourceAccessRouteSource;
+  hostname: string;
+  pathPrefix: string;
+  proxyKind: "none" | "traefik" | "caddy";
+  providerKey?: string;
+  appliedAt?: string;
+  observedAt?: string;
 }
 
 export interface ResourceAccessFailureDiagnostic {
@@ -124,6 +143,7 @@ export interface ClassifyResourceAccessFailureInput {
 
 const defaultGeneratedAt = "1970-01-01T00:00:00.000Z";
 const safeTokenPattern = /[^A-Za-z0-9._:-]/g;
+const safeRouteIdentifierPattern = /[^A-Za-z0-9._:/-]/g;
 
 const codeDefaults: Record<ResourceAccessFailureCode, ResourceAccessFailureDefaults> = {
   resource_access_route_not_found: {
@@ -216,6 +236,11 @@ function safeToken(input: string | undefined): string | undefined {
   return normalized ? normalized.slice(0, 160) : undefined;
 }
 
+function safeRouteIdentifier(input: string | undefined): string | undefined {
+  const normalized = input?.trim().replaceAll(safeRouteIdentifierPattern, "_");
+  return normalized ? normalized.slice(0, 220) : undefined;
+}
+
 function safePath(input: string | undefined): string | undefined {
   if (!input) {
     return undefined;
@@ -227,6 +252,29 @@ function safePath(input: string | undefined): string | undefined {
   }
 
   return withoutQuery.startsWith("/") ? withoutQuery : `/${withoutQuery}`;
+}
+
+function safeRouteSource(input: unknown): ResourceAccessRouteSource | undefined {
+  switch (input) {
+    case "generated-default":
+    case "durable-domain":
+    case "server-applied":
+    case "deployment-snapshot":
+      return input;
+    default:
+      return undefined;
+  }
+}
+
+function safeProxyKind(input: unknown): AppliedRouteContextMetadata["proxyKind"] | undefined {
+  switch (input) {
+    case "none":
+    case "traefik":
+    case "caddy":
+      return input;
+    default:
+      return undefined;
+  }
 }
 
 function safeMethod(input: string | undefined): string | undefined {
@@ -289,7 +337,8 @@ function sanitizeRouteContext(
   const serverId = safeToken(route.serverId);
   const destinationId = safeToken(route.destinationId);
   const providerKey = safeToken(route.providerKey);
-  const routeId = safeToken(route.routeId);
+  const routeId = safeRouteIdentifier(route.routeId);
+  const diagnosticId = safeRouteIdentifier(route.diagnosticId);
   const routeStatus = safeToken(route.routeStatus);
   const sanitized: ResourceAccessFailureRouteContext = {
     ...(host ? { host } : {}),
@@ -301,11 +350,108 @@ function sanitizeRouteContext(
     ...(destinationId ? { destinationId } : {}),
     ...(providerKey ? { providerKey } : {}),
     ...(routeId ? { routeId } : {}),
+    ...(diagnosticId ? { diagnosticId } : {}),
     ...(route.routeSource ? { routeSource: route.routeSource } : {}),
     ...(routeStatus ? { routeStatus } : {}),
   };
 
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+}
+
+export function sanitizeAppliedRouteContextMetadata(
+  input: unknown,
+): AppliedRouteContextMetadata | undefined {
+  if (!input || typeof input !== "object") {
+    return undefined;
+  }
+
+  const record = input as Record<string, unknown>;
+  if (record.schemaVersion !== "applied-route-context/v1") {
+    return undefined;
+  }
+
+  const resourceId = safeToken(
+    typeof record.resourceId === "string" ? record.resourceId : undefined,
+  );
+  const routeId = safeRouteIdentifier(
+    typeof record.routeId === "string" ? record.routeId : undefined,
+  );
+  const diagnosticId = safeRouteIdentifier(
+    typeof record.diagnosticId === "string" ? record.diagnosticId : undefined,
+  );
+  const routeSource = safeRouteSource(record.routeSource);
+  const hostname = safeToken(typeof record.hostname === "string" ? record.hostname : undefined);
+  const pathPrefix = safePath(
+    typeof record.pathPrefix === "string" ? record.pathPrefix : undefined,
+  );
+  const proxyKind = safeProxyKind(record.proxyKind);
+
+  if (
+    !resourceId ||
+    !routeId ||
+    !diagnosticId ||
+    !routeSource ||
+    !hostname ||
+    !pathPrefix ||
+    !proxyKind
+  ) {
+    return undefined;
+  }
+
+  const deploymentId = safeToken(
+    typeof record.deploymentId === "string" ? record.deploymentId : undefined,
+  );
+  const domainBindingId = safeToken(
+    typeof record.domainBindingId === "string" ? record.domainBindingId : undefined,
+  );
+  const serverId = safeToken(typeof record.serverId === "string" ? record.serverId : undefined);
+  const destinationId = safeToken(
+    typeof record.destinationId === "string" ? record.destinationId : undefined,
+  );
+  const providerKey = safeToken(
+    typeof record.providerKey === "string" ? record.providerKey : undefined,
+  );
+  const appliedAt = safeToken(typeof record.appliedAt === "string" ? record.appliedAt : undefined);
+  const observedAt = safeToken(
+    typeof record.observedAt === "string" ? record.observedAt : undefined,
+  );
+
+  return {
+    schemaVersion: "applied-route-context/v1",
+    resourceId,
+    ...(deploymentId ? { deploymentId } : {}),
+    ...(domainBindingId ? { domainBindingId } : {}),
+    ...(serverId ? { serverId } : {}),
+    ...(destinationId ? { destinationId } : {}),
+    routeId,
+    diagnosticId,
+    routeSource,
+    hostname,
+    pathPrefix,
+    proxyKind,
+    ...(providerKey ? { providerKey } : {}),
+    ...(appliedAt ? { appliedAt } : {}),
+    ...(observedAt ? { observedAt } : {}),
+  };
+}
+
+export function appliedRouteContextToDiagnosticRoute(
+  metadata: AppliedRouteContextMetadata,
+): ResourceAccessFailureRouteContext {
+  return {
+    host: metadata.hostname,
+    pathPrefix: metadata.pathPrefix,
+    resourceId: metadata.resourceId,
+    ...(metadata.deploymentId ? { deploymentId: metadata.deploymentId } : {}),
+    ...(metadata.domainBindingId ? { domainBindingId: metadata.domainBindingId } : {}),
+    ...(metadata.serverId ? { serverId: metadata.serverId } : {}),
+    ...(metadata.destinationId ? { destinationId: metadata.destinationId } : {}),
+    ...(metadata.providerKey ? { providerKey: metadata.providerKey } : {}),
+    routeId: metadata.routeId,
+    diagnosticId: metadata.diagnosticId,
+    routeSource: metadata.routeSource,
+    routeStatus: "applied",
+  };
 }
 
 export function parseResourceAccessFailureCode(

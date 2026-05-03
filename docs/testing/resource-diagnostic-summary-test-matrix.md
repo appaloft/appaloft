@@ -104,6 +104,7 @@ These rows are governed by
 | WEB-CLI-API-ACCESS-004 | contract + adapter integration | Cross-surface access/proxy/health/diagnostic regression harness | `resources.show`, `resources.health`, `resources.proxy-configuration.preview`, `resources.diagnostic-summary`, and `domain-bindings.show` read the same generated, durable, server-applied, route descriptor, and latest access-failure fields | API/oRPC responses preserve shared contract fields and selected/context route labels without adding a new public operation or transport-only schema | Generated access, durable domain, server-applied route, proxy preview route source, health route intent, diagnostic copy, and domain-binding selected route stay in parity. |
 | WEB-CLI-API-ACCESS-005 | adapter integration | CLI JSON display regression harness | CLI `resource show`, `resource health`, `resource proxy-config`, `resource diagnose`, and `domain-binding show` run against shared query outputs | CLI JSON contains the same generated/server-applied/durable route, selected route descriptor, proxy route source, health latest access failure, and diagnostic copy fields returned by API/oRPC | CLI remains a renderer over the shared query result and does not compute route precedence or diagnostic copy independently. |
 | WEB-CLI-API-ACCESS-006 | unit | Web access-route selection helper regression harness | Web resource detail receives a shared `ResourceAccessSummary` containing durable, server-applied, latest generated, planned generated, and latest access failure fields | The helper selects durable, then server-applied, then latest generated, then planned generated routes and treats latest access failure as diagnostic state from the contract | Web keeps route precedence in a shared typed helper instead of page-only Svelte logic. |
+| WEB-CLI-API-ACCESS-007 | contract + adapter integration | Applied route context metadata parity | `resources.proxy-configuration.preview` renders generated, durable, server-applied, and deployment-snapshot routes | API/oRPC and CLI JSON expose the same safe `applied-route-context/v1` metadata carried by provider-rendered route views | Web/API/CLI can explain resource/deployment/domain/server/destination/provider route ownership without parsing provider raw config or recomputing route precedence. |
 
 ## Entrypoint Matrix
 
@@ -154,6 +155,10 @@ Remaining coverage gaps:
 - edge access failure envelope composition rows `RES-DIAG-QRY-015` and `RES-DIAG-QRY-016`.
 - Full browser clipboard/e2e coverage for `WEB-CLI-API-ACCESS-006` remains deferred to a later Web
   harness; the current regression baseline covers the typed helper and shared contracts.
+- `WEB-CLI-API-ACCESS-007` is covered through the proxy preview contract schema, application query
+  service, provider renderer tests, CLI JSON shared-resource command harness, and HTTP/oRPC access
+  regression harness. Full browser route-metadata rendering remains deferred because Web consumes
+  the shared contract and this slice adds no new Web lookup form.
 
 ## Open Questions
 

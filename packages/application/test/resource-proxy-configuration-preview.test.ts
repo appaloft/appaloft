@@ -178,6 +178,7 @@ class FakeEdgeProxyProvider implements EdgeProxyProvider {
           ...(redirect.routeBehavior ? { routeBehavior: redirect.routeBehavior } : {}),
           ...(redirect.redirectTo ? { redirectTo: redirect.redirectTo } : {}),
           ...(redirect.redirectStatus ? { redirectStatus: redirect.redirectStatus } : {}),
+          ...(route.appliedRouteContext ? { appliedRouteContext: route.appliedRouteContext } : {}),
         };
       }),
     );
@@ -203,6 +204,19 @@ class FakeEdgeProxyProvider implements EdgeProxyProvider {
         },
       ],
       warnings: [],
+      ...(input.includeDiagnostics
+        ? {
+            diagnostics: {
+              providerKey: this.key,
+              routeCount: input.accessRoutes.length,
+              appliedRouteContexts: input.accessRoutes.flatMap(
+                (route) =>
+                  route.appliedRouteContexts ??
+                  (route.appliedRouteContext ? [route.appliedRouteContext] : []),
+              ),
+            },
+          }
+        : {}),
     });
   }
 }
@@ -289,6 +303,9 @@ function deploymentSummary(): DeploymentSummary {
             targetPort: 3000,
           },
         ],
+        metadata: {
+          "access.routeSource": "generated-default",
+        },
       },
       target: {
         kind: "single-server",
@@ -387,6 +404,7 @@ describe("ResourceProxyConfigurationPreviewQueryService", () => {
           ],
           metadata: {
             "access.routeSource": "durable-domain-binding",
+            "access.domainBindingId": "dbnd_durable",
           },
         },
       },
@@ -455,12 +473,28 @@ describe("ResourceProxyConfigurationPreviewQueryService", () => {
       expect.objectContaining({
         domains: ["durable.example.test"],
         source: "domain-binding",
+        appliedRouteContext: expect.objectContaining({
+          schemaVersion: "applied-route-context/v1",
+          resourceId: "res_web",
+          deploymentId: "dep_durable",
+          routeSource: "durable-domain",
+          domainBindingId: "dbnd_durable",
+          hostname: "durable.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          providerKey: "traefik",
+        }),
       }),
     ]);
     expect(result._unsafeUnwrap().routes).toEqual([
       expect.objectContaining({
         hostname: "durable.example.test",
         source: "domain-binding",
+        appliedRouteContext: expect.objectContaining({
+          routeSource: "durable-domain",
+          domainBindingId: "dbnd_durable",
+          diagnosticId: expect.stringContaining("durable-domain"),
+        }),
       }),
     ]);
   });
@@ -544,14 +578,70 @@ describe("ResourceProxyConfigurationPreviewQueryService", () => {
       expect.objectContaining({
         domains: ["server-applied.example.test"],
         source: "server-applied",
+        appliedRouteContext: expect.objectContaining({
+          schemaVersion: "applied-route-context/v1",
+          resourceId: "res_web",
+          deploymentId: "dep_server_applied",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+          routeSource: "server-applied",
+          hostname: "server-applied.example.test",
+          proxyKind: "traefik",
+          providerKey: "traefik",
+        }),
       }),
     ]);
     expect(result._unsafeUnwrap().routes).toEqual([
       expect.objectContaining({
         hostname: "server-applied.example.test",
         source: "server-applied",
+        appliedRouteContext: expect.objectContaining({
+          routeSource: "server-applied",
+          diagnosticId: expect.stringContaining("server-applied"),
+        }),
       }),
     ]);
+  });
+
+  test("[RES-ACCESS-DIAG-APPLIED-001] renders generated access applied route context metadata", async () => {
+    const context = createTestContext();
+    const { provider, service } = createService();
+    const query = ResourceProxyConfigurationPreviewQuery.create({
+      resourceId: "res_web",
+      routeScope: "latest",
+      includeDiagnostics: true,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    expect(provider.lastConfigurationInput?.accessRoutes[0]).toMatchObject({
+      domains: ["web.203.0.113.10.sslip.io"],
+      appliedRouteContext: {
+        schemaVersion: "applied-route-context/v1",
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+        routeSource: "generated-default",
+        hostname: "web.203.0.113.10.sslip.io",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        providerKey: "traefik",
+        appliedAt: "2026-01-01T00:00:02.000Z",
+      },
+    });
+    expect(
+      provider.lastConfigurationInput?.accessRoutes[0]?.appliedRouteContext?.routeId,
+    ).toContain("generated-default");
+    expect(
+      provider.lastConfigurationInput?.accessRoutes[0]?.appliedRouteContext?.diagnosticId,
+    ).toBe(provider.lastConfigurationInput?.accessRoutes[0]?.appliedRouteContext?.routeId);
+    expect(result._unsafeUnwrap().diagnostics?.appliedRouteContexts?.[0]).toMatchObject({
+      routeSource: "generated-default",
+      resourceId: "res_web",
+    });
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("secret");
   });
 
   test("does not treat generated access domain provider as edge proxy provider", async () => {

@@ -696,6 +696,19 @@ Phase 6 verification notes from 2026-05-03:
   reusable by evidence capture and diagnostics without exposing provider raw payloads, SSH
   credentials, auth headers, cookies, sensitive query strings, or remote raw logs.
 
+Phase 6 verification notes from 2026-05-03 applied route context metadata baseline:
+
+- The applied route context metadata slice adds `applied-route-context/v1` as a provider-neutral,
+  copy-safe route ownership contract for existing proxy preview and diagnostic/evidence flows.
+- Provider-rendered proxy preview can expose safe resource, deployment, optional domain binding,
+  server, destination, route id, diagnostic id, source, hostname, path prefix, proxy kind/provider,
+  and applied/observed timestamp metadata for generated access, durable domain, server-applied, and
+  deployment-snapshot routes.
+- Evidence capture now prefers supplied applied route metadata before falling back to automatic
+  hostname/path route context lookup.
+- The slice adds no public operation, no route repair/redeploy/rollback behavior, no Web lookup
+  form, no provider-native raw metadata parsing, and no real Traefik error-middleware e2e.
+
 Exit criteria:
 
 - [ ] A deployed HTTP app keeps exposing generated or configured access through
