@@ -284,8 +284,15 @@ latest-failure composition structure for existing read surfaces; real Traefik e2
 companion/static renderer support, and automatic route/resource lookup remain future hardening gaps.
 
 The request-id evidence lookup slice adds `resources.access-failure-evidence.lookup` and a
-short-retention evidence read model. Automatic provider metadata context lookup, real Traefik e2e
-probing, and companion/static renderer support remain future hardening gaps.
+short-retention evidence read model.
+
+The automatic route context lookup baseline adds an internal read service that resolves safe
+resource/deployment/domain/server/route context from hostname/path using existing
+`ResourceAccessSummary`, durable domain binding, server-applied route, and deployment read state.
+Evidence capture may call this lookup when provider-neutral input lacks route ids, then stores the
+same sanitized `resource-access-failure/v1` envelope with safe related ids filled in. This does not
+add a public operation or route repair surface. Provider-native raw metadata lookup, real Traefik
+e2e probing, and companion/static renderer support remain future hardening gaps.
 
 Existing `resources.health`, `resources.diagnostic-summary`, and
 `resources.proxy-configuration.preview` already provide the owner-facing read surfaces that the

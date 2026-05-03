@@ -12,6 +12,7 @@ import {
 import { createHttpApp } from "@appaloft/adapter-http-elysia";
 import {
   type AppLogger,
+  type AutomaticRouteContextLookup,
   type CertificateHttpChallengeTokenStore,
   type CertificateRetryScheduler,
   type CommandBus,
@@ -367,6 +368,10 @@ export async function createAppComposition(
     childContainer,
     tokens.resourceAccessFailureEvidenceRecorder,
   );
+  const resourceAccessRouteContextLookup = resolveToken<AutomaticRouteContextLookup>(
+    childContainer,
+    tokens.automaticRouteContextLookupService,
+  );
   const certificateRetryScheduler = resolveToken<CertificateRetryScheduler>(
     childContainer,
     tokens.certificateRetryScheduler,
@@ -394,6 +399,7 @@ export async function createAppComposition(
     terminalSessionGateway,
     certificateHttpChallengeTokenStore,
     resourceAccessFailureEvidenceRecorder,
+    resourceAccessRouteContextLookup,
     pluginRuntime,
     authRuntime,
     requestContextRunner,

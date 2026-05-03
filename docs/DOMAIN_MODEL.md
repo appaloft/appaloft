@@ -354,6 +354,10 @@ Boundary rule:
   request id. It stores and returns only safe `resource-access-failure/v1` envelope fields plus
   capture/expiry metadata for `resources.access-failure-evidence.lookup`; it is not aggregate state,
   not provider-native log storage, and not a route repair lifecycle.
+- automatic route context lookup is internal resource access observation over existing read models.
+  It resolves safe context for hostname/path access failures from generated access, durable domain
+  binding, server-applied route, and deployment route read state; it is not aggregate state, not
+  provider-native metadata storage, and not a mutation or route repair lifecycle.
 
 ### Dependency Resources
 

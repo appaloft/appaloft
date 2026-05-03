@@ -2,12 +2,14 @@ import { existsSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import {
   type AppLogger,
+  type AutomaticRouteContextLookup,
   type CertificateHttpChallengeTokenStore,
   type CommandBus,
   type DeploymentProgressObserver,
   DoctorQuery,
   type ExecutionContext,
   type ExecutionContextFactory,
+  enrichResourceAccessFailureDiagnosticWithRouteContext,
   ListDeploymentsQuery,
   ListEnvironmentsQuery,
   ListProjectsQuery,
@@ -452,6 +454,7 @@ export function createHttpApp(input: {
   embeddedDocsAssets?: EmbeddedStaticAssets;
   certificateHttpChallengeTokenStore?: CertificateHttpChallengeTokenStore;
   resourceAccessFailureEvidenceRecorder?: ResourceAccessFailureEvidenceRecorder;
+  resourceAccessRouteContextLookup?: AutomaticRouteContextLookup;
 }) {
   const pluginMiddlewares = input.pluginRuntime?.listHttpMiddlewares() ?? [];
   const pluginRoutes = input.pluginRuntime?.listHttpRoutes() ?? [];
@@ -940,6 +943,23 @@ export function createHttpApp(input: {
     .get("/api/schemas/appaloft-config.json", () => appaloftDeploymentConfigJsonSchema)
     .get("/.appaloft/resource-access-failure", ({ request }) =>
       resourceAccessFailureDiagnosticResponse(request, {
+        enrichEvidence: async (diagnostic) => {
+          if (!input.resourceAccessRouteContextLookup) {
+            return diagnostic;
+          }
+
+          const context = input.executionContextFactory.create({
+            entrypoint: "http",
+            locale: resolveAppaloftLocaleFromHeaders(request.headers),
+            requestId: diagnostic.requestId,
+          });
+
+          return enrichResourceAccessFailureDiagnosticWithRouteContext(
+            context,
+            diagnostic,
+            input.resourceAccessRouteContextLookup,
+          );
+        },
         recordEvidence: async (diagnostic, capturedAt, expiresAt) => {
           if (!input.resourceAccessFailureEvidenceRecorder) {
             return;

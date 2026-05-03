@@ -676,6 +676,11 @@ Phase 6 verification notes from 2026-05-01:
   leaving real Traefik middleware e2e, automatic route/resource context lookup from applied
   provider metadata, companion/static renderer support, and a Web lookup form as remaining Phase 6
   work.
+- The automatic route context lookup baseline adds internal hostname/path resolution from existing
+  generated access, durable domain binding, server-applied route, and deployment read state, and
+  lets evidence capture fill safe related ids when provider input lacks them. It does not add a new
+  public operation or real Traefik middleware e2e; provider-native metadata lookup, companion/static
+  renderer support, and the Web lookup form remain future Phase 6 work.
 
 Exit criteria:
 

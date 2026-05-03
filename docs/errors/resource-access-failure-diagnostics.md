@@ -166,14 +166,20 @@ The first implementation slice covers:
   override when the proxy manager knows a different reachable backend URL.
 
 Existing health and diagnostic summary source errors cover several owner-facing causes, but there
-is no renderer target for one-shot CLI remote SSH execution and no automatic resource-context lookup
-from applied provider metadata yet.
+is no renderer target for one-shot CLI remote SSH execution.
 
 The 2026-05-01 baseline adds stable `nextAction`, affected request descriptor, and optional domain
 binding id fields to the safe envelope and lets resource access read models expose one latest safe
 edge failure for owner-facing `resources.health` and `resources.diagnostic-summary` composition.
 This keeps latest-failure composition on existing read surfaces; real provider e2e lookup remains
 future work. The request-id evidence lookup slice adds short-retention persistence and safe lookup
+by request id.
+
+The automatic route context lookup baseline may enrich captured evidence with safe related ids when
+hostname/path match existing generated access, durable domain binding, server-applied, or deployment
+route read state. No new public error code is added for lookup misses: a miss keeps the original
+safe diagnostic envelope without unrelated ids, and the owner-facing next action remains an
+existing diagnostic/read surface.
 for retained envelopes without exposing raw provider payloads.
 
 ## Open Questions

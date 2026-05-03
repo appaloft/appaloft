@@ -5,6 +5,7 @@ import {
   ArchiveProjectUseCase,
   ArchiveResourceCommandHandler,
   ArchiveResourceUseCase,
+  AutomaticRouteContextLookupService,
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
   BootstrapServerProxyCommandHandler,
   BootstrapServerProxyUseCase,
@@ -421,6 +422,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.resourceAccessFailureEvidenceLookupQueryService,
     ResourceAccessFailureEvidenceLookupQueryService,
+  );
+  container.registerSingleton(
+    tokens.automaticRouteContextLookupService,
+    AutomaticRouteContextLookupService,
   );
   container.registerSingleton(tokens.resourceHealthQueryService, ResourceHealthQueryService);
   container.registerSingleton(
