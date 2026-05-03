@@ -23,152 +23,6 @@ Domain Driven Develop has three layers:
 
 Keep these layers separate. This skill defines method and code shape. The project defines the actual domain language, bounded contexts, aggregate ownership, lifecycle rules, and entrypoint contracts.
 
-## Tactical Behavior Placement
-
-Domain Driven Develop prefers rich tactical models over anemic data holders. Aggregate roots,
-entities, and value objects should expose intention-revealing behavior in the ubiquitous language.
-Application services, domain services, providers, helpers, handlers, adapters, and repositories
-should not peel domain objects into primitive state and then make the object's own decisions from
-outside.
-
-Place behavior by ownership:
-
-- A rule about one value belongs on that value object.
-- A rule coordinating multiple value objects owned by one entity belongs on that entity.
-- A rule coordinating entities and value objects inside one consistency boundary belongs on the
-  aggregate root.
-- A domain service coordinates rules that genuinely span multiple aggregate roots or domain
-  concepts and can be evaluated from already-loaded domain objects or explicit domain values.
-- An application service loads aggregates, coordinates repositories, transactions, ports, and side
-  effects, then calls domain behavior.
-- Providers and adapters translate to external systems. They may evaluate provider capabilities or
-  external response shapes, but they must not own aggregate invariants or value-object policy.
-
-Use names that reveal the business question or command, such as `isActive()`, `canCaptureAt(...)`,
-`appliesTo(...)`, `canApplyTo(...)`, `bypasses(...)`, `isSelectedBy(...)`, `increase(...)`,
-`decrease(...)`, `capAt(...)`, `combineWith(...)`, and `compareTo(...)`.
-
-Do not treat `toState()` or public `value` fields as the default way to ask a domain question.
-`toState()` is for serialization, persistence, read-model mapping, DTO/schema boundaries, fixtures,
-and assertions. It should not be used by domain behavior or application/domain services to branch on
-another object's internals. Primitive reads such as `.toState().status.value === "authorized"` or
-`.value > 0` are acceptable only inside the owning value object/entity/aggregate or at a boundary
-that is translating to a non-domain representation.
-
-Value object collaboration should not be scattered through helpers or services. If the calculation
-uses one value object, put it on that value object. If it combines several value objects held by an
-entity, put it on the entity. If it combines several child entities or owned values inside an
-aggregate root, put it on the aggregate root. A domain service may call those methods while
-coordinating across aggregate roots, but it should not reimplement their internals with primitive
-comparisons.
-
-### TypeScript Example: Order Payment
-
-Do not write this:
-
-```ts
-// Application or domain service peels value objects into primitives and owns Order policy.
-class PaymentService {
-  canCapture(order: Order): boolean {
-    const state = order.toState();
-
-    return (
-      state.status.value === "authorized" &&
-      state.amount.value > 0 &&
-      state.paymentDeadline.value > Date.now()
-    );
-  }
-
-  capture(order: Order): Result<Order, DomainError> {
-    if (!this.canCapture(order)) {
-      return err(DomainError.create("order.payment.cannot_capture"));
-    }
-
-    return ok(Order.rehydrate({ ...order.toState(), status: OrderStatus.captured() }));
-  }
-}
-```
-
-Write this instead:
-
-```ts
-class OrderAmount {
-  private constructor(public readonly value: number) {}
-
-  isPositive(): boolean {
-    return this.value > 0;
-  }
-}
-
-class PaymentWindow {
-  private constructor(private readonly deadline: PaymentTime) {}
-
-  includes(now: PaymentTime): boolean {
-    return this.deadline.isAfter(now);
-  }
-}
-
-class OrderStatus {
-  private constructor(public readonly value: "draft" | "authorized" | "captured") {}
-
-  isAuthorized(): boolean {
-    return this.value === "authorized";
-  }
-
-  capture(): Result<OrderStatus, DomainError> {
-    if (!this.isAuthorized()) {
-      return err(DomainError.create("order.payment.not_authorized"));
-    }
-
-    return ok(new OrderStatus("captured"));
-  }
-}
-
-class Order {
-  canCaptureAt(now: PaymentTime): boolean {
-    return (
-      this.status.isAuthorized() &&
-      this.totalAmount.isPositive() &&
-      this.paymentWindow.includes(now)
-    );
-  }
-
-  capture(now: PaymentTime): Result<Order, DomainError> {
-    if (!this.canCaptureAt(now)) {
-      return err(DomainError.create("order.payment.cannot_capture"));
-    }
-
-    return this.status.capture().map((status) => this.withStatus(status));
-  }
-}
-
-class PaymentService {
-  capture(order: Order, now: PaymentTime): Result<Order, DomainError> {
-    return order.capture(now);
-  }
-}
-```
-
-Do not write this:
-
-```ts
-// A helper compares unrelated primitive state that belongs inside the order line.
-function isLinePayable(line: OrderLine): boolean {
-  const state = line.toState();
-  return state.quantity.value > 0 && state.unitPrice.value > 0;
-}
-```
-
-Write this instead:
-
-```ts
-class OrderLine {
-  hasChargeableAmount(): boolean {
-    return this.quantity.isPositive() && this.unitPrice.isPositive();
-  }
-}
-```
-
 ## First Steps
 
 1. Identify the requested behavior or modeling question.
@@ -192,38 +46,54 @@ class OrderLine {
 
 ## Reference Map
 
-Load only the files needed for the current task:
+Load only the files needed for the current task. Keep reference files flat under `references/`
+so each file remains directly linked from this `SKILL.md`; use these groups to choose the
+right control plane before loading details.
+
+### Source Of Truth And Workflow Control
 
 - `references/project-source-of-truth.md`: read before non-trivial work to bind generic categories to project files.
 - `references/project-initialization.md`: read when the user asks to initialize a new product/project or the repository has no project-specific profile/domain docs yet.
 - `references/spec-driven-develop.md`: read for workflow control, round selection, readiness gates, and sync behavior.
-- `references/spec-plan-tasks-artifacts.md`: read when creating or using feature-level `spec.md`, `plan.md`, and `tasks.md` artifacts for new formal behavior.
 - `references/event-storming-discovery.md`: read during Discover Round when domain events, commands, actors, policies, aggregates, or ubiquitous language are not clear.
+- `references/next-behavior-selection.md`: read when choosing the next behavior after a behavior is implemented or mostly implemented.
 - `references/roadmap-and-versioning.md`: read when selecting the next behavior, checking release readiness, changing public surfaces, classifying compatibility impact, or applying SemVer.
 - `references/decisions-and-adrs.md`: read when deciding whether a behavior needs an ADR/decision record, or when changing boundaries, lifecycle, ownership, canonical language, persistence shape, or public contracts.
+
+### Round Artifacts And Synchronization
+
+- `references/spec-plan-tasks-artifacts.md`: read when creating or using feature-level `spec.md`, `plan.md`, and `tasks.md` artifacts for new formal behavior.
 - `references/round-artifacts.md`: read before non-trivial edits to build the behavior dossier, classify artifacts, and choose incremental or complete readiness.
 - `references/round-checklists.md`: read after the dossier exists and before editing files in a concrete round; contains minimum todo outcomes and synchronization surfaces.
 - `references/docs-round.md`: read when behavior changes user-visible language, input, output, status, recovery, workflows, or help surfaces.
 - `references/testing-traceability.md`: read when adding or changing behavior tests, test matrices, acceptance criteria, stable test ids, automation levels, or Code Round test bindings.
 - `references/reporting.md`: read for Discovery output, formal round summaries, artifact-state reports, coverage reports, and ready/not-ready reporting.
-- `references/next-behavior-selection.md`: read when choosing the next behavior after a behavior is implemented or mostly implemented.
-- `references/domain-events.md`: read when designing, emitting, consuming, publishing, projecting, replaying, backfilling, versioning, or testing domain/integration events.
-- `references/cqrs-with-ddd.md`: read when deciding whether CQRS is warranted, separating command/query flows, shaping read models, designing projections, or making consistency/event tradeoffs.
+- `references/verification.md`: read before finishing Code or Sync work.
+- `references/review-checklist.md`: read for domain-driven implementation review or before finalizing substantial changes.
+
+### Domain Modeling And Architecture Guardrails
+
 - `references/domain-modeling.md`: read when discovering bounded contexts, ubiquitous language, ownership, lifecycle, and whether DDD is warranted.
 - `references/context-boundaries.md`: read when bounded context, execution context, domain context, tracing, transactions, or i18n concerns are mixed.
 - `references/context-map-and-anticorruption.md`: read when a behavior crosses bounded contexts, teams, external systems, published languages, upstream/downstream relationships, or legacy models.
+- `references/domain-events.md`: read when designing, emitting, consuming, publishing, projecting, replaying, backfilling, versioning, or testing domain/integration events.
+- `references/cqrs-with-ddd.md`: read when deciding whether CQRS is warranted, separating command/query flows, shaping read models, designing projections, or making consistency/event tradeoffs.
 - `references/error-handling.md`: read when modeling expected domain/application failures, error taxonomy, adapter translation, or no-throw Result style.
 - `references/aggregate-root.md`: read when creating or changing aggregate roots, entities, invariants, state transitions, or domain events.
 - `references/value-object.md`: read when modeling IDs, names, statuses, money, addresses, timestamps, ranges, or other domain-significant values.
 - `references/domain-service.md`: read when a pure domain rule does not naturally belong to one aggregate or value object.
 - `references/repository.md`: read when designing repository ports, persistence adapters, read models, or selection/mutation boundaries.
 - `references/specification-and-visitor.md`: read when creating reusable business predicates, query/update specs, composite specs, SQL/API translation visitors, or avoiding `findBy...` repository proliferation.
+
+### Tactical Implementation Rules
+
 - `references/application-layer.md`: read when placing orchestration, command/query handlers, use cases, unit-of-work boundaries, event publication, and side effects.
 - `references/dependency-injection-ioc.md`: read when wiring dependencies, deciding constructor injection versus service locator, or keeping composition separate from use.
 - `references/language-typescript.md`: read when the target implementation uses TypeScript or when examples need a concrete language.
 - `references/tactical-typescript-project-structure.md`: read when initializing or restructuring a TypeScript DDD project, choosing package layout, creating aggregate/entity/value-object classes, repository ports, selection/mutation specifications, visitors, command/query application layers, or adapter boundaries.
-- `references/verification.md`: read before finishing Code or Sync work.
-- `references/review-checklist.md`: read for domain-driven implementation review or before finalizing substantial changes.
+
+### Calibration And Sources
+
 - `references/example-repositories.md`: read when concrete public examples would help calibrate tradeoffs.
 - `references/reading-list.md`: use for source links and conceptual grounding.
 
@@ -239,6 +109,8 @@ Load only the files needed for the current task:
 - Do not let one domain model silently serve multiple bounded contexts. Cross-context collaboration needs an explicit context relationship, published language, translation boundary, or documented shared-kernel choice.
 - Do not put persistence, framework, transport, tracing SDK, queue, filesystem, or provider SDK logic inside aggregates, entities, value objects, or specifications.
 - Do not let repositories answer business-policy questions. Repositories load, persist, and translate specifications; aggregates and application services make business decisions.
+- Do not add business-specific repository methods such as `findById`, `findByRequestId`, `findActiveByOwner`, or `markXDone` when a named selection or mutation spec can express the rule. Repository ports should expose stable collection-shaped operations such as `findOne(context, spec)`, `findMany(context, spec)`, `upsert(context, aggregate, spec)`, and `deleteOne(context, spec)`.
+- Treat specifications and their composition as part of the domain model, not as transport DTOs or persistence filter bags. A composed spec tree represents business logic; repository adapters translate that tree without owning its meaning.
 - Do not let query handlers mutate business state or command handlers answer rich read-model questions. Keep read and write responsibilities separate when the project uses CQRS.
 - Do not treat CQRS, command-bus classes, or domain events as proof that event sourcing or separate databases are required.
 - Do not publish event facts before the domain decision and required persistence boundary succeed. Do not let event handlers or projections own write-side business policy.
@@ -246,6 +118,12 @@ Load only the files needed for the current task:
 - Do not add service-locator calls inside domain objects, use cases, or handlers unless the project explicitly documents that exception.
 - Do not model domain-significant concepts as loose TypeScript interfaces, primitive aliases, or data bags when they have identity, invariants, lifecycle transitions, comparison, normalization, or behavior. Use classes for aggregate roots, entities, value objects, specifications, and domain services unless the project source of truth explicitly documents a different tactical style.
 - Do not put naked primitives such as `string`, `number`, `boolean`, string literal unions, or primitive arrays in aggregate/entity/value-object state for core domain concepts. Wrap them in value object classes or entities. Primitive values are allowed only inside value object internals, factory/rehydration inputs, serialization/DTO boundaries, tests, and explicitly non-domain plumbing such as error transport details.
+- Do not let aggregate roots, entities, or value objects become thin wrappers around primitives. They should expose intention-revealing behavior for domain questions, comparisons, transitions, and constrained changes.
+- Do not place value-object collaboration logic in helpers or domain services when the value objects are owned by one entity or aggregate root. If a calculation combines multiple owned value objects inside one entity, the entity owns that behavior. If a calculation coordinates multiple child entities or owned value objects inside one consistency boundary, the aggregate root owns that behavior.
+- Do not make domain services the primary home for intra-aggregate calculations. Domain services should call aggregate-root/entity/value-object methods and coordinate policies across already-loaded aggregate roots or genuinely cross-object rules; they should not repeatedly inspect child state that an aggregate root or entity can expose through domain methods.
+- Do not implement core domain decisions by peeling state with `toState().x.value` or equivalent primitive inspection. `toState()` belongs at serialization, persistence, read-model, logging, fixture, assertion, and adapter boundaries. Inside domain behavior, prefer methods such as `isActive()`, `appliesTo(...)`, `canTransitionTo(...)`, `increase(...)`, `decrease(...)`, `capAt(...)`, or aggregate-root operations named in ubiquitous language.
+- Do not move behavior into a domain service or helper merely to avoid adding methods to a value object, entity, or aggregate root. Use a domain service only when the rule genuinely spans multiple domain concepts or policies and cannot naturally live on one object.
+- Do not accept value-object or entity tests that only cover construction when new public domain behavior exists. Tests should cover exposed predicates, comparisons, transitions, clamping/capping behavior, and invalid transition results.
 - Do not create one package per bounded context by default in TypeScript projects. Prefer a small `core` package containing bounded-context directories for tactical domain objects, an `application` package for commands/queries/use cases/ports, and adapter/app packages outside the core. Split bounded contexts into separate packages only after an ADR explains the dependency and lifecycle need.
 - Do not enter Code Round for domain behavior until aggregate roots, entities, value objects, repository ports, selection/mutation specs, and visitor translation boundaries are either modeled in source-of-truth docs or explicitly marked not-applicable with a domain reason.
 - Do not settle cross-boundary architecture, ownership, lifecycle, public-contract, or canonical-language decisions only in code or local behavior specs. Create or update a decision record, or document why no decision record is needed.
@@ -254,6 +132,110 @@ Load only the files needed for the current task:
 - Do not start the next round while mandatory checklist items remain unchecked, unless each gap is moved to a documented later round, `not-applicable` state, or `deferred-gap`.
 - Do not bypass source-of-truth specs during Code Round. If the intended behavior is unclear, return to Spec Round.
 - Do not report completion without stating the active round, source-of-truth artifacts changed, verification performed, and deferred gaps.
+
+## Tactical Ownership Examples
+
+All generic TypeScript examples in this skill use an order/payment domain. Keep future examples in the same domain unless a project-specific profile supplies its own domain facts.
+
+Value objects must own local validation, comparison, state questions, and constrained arithmetic:
+
+```ts
+// Do.
+export class PaymentAmount {
+  private constructor(public readonly value: number) {}
+
+  static create(value: number): Result<PaymentAmount, DomainError> {
+    if (!Number.isInteger(value) || value < 0) {
+      return err(domainError.validation("payment_amount_invalid"));
+    }
+    return ok(new PaymentAmount(value));
+  }
+
+  static zero(): PaymentAmount {
+    return new PaymentAmount(0);
+  }
+
+  add(other: PaymentAmount): PaymentAmount {
+    return new PaymentAmount(this.value + other.value);
+  }
+
+  multiply(quantity: OrderLineQuantity): PaymentAmount {
+    return new PaymentAmount(this.value * quantity.value);
+  }
+
+  covers(total: PaymentAmount): boolean {
+    return this.value >= total.value;
+  }
+}
+
+// Avoid.
+if (payment.toState().amount.value >= order.toState().total.value) {
+  // payment decision by primitive peeling
+}
+```
+
+Entities must own calculations across their own value objects:
+
+```ts
+// Do.
+export class OrderLine extends Entity<OrderLineState, OrderLineId> {
+  lineTotal(): PaymentAmount {
+    return this.state.unitPrice.multiply(this.state.quantity);
+  }
+}
+
+// Avoid.
+const total = line.toState().unitPrice.value * line.toState().quantity.value;
+```
+
+Aggregate roots must coordinate child entities and owned value objects inside one consistency boundary:
+
+```ts
+// Do.
+export class Order extends AggregateRoot<OrderState, OrderId> {
+  payableAmount(): PaymentAmount {
+    return this.lines().reduce((sum, line) => sum.add(line.lineTotal()), PaymentAmount.zero());
+  }
+
+  authorizePayment(payment: Payment): Result<Order, DomainError> {
+    if (!payment.amount().covers(this.payableAmount())) {
+      return err(domainError.invariant("payment_amount_insufficient"));
+    }
+    return ok(new Order({ ...this.state, status: this.state.status.markPaid() }));
+  }
+}
+
+// Avoid.
+const total = order
+  .toState()
+  .lines.reduce((sum, line) => sum + line.unitPrice.value * line.quantity.value, 0);
+if (payment.toState().amount.value >= total) order.toState().status = OrderStatus.paid();
+```
+
+Domain services coordinate already-loaded aggregate roots or genuinely cross-owner policies. They should call aggregate/entity/value-object methods rather than own intra-aggregate calculations:
+
+```ts
+// Do.
+export class OrderPaymentPolicy {
+  authorize(order: Order, payment: Payment): Result<Order, DomainError> {
+    if (!order.canAcceptPayment()) return err(domainError.invariant("order_not_payable"));
+    return order.authorizePayment(payment);
+  }
+}
+
+// Avoid.
+export class OrderPaymentHelper {
+  authorize(order: Order, payment: Payment): Result<Order, DomainError> {
+    const total = order
+      .toState()
+      .lines.reduce((sum, line) => sum + line.unitPrice.value * line.quantity.value, 0);
+    if (payment.toState().amount.value < total) {
+      return err(domainError.invariant("payment_amount_insufficient"));
+    }
+    // service owns intra-aggregate calculation and transition
+  }
+}
+```
 
 ## Code Round Trigger
 
