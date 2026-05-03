@@ -119,6 +119,7 @@ export const tokens = {
   resourceAccessFailureEvidenceLookupQueryService: Symbol.for(
     "appaloft.resource_access_failure_evidence_lookup_query_service",
   ),
+  automaticRouteContextLookupService: Symbol.for("appaloft.automatic_route_context_lookup_service"),
   resourceHealthQueryService: Symbol.for("appaloft.resource_health_query_service"),
   resourceHealthProbeRunner: Symbol.for("appaloft.resource_health_probe_runner"),
   resourceRuntimeLogsQueryService: Symbol.for("appaloft.resource_runtime_logs_query_service"),

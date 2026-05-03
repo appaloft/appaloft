@@ -285,6 +285,9 @@ export async function resourceAccessFailureDiagnosticResponse(
   input?: {
     now?: () => string;
     retentionMs?: number;
+    enrichEvidence?: (
+      diagnostic: ResourceAccessFailureDiagnostic,
+    ) => Promise<ResourceAccessFailureDiagnostic>;
     recordEvidence?: (
       diagnostic: ResourceAccessFailureDiagnostic,
       capturedAt: string,
@@ -300,7 +303,10 @@ export async function resourceAccessFailureDiagnosticResponse(
 
   if (input?.recordEvidence) {
     try {
-      await input.recordEvidence(diagnostic, capturedAt, expiresAt);
+      const evidenceDiagnostic = input.enrichEvidence
+        ? await input.enrichEvidence(diagnostic)
+        : diagnostic;
+      await input.recordEvidence(evidenceDiagnostic, capturedAt, expiresAt);
     } catch {
       // The renderer must still explain the failed request if short-retention evidence is unavailable.
     }
