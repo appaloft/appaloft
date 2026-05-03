@@ -61,6 +61,21 @@ describe("CaddyEdgeProxyProvider", () => {
             pathPrefix: "/",
             tlsMode: "disabled",
             targetPort: 3000,
+            appliedRouteContext: {
+              schemaVersion: "applied-route-context/v1",
+              resourceId: "res_demo",
+              deploymentId: "dep_demo",
+              serverId: "srv_demo",
+              destinationId: "dst_demo",
+              routeId: "generated-default:res_demo:dep_demo:app.203.0.113.10.sslip.io:/",
+              diagnosticId: "generated-default:res_demo:dep_demo:app.203.0.113.10.sslip.io:/",
+              routeSource: "generated-default",
+              hostname: "app.203.0.113.10.sslip.io",
+              pathPrefix: "/",
+              proxyKind: "caddy",
+              providerKey: "caddy",
+              observedAt: "2026-01-01T00:00:00.000Z",
+            },
           },
         ],
         port: 3000,
@@ -104,6 +119,19 @@ describe("CaddyEdgeProxyProvider", () => {
     ]);
     expect(view.isOk()).toBe(true);
     expect(view._unsafeUnwrap().routes[0]?.source).toBe("generated-default");
+    expect(view._unsafeUnwrap().routes[0]?.appliedRouteContext).toMatchObject({
+      schemaVersion: "applied-route-context/v1",
+      resourceId: "res_demo",
+      deploymentId: "dep_demo",
+      routeSource: "generated-default",
+      hostname: "app.203.0.113.10.sslip.io",
+      proxyKind: "caddy",
+      providerKey: "caddy",
+    });
+    expect(view._unsafeUnwrap().diagnostics?.appliedRouteContexts?.[0]).toMatchObject({
+      resourceId: "res_demo",
+      routeSource: "generated-default",
+    });
     expect(view._unsafeUnwrap().sections[0]?.content).toContain("caddy.reverse_proxy");
   });
 

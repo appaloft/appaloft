@@ -72,6 +72,15 @@ class StaticRouteContextLookup implements AutomaticRouteContextLookup {
   }
 }
 
+class FailingRouteContextLookup implements AutomaticRouteContextLookup {
+  calls = 0;
+
+  async lookup() {
+    this.calls += 1;
+    throw new Error("host/path lookup should not be called when applied metadata is supplied");
+  }
+}
+
 function createTestApp(input?: {
   evidenceRecorder?: ResourceAccessFailureEvidenceRecorder;
   routeContextLookup?: AutomaticRouteContextLookup;
@@ -279,5 +288,63 @@ describe("resource access failure diagnostics HTTP renderer", () => {
     expect(serialized).not.toContain("secret-token");
     expect(serialized).not.toContain("session=secret");
     expect(serialized).not.toContain("token=secret");
+  });
+
+  test("[RES-ACCESS-DIAG-APPLIED-004][RES-ACCESS-DIAG-APPLIED-005] prefers applied route metadata for captured evidence", async () => {
+    const evidenceRecorder = new RecordingEvidenceRecorder();
+    const routeContextLookup = new FailingRouteContextLookup();
+    const app = createTestApp({ evidenceRecorder, routeContextLookup });
+    const appliedRouteContext = encodeURIComponent(
+      JSON.stringify({
+        schemaVersion: "applied-route-context/v1",
+        resourceId: "res_applied",
+        deploymentId: "dep_applied",
+        domainBindingId: "dbnd_applied",
+        serverId: "srv_applied",
+        destinationId: "dst_applied",
+        routeId: "durable-domain:res_applied:dep_applied:app.example.test:/",
+        diagnosticId: "durable-domain:res_applied:dep_applied:app.example.test:/",
+        routeSource: "durable-domain",
+        hostname: "app.example.test",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        providerKey: "traefik",
+        appliedAt: "2026-01-01T00:00:02.000Z",
+        rawProviderPayload: "Authorization: Bearer secret-token",
+      }),
+    );
+
+    const response = await app.handle(
+      new Request(
+        `http://localhost/.appaloft/resource-access-failure?signal=upstream-timeout&requestId=req_applied&host=app.example.test&path=/private?token=secret&appliedRouteContext=${appliedRouteContext}`,
+        {
+          headers: {
+            accept: "application/json",
+            authorization: "Bearer secret-token",
+            cookie: "session=secret",
+          },
+        },
+      ),
+    );
+
+    expect(response.status).toBe(504);
+    expect(routeContextLookup.calls).toBe(0);
+    expect(evidenceRecorder.records).toHaveLength(1);
+    expect(evidenceRecorder.records[0]?.diagnostic.route).toMatchObject({
+      resourceId: "res_applied",
+      deploymentId: "dep_applied",
+      domainBindingId: "dbnd_applied",
+      serverId: "srv_applied",
+      destinationId: "dst_applied",
+      routeId: "durable-domain:res_applied:dep_applied:app.example.test:/",
+      routeSource: "durable-domain",
+      routeStatus: "applied",
+      providerKey: "traefik",
+    });
+    const serialized = JSON.stringify(evidenceRecorder.records[0]);
+    expect(serialized).not.toContain("secret-token");
+    expect(serialized).not.toContain("session=secret");
+    expect(serialized).not.toContain("token=secret");
+    expect(serialized).not.toContain("rawProviderPayload");
   });
 });

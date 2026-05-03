@@ -66,7 +66,10 @@ import {
   type VariableKind,
 } from "@appaloft/core";
 import { type ExecutionContext, type RepositoryContext } from "./execution-context";
-import { type ResourceAccessFailureDiagnostic } from "./resource-access-failure-diagnostics";
+import {
+  type AppliedRouteContextMetadata,
+  type ResourceAccessFailureDiagnostic,
+} from "./resource-access-failure-diagnostics";
 
 export type { ResourceAccessFailureDiagnostic } from "./resource-access-failure-diagnostics";
 
@@ -1300,6 +1303,8 @@ export interface EdgeProxyRouteInput {
   routeBehavior?: "serve" | "redirect";
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
+  appliedRouteContext?: AppliedRouteContextMetadata;
+  appliedRouteContexts?: AppliedRouteContextMetadata[];
 }
 
 export interface ResourceAccessFailureRendererTarget {
@@ -1377,6 +1382,7 @@ export interface ProxyConfigurationRouteView {
   routeBehavior?: "serve" | "redirect";
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
+  appliedRouteContext?: AppliedRouteContextMetadata;
 }
 
 export interface ProxyConfigurationSection {
@@ -1416,6 +1422,7 @@ export interface ProxyConfigurationDiagnostics {
   routeCount: number;
   networkName?: string;
   tlsRoutes?: ProxyConfigurationTlsDiagnostic[];
+  appliedRouteContexts?: AppliedRouteContextMetadata[];
   metadata?: Record<string, string>;
 }
 

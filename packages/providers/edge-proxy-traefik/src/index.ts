@@ -358,6 +358,9 @@ function routeViews(input: ProxyConfigurationViewInput): ProxyConfigurationRoute
       const source = routeSource(input, route);
       const scheme = routeScheme(route);
       const redirect = isRedirectRoute(route);
+      const appliedRouteContext =
+        route.appliedRouteContexts?.find((context) => context.hostname === hostname) ??
+        route.appliedRouteContext;
       return {
         hostname,
         scheme,
@@ -369,8 +372,16 @@ function routeViews(input: ProxyConfigurationViewInput): ProxyConfigurationRoute
         routeBehavior: redirect ? "redirect" : "serve",
         ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
         ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
+        ...(appliedRouteContext ? { appliedRouteContext } : {}),
       };
     }),
+  );
+}
+
+function appliedRouteContexts(input: ProxyConfigurationViewInput) {
+  return input.accessRoutes.flatMap(
+    (route) =>
+      route.appliedRouteContexts ?? (route.appliedRouteContext ? [route.appliedRouteContext] : []),
   );
 }
 
@@ -647,12 +658,14 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
     }
 
     const routeTlsDiagnostics = tlsDiagnostics(input);
+    const routeContexts = appliedRouteContexts(input);
     const diagnostics = input.includeDiagnostics
       ? {
           providerKey: this.key,
           routeCount: input.accessRoutes.length,
           ...(realized.value.networkName ? { networkName: realized.value.networkName } : {}),
           tlsRoutes: routeTlsDiagnostics,
+          ...(routeContexts.length > 0 ? { appliedRouteContexts: routeContexts } : {}),
           ...(realized.value.metadata ? { metadata: realized.value.metadata } : {}),
         }
       : undefined;

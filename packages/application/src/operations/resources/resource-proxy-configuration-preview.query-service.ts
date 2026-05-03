@@ -14,6 +14,7 @@ import {
   type ResourceAccessRouteSummary,
   type ResourceSummary,
 } from "../../ports";
+import { type AppliedRouteContextMetadata } from "../../resource-access-failure-diagnostics";
 import { tokens } from "../../tokens";
 import { type ListResourcesQueryService } from "./list-resources.query-service";
 import { type ResourceProxyConfigurationPreviewQuery } from "./resource-proxy-configuration-preview.query";
@@ -49,6 +50,7 @@ function proxyConfigurationStatusFromDeployment(
 
 type ProxyRouteSource = NonNullable<EdgeProxyRouteInput["source"]>;
 type ResourceProxyRouteStatus = NonNullable<ResourceSummary["accessSummary"]>["proxyRouteStatus"];
+type AppliedRouteSource = AppliedRouteContextMetadata["routeSource"];
 
 function routeSourceFromDeployment(deployment: DeploymentSummary): ProxyRouteSource {
   switch (deployment.runtimePlan.execution.metadata?.["access.routeSource"]) {
@@ -63,35 +65,168 @@ function routeSourceFromDeployment(deployment: DeploymentSummary): ProxyRouteSou
   }
 }
 
+function appliedRouteSourceFromProxySource(source: ProxyRouteSource): AppliedRouteSource {
+  switch (source) {
+    case "domain-binding":
+      return "durable-domain";
+    case "generated-default":
+    case "deployment-snapshot":
+    case "server-applied":
+      return source;
+  }
+}
+
+function appliedAtFromDeployment(deployment: DeploymentSummary | undefined): string | undefined {
+  if (!deployment) {
+    return undefined;
+  }
+
+  return deployment.finishedAt ?? deployment.startedAt ?? deployment.createdAt;
+}
+
+function safeRoutePart(input: string | undefined): string | undefined {
+  const normalized = input?.trim().replace(/[^a-zA-Z0-9_.:/-]/g, "_");
+  return normalized ? normalized.slice(0, 220) : undefined;
+}
+
+function appliedRouteId(input: {
+  source: AppliedRouteSource;
+  resourceId: string;
+  hostname: string;
+  pathPrefix: string;
+  deploymentId?: string;
+  domainBindingId?: string;
+}): string {
+  return [
+    input.source,
+    input.resourceId,
+    input.deploymentId,
+    input.domainBindingId,
+    input.hostname,
+    input.pathPrefix,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(":")
+    .replace(/[^a-zA-Z0-9_.:/-]/g, "_")
+    .slice(0, 220);
+}
+
+function providerKeyForRoute(route: EdgeProxyRouteInput): string | undefined {
+  if (route.providerKey) {
+    return route.providerKey;
+  }
+
+  return route.proxyKind === "none" ? undefined : route.proxyKind;
+}
+
+function appliedRouteContextsForRoute(input: {
+  resource: ResourceSummary;
+  deployment?: DeploymentSummary;
+  route: EdgeProxyRouteInput;
+  source: ProxyRouteSource;
+  observedAt?: string;
+}): AppliedRouteContextMetadata[] {
+  const routeSource = appliedRouteSourceFromProxySource(input.source);
+  const metadata = input.deployment?.runtimePlan.execution.metadata ?? {};
+  const domainBindingId = safeRoutePart(metadata["access.domainBindingId"]);
+  const deploymentId = input.deployment?.id;
+  const serverId = input.deployment?.serverId;
+  const destinationId = input.deployment?.destinationId ?? input.resource.destinationId;
+  const providerKey = providerKeyForRoute(input.route);
+  const appliedAt = appliedAtFromDeployment(input.deployment);
+
+  return input.route.domains.map((hostname) => {
+    const routeId = appliedRouteId({
+      source: routeSource,
+      resourceId: input.resource.id,
+      hostname,
+      pathPrefix: input.route.pathPrefix,
+      ...(deploymentId ? { deploymentId } : {}),
+      ...(domainBindingId ? { domainBindingId } : {}),
+    });
+
+    return {
+      schemaVersion: "applied-route-context/v1",
+      resourceId: input.resource.id,
+      ...(deploymentId ? { deploymentId } : {}),
+      ...(domainBindingId && routeSource === "durable-domain" ? { domainBindingId } : {}),
+      ...(serverId ? { serverId } : {}),
+      ...(destinationId ? { destinationId } : {}),
+      routeId,
+      diagnosticId: routeId,
+      routeSource,
+      hostname,
+      pathPrefix: input.route.pathPrefix,
+      proxyKind: input.route.proxyKind,
+      ...(providerKey ? { providerKey } : {}),
+      ...(appliedAt ? { appliedAt } : {}),
+      ...(input.observedAt ? { observedAt: input.observedAt } : {}),
+    };
+  });
+}
+
+function attachAppliedRouteContext(input: {
+  resource: ResourceSummary;
+  deployment?: DeploymentSummary;
+  route: EdgeProxyRouteInput;
+  source: ProxyRouteSource;
+  observedAt?: string;
+}): EdgeProxyRouteInput {
+  const contexts = appliedRouteContextsForRoute(input);
+
+  return {
+    ...input.route,
+    appliedRouteContexts: contexts,
+    ...(contexts.length === 1 && contexts[0] ? { appliedRouteContext: contexts[0] } : {}),
+  };
+}
+
 function routesFromDeployment(
+  resource: ResourceSummary,
   deployment: DeploymentSummary,
   source: ProxyRouteSource = "deployment-snapshot",
 ): EdgeProxyRouteInput[] {
-  return (deployment.runtimePlan.execution.accessRoutes ?? []).map((route) => ({
-    proxyKind: route.proxyKind,
-    domains: route.domains,
-    pathPrefix: route.pathPrefix,
-    tlsMode: route.tlsMode,
-    ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
-    source,
-    ...(route.routeBehavior ? { routeBehavior: route.routeBehavior } : {}),
-    ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
-    ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
-  }));
+  return (deployment.runtimePlan.execution.accessRoutes ?? []).map((route) =>
+    attachAppliedRouteContext({
+      resource,
+      deployment,
+      source,
+      route: {
+        proxyKind: route.proxyKind,
+        domains: route.domains,
+        pathPrefix: route.pathPrefix,
+        tlsMode: route.tlsMode,
+        ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
+        source,
+        ...(route.routeBehavior ? { routeBehavior: route.routeBehavior } : {}),
+        ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
+        ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
+      },
+    }),
+  );
 }
 
 function routeFromSummary(
+  resource: ResourceSummary,
   route: PlannedResourceAccessRouteSummary | ResourceAccessRouteSummary,
   source: Exclude<ProxyRouteSource, "deployment-snapshot">,
+  deployment?: DeploymentSummary,
+  observedAt?: string,
 ): EdgeProxyRouteInput {
-  return {
-    proxyKind: route.proxyKind,
-    domains: [route.hostname],
-    pathPrefix: route.pathPrefix,
-    tlsMode: route.scheme === "https" ? "auto" : "disabled",
-    ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
+  return attachAppliedRouteContext({
+    resource,
+    ...(deployment ? { deployment } : {}),
     source,
-  };
+    ...(observedAt ? { observedAt } : {}),
+    route: {
+      proxyKind: route.proxyKind,
+      domains: [route.hostname],
+      pathPrefix: route.pathPrefix,
+      tlsMode: route.scheme === "https" ? "auto" : "disabled",
+      ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
+      source,
+    },
+  });
 }
 
 function routeRequiresProvider(route: EdgeProxyRouteInput): boolean {
@@ -293,7 +428,7 @@ export class ResourceProxyConfigurationPreviewQueryService {
 
       return ok({
         deployment: selectedDeployment,
-        routes: routesFromDeployment(selectedDeployment),
+        routes: routesFromDeployment(resource, selectedDeployment),
         status: proxyConfigurationStatusFromDeployment(selectedDeployment),
         stale: false,
       });
@@ -308,6 +443,7 @@ export class ResourceProxyConfigurationPreviewQueryService {
 
     if (query.routeScope === "latest" && selectedDeployment) {
       const deploymentRoutes = routesFromDeployment(
+        resource,
         selectedDeployment,
         routeSourceFromDeployment(selectedDeployment),
       );
@@ -326,7 +462,9 @@ export class ResourceProxyConfigurationPreviewQueryService {
     const planned = resource.accessSummary?.plannedGeneratedAccessRoute;
     if (planned) {
       return ok({
-        routes: [routeFromSummary(planned, "generated-default")],
+        routes: [
+          routeFromSummary(resource, planned, "generated-default", undefined, this.clock.now()),
+        ],
         status: "planned",
         stale: false,
       });
@@ -376,14 +514,22 @@ export class ResourceProxyConfigurationPreviewQueryService {
       : undefined;
     const deploymentRoutes =
       deployment && routeSourceFromDeployment(deployment) === selected.source
-        ? routesFromDeployment(deployment, selected.source)
+        ? routesFromDeployment(resource, deployment, selected.source)
         : undefined;
 
     return {
       ...(deployment ? { deployment } : {}),
       routes: deploymentRoutes?.length
         ? deploymentRoutes
-        : [routeFromSummary(selected.route, selected.source)],
+        : [
+            routeFromSummary(
+              resource,
+              selected.route,
+              selected.source,
+              deployment,
+              "updatedAt" in selected.route ? selected.route.updatedAt : this.clock.now(),
+            ),
+          ],
       status:
         selected.route === access.plannedGeneratedAccessRoute
           ? "planned"
