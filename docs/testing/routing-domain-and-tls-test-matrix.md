@@ -318,6 +318,13 @@ Current tests cover `ROUTE-TLS-EVT-004`, `ROUTE-TLS-READMODEL-001`,
 `ROUTE-TLS-READMODEL-002`, `ROUTE-TLS-READMODEL-003`, `ROUTE-TLS-READMODEL-015`, and
 `ROUTE-TLS-ENTRY-012`.
 
+`ROUTE-TLS-READMODEL-016` is target coverage for the applied route context metadata baseline.
+Provider-rendered proxy preview must expose safe `applied-route-context/v1` metadata for durable
+domain and server-applied routes, including resource, deployment, domain binding where applicable,
+server, destination, route id, diagnostic id, hostname, path prefix, proxy kind, provider key, and
+available applied/observed timestamps. It must not expose provider raw payloads, SSH credentials,
+auth headers, cookies, sensitive query strings, private keys, or raw remote logs.
+
 `DMBH-DOMAIN-001` is the domain-model hardening row for the no-behavior-change certificate
 admission and ready-gate refactor. It is bound to `packages/core/test/domain-binding.test.ts` and
 verified with `packages/application/test/confirm-domain-binding-ownership.test.ts`,

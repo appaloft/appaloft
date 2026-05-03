@@ -123,6 +123,19 @@ These rows are governed by
 | RES-ACCESS-DIAG-CONTEXT-006 | adapter integration | Evidence capture enriches missing ids | Renderer captures provider-neutral failure with hostname/path but no route ids | Capture calls automatic lookup before recording evidence | Stored `resource-access-failure/v1` envelope includes only safe related ids from lookup. |
 | RES-ACCESS-DIAG-CONTEXT-007 | application unit + adapter integration | Lookup and enriched capture remain redacted | Host/path request includes query strings, cookies, auth headers, provider raw payload hints, or secret-like values | Lookup and capture normalize to safe hostname/path and route ids only | Sensitive query values, auth/cookie headers, SSH credentials, private keys, provider raw payloads, and raw remote logs are absent. |
 
+## Applied Route Context Metadata Matrix
+
+These rows are governed by
+[Applied Route Context Metadata Contract Baseline](../specs/026-applied-route-context-metadata/spec.md).
+
+| Test ID | Preferred automation | Case | Input/read state | Expected query relationship | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| RES-ACCESS-DIAG-APPLIED-001 | application unit + provider contract | Generated access applied metadata | Proxy preview renders a generated default access route | Route view includes `applied-route-context/v1` metadata | Safe `resourceId`, `deploymentId`, `serverId`, `destinationId`, `routeId`, `diagnosticId`, `routeSource = generated-default`, hostname/path, proxy kind/provider, and observed/applied timestamp are present. |
+| RES-ACCESS-DIAG-APPLIED-002 | application unit + provider contract | Durable domain applied metadata | Proxy preview renders a durable domain route with a matching binding | Route view includes durable route context | `domainBindingId`, server/destination ids, `routeSource = durable-domain`, and route diagnostic id are present without treating generated access as the owner. |
+| RES-ACCESS-DIAG-APPLIED-003 | application unit + provider contract | Server-applied applied metadata | Proxy preview renders a server-applied route | Route view includes server-applied route context | `routeSource = server-applied`, resource/deployment/server/destination ids, proxy kind/provider, hostname/path, and diagnostic id are safe and stable. |
+| RES-ACCESS-DIAG-APPLIED-004 | adapter integration | Evidence capture prefers applied metadata | Renderer captures a failure with supplied `applied-route-context/v1` metadata and a host/path that would otherwise require lookup | Evidence capture records metadata-derived route context without calling hostname/path lookup | Stored envelope includes safe related ids from applied metadata and preserves the original diagnostic code/phase. |
+| RES-ACCESS-DIAG-APPLIED-005 | contract + adapter integration | Applied metadata remains redacted | Applied metadata input is adjacent to query strings, cookies, auth headers, provider raw payload hints, SSH credentials, or remote logs | Proxy preview and evidence capture keep only safe metadata fields | Sensitive query values, auth/cookie headers, private keys, provider raw payloads, and raw remote logs are absent from route views, problem JSON, and stored evidence. |
+
 ## Shared Access Diagnostic Contract Matrix
 
 These rows are governed by
@@ -175,6 +188,13 @@ Executable tests now cover:
 - `RES-ACCESS-DIAG-CONTEXT-005` through safe not-found coverage;
 - `RES-ACCESS-DIAG-CONTEXT-006` through renderer evidence capture enrichment coverage;
 - `RES-ACCESS-DIAG-CONTEXT-007` through lookup and enriched-capture redaction coverage;
+- `RES-ACCESS-DIAG-APPLIED-001` through application proxy preview, provider renderer, and
+  contract-schema coverage for generated access applied route metadata;
+- `RES-ACCESS-DIAG-APPLIED-002` through durable domain proxy preview metadata coverage;
+- `RES-ACCESS-DIAG-APPLIED-003` through server-applied proxy preview metadata coverage;
+- `RES-ACCESS-DIAG-APPLIED-004` through automatic lookup and HTTP renderer evidence-capture
+  preference coverage;
+- `RES-ACCESS-DIAG-APPLIED-005` through contract and HTTP evidence redaction coverage;
 - `EDGE-PROXY-PROVIDER-010` as the Traefik provider contract row.
 
 Remaining gaps include broader classification rows, a companion/static renderer path for one-shot

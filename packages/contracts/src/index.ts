@@ -604,6 +604,7 @@ export const resourceAccessFailureDiagnosticSchema = z.object({
       destinationId: z.string().optional(),
       providerKey: z.string().optional(),
       routeId: z.string().optional(),
+      diagnosticId: z.string().optional(),
       routeSource: z
         .enum(["generated-default", "durable-domain", "server-applied", "deployment-snapshot"])
         .optional(),
@@ -613,6 +614,29 @@ export const resourceAccessFailureDiagnosticSchema = z.object({
   causeCode: z.string().optional(),
   correlationId: z.string().optional(),
   causationId: z.string().optional(),
+});
+
+export const appliedRouteContextMetadataSchema = z.object({
+  schemaVersion: z.literal("applied-route-context/v1"),
+  resourceId: z.string(),
+  deploymentId: z.string().optional(),
+  domainBindingId: z.string().optional(),
+  serverId: z.string().optional(),
+  destinationId: z.string().optional(),
+  routeId: z.string(),
+  diagnosticId: z.string(),
+  routeSource: z.enum([
+    "generated-default",
+    "durable-domain",
+    "server-applied",
+    "deployment-snapshot",
+  ]),
+  hostname: z.string(),
+  pathPrefix: z.string(),
+  proxyKind: z.enum(["none", "traefik", "caddy"]),
+  providerKey: z.string().optional(),
+  appliedAt: z.string().optional(),
+  observedAt: z.string().optional(),
 });
 
 export const resourceAccessSummarySchema = z.object({
@@ -1488,6 +1512,7 @@ export const proxyConfigurationRouteViewSchema = z.object({
   redirectStatus: z
     .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
     .optional(),
+  appliedRouteContext: appliedRouteContextMetadataSchema.optional(),
 });
 
 export const proxyConfigurationSectionSchema = z.object({
@@ -1526,6 +1551,7 @@ export const proxyConfigurationDiagnosticsSchema = z.object({
   routeCount: z.number(),
   networkName: z.string().optional(),
   tlsRoutes: z.array(proxyConfigurationTlsDiagnosticSchema).optional(),
+  appliedRouteContexts: z.array(appliedRouteContextMetadataSchema).optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
@@ -3266,6 +3292,7 @@ export type PlannedResourceAccessRouteSummary = z.infer<
   typeof plannedResourceAccessRouteSummarySchema
 >;
 export type ResourceAccessFailureDiagnostic = z.infer<typeof resourceAccessFailureDiagnosticSchema>;
+export type AppliedRouteContextMetadata = z.infer<typeof appliedRouteContextMetadataSchema>;
 export type ResourceAccessFailureEvidenceLookup = z.infer<
   typeof resourceAccessFailureEvidenceLookupSchema
 >;

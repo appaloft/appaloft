@@ -943,7 +943,7 @@ export function createHttpApp(input: {
     .get("/api/schemas/appaloft-config.json", () => appaloftDeploymentConfigJsonSchema)
     .get("/.appaloft/resource-access-failure", ({ request }) =>
       resourceAccessFailureDiagnosticResponse(request, {
-        enrichEvidence: async (diagnostic) => {
+        enrichEvidence: async (diagnostic, appliedRouteContext) => {
           if (!input.resourceAccessRouteContextLookup) {
             return diagnostic;
           }
@@ -958,6 +958,7 @@ export function createHttpApp(input: {
             context,
             diagnostic,
             input.resourceAccessRouteContextLookup,
+            appliedRouteContext,
           );
         },
         recordEvidence: async (diagnostic, capturedAt, expiresAt) => {
