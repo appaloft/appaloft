@@ -70,6 +70,30 @@ async function parseCli(program: { parseAsync(args: string[]): Promise<unknown> 
   }
 }
 
+async function parseCliWithOutput(
+  program: { parseAsync(args: string[]): Promise<unknown> },
+  args: string[],
+): Promise<string> {
+  let output = "";
+  const writeStdout = process.stdout.write;
+  try {
+    process.stdout.write = ((
+      chunk: string | Uint8Array,
+      encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
+      callback?: (error?: Error | null) => void,
+    ) => {
+      output += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      const done = typeof encodingOrCallback === "function" ? encodingOrCallback : callback;
+      done?.();
+      return true;
+    }) as typeof process.stdout.write;
+    await program.parseAsync(args);
+    return output;
+  } finally {
+    process.stdout.write = writeStdout;
+  }
+}
+
 describe("CLI resource commands", () => {
   test("[RES-PROFILE-ENTRY-003] resource configure-runtime dispatches the application command", async () => {
     ensureReflectMetadata();
@@ -645,6 +669,381 @@ describe("CLI resource commands", () => {
       hostname: "web.example.test",
       path: "/private",
     });
+  });
+
+  test("[WEB-CLI-API-ACCESS-005] CLI JSON output preserves shared access/proxy/health/diagnostic route context", async () => {
+    ensureReflectMetadata();
+    const {
+      ResourceDiagnosticSummaryQuery,
+      ResourceHealthQuery,
+      ResourceProxyConfigurationPreviewQuery,
+      ShowDomainBindingQuery,
+      ShowResourceQuery,
+      createExecutionContext,
+    } = await import("@appaloft/application");
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const generatedRoute = {
+      url: "https://generated.example.test",
+      hostname: "generated.example.test",
+      scheme: "https",
+      providerKey: "sslip",
+      deploymentId: "dep_generated",
+      deploymentStatus: "succeeded",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+      targetPort: 3000,
+      updatedAt: "2026-01-01T00:00:05.000Z",
+    };
+    const serverAppliedRoute = {
+      url: "https://server-applied.example.test",
+      hostname: "server-applied.example.test",
+      scheme: "https",
+      deploymentId: "dep_server_applied",
+      deploymentStatus: "succeeded",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+      targetPort: 3000,
+      updatedAt: "2026-01-01T00:00:06.000Z",
+    };
+    const durableRoute = {
+      url: "https://durable.example.test",
+      hostname: "durable.example.test",
+      scheme: "https",
+      providerKey: "traefik",
+      deploymentId: "dep_durable",
+      deploymentStatus: "succeeded",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+      targetPort: 3000,
+      updatedAt: "2026-01-01T00:00:07.000Z",
+    };
+    const routeIntentStatus = {
+      schemaVersion: "route-intent-status/v1",
+      routeId: "durable_domain_binding:durable.example.test:/:dep_durable",
+      diagnosticId: "durable_domain_binding:durable.example.test:/:dep_durable",
+      source: "durable-domain-binding",
+      intent: {
+        host: "durable.example.test",
+        pathPrefix: "/",
+        protocol: "https",
+        routeBehavior: "serve",
+      },
+      context: {
+        resourceId: "res_demo",
+        deploymentId: "dep_durable",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+      },
+      proxy: {
+        intent: "required",
+        applied: "ready",
+        providerKey: "traefik",
+      },
+      domainVerification: "verified",
+      tls: "active",
+      runtimeHealth: "unknown",
+      latestObservation: {
+        source: "resource-access-summary",
+        observedAt: "2026-01-01T00:00:07.000Z",
+        deploymentId: "dep_durable",
+      },
+      recommendedAction: "none",
+      copySafeSummary: {
+        status: "available",
+        message: "Route access is available according to the latest route observation.",
+      },
+    };
+    const latestAccessFailure = {
+      schemaVersion: "resource-access-failure/v1",
+      requestId: "req_access_timeout",
+      generatedAt: "2026-01-01T00:00:08.000Z",
+      code: "resource_access_upstream_timeout",
+      category: "timeout",
+      phase: "upstream-connection",
+      httpStatus: 504,
+      retriable: true,
+      ownerHint: "resource",
+      nextAction: "check-health",
+      affected: {
+        url: "https://durable.example.test/private",
+        hostname: "durable.example.test",
+        path: "/private",
+        method: "GET",
+      },
+      route: {
+        resourceId: "res_demo",
+        deploymentId: "dep_durable",
+        domainBindingId: "dmb_ready",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+        providerKey: "traefik",
+        routeId: "route_durable",
+        routeSource: "durable-domain",
+        routeStatus: "ready",
+      },
+      causeCode: "resource_public_access_probe_failed",
+    };
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+
+        if (query instanceof ShowResourceQuery) {
+          return ok({
+            schemaVersion: "resources.show/v1",
+            resource: {
+              id: "res_demo",
+              projectId: "prj_demo",
+              environmentId: "env_demo",
+              destinationId: "dst_demo",
+              name: "Web",
+              slug: "web",
+              kind: "application",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              services: [],
+              deploymentCount: 1,
+            },
+            accessSummary: {
+              latestGeneratedAccessRoute: generatedRoute,
+              latestServerAppliedDomainRoute: serverAppliedRoute,
+              latestDurableDomainRoute: durableRoute,
+              proxyRouteStatus: "ready",
+              lastRouteRealizationDeploymentId: "dep_durable",
+              latestAccessFailureDiagnostic: latestAccessFailure,
+            },
+            lifecycle: { status: "active" },
+            diagnostics: [],
+            generatedAt: "2026-01-01T00:00:10.000Z",
+          } as T);
+        }
+
+        if (query instanceof ResourceHealthQuery) {
+          return ok({
+            schemaVersion: "resources.health/v1",
+            resourceId: "res_demo",
+            generatedAt: "2026-01-01T00:00:10.000Z",
+            overall: "degraded",
+            publicAccess: {
+              status: "failed",
+              url: durableRoute.url,
+              kind: "durable-domain",
+              routeIntentStatus,
+              latestAccessFailure,
+            },
+            checks: [],
+            sourceErrors: [],
+          } as T);
+        }
+
+        if (query instanceof ResourceProxyConfigurationPreviewQuery) {
+          return ok({
+            resourceId: "res_demo",
+            providerKey: "traefik",
+            routeScope: "latest",
+            status: "applied",
+            generatedAt: "2026-01-01T00:00:10.000Z",
+            lastAppliedDeploymentId: "dep_durable",
+            stale: false,
+            routes: [
+              {
+                hostname: durableRoute.hostname,
+                scheme: durableRoute.scheme,
+                url: durableRoute.url,
+                pathPrefix: "/",
+                tlsMode: "auto",
+                targetPort: 3000,
+                source: "domain-binding",
+              },
+              {
+                hostname: serverAppliedRoute.hostname,
+                scheme: serverAppliedRoute.scheme,
+                url: serverAppliedRoute.url,
+                pathPrefix: "/",
+                tlsMode: "auto",
+                targetPort: 3000,
+                source: "server-applied",
+              },
+              {
+                hostname: generatedRoute.hostname,
+                scheme: generatedRoute.scheme,
+                url: generatedRoute.url,
+                pathPrefix: "/",
+                tlsMode: "auto",
+                targetPort: 3000,
+                source: "generated-default",
+              },
+            ],
+            sections: [],
+            warnings: [],
+          } as T);
+        }
+
+        if (query instanceof ResourceDiagnosticSummaryQuery) {
+          return ok({
+            schemaVersion: "resources.diagnostic-summary/v1",
+            generatedAt: "2026-01-01T00:00:10.000Z",
+            focus: { resourceId: "res_demo", deploymentId: "dep_durable" },
+            context: {
+              projectId: "prj_demo",
+              environmentId: "env_demo",
+              resourceName: "Web",
+              resourceSlug: "web",
+              resourceKind: "application",
+              destinationId: "dst_demo",
+              serverId: "srv_demo",
+              services: [],
+            },
+            access: {
+              status: "failed",
+              generatedUrl: generatedRoute.url,
+              durableUrl: durableRoute.url,
+              serverAppliedUrl: serverAppliedRoute.url,
+              selectedRoute: routeIntentStatus,
+              routeIntentStatuses: [routeIntentStatus],
+              proxyRouteStatus: "ready",
+              latestAccessFailure,
+              reasonCode: latestAccessFailure.code,
+              phase: latestAccessFailure.phase,
+            },
+            proxy: {
+              status: "available",
+              providerKey: "traefik",
+              proxyRouteStatus: "ready",
+              configurationIncluded: true,
+              configurationStatus: "applied",
+              configurationGeneratedAt: "2026-01-01T00:00:10.000Z",
+              routeCount: 3,
+              sectionCount: 0,
+            },
+            deploymentLogs: { status: "not-requested", tailLimit: 20, lineCount: 0, lines: [] },
+            runtimeLogs: { status: "not-requested", tailLimit: 20, lineCount: 0, lines: [] },
+            system: { entrypoint: "cli", requestId: "req_cli_access_regression_test" },
+            sourceErrors: [],
+            redaction: {
+              policy: "deployment-environment-secrets",
+              masked: false,
+              maskedValueCount: 0,
+            },
+            copy: {
+              json: JSON.stringify({
+                generatedUrl: generatedRoute.url,
+                durableUrl: durableRoute.url,
+                serverAppliedUrl: serverAppliedRoute.url,
+                selectedRoute: routeIntentStatus.source,
+                latestAccessFailure: latestAccessFailure.requestId,
+              }),
+            },
+          } as T);
+        }
+
+        if (query instanceof ShowDomainBindingQuery) {
+          return ok({
+            binding: {
+              id: "dmb_ready",
+              projectId: "prj_demo",
+              environmentId: "env_demo",
+              resourceId: "res_demo",
+              serverId: "srv_demo",
+              destinationId: "dst_demo",
+              domainName: "durable.example.test",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              tlsMode: "auto",
+              certificatePolicy: "auto",
+              status: "ready",
+              verificationAttemptCount: 1,
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
+            routeReadiness: {
+              status: "ready",
+              routeBehavior: "serve",
+              selectedRoute: routeIntentStatus,
+              contextRoutes: [routeIntentStatus],
+            },
+            generatedAccessFallback: generatedRoute,
+            proxyReadiness: "ready",
+            certificates: [],
+            deleteSafety: {
+              domainBindingId: "dmb_ready",
+              safeToDelete: true,
+              blockers: [],
+              warnings: [],
+              preservesGeneratedAccess: true,
+              preservesDeploymentSnapshots: true,
+              preservesServerAppliedRouteAudit: true,
+            },
+          } as T);
+        }
+
+        return ok({} as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_access_regression_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const outputs = [
+      await parseCliWithOutput(program, ["node", "appaloft", "resource", "show", "res_demo"]),
+      await parseCliWithOutput(program, ["node", "appaloft", "resource", "health", "res_demo"]),
+      await parseCliWithOutput(program, [
+        "node",
+        "appaloft",
+        "resource",
+        "proxy-config",
+        "res_demo",
+        "--diagnostics",
+      ]),
+      await parseCliWithOutput(program, [
+        "node",
+        "appaloft",
+        "resource",
+        "diagnose",
+        "res_demo",
+        "--proxy-configuration",
+      ]),
+      await parseCliWithOutput(program, [
+        "node",
+        "appaloft",
+        "domain-binding",
+        "show",
+        "dmb_ready",
+      ]),
+    ].join("\n");
+
+    expect(outputs).toContain("https://generated.example.test");
+    expect(outputs).toContain("https://server-applied.example.test");
+    expect(outputs).toContain("https://durable.example.test");
+    expect(outputs).toContain('"source": "domain-binding"');
+    expect(outputs).toContain('"source": "server-applied"');
+    expect(outputs).toContain('"source": "generated-default"');
+    expect(outputs).toContain('"kind": "durable-domain"');
+    expect(outputs).toContain('"source": "durable-domain-binding"');
+    expect(outputs).toContain('"requestId": "req_access_timeout"');
+    expect(outputs).toContain('"proxyReadiness": "ready"');
+    expect(outputs).not.toContain("ssh-private-key");
+    expect(outputs).not.toContain("Authorization");
+    expect(outputs).not.toContain("Cookie");
+    expect(queries.some((query) => query instanceof ShowResourceQuery)).toBe(true);
+    expect(queries.some((query) => query instanceof ResourceHealthQuery)).toBe(true);
+    expect(queries.some((query) => query instanceof ResourceProxyConfigurationPreviewQuery)).toBe(
+      true,
+    );
+    expect(queries.some((query) => query instanceof ResourceDiagnosticSummaryQuery)).toBe(true);
+    expect(queries.some((query) => query instanceof ShowDomainBindingQuery)).toBe(true);
   });
 
   test("[RES-PROFILE-ENTRY-006] resource delete dispatches the application command", async () => {
