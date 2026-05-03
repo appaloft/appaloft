@@ -101,6 +101,9 @@ These rows are governed by
 | WEB-CLI-API-ACCESS-001 | e2e-preferred | API/oRPC route/access contract | HTTP/oRPC diagnostic, health, proxy, and resource reads are queried | Responses expose shared route/access fields and do not define transport-only business shapes | Generated/durable/server-applied/snapshot source labels are preserved. |
 | WEB-CLI-API-ACCESS-002 | e2e-preferred | CLI route/access contract | CLI show/health/proxy-config/diagnose commands run | CLI output is derived from shared query results | CLI does not invent separate precedence or route status names. |
 | WEB-CLI-API-ACCESS-003 | e2e-preferred | Web route/access contract | Web resource detail renders access/proxy/health/diagnostics | Web selects display route from shared helper/query fields | Business route precedence is not hidden in page-only Svelte logic. |
+| WEB-CLI-API-ACCESS-004 | contract + adapter integration | Cross-surface access/proxy/health/diagnostic regression harness | `resources.show`, `resources.health`, `resources.proxy-configuration.preview`, `resources.diagnostic-summary`, and `domain-bindings.show` read the same generated, durable, server-applied, route descriptor, and latest access-failure fields | API/oRPC responses preserve shared contract fields and selected/context route labels without adding a new public operation or transport-only schema | Generated access, durable domain, server-applied route, proxy preview route source, health route intent, diagnostic copy, and domain-binding selected route stay in parity. |
+| WEB-CLI-API-ACCESS-005 | adapter integration | CLI JSON display regression harness | CLI `resource show`, `resource health`, `resource proxy-config`, `resource diagnose`, and `domain-binding show` run against shared query outputs | CLI JSON contains the same generated/server-applied/durable route, selected route descriptor, proxy route source, health latest access failure, and diagnostic copy fields returned by API/oRPC | CLI remains a renderer over the shared query result and does not compute route precedence or diagnostic copy independently. |
+| WEB-CLI-API-ACCESS-006 | unit | Web access-route selection helper regression harness | Web resource detail receives a shared `ResourceAccessSummary` containing durable, server-applied, latest generated, planned generated, and latest access failure fields | The helper selects durable, then server-applied, then latest generated, then planned generated routes and treats latest access failure as diagnostic state from the contract | Web keeps route precedence in a shared typed helper instead of page-only Svelte logic. |
 
 ## Entrypoint Matrix
 
@@ -146,11 +149,11 @@ Remaining coverage gaps:
 - query schema edge cases for invalid ids/include flags/tail bounds;
 - no deployments and empty deployment logs branches;
 - redaction failure as a whole-query error;
-- API/oRPC contract tests;
-- CLI output tests;
 - Web clipboard/e2e coverage for the resource detail affordance and future Quick Deploy
   completion affordance.
 - edge access failure envelope composition rows `RES-DIAG-QRY-015` and `RES-DIAG-QRY-016`.
+- Full browser clipboard/e2e coverage for `WEB-CLI-API-ACCESS-006` remains deferred to a later Web
+  harness; the current regression baseline covers the typed helper and shared contracts.
 
 ## Open Questions
 

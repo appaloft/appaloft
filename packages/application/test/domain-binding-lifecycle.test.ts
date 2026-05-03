@@ -51,8 +51,12 @@ import {
   type CertificateReadModel,
   type CertificateSummary,
   createExecutionContext,
+  type DomainBindingReadModel,
+  type DomainBindingSummary,
   type ExecutionContext,
   type RepositoryContext,
+  type ResourceReadModel,
+  type ResourceSummary,
   toRepositoryContext,
 } from "../src";
 import {
@@ -87,6 +91,55 @@ class StaticCertificateReadModel implements CertificateReadModel {
   ): Promise<CertificateSummary | null> {
     void context;
     return this.certificates.find((certificate) => certificate.id === input.certificateId) ?? null;
+  }
+}
+
+class StaticDomainBindingReadModel implements DomainBindingReadModel {
+  constructor(private readonly bindings: DomainBindingSummary[]) {}
+
+  async list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      resourceId?: string;
+    },
+  ): Promise<DomainBindingSummary[]> {
+    void context;
+    return this.bindings
+      .filter((binding) => (input?.projectId ? binding.projectId === input.projectId : true))
+      .filter((binding) =>
+        input?.environmentId ? binding.environmentId === input.environmentId : true,
+      )
+      .filter((binding) => (input?.resourceId ? binding.resourceId === input.resourceId : true));
+  }
+}
+
+class StaticResourceReadModel implements ResourceReadModel {
+  constructor(private readonly resources: ResourceSummary[]) {}
+
+  async list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+    },
+  ): Promise<ResourceSummary[]> {
+    void context;
+    return this.resources
+      .filter((resource) => (input?.projectId ? resource.projectId === input.projectId : true))
+      .filter((resource) =>
+        input?.environmentId ? resource.environmentId === input.environmentId : true,
+      );
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: Parameters<ResourceReadModel["findOne"]>[1],
+  ): Promise<ResourceSummary | null> {
+    void context;
+    void spec;
+    return this.resources[0] ?? null;
   }
 }
 
@@ -300,6 +353,132 @@ describe("Domain binding lifecycle", () => {
       preservesDeploymentSnapshots: true,
       preservesServerAppliedRouteAudit: true,
     });
+  });
+
+  test("ROUTE-TLS-READMODEL-015 shows domain route/access parity from the shared resource access summary", async () => {
+    const seed = await seedRoutingContext();
+    const domainBindingId = "dmb_ready";
+
+    const certificateReadModel = new StaticCertificateReadModel([
+      activeCertificate({ certificateId: "crt_active", domainBindingId }),
+    ]);
+    const show = new ShowDomainBindingQueryService(
+      new StaticDomainBindingReadModel([
+        {
+          id: domainBindingId,
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+          domainName: "www.example.com",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          certificatePolicy: "auto",
+          status: "ready",
+          verificationAttemptCount: 1,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ]),
+      certificateReadModel,
+      new StaticResourceReadModel([
+        {
+          id: "res_demo",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          destinationId: "dst_demo",
+          name: "web",
+          slug: "web",
+          kind: "application",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          services: [],
+          deploymentCount: 3,
+          lastDeploymentId: "dep_durable",
+          lastDeploymentStatus: "succeeded",
+          accessSummary: {
+            latestDurableDomainRoute: {
+              url: "https://www.example.com",
+              hostname: "www.example.com",
+              scheme: "https",
+              providerKey: "traefik",
+              deploymentId: "dep_durable",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:07.000Z",
+            },
+            latestServerAppliedDomainRoute: {
+              url: "https://server-applied.example.com",
+              hostname: "server-applied.example.com",
+              scheme: "https",
+              deploymentId: "dep_server_applied",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:06.000Z",
+            },
+            latestGeneratedAccessRoute: {
+              url: "https://generated.example.com",
+              hostname: "generated.example.com",
+              scheme: "https",
+              providerKey: "sslip",
+              deploymentId: "dep_generated",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_durable",
+          },
+        },
+      ]),
+    );
+
+    const detail = await show.execute(seed.context, { domainBindingId });
+
+    expect(detail.isOk()).toBe(true);
+    const value = detail._unsafeUnwrap();
+    expect(value.routeReadiness).toMatchObject({
+      status: "ready",
+      routeBehavior: "serve",
+      selectedRoute: {
+        source: "durable-domain-binding",
+        intent: {
+          host: "www.example.com",
+        },
+        proxy: {
+          applied: "ready",
+        },
+      },
+    });
+    expect(value.routeReadiness.contextRoutes.map((route) => route.source)).toEqual([
+      "durable-domain-binding",
+      "server-applied-route",
+      "generated-default-access",
+    ]);
+    expect(value.generatedAccessFallback).toMatchObject({
+      url: "https://generated.example.com",
+    });
+    expect(value.proxyReadiness).toBe("ready");
+    expect(value.certificates).toHaveLength(1);
+    expect(value.deleteSafety).toMatchObject({
+      domainBindingId,
+      safeToDelete: false,
+      preservesGeneratedAccess: true,
+      preservesDeploymentSnapshots: true,
+      preservesServerAppliedRouteAudit: true,
+    });
+
+    const serialized = JSON.stringify(value);
+    expect(serialized).not.toContain("providerRaw");
+    expect(serialized).not.toContain("privateKey");
+    expect(serialized).not.toContain("Authorization");
+    expect(serialized).not.toContain("Cookie");
   });
 
   test("ROUTE-TLS-CMD-022 deletes only when no blocking certificate state exists", async () => {

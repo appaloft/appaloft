@@ -120,4 +120,74 @@ describe("resource access route precedence", () => {
       },
     });
   });
+
+  test("[WEB-CLI-API-ACCESS-006] keeps route precedence stable when diagnostic failure copy is present", () => {
+    const selected = selectCurrentResourceAccessRoute({
+      latestServerAppliedDomainRoute: {
+        url: "https://server-applied.example.test",
+        hostname: "server-applied.example.test",
+        scheme: "https",
+        deploymentId: "dep_server_applied",
+        deploymentStatus: "succeeded",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        updatedAt: "2026-01-01T00:02:00.000Z",
+      },
+      latestGeneratedAccessRoute: {
+        url: "https://generated.example.test",
+        hostname: "generated.example.test",
+        scheme: "https",
+        deploymentId: "dep_generated",
+        deploymentStatus: "succeeded",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        updatedAt: "2026-01-01T00:01:00.000Z",
+      },
+      plannedGeneratedAccessRoute: {
+        url: "https://planned.example.test",
+        hostname: "planned.example.test",
+        scheme: "https",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        targetPort: 3000,
+      },
+      proxyRouteStatus: "failed",
+      lastRouteRealizationDeploymentId: "dep_server_applied",
+      latestAccessFailureDiagnostic: {
+        schemaVersion: "resource-access-failure/v1",
+        requestId: "req_access_timeout",
+        generatedAt: "2026-01-01T00:00:08.000Z",
+        code: "resource_access_upstream_timeout",
+        category: "timeout",
+        phase: "upstream-connection",
+        httpStatus: 504,
+        retriable: true,
+        ownerHint: "resource",
+        nextAction: "check-health",
+        affected: {
+          url: "https://server-applied.example.test/private",
+          hostname: "server-applied.example.test",
+          path: "/private",
+          method: "GET",
+        },
+        route: {
+          resourceId: "res_web",
+          deploymentId: "dep_server_applied",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+          providerKey: "traefik",
+          routeId: "route_server_applied",
+          routeSource: "server-applied",
+          routeStatus: "failed",
+        },
+      },
+    });
+
+    expect(selected).toMatchObject({
+      kind: "server-applied-domain",
+      route: {
+        url: "https://server-applied.example.test",
+      },
+    });
+  });
 });
