@@ -17,6 +17,11 @@
 
 ## Test-First
 
+- [x] 2026-05-03 regression baseline: no new ADR/public operation/schema is needed; broaden
+  `WEB-CLI-API-ACCESS-004..006` and `ROUTE-TLS-READMODEL-015` coverage across existing
+  `resources.show`, `resources.health`, `resources.proxy-configuration.preview`,
+  `resources.diagnostic-summary`, `domain-bindings.show`, CLI JSON output, and the Web shared
+  route-selection helper.
 - [x] `ROUTE-INTENT-001`: generated access route descriptor is built from planned/latest generated
   access without treating it as a durable domain binding.
 - [x] `ROUTE-INTENT-002`: durable domain route descriptor wins current-route precedence when ready.
