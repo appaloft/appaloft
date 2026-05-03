@@ -172,6 +172,7 @@ Then:
 | ROUTE-TLS-READMODEL-012 | integration | Domain binding delete safety | Binding has active certificate state or historical certificate attempts | `domain-bindings.delete-check` blocks active certificate state and warns on historical certificate attempts without mutating state |
 | ROUTE-TLS-READMODEL-013 | integration | Certificate show readback | Provider-issued and imported certificates exist | `certificates.show` returns safe metadata, status, source, latest attempt, and attempt history without PEM, private key, passphrase, secret refs, or provider credentials |
 | ROUTE-TLS-READMODEL-014 | integration | Revoked/deleted certificate projection | Certificate was revoked or deleted | `certificates.show` and `certificates.list` expose the lifecycle state needed for audit and follow-up without treating the certificate as active TLS material |
+| ROUTE-TLS-READMODEL-015 | integration | Domain binding show route/access parity | A binding's resource access summary has durable, server-applied, generated, proxy readiness, and optional generated fallback context | `domain-bindings.show` returns selected/context route descriptors, generated access fallback, proxy readiness, certificate context, and delete safety using the same shared route/access vocabulary as `ResourceAccessSummary` | Selected durable route wins, server-applied/generated routes remain context, and no provider raw payload or secret material is exposed. |
 
 ## Workflow Matrix
 
@@ -314,7 +315,8 @@ aggregates, but applied/ready route state still depends on the future edge proxy
 slice.
 
 Current tests cover `ROUTE-TLS-EVT-004`, `ROUTE-TLS-READMODEL-001`,
-`ROUTE-TLS-READMODEL-002`, `ROUTE-TLS-READMODEL-003`, and `ROUTE-TLS-ENTRY-012`.
+`ROUTE-TLS-READMODEL-002`, `ROUTE-TLS-READMODEL-003`, `ROUTE-TLS-READMODEL-015`, and
+`ROUTE-TLS-ENTRY-012`.
 
 `DMBH-DOMAIN-001` is the domain-model hardening row for the no-behavior-change certificate
 admission and ready-gate refactor. It is bound to `packages/core/test/domain-binding.test.ts` and

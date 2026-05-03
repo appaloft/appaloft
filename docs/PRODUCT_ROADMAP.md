@@ -621,10 +621,10 @@ Required:
   after creation.
 - [x] Add certificate show/import/revoke/delete/retry semantics around provider-issued and imported
   certificates.
-- [ ] Broaden API/Web/CLI regression coverage for generated access display.
-- [ ] Broaden API/Web/CLI regression coverage for provider-rendered proxy configuration preview.
-- [ ] Broaden API/Web/CLI regression coverage for server-applied domains and durable domain routes.
-- [ ] Broaden API/Web/CLI regression coverage for diagnostic copy.
+- [x] Broaden API/Web/CLI regression coverage for generated access display.
+- [x] Broaden API/Web/CLI regression coverage for provider-rendered proxy configuration preview.
+- [x] Broaden API/Web/CLI regression coverage for server-applied domains and durable domain routes.
+- [x] Broaden API/Web/CLI regression coverage for diagnostic copy.
 - [ ] Close `resource-access-failure` diagnostics: real Traefik error-middleware e2e,
   automatic route/resource context lookup from applied provider metadata, and companion/static
   renderer support for one-shot CLI or remote SSH runtimes without a reachable Appaloft backend
@@ -681,6 +681,20 @@ Phase 6 verification notes from 2026-05-01:
   lets evidence capture fill safe related ids when provider input lacks them. It does not add a new
   public operation or real Traefik middleware e2e; provider-native metadata lookup, companion/static
   renderer support, and the Web lookup form remain future Phase 6 work.
+
+Phase 6 verification notes from 2026-05-03:
+
+- The access/proxy/health/diagnostic regression harness baseline closes the API/oRPC, CLI JSON, and
+  Web helper coverage gap for generated access display, provider-rendered proxy preview routes,
+  durable domain routes, server-applied routes, route intent descriptors, latest safe access failure
+  context, and diagnostic copy parity across the existing read surfaces.
+- The slice added no public operation, no public schema field, no route repair/redeploy/rollback
+  behavior, and no real Traefik error-middleware e2e. `resources.show`, `resources.health`,
+  `resources.proxy-configuration.preview`, `resources.diagnostic-summary`, `domain-bindings.show`,
+  and the Web shared access-route helper remain the reused contract surfaces.
+- `resources.access-failure-evidence.lookup` and the automatic route context lookup baseline remain
+  reusable by evidence capture and diagnostics without exposing provider raw payloads, SSH
+  credentials, auth headers, cookies, sensitive query strings, or remote raw logs.
 
 Exit criteria:
 
