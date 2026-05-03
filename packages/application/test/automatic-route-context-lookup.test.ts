@@ -178,6 +178,67 @@ function createService(input: {
 }
 
 describe("automatic route context lookup", () => {
+  test("[RES-ACCESS-DIAG-APPLIED-004] prefers supplied applied route metadata before read-model lookup", async () => {
+    const service = createService({
+      resources: [
+        createResource({
+          id: "res_other",
+          projectId: "prj_web",
+          environmentId: "env_prod",
+          accessSummary: {
+            latestGeneratedAccessRoute: {
+              url: "https://other.example.test/",
+              hostname: "other.example.test",
+              scheme: "https",
+              deploymentId: "dep_other",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              updatedAt,
+            },
+          },
+        }),
+      ],
+      deployments: [createDeployment({ id: "dep_other", resourceId: "res_other" })],
+    });
+
+    const result = await service.lookup(createExecutionContext({ entrypoint: "cli" }), {
+      hostname: "other.example.test",
+      path: "/",
+      appliedRouteContext: {
+        schemaVersion: "applied-route-context/v1",
+        resourceId: "res_applied",
+        deploymentId: "dep_applied",
+        domainBindingId: "dbnd_applied",
+        serverId: "srv_applied",
+        destinationId: "dst_applied",
+        routeId: "durable-domain:res_applied:dep_applied:app.example.test:/",
+        diagnosticId: "durable-domain:res_applied:dep_applied:app.example.test:/",
+        routeSource: "durable-domain",
+        hostname: "app.example.test",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        providerKey: "traefik",
+        appliedAt: "2026-01-01T00:00:02.000Z",
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "found",
+      matchedSource: "durable-domain-binding-route",
+      hostname: "app.example.test",
+      resourceId: "res_applied",
+      deploymentId: "dep_applied",
+      domainBindingId: "dbnd_applied",
+      serverId: "srv_applied",
+      destinationId: "dst_applied",
+      routeSource: "durable-domain",
+      routeStatus: "applied",
+      confidence: "high",
+    });
+    expect(JSON.stringify(result)).not.toContain("res_other");
+  });
+
   test("[RES-ACCESS-DIAG-CONTEXT-001] resolves generated access route by hostname and path", async () => {
     const service = createService({
       resources: [

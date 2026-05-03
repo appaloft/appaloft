@@ -373,6 +373,12 @@ Current boundary:
   for evidence capture and diagnostic composition, reusing existing resource access, domain binding,
   and deployment read models. It does not add a public operation, operation-catalog row, CLI/API/Web
   surface, or route repair command.
+- applied route context metadata is an additive safe output field on existing proxy preview and
+  diagnostic/evidence flows. `resources.proxy-configuration.preview` may expose
+  `applied-route-context/v1` metadata so API/oRPC, CLI, Web, and future tool consumers can explain
+  route ownership without parsing provider-rendered labels/config. Evidence capture may prefer the
+  same metadata before falling back to hostname/path lookup. This does not add a new operation key,
+  command, route repair flow, or deployment admission field.
 - resource health is resource-owned observation governed by
   [ADR-020: Resource Health Observation](./decisions/ADR-020-resource-health-observation.md).
   `resources.health` is the active current health source for resource detail, project resource

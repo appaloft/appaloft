@@ -8,8 +8,8 @@ Accepted for Phase 6 / 0.8.0 implementation.
 
 This slice adds provider-neutral automatic route/resource context lookup for access failure
 diagnostics. It resolves a safe route context from hostname and path using existing read models,
-then lets evidence capture enrich `resource-access-failure/v1` envelopes when provider-injected
-signals do not include related ids.
+then lets evidence capture enrich `resource-access-failure/v1` envelopes when applied route context
+metadata or provider-injected signals do not include related ids.
 
 This is an internal read-model/query-service capability. It does not add a public operation,
 transport route, CLI command, Web form, route repair command, or real Traefik error-middleware e2e
@@ -89,9 +89,10 @@ confidence for the matching source, but it must not override stable precedence.
 ## Evidence Capture
 
 When the access-failure renderer captures evidence and the incoming provider-neutral diagnostic
-does not include route context, it should call automatic route context lookup with the safe
-affected hostname/path. If a context is found, capture stores the same sanitized diagnostic
-envelope with safe related ids filled in.
+does not include route context, it should first use safe `applied-route-context/v1` metadata when
+supplied by the provider-rendered route. If no applied metadata is available, it should call
+automatic route context lookup with the safe affected hostname/path. If a context is found, capture
+stores the same sanitized diagnostic envelope with safe related ids filled in.
 
 If no context is found, capture still stores the safe diagnostic envelope without leaking other
 resource ids.

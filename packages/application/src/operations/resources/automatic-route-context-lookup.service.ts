@@ -12,6 +12,8 @@ import {
   type ResourceSummary,
 } from "../../ports";
 import {
+  type AppliedRouteContextMetadata,
+  appliedRouteContextToDiagnosticRoute,
   type ResourceAccessFailureDiagnostic,
   type ResourceAccessFailureNextAction,
   type ResourceAccessFailureRouteContext,
@@ -24,6 +26,7 @@ export type AutomaticRouteContextMatchedSource =
   | "durable-domain-binding-route"
   | "server-applied-route"
   | "planned-generated-access-route"
+  | "deployment-snapshot-route"
   | "not-found";
 
 export type AutomaticRouteContextConfidence = "high" | "medium" | "low";
@@ -35,6 +38,7 @@ export interface AutomaticRouteContextLookupInput {
   method?: string;
   observedAt?: string;
   routeSource?: ResourceAccessRouteSource;
+  appliedRouteContext?: AppliedRouteContextMetadata;
 }
 
 export interface AutomaticRouteContextFound {
@@ -105,6 +109,7 @@ const routeSourceByMatchedSource: Record<
   "durable-domain-binding-route": "durable-domain",
   "server-applied-route": "server-applied",
   "planned-generated-access-route": "generated-default",
+  "deployment-snapshot-route": "deployment-snapshot",
 };
 
 function normalizeHostname(input: string): string {
@@ -312,12 +317,54 @@ export function routeContextToDiagnosticRoute(
   };
 }
 
+function automaticRouteContextFromAppliedMetadata(
+  metadata: AppliedRouteContextMetadata,
+): AutomaticRouteContextFound {
+  return {
+    schemaVersion: "automatic-route-context-lookup/v1",
+    status: "found",
+    matchedSource:
+      metadata.routeSource === "durable-domain"
+        ? "durable-domain-binding-route"
+        : metadata.routeSource === "server-applied"
+          ? "server-applied-route"
+          : metadata.routeSource === "deployment-snapshot"
+            ? "deployment-snapshot-route"
+            : "generated-access-route",
+    hostname: metadata.hostname,
+    pathPrefix: metadata.pathPrefix,
+    resourceId: metadata.resourceId,
+    ...(metadata.deploymentId ? { deploymentId: metadata.deploymentId } : {}),
+    ...(metadata.domainBindingId ? { domainBindingId: metadata.domainBindingId } : {}),
+    ...(metadata.serverId ? { serverId: metadata.serverId } : {}),
+    ...(metadata.destinationId ? { destinationId: metadata.destinationId } : {}),
+    ...(metadata.providerKey ? { providerKey: metadata.providerKey } : {}),
+    routeId: metadata.routeId,
+    routeSource: metadata.routeSource,
+    routeStatus: "applied",
+    confidence: "high",
+    nextAction: "diagnostic-summary",
+  };
+}
+
 export async function enrichResourceAccessFailureDiagnosticWithRouteContext(
   context: ExecutionContext,
   diagnostic: ResourceAccessFailureDiagnostic,
   lookup: AutomaticRouteContextLookup,
+  appliedRouteContext?: AppliedRouteContextMetadata,
 ): Promise<ResourceAccessFailureDiagnostic> {
-  if (diagnostic.route?.resourceId || !diagnostic.affected?.hostname || !diagnostic.affected.path) {
+  if (diagnostic.route?.resourceId) {
+    return diagnostic;
+  }
+
+  if (appliedRouteContext) {
+    return {
+      ...diagnostic,
+      route: appliedRouteContextToDiagnosticRoute(appliedRouteContext),
+    };
+  }
+
+  if (!diagnostic.affected?.hostname || !diagnostic.affected.path) {
     return diagnostic;
   }
 
@@ -354,6 +401,10 @@ export class AutomaticRouteContextLookupService implements AutomaticRouteContext
     context: ExecutionContext,
     input: AutomaticRouteContextLookupInput,
   ): Promise<AutomaticRouteContextLookupResult> {
+    if (input.appliedRouteContext) {
+      return automaticRouteContextFromAppliedMetadata(input.appliedRouteContext);
+    }
+
     const repositoryContext = toRepositoryContext(context);
     const hostname = normalizeHostname(input.hostname);
     const path = normalizePath(input.path);

@@ -358,6 +358,13 @@ Boundary rule:
   It resolves safe context for hostname/path access failures from generated access, durable domain
   binding, server-applied route, and deployment route read state; it is not aggregate state, not
   provider-native metadata storage, and not a mutation or route repair lifecycle.
+- applied route context metadata is provider-neutral, copy-safe route ownership metadata attached
+  to provider-rendered proxy preview and reusable diagnostic/evidence flows. It identifies the
+  resource, deployment, optional domain binding, server, destination, route id, diagnostic id,
+  source, hostname, path prefix, proxy kind, provider key, and available applied/observed timestamp
+  without exposing provider raw payloads, secrets, SSH credentials, auth headers, cookies, sensitive
+  query strings, or remote raw logs. It is read-model/adapter metadata, not `Resource`,
+  `Deployment`, `DomainBinding`, or `DeploymentTarget` aggregate state.
 
 ### Dependency Resources
 

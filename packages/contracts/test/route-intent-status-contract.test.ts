@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  appliedRouteContextMetadataSchema,
+  proxyConfigurationViewSchema,
   resourceAccessFailureEvidenceLookupSchema,
   resourceAccessSummarySchema,
   resourceDiagnosticSummarySchema,
@@ -54,6 +56,56 @@ describe("route intent/status contract", () => {
     expect(descriptor.source).toBe("durable-domain-binding");
     expect(descriptor.blockingReason).toBe("domain_not_verified");
     expect(JSON.stringify(descriptor)).not.toContain("privateKey");
+  });
+
+  test("[RES-ACCESS-DIAG-APPLIED-001][WEB-CLI-API-ACCESS-007] validates proxy preview applied route context metadata", () => {
+    const metadata = appliedRouteContextMetadataSchema.parse({
+      schemaVersion: "applied-route-context/v1",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      serverId: "srv_web",
+      destinationId: "dst_web",
+      routeId: "generated-default:res_web:dep_web:web.example.test:/",
+      diagnosticId: "generated-default:res_web:dep_web:web.example.test:/",
+      routeSource: "generated-default",
+      hostname: "web.example.test",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+      providerKey: "traefik",
+      appliedAt: "2026-01-01T00:00:02.000Z",
+    });
+    const view = proxyConfigurationViewSchema.parse({
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      providerKey: "traefik",
+      routeScope: "latest",
+      status: "applied",
+      generatedAt: "2026-01-01T00:00:03.000Z",
+      stale: false,
+      routes: [
+        {
+          hostname: "web.example.test",
+          scheme: "https",
+          url: "https://web.example.test",
+          pathPrefix: "/",
+          tlsMode: "auto",
+          source: "generated-default",
+          appliedRouteContext: metadata,
+        },
+      ],
+      sections: [],
+      warnings: [],
+      diagnostics: {
+        providerKey: "traefik",
+        routeCount: 1,
+        appliedRouteContexts: [metadata],
+      },
+    });
+
+    expect(view.routes[0]?.appliedRouteContext?.resourceId).toBe("res_web");
+    expect(view.diagnostics?.appliedRouteContexts?.[0]?.routeSource).toBe("generated-default");
+    expect(JSON.stringify(view)).not.toContain("Authorization");
+    expect(JSON.stringify(view)).not.toContain("token=secret");
   });
 
   test("[ROUTE-STATUS-003][ACCESS-DIAG-003] validates certificate access states as diagnostics", () => {
