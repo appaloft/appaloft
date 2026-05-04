@@ -625,11 +625,10 @@ Required:
 - [x] Broaden API/Web/CLI regression coverage for provider-rendered proxy configuration preview.
 - [x] Broaden API/Web/CLI regression coverage for server-applied domains and durable domain routes.
 - [x] Broaden API/Web/CLI regression coverage for diagnostic copy.
-- [ ] Close `resource-access-failure` diagnostics: real Traefik error-middleware e2e,
+- [x] Close `resource-access-failure` diagnostics: real Traefik error-middleware e2e,
   automatic route/resource context lookup from applied provider metadata, and companion/static
   renderer support for one-shot CLI or remote SSH runtimes without a reachable Appaloft backend
-  service. The short-retention request-id envelope lookup baseline is implemented, but the broader
-  row remains open until the real edge and automatic-context slices close.
+  service.
 - [x] Keep access/proxy/log/health failures visible through read models, proxy preview, and
   diagnostics.
 
@@ -719,7 +718,7 @@ Phase 6 verification notes from 2026-05-04 failure visibility baseline:
   `applied-route-context/v1` metadata instead of parsing provider raw payloads.
 - The slice adds no public operation, no public schema field, no route repair/redeploy/rollback
   behavior, no Web lookup form, no provider-native raw metadata parsing, and no real Traefik
-  middleware e2e. The broader `resource-access-failure` row remains open for real edge,
+  middleware e2e. At that point, the broader `resource-access-failure` row still needed real edge,
   companion/static renderer, provider-native metadata lookup, and Web lookup form work.
 
 Phase 6 verification notes from 2026-05-04 companion/static access failure renderer baseline:
@@ -733,7 +732,7 @@ Phase 6 verification notes from 2026-05-04 companion/static access failure rende
   ids when supplied.
 - The slice adds no public operation, no public schema field, no Web lookup form, no route
   repair/redeploy/rollback behavior, no provider-native raw metadata parsing, and no real Traefik
-  middleware e2e. The broader `resource-access-failure` row remains open for real edge,
+  middleware e2e. At that point, the broader `resource-access-failure` row still needed real edge,
   provider-native metadata lookup, and Web lookup form work.
 
 Phase 6 verification notes from 2026-05-04 applied route context lookup baseline:
@@ -746,8 +745,24 @@ Phase 6 verification notes from 2026-05-04 applied route context lookup baseline
   deployment-snapshot route source language plus safe provider/proxy/timestamp fields.
 - The slice adds no public operation, no public schema field, no Web lookup form, no route
   repair/redeploy/rollback behavior, no provider-native raw metadata parsing, and no real Traefik
-  middleware e2e. The broader `resource-access-failure` row remains open for real edge,
+  middleware e2e. At that point, the broader `resource-access-failure` row still needed real edge,
   provider-native metadata lookup beyond safe Appaloft-applied metadata, and Web lookup form work.
+
+Phase 6 verification notes from 2026-05-04 real Traefik access failure middleware e2e baseline:
+
+- The real Traefik baseline wires served-route `errors` middleware to the existing
+  `resource-access-failure/v1` renderer for 404, 502, 503, and 504 class failures, carrying only
+  sanitized `applied-route-context/v1` query parameters for route/resource/deployment/domain/server
+  and destination ownership.
+- The HTTP renderer now accepts real-proxy forwarded host/path/request-id metadata, strips unsafe
+  request details, captures evidence, and lets the existing request-id lookup return the enriched
+  Appaloft route context. The opt-in Docker e2e proves the real edge path can hit the renderer and
+  then be explained through the existing lookup surface.
+- The slice adds no public operation, no public schema field, no Web lookup form, no route
+  repair/redeploy/rollback behavior, and no provider-native raw metadata parsing. Provider-native
+  metadata lookup beyond safe Appaloft-applied metadata and a Web lookup form remain future
+  enhancements rather than prerequisites for closing the required `resource-access-failure`
+  diagnostics row.
 
 Exit criteria:
 
@@ -757,7 +772,7 @@ Exit criteria:
   operations.
 - [ ] A custom domain can be created, verified, issued/renewed or imported for TLS, observed,
   retried, and removed through explicit operations.
-- [ ] Access/proxy/log/health failures remain visible through Appaloft operations, not screenshots
+- [x] Access/proxy/log/health failures remain visible through Appaloft operations, not screenshots
   or raw server commands.
 
 ## Phase 7: Day-Two Production Controls
