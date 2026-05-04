@@ -57,6 +57,7 @@ type ResourceEffectiveConfigView = {
   environmentId: string;
   ownedEntries: ResourceConfigEntryView[];
   effectiveEntries: ResourceConfigEntryView[];
+  overrides: ResourceConfigOverrideSummary[];
   precedence: readonly ["defaults", "system", "organization", "project", "environment", "resource", "deployment"];
   generatedAt: string;
 };
@@ -65,12 +66,17 @@ type ResourceEffectiveConfigView = {
 `ResourceConfigEntryView` must include `key`, masked `value`, `kind`, `exposure`, `scope`,
 `isSecret`, and `updatedAt` when known.
 
+`ResourceConfigOverrideSummary` must include `key`, `exposure`, selected `scope`, and overridden
+scopes. It must not include raw values.
+
 Required behavior:
 
 - `ownedEntries` includes only `scope = "resource"` entries.
 - `effectiveEntries` includes inherited environment entries plus resource overrides.
 - when both environment and resource define the same `key + exposure` identity, the effective entry
   must resolve to `scope = "resource"`.
+- `overrides` reports safe conflict/override metadata whenever more than one scope contributes to
+  the same `key + exposure` identity.
 - secret entries must return a masked value rather than plaintext.
 
 ## Entrypoints
@@ -85,4 +91,6 @@ Required behavior:
 ## Current Implementation Notes And Migration Gaps
 
 This query is active together with resource-scoped variable mutation commands. It uses masked read
-models and must not leak secret values even though the write side stores them.
+models and must not leak secret values even though the write side stores them. The Phase 7 baseline
+adds safe override summaries while preserving the `resources.effective-config/v1` schema version as
+an additive response-field change.

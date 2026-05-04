@@ -492,6 +492,33 @@ describe("CLI resource commands", () => {
     });
   });
 
+  test("[RES-PROFILE-ENTRY-015] resource import-variables dispatches the application command", async () => {
+    const { ImportResourceVariablesCommand } = await import("@appaloft/application");
+    const { commands, program } = await createCommandCaptureHarness(
+      "req_cli_resource_import_variables_test",
+    );
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "import-variables",
+      "res_demo",
+      "--content",
+      "DATABASE_URL=postgres://secret",
+      "--exposure",
+      "runtime",
+    ]);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ImportResourceVariablesCommand);
+    expect(commands[0]).toMatchObject({
+      resourceId: "res_demo",
+      content: "DATABASE_URL=postgres://secret",
+      exposure: "runtime",
+    });
+  });
+
   test("[RES-PROFILE-ENTRY-003] resource effective-config dispatches the application query", async () => {
     ensureReflectMetadata();
     const { ResourceEffectiveConfigQuery, createExecutionContext } = await import(

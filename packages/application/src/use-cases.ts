@@ -70,6 +70,7 @@ export * from "./operations/resources/configure-resource-runtime.use-case";
 export * from "./operations/resources/configure-resource-source.use-case";
 export * from "./operations/resources/create-resource.use-case";
 export * from "./operations/resources/delete-resource.use-case";
+export * from "./operations/resources/import-resource-variables.use-case";
 export * from "./operations/resources/list-resources.query-service";
 export * from "./operations/resources/resource-access-failure-evidence-lookup.query-service";
 export * from "./operations/resources/resource-access-summary.projector";
