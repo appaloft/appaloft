@@ -41,6 +41,7 @@ import { type ResourceProxyConfigurationPreviewQueryService } from "./resource-p
 import { ResourceRuntimeLogsQuery } from "./resource-runtime-logs.query";
 import { type ResourceRuntimeLogsQueryService } from "./resource-runtime-logs.query-service";
 import { routeIntentStatusDescriptors, selectedRouteIntentStatus } from "./route-intent-status";
+import { sanitizeFailureMessage } from "./safe-diagnostic-message";
 
 type DiagnosticSummaryCore = Omit<ResourceDiagnosticSummary, "copy">;
 
@@ -103,7 +104,9 @@ function sourceError(input: {
   relatedState?: string;
   message?: string;
 }): ResourceDiagnosticSourceError {
-  const redactedMessage = input.message ? redactText(input.message, input.redactions).value : "";
+  const redactedMessage = input.message
+    ? sanitizeFailureMessage(input.message, input.redactions).value
+    : "";
 
   return {
     source: input.source,

@@ -274,6 +274,52 @@ class TlsDiagnosticEdgeProxyProvider implements EdgeProxyProvider {
   }
 }
 
+class RawFailureEdgeProxyProvider implements EdgeProxyProvider {
+  readonly key = "traefik";
+  readonly displayName = "Traefik";
+  readonly capabilities = {
+    ensureProxy: true,
+    dockerLabels: true,
+    reloadProxy: true,
+    configurationView: true,
+    runtimeLogs: false,
+    diagnostics: true,
+  };
+
+  async ensureProxy(): Promise<Result<EdgeProxyEnsurePlan>> {
+    return err(domainError.provider("not used"));
+  }
+
+  async diagnoseProxy(): Promise<Result<never>> {
+    return err(domainError.provider("not used"));
+  }
+
+  async realizeRoutes(): Promise<Result<ProxyRouteRealizationPlan>> {
+    return err(domainError.provider("not used"));
+  }
+
+  async reloadProxy(): Promise<Result<ProxyReloadPlan>> {
+    return err(domainError.provider("not used"));
+  }
+
+  async renderConfigurationView(): Promise<Result<ProxyConfigurationView>> {
+    return err(
+      domainError.provider(
+        [
+          "provider raw payload Authorization: Bearer raw-token Cookie: sid=raw-cookie",
+          "https://edge.example.test/path?access_token=raw-query-token&safe=value",
+          "ssh://deploy:raw-password@example.test",
+          "-----BEGIN PRIVATE KEY----- raw-key -----END PRIVATE KEY-----",
+          "remote log line one\nremote log line two",
+        ].join(" "),
+        {
+          phase: "proxy-summary",
+        },
+      ),
+    );
+  }
+}
+
 class StaticEdgeProxyProviderRegistry implements EdgeProxyProviderRegistry {
   constructor(private readonly provider: EdgeProxyProvider) {}
 
@@ -691,6 +737,50 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).toContain('"domainBindingId": "dbnd_web"');
     expect(summary.copy.json).not.toContain("secret-token");
     expect(summary.copy.json).not.toContain("Authorization");
+  });
+
+  test("[RES-DIAG-QRY-019][ACCESS-DIAG-005] redacts unsafe failure messages in diagnostic copy JSON", async () => {
+    const context = createTestContext();
+    const { service } = createService({
+      edgeProxyProviderRegistry: new StaticEdgeProxyProviderRegistry(
+        new RawFailureEdgeProxyProvider(),
+      ),
+    });
+    const query = ResourceDiagnosticSummaryQuery.create({
+      resourceId: "res_web",
+      includeDeploymentLogTail: false,
+      includeRuntimeLogTail: false,
+      includeProxyConfiguration: true,
+      tailLines: 10,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.proxy).toMatchObject({
+      status: "failed",
+      reasonCode: "provider_error",
+      phase: "proxy-summary",
+    });
+    expect(summary.sourceErrors).toContainEqual(
+      expect.objectContaining({
+        source: "proxy",
+        code: "provider_error",
+        phase: "proxy-summary",
+      }),
+    );
+    expect(summary.copy.json).toContain('"provider_error"');
+    expect(summary.copy.json).toContain('"proxy-summary"');
+    expect(summary.copy.json).not.toContain("provider raw payload");
+    expect(summary.copy.json).not.toContain("Authorization");
+    expect(summary.copy.json).not.toContain("Cookie");
+    expect(summary.copy.json).not.toContain("raw-token");
+    expect(summary.copy.json).not.toContain("raw-cookie");
+    expect(summary.copy.json).not.toContain("access_token=raw-query-token");
+    expect(summary.copy.json).not.toContain("raw-password");
+    expect(summary.copy.json).not.toContain("BEGIN PRIVATE KEY");
+    expect(summary.copy.json).not.toContain("remote log line two");
   });
 
   test("[RES-DIAG-QRY-017][ROUTE-INTENT-002][ACCESS-DIAG-004] keeps durable route first for diagnostic proxy context", async () => {

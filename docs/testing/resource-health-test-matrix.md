@@ -90,6 +90,7 @@ Then:
 | RES-HEALTH-QRY-018 | integration | Edge upstream timeout observed | Latest deployment succeeded, internal health is unknown or healthy, latest edge failure is `resource_access_upstream_timeout` | `ok(overall = "degraded")` | Source error/check record includes request id, code, phase, retriable flag, and does not mark deployment success as reachable. |
 | RES-HEALTH-QRY-019 | integration | Edge proxy route unavailable observed | Latest deployment exists, edge failure is `resource_access_route_unavailable` or `resource_access_proxy_unavailable` | `ok(overall = "degraded")` | Proxy/public access sections use `resource_access_*` code and keep category out of `domain`. |
 | RES-HEALTH-QRY-020 | integration | Server-applied route ready | Server-applied config domain and generated route both exist, with no ready durable binding | `ok` uses server-applied domain as public access target | Server-applied route precedes generated default route and reports `kind = server-applied-domain`. |
+| RES-HEALTH-QRY-021 | integration | Health failure visibility sanitizer | Live health or public access probe failure includes auth headers, cookies, sensitive query values, private key material, provider raw payload hints, or raw remote command output in its message | `ok` with degraded/unhealthy/unknown health according to the source failure | Health source errors preserve stable code/phase/retriable fields and redact unsafe adjacent text. |
 
 ## Shared Route/Access Health Matrix
 
@@ -152,6 +153,9 @@ Current covered cases:
 - in-flight latest deployment returns `overall = "starting"`;
 - configured policy remains `overall = "unknown"` in cached mode until a current probe exists;
 - live HTTP policy pass/fail is covered in application tests;
+- health/probe failure message sanitization for unsafe headers, cookies, sensitive query values,
+  private key material, SSH credential URLs, and remote raw output is covered by
+  `RES-HEALTH-QRY-021` and `ACCESS-DIAG-005`;
 - `resources.configure-health` is covered by application integration tests, HTTP/oRPC entrypoint
   tests, CLI dispatch tests, and Web resource detail WebView coverage.
 

@@ -147,6 +147,7 @@ These rows are governed by
 | ACCESS-DIAG-002 | integration | Proxy route missing or stale | Route exists but proxy status is missing/stale/unapplied/failed | Proxy preview, health, and diagnostic summary use `proxy_route_missing` or `proxy_route_stale` | State remains route/access observation unless deployment execution failed. |
 | ACCESS-DIAG-003 | integration | Domain, DNS, or TLS blocking reason | Durable/custom route is not usable because domain, DNS, or TLS state is not ready | Descriptor/source errors use `domain_not_verified`, `dns_points_elsewhere`, `certificate_missing`, or `certificate_expired_or_not_active` | Recommended action is diagnostic/fix guidance, not a hidden mutation. |
 | ACCESS-DIAG-004 | integration | Copy-safe diagnostic payload | Access diagnostic has provider/native/raw inputs that may contain secrets | Copy JSON contains stable ids, codes, phases, request ids, and safe route metadata only | Raw provider SDK payloads, private keys, env values, headers/cookies, internal coordinates, and raw command output are absent. |
+| ACCESS-DIAG-005 | integration | Cross-surface failure visibility baseline | Access, proxy, runtime log, deployment log, health, or route context lookup source reports a failure or unavailable state | Existing health/proxy/log/diagnostic read surfaces expose stable source, code, phase, related ids when safe, and suggested next action | The response does not trigger repair, redeploy, rollback, route mutation, or provider-native raw payload parsing. |
 
 ## Redaction Matrix
 
@@ -195,6 +196,8 @@ Executable tests now cover:
 - `RES-ACCESS-DIAG-APPLIED-004` through automatic lookup and HTTP renderer evidence-capture
   preference coverage;
 - `RES-ACCESS-DIAG-APPLIED-005` through contract and HTTP evidence redaction coverage;
+- `ACCESS-DIAG-005` through resource diagnostic summary and resource health application tests that
+  keep cross-surface source errors visible while redacting unsafe adjacent text;
 - `EDGE-PROXY-PROVIDER-010` as the Traefik provider contract row.
 
 Remaining gaps include broader classification rows, a companion/static renderer path for one-shot
