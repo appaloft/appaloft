@@ -361,9 +361,15 @@ export class PgDependencyResourceDeleteSafetyReader
     context: RepositoryContext,
     input: { dependencyResourceId: string },
   ): Promise<Result<DependencyResourceDeleteBlocker[]>> {
-    void context;
-    void input;
-    return ok([]);
+    const executor = resolveRepositoryExecutor(this.db, context);
+    const row = await executor
+      .selectFrom("resource_dependency_bindings")
+      .select((expressionBuilder) => [expressionBuilder.fn.count<number>("id").as("count")])
+      .where("dependency_resource_id", "=", input.dependencyResourceId)
+      .where("lifecycle_status", "=", "active")
+      .executeTakeFirst();
+    const count = Number(row?.count ?? 0);
+    return ok(count > 0 ? [{ kind: "resource-binding", count }] : []);
   }
 }
 

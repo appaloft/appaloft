@@ -11,14 +11,18 @@ This first slice is Postgres-only. Every mutation must dispatch one explicit ope
 - `dependency-resources.import-postgres`
 - `dependency-resources.rename`
 - `dependency-resources.delete`
+- `resources.bind-dependency`
+- `resources.unbind-dependency`
 
 Every read must dispatch one explicit query:
 
 - `dependency-resources.list`
 - `dependency-resources.show`
+- `resources.list-dependency-bindings`
+- `resources.show-dependency-binding`
 
-The workflow is not dependency bind/unbind, not secret rotation, not backup/restore, not
-provider-native database provisioning, and not a deployment command.
+The workflow is not secret rotation, not backup/restore, not provider-native database
+provisioning, not runtime env injection, and not a deployment command.
 
 ## Global References
 
@@ -29,6 +33,7 @@ provider-native database provisioning, and not a deployment command.
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [Postgres Dependency Resource Lifecycle](../specs/033-postgres-dependency-resource-lifecycle/spec.md)
+- [Dependency Resource Binding Baseline](../specs/034-dependency-resource-binding-baseline/spec.md)
 - [Dependency Resource Test Matrix](../testing/dependency-resource-test-matrix.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -43,7 +48,10 @@ The workflow lets operators:
    binding readiness, and backup relationship metadata.
 4. Rename a dependency resource without changing bindings, backup metadata, provider state,
    runtime state, or snapshots.
-5. Delete only dependency resources that pass safety checks.
+5. Bind a Postgres dependency resource to a Resource with safe target metadata.
+6. List/show Resource dependency binding summaries without exposing raw secrets.
+7. Unbind without deleting the dependency resource or any external/provider database.
+8. Delete only dependency resources that pass safety checks.
 
 ## Operation Boundaries
 
@@ -55,6 +63,10 @@ The workflow lets operators:
 | Show dependency resource | `dependency-resources.show` | Nothing | Any aggregate or runtime state |
 | Rename dependency resource | `dependency-resources.rename` | Dependency resource name/slug | Bindings, backup metadata, provider state, runtime, snapshots |
 | Delete dependency resource | `dependency-resources.delete` | Dependency resource lifecycle/tombstone | External/provider database, bindings, backup data, runtime cleanup |
+| Bind dependency to Resource | `resources.bind-dependency` | ResourceBinding | Provider database, ResourceInstance lifecycle, runtime, deployment snapshots |
+| Unbind dependency from Resource | `resources.unbind-dependency` | ResourceBinding lifecycle/tombstone | Dependency resource, external/provider database, runtime cleanup, snapshots |
+| List Resource dependency bindings | `resources.list-dependency-bindings` | Nothing | Any aggregate or runtime state |
+| Show Resource dependency binding | `resources.show-dependency-binding` | Nothing | Any aggregate or runtime state |
 
 ## Postgres Source Modes
 
@@ -83,16 +95,28 @@ Read models must mask or omit:
 - sensitive query parameters such as `password`, `token`, `secret`, `sslcert`, `sslkey`, and
   `sslpassword`.
 
-## Binding Readiness
+## Binding Readiness And Binding Metadata
 
-This slice returns a binding readiness summary but does not implement bind/unbind:
+Dependency resources and Resource dependency bindings return binding readiness summaries:
 
 - `ready` when the dependency resource has enough safe metadata for a future binding flow;
 - `blocked` when required connection metadata is missing or lifecycle status is not usable;
-- `not-implemented` when the only missing capability is future bind/unbind implementation.
+- `not-implemented` only for dependency resources that predate concrete binding support.
 
-The summary is read-model guidance. Future `resources.bind-dependency` or equivalent commands must
-validate write-side state again and must not rely only on stale read models.
+The summary is read-model guidance. `resources.bind-dependency` validates write-side Resource and
+Dependency Resource state again and must not rely only on stale read models.
+
+Resource dependency bindings store only provider-neutral control-plane metadata:
+
+- Resource and Dependency Resource references;
+- project/environment ownership;
+- binding target name/profile label;
+- scope and injection mode;
+- safe secret reference pointer when present;
+- active/removed status and timestamps.
+
+They must not store raw connection strings, raw passwords, tokens, auth headers, cookies, SSH
+credentials, provider tokens, private keys, sensitive query parameters, or raw environment values.
 
 ## Delete Safety
 
@@ -115,6 +139,10 @@ Dependency resources do not change deployment admission in this slice. A future 
 slice may copy provider-neutral binding references into immutable deployment snapshots, but raw
 connection secrets must not be written into snapshots.
 
+`resources.bind-dependency` and `resources.unbind-dependency` do not mutate historical deployment
+snapshots and do not inject current runtime environment variables. Binding read models report
+snapshot materialization as deferred until a future snapshot binding slice exists.
+
 `deployments.create` must not accept dependency resource, database URL, username, password, or
 secret-rotation fields.
 
@@ -122,16 +150,17 @@ secret-rotation fields.
 
 | Entrypoint | Required behavior |
 | --- | --- |
-| CLI | Separate dependency commands. No generic `dependency update`. |
+| CLI | Separate dependency and Resource dependency binding commands. No generic `dependency update`. |
 | oRPC / HTTP | Routes reuse command/query schemas and dispatch through bus. |
 | Web | Deferred unless implemented with i18n and tests. |
 | Automation / MCP | Future tools map one-to-one to operation keys. |
 
 ## Current Implementation Notes And Migration Gaps
 
-This Code Round adds Postgres dependency resource lifecycle records and safe read models. Redis,
-dependency bind/unbind, secret rotation, provider-native provisioning/deletion, backup/restore,
-deployment snapshot binding, Web affordances, and runtime cleanup are future work.
+This Code Round adds Postgres dependency resource lifecycle records, Resource binding metadata, safe
+read models, and real active-binding delete blockers. Redis, secret rotation, provider-native
+provisioning/deletion, backup/restore, deployment snapshot materialization, Web affordances, and
+runtime cleanup are future work.
 
 ## Open Questions
 

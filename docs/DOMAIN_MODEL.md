@@ -403,6 +403,7 @@ Owns:
 Implemented now:
 - foundational `ResourceInstance`
 - foundational `ResourceBinding`
+- Postgres Resource binding baseline: bind/unbind/list/show safe metadata
 
 ### Postgres Dependency Resource
 
@@ -420,14 +421,16 @@ Rules:
   sensitive query parameters must not appear in list/show, events, errors, logs, or snapshots
 - deletion is blocked by active/future ResourceBinding blockers, backup relationship metadata,
   provider-managed unsafe state, and future deployment snapshot/reference blockers
-- binding readiness is a read-model summary for future bind/unbind; future binding commands must
-  revalidate write-side state
+- binding readiness is a read-model summary; `resources.bind-dependency` must revalidate
+  write-side Resource and Dependency Resource state
 
 Current scope:
 - Phase 7 baseline under
   [Postgres Dependency Resource Lifecycle](./specs/033-postgres-dependency-resource-lifecycle/spec.md)
-- Redis, dependency bind/unbind, secret rotation, provider-native provisioning/deletion,
-  backup/restore, and deployment snapshot binding are future Phase 7 work
+- Phase 7 binding baseline under
+  [Dependency Resource Binding Baseline](./specs/034-dependency-resource-binding-baseline/spec.md)
+- Redis, secret rotation, provider-native provisioning/deletion, backup/restore, runtime env
+  injection, and deployment snapshot binding are future Phase 7 work
 
 ### Release Orchestration
 
@@ -828,17 +831,30 @@ Current scope:
 ### ResourceBinding
 
 Meaning:
-- explicit dependency contract between workload and resource instance
+- explicit dependency contract between Resource and ResourceInstance
 
 Rules:
+- binding is an independent write-side association/aggregate, not internal `ResourceInstance`
+  state and not merely a read-side join
+- binding admission loads Resource and Dependency Resource and accepts only matching
+  project/environment ownership in this slice
+- binding stores only provider-neutral safe metadata: Resource reference, Dependency Resource
+  reference, target name/profile label, scope, injection mode, safe secret reference pointer,
+  lifecycle status, and timestamps
+- binding must not store raw connection strings, raw passwords, tokens, auth headers, cookies, SSH
+  credentials, provider tokens, private keys, sensitive query parameters, or raw environment values
 - binding scope and injection mode must remain coherent
 - build-only bindings must not leak runtime references
 - scope and injection mode value objects answer single-value predicates, while `ResourceBinding`
   owns the cross-VO coherence rule
+- unbind removes/tombstones only the association; it must not delete the dependency resource,
+  external/provider database, runtime state, backup data, or historical deployment snapshot
 
 Current scope:
-- foundational aggregate in `core`
-- not yet wired into application operations
+- wired into Phase 7 Postgres Dependency Resource Binding Baseline through
+  `resources.bind-dependency`, `resources.unbind-dependency`,
+  `resources.list-dependency-bindings`, and `resources.show-dependency-binding`
+- deployment snapshot materialization and runtime env injection remain deferred
 
 ### ResourceInstance
 

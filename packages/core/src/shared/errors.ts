@@ -45,6 +45,11 @@ export const domainError = {
     createError("conflict", "user", message, details),
   resourceContextMismatch: (message: string, details?: DomainErrorDetails): DomainError =>
     createError("resource_context_mismatch", "user", message, details),
+  resourceDependencyBindingContextMismatch: (
+    message: string,
+    details?: DomainErrorDetails,
+  ): DomainError =>
+    createError("resource_dependency_binding_context_mismatch", "user", message, details),
   resourceRuntimeLogsContextMismatch: (
     message: string,
     details?: DomainErrorDetails,

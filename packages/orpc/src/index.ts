@@ -8,7 +8,9 @@ import {
   archiveProjectCommandInputSchema,
   archiveResourceCommandInputSchema,
   attachResourceStorageCommandInputSchema,
+  BindResourceDependencyCommand,
   BootstrapServerProxyCommand,
+  bindResourceDependencyCommandInputSchema,
   bootstrapServerProxyCommandInputSchema,
   CheckDomainBindingDeleteSafetyQuery,
   CheckServerDeleteSafetyQuery,
@@ -105,6 +107,7 @@ import {
   ListPluginsQuery,
   ListProjectsQuery,
   ListProvidersQuery,
+  ListResourceDependencyBindingsQuery,
   ListResourcesQuery,
   ListServersQuery,
   ListSshCredentialsQuery,
@@ -118,6 +121,7 @@ import {
   listEnvironmentsQueryInputSchema,
   listGitHubRepositoriesQueryInputSchema,
   listOperatorWorkQueryInputSchema,
+  listResourceDependencyBindingsQueryInputSchema,
   listResourcesQueryInputSchema,
   listSshCredentialsQueryInputSchema,
   listStorageVolumesQueryInputSchema,
@@ -175,6 +179,7 @@ import {
   ShowEnvironmentQuery,
   ShowOperatorWorkQuery,
   ShowProjectQuery,
+  ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
   ShowServerQuery,
   ShowSshCredentialQuery,
@@ -192,6 +197,7 @@ import {
   showEnvironmentQueryInputSchema,
   showOperatorWorkQueryInputSchema,
   showProjectQueryInputSchema,
+  showResourceDependencyBindingQueryInputSchema,
   showResourceQueryInputSchema,
   showServerQueryInputSchema,
   showSshCredentialQueryInputSchema,
@@ -200,9 +206,11 @@ import {
   TestServerConnectivityCommand,
   testDraftServerConnectivityCommandInputSchema,
   testRegisteredServerConnectivityCommandInputSchema,
+  UnbindResourceDependencyCommand,
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
   UnsetResourceVariableCommand,
+  unbindResourceDependencyCommandInputSchema,
   unlockEnvironmentCommandInputSchema,
   unsetEnvironmentVariableCommandInputSchema,
   unsetResourceVariableCommandInputSchema,
@@ -212,6 +220,7 @@ import {
   archiveProjectResponseSchema,
   archiveResourceResponseSchema,
   attachResourceStorageResponseSchema,
+  bindResourceDependencyResponseSchema,
   bootstrapServerProxyResponseSchema,
   checkDomainBindingDeleteSafetyResponseSchema,
   checkServerDeleteSafetyResponseSchema,
@@ -265,6 +274,7 @@ import {
   listPluginsResponseSchema,
   listProjectsResponseSchema,
   listProvidersResponseSchema,
+  listResourceDependencyBindingsResponseSchema,
   listResourcesResponseSchema,
   listServersResponseSchema,
   listSshCredentialsResponseSchema,
@@ -297,11 +307,13 @@ import {
   showDomainBindingResponseSchema,
   showOperatorWorkResponseSchema,
   showProjectResponseSchema,
+  showResourceDependencyBindingResponseSchema,
   showServerResponseSchema,
   showSshCredentialResponseSchema,
   showStorageVolumeResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
+  unbindResourceDependencyResponseSchema,
   unlockEnvironmentResponseSchema,
   unsetResourceVariableResponseSchema,
 } from "@appaloft/contracts";
@@ -529,6 +541,22 @@ export const apiRouteDescriptions = {
   ),
   deleteDependencyResource: routeDescription(
     "Deletes only dependency resources that are not blocked by bindings, backup relationships, provider-managed unsafe state, or snapshot references.",
+    "resource.concept",
+  ),
+  bindResourceDependency: routeDescription(
+    "Binds a ready Postgres dependency resource to a resource using safe control-plane metadata only.",
+    "resource.concept",
+  ),
+  unbindResourceDependency: routeDescription(
+    "Removes a resource dependency binding without deleting the dependency resource or external database.",
+    "resource.concept",
+  ),
+  listResourceDependencyBindings: routeDescription(
+    "Lists safe dependency binding summaries for one resource without exposing raw connection secrets.",
+    "resource.concept",
+  ),
+  showResourceDependencyBinding: routeDescription(
+    "Reads one safe dependency binding summary for a resource without exposing raw connection secrets.",
     "resource.concept",
   ),
   setResourceVariable: routeDescription(
@@ -2399,6 +2427,58 @@ export const deleteDependencyResourceProcedure = base
     executeCommand(context, DeleteDependencyResourceCommand.create(input)),
   );
 
+export const bindResourceDependencyProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/dependency-bindings",
+    description: apiRouteDescriptions.bindResourceDependency,
+    successStatus: 201,
+  })
+  .input(bindResourceDependencyCommandInputSchema)
+  .output(bindResourceDependencyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, BindResourceDependencyCommand.create(input)),
+  );
+
+export const unbindResourceDependencyProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/resources/{resourceId}/dependency-bindings/{bindingId}",
+    description: apiRouteDescriptions.unbindResourceDependency,
+    successStatus: 200,
+  })
+  .input(unbindResourceDependencyCommandInputSchema)
+  .output(unbindResourceDependencyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, UnbindResourceDependencyCommand.create(input)),
+  );
+
+export const listResourceDependencyBindingsProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/dependency-bindings",
+    description: apiRouteDescriptions.listResourceDependencyBindings,
+    successStatus: 200,
+  })
+  .input(listResourceDependencyBindingsQueryInputSchema)
+  .output(listResourceDependencyBindingsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListResourceDependencyBindingsQuery.create(input)),
+  );
+
+export const showResourceDependencyBindingProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/dependency-bindings/{bindingId}",
+    description: apiRouteDescriptions.showResourceDependencyBinding,
+    successStatus: 200,
+  })
+  .input(showResourceDependencyBindingQueryInputSchema)
+  .output(showResourceDependencyBindingResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowResourceDependencyBindingQuery.create(input)),
+  );
+
 export const openTerminalSessionProcedure = base
   .route({
     method: "POST",
@@ -2516,6 +2596,12 @@ export const appaloftOrpcRouter = {
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
     logs: resourceRuntimeLogsProcedure,
     logsStream: resourceRuntimeLogsStreamProcedure,
+    dependencyBindings: {
+      bind: bindResourceDependencyProcedure,
+      unbind: unbindResourceDependencyProcedure,
+      list: listResourceDependencyBindingsProcedure,
+      show: showResourceDependencyBindingProcedure,
+    },
   },
   storageVolumes: {
     create: createStorageVolumeProcedure,
@@ -2733,6 +2819,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/proxy-configuration",
     "/api/resources/:resourceId/runtime-logs",
     "/api/resources/:resourceId/runtime-logs/stream",
+    "/api/resources/:resourceId/dependency-bindings",
+    "/api/resources/:resourceId/dependency-bindings/:bindingId",
     "/api/resource-access-failures/:requestId",
     "/api/terminal-sessions",
     "/api/domain-bindings",

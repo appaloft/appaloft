@@ -201,6 +201,20 @@ export interface ResourceStorageAttachmentsTable {
   attached_at: TimestampColumn;
 }
 
+export interface ResourceDependencyBindingsTable {
+  id: string;
+  project_id: string;
+  environment_id: string;
+  resource_id: string;
+  dependency_resource_id: string;
+  target_name: string;
+  scope: string;
+  injection_mode: string;
+  lifecycle_status: string;
+  created_at: TimestampColumn;
+  removed_at: NullableUpdatableTimestampColumn;
+}
+
 export interface DeploymentsTable {
   id: string;
   project_id: string;
@@ -428,6 +442,7 @@ export interface Database {
   environment_variables: EnvironmentVariablesTable;
   resource_variables: ResourceVariablesTable;
   dependency_resources: DependencyResourcesTable;
+  resource_dependency_bindings: ResourceDependencyBindingsTable;
   storage_volumes: StorageVolumesTable;
   resource_storage_attachments: ResourceStorageAttachmentsTable;
   deployments: DeploymentsTable;

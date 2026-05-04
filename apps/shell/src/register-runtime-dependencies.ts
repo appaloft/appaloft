@@ -84,6 +84,8 @@ import {
   PgProjectRepository,
   PgResourceAccessFailureEvidenceProjection,
   PgResourceDeletionBlockerReader,
+  PgResourceDependencyBindingReadModel,
+  PgResourceDependencyBindingRepository,
   PgResourceReadModel,
   PgResourceRepository,
   PgServerDeletionBlockerReader,
@@ -739,6 +741,11 @@ export function registerRuntimeDependencies(
   container.register(tokens.dependencyResourceRepository, {
     useFactory: instanceCachingFactory(() => new PgDependencyResourceRepository(input.database.db)),
   });
+  container.register(tokens.resourceDependencyBindingRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceDependencyBindingRepository(input.database.db),
+    ),
+  });
   container.register(tokens.dependencyResourceDeleteSafetyReader, {
     useFactory: instanceCachingFactory(
       () => new PgDependencyResourceDeleteSafetyReader(input.database.db),
@@ -848,6 +855,11 @@ export function registerRuntimeDependencies(
           input.database.db,
           dependencyContainer.resolve(tokens.dependencyResourceDeleteSafetyReader),
         ),
+    ),
+  });
+  container.register(tokens.resourceDependencyBindingReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceDependencyBindingReadModel(input.database.db),
     ),
   });
   container.register(tokens.storageVolumeReadModel, {

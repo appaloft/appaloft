@@ -1,6 +1,7 @@
 import {
   ArchiveResourceCommand,
   AttachResourceStorageCommand,
+  BindResourceDependencyCommand,
   ConfigureResourceAccessCommand,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
@@ -10,6 +11,7 @@ import {
   DeleteResourceCommand,
   DetachResourceStorageCommand,
   ImportResourceVariablesCommand,
+  ListResourceDependencyBindingsQuery,
   ListResourcesQuery,
   OpenTerminalSessionCommand,
   ResourceAccessFailureEvidenceLookupQuery,
@@ -19,7 +21,9 @@ import {
   ResourceProxyConfigurationPreviewQuery,
   ResourceRuntimeLogsQuery,
   SetResourceVariableCommand,
+  ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
+  UnbindResourceDependencyCommand,
   UnsetResourceVariableCommand,
 } from "@appaloft/application";
 import {
@@ -45,6 +49,8 @@ import { cliCommandDescriptions } from "./docs-help.js";
 
 const resourceIdArg = Args.text({ name: "resourceId" });
 const storageVolumeIdArg = Args.text({ name: "storageVolumeId" });
+const dependencyResourceIdArg = Args.text({ name: "dependencyResourceId" });
+const dependencyBindingIdArg = Args.text({ name: "bindingId" });
 const resourceStorageAttachmentIdArg = Args.text({ name: "attachmentId" });
 const accessFailureRequestIdArg = Args.text({ name: "requestId" });
 const projectOption = Options.text("project").pipe(Options.optional);
@@ -153,6 +159,20 @@ const storageDestinationPathOption = Options.text("destination-path");
 const storageMountModeOption = Options.choice("mount-mode", ["read-write", "read-only"]).pipe(
   Options.withDefault("read-write"),
 );
+const dependencyTargetNameOption = Options.text("target-name").pipe(
+  Options.withDefault("DATABASE_URL"),
+);
+const dependencyScopeOption = Options.choice("scope", [
+  "environment",
+  "release",
+  "build-only",
+  "runtime-only",
+]).pipe(Options.withDefault("runtime-only"));
+const dependencyInjectionModeOption = Options.choice("injection-mode", [
+  "env",
+  "file",
+  "reference",
+]).pipe(Options.withDefault("env"));
 
 const listCommand = EffectCommand.make(
   "list",
@@ -195,6 +215,65 @@ const effectiveConfigCommand = EffectCommand.make(
   },
   ({ resourceId }) => runQuery(ResourceEffectiveConfigQuery.create({ resourceId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceEffectiveConfig));
+
+const dependencyBindCommand = EffectCommand.make(
+  "bind",
+  {
+    resourceId: resourceIdArg,
+    dependencyResourceId: dependencyResourceIdArg,
+    targetName: dependencyTargetNameOption,
+    scope: dependencyScopeOption,
+    injectionMode: dependencyInjectionModeOption,
+  },
+  ({ dependencyResourceId, injectionMode, resourceId, scope, targetName }) =>
+    runCommand(
+      BindResourceDependencyCommand.create({
+        resourceId,
+        dependencyResourceId,
+        targetName,
+        scope,
+        injectionMode,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDependencyBind));
+
+const dependencyUnbindCommand = EffectCommand.make(
+  "unbind",
+  {
+    resourceId: resourceIdArg,
+    bindingId: dependencyBindingIdArg,
+  },
+  ({ bindingId, resourceId }) =>
+    runCommand(UnbindResourceDependencyCommand.create({ resourceId, bindingId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDependencyUnbind));
+
+const dependencyListCommand = EffectCommand.make(
+  "list",
+  {
+    resourceId: resourceIdArg,
+  },
+  ({ resourceId }) => runQuery(ListResourceDependencyBindingsQuery.create({ resourceId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDependencyList));
+
+const dependencyShowCommand = EffectCommand.make(
+  "show",
+  {
+    resourceId: resourceIdArg,
+    bindingId: dependencyBindingIdArg,
+  },
+  ({ bindingId, resourceId }) =>
+    runQuery(ShowResourceDependencyBindingQuery.create({ resourceId, bindingId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDependencyShow));
+
+const dependencyCommand = EffectCommand.make("dependency").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.resourceDependency),
+  EffectCommand.withSubcommands([
+    dependencyBindCommand,
+    dependencyUnbindCommand,
+    dependencyListCommand,
+    dependencyShowCommand,
+  ]),
+);
 
 const createCommand = EffectCommand.make(
   "create",
@@ -776,6 +855,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     configureNetworkCommand,
     configureAccessCommand,
     storageCommand,
+    dependencyCommand,
     proxyConfigCommand,
     diagnoseCommand,
   ]),

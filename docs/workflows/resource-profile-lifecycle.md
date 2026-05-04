@@ -72,8 +72,10 @@ The workflow gives operators a stable way to:
 6. Inspect profile drift between the current Resource profile, normalized entry workflow profile,
    and latest deployment snapshot.
 7. Attach and detach durable storage for future deployment snapshot materialization.
-8. Retire a resource through archive.
-9. Permanently delete only archived, unreferenced resources.
+8. Bind and unbind dependency resources for future deployment snapshot materialization without
+   injecting current runtime environment variables.
+9. Retire a resource through archive.
+10. Permanently delete only archived, unreferenced resources.
 
 Profile changes are reusable configuration for future deployments. They are not deployment
 execution, redeploy, restart, route apply, domain binding, certificate issuance, or runtime
@@ -95,6 +97,8 @@ cleanup.
 | Inspect effective future deployment configuration | `resources.effective-config` | Nothing | Resource lifecycle, current runtime, historical deployment snapshots |
 | Attach durable storage | `resources.attach-storage` | Resource storage attachment profile | Storage volume lifecycle, current runtime, historical deployment snapshots |
 | Detach durable storage | `resources.detach-storage` | Resource storage attachment profile | Storage deletion, current runtime, historical deployment snapshots |
+| Bind dependency resource | `resources.bind-dependency` | ResourceBinding metadata | Dependency resource lifecycle, current runtime, historical deployment snapshots |
+| Unbind dependency resource | `resources.unbind-dependency` | ResourceBinding lifecycle/tombstone | Dependency resource deletion, current runtime, historical deployment snapshots |
 | Retire resource | `resources.archive` | Resource lifecycle status | Runtime stop, route/domain/certificate/source-link cleanup |
 | Remove unused archived resource from active state | `resources.delete` | Archived unreferenced resource identity | Cascading cleanup of blockers |
 
@@ -350,7 +354,10 @@ and no retained blockers. Each future Code Round must update `CORE_OPERATIONS.md
 
 Resource storage attachment operations are proposed by
 [Storage Volume Lifecycle And Resource Attachment](../specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md)
-and are not active until the Code Round lands.
+and are active after that Code Round. Resource dependency binding operations are proposed by
+[Dependency Resource Binding Baseline](../specs/034-dependency-resource-binding-baseline/spec.md)
+and remain provider-neutral control-plane metadata until snapshot materialization and runtime
+injection are specified.
 
 ## Open Questions
 

@@ -43,6 +43,9 @@ import {
   type ProjectRepository,
   projectResourceAccessSummary,
   type RepositoryContext,
+  type ResourceDependencyBindingReadModel,
+  type ResourceDependencyBindingRepository,
+  type ResourceDependencyBindingSummary,
   type ResourceReadModel,
   type ResourceRepository,
   type ResourceSummary,
@@ -55,6 +58,7 @@ import {
 } from "@appaloft/application";
 import {
   ActiveDomainBindingByOwnerAndRouteSpec,
+  ActiveResourceBindingByTargetSpec,
   Certificate,
   CertificateByAttemptIdempotencyKeySpec,
   CertificateByDomainBindingIdSpec,
@@ -99,6 +103,11 @@ import {
   type ProjectMutationSpec,
   type ProjectSelectionSpec,
   Resource,
+  ResourceBinding,
+  ResourceBindingByIdSpec,
+  type ResourceBindingMutationSpec,
+  type ResourceBindingSelectionSpec,
+  ResourceBindingsByResourceSpec,
   ResourceByEnvironmentAndSlugSpec,
   ResourceByIdSpec,
   ResourceInstance,
@@ -1002,6 +1011,8 @@ export class MemoryDependencyResourceDeleteSafetyReader
 {
   private readonly blockers = new Map<string, DependencyResourceDeleteBlocker[]>();
 
+  constructor(private readonly bindings?: MemoryResourceDependencyBindingRepository) {}
+
   setBlockers(dependencyResourceId: string, blockers: DependencyResourceDeleteBlocker[]): void {
     this.blockers.set(dependencyResourceId, blockers);
   }
@@ -1011,7 +1022,19 @@ export class MemoryDependencyResourceDeleteSafetyReader
     input: { dependencyResourceId: string },
   ): Promise<Result<DependencyResourceDeleteBlocker[]>> {
     void context;
-    return ok(this.blockers.get(input.dependencyResourceId) ?? []);
+    const blockers = [...(this.blockers.get(input.dependencyResourceId) ?? [])];
+    if (this.bindings) {
+      const activeBindings = [...this.bindings.items.values()].filter((binding) => {
+        const state = binding.toState();
+        return (
+          state.status.isActive() && state.resourceInstanceId.value === input.dependencyResourceId
+        );
+      });
+      if (activeBindings.length > 0) {
+        blockers.push({ kind: "resource-binding", count: activeBindings.length });
+      }
+    }
+    return ok(blockers);
   }
 }
 
@@ -1104,6 +1127,146 @@ export class MemoryDependencyResourceReadModel implements DependencyResourceRead
       return null;
     }
     return this.toSummary(dependencyResource);
+  }
+}
+
+export class MemoryResourceDependencyBindingRepository
+  implements ResourceDependencyBindingRepository
+{
+  readonly items = new Map<string, ResourceBinding>();
+
+  async upsert(
+    context: RepositoryContext,
+    resourceBinding: ResourceBinding,
+    spec: ResourceBindingMutationSpec,
+  ): Promise<void> {
+    void context;
+    void spec;
+    const state = resourceBinding.toState();
+    this.items.set(state.id.value, ResourceBinding.rehydrate(state));
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: ResourceBindingSelectionSpec,
+  ): Promise<ResourceBinding | null> {
+    void context;
+    if (spec instanceof ResourceBindingByIdSpec) {
+      return this.items.get(spec.id.value) ?? null;
+    }
+    if (
+      spec instanceof ActiveResourceBindingByTargetSpec ||
+      spec instanceof ResourceBindingsByResourceSpec
+    ) {
+      for (const binding of this.items.values()) {
+        if (spec.isSatisfiedBy(binding)) {
+          return binding;
+        }
+      }
+    }
+    return null;
+  }
+}
+
+export class MemoryResourceDependencyBindingReadModel
+  implements ResourceDependencyBindingReadModel
+{
+  constructor(
+    private readonly bindings: MemoryResourceDependencyBindingRepository,
+    private readonly dependencyResources: MemoryDependencyResourceRepository,
+  ) {}
+
+  private toSummary(
+    binding: ResourceBinding,
+    dependencyResource: ResourceInstance,
+  ): ResourceDependencyBindingSummary {
+    const bindingState = binding.toState();
+    const dependencyState = dependencyResource.toState();
+    return {
+      id: bindingState.id.value,
+      projectId: bindingState.projectId.value,
+      environmentId: bindingState.environmentId.value,
+      resourceId: bindingState.resourceId.value,
+      dependencyResourceId: bindingState.resourceInstanceId.value,
+      dependencyResourceName: dependencyState.name.value,
+      ...(dependencyState.slug ? { dependencyResourceSlug: dependencyState.slug.value } : {}),
+      kind: dependencyState.kind.value as ResourceDependencyBindingSummary["kind"],
+      sourceMode: dependencyState.sourceMode?.value ?? "appaloft-managed",
+      providerKey: dependencyState.providerKey.value,
+      providerManaged: dependencyState.providerManaged ?? false,
+      lifecycleStatus: dependencyState.status.value,
+      target: {
+        targetName: bindingState.targetName.value,
+        scope: bindingState.scope.value,
+        injectionMode: bindingState.injectionMode.value,
+        ...(dependencyState.connectionSecretRef
+          ? { secretRef: dependencyState.connectionSecretRef.value }
+          : {}),
+      },
+      ...(dependencyState.postgresEndpoint
+        ? {
+            connection: {
+              host: dependencyState.postgresEndpoint.host.value,
+              ...(dependencyState.postgresEndpoint.port
+                ? { port: dependencyState.postgresEndpoint.port.value }
+                : {}),
+              ...(dependencyState.postgresEndpoint.databaseName
+                ? { databaseName: dependencyState.postgresEndpoint.databaseName.value }
+                : {}),
+              maskedConnection: dependencyState.postgresEndpoint.maskedConnection.value,
+              ...(dependencyState.connectionSecretRef
+                ? { secretRef: dependencyState.connectionSecretRef.value }
+                : {}),
+            },
+          }
+        : {}),
+      bindingReadiness: {
+        status: "ready",
+      },
+      snapshotReadiness: {
+        status: "deferred",
+        reason: "deployment snapshot dependency binding materialization is deferred",
+      },
+      status: bindingState.status.value,
+      createdAt: bindingState.createdAt.value,
+      ...(bindingState.removedAt ? { removedAt: bindingState.removedAt.value } : {}),
+    };
+  }
+
+  async list(
+    context: RepositoryContext,
+    input: { resourceId: string },
+  ): Promise<Result<ResourceDependencyBindingSummary[]>> {
+    void context;
+    const summaries: ResourceDependencyBindingSummary[] = [];
+    for (const binding of this.bindings.items.values()) {
+      const state = binding.toState();
+      if (state.resourceId.value !== input.resourceId || !state.status.isActive()) {
+        continue;
+      }
+      const dependencyResource = this.dependencyResources.items.get(state.resourceInstanceId.value);
+      if (dependencyResource) {
+        summaries.push(this.toSummary(binding, dependencyResource));
+      }
+    }
+    return ok(summaries);
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    input: { resourceId: string; bindingId: string },
+  ): Promise<Result<ResourceDependencyBindingSummary | null>> {
+    void context;
+    const binding = this.bindings.items.get(input.bindingId);
+    if (!binding) {
+      return ok(null);
+    }
+    const state = binding.toState();
+    if (state.resourceId.value !== input.resourceId || !state.status.isActive()) {
+      return ok(null);
+    }
+    const dependencyResource = this.dependencyResources.items.get(state.resourceInstanceId.value);
+    return ok(dependencyResource ? this.toSummary(binding, dependencyResource) : null);
   }
 }
 

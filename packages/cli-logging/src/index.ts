@@ -125,7 +125,7 @@ export class CliAggregateLogVisitor
     return this.entry(
       context,
       "binding",
-      `${state.alias.value} ${state.scope.value} via ${state.injectionMode.value}`,
+      `${state.targetName.value} ${state.scope.value} via ${state.injectionMode.value}`,
     );
   }
 
