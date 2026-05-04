@@ -379,6 +379,11 @@ Current boundary:
   route ownership without parsing provider-rendered labels/config. Evidence capture may prefer the
   same metadata before falling back to hostname/path lookup. This does not add a new operation key,
   command, route repair flow, or deployment admission field.
+- applied route context lookup is an internal read-only capability under the same existing access
+  failure diagnostics surfaces. It resolves safe `applied-route-context/v1` metadata by diagnostic
+  id, route id, resource id, deployment id, host, or path where current read state allows, and
+  evidence capture uses it before hostname/path fallback. It does not add an operation catalog row,
+  transport route, CLI command, Web form, route repair flow, or provider-native raw metadata parser.
 - companion/static access failure rendering is an internal read/adapter capability under existing
   resource access failure diagnostics. Static and one-shot CLI/SSH runtimes may package a
   provider-neutral renderer asset for `resource-access-failure/v1` envelopes when no reachable

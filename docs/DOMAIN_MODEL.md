@@ -370,6 +370,11 @@ Boundary rule:
   without exposing provider raw payloads, secrets, SSH credentials, auth headers, cookies, sensitive
   query strings, or remote raw logs. It is read-model/adapter metadata, not `Resource`,
   `Deployment`, `DomainBinding`, or `DeploymentTarget` aggregate state.
+- applied route context lookup is the internal read-only resolver for safe
+  `applied-route-context/v1` metadata. It may resolve by diagnostic id, route id, resource id,
+  deployment id, host, or path from existing resource/deployment/domain/route read state and
+  supplied safe metadata. It is not a provider-native metadata store, route repair lifecycle,
+  redeploy/rollback workflow, managed domain lifecycle, or aggregate mutation.
 - companion/static access failure rendering is provider-neutral read/adapter output over an already
   sanitized `resource-access-failure/v1` envelope. Static runtime packaging may carry a renderer
   asset for one-shot CLI or SSH deployments without a reachable Appaloft backend service, but it

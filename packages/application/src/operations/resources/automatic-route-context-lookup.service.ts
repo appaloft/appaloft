@@ -32,13 +32,17 @@ export type AutomaticRouteContextMatchedSource =
 export type AutomaticRouteContextConfidence = "high" | "medium" | "low";
 
 export interface AutomaticRouteContextLookupInput {
-  hostname: string;
-  path: string;
+  hostname?: string;
+  path?: string;
   requestId?: string;
   method?: string;
   observedAt?: string;
   routeSource?: ResourceAccessRouteSource;
   appliedRouteContext?: AppliedRouteContextMetadata;
+  diagnosticId?: string;
+  routeId?: string;
+  resourceId?: string;
+  deploymentId?: string;
 }
 
 export interface AutomaticRouteContextFound {
@@ -54,8 +58,12 @@ export interface AutomaticRouteContextFound {
   destinationId?: string;
   providerKey?: string;
   routeId: string;
+  diagnosticId: string;
   routeSource: ResourceAccessRouteSource;
   routeStatus: string;
+  proxyKind: AppliedRouteContextMetadata["proxyKind"];
+  appliedAt?: string;
+  observedAt?: string;
   confidence: AutomaticRouteContextConfidence;
   nextAction: ResourceAccessFailureNextAction;
 }
@@ -98,6 +106,8 @@ interface Candidate {
   providerKey?: string;
   routeSource: ResourceAccessRouteSource;
   routeStatus: string;
+  proxyKind: AppliedRouteContextMetadata["proxyKind"];
+  observedAt?: string;
   sourceRank: number;
 }
 
@@ -125,6 +135,11 @@ function normalizePath(input: string): string {
   }
 
   return withoutQuery.startsWith("/") ? withoutQuery : `/${withoutQuery}`;
+}
+
+function safeRouteIdentifier(input: string | undefined): string | undefined {
+  const normalized = input?.trim().replace(/[^a-zA-Z0-9_.:/-]/g, "_");
+  return normalized ? normalized.slice(0, 220) : undefined;
 }
 
 function pathMatches(path: string, prefix: string): boolean {
@@ -168,8 +183,8 @@ function sourceRankForDurable(binding?: DomainBindingSummary): number {
   return binding?.status === "ready" ? 10 : 20;
 }
 
-function routeIdFor(input: {
-  source: AutomaticRouteContextMatchedSource;
+function appliedRouteIdFor(input: {
+  source: ResourceAccessRouteSource;
   resourceId: string;
   hostname: string;
   pathPrefix: string;
@@ -188,6 +203,14 @@ function routeIdFor(input: {
     .join(":");
 
   return raw.replace(/[^a-zA-Z0-9_.:/-]/g, "_").slice(0, 220);
+}
+
+function appliedAtFromDeployment(deployment: DeploymentSummary | undefined): string | undefined {
+  if (!deployment) {
+    return undefined;
+  }
+
+  return deployment.finishedAt ?? deployment.startedAt ?? deployment.createdAt;
 }
 
 function confidenceFor(
@@ -253,6 +276,8 @@ function routeCandidate(input: {
       input.domainBinding && input.matchedSource === "durable-domain-binding-route"
         ? durableStatus(input.domainBinding)
         : routeStatusFrom(input.resource, input.route),
+    proxyKind: input.route.proxyKind,
+    ...("updatedAt" in input.route ? { observedAt: input.route.updatedAt } : {}),
     sourceRank: input.sourceRank,
   };
 }
@@ -271,6 +296,8 @@ function bindingCandidate(input: {
     domainBinding: input.binding,
     routeSource: "durable-domain",
     routeStatus: durableStatus(input.binding),
+    proxyKind: input.binding.proxyKind,
+    observedAt: input.binding.createdAt,
     sourceRank: sourceRankForDurable(input.binding),
   };
 }
@@ -312,6 +339,7 @@ export function routeContextToDiagnosticRoute(
     ...(result.destinationId ? { destinationId: result.destinationId } : {}),
     ...(result.providerKey ? { providerKey: result.providerKey } : {}),
     routeId: result.routeId,
+    diagnosticId: result.diagnosticId,
     routeSource: result.routeSource,
     routeStatus: result.routeStatus,
   };
@@ -340,8 +368,12 @@ function automaticRouteContextFromAppliedMetadata(
     ...(metadata.destinationId ? { destinationId: metadata.destinationId } : {}),
     ...(metadata.providerKey ? { providerKey: metadata.providerKey } : {}),
     routeId: metadata.routeId,
+    diagnosticId: metadata.diagnosticId,
     routeSource: metadata.routeSource,
     routeStatus: "applied",
+    proxyKind: metadata.proxyKind,
+    ...(metadata.appliedAt ? { appliedAt: metadata.appliedAt } : {}),
+    ...(metadata.observedAt ? { observedAt: metadata.observedAt } : {}),
     confidence: "high",
     nextAction: "diagnostic-summary",
   };
@@ -353,15 +385,33 @@ export async function enrichResourceAccessFailureDiagnosticWithRouteContext(
   lookup: AutomaticRouteContextLookup,
   appliedRouteContext?: AppliedRouteContextMetadata,
 ): Promise<ResourceAccessFailureDiagnostic> {
-  if (diagnostic.route?.resourceId) {
-    return diagnostic;
-  }
-
   if (appliedRouteContext) {
+    const result = await lookup.lookup(context, {
+      ...(diagnostic.affected?.hostname ? { hostname: diagnostic.affected.hostname } : {}),
+      ...(diagnostic.affected?.path ? { path: diagnostic.affected.path } : {}),
+      requestId: diagnostic.requestId,
+      ...(diagnostic.affected?.method ? { method: diagnostic.affected.method } : {}),
+      ...(diagnostic.generatedAt ? { observedAt: diagnostic.generatedAt } : {}),
+      appliedRouteContext,
+      diagnosticId: appliedRouteContext.diagnosticId,
+      routeId: appliedRouteContext.routeId,
+      resourceId: appliedRouteContext.resourceId,
+      ...(appliedRouteContext.deploymentId
+        ? { deploymentId: appliedRouteContext.deploymentId }
+        : {}),
+    });
+    const route =
+      routeContextToDiagnosticRoute(result) ??
+      appliedRouteContextToDiagnosticRoute(appliedRouteContext);
+
     return {
       ...diagnostic,
-      route: appliedRouteContextToDiagnosticRoute(appliedRouteContext),
+      route,
     };
+  }
+
+  if (diagnostic.route?.resourceId) {
+    return diagnostic;
   }
 
   if (!diagnostic.affected?.hostname || !diagnostic.affected.path) {
@@ -406,8 +456,10 @@ export class AutomaticRouteContextLookupService implements AutomaticRouteContext
     }
 
     const repositoryContext = toRepositoryContext(context);
-    const hostname = normalizeHostname(input.hostname);
-    const path = normalizePath(input.path);
+    const hostname = input.hostname ? normalizeHostname(input.hostname) : undefined;
+    const path = input.path ? normalizePath(input.path) : undefined;
+    const diagnosticId = safeRouteIdentifier(input.diagnosticId);
+    const routeIdInput = safeRouteIdentifier(input.routeId);
     const resources = await this.resourceReadModel.list(repositoryContext);
     const bindings = await this.domainBindingReadModel.list(repositoryContext);
     const resourceById = new Map(resources.map((resource) => [resource.id, resource]));
@@ -494,7 +546,13 @@ export class AutomaticRouteContextLookupService implements AutomaticRouteContext
 
     const selected = candidates
       .filter(
-        (candidate) => candidate.hostname === hostname && pathMatches(path, candidate.pathPrefix),
+        (candidate) =>
+          (!hostname || candidate.hostname === hostname) &&
+          (!path || pathMatches(path, candidate.pathPrefix)) &&
+          (!diagnosticId || candidateRouteIds(candidate).diagnosticId === diagnosticId) &&
+          (!routeIdInput || candidateRouteIds(candidate).routeId === routeIdInput) &&
+          (!input.resourceId || candidate.resource.id === input.resourceId) &&
+          (!input.deploymentId || candidate.deploymentId === input.deploymentId),
       )
       .sort((left, right) => {
         const rankCompare = left.sourceRank - right.sourceRank;
@@ -506,7 +564,7 @@ export class AutomaticRouteContextLookupService implements AutomaticRouteContext
       })[0];
 
     if (!selected) {
-      return notFound({ hostname, path });
+      return notFound({ hostname: hostname ?? "unknown", path: path ?? "/" });
     }
 
     const deployments = await this.deploymentReadModel.list(repositoryContext, {
@@ -517,14 +575,8 @@ export class AutomaticRouteContextLookupService implements AutomaticRouteContext
     const serverId = domainBinding?.serverId ?? deployment?.serverId;
     const destinationId =
       domainBinding?.destinationId ?? deployment?.destinationId ?? selected.resource.destinationId;
-    const routeId = routeIdFor({
-      source: selected.matchedSource,
-      resourceId: selected.resource.id,
-      hostname: selected.hostname,
-      pathPrefix: selected.pathPrefix,
-      ...(selected.deploymentId ? { deploymentId: selected.deploymentId } : {}),
-      ...(domainBinding?.id ? { domainBindingId: domainBinding.id } : {}),
-    });
+    const routeIds = candidateRouteIds(selected, domainBinding?.id);
+    const appliedAt = appliedAtFromDeployment(deployment);
 
     return {
       schemaVersion: "automatic-route-context-lookup/v1",
@@ -538,11 +590,38 @@ export class AutomaticRouteContextLookupService implements AutomaticRouteContext
       ...(serverId ? { serverId } : {}),
       ...(destinationId ? { destinationId } : {}),
       ...(selected.providerKey ? { providerKey: selected.providerKey } : {}),
-      routeId,
+      routeId: routeIds.routeId,
+      diagnosticId: routeIds.diagnosticId,
       routeSource: selected.routeSource,
       routeStatus: selected.routeStatus,
+      proxyKind: selected.proxyKind,
+      ...(appliedAt ? { appliedAt } : {}),
+      ...(selected.observedAt ? { observedAt: selected.observedAt } : {}),
       confidence: confidenceFor(selected, input.routeSource),
       nextAction: "diagnostic-summary",
     };
   }
+}
+
+function candidateRouteIds(
+  candidate: Candidate,
+  domainBindingId?: string,
+): {
+  routeId: string;
+  diagnosticId: string;
+} {
+  const resolvedDomainBindingId = domainBindingId ?? candidate.domainBinding?.id;
+  const routeId = appliedRouteIdFor({
+    source: candidate.routeSource,
+    resourceId: candidate.resource.id,
+    hostname: candidate.hostname,
+    pathPrefix: candidate.pathPrefix,
+    ...(candidate.deploymentId ? { deploymentId: candidate.deploymentId } : {}),
+    ...(resolvedDomainBindingId ? { domainBindingId: resolvedDomainBindingId } : {}),
+  });
+
+  return {
+    routeId,
+    diagnosticId: routeId,
+  };
 }

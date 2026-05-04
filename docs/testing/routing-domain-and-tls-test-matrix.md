@@ -174,6 +174,7 @@ Then:
 | ROUTE-TLS-READMODEL-014 | integration | Revoked/deleted certificate projection | Certificate was revoked or deleted | `certificates.show` and `certificates.list` expose the lifecycle state needed for audit and follow-up without treating the certificate as active TLS material |
 | ROUTE-TLS-READMODEL-015 | integration | Domain binding show route/access parity | A binding's resource access summary has durable, server-applied, generated, proxy readiness, and optional generated fallback context | `domain-bindings.show` returns selected/context route descriptors, generated access fallback, proxy readiness, certificate context, and delete safety using the same shared route/access vocabulary as `ResourceAccessSummary` | Selected durable route wins, server-applied/generated routes remain context, and no provider raw payload or secret material is exposed. |
 | ROUTE-TLS-READMODEL-016 | integration | Domain/route failure visibility sanitizer | Domain route, proxy, or route-context diagnostic state contains unsafe provider/raw payload hints near failure metadata | Existing domain/access/proxy/diagnostic read models keep safe route/source ids and stable codes | Provider raw payloads, private keys, SSH credentials, auth headers, cookies, sensitive query values, and raw remote logs are absent; next actions remain suggestions only. |
+| ROUTE-TLS-READMODEL-017 | integration | Applied route context lookup remains read-only | Applied route context lookup resolves generated, durable, server-applied, or deployment-snapshot route ownership from safe metadata | Existing access-failure evidence, proxy preview, health, or diagnostic summary surfaces consume the context | No managed `DomainBinding`, `Certificate`, route repair, redeploy, rollback, provider-native metadata parsing, or route mutation state is introduced. |
 
 ## Workflow Matrix
 
@@ -327,6 +328,10 @@ domain and server-applied routes, including resource, deployment, domain binding
 server, destination, route id, diagnostic id, hostname, path prefix, proxy kind, provider key, and
 available applied/observed timestamps. It must not expose provider raw payloads, SSH credentials,
 auth headers, cookies, sensitive query strings, private keys, or raw remote logs.
+
+`ROUTE-TLS-READMODEL-017` is covered by the applied route context lookup baseline. The lookup is an
+internal read-only resolver over safe metadata and existing read state; it does not create managed
+domain, certificate, recovery, route repair, or provider-native parsing behavior.
 
 `DMBH-DOMAIN-001` is the domain-model hardening row for the no-behavior-change certificate
 admission and ready-gate refactor. It is bound to `packages/core/test/domain-binding.test.ts` and
