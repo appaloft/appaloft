@@ -53,6 +53,7 @@ import { renameProjectCommandInputSchema } from "./operations/projects/rename-pr
 import { showProjectQueryInputSchema } from "./operations/projects/show-project.query";
 import { archiveResourceCommandInputSchema } from "./operations/resources/archive-resource.command";
 import { attachResourceStorageCommandInputSchema } from "./operations/resources/attach-resource-storage.command";
+import { bindResourceDependencyCommandInputSchema } from "./operations/resources/bind-resource-dependency.command";
 import { configureResourceAccessCommandInputSchema } from "./operations/resources/configure-resource-access.command";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
 import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
@@ -62,6 +63,7 @@ import { createResourceCommandInputSchema } from "./operations/resources/create-
 import { deleteResourceCommandInputSchema } from "./operations/resources/delete-resource.command";
 import { detachResourceStorageCommandInputSchema } from "./operations/resources/detach-resource-storage.command";
 import { importResourceVariablesCommandInputSchema } from "./operations/resources/import-resource-variables.command";
+import { listResourceDependencyBindingsQueryInputSchema } from "./operations/resources/list-resource-dependency-bindings.query";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
 import { resourceAccessFailureEvidenceLookupQueryInputSchema } from "./operations/resources/resource-access-failure-evidence-lookup.query";
 import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resources/resource-diagnostic-summary.query";
@@ -71,6 +73,8 @@ import { resourceProxyConfigurationPreviewQueryInputSchema } from "./operations/
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
 import { setResourceVariableCommandInputSchema } from "./operations/resources/set-resource-variable.command";
 import { showResourceQueryInputSchema } from "./operations/resources/show-resource.query";
+import { showResourceDependencyBindingQueryInputSchema } from "./operations/resources/show-resource-dependency-binding.query";
+import { unbindResourceDependencyCommandInputSchema } from "./operations/resources/unbind-resource-dependency.command";
 import { unsetResourceVariableCommandInputSchema } from "./operations/resources/unset-resource-variable.command";
 import { bootstrapServerProxyCommandInputSchema } from "./operations/servers/bootstrap-server-proxy.command";
 import { checkServerDeleteSafetyQueryInputSchema } from "./operations/servers/check-server-delete-safety.query";
@@ -857,6 +861,65 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft dependency delete <dependencyResourceId>",
       orpc: { method: "DELETE", path: "/api/dependency-resources/{dependencyResourceId}" },
+    },
+  },
+  {
+    key: "resources.bind-dependency",
+    kind: "command",
+    domain: "resources",
+    messageName: "BindResourceDependencyCommand",
+    handlerName: "BindResourceDependencyCommandHandler",
+    serviceName: "BindResourceDependencyUseCase",
+    inputSchema: bindResourceDependencyCommandInputSchema,
+    serviceToken: tokens.bindResourceDependencyUseCase,
+    transports: {
+      cli: "appaloft resource dependency bind <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/dependency-bindings" },
+    },
+  },
+  {
+    key: "resources.unbind-dependency",
+    kind: "command",
+    domain: "resources",
+    messageName: "UnbindResourceDependencyCommand",
+    handlerName: "UnbindResourceDependencyCommandHandler",
+    serviceName: "UnbindResourceDependencyUseCase",
+    inputSchema: unbindResourceDependencyCommandInputSchema,
+    serviceToken: tokens.unbindResourceDependencyUseCase,
+    transports: {
+      cli: "appaloft resource dependency unbind <resourceId> <bindingId>",
+      orpc: {
+        method: "DELETE",
+        path: "/api/resources/{resourceId}/dependency-bindings/{bindingId}",
+      },
+    },
+  },
+  {
+    key: "resources.list-dependency-bindings",
+    kind: "query",
+    domain: "resources",
+    messageName: "ListResourceDependencyBindingsQuery",
+    handlerName: "ListResourceDependencyBindingsQueryHandler",
+    serviceName: "ListResourceDependencyBindingsQueryService",
+    inputSchema: listResourceDependencyBindingsQueryInputSchema,
+    serviceToken: tokens.listResourceDependencyBindingsQueryService,
+    transports: {
+      cli: "appaloft resource dependency list <resourceId>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/dependency-bindings" },
+    },
+  },
+  {
+    key: "resources.show-dependency-binding",
+    kind: "query",
+    domain: "resources",
+    messageName: "ShowResourceDependencyBindingQuery",
+    handlerName: "ShowResourceDependencyBindingQueryHandler",
+    serviceName: "ShowResourceDependencyBindingQueryService",
+    inputSchema: showResourceDependencyBindingQueryInputSchema,
+    serviceToken: tokens.showResourceDependencyBindingQueryService,
+    transports: {
+      cli: "appaloft resource dependency show <resourceId> <bindingId>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/dependency-bindings/{bindingId}" },
     },
   },
   {

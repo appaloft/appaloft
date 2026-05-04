@@ -172,6 +172,14 @@ export const cliCommandDescriptions = {
     "Detach storage from a resource without deleting the volume",
     "storage.volume-lifecycle",
   ),
+  resourceDependency: withDocs("Resource dependency binding operations", "resource.concept"),
+  resourceDependencyBind: withDocs("Bind a dependency resource to a resource", "resource.concept"),
+  resourceDependencyUnbind: withDocs(
+    "Unbind a dependency resource without deleting it",
+    "resource.concept",
+  ),
+  resourceDependencyList: withDocs("List resource dependency bindings", "resource.concept"),
+  resourceDependencyShow: withDocs("Show one resource dependency binding", "resource.concept"),
   storage: withDocs("Storage operations", "storage.volume-lifecycle"),
   storageVolume: withDocs("Storage volume operations", "storage.volume-lifecycle"),
   storageVolumeCreate: withDocs(

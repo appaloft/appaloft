@@ -4,13 +4,17 @@ import { describe, expect, test } from "bun:test";
 import {
   type Command as AppCommand,
   type Query as AppQuery,
+  BindResourceDependencyCommand,
   type CommandBus,
   type ExecutionContextFactory,
   ImportPostgresDependencyResourceCommand,
   ListDependencyResourcesQuery,
+  ListResourceDependencyBindingsQuery,
   ProvisionPostgresDependencyResourceCommand,
   type QueryBus,
   ShowDependencyResourceQuery,
+  ShowResourceDependencyBindingQuery,
+  UnbindResourceDependencyCommand,
 } from "@appaloft/application";
 import { ok } from "@appaloft/core";
 
@@ -137,5 +141,45 @@ describe("CLI dependency commands", () => {
 
     expect(queries[0]).toBeInstanceOf(ListDependencyResourcesQuery);
     expect(queries[1]).toBeInstanceOf(ShowDependencyResourceQuery);
+  });
+
+  test("[DEP-BIND-PG-ENTRY-001] resource dependency commands dispatch buses", async () => {
+    const { commands, program, queries } = await createCommandCaptureHarness("req_cli_dep_bind");
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "dependency",
+      "bind",
+      "res_web",
+      "rsi_pg",
+      "--target-name",
+      "DATABASE_URL",
+    ]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "dependency",
+      "unbind",
+      "res_web",
+      "rbd_pg",
+    ]);
+    await parseCli(program, ["node", "appaloft", "resource", "dependency", "list", "res_web"]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "dependency",
+      "show",
+      "res_web",
+      "rbd_pg",
+    ]);
+
+    expect(commands[0]).toBeInstanceOf(BindResourceDependencyCommand);
+    expect(commands[1]).toBeInstanceOf(UnbindResourceDependencyCommand);
+    expect(queries[0]).toBeInstanceOf(ListResourceDependencyBindingsQuery);
+    expect(queries[1]).toBeInstanceOf(ShowResourceDependencyBindingQuery);
   });
 });

@@ -830,6 +830,12 @@ Current verification notes:
   satisfy the full `0.9.0` release rule while Redis, dependency binding, secret rotation,
   backup/restore, provider-native database realization, recovery, auto-deploy, preview, and cluster
   runtime items remain open.
+- 2026-05-04 Phase 7 dependency resource binding baseline implemented provider-neutral Postgres
+  bind/unbind/list/show binding metadata through Resource-scoped CLI/oRPC/HTTP operations, masked
+  safe summaries, real active-binding delete-safety blockers, and PG/PGlite persistence. This still
+  does not satisfy the full `0.9.0` release rule while secret rotation, runtime injection,
+  deployment snapshot materialization, provider-native database realization, Redis, backup/restore,
+  recovery, auto-deploy, preview, and cluster runtime items remain open.
 
 Required:
 
@@ -840,6 +846,8 @@ Required:
 - [x] Add storage attach/detach, bind mount versus named volume, destination path validation, and
   backup relationship metadata.
 - [x] Add provider-neutral Postgres dependency resource provision/import/list/show/rename/delete
+  baseline.
+- [x] Add provider-neutral Postgres dependency resource bind/unbind/list/show binding metadata
   baseline.
 - [ ] Add provider-native Postgres database realization and closed bind/backup/delete lifecycle.
 - [ ] Add Redis provisioning/import/list/show/update/delete.
