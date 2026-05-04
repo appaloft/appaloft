@@ -287,6 +287,18 @@ Implemented operations:
 | Read resource health | Query | `resources.health` | `ResourceHealthQuery` | `ResourceHealthQueryInput` | `appaloft resource health <resourceId>` | `GET /api/resources/{resourceId}/health` |
 | Open resource terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft resource terminal <resourceId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
+Phase 7 storage operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| Create storage volume | Command | `storage-volumes.create` | `CreateStorageVolumeCommand` | `CreateStorageVolumeCommandInput` | `appaloft storage volume create` | `POST /api/storage-volumes` |
+| List storage volumes | Query | `storage-volumes.list` | `ListStorageVolumesQuery` | `ListStorageVolumesQueryInput` | `appaloft storage volume list` | `GET /api/storage-volumes` |
+| Show storage volume | Query | `storage-volumes.show` | `ShowStorageVolumeQuery` | `ShowStorageVolumeQueryInput` | `appaloft storage volume show <storageVolumeId>` | `GET /api/storage-volumes/{storageVolumeId}` |
+| Rename storage volume | Command | `storage-volumes.rename` | `RenameStorageVolumeCommand` | `RenameStorageVolumeCommandInput` | `appaloft storage volume rename <storageVolumeId> --name <name>` | `POST /api/storage-volumes/{storageVolumeId}/rename` |
+| Delete storage volume | Command | `storage-volumes.delete` | `DeleteStorageVolumeCommand` | `DeleteStorageVolumeCommandInput` | `appaloft storage volume delete <storageVolumeId>` | `DELETE /api/storage-volumes/{storageVolumeId}` |
+| Attach storage to resource | Command | `resources.attach-storage` | `AttachResourceStorageCommand` | `AttachResourceStorageCommandInput` | `appaloft resource storage attach <resourceId> <storageVolumeId> --destination-path <path>` | `POST /api/resources/{resourceId}/storage-attachments` |
+| Detach storage from resource | Command | `resources.detach-storage` | `DetachResourceStorageCommand` | `DetachResourceStorageCommandInput` | `appaloft resource storage detach <resourceId> <attachmentId>` | `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` |
+
 Current boundary:
 - resources are persisted and can be listed by project or environment
 - deployment creation resolves or bootstraps a resource and destination before creating the
@@ -421,6 +433,11 @@ Current boundary:
   `resources.import-variables`, and `resources.unset-variable`; these commands replace only the
   resource override layer used during future deployment snapshot materialization after environment
   precedence is resolved.
+- storage volume lifecycle is implemented for Phase 7 through
+  `storage-volumes.create/list/show/rename/delete` and `resources.attach-storage/detach-storage`.
+  Storage attachments are Resource profile state for future deployment snapshot materialization;
+  storage commands must not create deployments, mutate historical snapshots, apply live runtime
+  mounts, provision provider-native volumes, or perform backup/restore.
 - `.env` import is an operation-local parser for pasted content. It rejects malformed or unsafe
   variable keys, classifies secret-like keys as runtime secrets by default, rejects build-time
   secret exposure, uses last pasted duplicate wins, and reports duplicate/existing override
@@ -444,6 +461,8 @@ Current boundary:
 
 Core next operations expected here:
 - declare compose-stack services from compose metadata
+- implement Phase 7 storage volume lifecycle and resource attachment baseline from
+  [Storage Volume Lifecycle And Resource Attachment](./specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md)
 
 ## Source Links
 

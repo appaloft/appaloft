@@ -971,6 +971,50 @@ export const resourceSummarySchema = z.object({
   accessSummary: resourceAccessSummarySchema.optional(),
 });
 
+export const storageMountModeSchema = z.enum(["read-write", "read-only"]);
+
+export const resourceStorageAttachmentSummarySchema = z.object({
+  id: z.string(),
+  storageVolumeId: z.string(),
+  storageVolumeName: z.string().optional(),
+  storageVolumeKind: z.enum(["named-volume", "bind-mount"]).optional(),
+  destinationPath: z.string(),
+  mountMode: storageMountModeSchema,
+  attachedAt: z.string(),
+});
+
+export const storageVolumeAttachmentSummarySchema = z.object({
+  attachmentId: z.string(),
+  resourceId: z.string(),
+  resourceName: z.string().optional(),
+  resourceSlug: z.string().optional(),
+  destinationPath: z.string(),
+  mountMode: storageMountModeSchema,
+  attachedAt: z.string(),
+});
+
+export const storageBackupRelationshipSchema = z.object({
+  retentionRequired: z.boolean(),
+  reason: z.string().optional(),
+});
+
+export const storageVolumeSummarySchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  kind: z.enum(["named-volume", "bind-mount"]),
+  sourcePath: z.string().optional(),
+  description: z.string().optional(),
+  lifecycleStatus: z.enum(["active", "deleted"]),
+  backupRelationship: storageBackupRelationshipSchema.optional(),
+  attachmentCount: z.number(),
+  attachments: z.array(storageVolumeAttachmentSummarySchema),
+  createdAt: z.string(),
+  deletedAt: z.string().optional(),
+});
+
 export const deploymentResourceInputSchema = z.object({
   name: z.string().min(1),
   kind: z
@@ -1247,6 +1291,7 @@ export const resourceDetailSchema = z.object({
   networkProfile: resourceNetworkProfileSchema.optional(),
   accessProfile: resourceAccessProfileSchema.optional(),
   healthPolicy: requestedDeploymentHealthCheckSchema.optional(),
+  storageAttachments: z.array(resourceStorageAttachmentSummarySchema).optional(),
   accessSummary: resourceAccessSummarySchema.optional(),
   latestDeployment: resourceDetailDeploymentContextSchema.optional(),
   lifecycle: z.object({
@@ -1424,6 +1469,26 @@ export const configureResourceAccessResponseSchema = z.object({
   id: z.string(),
 });
 
+export const attachResourceStorageInputSchema = z.object({
+  resourceId: z.string().min(1),
+  storageVolumeId: z.string().min(1),
+  destinationPath: z.string().min(1),
+  mountMode: storageMountModeSchema.default("read-write"),
+});
+
+export const attachResourceStorageResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const detachResourceStorageInputSchema = z.object({
+  resourceId: z.string().min(1),
+  attachmentId: z.string().min(1),
+});
+
+export const detachResourceStorageResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const configureResourceRuntimeInputSchema = z.object({
   resourceId: z.string().min(1),
   runtimeProfile: resourceRuntimeProfileInputSchema.omit({
@@ -1444,6 +1509,75 @@ export const configureResourceSourceInputSchema = z.object({
 });
 
 export const configureResourceSourceResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const createStorageVolumeInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    environmentId: z.string().min(1),
+    name: z.string().min(1),
+    kind: z.enum(["named-volume", "bind-mount"]),
+    description: z.string().min(1).optional(),
+    sourcePath: z.string().min(1).optional(),
+    backupRelationship: storageBackupRelationshipSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.kind === "bind-mount" && !value.sourcePath) {
+      context.addIssue({
+        code: "custom",
+        path: ["sourcePath"],
+        message: "Bind mount storage volumes require sourcePath",
+      });
+    }
+    if (value.kind === "named-volume" && value.sourcePath) {
+      context.addIssue({
+        code: "custom",
+        path: ["sourcePath"],
+        message: "Named storage volumes must not include sourcePath",
+      });
+    }
+  });
+
+export const createStorageVolumeResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const listStorageVolumesInputSchema = z.object({
+  projectId: z.string().min(1).optional(),
+  environmentId: z.string().min(1).optional(),
+});
+
+export const listStorageVolumesResponseSchema = z.object({
+  schemaVersion: z.literal("storage-volumes.list/v1"),
+  items: z.array(storageVolumeSummarySchema),
+  generatedAt: z.string(),
+});
+
+export const showStorageVolumeInputSchema = z.object({
+  storageVolumeId: z.string().min(1),
+});
+
+export const showStorageVolumeResponseSchema = z.object({
+  schemaVersion: z.literal("storage-volumes.show/v1"),
+  storageVolume: storageVolumeSummarySchema,
+  generatedAt: z.string(),
+});
+
+export const renameStorageVolumeInputSchema = z.object({
+  storageVolumeId: z.string().min(1),
+  name: z.string().min(1),
+});
+
+export const renameStorageVolumeResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const deleteStorageVolumeInputSchema = z.object({
+  storageVolumeId: z.string().min(1),
+});
+
+export const deleteStorageVolumeResponseSchema = z.object({
   id: z.string(),
 });
 
@@ -3352,6 +3486,10 @@ export type RouteIntentStatusDescriptor = z.infer<typeof routeIntentStatusDescri
 export type ResourceHealthSummary = z.infer<typeof resourceHealthSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type ResourceDetail = z.infer<typeof resourceDetailSchema>;
+export type ResourceStorageAttachmentSummary = z.infer<
+  typeof resourceStorageAttachmentSummarySchema
+>;
+export type StorageVolumeSummary = z.infer<typeof storageVolumeSummarySchema>;
 export type ResourceConfigEntry = z.infer<typeof resourceConfigEntrySchema>;
 export type ResourceConfigOverrideSummary = z.infer<typeof resourceConfigOverrideSummarySchema>;
 export type ResourceEffectiveConfig = z.infer<typeof resourceEffectiveConfigSchema>;
@@ -3373,6 +3511,10 @@ export type ConfigureResourceNetworkResponse = z.infer<
 >;
 export type ConfigureResourceAccessInput = z.infer<typeof configureResourceAccessInputSchema>;
 export type ConfigureResourceAccessResponse = z.infer<typeof configureResourceAccessResponseSchema>;
+export type AttachResourceStorageInput = z.infer<typeof attachResourceStorageInputSchema>;
+export type AttachResourceStorageResponse = z.infer<typeof attachResourceStorageResponseSchema>;
+export type DetachResourceStorageInput = z.infer<typeof detachResourceStorageInputSchema>;
+export type DetachResourceStorageResponse = z.infer<typeof detachResourceStorageResponseSchema>;
 export type ConfigureResourceRuntimeInput = z.infer<typeof configureResourceRuntimeInputSchema>;
 export type ConfigureResourceRuntimeResponse = z.infer<
   typeof configureResourceRuntimeResponseSchema
@@ -3419,6 +3561,16 @@ export type LockEnvironmentResponse = z.infer<typeof lockEnvironmentResponseSche
 export type UnlockEnvironmentInput = z.infer<typeof unlockEnvironmentInputSchema>;
 export type UnlockEnvironmentResponse = z.infer<typeof unlockEnvironmentResponseSchema>;
 export type ListResourcesResponse = z.infer<typeof listResourcesResponseSchema>;
+export type CreateStorageVolumeInput = z.infer<typeof createStorageVolumeInputSchema>;
+export type CreateStorageVolumeResponse = z.infer<typeof createStorageVolumeResponseSchema>;
+export type ListStorageVolumesInput = z.infer<typeof listStorageVolumesInputSchema>;
+export type ListStorageVolumesResponse = z.infer<typeof listStorageVolumesResponseSchema>;
+export type ShowStorageVolumeInput = z.infer<typeof showStorageVolumeInputSchema>;
+export type ShowStorageVolumeResponse = z.infer<typeof showStorageVolumeResponseSchema>;
+export type RenameStorageVolumeInput = z.infer<typeof renameStorageVolumeInputSchema>;
+export type RenameStorageVolumeResponse = z.infer<typeof renameStorageVolumeResponseSchema>;
+export type DeleteStorageVolumeInput = z.infer<typeof deleteStorageVolumeInputSchema>;
+export type DeleteStorageVolumeResponse = z.infer<typeof deleteStorageVolumeResponseSchema>;
 export type DomainBindingSummary = z.infer<typeof domainBindingSummarySchema>;
 export type CreateDomainBindingInput = z.infer<typeof createDomainBindingInputSchema>;
 export type CreateDomainBindingResponse = z.infer<typeof createDomainBindingResponseSchema>;

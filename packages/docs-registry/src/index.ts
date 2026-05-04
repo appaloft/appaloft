@@ -546,6 +546,46 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: ["apps/web/src/routes/resources/[resourceId]/+page.svelte: resource access form"],
   },
+  "storage.volume-lifecycle": {
+    id: "storage.volume-lifecycle",
+    title: "Storage volume lifecycle",
+    description:
+      "How durable storage volumes and resource storage attachments are validated and managed.",
+    page: {
+      "zh-CN": "resources/storage-volumes",
+      "en-US": "en/resources/storage-volumes",
+    },
+    anchor: "storage-volume-lifecycle",
+    localeCoverage: {
+      "zh-CN": "stub",
+      "en-US": "stub",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "storage-volumes.create",
+    aliases: [
+      "storage",
+      "volume",
+      "bind mount",
+      "named volume",
+      "resource attachment",
+      "persistent storage",
+      "持久化存储",
+    ],
+    specReferences: [
+      "docs/workflows/storage-volume-lifecycle.md",
+      "docs/workflows/resource-profile-lifecycle.md",
+      "docs/testing/storage-volume-test-matrix.md",
+      "docs/specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md",
+      "docs/commands/storage-volumes.create.md",
+      "docs/commands/storage-volumes.rename.md",
+      "docs/commands/storage-volumes.delete.md",
+      "docs/commands/resources.attach-storage.md",
+      "docs/commands/resources.detach-storage.md",
+      "docs/queries/storage-volumes.list.md",
+      "docs/queries/storage-volumes.show.md",
+    ],
+    webSurfaces: ["Web write UI deferred; resources.show can read storage attachment summary."],
+  },
   "server.ssh-credential": {
     id: "server.ssh-credential",
     title: "SSH credential",
@@ -1415,6 +1455,41 @@ export const publicDocsOperationCoverage = [
     operationKey: "resources.configure-access",
     status: "documented",
     topicId: "resource.access-profile",
+  },
+  {
+    operationKey: "resources.attach-storage",
+    status: "documented",
+    topicId: "storage.volume-lifecycle",
+  },
+  {
+    operationKey: "resources.detach-storage",
+    status: "documented",
+    topicId: "storage.volume-lifecycle",
+  },
+  {
+    operationKey: "storage-volumes.create",
+    status: "documented",
+    topicId: "storage.volume-lifecycle",
+  },
+  {
+    operationKey: "storage-volumes.list",
+    status: "documented",
+    topicId: "storage.volume-lifecycle",
+  },
+  {
+    operationKey: "storage-volumes.show",
+    status: "documented",
+    topicId: "storage.volume-lifecycle",
+  },
+  {
+    operationKey: "storage-volumes.rename",
+    status: "documented",
+    topicId: "storage.volume-lifecycle",
+  },
+  {
+    operationKey: "storage-volumes.delete",
+    status: "documented",
+    topicId: "storage.volume-lifecycle",
   },
   {
     operationKey: "resources.runtime-logs",

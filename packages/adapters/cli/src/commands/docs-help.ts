@@ -22,6 +22,7 @@ export const cliDocsHrefs = {
   resourceHealthProfile: resolvePublicDocsHelpHref("resource.health-profile"),
   resourceNetworkProfile: resolvePublicDocsHelpHref("resource.network-profile"),
   resourceAccessProfile: resolvePublicDocsHelpHref("resource.access-profile"),
+  storageVolumeLifecycle: resolvePublicDocsHelpHref("storage.volume-lifecycle"),
   environmentConcept: resolvePublicDocsHelpHref("environment.concept"),
   environmentLifecycle: resolvePublicDocsHelpHref("environment.lifecycle"),
   environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
@@ -162,6 +163,25 @@ export const cliCommandDescriptions = {
     "Configure resource generated access profile",
     "resource.access-profile",
   ),
+  resourceStorage: withDocs("Resource storage attachment operations", "storage.volume-lifecycle"),
+  resourceAttachStorage: withDocs(
+    "Attach storage to a resource at a destination path",
+    "storage.volume-lifecycle",
+  ),
+  resourceDetachStorage: withDocs(
+    "Detach storage from a resource without deleting the volume",
+    "storage.volume-lifecycle",
+  ),
+  storage: withDocs("Storage operations", "storage.volume-lifecycle"),
+  storageVolume: withDocs("Storage volume operations", "storage.volume-lifecycle"),
+  storageVolumeCreate: withDocs(
+    "Create a named volume or bind mount metadata record",
+    "storage.volume-lifecycle",
+  ),
+  storageVolumeList: withDocs("List storage volumes", "storage.volume-lifecycle"),
+  storageVolumeShow: withDocs("Show storage volume detail", "storage.volume-lifecycle"),
+  storageVolumeRename: withDocs("Rename a storage volume", "storage.volume-lifecycle"),
+  storageVolumeDelete: withDocs("Delete an unattached storage volume", "storage.volume-lifecycle"),
   resourceSetVariable: withDocs(
     "Set a resource-scoped variable override",
     "environment.variable-precedence",

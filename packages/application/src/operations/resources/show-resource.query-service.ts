@@ -31,6 +31,7 @@ import {
   type ResourceDetailRuntimeProfile,
   type ResourceDetailSourceProfile,
   type ResourceRepository,
+  type ResourceStorageAttachmentSummary,
   type ResourceSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -197,6 +198,16 @@ function accessProfileFromState(
     generatedAccessMode: profile.generatedAccessMode.value,
     pathPrefix: profile.pathPrefix.value,
   };
+}
+
+function storageAttachmentsFromState(state: ResourceState): ResourceStorageAttachmentSummary[] {
+  return state.storageAttachments.map((attachment) => ({
+    id: attachment.id.value,
+    storageVolumeId: attachment.storageVolumeId.value,
+    destinationPath: attachment.destinationPath.value,
+    mountMode: attachment.mountMode.value,
+    attachedAt: attachment.attachedAt.value,
+  }));
 }
 
 function identityFromState(
@@ -370,6 +381,7 @@ export class ShowResourceQueryService {
       const runtimeProfile = runtimeProfileFromState(state.runtimeProfile);
       const networkProfile = networkProfileFromState(state.networkProfile);
       const accessProfile = accessProfileFromState(state.accessProfile);
+      const storageAttachments = storageAttachmentsFromState(state);
       const healthPolicy = healthCheckFromState(state.runtimeProfile?.healthCheck);
       const accessSummary: ResourceAccessSummary | undefined = query.includeAccessSummary
         ? summary?.accessSummary
@@ -382,6 +394,7 @@ export class ShowResourceQueryService {
         ...(runtimeProfile ? { runtimeProfile } : {}),
         ...(networkProfile ? { networkProfile } : {}),
         ...(accessProfile ? { accessProfile } : {}),
+        ...(storageAttachments.length > 0 ? { storageAttachments } : {}),
         ...(healthPolicy ? { healthPolicy } : {}),
         ...(accessSummary ? { accessSummary } : {}),
         ...(deployment ? { latestDeployment: deploymentContextFromSummary(deployment) } : {}),

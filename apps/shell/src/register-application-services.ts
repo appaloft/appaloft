@@ -5,6 +5,8 @@ import {
   ArchiveProjectUseCase,
   ArchiveResourceCommandHandler,
   ArchiveResourceUseCase,
+  AttachResourceStorageCommandHandler,
+  AttachResourceStorageUseCase,
   AutomaticRouteContextLookupService,
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
   BootstrapServerProxyCommandHandler,
@@ -45,6 +47,8 @@ import {
   CreateProjectUseCase,
   CreateResourceUseCase,
   CreateSshCredentialUseCase,
+  CreateStorageVolumeCommandHandler,
+  CreateStorageVolumeUseCase,
   DbMigrateUseCase,
   DbStatusQueryService,
   DeactivateServerCommandHandler,
@@ -59,6 +63,8 @@ import {
   DeleteServerUseCase,
   DeleteSshCredentialCommandHandler,
   DeleteSshCredentialUseCase,
+  DeleteStorageVolumeCommandHandler,
+  DeleteStorageVolumeUseCase,
   DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
   DeploymentContextResolver,
@@ -70,6 +76,8 @@ import {
   DeploymentRecoveryReadinessQueryHandler,
   DeploymentRecoveryReadinessQueryService,
   DeploymentSnapshotFactory,
+  DetachResourceStorageCommandHandler,
+  DetachResourceStorageUseCase,
   DiffEnvironmentsQueryService,
   DoctorQueryService,
   EnvironmentEffectivePrecedenceQueryHandler,
@@ -99,6 +107,8 @@ import {
   ListResourcesQueryService,
   ListServersQueryService,
   ListSshCredentialsQueryService,
+  ListStorageVolumesQueryHandler,
+  ListStorageVolumesQueryService,
   LockEnvironmentCommandHandler,
   LockEnvironmentUseCase,
   MarkDomainReadyOnCertificateImportedHandler,
@@ -119,6 +129,8 @@ import {
   RenameProjectUseCase,
   RenameServerCommandHandler,
   RenameServerUseCase,
+  RenameStorageVolumeCommandHandler,
+  RenameStorageVolumeUseCase,
   ResourceAccessFailureEvidenceLookupQueryHandler,
   ResourceAccessFailureEvidenceLookupQueryService,
   ResourceDiagnosticSummaryQueryService,
@@ -156,6 +168,8 @@ import {
   ShowServerQueryService,
   ShowSshCredentialQueryHandler,
   ShowSshCredentialQueryService,
+  ShowStorageVolumeQueryHandler,
+  ShowStorageVolumeQueryService,
   StreamDeploymentEventsQueryHandler,
   StreamDeploymentEventsQueryService,
   TestServerConnectivityUseCase,
@@ -213,6 +227,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
   container.registerSingleton(ConfigureResourceSourceCommandHandler);
+  container.registerSingleton(AttachResourceStorageCommandHandler);
+  container.registerSingleton(DetachResourceStorageCommandHandler);
   container.registerSingleton(SetResourceVariableCommandHandler);
   container.registerSingleton(ImportResourceVariablesCommandHandler);
   container.registerSingleton(UnsetResourceVariableCommandHandler);
@@ -248,6 +264,11 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ShowDomainBindingQueryHandler);
   container.registerSingleton(ShowSshCredentialQueryHandler);
   container.registerSingleton(InspectServerCapacityQueryHandler);
+  container.registerSingleton(CreateStorageVolumeCommandHandler);
+  container.registerSingleton(RenameStorageVolumeCommandHandler);
+  container.registerSingleton(DeleteStorageVolumeCommandHandler);
+  container.registerSingleton(ListStorageVolumesQueryHandler);
+  container.registerSingleton(ShowStorageVolumeQueryHandler);
   container.registerSingleton(
     tokens.certificateProviderSelectionPolicy,
     ShellCertificateProviderSelectionPolicy,
@@ -273,6 +294,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
   container.registerSingleton(tokens.archiveResourceUseCase, ArchiveResourceUseCase);
   container.registerSingleton(tokens.deleteResourceUseCase, DeleteResourceUseCase);
+  container.registerSingleton(tokens.attachResourceStorageUseCase, AttachResourceStorageUseCase);
+  container.registerSingleton(tokens.detachResourceStorageUseCase, DetachResourceStorageUseCase);
   container.registerSingleton(
     tokens.configureResourceSourceUseCase,
     ConfigureResourceSourceUseCase,
@@ -301,6 +324,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.unsetResourceVariableUseCase, UnsetResourceVariableUseCase);
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.showResourceQueryService, ShowResourceQueryService);
+  container.registerSingleton(tokens.createStorageVolumeUseCase, CreateStorageVolumeUseCase);
+  container.registerSingleton(tokens.renameStorageVolumeUseCase, RenameStorageVolumeUseCase);
+  container.registerSingleton(tokens.deleteStorageVolumeUseCase, DeleteStorageVolumeUseCase);
+  container.registerSingleton(
+    tokens.listStorageVolumesQueryService,
+    ListStorageVolumesQueryService,
+  );
+  container.registerSingleton(tokens.showStorageVolumeQueryService, ShowStorageVolumeQueryService);
   container.registerSingleton(
     tokens.resourceEffectiveConfigQueryService,
     ResourceEffectiveConfigQueryService,

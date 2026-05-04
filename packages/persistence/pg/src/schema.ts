@@ -141,6 +141,34 @@ export interface ResourceVariablesTable {
   updated_at: TimestampColumn;
 }
 
+export interface StorageVolumesTable {
+  id: string;
+  project_id: string;
+  environment_id: string;
+  name: string;
+  slug: string;
+  kind: string;
+  source_path: string | null;
+  description: string | null;
+  backup_relationship: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
+  lifecycle_status: string;
+  created_at: TimestampColumn;
+  deleted_at: NullableUpdatableTimestampColumn;
+}
+
+export interface ResourceStorageAttachmentsTable {
+  id: string;
+  resource_id: string;
+  storage_volume_id: string;
+  destination_path: string;
+  mount_mode: string;
+  attached_at: TimestampColumn;
+}
+
 export interface DeploymentsTable {
   id: string;
   project_id: string;
@@ -367,6 +395,8 @@ export interface Database {
   resources: ResourcesTable;
   environment_variables: EnvironmentVariablesTable;
   resource_variables: ResourceVariablesTable;
+  storage_volumes: StorageVolumesTable;
+  resource_storage_attachments: ResourceStorageAttachmentsTable;
   deployments: DeploymentsTable;
   domain_bindings: DomainBindingsTable;
   certificates: CertificatesTable;
