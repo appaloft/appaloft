@@ -11,6 +11,11 @@ import {
   type CertificateSecretStore,
   type CertificateSummary,
   type Clock,
+  type DependencyResourceDeleteBlocker,
+  type DependencyResourceDeleteSafetyReader,
+  type DependencyResourceReadModel,
+  type DependencyResourceRepository,
+  type DependencyResourceSummary,
   type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentRepository,
@@ -96,6 +101,11 @@ import {
   Resource,
   ResourceByEnvironmentAndSlugSpec,
   ResourceByIdSpec,
+  ResourceInstance,
+  ResourceInstanceByEnvironmentAndSlugSpec,
+  ResourceInstanceByIdSpec,
+  type ResourceInstanceMutationSpec,
+  type ResourceInstanceSelectionSpec,
   type ResourceMutationSpec,
   type ResourceSelectionSpec,
   type Result,
@@ -949,6 +959,151 @@ export class MemoryStorageVolumeReadModel implements StorageVolumeReadModel {
   async countAttachments(context: RepositoryContext, storageVolumeId: string): Promise<number> {
     void context;
     return this.attachments(storageVolumeId).length;
+  }
+}
+
+export class MemoryDependencyResourceRepository implements DependencyResourceRepository {
+  readonly items = new Map<string, ResourceInstance>();
+
+  async upsert(
+    context: RepositoryContext,
+    dependencyResource: ResourceInstance,
+    spec: ResourceInstanceMutationSpec,
+  ): Promise<void> {
+    void context;
+    void spec;
+    const state = dependencyResource.toState();
+    this.items.set(state.id.value, ResourceInstance.rehydrate(state));
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: ResourceInstanceSelectionSpec,
+  ): Promise<ResourceInstance | null> {
+    void context;
+    if (spec instanceof ResourceInstanceByIdSpec) {
+      return this.items.get(spec.id.value) ?? null;
+    }
+
+    if (spec instanceof ResourceInstanceByEnvironmentAndSlugSpec) {
+      for (const dependencyResource of this.items.values()) {
+        if (spec.isSatisfiedBy(dependencyResource)) {
+          return dependencyResource;
+        }
+      }
+    }
+
+    return null;
+  }
+}
+
+export class MemoryDependencyResourceDeleteSafetyReader
+  implements DependencyResourceDeleteSafetyReader
+{
+  private readonly blockers = new Map<string, DependencyResourceDeleteBlocker[]>();
+
+  setBlockers(dependencyResourceId: string, blockers: DependencyResourceDeleteBlocker[]): void {
+    this.blockers.set(dependencyResourceId, blockers);
+  }
+
+  async findBlockers(
+    context: RepositoryContext,
+    input: { dependencyResourceId: string },
+  ): Promise<Result<DependencyResourceDeleteBlocker[]>> {
+    void context;
+    return ok(this.blockers.get(input.dependencyResourceId) ?? []);
+  }
+}
+
+export class MemoryDependencyResourceReadModel implements DependencyResourceReadModel {
+  constructor(
+    private readonly repository: MemoryDependencyResourceRepository,
+    private readonly deleteSafetyReader?: MemoryDependencyResourceDeleteSafetyReader,
+  ) {}
+
+  private toSummary(dependencyResource: ResourceInstance): DependencyResourceSummary {
+    const state = dependencyResource.toState();
+    const blockers = this.deleteSafetyReader
+      ? (this.deleteSafetyReader as MemoryDependencyResourceDeleteSafetyReader).findBlockers
+      : undefined;
+    void blockers;
+    return {
+      id: state.id.value,
+      projectId: state.projectId?.value ?? state.ownerId.value,
+      environmentId: state.environmentId?.value ?? "",
+      name: state.name.value,
+      slug: state.slug?.value ?? state.name.value.toLowerCase(),
+      kind: state.kind.value as DependencyResourceSummary["kind"],
+      sourceMode: state.sourceMode?.value ?? "appaloft-managed",
+      providerKey: state.providerKey.value,
+      providerManaged: state.providerManaged ?? false,
+      ...(state.description ? { description: state.description.value } : {}),
+      lifecycleStatus: state.status.value,
+      ...(state.postgresEndpoint
+        ? {
+            connection: {
+              host: state.postgresEndpoint.host.value,
+              ...(state.postgresEndpoint.port ? { port: state.postgresEndpoint.port.value } : {}),
+              ...(state.postgresEndpoint.databaseName
+                ? { databaseName: state.postgresEndpoint.databaseName.value }
+                : {}),
+              maskedConnection: state.postgresEndpoint.maskedConnection.value,
+              ...(state.connectionSecretRef ? { secretRef: state.connectionSecretRef.value } : {}),
+            },
+          }
+        : {}),
+      bindingReadiness: {
+        status: state.bindingReadiness?.status ?? "not-implemented",
+        ...(state.bindingReadiness?.reason ? { reason: state.bindingReadiness.reason.value } : {}),
+      },
+      ...(state.backupRelationship
+        ? {
+            backupRelationship: {
+              retentionRequired: state.backupRelationship.retentionRequired,
+              ...(state.backupRelationship.reason
+                ? { reason: state.backupRelationship.reason.value }
+                : {}),
+            },
+          }
+        : {}),
+      deleteSafety: {
+        blockers: [],
+      },
+      createdAt: state.createdAt.value,
+      ...(state.deletedAt ? { deletedAt: state.deletedAt.value } : {}),
+    };
+  }
+
+  async list(
+    context: RepositoryContext,
+    input?: { projectId?: string; environmentId?: string; kind?: "postgres" },
+  ): Promise<DependencyResourceSummary[]> {
+    void context;
+    return [...this.repository.items.values()]
+      .filter((dependencyResource) => dependencyResource.toState().status.value !== "deleted")
+      .filter((dependencyResource) =>
+        input?.projectId ? dependencyResource.toState().projectId?.value === input.projectId : true,
+      )
+      .filter((dependencyResource) =>
+        input?.environmentId
+          ? dependencyResource.toState().environmentId?.value === input.environmentId
+          : true,
+      )
+      .filter((dependencyResource) =>
+        input?.kind ? dependencyResource.toState().kind.value === input.kind : true,
+      )
+      .map((dependencyResource) => this.toSummary(dependencyResource));
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: ResourceInstanceSelectionSpec,
+  ): Promise<DependencyResourceSummary | null> {
+    const dependencyResource = await this.repository.findOne(context, spec);
+    if (!dependencyResource || dependencyResource.toState().status.value === "deleted") {
+      return null;
+    }
+    return this.toSummary(dependencyResource);
   }
 }
 

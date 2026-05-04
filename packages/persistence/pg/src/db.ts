@@ -43,6 +43,7 @@ import { processAttemptJournalMigration } from "./migrations/035_process_attempt
 import { domainBindingDeletedStatusMigration } from "./migrations/036_domain_binding_deleted_status";
 import { resourceAccessFailureEvidenceMigration } from "./migrations/037_resource_access_failure_evidence";
 import { storageVolumesMigration } from "./migrations/038_storage_volumes";
+import { dependencyResourcesMigration } from "./migrations/039_dependency_resources";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -175,6 +176,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "036_domain_binding_deleted_status": domainBindingDeletedStatusMigration,
       "037_resource_access_failure_evidence": resourceAccessFailureEvidenceMigration,
       "038_storage_volumes": storageVolumesMigration,
+      "039_dependency_resources": dependencyResourcesMigration,
     };
   }
 }

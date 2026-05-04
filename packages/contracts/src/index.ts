@@ -1015,6 +1015,60 @@ export const storageVolumeSummarySchema = z.object({
   deletedAt: z.string().optional(),
 });
 
+export const dependencyResourceConnectionSummarySchema = z.object({
+  host: z.string(),
+  port: z.number().optional(),
+  databaseName: z.string().optional(),
+  maskedConnection: z.string(),
+  secretRef: z.string().optional(),
+});
+
+export const dependencyResourceBindingReadinessSummarySchema = z.object({
+  status: z.enum(["ready", "blocked", "not-implemented"]),
+  reason: z.string().optional(),
+});
+
+export const dependencyResourceBackupRelationshipSchema = z.object({
+  retentionRequired: z.boolean(),
+  reason: z.string().optional(),
+});
+
+export const dependencyResourceDeleteBlockerSchema = z.object({
+  kind: z.enum([
+    "resource-binding",
+    "backup-relationship",
+    "provider-managed-unsafe",
+    "deployment-snapshot-reference",
+  ]),
+  relatedEntityId: z.string().optional(),
+  relatedEntityType: z.string().optional(),
+  count: z.number().optional(),
+});
+
+export const dependencyResourceSummarySchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  kind: z.literal("postgres"),
+  sourceMode: z.enum(["appaloft-managed", "imported-external"]),
+  providerKey: z.string(),
+  providerManaged: z.boolean(),
+  description: z.string().optional(),
+  lifecycleStatus: z.enum(["provisioning", "ready", "degraded", "deleted"]),
+  connection: dependencyResourceConnectionSummarySchema.optional(),
+  bindingReadiness: dependencyResourceBindingReadinessSummarySchema,
+  backupRelationship: dependencyResourceBackupRelationshipSchema.optional(),
+  deleteSafety: z
+    .object({
+      blockers: z.array(dependencyResourceDeleteBlockerSchema),
+    })
+    .optional(),
+  createdAt: z.string(),
+  deletedAt: z.string().optional(),
+});
+
 export const deploymentResourceInputSchema = z.object({
   name: z.string().min(1),
   kind: z
@@ -1579,6 +1633,22 @@ export const deleteStorageVolumeInputSchema = z.object({
 
 export const deleteStorageVolumeResponseSchema = z.object({
   id: z.string(),
+});
+
+export const dependencyResourceResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const listDependencyResourcesResponseSchema = z.object({
+  schemaVersion: z.literal("dependency-resources.list/v1"),
+  items: z.array(dependencyResourceSummarySchema),
+  generatedAt: z.string(),
+});
+
+export const showDependencyResourceResponseSchema = z.object({
+  schemaVersion: z.literal("dependency-resources.show/v1"),
+  dependencyResource: dependencyResourceSummarySchema,
+  generatedAt: z.string(),
 });
 
 export const defaultAccessDomainPolicyScopeSchema = z.discriminatedUnion("kind", [
@@ -3490,6 +3560,17 @@ export type ResourceStorageAttachmentSummary = z.infer<
   typeof resourceStorageAttachmentSummarySchema
 >;
 export type StorageVolumeSummary = z.infer<typeof storageVolumeSummarySchema>;
+export type DependencyResourceConnectionSummary = z.infer<
+  typeof dependencyResourceConnectionSummarySchema
+>;
+export type DependencyResourceBindingReadinessSummary = z.infer<
+  typeof dependencyResourceBindingReadinessSummarySchema
+>;
+export type DependencyResourceBackupRelationship = z.infer<
+  typeof dependencyResourceBackupRelationshipSchema
+>;
+export type DependencyResourceDeleteBlocker = z.infer<typeof dependencyResourceDeleteBlockerSchema>;
+export type DependencyResourceSummary = z.infer<typeof dependencyResourceSummarySchema>;
 export type ResourceConfigEntry = z.infer<typeof resourceConfigEntrySchema>;
 export type ResourceConfigOverrideSummary = z.infer<typeof resourceConfigOverrideSummarySchema>;
 export type ResourceEffectiveConfig = z.infer<typeof resourceEffectiveConfigSchema>;
@@ -3571,6 +3652,9 @@ export type RenameStorageVolumeInput = z.infer<typeof renameStorageVolumeInputSc
 export type RenameStorageVolumeResponse = z.infer<typeof renameStorageVolumeResponseSchema>;
 export type DeleteStorageVolumeInput = z.infer<typeof deleteStorageVolumeInputSchema>;
 export type DeleteStorageVolumeResponse = z.infer<typeof deleteStorageVolumeResponseSchema>;
+export type DependencyResourceResponse = z.infer<typeof dependencyResourceResponseSchema>;
+export type ListDependencyResourcesResponse = z.infer<typeof listDependencyResourcesResponseSchema>;
+export type ShowDependencyResourceResponse = z.infer<typeof showDependencyResourceResponseSchema>;
 export type DomainBindingSummary = z.infer<typeof domainBindingSummarySchema>;
 export type CreateDomainBindingInput = z.infer<typeof createDomainBindingInputSchema>;
 export type CreateDomainBindingResponse = z.infer<typeof createDomainBindingResponseSchema>;

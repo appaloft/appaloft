@@ -404,6 +404,31 @@ Implemented now:
 - foundational `ResourceInstance`
 - foundational `ResourceBinding`
 
+### Postgres Dependency Resource
+
+Meaning:
+- a project/environment-owned Postgres dependency resource record represented by `ResourceInstance`
+
+Rules:
+- source mode is either `appaloft-managed` or `imported-external`
+- Appaloft-managed Postgres in this slice is provider-neutral control-plane metadata; it does not
+  create provider-native databases, run runtime work, or mutate deployment snapshots
+- imported external Postgres delete removes only the Appaloft control-plane record and must not
+  imply external database deletion
+- connection read models expose only masked endpoint/connection metadata and secret references; raw
+  passwords, tokens, auth headers, cookies, SSH credentials, provider tokens, private keys, and
+  sensitive query parameters must not appear in list/show, events, errors, logs, or snapshots
+- deletion is blocked by active/future ResourceBinding blockers, backup relationship metadata,
+  provider-managed unsafe state, and future deployment snapshot/reference blockers
+- binding readiness is a read-model summary for future bind/unbind; future binding commands must
+  revalidate write-side state
+
+Current scope:
+- Phase 7 baseline under
+  [Postgres Dependency Resource Lifecycle](./specs/033-postgres-dependency-resource-lifecycle/spec.md)
+- Redis, dependency bind/unbind, secret rotation, provider-native provisioning/deletion,
+  backup/restore, and deployment snapshot binding are future Phase 7 work
+
 ### Release Orchestration
 
 Owns:
