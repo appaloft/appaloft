@@ -136,6 +136,18 @@ These rows are governed by
 | RES-ACCESS-DIAG-APPLIED-004 | adapter integration | Evidence capture prefers applied metadata | Renderer captures a failure with supplied `applied-route-context/v1` metadata and a host/path that would otherwise require lookup | Evidence capture records metadata-derived route context without calling hostname/path lookup | Stored envelope includes safe related ids from applied metadata and preserves the original diagnostic code/phase. |
 | RES-ACCESS-DIAG-APPLIED-005 | contract + adapter integration | Applied metadata remains redacted | Applied metadata input is adjacent to query strings, cookies, auth headers, provider raw payload hints, SSH credentials, or remote logs | Proxy preview and evidence capture keep only safe metadata fields | Sensitive query values, auth/cookie headers, private keys, provider raw payloads, and raw remote logs are absent from route views, problem JSON, and stored evidence. |
 
+## Companion/Static Renderer Matrix
+
+These rows are governed by
+[Companion/Static Access Failure Renderer Baseline](../specs/028-companion-static-access-failure-renderer/spec.md).
+
+| Test ID | Preferred automation | Case | Input/read state | Expected query relationship | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| RES-ACCESS-DIAG-STATIC-001 | application unit | Static renderer displays safe envelope | Sanitized `resource-access-failure/v1` diagnostic is rendered without a backend service | No query is dispatched | HTML includes request id, code, category, phase, retriable flag, next action, generated time, and safe affected request metadata. |
+| RES-ACCESS-DIAG-STATIC-002 | application unit | Static renderer preserves route context | Diagnostic includes safe route context from `applied-route-context/v1` or existing enrichment | No route repair or lookup is triggered by rendering | HTML includes diagnostic id, resource/deployment/domain/server/destination/route ids, route source/status, host, path prefix, and provider key when safe. |
+| RES-ACCESS-DIAG-STATIC-003 | runtime adapter integration | Static-site runtime packages renderer asset | Appaloft generates an adapter-owned static-site Docker build | No backend renderer URL is required | Build context includes a static renderer asset under `/.appaloft/resource-access-failure` and static server config serves that path before app-route fallback. |
+| RES-ACCESS-DIAG-STATIC-004 | application unit + runtime adapter integration | Static renderer remains redacted and read-only | Diagnostic-adjacent data contains secrets, private keys, auth headers, cookies, sensitive query values, provider raw payload hints, SSH credentials, or raw remote logs | Rendering and packaging do not persist or mutate Appaloft state | Rendered HTML and packaged assets omit unsafe adjacent data and do not trigger repair, redeploy, rollback, route mutation, or provider-native raw payload parsing. |
+
 ## Shared Access Diagnostic Contract Matrix
 
 These rows are governed by
@@ -198,12 +210,15 @@ Executable tests now cover:
 - `RES-ACCESS-DIAG-APPLIED-005` through contract and HTTP evidence redaction coverage;
 - `ACCESS-DIAG-005` through resource diagnostic summary and resource health application tests that
   keep cross-surface source errors visible while redacting unsafe adjacent text;
+- `RES-ACCESS-DIAG-STATIC-001` through shared application access-failure renderer tests;
+- `RES-ACCESS-DIAG-STATIC-002` through application renderer route-context preservation tests;
+- `RES-ACCESS-DIAG-STATIC-003` through runtime static-site Docker build asset packaging tests;
+- `RES-ACCESS-DIAG-STATIC-004` through application renderer and runtime packaging redaction tests;
 - `EDGE-PROXY-PROVIDER-010` as the Traefik provider contract row.
 
-Remaining gaps include broader classification rows, a companion/static renderer path for one-shot
-CLI remote SSH execution, real Traefik end-to-end error-middleware probing, provider-native
-metadata lookup beyond existing read models, a Web lookup form, and redaction rows beyond the
-current renderer-level assertions.
+Remaining gaps include broader classification rows, real Traefik end-to-end error-middleware
+probing, provider-native metadata lookup beyond existing read models, a Web lookup form, and
+redaction rows beyond the current renderer-level assertions.
 
 ## Open Questions
 

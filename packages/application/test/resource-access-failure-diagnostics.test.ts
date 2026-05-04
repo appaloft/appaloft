@@ -6,6 +6,8 @@ import {
   classifyResourceAccessFailure,
   parseResourceAccessFailureCode,
   parseResourceAccessFailureSignal,
+  renderResourceAccessFailureDiagnosticHtml,
+  renderResourceAccessFailureStaticRendererAsset,
   resourceAccessFailureCodeFromHttpStatus,
 } from "../src";
 
@@ -133,5 +135,72 @@ describe("resource access failure diagnostics", () => {
     );
     expect(resourceAccessFailureCodeFromHttpStatus(504)).toBe("resource_access_upstream_timeout");
     expect(resourceAccessFailureCodeFromHttpStatus(418)).toBe("resource_access_unknown");
+  });
+
+  test("[RES-ACCESS-DIAG-STATIC-001][RES-ACCESS-DIAG-STATIC-002] renders a static-safe diagnostic with route context", () => {
+    const diagnostic = classifyResourceAccessFailure({
+      signal: "upstream-timeout",
+      requestId: "req_static_timeout",
+      generatedAt: "2026-05-04T10:00:00.000Z",
+      affected: {
+        url: "https://web.example.test/private?token=secret-token",
+        hostname: "web.example.test",
+        path: "/private?token=secret-token",
+        method: "get",
+      },
+      route: {
+        host: "web.example.test",
+        pathPrefix: "/private",
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+        domainBindingId: "dbnd_web",
+        serverId: "srv_web",
+        destinationId: "dst_web",
+        providerKey: "traefik",
+        routeId: "route_web",
+        diagnosticId: "diag_route_web",
+        routeSource: "server-applied",
+        routeStatus: "applied",
+      },
+    });
+
+    const html = renderResourceAccessFailureDiagnosticHtml(diagnostic, {
+      mode: "static",
+    });
+
+    expect(html).toContain("req_static_timeout");
+    expect(html).toContain("diag_route_web");
+    expect(html).toContain("resource_access_upstream_timeout");
+    expect(html).toContain("timeout");
+    expect(html).toContain("upstream-connection");
+    expect(html).toContain("true");
+    expect(html).toContain("check-health");
+    expect(html).toContain("server-applied");
+    expect(html).toContain("res_web");
+    expect(html).toContain("dep_web");
+    expect(html).toContain("dbnd_web");
+    expect(html).toContain("srv_web");
+    expect(html).toContain("dst_web");
+    expect(html).toContain("route_web");
+    expect(html).toContain("web.example.test");
+    expect(html).toContain("/private");
+    expect(html).not.toContain("secret-token");
+  });
+
+  test("[RES-ACCESS-DIAG-STATIC-004] static renderer asset omits unsafe adjacent payloads and mutation affordances", () => {
+    const asset = renderResourceAccessFailureStaticRendererAsset();
+
+    expect(asset).toContain("resource-access-failure/v1");
+    expect(asset).toContain("requestId");
+    expect(asset).toContain("diagnosticId");
+    expect(asset).toContain("nextAction");
+    expect(asset).not.toContain("Authorization");
+    expect(asset).not.toContain("Cookie");
+    expect(asset).not.toContain("PRIVATE KEY");
+    expect(asset).not.toContain("ssh://");
+    expect(asset).not.toContain("providerRawPayload");
+    expect(asset).not.toContain("redeploy");
+    expect(asset).not.toContain("rollback");
+    expect(asset).not.toContain("repair route");
   });
 });

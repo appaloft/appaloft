@@ -370,6 +370,11 @@ Boundary rule:
   without exposing provider raw payloads, secrets, SSH credentials, auth headers, cookies, sensitive
   query strings, or remote raw logs. It is read-model/adapter metadata, not `Resource`,
   `Deployment`, `DomainBinding`, or `DeploymentTarget` aggregate state.
+- companion/static access failure rendering is provider-neutral read/adapter output over an already
+  sanitized `resource-access-failure/v1` envelope. Static runtime packaging may carry a renderer
+  asset for one-shot CLI or SSH deployments without a reachable Appaloft backend service, but it
+  does not create aggregate state, route repair state, provider-native metadata storage, or a new
+  public operation.
 
 ### Dependency Resources
 

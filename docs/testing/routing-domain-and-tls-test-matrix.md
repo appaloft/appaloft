@@ -243,6 +243,7 @@ Then:
 | ROUTE-TLS-BOUNDARY-005 | integration | Server-applied config domain route | Pure CLI/SSH config deploy applies `access.domains[]` through target proxy state | No managed `DomainBinding` or `Certificate` aggregate is created; route state is target-local until a control-plane adoption flow maps it explicitly. |
 | ROUTE-TLS-BOUNDARY-006 | integration | Server-applied canonical redirect alias | Pure CLI/SSH config deploy applies `redirectTo` alias route state through target proxy state | No managed `DomainBinding`, `Certificate`, or route-ownership aggregate is created for the alias; route state is target-local until a control-plane adoption flow maps it explicitly. |
 | ROUTE-TLS-BOUNDARY-007 | integration | Domain binding delete does not revoke/delete certificate | Active certificate is attached to a domain binding | `domain-bindings.delete` is attempted | Delete is blocked by active certificate state; no `certificate-revoked` or `certificate-deleted` event is recorded. |
+| ROUTE-TLS-BOUNDARY-008 | integration | Static access failure renderer packaging | Appaloft packages an adapter-owned static-site runtime with generated access or server-applied routes | Static renderer asset is included for `/.appaloft/resource-access-failure` | No managed `DomainBinding`, `Certificate`, route repair, redeploy, rollback, or provider-native metadata parsing is introduced. |
 
 ## Entry Surface Matrix
 
@@ -380,6 +381,12 @@ challenge token store.
 Current tests cover `ROUTE-TLS-PROVIDER-001`, `ROUTE-TLS-PROVIDER-002`, and
 `ROUTE-TLS-PROVIDER-003` with a fake ACME client boundary, plus existing shell e2e coverage for
 `ROUTE-TLS-PROVIDER-004`.
+
+`ROUTE-TLS-BOUNDARY-008` is covered by the companion/static access failure renderer baseline. The
+static renderer asset is packaged in adapter-owned static-site Docker builds so one-shot CLI or SSH
+static runtimes can display a safe `resource-access-failure/v1` envelope without a reachable
+backend renderer service. The packaging does not create managed domain/certificate aggregates and
+does not add route repair, redeploy, rollback, or provider-native raw metadata parsing.
 
 Current edge-proxy provider/runtime tests cover provider-owned proxy reload plans for automatic
 Docker-label providers and command-based reload execution/failure through
