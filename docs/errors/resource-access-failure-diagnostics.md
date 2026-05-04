@@ -187,6 +187,12 @@ no new public error code, no new category, and no new phase. Static rendering ca
 safe fields supplied in the `resource-access-failure/v1` envelope; backend evidence lookup and
 automatic route context lookup remain existing read behavior when a backend renderer is reachable.
 
+The applied route context lookup baseline adds no new public error code, category, or phase. Lookup
+misses keep the original safe diagnostic envelope without unrelated route ids, while found context
+may populate the same safe route fields from `applied-route-context/v1` diagnostic id, route id,
+resource id, deployment id, host, or path metadata. The lookup remains read-only and must not
+trigger route repair, redeploy, rollback, provider-native raw metadata parsing, or route mutation.
+
 ## Open Questions
 
 - Should the immediate public page include a short owner login link when the request host maps to a
