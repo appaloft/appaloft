@@ -469,6 +469,13 @@ export const resourceConfigEntrySchema = environmentVariableSchema.extend({
   updatedAt: z.string().optional(),
 });
 
+export const resourceConfigOverrideSummarySchema = z.object({
+  key: z.string(),
+  exposure: z.enum(["build-time", "runtime"]),
+  selectedScope: z.string(),
+  overriddenScopes: z.array(z.string()),
+});
+
 export const environmentSummarySchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -1264,6 +1271,14 @@ export const setResourceVariableInputSchema = z.object({
   isSecret: z.boolean().optional(),
 });
 
+export const importResourceVariablesInputSchema = z.object({
+  resourceId: z.string().min(1),
+  content: z.string().min(1),
+  exposure: z.enum(["build-time", "runtime"]),
+  secretKeys: z.array(z.string().min(1)).default([]),
+  plainKeys: z.array(z.string().min(1)).default([]),
+});
+
 export const unsetResourceVariableInputSchema = z.object({
   resourceId: z.string().min(1),
   key: z.string().min(1),
@@ -1276,6 +1291,7 @@ export const resourceEffectiveConfigSchema = z.object({
   environmentId: z.string(),
   ownedEntries: z.array(resourceConfigEntrySchema),
   effectiveEntries: z.array(resourceConfigEntrySchema),
+  overrides: z.array(resourceConfigOverrideSummarySchema).default([]),
   precedence: z.array(z.string()),
   generatedAt: z.string(),
 });
@@ -1291,6 +1307,38 @@ export const environmentEffectivePrecedenceSchema = z.object({
 });
 
 export const setResourceVariableResponseSchema = z.null();
+export const importedResourceVariableEntrySchema = z.object({
+  key: z.string(),
+  value: z.string(),
+  exposure: z.enum(["build-time", "runtime"]),
+  kind: z.enum(["plain-config", "secret"]),
+  isSecret: z.boolean(),
+  action: z.enum(["created", "replaced"]),
+  sourceLine: z.number().int().positive(),
+});
+
+export const resourceVariableDuplicateOverrideSchema = z.object({
+  key: z.string(),
+  exposure: z.enum(["build-time", "runtime"]),
+  firstLine: z.number().int().positive(),
+  lastLine: z.number().int().positive(),
+  rule: z.literal("last-wins"),
+});
+
+export const resourceVariableExistingOverrideSchema = z.object({
+  key: z.string(),
+  exposure: z.enum(["build-time", "runtime"]),
+  previousScope: z.literal("resource"),
+  rule: z.literal("resource-entry-replaced"),
+});
+
+export const importResourceVariablesResponseSchema = z.object({
+  resourceId: z.string(),
+  importedEntries: z.array(importedResourceVariableEntrySchema),
+  duplicateOverrides: z.array(resourceVariableDuplicateOverrideSchema),
+  existingOverrides: z.array(resourceVariableExistingOverrideSchema),
+});
+
 export const unsetResourceVariableResponseSchema = z.null();
 export const resourceEffectiveConfigResponseSchema = resourceEffectiveConfigSchema;
 
@@ -3305,6 +3353,7 @@ export type ResourceHealthSummary = z.infer<typeof resourceHealthSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type ResourceDetail = z.infer<typeof resourceDetailSchema>;
 export type ResourceConfigEntry = z.infer<typeof resourceConfigEntrySchema>;
+export type ResourceConfigOverrideSummary = z.infer<typeof resourceConfigOverrideSummarySchema>;
 export type ResourceEffectiveConfig = z.infer<typeof resourceEffectiveConfigSchema>;
 export type ShowResourceInput = z.infer<typeof showResourceInputSchema>;
 export type ShowResourceResponse = z.infer<typeof showResourceResponseSchema>;
@@ -3332,6 +3381,8 @@ export type ConfigureResourceSourceInput = z.infer<typeof configureResourceSourc
 export type ConfigureResourceSourceResponse = z.infer<typeof configureResourceSourceResponseSchema>;
 export type SetResourceVariableInput = z.infer<typeof setResourceVariableInputSchema>;
 export type SetResourceVariableResponse = z.infer<typeof setResourceVariableResponseSchema>;
+export type ImportResourceVariablesInput = z.infer<typeof importResourceVariablesInputSchema>;
+export type ImportResourceVariablesResponse = z.infer<typeof importResourceVariablesResponseSchema>;
 export type UnsetResourceVariableInput = z.infer<typeof unsetResourceVariableInputSchema>;
 export type UnsetResourceVariableResponse = z.infer<typeof unsetResourceVariableResponseSchema>;
 export type ResourceEffectiveConfigResponse = z.infer<typeof resourceEffectiveConfigResponseSchema>;

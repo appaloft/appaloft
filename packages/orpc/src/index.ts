@@ -77,8 +77,10 @@ import {
   type ExecutionContextFactory,
   environmentEffectivePrecedenceQueryInputSchema,
   ImportCertificateCommand,
+  ImportResourceVariablesCommand,
   IssueOrRenewCertificateCommand,
   importCertificateCommandInputSchema,
+  importResourceVariablesCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
   ListCertificatesQuery,
   ListDefaultAccessDomainPoliciesQuery,
@@ -219,6 +221,7 @@ import {
   environmentEffectivePrecedenceResponseSchema,
   environmentSummarySchema,
   importCertificateResponseSchema,
+  importResourceVariablesResponseSchema,
   issueOrRenewCertificateResponseSchema,
   listCertificatesResponseSchema,
   listDefaultAccessDomainPoliciesResponseSchema,
@@ -440,6 +443,10 @@ export const apiRouteDescriptions = {
   ),
   setResourceVariable: routeDescription(
     "Sets one resource-scoped variable or secret override.",
+    "environment.variable-precedence",
+  ),
+  importResourceVariables: routeDescription(
+    "Imports pasted .env content into resource-scoped variables and secrets.",
     "environment.variable-precedence",
   ),
   unsetResourceVariable: routeDescription(
@@ -1522,6 +1529,19 @@ export const setResourceVariableProcedure = base
     executeCommand(context, SetResourceVariableCommand.create(input)),
   );
 
+export const importResourceVariablesProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/variables/import",
+    description: apiRouteDescriptions.importResourceVariables,
+    successStatus: 200,
+  })
+  .input(importResourceVariablesCommandInputSchema)
+  .output(importResourceVariablesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ImportResourceVariablesCommand.create(input)),
+  );
+
 export const unsetResourceVariableProcedure = base
   .route({
     method: "DELETE",
@@ -2225,6 +2245,7 @@ export const appaloftOrpcRouter = {
     configureRuntime: configureResourceRuntimeProcedure,
     configureSource: configureResourceSourceProcedure,
     setVariable: setResourceVariableProcedure,
+    importVariables: importResourceVariablesProcedure,
     unsetVariable: unsetResourceVariableProcedure,
     effectiveConfig: resourceEffectiveConfigProcedure,
     diagnosticSummary: resourceDiagnosticSummaryProcedure,

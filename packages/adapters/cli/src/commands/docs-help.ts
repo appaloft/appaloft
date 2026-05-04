@@ -166,6 +166,10 @@ export const cliCommandDescriptions = {
     "Set a resource-scoped variable override",
     "environment.variable-precedence",
   ),
+  resourceImportVariables: withDocs(
+    "Import pasted .env variables into one resource",
+    "environment.variable-precedence",
+  ),
   resourceUnsetVariable: withDocs(
     "Unset a resource-scoped variable override",
     "environment.variable-precedence",

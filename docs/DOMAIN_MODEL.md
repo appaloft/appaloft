@@ -322,6 +322,9 @@ Boundary rule:
 - resource detail is the owner-scoped console surface for new deployment, deployment history,
   source/runtime/network profile, generated access routes, proxy configuration, application runtime
   logs, diagnostic summary, domain/TLS, and resource-specific configuration actions
+- resource-scoped configuration includes one-entry set/unset and `.env` import operations. `.env`
+  import is application command parsing over the same `Resource` override layer, not a separate
+  aggregate, secret backend, repository config identity source, or deployment command field.
 - application runtime log observation belongs to the resource surface and is performed through an
   application-layer runtime log reader port. Docker/Compose is the v1 deployment-backed reader
   substrate under ADR-021; future PM2, systemd, file-tail, and provider log mechanisms are adapter
@@ -343,6 +346,10 @@ Boundary rule:
 - support/debug diagnostics are exposed through a resource-scoped read/query view such as
   `ResourceDiagnosticSummary`; it composes read-model state and safe adapter/system context, and is
   not `Resource` aggregate state
+- effective resource configuration is a resource-scoped read/query view over `Environment` and
+  `Resource` configuration entries. It may expose masked values and safe override metadata such as
+  winning scope and overridden scopes, but it must not expose plaintext secrets, mutate aggregates,
+  or become a deployment-owned configuration model.
 - access/proxy/log/health failure visibility belongs to application read/query surfaces. Source
   failures may preserve stable source, code, category, phase, retryability, and safe related ids, but
   copyable diagnostic and health payloads must normalize unsafe adjacent message text such as auth

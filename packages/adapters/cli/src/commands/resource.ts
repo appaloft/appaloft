@@ -7,6 +7,7 @@ import {
   ConfigureResourceSourceCommand,
   CreateResourceCommand,
   DeleteResourceCommand,
+  ImportResourceVariablesCommand,
   ListResourcesQuery,
   OpenTerminalSessionCommand,
   ResourceAccessFailureEvidenceLookupQuery,
@@ -143,6 +144,7 @@ const variableKindOption = Options.choice("kind", variableKinds).pipe(
   Options.withDefault("plain-config"),
 );
 const variableSecretOption = Options.boolean("secret").pipe(Options.withDefault(false));
+const importContentOption = Options.text("content");
 
 const listCommand = EffectCommand.make(
   "list",
@@ -303,6 +305,23 @@ const setVariableCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceSetVariable));
+
+const importVariablesCommand = EffectCommand.make(
+  "import-variables",
+  {
+    resourceId: resourceIdArg,
+    content: importContentOption,
+    exposure: variableExposureOption,
+  },
+  ({ content, exposure, resourceId }) =>
+    runCommand(
+      ImportResourceVariablesCommand.create({
+        resourceId,
+        content,
+        exposure,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceImportVariables));
 
 const unsetVariableCommand = EffectCommand.make(
   "unset-variable",
@@ -698,6 +717,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     archiveCommand,
     deleteCommand,
     setVariableCommand,
+    importVariablesCommand,
     unsetVariableCommand,
     terminalCommand,
     logsCommand,

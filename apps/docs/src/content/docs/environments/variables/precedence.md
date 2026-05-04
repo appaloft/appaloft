@@ -16,6 +16,7 @@ relatedOperations:
   - environments.unset-variable
   - environments.effective-precedence
   - resources.set-variable
+  - resources.import-variables
   - resources.unset-variable
   - resources.effective-config
 sidebar:
@@ -65,7 +66,7 @@ CLI 适合 `set`、`unset`、`effective-precedence`、`effective-config`、`diff
 HTTP API 应返回变量 key、作用域、是否 secret、来源层级和 masked value。API 不应返回明文 secret。
 
 `environments.effective-precedence` 用于检查单个环境在资源覆盖之前会贡献的有效变量。
-`resources.effective-config` 用于检查资源级变量覆盖环境变量之后的部署输入视图。
+`resources.import-variables` 用于把粘贴的 `.env` 内容导入单个资源；重复 key 采用最后一行生效，并在结果里报告覆盖信息。`resources.effective-config` 用于检查资源级变量覆盖环境变量之后的部署输入视图，并显示安全的来源/覆盖摘要。
 
 <h2 id="environment-variable-recovery">常见问题</h2>
 

@@ -990,6 +990,60 @@ export class Resource extends AggregateRoot<ResourceState> {
       });
   }
 
+  importVariables(input: {
+    entries: Array<{
+      key: ConfigKey;
+      value: ConfigValueText;
+      kind: VariableKindValue;
+      exposure: VariableExposureValue;
+      isSecret: boolean;
+    }>;
+    updatedAt: UpdatedAt;
+  }): Result<void> {
+    const active = this.rejectInactiveResource("resources.import-variables");
+    if (active.isErr()) {
+      return active;
+    }
+
+    const configSet = EnvironmentConfigSet.rehydrate(this.state.variables.toState());
+    const nextEntries: ResourceVariableState[] = [];
+
+    for (const entry of input.entries) {
+      const setResult = configSet.setEntry({
+        key: entry.key,
+        value: entry.value,
+        kind: entry.kind,
+        exposure: entry.exposure,
+        scope: ConfigScopeValue.rehydrate("resource"),
+        isSecret: entry.isSecret,
+        updatedAt: input.updatedAt,
+      });
+
+      if (setResult.isErr()) {
+        return err(setResult.error);
+      }
+
+      nextEntries.push(setResult.value.toState());
+    }
+
+    this.state.variables = configSet;
+
+    for (const nextEntry of nextEntries) {
+      this.recordDomainEvent("resource-variable-set", input.updatedAt, {
+        resourceId: this.state.id.value,
+        projectId: this.state.projectId.value,
+        environmentId: this.state.environmentId.value,
+        variableKey: nextEntry.key.value,
+        variableExposure: nextEntry.exposure.value,
+        variableKind: nextEntry.kind.value,
+        isSecret: nextEntry.isSecret,
+        configuredAt: input.updatedAt.value,
+      });
+    }
+
+    return ok(undefined);
+  }
+
   materializeEffectiveEnvironmentSnapshot(input: {
     environmentId: EnvironmentId;
     snapshotId: EnvironmentSnapshotId;
