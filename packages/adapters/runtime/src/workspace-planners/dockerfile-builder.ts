@@ -6,7 +6,10 @@ import {
 import { pinnedBunAlpineImage } from "./bun";
 import {
   defaultStaticServerImage,
+  renderStaticAccessFailureRendererAsset,
   renderStaticServerConfig,
+  staticAccessFailureRendererAssetPath,
+  staticAccessFailureRendererRootPath,
   staticServerConfigAssetPath,
   staticServerConfigPath,
   staticServerRoot,
@@ -267,6 +270,10 @@ export function renderStaticSiteDockerBuild(
       relativePath: staticServerConfigAssetPath,
       contents: renderStaticServerConfig(),
     },
+    {
+      relativePath: staticAccessFailureRendererAssetPath,
+      contents: renderStaticAccessFailureRendererAsset(),
+    },
   ] as const;
 
   if (!context.installCommand && !context.buildCommand) {
@@ -275,6 +282,7 @@ export function renderStaticSiteDockerBuild(
         .from(serverImage)
         .copyJson(publishDirectorySource, staticServerRoot)
         .copyJson(staticServerConfigAssetPath, staticServerConfigPath)
+        .copyJson(staticAccessFailureRendererAssetPath, staticAccessFailureRendererRootPath)
         .expose(80)
         .cmdExec(["nginx", "-g", "daemon off;"])
         .build(),
@@ -294,6 +302,7 @@ export function renderStaticSiteDockerBuild(
       .from(serverImage)
       .copyJson(`/app/${publishDirectorySource}`, staticServerRoot, { from: "build" })
       .copyJson(staticServerConfigAssetPath, staticServerConfigPath)
+      .copyJson(staticAccessFailureRendererAssetPath, staticAccessFailureRendererRootPath)
       .expose(80)
       .cmdExec(["nginx", "-g", "daemon off;"])
       .build(),

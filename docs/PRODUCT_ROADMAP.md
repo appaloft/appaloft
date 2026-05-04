@@ -722,6 +722,20 @@ Phase 6 verification notes from 2026-05-04 failure visibility baseline:
   middleware e2e. The broader `resource-access-failure` row remains open for real edge,
   companion/static renderer, provider-native metadata lookup, and Web lookup form work.
 
+Phase 6 verification notes from 2026-05-04 companion/static access failure renderer baseline:
+
+- The companion/static renderer baseline adds shared application rendering helpers and packages a
+  provider-neutral static renderer asset into adapter-owned static-site Docker builds so one-shot
+  CLI/SSH static runtimes can render safe `resource-access-failure/v1` diagnostics without a
+  reachable backend renderer service.
+- The renderer preserves request id, code, category, phase, retryability, next action, safe
+  affected request fields, and safe route context including `applied-route-context/v1` diagnostic
+  ids when supplied.
+- The slice adds no public operation, no public schema field, no Web lookup form, no route
+  repair/redeploy/rollback behavior, no provider-native raw metadata parsing, and no real Traefik
+  middleware e2e. The broader `resource-access-failure` row remains open for real edge,
+  provider-native metadata lookup, and Web lookup form work.
+
 Exit criteria:
 
 - [ ] A deployed HTTP app keeps exposing generated or configured access through
