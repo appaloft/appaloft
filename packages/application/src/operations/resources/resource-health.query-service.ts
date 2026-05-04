@@ -45,6 +45,7 @@ import {
 import { type ListResourcesQueryService } from "./list-resources.query-service";
 import { type ResourceHealthQuery } from "./resource-health.query";
 import { selectedRouteIntentStatus } from "./route-intent-status";
+import { sanitizeFailureMessage } from "./safe-diagnostic-message";
 
 type DeploymentTerminalStatus = "succeeded" | "failed" | "canceled" | "rolled-back";
 
@@ -101,6 +102,8 @@ function sourceError(input: {
   relatedState?: string;
   message?: string;
 }): ResourceHealthSourceError {
+  const safeMessage = input.message ? sanitizeFailureMessage(input.message).value : undefined;
+
   return {
     source: input.source,
     code: input.code,
@@ -109,7 +112,7 @@ function sourceError(input: {
     retriable: input.retriable,
     ...(input.relatedEntityId ? { relatedEntityId: input.relatedEntityId } : {}),
     ...(input.relatedState ? { relatedState: input.relatedState } : {}),
-    ...(input.message ? { message: input.message } : {}),
+    ...(safeMessage ? { message: safeMessage } : {}),
   };
 }
 
@@ -734,6 +737,8 @@ function positiveIntegerFromString(raw: string | undefined): number | undefined 
 }
 
 function checkFromProbeResult(result: ResourceHealthProbeResult): ResourceHealthCheck {
+  const message = result.message ? sanitizeFailureMessage(result.message).value : undefined;
+
   return {
     name: result.name,
     target: result.target,
@@ -741,7 +746,7 @@ function checkFromProbeResult(result: ResourceHealthProbeResult): ResourceHealth
     observedAt: result.observedAt,
     durationMs: result.durationMs,
     ...(result.statusCode ? { statusCode: result.statusCode } : {}),
-    ...(result.message ? { message: result.message } : {}),
+    ...(message ? { message } : {}),
     ...(result.reasonCode ? { reasonCode: result.reasonCode } : {}),
     ...(typeof result.retriable === "boolean" ? { retriable: result.retriable } : {}),
     ...(result.metadata ? { metadata: result.metadata } : {}),
@@ -943,12 +948,15 @@ export class ResourceHealthQueryService {
               reasonCode: "resource_health_check_passed",
             };
           } else {
+            const message = probeResult.value.message
+              ? sanitizeFailureMessage(probeResult.value.message).value
+              : undefined;
             runtime = {
               ...runtime,
               health: "unhealthy",
               reasonCode: probeResult.value.reasonCode ?? "resource_health_check_failed",
               observedAt: probeResult.value.observedAt,
-              ...(probeResult.value.message ? { message: probeResult.value.message } : {}),
+              ...(message ? { message } : {}),
             };
             sourceErrors.push(
               sourceError({
@@ -958,7 +966,7 @@ export class ResourceHealthQueryService {
                 phase: "health-check-execution",
                 retriable: probeResult.value.retriable ?? true,
                 relatedEntityId: resource.id,
-                ...(probeResult.value.message ? { message: probeResult.value.message } : {}),
+                ...(message ? { message } : {}),
               }),
             );
           }
@@ -1026,7 +1034,9 @@ export class ResourceHealthQueryService {
                 phase: "public-access-observation",
                 retriable: probeResult.value.retriable ?? true,
                 relatedEntityId: resource.id,
-                ...(probeResult.value.message ? { message: probeResult.value.message } : {}),
+                ...(probeResult.value.message
+                  ? { message: sanitizeFailureMessage(probeResult.value.message).value }
+                  : {}),
               }),
             );
           }
