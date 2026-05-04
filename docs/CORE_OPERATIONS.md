@@ -299,12 +299,26 @@ Phase 7 storage operations:
 | Attach storage to resource | Command | `resources.attach-storage` | `AttachResourceStorageCommand` | `AttachResourceStorageCommandInput` | `appaloft resource storage attach <resourceId> <storageVolumeId> --destination-path <path>` | `POST /api/resources/{resourceId}/storage-attachments` |
 | Detach storage from resource | Command | `resources.detach-storage` | `DetachResourceStorageCommand` | `DetachResourceStorageCommandInput` | `appaloft resource storage detach <resourceId> <attachmentId>` | `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` |
 
+Phase 7 Postgres dependency resource operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| Provision Postgres dependency resource | Command | `dependency-resources.provision-postgres` | `ProvisionPostgresDependencyResourceCommand` | `ProvisionPostgresDependencyResourceCommandInput` | `appaloft dependency postgres provision` | `POST /api/dependency-resources/postgres/provision` |
+| Import Postgres dependency resource | Command | `dependency-resources.import-postgres` | `ImportPostgresDependencyResourceCommand` | `ImportPostgresDependencyResourceCommandInput` | `appaloft dependency postgres import` | `POST /api/dependency-resources/postgres/import` |
+| List dependency resources | Query | `dependency-resources.list` | `ListDependencyResourcesQuery` | `ListDependencyResourcesQueryInput` | `appaloft dependency list` | `GET /api/dependency-resources` |
+| Show dependency resource | Query | `dependency-resources.show` | `ShowDependencyResourceQuery` | `ShowDependencyResourceQueryInput` | `appaloft dependency show <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}` |
+| Rename dependency resource | Command | `dependency-resources.rename` | `RenameDependencyResourceCommand` | `RenameDependencyResourceCommandInput` | `appaloft dependency rename <dependencyResourceId> --name <name>` | `POST /api/dependency-resources/{dependencyResourceId}/rename` |
+| Delete dependency resource | Command | `dependency-resources.delete` | `DeleteDependencyResourceCommand` | `DeleteDependencyResourceCommandInput` | `appaloft dependency delete <dependencyResourceId>` | `DELETE /api/dependency-resources/{dependencyResourceId}` |
+
 Current boundary:
 - resources are persisted and can be listed by project or environment
 - deployment creation resolves or bootstraps a resource and destination before creating the
   deployment record
 - provider-backed dependency resources remain `ResourceInstance`; they are not the same aggregate
   as project resources
+- Postgres dependency resources are provider-neutral `ResourceInstance` records in this slice.
+  Appaloft-managed Postgres records do not create provider-native databases yet, imported external
+  Postgres delete removes only Appaloft's record, and list/show output masks connection secrets.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).

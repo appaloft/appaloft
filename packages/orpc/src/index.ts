@@ -55,6 +55,7 @@ import {
   createStorageVolumeCommandInputSchema,
   DeactivateServerCommand,
   DeleteCertificateCommand,
+  DeleteDependencyResourceCommand,
   DeleteDomainBindingCommand,
   DeleteResourceCommand,
   DeleteServerCommand,
@@ -70,6 +71,7 @@ import {
   DiffEnvironmentsQuery,
   deactivateServerCommandInputSchema,
   deleteCertificateCommandInputSchema,
+  deleteDependencyResourceCommandInputSchema,
   deleteDomainBindingCommandInputSchema,
   deleteResourceCommandInputSchema,
   deleteServerCommandInputSchema,
@@ -85,13 +87,16 @@ import {
   type ExecutionContextFactory,
   environmentEffectivePrecedenceQueryInputSchema,
   ImportCertificateCommand,
+  ImportPostgresDependencyResourceCommand,
   ImportResourceVariablesCommand,
   IssueOrRenewCertificateCommand,
   importCertificateCommandInputSchema,
+  importPostgresDependencyResourceCommandInputSchema,
   importResourceVariablesCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
   ListCertificatesQuery,
   ListDefaultAccessDomainPoliciesQuery,
+  ListDependencyResourcesQuery,
   ListDeploymentsQuery,
   ListDomainBindingsQuery,
   ListEnvironmentsQuery,
@@ -107,6 +112,7 @@ import {
   LockEnvironmentCommand,
   listCertificatesQueryInputSchema,
   listDefaultAccessDomainPoliciesQueryInputSchema,
+  listDependencyResourcesQueryInputSchema,
   listDeploymentsQueryInputSchema,
   listDomainBindingsQueryInputSchema,
   listEnvironmentsQueryInputSchema,
@@ -119,10 +125,13 @@ import {
   OpenTerminalSessionCommand,
   openTerminalSessionCommandInputSchema,
   PromoteEnvironmentCommand,
+  ProvisionPostgresDependencyResourceCommand,
   promoteEnvironmentCommandInputSchema,
+  provisionPostgresDependencyResourceCommandInputSchema,
   type Query,
   type QueryBus,
   RegisterServerCommand,
+  RenameDependencyResourceCommand,
   RenameEnvironmentCommand,
   RenameProjectCommand,
   RenameServerCommand,
@@ -141,6 +150,7 @@ import {
   RevokeCertificateCommand,
   RotateSshCredentialCommand,
   registerServerCommandInputSchema,
+  renameDependencyResourceCommandInputSchema,
   renameEnvironmentCommandInputSchema,
   renameProjectCommandInputSchema,
   renameServerCommandInputSchema,
@@ -159,6 +169,7 @@ import {
   SetResourceVariableCommand,
   ShowCertificateQuery,
   ShowDefaultAccessDomainPolicyQuery,
+  ShowDependencyResourceQuery,
   ShowDeploymentQuery,
   ShowDomainBindingQuery,
   ShowEnvironmentQuery,
@@ -175,6 +186,7 @@ import {
   setResourceVariableCommandInputSchema,
   showCertificateQueryInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
+  showDependencyResourceQueryInputSchema,
   showDeploymentQueryInputSchema,
   showDomainBindingQueryInputSchema,
   showEnvironmentQueryInputSchema,
@@ -227,6 +239,7 @@ import {
   deleteServerResponseSchema,
   deleteSshCredentialResponseSchema,
   deleteStorageVolumeResponseSchema,
+  dependencyResourceResponseSchema,
   deploymentEventStreamEnvelopeSchema,
   deploymentEventStreamResponseSchema,
   deploymentEventStreamStreamResponseSchema,
@@ -243,6 +256,7 @@ import {
   issueOrRenewCertificateResponseSchema,
   listCertificatesResponseSchema,
   listDefaultAccessDomainPoliciesResponseSchema,
+  listDependencyResourcesResponseSchema,
   listDeploymentsResponseSchema,
   listDomainBindingsResponseSchema,
   listEnvironmentsResponseSchema,
@@ -278,6 +292,7 @@ import {
   setResourceVariableResponseSchema,
   showCertificateResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
+  showDependencyResourceResponseSchema,
   showDeploymentResponseSchema,
   showDomainBindingResponseSchema,
   showOperatorWorkResponseSchema,
@@ -363,6 +378,7 @@ export const apiDocsHrefs = {
   terminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
   storageVolumeLifecycle: resolvePublicDocsHelpHref("storage.volume-lifecycle"),
+  dependencyResourceLifecycle: resolvePublicDocsHelpHref("resource.concept"),
 } as const;
 
 export const apiRouteDescriptions = {
@@ -490,6 +506,30 @@ export const apiRouteDescriptions = {
   deleteStorageVolume: routeDescription(
     "Deletes only unattached storage volumes that are not blocked by backup retention metadata.",
     "storage.volume-lifecycle",
+  ),
+  provisionPostgresDependencyResource: routeDescription(
+    "Records provider-neutral Appaloft-managed Postgres dependency resource intent without creating provider-native database infrastructure.",
+    "resource.concept",
+  ),
+  importPostgresDependencyResource: routeDescription(
+    "Imports external Postgres dependency metadata while keeping raw connection secrets outside list and show responses.",
+    "resource.concept",
+  ),
+  listDependencyResources: routeDescription(
+    "Lists dependency resources with ownership, masked connection, binding readiness, and backup relationship summaries.",
+    "resource.concept",
+  ),
+  showDependencyResource: routeDescription(
+    "Reads one dependency resource with masked connection and delete-safety metadata.",
+    "resource.concept",
+  ),
+  renameDependencyResource: routeDescription(
+    "Renames one dependency resource without changing provider ownership, bindings, or connection secret boundaries.",
+    "resource.concept",
+  ),
+  deleteDependencyResource: routeDescription(
+    "Deletes only dependency resources that are not blocked by bindings, backup relationships, provider-managed unsafe state, or snapshot references.",
+    "resource.concept",
   ),
   setResourceVariable: routeDescription(
     "Sets one resource-scoped variable or secret override.",
@@ -796,6 +836,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "resource_slug_conflict":
     case "resource_archived":
     case "resource_delete_blocked":
+    case "dependency_resource_delete_blocked":
     case "server_delete_blocked":
     case "server_inactive":
     case "deployment_not_redeployable":
@@ -2280,6 +2321,84 @@ export const deleteStorageVolumeProcedure = base
     executeCommand(context, DeleteStorageVolumeCommand.create(input)),
   );
 
+export const provisionPostgresDependencyResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/postgres/provision",
+    description: apiRouteDescriptions.provisionPostgresDependencyResource,
+    successStatus: 201,
+  })
+  .input(provisionPostgresDependencyResourceCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ProvisionPostgresDependencyResourceCommand.create(input)),
+  );
+
+export const importPostgresDependencyResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/postgres/import",
+    description: apiRouteDescriptions.importPostgresDependencyResource,
+    successStatus: 201,
+  })
+  .input(importPostgresDependencyResourceCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ImportPostgresDependencyResourceCommand.create(input)),
+  );
+
+export const listDependencyResourcesProcedure = base
+  .route({
+    method: "GET",
+    path: "/dependency-resources",
+    description: apiRouteDescriptions.listDependencyResources,
+    successStatus: 200,
+  })
+  .input(listDependencyResourcesQueryInputSchema)
+  .output(listDependencyResourcesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListDependencyResourcesQuery.create(input)),
+  );
+
+export const showDependencyResourceProcedure = base
+  .route({
+    method: "GET",
+    path: "/dependency-resources/{dependencyResourceId}",
+    description: apiRouteDescriptions.showDependencyResource,
+    successStatus: 200,
+  })
+  .input(showDependencyResourceQueryInputSchema)
+  .output(showDependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowDependencyResourceQuery.create(input)),
+  );
+
+export const renameDependencyResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/{dependencyResourceId}/rename",
+    description: apiRouteDescriptions.renameDependencyResource,
+    successStatus: 200,
+  })
+  .input(renameDependencyResourceCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RenameDependencyResourceCommand.create(input)),
+  );
+
+export const deleteDependencyResourceProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/dependency-resources/{dependencyResourceId}",
+    description: apiRouteDescriptions.deleteDependencyResource,
+    successStatus: 200,
+  })
+  .input(deleteDependencyResourceCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteDependencyResourceCommand.create(input)),
+  );
+
 export const openTerminalSessionProcedure = base
   .route({
     method: "POST",
@@ -2404,6 +2523,14 @@ export const appaloftOrpcRouter = {
     show: showStorageVolumeProcedure,
     rename: renameStorageVolumeProcedure,
     delete: deleteStorageVolumeProcedure,
+  },
+  dependencyResources: {
+    provisionPostgres: provisionPostgresDependencyResourceProcedure,
+    importPostgres: importPostgresDependencyResourceProcedure,
+    list: listDependencyResourcesProcedure,
+    show: showDependencyResourceProcedure,
+    rename: renameDependencyResourceProcedure,
+    delete: deleteDependencyResourceProcedure,
   },
   terminalSessions: {
     open: openTerminalSessionProcedure,
@@ -2628,6 +2755,11 @@ export function mountAppaloftOrpcRoutes(
     "/api/deployments/:deploymentId/logs",
     "/api/deployments/:deploymentId/events",
     "/api/deployments/:deploymentId/events/stream",
+    "/api/dependency-resources",
+    "/api/dependency-resources/postgres/provision",
+    "/api/dependency-resources/postgres/import",
+    "/api/dependency-resources/:dependencyResourceId",
+    "/api/dependency-resources/:dependencyResourceId/rename",
     "/api/operator-work",
     "/api/operator-work/:workId",
     "/api/providers",

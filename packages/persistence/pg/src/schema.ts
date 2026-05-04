@@ -160,6 +160,38 @@ export interface StorageVolumesTable {
   deleted_at: NullableUpdatableTimestampColumn;
 }
 
+export interface DependencyResourcesTable {
+  id: string;
+  project_id: string;
+  environment_id: string;
+  name: string;
+  slug: string;
+  kind: string;
+  source_mode: string;
+  provider_key: string;
+  provider_managed: boolean;
+  description: string | null;
+  endpoint: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
+  connection_secret_ref: string | null;
+  backup_relationship: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
+  binding_readiness: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
+  lifecycle_status: string;
+  created_at: TimestampColumn;
+  deleted_at: NullableUpdatableTimestampColumn;
+}
+
 export interface ResourceStorageAttachmentsTable {
   id: string;
   resource_id: string;
@@ -395,6 +427,7 @@ export interface Database {
   resources: ResourcesTable;
   environment_variables: EnvironmentVariablesTable;
   resource_variables: ResourceVariablesTable;
+  dependency_resources: DependencyResourcesTable;
   storage_volumes: StorageVolumesTable;
   resource_storage_attachments: ResourceStorageAttachmentsTable;
   deployments: DeploymentsTable;
