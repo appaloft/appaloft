@@ -15,6 +15,8 @@ It is not a single command. Every user-visible mutation must dispatch one explic
 - `resources.set-variable`
 - `resources.import-variables`
 - `resources.unset-variable`
+- `resources.attach-storage`
+- `resources.detach-storage`
 - `resources.archive`
 - `resources.delete`
 
@@ -43,7 +45,10 @@ This workflow inherits:
 - [resources.set-variable Command Spec](../commands/resources.set-variable.md)
 - [resources.import-variables Command Spec](../commands/resources.import-variables.md)
 - [resources.unset-variable Command Spec](../commands/resources.unset-variable.md)
+- [resources.attach-storage Command Spec](../commands/resources.attach-storage.md)
+- [resources.detach-storage Command Spec](../commands/resources.detach-storage.md)
 - [resources.effective-config Query Spec](../queries/resources.effective-config.md)
+- [Storage Volume Lifecycle Workflow](./storage-volume-lifecycle.md)
 - [resources.archive Command Spec](../commands/resources.archive.md)
 - [resources.delete Command Spec](../commands/resources.delete.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
@@ -66,8 +71,9 @@ The workflow gives operators a stable way to:
    override summaries.
 6. Inspect profile drift between the current Resource profile, normalized entry workflow profile,
    and latest deployment snapshot.
-7. Retire a resource through archive.
-8. Permanently delete only archived, unreferenced resources.
+7. Attach and detach durable storage for future deployment snapshot materialization.
+8. Retire a resource through archive.
+9. Permanently delete only archived, unreferenced resources.
 
 Profile changes are reusable configuration for future deployments. They are not deployment
 execution, redeploy, restart, route apply, domain binding, certificate issuance, or runtime
@@ -87,6 +93,8 @@ cleanup.
 | Import pasted `.env` variables | `resources.import-variables` | Resource config override layer | Environment variables, deployment snapshots, current runtime, domains, dependency bindings |
 | Remove one resource-scoped variable override | `resources.unset-variable` | Resource config override layer | Environment variables, deployment snapshots, current runtime, domains |
 | Inspect effective future deployment configuration | `resources.effective-config` | Nothing | Resource lifecycle, current runtime, historical deployment snapshots |
+| Attach durable storage | `resources.attach-storage` | Resource storage attachment profile | Storage volume lifecycle, current runtime, historical deployment snapshots |
+| Detach durable storage | `resources.detach-storage` | Resource storage attachment profile | Storage deletion, current runtime, historical deployment snapshots |
 | Retire resource | `resources.archive` | Resource lifecycle status | Runtime stop, route/domain/certificate/source-link cleanup |
 | Remove unused archived resource from active state | `resources.delete` | Archived unreferenced resource identity | Cascading cleanup of blockers |
 
@@ -168,6 +176,23 @@ resources.show(resourceId)
   -> resources.effective-config(resourceId)
 ```
 
+Resource storage attachment:
+
+```text
+resources.show(resourceId)
+  -> storage-volumes.show(storageVolumeId)
+  -> resources.attach-storage(resourceId, storageVolumeId, destinationPath)
+  -> resources.show(resourceId)
+```
+
+Resource storage detachment:
+
+```text
+resources.show(resourceId)
+  -> resources.detach-storage(resourceId, attachmentId)
+  -> resources.show(resourceId)
+```
+
 Archive:
 
 ```text
@@ -201,6 +226,8 @@ Archived resources:
 - reject `resources.set-variable`;
 - reject `resources.import-variables`;
 - reject `resources.unset-variable`;
+- reject `resources.attach-storage`;
+- reject `resources.detach-storage`;
 - may be passed to `resources.delete` after deletion guards pass.
 
 `resources.archive` is synchronous lifecycle-state mutation. Command success means archived state
@@ -239,6 +266,11 @@ Runtime naming intent is part of that same future-only rule. Changing a resource
 `runtimeProfile.runtimeName` changes how future deployments derive effective Docker container or
 Compose project names. It must not rename a currently running workload in place, and it must not
 be treated as permission to clean up another resource that happens to use the same requested name.
+
+Resource storage attachments follow the same future-only rule. Attaching or detaching storage
+changes the durable Resource profile used by future deployment snapshot materialization. It must
+not apply a mount to current runtime state, provision provider-native volumes, delete storage,
+perform backup/restore, or rewrite historical deployment snapshots.
 
 When the operator wants changed profile state to become runtime state, they must create a new
 deployment through the explicit deployment workflow once that is appropriate. Redeploy remains
@@ -295,7 +327,7 @@ network and access profiles, but they keep their own commands and lifecycle even
 | --- | --- |
 | Web | Resource detail is owner-scoped. Each source/runtime/network/access/health/configuration section dispatches the matching operation and refetches `resources.show`, `resources.effective-config`, or the relevant observation query. Editors must make the future deployment boundary visible: saving them persists durable resource profile or override state for future deployment admission, verification, route planning, or deployment snapshot materialization; it does not create deployments, rewrite historical deployment snapshots, immediately restart current runtime, bind domains, issue certificates, or apply proxy routes. |
 | CLI | Each operation has its own `appaloft resource ...` subcommand. No `appaloft resource update` generic mutation. `appaloft resource import-variables <resourceId> --content <dotenv>` imports pasted `.env` content and masks secret values in output. `appaloft resource show --json` may expose drift diagnostics, and config deploy must report blocking entry-profile drift with the explicit command to run. |
-| oRPC / HTTP | Each operation has its own route using the application command/query schema. No parallel transport-only input shape. `POST /api/resources/{resourceId}/variables/import` dispatches `resources.import-variables`. `GET /api/resources/{resourceId}` carries drift diagnostics through `resources.show` rather than a new query. |
+| oRPC / HTTP | Each operation has its own route using the application command/query schema. No parallel transport-only input shape. `POST /api/resources/{resourceId}/variables/import` dispatches `resources.import-variables`. `POST /api/resources/{resourceId}/storage-attachments` dispatches `resources.attach-storage`; `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` dispatches `resources.detach-storage`. `GET /api/resources/{resourceId}` carries drift diagnostics and storage attachment summaries through `resources.show` rather than a new resource query. |
 | Automation / MCP | Future tools map one-to-one to operation keys. Tools must not combine unrelated source/runtime/network/archive/delete behavior. Future MCP drift visibility should reuse `resources.show` diagnostics and suggested operation keys. |
 
 ## Current Implementation Notes And Migration Gaps
@@ -315,6 +347,10 @@ Archived-resource guards are active for source/runtime/network/access/health mut
 admission. `resources.delete` may delete only archived resources with matching slug confirmation
 and no retained blockers. Each future Code Round must update `CORE_OPERATIONS.md` and
 `operation-catalog.ts` in the same change that exposes the operation.
+
+Resource storage attachment operations are proposed by
+[Storage Volume Lifecycle And Resource Attachment](../specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md)
+and are not active until the Code Round lands.
 
 ## Open Questions
 

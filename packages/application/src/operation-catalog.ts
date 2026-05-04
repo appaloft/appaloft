@@ -46,6 +46,7 @@ import { listProjectsQueryInputSchema } from "./operations/projects/list-project
 import { renameProjectCommandInputSchema } from "./operations/projects/rename-project.command";
 import { showProjectQueryInputSchema } from "./operations/projects/show-project.query";
 import { archiveResourceCommandInputSchema } from "./operations/resources/archive-resource.command";
+import { attachResourceStorageCommandInputSchema } from "./operations/resources/attach-resource-storage.command";
 import { configureResourceAccessCommandInputSchema } from "./operations/resources/configure-resource-access.command";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
 import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
@@ -53,6 +54,7 @@ import { configureResourceRuntimeCommandInputSchema } from "./operations/resourc
 import { configureResourceSourceCommandInputSchema } from "./operations/resources/configure-resource-source.command";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
 import { deleteResourceCommandInputSchema } from "./operations/resources/delete-resource.command";
+import { detachResourceStorageCommandInputSchema } from "./operations/resources/detach-resource-storage.command";
 import { importResourceVariablesCommandInputSchema } from "./operations/resources/import-resource-variables.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
 import { resourceAccessFailureEvidenceLookupQueryInputSchema } from "./operations/resources/resource-access-failure-evidence-lookup.query";
@@ -82,6 +84,11 @@ import { showServerQueryInputSchema } from "./operations/servers/show-server.que
 import { showSshCredentialQueryInputSchema } from "./operations/servers/show-ssh-credential.query";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
 import { relinkSourceLinkCommandInputSchema } from "./operations/source-links/relink-source-link.command";
+import { createStorageVolumeCommandInputSchema } from "./operations/storage-volumes/create-storage-volume.command";
+import { deleteStorageVolumeCommandInputSchema } from "./operations/storage-volumes/delete-storage-volume.command";
+import { listStorageVolumesQueryInputSchema } from "./operations/storage-volumes/list-storage-volumes.query";
+import { renameStorageVolumeCommandInputSchema } from "./operations/storage-volumes/rename-storage-volume.command";
+import { showStorageVolumeQueryInputSchema } from "./operations/storage-volumes/show-storage-volume.query";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
 import { openTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/open-terminal-session.command";
 import { tokens } from "./tokens";
@@ -93,6 +100,7 @@ type OperationDomain =
   | "credentials"
   | "environments"
   | "resources"
+  | "storage-volumes"
   | "deployments"
   | "operator-work"
   | "default-access-domain-policies"
@@ -589,6 +597,37 @@ export const operationCatalog = [
     },
   },
   {
+    key: "resources.attach-storage",
+    kind: "command",
+    domain: "resources",
+    messageName: "AttachResourceStorageCommand",
+    handlerName: "AttachResourceStorageCommandHandler",
+    serviceName: "AttachResourceStorageUseCase",
+    inputSchema: attachResourceStorageCommandInputSchema,
+    serviceToken: tokens.attachResourceStorageUseCase,
+    transports: {
+      cli: "appaloft resource storage attach <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/storage-attachments" },
+    },
+  },
+  {
+    key: "resources.detach-storage",
+    kind: "command",
+    domain: "resources",
+    messageName: "DetachResourceStorageCommand",
+    handlerName: "DetachResourceStorageCommandHandler",
+    serviceName: "DetachResourceStorageUseCase",
+    inputSchema: detachResourceStorageCommandInputSchema,
+    serviceToken: tokens.detachResourceStorageUseCase,
+    transports: {
+      cli: "appaloft resource storage detach <resourceId> <attachmentId>",
+      orpc: {
+        method: "DELETE",
+        path: "/api/resources/{resourceId}/storage-attachments/{attachmentId}",
+      },
+    },
+  },
+  {
     key: "resources.set-variable",
     kind: "command",
     domain: "resources",
@@ -727,6 +766,76 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource proxy-config <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/proxy-configuration" },
+    },
+  },
+  {
+    key: "storage-volumes.create",
+    kind: "command",
+    domain: "storage-volumes",
+    messageName: "CreateStorageVolumeCommand",
+    handlerName: "CreateStorageVolumeCommandHandler",
+    serviceName: "CreateStorageVolumeUseCase",
+    inputSchema: createStorageVolumeCommandInputSchema,
+    serviceToken: tokens.createStorageVolumeUseCase,
+    transports: {
+      cli: "appaloft storage volume create",
+      orpc: { method: "POST", path: "/api/storage-volumes" },
+    },
+  },
+  {
+    key: "storage-volumes.list",
+    kind: "query",
+    domain: "storage-volumes",
+    messageName: "ListStorageVolumesQuery",
+    handlerName: "ListStorageVolumesQueryHandler",
+    serviceName: "ListStorageVolumesQueryService",
+    inputSchema: listStorageVolumesQueryInputSchema,
+    serviceToken: tokens.listStorageVolumesQueryService,
+    transports: {
+      cli: "appaloft storage volume list",
+      orpc: { method: "GET", path: "/api/storage-volumes" },
+    },
+  },
+  {
+    key: "storage-volumes.show",
+    kind: "query",
+    domain: "storage-volumes",
+    messageName: "ShowStorageVolumeQuery",
+    handlerName: "ShowStorageVolumeQueryHandler",
+    serviceName: "ShowStorageVolumeQueryService",
+    inputSchema: showStorageVolumeQueryInputSchema,
+    serviceToken: tokens.showStorageVolumeQueryService,
+    transports: {
+      cli: "appaloft storage volume show <storageVolumeId>",
+      orpc: { method: "GET", path: "/api/storage-volumes/{storageVolumeId}" },
+    },
+  },
+  {
+    key: "storage-volumes.rename",
+    kind: "command",
+    domain: "storage-volumes",
+    messageName: "RenameStorageVolumeCommand",
+    handlerName: "RenameStorageVolumeCommandHandler",
+    serviceName: "RenameStorageVolumeUseCase",
+    inputSchema: renameStorageVolumeCommandInputSchema,
+    serviceToken: tokens.renameStorageVolumeUseCase,
+    transports: {
+      cli: "appaloft storage volume rename <storageVolumeId>",
+      orpc: { method: "POST", path: "/api/storage-volumes/{storageVolumeId}/rename" },
+    },
+  },
+  {
+    key: "storage-volumes.delete",
+    kind: "command",
+    domain: "storage-volumes",
+    messageName: "DeleteStorageVolumeCommand",
+    handlerName: "DeleteStorageVolumeCommandHandler",
+    serviceName: "DeleteStorageVolumeUseCase",
+    inputSchema: deleteStorageVolumeCommandInputSchema,
+    serviceToken: tokens.deleteStorageVolumeUseCase,
+    transports: {
+      cli: "appaloft storage volume delete <storageVolumeId>",
+      orpc: { method: "DELETE", path: "/api/storage-volumes/{storageVolumeId}" },
     },
   },
   {
