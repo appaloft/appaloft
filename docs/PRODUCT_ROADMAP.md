@@ -630,7 +630,7 @@ Required:
   renderer support for one-shot CLI or remote SSH runtimes without a reachable Appaloft backend
   service. The short-retention request-id envelope lookup baseline is implemented, but the broader
   row remains open until the real edge and automatic-context slices close.
-- [ ] Keep access/proxy/log/health failures visible through read models, proxy preview, and
+- [x] Keep access/proxy/log/health failures visible through read models, proxy preview, and
   diagnostics.
 
 Phase 6 verification notes from 2026-04-30:
@@ -708,6 +708,19 @@ Phase 6 verification notes from 2026-05-03 applied route context metadata baseli
   hostname/path route context lookup.
 - The slice adds no public operation, no route repair/redeploy/rollback behavior, no Web lookup
   form, no provider-native raw metadata parsing, and no real Traefik error-middleware e2e.
+
+Phase 6 verification notes from 2026-05-04 failure visibility baseline:
+
+- The failure visibility baseline keeps proxy/log/health-adjacent source errors visible through
+  existing `resources.diagnostic-summary` and `resources.health` read models while normalizing
+  unsafe adjacent text before it reaches copyable JSON.
+- Diagnostic and health source errors preserve stable source, code, category, phase, retryability,
+  and related resource context, and continue to reuse latest safe `resource-access-failure/v1` and
+  `applied-route-context/v1` metadata instead of parsing provider raw payloads.
+- The slice adds no public operation, no public schema field, no route repair/redeploy/rollback
+  behavior, no Web lookup form, no provider-native raw metadata parsing, and no real Traefik
+  middleware e2e. The broader `resource-access-failure` row remains open for real edge,
+  companion/static renderer, provider-native metadata lookup, and Web lookup form work.
 
 Exit criteria:
 

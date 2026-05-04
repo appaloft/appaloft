@@ -343,6 +343,11 @@ Boundary rule:
 - support/debug diagnostics are exposed through a resource-scoped read/query view such as
   `ResourceDiagnosticSummary`; it composes read-model state and safe adapter/system context, and is
   not `Resource` aggregate state
+- access/proxy/log/health failure visibility belongs to application read/query surfaces. Source
+  failures may preserve stable source, code, category, phase, retryability, and safe related ids, but
+  copyable diagnostic and health payloads must normalize unsafe adjacent message text such as auth
+  headers, cookies, sensitive query values, private keys, SSH credentials, provider raw payload
+  hints, and remote raw output before returning it.
 - edge request access failure diagnostics are adapter/read-model observations over public access
   failures. They map concrete proxy/upstream failures into stable `ResourceAccessFailureDiagnostic`
   codes, safe affected request descriptors, optional owner hints, related ids, request/correlation

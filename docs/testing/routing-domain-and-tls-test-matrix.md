@@ -173,6 +173,7 @@ Then:
 | ROUTE-TLS-READMODEL-013 | integration | Certificate show readback | Provider-issued and imported certificates exist | `certificates.show` returns safe metadata, status, source, latest attempt, and attempt history without PEM, private key, passphrase, secret refs, or provider credentials |
 | ROUTE-TLS-READMODEL-014 | integration | Revoked/deleted certificate projection | Certificate was revoked or deleted | `certificates.show` and `certificates.list` expose the lifecycle state needed for audit and follow-up without treating the certificate as active TLS material |
 | ROUTE-TLS-READMODEL-015 | integration | Domain binding show route/access parity | A binding's resource access summary has durable, server-applied, generated, proxy readiness, and optional generated fallback context | `domain-bindings.show` returns selected/context route descriptors, generated access fallback, proxy readiness, certificate context, and delete safety using the same shared route/access vocabulary as `ResourceAccessSummary` | Selected durable route wins, server-applied/generated routes remain context, and no provider raw payload or secret material is exposed. |
+| ROUTE-TLS-READMODEL-016 | integration | Domain/route failure visibility sanitizer | Domain route, proxy, or route-context diagnostic state contains unsafe provider/raw payload hints near failure metadata | Existing domain/access/proxy/diagnostic read models keep safe route/source ids and stable codes | Provider raw payloads, private keys, SSH credentials, auth headers, cookies, sensitive query values, and raw remote logs are absent; next actions remain suggestions only. |
 
 ## Workflow Matrix
 
@@ -318,7 +319,8 @@ Current tests cover `ROUTE-TLS-EVT-004`, `ROUTE-TLS-READMODEL-001`,
 `ROUTE-TLS-READMODEL-002`, `ROUTE-TLS-READMODEL-003`, `ROUTE-TLS-READMODEL-015`, and
 `ROUTE-TLS-ENTRY-012`.
 
-`ROUTE-TLS-READMODEL-016` is target coverage for the applied route context metadata baseline.
+`ROUTE-TLS-READMODEL-016` is covered by the applied route context metadata baseline and the
+failure visibility baseline.
 Provider-rendered proxy preview must expose safe `applied-route-context/v1` metadata for durable
 domain and server-applied routes, including resource, deployment, domain binding where applicable,
 server, destination, route id, diagnostic id, hostname, path prefix, proxy kind, provider key, and
