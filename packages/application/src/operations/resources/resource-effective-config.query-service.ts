@@ -17,6 +17,7 @@ import {
   type Clock,
   type EnvironmentRepository,
   type ResourceConfigEntryView,
+  type ResourceConfigOverrideSummary,
   type ResourceEffectiveConfigView,
   type ResourceRepository,
 } from "../../ports";
@@ -47,6 +48,45 @@ function maskEntry(input: {
 
 function resourceReadNotFound(resourceId: string) {
   return domainError.notFound("resource", resourceId);
+}
+
+function variableIdentity(input: { key: string; exposure: string }): string {
+  return `${input.key}:${input.exposure}`;
+}
+
+function summarizeOverrides(input: {
+  inherited: Array<{ key: string; exposure: string; scope: string }>;
+  owned: Array<{ key: string; exposure: string; scope: string }>;
+  effective: Array<{ key: string; exposure: string; scope: string }>;
+}): ResourceConfigOverrideSummary[] {
+  const scopesByIdentity = new Map<string, Set<string>>();
+  for (const entry of [...input.inherited, ...input.owned]) {
+    const identity = variableIdentity(entry);
+    const scopes = scopesByIdentity.get(identity) ?? new Set<string>();
+    scopes.add(entry.scope);
+    scopesByIdentity.set(identity, scopes);
+  }
+
+  return input.effective.flatMap((entry) => {
+    const scopes = scopesByIdentity.get(variableIdentity(entry));
+    if (!scopes || scopes.size <= 1) {
+      return [];
+    }
+
+    const overriddenScopes = [...scopes].filter((scope) => scope !== entry.scope);
+    if (overriddenScopes.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        key: entry.key,
+        exposure: entry.exposure as ResourceConfigOverrideSummary["exposure"],
+        selectedScope: entry.scope as ResourceConfigOverrideSummary["selectedScope"],
+        overriddenScopes: overriddenScopes as ResourceConfigOverrideSummary["overriddenScopes"],
+      },
+    ];
+  });
 }
 
 @injectable()
@@ -100,6 +140,9 @@ export class ResourceEffectiveConfigQueryService {
         createdAt: generatedAt,
         inherited: inherited.toState().variables,
       });
+      const inheritedVariables = inherited.toState().variables;
+      const ownedVariables = resourceState.variables.toState();
+      const effectiveVariables = effective.variables;
 
       return ok({
         schemaVersion: "resources.effective-config/v1",
@@ -126,6 +169,23 @@ export class ResourceEffectiveConfigQueryService {
             kind: entry.kind as ResourceConfigEntryView["kind"],
           }),
         ),
+        overrides: summarizeOverrides({
+          inherited: inheritedVariables.map((entry) => ({
+            key: entry.key.value,
+            exposure: entry.exposure.value,
+            scope: entry.scope.value,
+          })),
+          owned: ownedVariables.map((entry) => ({
+            key: entry.key.value,
+            exposure: entry.exposure.value,
+            scope: entry.scope.value,
+          })),
+          effective: effectiveVariables.map((entry) => ({
+            key: entry.key,
+            exposure: entry.exposure,
+            scope: entry.scope,
+          })),
+        }),
         precedence: [...effective.precedence] as ResourceEffectiveConfigView["precedence"],
         generatedAt: generatedAt.value,
       } satisfies ResourceEffectiveConfigView);

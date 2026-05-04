@@ -12,6 +12,7 @@ searchAliases:
 relatedOperations:
   - environments.set-variable
   - resources.set-variable
+  - resources.import-variables
   - resources.effective-config
 sidebar:
   label: "Secrets"
@@ -25,11 +26,18 @@ payloads, or effective-config responses as plaintext.
 
 Users should see the existence and state of a secret, such as masked value, last update time, source environment, and whether it participates in deployment snapshots. They should not see plaintext values.
 
+When pasted `.env` content is imported into a resource, Appaloft treats secret-like keys as runtime
+secrets, such as `DATABASE_URL`, `*_TOKEN`, `*_PASSWORD`, and `*_PRIVATE_KEY`. Import summaries,
+API, CLI, Web, logs, and diagnostics should show only masked values.
+
 <h2 id="environment-secret-build-time">Build-time limit</h2>
 
 Build-time variables cannot be marked secret because they can become part of build artifacts.
 
 If a variable can enter a browser bundle, static file, or build artifact, it is not a secret. Do not put database passwords, API tokens, or private keys in build-time variables.
+
+Build-time variables must use the `PUBLIC_` or `VITE_` prefix. Build-time variables with
+secret-like names are rejected instead of being silently downgraded to plain config.
 
 <h2 id="environment-secret-rotation">Rotate secrets</h2>
 

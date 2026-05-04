@@ -287,6 +287,7 @@ describe("public docs operation coverage", () => {
 
     for (const operationKey of [
       "resources.set-variable",
+      "resources.import-variables",
       "resources.unset-variable",
       "resources.effective-config",
     ] as const) {
@@ -300,8 +301,10 @@ describe("public docs operation coverage", () => {
       });
       expect(topic.specReferences).toEqual(
         expect.arrayContaining([
+          "docs/commands/resources.import-variables.md",
           "docs/queries/resources.effective-config.md",
           "docs/testing/resource-profile-lifecycle-test-matrix.md",
+          "docs/specs/031-resource-secret-operations-and-effective-config/spec.md",
           "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
         ]),
       );

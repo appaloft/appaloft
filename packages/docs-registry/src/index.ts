@@ -769,11 +769,13 @@ export const publicDocsHelpTopics = {
     specReferences: [
       "docs/queries/environments.effective-precedence.md",
       "docs/commands/resources.set-variable.md",
+      "docs/commands/resources.import-variables.md",
       "docs/commands/resources.unset-variable.md",
       "docs/testing/environment-effective-precedence-test-matrix.md",
       "docs/queries/resources.effective-config.md",
       "docs/testing/resource-profile-lifecycle-test-matrix.md",
       "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
+      "docs/specs/031-resource-secret-operations-and-effective-config/spec.md",
     ],
     webSurfaces: [
       "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource configuration section",
@@ -1489,6 +1491,11 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "resources.set-variable",
+    status: "documented",
+    topicId: "environment.variable-precedence",
+  },
+  {
+    operationKey: "resources.import-variables",
     status: "documented",
     topicId: "environment.variable-precedence",
   },

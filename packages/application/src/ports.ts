@@ -2095,8 +2095,16 @@ export interface ResourceEffectiveConfigView {
   environmentId: string;
   ownedEntries: ResourceConfigEntryView[];
   effectiveEntries: ResourceConfigEntryView[];
+  overrides: ResourceConfigOverrideSummary[];
   precedence: ConfigScope[];
   generatedAt: string;
+}
+
+export interface ResourceConfigOverrideSummary {
+  key: string;
+  exposure: VariableExposure;
+  selectedScope: ConfigScope;
+  overriddenScopes: ConfigScope[];
 }
 
 export type ResourceHealthOverall =

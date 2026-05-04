@@ -15,6 +15,7 @@ relatedOperations:
   - environments.unset-variable
   - environments.effective-precedence
   - resources.set-variable
+  - resources.import-variables
   - resources.unset-variable
   - resources.effective-config
 sidebar:
@@ -68,8 +69,10 @@ scripts. CLI output should show masked status for secrets, not values.
 The HTTP API should return variable key, scope, whether it is secret, source layer, and masked value. It should not return plaintext secrets.
 
 Use `environments.effective-precedence` to inspect the values one environment contributes before
-resource overrides. Use `resources.effective-config` to inspect the deployment input view after
-resource variables override environment variables.
+resource overrides. Use `resources.import-variables` to import pasted `.env` content into one
+resource; duplicate keys use the last pasted line and the response reports safe override metadata.
+Use `resources.effective-config` to inspect the deployment input view after resource variables
+override environment variables, including safe source and override summaries.
 
 <h2 id="environment-variable-recovery">Common issues</h2>
 

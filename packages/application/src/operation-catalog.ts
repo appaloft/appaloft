@@ -53,6 +53,7 @@ import { configureResourceRuntimeCommandInputSchema } from "./operations/resourc
 import { configureResourceSourceCommandInputSchema } from "./operations/resources/configure-resource-source.command";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
 import { deleteResourceCommandInputSchema } from "./operations/resources/delete-resource.command";
+import { importResourceVariablesCommandInputSchema } from "./operations/resources/import-resource-variables.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
 import { resourceAccessFailureEvidenceLookupQueryInputSchema } from "./operations/resources/resource-access-failure-evidence-lookup.query";
 import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resources/resource-diagnostic-summary.query";
@@ -599,6 +600,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource set-variable <resourceId> <key> <value>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/variables" },
+    },
+  },
+  {
+    key: "resources.import-variables",
+    kind: "command",
+    domain: "resources",
+    messageName: "ImportResourceVariablesCommand",
+    handlerName: "ImportResourceVariablesCommandHandler",
+    serviceName: "ImportResourceVariablesUseCase",
+    inputSchema: importResourceVariablesCommandInputSchema,
+    serviceToken: tokens.importResourceVariablesUseCase,
+    transports: {
+      cli: "appaloft resource import-variables <resourceId> --content <dotenv>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/variables/import" },
     },
   },
   {

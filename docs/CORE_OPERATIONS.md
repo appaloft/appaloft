@@ -273,6 +273,7 @@ Implemented operations:
 | Configure resource network profile | Command | `resources.configure-network` | `ConfigureResourceNetworkCommand` | `ConfigureResourceNetworkCommandInput` | `appaloft resource configure-network <resourceId>` | `POST /api/resources/{resourceId}/network-profile` |
 | Configure resource access profile | Command | `resources.configure-access` | `ConfigureResourceAccessCommand` | `ConfigureResourceAccessCommandInput` | `appaloft resource configure-access <resourceId>` | `POST /api/resources/{resourceId}/access-profile` |
 | Set resource variable | Command | `resources.set-variable` | `SetResourceVariableCommand` | `SetResourceVariableCommandInput` | `appaloft resource set-variable <resourceId> <key> <value>` | `POST /api/resources/{resourceId}/variables` |
+| Import resource variables | Command | `resources.import-variables` | `ImportResourceVariablesCommand` | `ImportResourceVariablesCommandInput` | `appaloft resource import-variables <resourceId> --content <dotenv>` | `POST /api/resources/{resourceId}/variables/import` |
 | Unset resource variable | Command | `resources.unset-variable` | `UnsetResourceVariableCommand` | `UnsetResourceVariableCommandInput` | `appaloft resource unset-variable <resourceId> <key>` | `DELETE /api/resources/{resourceId}/variables/{key}` |
 | Archive resource | Command | `resources.archive` | `ArchiveResourceCommand` | `ArchiveResourceCommandInput` | `appaloft resource archive <resourceId>` | `POST /api/resources/{resourceId}/archive` |
 | Delete resource | Command | `resources.delete` | `DeleteResourceCommand` | `DeleteResourceCommandInput` | `appaloft resource delete <resourceId> --confirm-slug <slug>` | `DELETE /api/resources/{resourceId}` |
@@ -416,11 +417,18 @@ Current boundary:
   runtime, network, access, health, and configuration; and points to explicit remediation commands.
   It is not a separate operation and must not add profile fields or drift overrides to
   `deployments.create`.
-- resource-scoped variables and secrets are resource-owned through `resources.set-variable` and
-  `resources.unset-variable`; these commands replace only the resource override layer used during
-  future deployment snapshot materialization after environment precedence is resolved.
+- resource-scoped variables and secrets are resource-owned through `resources.set-variable`,
+  `resources.import-variables`, and `resources.unset-variable`; these commands replace only the
+  resource override layer used during future deployment snapshot materialization after environment
+  precedence is resolved.
+- `.env` import is an operation-local parser for pasted content. It rejects malformed or unsafe
+  variable keys, classifies secret-like keys as runtime secrets by default, rejects build-time
+  secret exposure, uses last pasted duplicate wins, and reports duplicate/existing override
+  metadata without returning raw secret values.
 - `resources.effective-config` is the active read surface for masked resource-owned variables and
-  the merged effective deployment snapshot view. It must not return plaintext secret values.
+  the merged effective deployment snapshot view. It must not return plaintext secret values, and it
+  includes safe override summaries so operators can see which scope won without inspecting raw
+  secret material.
 - resource archive is resource-owned through `resources.archive`; the command moves lifecycle
   state to `archived`, publishes `resource-archived` on the first transition, and blocks future
   profile mutations and deployments without stopping runtime or deleting retained history,

@@ -406,6 +406,25 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[RES-PROFILE-CONFIG-019] resource variable import is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find(
+      (candidate) => candidate.key === "resources.import-variables",
+    );
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "resources",
+      messageName: "ImportResourceVariablesCommand",
+      handlerName: "ImportResourceVariablesCommandHandler",
+      serviceName: "ImportResourceVariablesUseCase",
+      transports: {
+        cli: "appaloft resource import-variables <resourceId> --content <dotenv>",
+        orpc: { method: "POST", path: "/api/resources/{resourceId}/variables/import" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[ENV-LIFE-ENTRY-006] environment lock and unlock are exposed through the active operation catalog", () => {
     const lockEntry = operationCatalog.find((candidate) => candidate.key === "environments.lock");
     const unlockEntry = operationCatalog.find(

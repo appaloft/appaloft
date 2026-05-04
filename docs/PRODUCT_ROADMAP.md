@@ -811,6 +811,13 @@ Already done:
 - [x] Core contains dependency resource and binding concepts.
 - [x] Deployment list/logs and resource health/log/diagnostic read surfaces exist.
 
+Current verification notes:
+
+- 2026-05-04 Phase 7 baseline slice implemented resource-scoped `.env` import,
+  resource secret classification/masking, and `resources.effective-config` override summaries. This
+  does not satisfy the full `0.9.0` release rule while storage, dependency resources, recovery,
+  auto-deploy, preview, and cluster runtime items remain open.
+
 Required:
 
 - [ ] Add resource-scoped environment variable operations.
