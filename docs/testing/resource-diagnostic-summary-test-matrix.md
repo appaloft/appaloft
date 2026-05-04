@@ -86,6 +86,7 @@ Then:
 | RES-DIAG-QRY-016 | integration | Edge failure has operation cause | Edge failure references a deployment, proxy, or health cause code | `ok` with edge diagnostic and `causeCode` | Owning source error remains unchanged | Copy payload keeps both edge code and operation-owned cause code. |
 | RES-DIAG-QRY-017 | integration | Access precedence summary | Durable ready, server-applied, and generated routes are all present | `ok` with access and proxy sections available | None | Copy payload preserves separate route URLs and proxy/provider context uses durable, server-applied, latest generated, then planned generated precedence for the selected route. |
 | RES-DIAG-QRY-018 | integration | Non-ready durable access | Durable domain binding exists but is not ready while generated or server-applied fallback route data exists | `ok` with access unavailable | `resource_domain_binding_not_ready` | Access section keeps fallback URLs as context but reports the non-ready durable binding as the blocking selected route. |
+| RES-DIAG-QRY-019 | integration | Failure visibility sanitizer | Access/proxy/log/health-adjacent source failures contain auth headers, cookies, sensitive query values, SSH credential URLs, private key material, provider raw payload hints, or multiline remote command output | `ok` with source errors and section statuses | Owning stable source code remains present | `copy.json` and source error messages preserve safe ids/codes/phases/next actions while redacting unsafe adjacent text. |
 
 ## Shared Route/Access Diagnostic Matrix
 
@@ -98,6 +99,7 @@ These rows are governed by
 | ACCESS-DIAG-002 | integration | Proxy route blocking reason | Proxy route missing, stale, unapplied, or failed | Diagnostic access/proxy/source error uses `proxy_route_missing` or `proxy_route_stale` | Proxy preview and diagnostics share route source/status. |
 | ACCESS-DIAG-003 | integration | Domain/DNS/TLS blocking reason | Domain verification, DNS, or certificate state blocks access | Diagnostic access/source error uses stable blocking reason and recommended action | Future domain/certificate lifecycle commands can attach without redefining copy shape. |
 | ACCESS-DIAG-004 | integration | Copy-safe route/access payload | Diagnostic inputs contain provider/native/raw or secret-bearing detail | `copy.json` omits unsafe material and preserves stable ids/codes/phases | Copy payload is safe for support/debug sharing. |
+| ACCESS-DIAG-005 | integration | Cross-surface failure visibility baseline | Access, proxy, runtime log, deployment log, health, or route context lookup source reports a failure or unavailable state | Existing health/proxy/log/diagnostic read surfaces expose stable source, code, phase, related ids when safe, and suggested next action | The response does not trigger repair, redeploy, rollback, route mutation, or provider-native raw payload parsing. |
 | WEB-CLI-API-ACCESS-001 | e2e-preferred | API/oRPC route/access contract | HTTP/oRPC diagnostic, health, proxy, and resource reads are queried | Responses expose shared route/access fields and do not define transport-only business shapes | Generated/durable/server-applied/snapshot source labels are preserved. |
 | WEB-CLI-API-ACCESS-002 | e2e-preferred | CLI route/access contract | CLI show/health/proxy-config/diagnose commands run | CLI output is derived from shared query results | CLI does not invent separate precedence or route status names. |
 | WEB-CLI-API-ACCESS-003 | e2e-preferred | Web route/access contract | Web resource detail renders access/proxy/health/diagnostics | Web selects display route from shared helper/query fields | Business route precedence is not hidden in page-only Svelte logic. |
@@ -141,6 +143,8 @@ Current executable coverage includes:
 - proxy provider failure represented as an `ok` summary with `proxy_provider_unavailable`;
 - runtime log reader failure represented as an `ok` summary with
   `resource_runtime_logs_unavailable`;
+- safe source error message sanitization for proxy/log/health-adjacent failures through
+  `RES-DIAG-QRY-019` and `ACCESS-DIAG-005`;
 - runtime log tail not requested without calling the runtime log reader;
 - selected deployment/resource context mismatch returning
   `resource_diagnostic_context_mismatch`.

@@ -754,6 +754,54 @@ describe("ResourceHealthQueryService", () => {
     );
   });
 
+  test("[RES-HEALTH-QRY-021][ACCESS-DIAG-005] redacts unsafe probe failure messages", async () => {
+    const service = createService({
+      resourceAggregates: [resourceAggregateWithHealthPolicy()],
+      probeRunner: new StaticResourceHealthProbeRunner({
+        name: "health-policy",
+        target: "runtime",
+        status: "failed",
+        observedAt: "2026-01-01T00:00:10.100Z",
+        durationMs: 12,
+        statusCode: 502,
+        message: [
+          "Authorization: Bearer raw-token Cookie: sid=raw-cookie",
+          "https://edge.example.test/path?token=raw-query-token&safe=value",
+          "ssh://deploy:raw-password@example.test",
+          "-----BEGIN PRIVATE KEY----- raw-key -----END PRIVATE KEY-----",
+          "remote log line one\nremote log line two",
+        ].join(" "),
+        reasonCode: "resource_health_check_failed",
+        retriable: true,
+      }),
+    });
+
+    const result = await service.execute(
+      createTestContext(),
+      createQuery({ mode: "live", includeChecks: true }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.overall).toBe("unhealthy");
+    expect(summary.sourceErrors).toContainEqual(
+      expect.objectContaining({
+        source: "health-check",
+        code: "resource_health_check_failed",
+        phase: "health-check-execution",
+      }),
+    );
+    const serialized = JSON.stringify(summary);
+    expect(serialized).not.toContain("Authorization");
+    expect(serialized).not.toContain("Cookie");
+    expect(serialized).not.toContain("raw-token");
+    expect(serialized).not.toContain("raw-cookie");
+    expect(serialized).not.toContain("token=raw-query-token");
+    expect(serialized).not.toContain("raw-password");
+    expect(serialized).not.toContain("BEGIN PRIVATE KEY");
+    expect(serialized).not.toContain("remote log line two");
+  });
+
   test("reports starting while the latest deployment is still in flight", async () => {
     const deployment = deploymentSummary({
       status: "running",
