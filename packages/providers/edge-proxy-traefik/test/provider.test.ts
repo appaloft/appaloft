@@ -406,6 +406,77 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(content).not.toContain("token=secret");
   });
 
+  test("[RES-ACCESS-DIAG-REAL-001] renders served route error middleware with safe applied route context", async () => {
+    const provider = new TraefikEdgeProxyProvider();
+    const appliedRouteContext = {
+      schemaVersion: "applied-route-context/v1" as const,
+      resourceId: "res_real",
+      deploymentId: "dep_real",
+      domainBindingId: "dbnd_real",
+      serverId: "srv_real",
+      destinationId: "dst_real",
+      routeId: "durable-domain:res_real:dep_real:real.example.test:/",
+      diagnosticId: "durable-domain:res_real:dep_real:real.example.test:/",
+      routeSource: "durable-domain" as const,
+      hostname: "real.example.test",
+      pathPrefix: "/",
+      proxyKind: "traefik" as const,
+      providerKey: "traefik",
+      appliedAt: "2026-05-04T00:00:00.000Z",
+      rawProviderPayload: "Authorization: Bearer secret-token",
+    };
+
+    const realized = await provider.realizeRoutes(
+      { correlationId: "req_real_traefik_context_test" },
+      {
+        deploymentId: "dep_real",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "traefik",
+            domains: ["real.example.test"],
+            pathPrefix: "/",
+            tlsMode: "disabled",
+            targetPort: 6553,
+            appliedRouteContext,
+          },
+        ],
+        resourceAccessFailureRenderer: {
+          url: "http://appaloft.internal:3001/.appaloft/resource-access-failure?token=secret",
+        },
+      },
+    );
+
+    expect(realized.isOk()).toBe(true);
+    const labels = realized._unsafeUnwrap().labels;
+    const serialized = labels.join("\n");
+    expect(labels).toContain("traefik.http.routers.dep-real.middlewares=dep-real-access-errors");
+    expect(serialized).toContain(
+      "traefik.http.middlewares.dep-real-access-errors.errors.status=404,502,503,504",
+    );
+    expect(serialized).toContain(
+      "traefik.http.middlewares.dep-real-access-errors.errors.query=/.appaloft/resource-access-failure?status={status}",
+    );
+    expect(serialized).toContain("resourceId=res_real");
+    expect(serialized).toContain("deploymentId=dep_real");
+    expect(serialized).toContain("domainBindingId=dbnd_real");
+    expect(serialized).toContain("serverId=srv_real");
+    expect(serialized).toContain("destinationId=dst_real");
+    expect(serialized).toContain(
+      "routeId=durable-domain%3Ares_real%3Adep_real%3Areal.example.test%3A%2F",
+    );
+    expect(serialized).toContain(
+      "diagnosticId=durable-domain%3Ares_real%3Adep_real%3Areal.example.test%3A%2F",
+    );
+    expect(serialized).toContain("routeSource=durable-domain");
+    expect(serialized).toContain("routeHost=real.example.test");
+    expect(serialized).toContain("pathPrefix=%2F");
+    expect(serialized).toContain("providerKey=traefik");
+    expect(serialized).not.toContain("secret-token");
+    expect(serialized).not.toContain("rawProviderPayload");
+    expect(serialized).not.toContain("token=secret");
+  });
+
   test("[RES-ACCESS-DIAG-ROUTE-004] renders a low-priority route-not-found fallback when a renderer target is available", async () => {
     const provider = new TraefikEdgeProxyProvider();
 
