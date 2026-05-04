@@ -89,6 +89,8 @@ import {
   PgSshCredentialReadModel,
   PgSshCredentialRepository,
   PgSshCredentialUsageReader,
+  PgStorageVolumeReadModel,
+  PgStorageVolumeRepository,
 } from "@appaloft/persistence-pg";
 import { createBuiltinPlugins } from "@appaloft/plugin-builtins";
 import { LocalPluginHost } from "@appaloft/plugin-host";
@@ -731,6 +733,9 @@ export function registerRuntimeDependencies(
   container.register(tokens.resourceRepository, {
     useFactory: instanceCachingFactory(() => new PgResourceRepository(input.database.db)),
   });
+  container.register(tokens.storageVolumeRepository, {
+    useFactory: instanceCachingFactory(() => new PgStorageVolumeRepository(input.database.db)),
+  });
   container.register(tokens.resourceDeletionBlockerReader, {
     useFactory: instanceCachingFactory(
       () => new PgResourceDeletionBlockerReader(input.database.db),
@@ -824,6 +829,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.resourceReadModel, {
     useFactory: instanceCachingFactory(() => new PgResourceReadModel(input.database.db)),
+  });
+  container.register(tokens.storageVolumeReadModel, {
+    useFactory: instanceCachingFactory(() => new PgStorageVolumeReadModel(input.database.db)),
   });
   container.register(tokens.resourceAccessFailureEvidenceRecorder, {
     useFactory: instanceCachingFactory(

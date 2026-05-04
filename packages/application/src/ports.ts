@@ -60,6 +60,10 @@ import {
   type SshCredential,
   type SshCredentialMutationSpec,
   type SshCredentialSelectionSpec,
+  type StorageVolume,
+  type StorageVolumeKind,
+  type StorageVolumeMutationSpec,
+  type StorageVolumeSelectionSpec,
   type TargetKind,
   type TlsMode,
   type VariableExposure,
@@ -377,6 +381,18 @@ export interface EnvironmentRepository {
 export interface ResourceRepository {
   findOne(context: RepositoryContext, spec: ResourceSelectionSpec): Promise<Resource | null>;
   upsert(context: RepositoryContext, resource: Resource, spec: ResourceMutationSpec): Promise<void>;
+}
+
+export interface StorageVolumeRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: StorageVolumeSelectionSpec,
+  ): Promise<StorageVolume | null>;
+  upsert(
+    context: RepositoryContext,
+    storageVolume: StorageVolume,
+    spec: StorageVolumeMutationSpec,
+  ): Promise<void>;
 }
 
 export type ResourceDeletionBlockerKind =
@@ -1573,6 +1589,16 @@ export interface ResourceSummary {
   accessSummary?: ResourceAccessSummary;
 }
 
+export interface ResourceStorageAttachmentSummary {
+  id: string;
+  storageVolumeId: string;
+  storageVolumeName?: string;
+  storageVolumeKind?: StorageVolumeKind;
+  destinationPath: string;
+  mountMode: "read-write" | "read-only";
+  attachedAt: string;
+}
+
 export interface ResourceAccessRouteSummary {
   url: string;
   hostname: string;
@@ -2072,10 +2098,53 @@ export interface ResourceDetail {
   networkProfile?: ResourceDetailNetworkProfile;
   accessProfile?: ResourceAccessProfile;
   healthPolicy?: ResourceDetailHealthPolicy;
+  storageAttachments?: ResourceStorageAttachmentSummary[];
   accessSummary?: ResourceDetailAccessSummary;
   latestDeployment?: ResourceDetailDeploymentContext;
   lifecycle: ResourceDetailLifecycle;
   diagnostics: ResourceDetailProfileDiagnostic[];
+  generatedAt: string;
+}
+
+export interface StorageVolumeAttachmentSummary {
+  attachmentId: string;
+  resourceId: string;
+  resourceName?: string;
+  resourceSlug?: string;
+  destinationPath: string;
+  mountMode: "read-write" | "read-only";
+  attachedAt: string;
+}
+
+export interface StorageVolumeSummary {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  name: string;
+  slug: string;
+  kind: StorageVolumeKind;
+  sourcePath?: string;
+  description?: string;
+  lifecycleStatus: "active" | "deleted";
+  backupRelationship?: {
+    retentionRequired: boolean;
+    reason?: string;
+  };
+  attachmentCount: number;
+  attachments: StorageVolumeAttachmentSummary[];
+  createdAt: string;
+  deletedAt?: string;
+}
+
+export interface ListStorageVolumesResult {
+  schemaVersion: "storage-volumes.list/v1";
+  items: StorageVolumeSummary[];
+  generatedAt: string;
+}
+
+export interface ShowStorageVolumeResult {
+  schemaVersion: "storage-volumes.show/v1";
+  storageVolume: StorageVolumeSummary;
   generatedAt: string;
 }
 
@@ -3513,6 +3582,21 @@ export interface ResourceReadModel {
     },
   ): Promise<ResourceSummary[]>;
   findOne(context: RepositoryContext, spec: ResourceSelectionSpec): Promise<ResourceSummary | null>;
+}
+
+export interface StorageVolumeReadModel {
+  list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+    },
+  ): Promise<StorageVolumeSummary[]>;
+  findOne(
+    context: RepositoryContext,
+    spec: StorageVolumeSelectionSpec,
+  ): Promise<StorageVolumeSummary | null>;
+  countAttachments(context: RepositoryContext, storageVolumeId: string): Promise<number>;
 }
 
 export interface DeploymentReadModel {

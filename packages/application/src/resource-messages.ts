@@ -1,4 +1,5 @@
 export * from "./operations/resources/archive-resource.command";
+export * from "./operations/resources/attach-resource-storage.command";
 export * from "./operations/resources/configure-resource-access.command";
 export * from "./operations/resources/configure-resource-health.command";
 export * from "./operations/resources/configure-resource-network.command";
@@ -6,6 +7,7 @@ export * from "./operations/resources/configure-resource-runtime.command";
 export * from "./operations/resources/configure-resource-source.command";
 export * from "./operations/resources/create-resource.command";
 export * from "./operations/resources/delete-resource.command";
+export * from "./operations/resources/detach-resource-storage.command";
 export * from "./operations/resources/import-resource-variables.command";
 export * from "./operations/resources/list-resources.query";
 export * from "./operations/resources/resource-access-failure-evidence-lookup.query";

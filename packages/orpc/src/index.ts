@@ -3,9 +3,11 @@ import {
   ArchiveEnvironmentCommand,
   ArchiveProjectCommand,
   ArchiveResourceCommand,
+  AttachResourceStorageCommand,
   archiveEnvironmentCommandInputSchema,
   archiveProjectCommandInputSchema,
   archiveResourceCommandInputSchema,
+  attachResourceStorageCommandInputSchema,
   BootstrapServerProxyCommand,
   bootstrapServerProxyCommandInputSchema,
   CheckDomainBindingDeleteSafetyQuery,
@@ -30,6 +32,7 @@ import {
   CreateProjectCommand,
   CreateResourceCommand,
   CreateSshCredentialCommand,
+  CreateStorageVolumeCommand,
   checkDomainBindingDeleteSafetyQueryInputSchema,
   checkServerDeleteSafetyQueryInputSchema,
   cloneEnvironmentCommandInputSchema,
@@ -49,18 +52,21 @@ import {
   createProjectCommandInputSchema,
   createResourceCommandInputSchema,
   createSshCredentialCommandInputSchema,
+  createStorageVolumeCommandInputSchema,
   DeactivateServerCommand,
   DeleteCertificateCommand,
   DeleteDomainBindingCommand,
   DeleteResourceCommand,
   DeleteServerCommand,
   DeleteSshCredentialCommand,
+  DeleteStorageVolumeCommand,
   type DeploymentEventStreamEnvelope,
   DeploymentLogsQuery,
   DeploymentPlanQuery,
   type DeploymentProgressEvent,
   type DeploymentProgressObserver,
   DeploymentRecoveryReadinessQuery,
+  DetachResourceStorageCommand,
   DiffEnvironmentsQuery,
   deactivateServerCommandInputSchema,
   deleteCertificateCommandInputSchema,
@@ -68,9 +74,11 @@ import {
   deleteResourceCommandInputSchema,
   deleteServerCommandInputSchema,
   deleteSshCredentialCommandInputSchema,
+  deleteStorageVolumeCommandInputSchema,
   deploymentLogsQueryInputSchema,
   deploymentPlanQueryInputSchema,
   deploymentRecoveryReadinessQueryInputSchema,
+  detachResourceStorageCommandInputSchema,
   diffEnvironmentsQueryInputSchema,
   EnvironmentEffectivePrecedenceQuery,
   type ExecutionContext,
@@ -95,6 +103,7 @@ import {
   ListResourcesQuery,
   ListServersQuery,
   ListSshCredentialsQuery,
+  ListStorageVolumesQuery,
   LockEnvironmentCommand,
   listCertificatesQueryInputSchema,
   listDefaultAccessDomainPoliciesQueryInputSchema,
@@ -105,6 +114,7 @@ import {
   listOperatorWorkQueryInputSchema,
   listResourcesQueryInputSchema,
   listSshCredentialsQueryInputSchema,
+  listStorageVolumesQueryInputSchema,
   lockEnvironmentCommandInputSchema,
   OpenTerminalSessionCommand,
   openTerminalSessionCommandInputSchema,
@@ -116,6 +126,7 @@ import {
   RenameEnvironmentCommand,
   RenameProjectCommand,
   RenameServerCommand,
+  RenameStorageVolumeCommand,
   ResourceAccessFailureEvidenceLookupQuery,
   ResourceDiagnosticSummaryQuery,
   ResourceEffectiveConfigQuery,
@@ -133,6 +144,7 @@ import {
   renameEnvironmentCommandInputSchema,
   renameProjectCommandInputSchema,
   renameServerCommandInputSchema,
+  renameStorageVolumeCommandInputSchema,
   resourceAccessFailureEvidenceLookupQueryInputSchema,
   resourceDiagnosticSummaryQueryInputSchema,
   resourceEffectiveConfigQueryInputSchema,
@@ -155,6 +167,7 @@ import {
   ShowResourceQuery,
   ShowServerQuery,
   ShowSshCredentialQuery,
+  ShowStorageVolumeQuery,
   StreamDeploymentEventsQuery,
   type StreamDeploymentEventsQueryInput,
   type StreamDeploymentEventsResult,
@@ -170,6 +183,7 @@ import {
   showResourceQueryInputSchema,
   showServerQueryInputSchema,
   showSshCredentialQueryInputSchema,
+  showStorageVolumeQueryInputSchema,
   streamDeploymentEventsQueryInputSchema,
   TestServerConnectivityCommand,
   testDraftServerConnectivityCommandInputSchema,
@@ -185,6 +199,7 @@ import {
   archiveEnvironmentResponseSchema,
   archiveProjectResponseSchema,
   archiveResourceResponseSchema,
+  attachResourceStorageResponseSchema,
   bootstrapServerProxyResponseSchema,
   checkDomainBindingDeleteSafetyResponseSchema,
   checkServerDeleteSafetyResponseSchema,
@@ -204,12 +219,14 @@ import {
   createProjectResponseSchema,
   createResourceResponseSchema,
   createSshCredentialResponseSchema,
+  createStorageVolumeResponseSchema,
   deactivateServerResponseSchema,
   deleteCertificateResponseSchema,
   deleteDomainBindingResponseSchema,
   deleteResourceResponseSchema,
   deleteServerResponseSchema,
   deleteSshCredentialResponseSchema,
+  deleteStorageVolumeResponseSchema,
   deploymentEventStreamEnvelopeSchema,
   deploymentEventStreamResponseSchema,
   deploymentEventStreamStreamResponseSchema,
@@ -217,6 +234,7 @@ import {
   deploymentPlanResponseSchema,
   deploymentProgressEventSchema,
   deploymentRecoveryReadinessResponseSchema,
+  detachResourceStorageResponseSchema,
   diffEnvironmentResponseSchema,
   environmentEffectivePrecedenceResponseSchema,
   environmentSummarySchema,
@@ -236,6 +254,7 @@ import {
   listResourcesResponseSchema,
   listServersResponseSchema,
   listSshCredentialsResponseSchema,
+  listStorageVolumesResponseSchema,
   lockEnvironmentResponseSchema,
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
@@ -243,6 +262,7 @@ import {
   renameEnvironmentResponseSchema,
   renameProjectResponseSchema,
   renameServerResponseSchema,
+  renameStorageVolumeResponseSchema,
   resourceAccessFailureEvidenceLookupSchema,
   resourceDetailSchema,
   resourceDiagnosticSummarySchema,
@@ -264,6 +284,7 @@ import {
   showProjectResponseSchema,
   showServerResponseSchema,
   showSshCredentialResponseSchema,
+  showStorageVolumeResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
   unlockEnvironmentResponseSchema,
@@ -341,6 +362,7 @@ export const apiDocsHrefs = {
   operatorWorkLedger: resolvePublicDocsHelpHref("operator.work-ledger"),
   terminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
+  storageVolumeLifecycle: resolvePublicDocsHelpHref("storage.volume-lifecycle"),
 } as const;
 
 export const apiRouteDescriptions = {
@@ -440,6 +462,34 @@ export const apiRouteDescriptions = {
   configureResourceAccess: routeDescription(
     "Configures resource participation in generated default access route planning.",
     "resource.access-profile",
+  ),
+  attachResourceStorage: routeDescription(
+    "Attaches an existing storage volume to a resource at a validated destination path.",
+    "storage.volume-lifecycle",
+  ),
+  detachResourceStorage: routeDescription(
+    "Detaches storage from a resource without deleting the underlying volume.",
+    "storage.volume-lifecycle",
+  ),
+  createStorageVolume: routeDescription(
+    "Creates provider-neutral durable storage metadata for a named volume or bind mount.",
+    "storage.volume-lifecycle",
+  ),
+  listStorageVolumes: routeDescription(
+    "Lists storage volumes with safe resource attachment summaries.",
+    "storage.volume-lifecycle",
+  ),
+  showStorageVolume: routeDescription(
+    "Reads one storage volume with safe resource attachment summaries.",
+    "storage.volume-lifecycle",
+  ),
+  renameStorageVolume: routeDescription(
+    "Renames one storage volume without changing resource attachments or runtime state.",
+    "storage.volume-lifecycle",
+  ),
+  deleteStorageVolume: routeDescription(
+    "Deletes only unattached storage volumes that are not blocked by backup retention metadata.",
+    "storage.volume-lifecycle",
   ),
   setResourceVariable: routeDescription(
     "Sets one resource-scoped variable or secret override.",
@@ -1490,6 +1540,32 @@ export const configureResourceAccessProcedure = base
     executeCommand(context, ConfigureResourceAccessCommand.create(input)),
   );
 
+export const attachResourceStorageProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/storage-attachments",
+    description: apiRouteDescriptions.attachResourceStorage,
+    successStatus: 200,
+  })
+  .input(attachResourceStorageCommandInputSchema)
+  .output(attachResourceStorageResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, AttachResourceStorageCommand.create(input)),
+  );
+
+export const detachResourceStorageProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/resources/{resourceId}/storage-attachments/{attachmentId}",
+    description: apiRouteDescriptions.detachResourceStorage,
+    successStatus: 200,
+  })
+  .input(detachResourceStorageCommandInputSchema)
+  .output(detachResourceStorageResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DetachResourceStorageCommand.create(input)),
+  );
+
 export const configureResourceRuntimeProcedure = base
   .route({
     method: "POST",
@@ -2139,6 +2215,71 @@ export const resourceProxyConfigurationPreviewProcedure = base
     executeQuery(context, ResourceProxyConfigurationPreviewQuery.create(input)),
   );
 
+export const createStorageVolumeProcedure = base
+  .route({
+    method: "POST",
+    path: "/storage-volumes",
+    description: apiRouteDescriptions.createStorageVolume,
+    successStatus: 201,
+  })
+  .input(createStorageVolumeCommandInputSchema)
+  .output(createStorageVolumeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateStorageVolumeCommand.create(input)),
+  );
+
+export const listStorageVolumesProcedure = base
+  .route({
+    method: "GET",
+    path: "/storage-volumes",
+    description: apiRouteDescriptions.listStorageVolumes,
+    successStatus: 200,
+  })
+  .input(listStorageVolumesQueryInputSchema)
+  .output(listStorageVolumesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListStorageVolumesQuery.create(input)),
+  );
+
+export const showStorageVolumeProcedure = base
+  .route({
+    method: "GET",
+    path: "/storage-volumes/{storageVolumeId}",
+    description: apiRouteDescriptions.showStorageVolume,
+    successStatus: 200,
+  })
+  .input(showStorageVolumeQueryInputSchema)
+  .output(showStorageVolumeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowStorageVolumeQuery.create(input)),
+  );
+
+export const renameStorageVolumeProcedure = base
+  .route({
+    method: "POST",
+    path: "/storage-volumes/{storageVolumeId}/rename",
+    description: apiRouteDescriptions.renameStorageVolume,
+    successStatus: 200,
+  })
+  .input(renameStorageVolumeCommandInputSchema)
+  .output(renameStorageVolumeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RenameStorageVolumeCommand.create(input)),
+  );
+
+export const deleteStorageVolumeProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/storage-volumes/{storageVolumeId}",
+    description: apiRouteDescriptions.deleteStorageVolume,
+    successStatus: 200,
+  })
+  .input(deleteStorageVolumeCommandInputSchema)
+  .output(deleteStorageVolumeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteStorageVolumeCommand.create(input)),
+  );
+
 export const openTerminalSessionProcedure = base
   .route({
     method: "POST",
@@ -2242,6 +2383,8 @@ export const appaloftOrpcRouter = {
     configureHealth: configureResourceHealthProcedure,
     configureNetwork: configureResourceNetworkProcedure,
     configureAccess: configureResourceAccessProcedure,
+    attachStorage: attachResourceStorageProcedure,
+    detachStorage: detachResourceStorageProcedure,
     configureRuntime: configureResourceRuntimeProcedure,
     configureSource: configureResourceSourceProcedure,
     setVariable: setResourceVariableProcedure,
@@ -2254,6 +2397,13 @@ export const appaloftOrpcRouter = {
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
     logs: resourceRuntimeLogsProcedure,
     logsStream: resourceRuntimeLogsStreamProcedure,
+  },
+  storageVolumes: {
+    create: createStorageVolumeProcedure,
+    list: listStorageVolumesProcedure,
+    show: showStorageVolumeProcedure,
+    rename: renameStorageVolumeProcedure,
+    delete: deleteStorageVolumeProcedure,
   },
   terminalSessions: {
     open: openTerminalSessionProcedure,

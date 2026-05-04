@@ -18,7 +18,7 @@ Appaloft is not primarily "server CRUD". Its core project-facing flow is:
 Resources are the deployable units users organize inside environments. Workloads, config,
 dependency bindings, releases, and runtime targets sit underneath that flow:
 
-`Resource -> Workload -> Config / Resource Binding -> Release -> Deployment`
+`Resource -> Workload -> Config / Storage Attachment / Resource Binding -> Release -> Deployment`
 
 Runtime placement is a separate relationship:
 
@@ -45,6 +45,9 @@ dispatching explicit operations. The final deployment write remains `deployments
 - release and deployment are different concepts
 - environment is a first-class domain object
 - resource binding must remain an explicit domain concept
+- storage volumes and resource storage attachments are explicit domain concepts; provider-native
+  Docker/Compose/Swarm volume realization belongs behind runtime adapters and future deployment
+  snapshot materialization
 - core does not depend on Elysia, tsyringe, Kysely, PostgreSQL drivers, or UI frameworks
 - repositories exist only for aggregate roots
 - entities and value objects are persisted through the owning aggregate root, never through standalone repositories
@@ -88,6 +91,9 @@ Allowed mutation names are specific to the aggregate language, for example:
 - `certificates.issue-or-renew`, `certificates.retry`, `certificates.revoke`, and
   `certificates.delete` instead of `certificates.update`;
 - `certificates.show` instead of a transport-specific certificate detail read.
+- `storage-volumes.rename` instead of `storage-volumes.update`;
+- `resources.attach-storage` and `resources.detach-storage` instead of editing an untyped mount
+  array.
 
 If a future behavior appears to require one broad update command, the model is not specific enough.
 The behavior must be split into separate domain commands or first receive an ADR/spec that defines a
@@ -727,12 +733,39 @@ Rules:
   stop another resource
 - generated default access routes target `ResourceNetworkProfile.internalPort` through the selected
   deployment target's edge proxy and do not require public host publication of the application port
+- resource storage attachments belong to the Resource profile. Attach/detach affects future
+  deployment snapshots only and does not apply mounts to current runtime state or rewrite historical
+  deployment snapshots
+- one Resource may not attach two storage volumes at the same normalized destination path
 
 Current scope:
 - foundational aggregate in `core`
 - persisted and listed through application read models
 - deployment creation can resolve, bootstrap, and attach a resource and destination
 - current code stores the listener port as `ResourceNetworkProfile.internalPort`, governed by [ADR-015: Resource Network Profile](./decisions/ADR-015-resource-network-profile.md)
+
+### StorageVolume
+
+Meaning:
+- project/environment-scoped durable storage identity
+- can represent a provider-neutral named volume or a trusted bind mount source path
+- can be attached to one or more Resources through resource-owned attachment records
+
+Rules:
+- names are unique within a project environment
+- `named-volume` stores provider-neutral identity only; runtime adapters may later map it to
+  Docker/Compose/Swarm provider-native storage
+- `bind-mount` stores a trusted source path as adapter/runtime boundary data after strict path
+  validation
+- deletion is blocked while any active Resource attachment references the volume
+- backup relationship metadata is metadata-only in this slice, but it participates in delete safety
+- storage commands do not create deployments, provision provider-native volumes, run backup/restore,
+  prune runtime state, or mutate historical deployment snapshots
+
+Current scope:
+- Phase 7 baseline aggregate planned under
+  [Storage Volume Lifecycle And Resource Attachment](./specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md)
+- intended to feed provider-neutral storage mount metadata into future deployment snapshots
 
 ### Release
 

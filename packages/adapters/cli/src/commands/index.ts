@@ -14,6 +14,7 @@ import { remoteStateCommand } from "./remote-state.js";
 import { resourceCommand } from "./resource.js";
 import { serverCommand } from "./server.js";
 import { sourceLinksCommand } from "./source-link.js";
+import { storageCommand } from "./storage.js";
 
 export const mainCommand = EffectCommand.make("appaloft").pipe(
   EffectCommand.withDescription("AI Native local-to-cloud deployment platform"),
@@ -26,6 +27,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     defaultAccessCommand,
     projectCommand,
     resourceCommand,
+    storageCommand,
     serverCommand,
     domainBindingCommand,
     certificateCommand,

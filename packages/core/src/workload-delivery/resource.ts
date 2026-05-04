@@ -16,6 +16,8 @@ import {
   type EnvironmentSnapshotId,
   type ProjectId,
   type ResourceId,
+  type ResourceStorageAttachmentId,
+  type StorageVolumeId,
 } from "../shared/identifiers";
 import {
   type HealthCheckExpectedStatusCode,
@@ -70,6 +72,7 @@ import {
   ResourceSourceBinding,
   type ResourceSourceBindingState,
 } from "./source-binding";
+import { type ResourceStorageMountModeValue, type StorageDestinationPath } from "./storage-volume";
 
 export interface ResourceServiceState {
   name: ResourceServiceName;
@@ -410,6 +413,14 @@ export interface ResourceAccessProfileState {
   pathPrefix: RoutePathPrefix;
 }
 
+export interface ResourceStorageAttachmentState {
+  id: ResourceStorageAttachmentId;
+  storageVolumeId: StorageVolumeId;
+  destinationPath: StorageDestinationPath;
+  mountMode: ResourceStorageMountModeValue;
+  attachedAt: CreatedAt;
+}
+
 export interface ResourceState {
   id: ResourceId;
   projectId: ProjectId;
@@ -423,6 +434,7 @@ export interface ResourceState {
   runtimeProfile?: ResourceRuntimeProfileState;
   networkProfile?: ResourceNetworkProfileState;
   accessProfile?: ResourceAccessProfileState;
+  storageAttachments: ResourceStorageAttachmentState[];
   variables: EnvironmentConfigSet;
   lifecycleStatus: ResourceLifecycleStatusValue;
   archivedAt?: ArchivedAt;
@@ -463,6 +475,12 @@ function cloneResourceAccessProfileState(
   profile: ResourceAccessProfileState,
 ): ResourceAccessProfileState {
   return { ...profile };
+}
+
+function cloneResourceStorageAttachmentState(
+  attachment: ResourceStorageAttachmentState,
+): ResourceStorageAttachmentState {
+  return { ...attachment };
 }
 
 export type ResourceVariableState = ReturnType<EnvironmentConfigSet["toState"]>[number];
@@ -709,9 +727,15 @@ export interface ResourceVisitor<TContext, TResult> {
 
 type ResourceRehydrateState = Omit<
   ResourceState,
-  "archiveReason" | "archivedAt" | "deletedAt" | "lifecycleStatus" | "variables"
+  | "archiveReason"
+  | "archivedAt"
+  | "deletedAt"
+  | "lifecycleStatus"
+  | "storageAttachments"
+  | "variables"
 > &
   Partial<Pick<ResourceState, "archiveReason" | "archivedAt" | "deletedAt" | "lifecycleStatus">> & {
+    storageAttachments?: ResourceStorageAttachmentState[];
     variables?: EnvironmentConfigSet;
   };
 
@@ -800,6 +824,7 @@ export class Resource extends AggregateRoot<ResourceState> {
         ...(input.accessProfile
           ? { accessProfile: cloneResourceAccessProfileState(input.accessProfile) }
           : {}),
+        storageAttachments: [],
         variables: EnvironmentConfigSet.rehydrate(input.variables ?? []),
         lifecycleStatus: ResourceLifecycleStatusValue.active(),
         createdAt: input.createdAt,
@@ -866,6 +891,7 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(state.accessProfile
         ? { accessProfile: cloneResourceAccessProfileState(state.accessProfile) }
         : {}),
+      storageAttachments: (state.storageAttachments ?? []).map(cloneResourceStorageAttachmentState),
       variables: EnvironmentConfigSet.rehydrate(state.variables?.toState() ?? []),
       lifecycleStatus: state.lifecycleStatus ?? ResourceLifecycleStatusValue.active(),
       ...(state.archivedAt ? { archivedAt: state.archivedAt } : {}),
@@ -988,6 +1014,90 @@ export class Resource extends AggregateRoot<ResourceState> {
         });
         return undefined;
       });
+  }
+
+  attachStorage(input: {
+    attachmentId: ResourceStorageAttachmentId;
+    storageVolumeId: StorageVolumeId;
+    destinationPath: StorageDestinationPath;
+    mountMode: ResourceStorageMountModeValue;
+    attachedAt: CreatedAt;
+  }): Result<void> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.attach-storage");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    if (
+      this.state.storageAttachments.some((attachment) =>
+        attachment.destinationPath.equals(input.destinationPath),
+      )
+    ) {
+      return err(
+        domainError.conflict("resource_storage_destination_conflict", {
+          phase: "resource-storage-attachment",
+          resourceId: this.state.id.value,
+          destinationPath: input.destinationPath.value,
+        }),
+      );
+    }
+
+    this.state.storageAttachments = [
+      ...this.state.storageAttachments,
+      {
+        id: input.attachmentId,
+        storageVolumeId: input.storageVolumeId,
+        destinationPath: input.destinationPath,
+        mountMode: input.mountMode,
+        attachedAt: input.attachedAt,
+      },
+    ];
+
+    this.recordDomainEvent("resource-storage-attached", input.attachedAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      attachmentId: input.attachmentId.value,
+      storageVolumeId: input.storageVolumeId.value,
+      destinationPath: input.destinationPath.value,
+      mountMode: input.mountMode.value,
+      attachedAt: input.attachedAt.value,
+    });
+
+    return ok(undefined);
+  }
+
+  detachStorage(input: {
+    attachmentId: ResourceStorageAttachmentId;
+    detachedAt: UpdatedAt;
+  }): Result<{ changed: boolean }> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.detach-storage");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    const attachment = this.state.storageAttachments.find((candidate) =>
+      candidate.id.equals(input.attachmentId),
+    );
+    if (!attachment) {
+      return err(domainError.notFound("resource_storage_attachment", input.attachmentId.value));
+    }
+
+    this.state.storageAttachments = this.state.storageAttachments.filter(
+      (candidate) => !candidate.id.equals(input.attachmentId),
+    );
+
+    this.recordDomainEvent("resource-storage-detached", input.detachedAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      attachmentId: input.attachmentId.value,
+      storageVolumeId: attachment.storageVolumeId.value,
+      destinationPath: attachment.destinationPath.value,
+      detachedAt: input.detachedAt.value,
+    });
+
+    return ok({ changed: true });
   }
 
   importVariables(input: {
@@ -1497,6 +1607,7 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(this.state.accessProfile
         ? { accessProfile: cloneResourceAccessProfileState(this.state.accessProfile) }
         : {}),
+      storageAttachments: this.state.storageAttachments.map(cloneResourceStorageAttachmentState),
       variables: EnvironmentConfigSet.rehydrate(this.state.variables.toState()),
     };
   }

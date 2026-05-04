@@ -44,6 +44,9 @@ import {
   type ServerReadModel,
   type ServerRepository,
   type ServerSummary,
+  type StorageVolumeReadModel,
+  type StorageVolumeRepository,
+  type StorageVolumeSummary,
 } from "@appaloft/application";
 import {
   ActiveDomainBindingByOwnerAndRouteSpec,
@@ -96,6 +99,11 @@ import {
   type ResourceMutationSpec,
   type ResourceSelectionSpec,
   type Result,
+  StorageVolume,
+  StorageVolumeByEnvironmentAndSlugSpec,
+  StorageVolumeByIdSpec,
+  type StorageVolumeMutationSpec,
+  type StorageVolumeSelectionSpec,
 } from "@appaloft/core";
 
 export class FixedClock implements Clock {
@@ -818,6 +826,129 @@ export class MemoryResourceReadModel implements ResourceReadModel {
     }
 
     return null;
+  }
+}
+
+export class MemoryStorageVolumeRepository implements StorageVolumeRepository {
+  readonly items = new Map<string, StorageVolume>();
+
+  async upsert(
+    context: RepositoryContext,
+    storageVolume: StorageVolume,
+    spec: StorageVolumeMutationSpec,
+  ): Promise<void> {
+    void context;
+    void spec;
+    this.items.set(storageVolume.id.value, StorageVolume.rehydrate(storageVolume.toState()));
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: StorageVolumeSelectionSpec,
+  ): Promise<StorageVolume | null> {
+    void context;
+    if (spec instanceof StorageVolumeByIdSpec) {
+      return this.items.get(spec.id.value) ?? null;
+    }
+
+    if (spec instanceof StorageVolumeByEnvironmentAndSlugSpec) {
+      for (const storageVolume of this.items.values()) {
+        if (spec.isSatisfiedBy(storageVolume)) {
+          return storageVolume;
+        }
+      }
+    }
+
+    return null;
+  }
+}
+
+export class MemoryStorageVolumeReadModel implements StorageVolumeReadModel {
+  constructor(
+    private readonly repository: MemoryStorageVolumeRepository,
+    private readonly resources?: MemoryResourceRepository,
+  ) {}
+
+  private attachments(storageVolumeId: string): StorageVolumeSummary["attachments"] {
+    return [...(this.resources?.items.values() ?? [])]
+      .map((resource) => resource.toState())
+      .flatMap((resource) =>
+        resource.storageAttachments
+          .filter((attachment) => attachment.storageVolumeId.value === storageVolumeId)
+          .map((attachment) => ({
+            attachmentId: attachment.id.value,
+            resourceId: resource.id.value,
+            resourceName: resource.name.value,
+            resourceSlug: resource.slug.value,
+            destinationPath: attachment.destinationPath.value,
+            mountMode: attachment.mountMode.value,
+            attachedAt: attachment.attachedAt.value,
+          })),
+      );
+  }
+
+  private toSummary(storageVolume: StorageVolume): StorageVolumeSummary {
+    const state = storageVolume.toState();
+    const attachments = this.attachments(state.id.value);
+    return {
+      id: state.id.value,
+      projectId: state.projectId.value,
+      environmentId: state.environmentId.value,
+      name: state.name.value,
+      slug: state.slug.value,
+      kind: state.kind.value,
+      ...(state.sourcePath ? { sourcePath: state.sourcePath.value } : {}),
+      ...(state.description ? { description: state.description.value } : {}),
+      lifecycleStatus: state.lifecycleStatus.value,
+      ...(state.backupRelationship
+        ? {
+            backupRelationship: {
+              retentionRequired: state.backupRelationship.retentionRequired,
+              ...(state.backupRelationship.reason
+                ? { reason: state.backupRelationship.reason.value }
+                : {}),
+            },
+          }
+        : {}),
+      attachmentCount: attachments.length,
+      attachments,
+      createdAt: state.createdAt.value,
+      ...(state.deletedAt ? { deletedAt: state.deletedAt.value } : {}),
+    };
+  }
+
+  async list(
+    context: RepositoryContext,
+    input?: { projectId?: string; environmentId?: string },
+  ): Promise<StorageVolumeSummary[]> {
+    void context;
+    return [...this.repository.items.values()]
+      .filter((storageVolume) => !storageVolume.toState().lifecycleStatus.isDeleted())
+      .filter((storageVolume) =>
+        input?.projectId ? storageVolume.toState().projectId.value === input.projectId : true,
+      )
+      .filter((storageVolume) =>
+        input?.environmentId
+          ? storageVolume.toState().environmentId.value === input.environmentId
+          : true,
+      )
+      .map((storageVolume) => this.toSummary(storageVolume));
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: StorageVolumeSelectionSpec,
+  ): Promise<StorageVolumeSummary | null> {
+    const storageVolume = await this.repository.findOne(context, spec);
+    if (!storageVolume || storageVolume.toState().lifecycleStatus.isDeleted()) {
+      return null;
+    }
+    return this.toSummary(storageVolume);
+  }
+
+  async countAttachments(context: RepositoryContext, storageVolumeId: string): Promise<number> {
+    void context;
+    return this.attachments(storageVolumeId).length;
   }
 }
 

@@ -817,14 +817,20 @@ Current verification notes:
   resource secret classification/masking, and `resources.effective-config` override summaries. This
   does not satisfy the full `0.9.0` release rule while storage, dependency resources, recovery,
   auto-deploy, preview, and cluster runtime items remain open.
+- 2026-05-04 Phase 7 baseline slice implemented provider-neutral storage volume
+  create/list/show/rename/delete plus Resource storage attach/detach contracts, destination path
+  validation, attachment read models, delete safety, and backup relationship metadata placeholders.
+  This still does not satisfy the full `0.9.0` release rule while Postgres/Redis provisioning,
+  dependency binding, backup/restore, recovery, auto-deploy, preview, and cluster runtime items
+  remain open.
 
 Required:
 
 - [ ] Add resource-scoped environment variable operations.
 - [ ] Add secret operations with build/runtime exposure rules, masking, `.env` import/paste, and
   effective config queries.
-- [ ] Add storage/volume create/list/show/update/delete.
-- [ ] Add storage attach/detach, bind mount versus named volume, destination path validation, and
+- [x] Add storage/volume create/list/show/update/delete.
+- [x] Add storage attach/detach, bind mount versus named volume, destination path validation, and
   backup relationship metadata.
 - [ ] Add Postgres provisioning/import/list/show/update/delete.
 - [ ] Add Redis provisioning/import/list/show/update/delete.

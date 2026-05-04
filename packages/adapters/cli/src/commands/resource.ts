@@ -1,5 +1,6 @@
 import {
   ArchiveResourceCommand,
+  AttachResourceStorageCommand,
   ConfigureResourceAccessCommand,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
@@ -7,6 +8,7 @@ import {
   ConfigureResourceSourceCommand,
   CreateResourceCommand,
   DeleteResourceCommand,
+  DetachResourceStorageCommand,
   ImportResourceVariablesCommand,
   ListResourcesQuery,
   OpenTerminalSessionCommand,
@@ -42,6 +44,8 @@ import {
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const resourceIdArg = Args.text({ name: "resourceId" });
+const storageVolumeIdArg = Args.text({ name: "storageVolumeId" });
+const resourceStorageAttachmentIdArg = Args.text({ name: "attachmentId" });
 const accessFailureRequestIdArg = Args.text({ name: "requestId" });
 const projectOption = Options.text("project").pipe(Options.optional);
 const environmentOption = Options.text("environment").pipe(Options.optional);
@@ -145,6 +149,10 @@ const variableKindOption = Options.choice("kind", variableKinds).pipe(
 );
 const variableSecretOption = Options.boolean("secret").pipe(Options.withDefault(false));
 const importContentOption = Options.text("content");
+const storageDestinationPathOption = Options.text("destination-path");
+const storageMountModeOption = Options.choice("mount-mode", ["read-write", "read-only"]).pipe(
+  Options.withDefault("read-write"),
+);
 
 const listCommand = EffectCommand.make(
   "list",
@@ -576,6 +584,45 @@ const configureAccessCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureAccess));
 
+const attachStorageCommand = EffectCommand.make(
+  "attach",
+  {
+    resourceId: resourceIdArg,
+    storageVolumeId: storageVolumeIdArg,
+    destinationPath: storageDestinationPathOption,
+    mountMode: storageMountModeOption,
+  },
+  ({ destinationPath, mountMode, resourceId, storageVolumeId }) =>
+    runCommand(
+      AttachResourceStorageCommand.create({
+        resourceId,
+        storageVolumeId,
+        destinationPath,
+        mountMode,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceAttachStorage));
+
+const detachStorageCommand = EffectCommand.make(
+  "detach",
+  {
+    resourceId: resourceIdArg,
+    attachmentId: resourceStorageAttachmentIdArg,
+  },
+  ({ attachmentId, resourceId }) =>
+    runCommand(
+      DetachResourceStorageCommand.create({
+        resourceId,
+        attachmentId,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDetachStorage));
+
+const storageCommand = EffectCommand.make("storage").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.resourceStorage),
+  EffectCommand.withSubcommands([attachStorageCommand, detachStorageCommand]),
+);
+
 const configureRuntimeCommand = EffectCommand.make(
   "configure-runtime",
   {
@@ -728,6 +775,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     configureHealthCommand,
     configureNetworkCommand,
     configureAccessCommand,
+    storageCommand,
     proxyConfigCommand,
     diagnoseCommand,
   ]),
