@@ -26,3 +26,4 @@ export * from "./server-repository";
 export * from "./source-link-repository";
 export * from "./ssh-credential-read-model";
 export * from "./ssh-credential-repository";
+export * from "./storage-volume-repository";

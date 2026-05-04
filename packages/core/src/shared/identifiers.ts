@@ -199,6 +199,48 @@ export class ResourceId extends IdentifierValue {
   }
 }
 
+const storageVolumeIdBrand: unique symbol = Symbol("StorageVolumeId");
+export class StorageVolumeId extends IdentifierValue {
+  private [storageVolumeIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<StorageVolumeId> {
+    return createIdentifierValue(
+      value,
+      "Storage volume ID",
+      (normalized) => new StorageVolumeId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): StorageVolumeId {
+    return new StorageVolumeId(value.trim());
+  }
+}
+
+const resourceStorageAttachmentIdBrand: unique symbol = Symbol("ResourceStorageAttachmentId");
+export class ResourceStorageAttachmentId extends IdentifierValue {
+  private [resourceStorageAttachmentIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceStorageAttachmentId> {
+    return createIdentifierValue(
+      value,
+      "Resource storage attachment ID",
+      (normalized) => new ResourceStorageAttachmentId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): ResourceStorageAttachmentId {
+    return new ResourceStorageAttachmentId(value.trim());
+  }
+}
+
 const resourceInstanceIdBrand: unique symbol = Symbol("ResourceInstanceId");
 export class ResourceInstanceId extends IdentifierValue {
   private [resourceInstanceIdBrand]!: void;

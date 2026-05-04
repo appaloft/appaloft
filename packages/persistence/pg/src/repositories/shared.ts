@@ -127,6 +127,8 @@ import {
   ResourceServiceKindValue,
   ResourceServiceName,
   ResourceSlug,
+  ResourceStorageAttachmentId,
+  ResourceStorageMountModeValue,
   RotatedAt,
   RoutePathPrefix,
   RuntimeArtifactIntentValue,
@@ -161,6 +163,8 @@ import {
   SshPublicKeyText,
   StartedAt,
   StaticPublishDirectory,
+  StorageDestinationPath,
+  StorageVolumeId,
   TargetKindValue,
   TlsModeValue,
   UpdatedAt,
@@ -173,6 +177,7 @@ import { type Database } from "../schema";
 
 export type EnvironmentVariableRow = Selectable<Database["environment_variables"]>;
 export type ResourceVariableRow = Selectable<Database["resource_variables"]>;
+export type ResourceStorageAttachmentRow = Selectable<Database["resource_storage_attachments"]>;
 type SourceKindInput = Parameters<typeof SourceKindValue.rehydrate>[0];
 type BuildStrategyInput = Parameters<typeof BuildStrategyKindValue.rehydrate>[0];
 type PackagingModeInput = Parameters<typeof PackagingModeValue.rehydrate>[0];
@@ -1378,6 +1383,7 @@ export function rehydrateCertificateRow(row: Selectable<Database["certificates"]
 export function rehydrateResourceRow(
   row: Selectable<Database["resources"]>,
   variables: ResourceVariableRow[] = [],
+  storageAttachments: ResourceStorageAttachmentRow[] = [],
 ) {
   const services = (row.services ?? []) as unknown as SerializedResourceService[];
   const sourceBinding = row.source_binding
@@ -1563,6 +1569,17 @@ export function rehydrateResourceRow(
           },
         }
       : {}),
+    storageAttachments: storageAttachments.map((attachment) => ({
+      id: ResourceStorageAttachmentId.rehydrate(attachment.id),
+      storageVolumeId: StorageVolumeId.rehydrate(attachment.storage_volume_id),
+      destinationPath: StorageDestinationPath.rehydrate(attachment.destination_path),
+      mountMode: ResourceStorageMountModeValue.rehydrate(
+        attachment.mount_mode as Parameters<typeof ResourceStorageMountModeValue.rehydrate>[0],
+      ),
+      attachedAt: CreatedAt.rehydrate(
+        normalizeTimestamp(attachment.attached_at) ?? attachment.attached_at,
+      ),
+    })),
     variables: rehydrateConfigSet(variables),
     lifecycleStatus: ResourceLifecycleStatusValue.rehydrate(
       row.lifecycle_status as ResourceLifecycleStatusInput,

@@ -61,6 +61,7 @@ class KyselyResourceMutationVisitor
     ResourceMutationSpecVisitor<{
       resource: Insertable<Database["resources"]>;
       variables: Insertable<Database["resource_variables"]>[];
+      storageAttachments: Insertable<Database["resource_storage_attachments"]>[];
     }>
 {
   visitUpsertResource(spec: UpsertResourceSpec) {
@@ -192,6 +193,14 @@ class KyselyResourceMutationVisitor
         is_secret: variable.is_secret,
         updated_at: variable.updated_at,
       })),
+      storageAttachments: spec.state.storageAttachments.map((attachment) => ({
+        id: attachment.id.value,
+        resource_id: spec.state.id.value,
+        storage_volume_id: attachment.storageVolumeId.value,
+        destination_path: attachment.destinationPath.value,
+        mount_mode: attachment.mountMode.value,
+        attached_at: attachment.attachedAt.value,
+      })),
     };
   }
 }
@@ -247,6 +256,18 @@ export class PgResourceRepository implements ResourceRepository {
           if (mutation.variables.length > 0) {
             await transaction.insertInto("resource_variables").values(mutation.variables).execute();
           }
+
+          await transaction
+            .deleteFrom("resource_storage_attachments")
+            .where("resource_id", "=", mutation.resource.id)
+            .execute();
+
+          if (mutation.storageAttachments.length > 0) {
+            await transaction
+              .insertInto("resource_storage_attachments")
+              .values(mutation.storageAttachments)
+              .execute();
+          }
         });
       },
     );
@@ -270,7 +291,14 @@ export class PgResourceRepository implements ResourceRepository {
       .orderBy("updated_at", "asc")
       .execute();
 
-    return Resource.rehydrate(rehydrateResourceRow(resourceRow, variables));
+    const storageAttachments = await executor
+      .selectFrom("resource_storage_attachments")
+      .selectAll()
+      .where("resource_id", "=", resourceRow.id)
+      .orderBy("attached_at", "asc")
+      .execute();
+
+    return Resource.rehydrate(rehydrateResourceRow(resourceRow, variables, storageAttachments));
   }
 
   async findOne(context: RepositoryContext, spec: ResourceSelectionSpec): Promise<Resource | null> {
