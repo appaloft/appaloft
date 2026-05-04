@@ -77,6 +77,8 @@ import {
   type ExecutionContext,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
+  ImportResourceVariablesCommandHandler,
+  ImportResourceVariablesUseCase,
   InspectServerCapacityQueryHandler,
   InspectServerCapacityQueryService,
   IssueCertificateOnCertificateRequestedHandler,
@@ -212,6 +214,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
   container.registerSingleton(ConfigureResourceSourceCommandHandler);
   container.registerSingleton(SetResourceVariableCommandHandler);
+  container.registerSingleton(ImportResourceVariablesCommandHandler);
   container.registerSingleton(UnsetResourceVariableCommandHandler);
   container.registerSingleton(ArchiveResourceCommandHandler);
   container.registerSingleton(DeleteResourceCommandHandler);
@@ -289,6 +292,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.configureResourceRuntimeUseCase,
     ConfigureResourceRuntimeUseCase,
+  );
+  container.registerSingleton(
+    tokens.importResourceVariablesUseCase,
+    ImportResourceVariablesUseCase,
   );
   container.registerSingleton(tokens.setResourceVariableUseCase, SetResourceVariableUseCase);
   container.registerSingleton(tokens.unsetResourceVariableUseCase, UnsetResourceVariableUseCase);

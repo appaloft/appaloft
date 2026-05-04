@@ -8,6 +8,7 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  ImportResourceVariablesCommand,
   type Query,
   type QueryBus,
   ResourceEffectiveConfigQuery,
@@ -138,6 +139,63 @@ describe("resource config HTTP routes", () => {
     });
   });
 
+  test("[RES-PROFILE-ENTRY-016] dispatches ImportResourceVariablesCommand through oRPC", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          resourceId: "res_web",
+          importedEntries: [],
+          duplicateOverrides: [],
+          existingOverrides: [],
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/rpc/resources/importVariables", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          json: {
+            resourceId: "res_web",
+            content: "DATABASE_URL=postgres://secret",
+            exposure: "runtime",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      json: {
+        resourceId: "res_web",
+        importedEntries: [],
+        duplicateOverrides: [],
+        existingOverrides: [],
+      },
+    });
+    expect(capturedCommand).toBeInstanceOf(ImportResourceVariablesCommand);
+    expect(capturedCommand).toMatchObject({
+      resourceId: "res_web",
+      content: "DATABASE_URL=postgres://secret",
+      exposure: "runtime",
+    });
+  });
+
   test("[RES-PROFILE-ENTRY-004] dispatches ResourceEffectiveConfigQuery through oRPC", async () => {
     let capturedQuery: Query<unknown> | undefined;
     const commandBus = {
@@ -153,6 +211,7 @@ describe("resource config HTTP routes", () => {
           environmentId: "env_demo",
           ownedEntries: [],
           effectiveEntries: [],
+          overrides: [],
           precedence: [
             "defaults",
             "system",
@@ -195,6 +254,7 @@ describe("resource config HTTP routes", () => {
         environmentId: "env_demo",
         ownedEntries: [],
         effectiveEntries: [],
+        overrides: [],
         precedence: [
           "defaults",
           "system",

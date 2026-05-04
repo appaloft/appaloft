@@ -33,6 +33,7 @@ import {
 
 import { createExecutionContext, toRepositoryContext } from "../src";
 import {
+  ImportResourceVariablesUseCase,
   ResourceEffectiveConfigQueryService,
   SetResourceVariableUseCase,
   UnsetResourceVariableUseCase,
@@ -121,6 +122,7 @@ async function createHarness(input?: { environment?: Environment; resource?: Res
     resources,
     eventBus,
     setVariableUseCase: new SetResourceVariableUseCase(resources, clock, eventBus, logger),
+    importVariablesUseCase: new ImportResourceVariablesUseCase(resources, clock, eventBus, logger),
     unsetVariableUseCase: new UnsetResourceVariableUseCase(resources, clock, eventBus, logger),
     effectiveConfigQueryService: new ResourceEffectiveConfigQueryService(
       resources,
@@ -382,6 +384,222 @@ describe("resource config operations", () => {
       code: "resource_archived",
       details: {
         commandName: "resources.unset-variable",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[RES-PROFILE-CONFIG-013] imports pasted runtime .env content with secret classification and masked response", async () => {
+    const { context, eventBus, effectiveConfigQueryService, importVariablesUseCase } =
+      await createHarness();
+
+    const result = await importVariablesUseCase.execute(context, {
+      resourceId: "res_web",
+      exposure: "runtime",
+      content: `
+        PUBLIC_BASE_URL=https://resource.example.test
+        DATABASE_URL=postgres://resource-secret
+      `,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      resourceId: "res_web",
+      importedEntries: [
+        {
+          key: "PUBLIC_BASE_URL",
+          value: "https://resource.example.test",
+          exposure: "runtime",
+          kind: "plain-config",
+          isSecret: false,
+          action: "created",
+        },
+        {
+          key: "DATABASE_URL",
+          value: "****",
+          exposure: "runtime",
+          kind: "secret",
+          isSecret: true,
+          action: "created",
+        },
+      ],
+    });
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("postgres://resource-secret");
+    expect(eventBus.events).toEqual([
+      expect.objectContaining({
+        type: "resource-variable-set",
+        payload: expect.objectContaining({
+          variableKey: "PUBLIC_BASE_URL",
+          isSecret: false,
+        }),
+      }),
+      expect.objectContaining({
+        type: "resource-variable-set",
+        payload: expect.objectContaining({
+          variableKey: "DATABASE_URL",
+          isSecret: true,
+        }),
+      }),
+    ]);
+
+    const queryResult = await effectiveConfigQueryService.execute(context, {
+      resourceId: "res_web",
+    });
+    expect(queryResult.isOk()).toBe(true);
+    expect(JSON.stringify(queryResult._unsafeUnwrap())).not.toContain("postgres://resource-secret");
+  });
+
+  test("[RES-PROFILE-CONFIG-014] rejects malformed .env import before mutating resource variables", async () => {
+    const { context, eventBus, importVariablesUseCase } = await createHarness();
+
+    const result = await importVariablesUseCase.execute(context, {
+      resourceId: "res_web",
+      exposure: "runtime",
+      content: "INVALID-KEY=value",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "resource-env-import-parse",
+        line: 1,
+        key: "INVALID-KEY",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[RES-PROFILE-CONFIG-015] rejects build-time non-public keys and build-time secrets", async () => {
+    const { context, eventBus, importVariablesUseCase } = await createHarness();
+
+    const nonPublic = await importVariablesUseCase.execute(context, {
+      resourceId: "res_web",
+      exposure: "build-time",
+      content: "API_URL=https://api.example.test",
+    });
+    const secret = await importVariablesUseCase.execute(context, {
+      resourceId: "res_web",
+      exposure: "build-time",
+      content: "PUBLIC_API_TOKEN=secret-token",
+    });
+
+    expect(nonPublic.isErr()).toBe(true);
+    expect(nonPublic._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "config-profile-resolution",
+        key: "API_URL",
+      },
+    });
+    expect(secret.isErr()).toBe(true);
+    expect(secret._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "config-secret-validation",
+        key: "PUBLIC_API_TOKEN",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[RES-PROFILE-CONFIG-016] reports duplicate last-wins and existing resource overrides without exposing secrets", async () => {
+    const resource = resourceFixture();
+    resource
+      .setVariable({
+        key: ConfigKey.rehydrate("DATABASE_URL"),
+        value: ConfigValueText.rehydrate("postgres://old-secret"),
+        kind: VariableKindValue.rehydrate("secret"),
+        exposure: VariableExposureValue.rehydrate("runtime"),
+        isSecret: true,
+        updatedAt: UpdatedAt.rehydrate("2026-01-01T00:00:04.000Z"),
+      })
+      ._unsafeUnwrap();
+    const { context, importVariablesUseCase } = await createHarness({ resource });
+
+    const result = await importVariablesUseCase.execute(context, {
+      resourceId: "res_web",
+      exposure: "runtime",
+      content: ["DATABASE_URL=postgres://first-secret", "DATABASE_URL=postgres://last-secret"].join(
+        "\n",
+      ),
+    });
+
+    expect(result.isOk()).toBe(true);
+    const output = result._unsafeUnwrap();
+    expect(output.importedEntries).toEqual([
+      expect.objectContaining({
+        key: "DATABASE_URL",
+        value: "****",
+        action: "replaced",
+        sourceLine: 2,
+      }),
+    ]);
+    expect(output.duplicateOverrides).toEqual([
+      {
+        key: "DATABASE_URL",
+        exposure: "runtime",
+        firstLine: 1,
+        lastLine: 2,
+        rule: "last-wins",
+      },
+    ]);
+    expect(output.existingOverrides).toEqual([
+      {
+        key: "DATABASE_URL",
+        exposure: "runtime",
+        previousScope: "resource",
+        rule: "resource-entry-replaced",
+      },
+    ]);
+    expect(JSON.stringify(output)).not.toContain("postgres://old-secret");
+    expect(JSON.stringify(output)).not.toContain("postgres://last-secret");
+  });
+
+  test("[RES-PROFILE-CONFIG-017] returns safe effective config override summaries", async () => {
+    const { context, effectiveConfigQueryService, setVariableUseCase } = await createHarness();
+
+    const setResult = await setVariableUseCase.execute(context, {
+      resourceId: "res_web",
+      key: "DATABASE_URL",
+      value: "postgres://resource",
+      kind: "secret",
+      exposure: "runtime",
+      isSecret: true,
+    });
+    expect(setResult.isOk()).toBe(true);
+
+    const queryResult = await effectiveConfigQueryService.execute(context, {
+      resourceId: "res_web",
+    });
+
+    expect(queryResult.isOk()).toBe(true);
+    expect(queryResult._unsafeUnwrap().overrides).toEqual([
+      {
+        key: "DATABASE_URL",
+        exposure: "runtime",
+        selectedScope: "resource",
+        overriddenScopes: ["environment"],
+      },
+    ]);
+  });
+
+  test("[RES-PROFILE-CONFIG-018] rejects importing variables for archived resources", async () => {
+    const { context, eventBus, importVariablesUseCase } = await createHarness({
+      resource: archivedResourceFixture(),
+    });
+
+    const result = await importVariablesUseCase.execute(context, {
+      resourceId: "res_web",
+      exposure: "runtime",
+      content: "APP_PORT=3100",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_archived",
+      details: {
+        commandName: "resources.import-variables",
       },
     });
     expect(eventBus.events).toHaveLength(0);

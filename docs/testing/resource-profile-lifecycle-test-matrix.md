@@ -92,6 +92,13 @@ generic `resources.update`.
 | RES-PROFILE-CONFIG-010 | `resources.effective-config` | Query service | Resource inherits environment-only variable. | Returns environment-owned effective entry and no resource-owned entry. |
 | RES-PROFILE-CONFIG-011 | `resources.effective-config` | Query service | Secret values are present. | Returns masked values only; no plaintext secret in owned or effective entries. |
 | RES-PROFILE-CONFIG-012 | `deployments.create` | Snapshot boundary | Resource-scoped variable exists at deployment admission. | Immutable deployment snapshot includes the resource-owned effective entry and retains `scope = "resource"` on the resolved snapshot variable. |
+| RES-PROFILE-CONFIG-013 | `resources.import-variables` | Command use case | Pasted runtime `.env` content contains plain and secret-like keys. | Stores resource-scoped entries, classifies secret-like keys as secrets, returns masked imported entries, and publishes `resource-variable-set` without raw secret values. |
+| RES-PROFILE-CONFIG-014 | `resources.import-variables` | Command use case | Pasted `.env` content contains an invalid key or malformed line. | Rejects with `validation_error`, `phase = resource-env-import-parse`, and no aggregate mutation. |
+| RES-PROFILE-CONFIG-015 | `resources.import-variables` | Command use case | Build-time import contains a non-public key or a secret-like key. | Rejects before persistence through build/runtime exposure rules. |
+| RES-PROFILE-CONFIG-016 | `resources.import-variables` | Command use case | Pasted content repeats a key and an existing resource entry already has that identity. | Last pasted occurrence wins, existing resource entry is replaced, and response reports duplicate/existing override metadata without raw secret values. |
+| RES-PROFILE-CONFIG-017 | `resources.effective-config` | Query service | Environment and resource define the same `key + exposure`. | Returns safe override summary with selected scope `resource` and overridden environment scope. |
+| RES-PROFILE-CONFIG-018 | `resources.import-variables` | Command use case | Archived resource receives a `.env` import. | Returns `resource_archived`, no event, no mutation. |
+| RES-PROFILE-CONFIG-019 | Operation catalog | Catalog | Resource import is public. | `resources.import-variables` appears in `CORE_OPERATIONS.md` and `operation-catalog.ts` with CLI and oRPC transports. |
 | DMBH-RES-NET-001 | `Resource` | Core domain unit | Resource network exposure mode and health-check type vary across direct-port, reverse-proxy, HTTP, and unsupported health checks. | `Resource` owns admission while exposure mode and health-check type value objects answer single-value predicates. |
 | RES-PROFILE-ARCHIVE-001 | `resources.archive` | Command use case | Active resource archived. | Persists archived lifecycle, publishes `resource-archived`, returns `ok({ id })`. |
 | RES-PROFILE-ARCHIVE-002 | `resources.archive` | Command use case | Already archived resource. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event. |
@@ -110,8 +117,8 @@ generic `resources.update`.
 | RES-PROFILE-DELETE-009 | `resource-deleted` | Event payload | Delete succeeds. | Event includes resource ids, `resourceSlug`, deleted timestamp, and no secrets, logs, certificate material, or provider configs. |
 | RES-PROFILE-ENTRY-001 | Web | Entrypoint | Resource detail page loads durable profile. | Dispatches `resources.show`; does not synthesize full detail from list-only data. |
 | RES-PROFILE-ENTRY-002 | Web | Entrypoint | Source/runtime/network/access/health/config/archive/delete actions submitted independently. | Each form/action dispatches its matching command and refetches detail/health/effective-config/list. |
-| RES-PROFILE-ENTRY-003 | CLI | Entrypoint | Resource profile commands are listed. | CLI exposes separate source/runtime/network/access/health/config/archive/delete subcommands and no generic `resource update`. |
-| RES-PROFILE-ENTRY-004 | HTTP/oRPC | Entrypoint | Routes accept show/source/runtime/network/access/health/config/archive/delete requests. | Each route reuses the application schema; no transport-only schema. |
+| RES-PROFILE-ENTRY-003 | CLI | Entrypoint | Resource profile commands are listed. | CLI exposes separate source/runtime/network/access/health/config/import/archive/delete subcommands and no generic `resource update`. |
+| RES-PROFILE-ENTRY-004 | HTTP/oRPC | Entrypoint | Routes accept show/source/runtime/network/access/health/config/import/archive/delete requests. | Each route reuses the application schema; no transport-only schema. |
 | RES-PROFILE-ENTRY-005 | Operation catalog | Catalog | Public exposure in Code Round. | Each active operation appears in `CORE_OPERATIONS.md` and `operation-catalog.ts` in the same change. |
 | RES-PROFILE-ENTRY-006 | CLI | Entrypoint | Delete command submitted with `--confirm-slug`. | Dispatches `DeleteResourceCommand` through `CommandBus`; no generic delete/update helper bypass. |
 | RES-PROFILE-ENTRY-007 | HTTP/oRPC | Entrypoint | Delete route submitted with command schema. | Dispatches `DeleteResourceCommand`; a follow-up `resources.show` for the deleted resource returns `not_found`. |
@@ -122,6 +129,8 @@ generic `resources.update`.
 | RES-PROFILE-ENTRY-012 | Web | Entrypoint | Resource detail source/runtime/network/access/health/configuration profile editors are visible. | The page states saves are durable resource-level edits for future deployments, verification, route planning, or deployment snapshot materialization; deployments are not created, historical deployment snapshots stay unchanged, current runtime is not restarted, domains are not bound, certificates are not issued, and proxy routes are not applied. |
 | RES-PROFILE-ENTRY-013 | Web | Entrypoint | Resource detail health settings submitted. | Dispatches `resources.configure-health`, invalidates resource detail/health state, and does not present the save as deployment, restart, or live health proof. |
 | RES-PROFILE-ENTRY-014 | Web | Entrypoint | Resource detail configuration override removed. | Dispatches `resources.unset-variable`, invalidates `resources.effective-config`, and does not mutate environment variables, historical deployment snapshots, or current runtime. |
+| RES-PROFILE-ENTRY-015 | CLI | Entrypoint | Resource `.env` import submitted. | Dispatches `ImportResourceVariablesCommand` through `CommandBus`; no CLI-only parser bypasses the application schema. |
+| RES-PROFILE-ENTRY-016 | HTTP/oRPC | Entrypoint | Resource `.env` import route submitted. | Dispatches `ImportResourceVariablesCommand` through `CommandBus` using the command schema. |
 | RES-PROFILE-ERROR-001 | Error mapping | Contract | Persistence failure before command success. | Returns `infra_error`, `phase = resource-persistence`. |
 | RES-PROFILE-ERROR-002 | Error mapping | Contract | Event publication/outbox failure before command success. | Returns `infra_error`, `phase = event-publication`. |
 | RES-PROFILE-ERROR-003 | Error mapping | Contract | Event consumer projection failure. | Records `phase = event-consumption` and does not reinterpret command success. |
@@ -139,6 +148,7 @@ Tests must assert that profile commands do not:
 - retarget source links;
 - write secrets into events, read models, errors, logs, or diagnostics.
 - return plaintext secret values from resource configuration queries or effective deployment snapshot reads.
+- return plaintext secret values from `.env` import command summaries.
 - hide resource profile drift by mutating profiles through `deployments.create`.
 - expose a generic `resources.update` action as a drift remedy.
 

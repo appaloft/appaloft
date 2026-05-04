@@ -34,6 +34,7 @@ import {
   type DiffEnvironmentsQueryInput,
   type EnvironmentEffectivePrecedenceQueryInput,
   type ImportCertificateCommandInput,
+  type ImportResourceVariablesCommandInput,
   type IssueOrRenewCertificateCommandInput,
   type ListCertificatesQueryInput,
   type ListDefaultAccessDomainPoliciesQueryInput,
@@ -120,6 +121,7 @@ import {
   type EnvironmentEffectivePrecedenceResponse,
   type EnvironmentSummary,
   type ImportCertificateResponse,
+  type ImportResourceVariablesResponse,
   type IssueOrRenewCertificateResponse,
   type ListCertificatesResponse,
   type ListDefaultAccessDomainPoliciesResponse,
@@ -468,6 +470,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       SetResourceVariableCommandInput,
       SetResourceVariableResponse,
+      AppaloftClientError
+    >;
+    importVariables: Client<
+      AppaloftClientContext,
+      ImportResourceVariablesCommandInput,
+      ImportResourceVariablesResponse,
       AppaloftClientError
     >;
     unsetVariable: Client<
