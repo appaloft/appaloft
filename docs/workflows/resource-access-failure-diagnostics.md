@@ -301,6 +301,13 @@ context when supplied. Backend renderers continue to use evidence capture and au
 context lookup; static rendering without a backend does not perform lookup, provider-native raw
 metadata parsing, repair, redeploy, rollback, or route mutation.
 
+The applied route context lookup baseline routes supplied `applied-route-context/v1` metadata
+through the same provider-neutral lookup core used by hostname/path enrichment. The lookup can
+resolve safe diagnostic id, route id, resource id, deployment id, host, and path context from
+supplied metadata and existing read state before evidence capture falls back to hostname/path
+matching. It adds no public operation, Web lookup form, provider-native raw metadata parsing,
+repair, redeploy, rollback, or route mutation behavior.
+
 Existing `resources.health`, `resources.diagnostic-summary`, and
 `resources.proxy-configuration.preview` already provide the owner-facing read surfaces that the
 edge diagnostic page should link to or summarize after authentication.

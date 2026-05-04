@@ -135,6 +135,11 @@ These rows are governed by
 | RES-ACCESS-DIAG-APPLIED-003 | application unit + provider contract | Server-applied applied metadata | Proxy preview renders a server-applied route | Route view includes server-applied route context | `routeSource = server-applied`, resource/deployment/server/destination ids, proxy kind/provider, hostname/path, and diagnostic id are safe and stable. |
 | RES-ACCESS-DIAG-APPLIED-004 | adapter integration | Evidence capture prefers applied metadata | Renderer captures a failure with supplied `applied-route-context/v1` metadata and a host/path that would otherwise require lookup | Evidence capture records metadata-derived route context without calling hostname/path lookup | Stored envelope includes safe related ids from applied metadata and preserves the original diagnostic code/phase. |
 | RES-ACCESS-DIAG-APPLIED-005 | contract + adapter integration | Applied metadata remains redacted | Applied metadata input is adjacent to query strings, cookies, auth headers, provider raw payload hints, SSH credentials, or remote logs | Proxy preview and evidence capture keep only safe metadata fields | Sensitive query values, auth/cookie headers, private keys, provider raw payloads, and raw remote logs are absent from route views, problem JSON, and stored evidence. |
+| RES-ACCESS-DIAG-APPLIED-006 | application unit | Applied lookup by diagnostic id | Safe `applied-route-context/v1` metadata can be reconstructed from current route read state | Internal lookup receives `diagnosticId` | Found context includes safe route/resource/deployment/domain/server/destination ids, host, path prefix, source, status, proxy kind/provider, and timestamps when available. |
+| RES-ACCESS-DIAG-APPLIED-007 | application unit | Applied lookup by route/resource/deployment ids | Existing route read state exposes route id, resource id, or deployment id | Internal lookup receives one or more ids | Matching context is returned without expanding to unrelated routes or provider raw payloads. |
+| RES-ACCESS-DIAG-APPLIED-008 | adapter integration | Evidence capture uses applied lookup core | Renderer captures a failure with supplied applied metadata and affected host/path | Evidence enrichment calls the shared applied lookup path before hostname/path fallback | Stored evidence uses metadata-derived route context and does not perform route repair, redeploy, rollback, or mutation. |
+| RES-ACCESS-DIAG-APPLIED-009 | application unit | Applied lookup preserves route source | Generated access, durable domain, server-applied, and deployment-snapshot route metadata are available | Internal lookup resolves each context | `routeSource` remains generated default, durable domain, server-applied, or deployment snapshot respectively; provider-specific labels do not replace source language. |
+| RES-ACCESS-DIAG-APPLIED-010 | application unit + adapter integration | Applied lookup remains redacted and read-only | Metadata or adjacent request data contains secrets, auth headers, cookies, sensitive query values, provider raw payload hints, SSH credentials, or raw remote logs | Lookup, renderer enrichment, and evidence capture return context | Output contains only safe ids, host, path prefix, source, status, provider/proxy kind, and timestamps; no provider raw payloads or mutation side effects occur. |
 
 ## Companion/Static Renderer Matrix
 
@@ -208,6 +213,13 @@ Executable tests now cover:
 - `RES-ACCESS-DIAG-APPLIED-004` through automatic lookup and HTTP renderer evidence-capture
   preference coverage;
 - `RES-ACCESS-DIAG-APPLIED-005` through contract and HTTP evidence redaction coverage;
+- `RES-ACCESS-DIAG-APPLIED-006` through application lookup coverage for diagnostic id matching;
+- `RES-ACCESS-DIAG-APPLIED-007` through application lookup coverage for route/resource/deployment
+  id narrowing;
+- `RES-ACCESS-DIAG-APPLIED-008` through HTTP renderer evidence capture using the shared applied
+  lookup path before hostname/path fallback;
+- `RES-ACCESS-DIAG-APPLIED-009` through application route-source preservation coverage;
+- `RES-ACCESS-DIAG-APPLIED-010` through application and HTTP redaction/read-only coverage;
 - `ACCESS-DIAG-005` through resource diagnostic summary and resource health application tests that
   keep cross-surface source errors visible while redacting unsafe adjacent text;
 - `RES-ACCESS-DIAG-STATIC-001` through shared application access-failure renderer tests;

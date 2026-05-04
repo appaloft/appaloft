@@ -736,6 +736,19 @@ Phase 6 verification notes from 2026-05-04 companion/static access failure rende
   middleware e2e. The broader `resource-access-failure` row remains open for real edge,
   provider-native metadata lookup, and Web lookup form work.
 
+Phase 6 verification notes from 2026-05-04 applied route context lookup baseline:
+
+- The applied route context lookup baseline makes `applied-route-context/v1` metadata resolvable
+  through the shared provider-neutral lookup core by diagnostic id, route id, resource id,
+  deployment id, host, or path where current safe read state allows.
+- Evidence capture now routes supplied applied metadata through that lookup core before falling
+  back to hostname/path matching, preserving generated-default, durable-domain, server-applied, and
+  deployment-snapshot route source language plus safe provider/proxy/timestamp fields.
+- The slice adds no public operation, no public schema field, no Web lookup form, no route
+  repair/redeploy/rollback behavior, no provider-native raw metadata parsing, and no real Traefik
+  middleware e2e. The broader `resource-access-failure` row remains open for real edge,
+  provider-native metadata lookup beyond safe Appaloft-applied metadata, and Web lookup form work.
+
 Exit criteria:
 
 - [ ] A deployed HTTP app keeps exposing generated or configured access through

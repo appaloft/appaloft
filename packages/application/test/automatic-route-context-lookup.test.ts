@@ -239,6 +239,219 @@ describe("automatic route context lookup", () => {
     expect(JSON.stringify(result)).not.toContain("res_other");
   });
 
+  test("[RES-ACCESS-DIAG-APPLIED-006] resolves applied route context by diagnostic id", async () => {
+    const service = createService({
+      resources: [
+        createResource({
+          id: "res_web",
+          projectId: "prj_web",
+          environmentId: "env_prod",
+          destinationId: "dst_web",
+          accessSummary: {
+            latestGeneratedAccessRoute: {
+              url: "https://web.appaloft.test/",
+              hostname: "web.appaloft.test",
+              scheme: "https",
+              providerKey: "traefik",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              updatedAt,
+            },
+            proxyRouteStatus: "ready",
+          },
+        }),
+      ],
+      deployments: [createDeployment({ id: "dep_web" })],
+    });
+
+    const result = await service.lookup(createExecutionContext({ entrypoint: "cli" }), {
+      diagnosticId: "generated-default:res_web:dep_web:web.appaloft.test:/",
+    });
+
+    expect(result).toMatchObject({
+      status: "found",
+      matchedSource: "generated-access-route",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      serverId: "srv_web",
+      destinationId: "dst_web",
+      routeId: "generated-default:res_web:dep_web:web.appaloft.test:/",
+      diagnosticId: "generated-default:res_web:dep_web:web.appaloft.test:/",
+      routeSource: "generated-default",
+      routeStatus: "ready",
+      proxyKind: "traefik",
+      providerKey: "traefik",
+      appliedAt: createdAt,
+      observedAt: updatedAt,
+    });
+  });
+
+  test("[RES-ACCESS-DIAG-APPLIED-007] resolves applied route context by route, resource, and deployment ids", async () => {
+    const service = createService({
+      resources: [
+        createResource({
+          id: "res_web",
+          projectId: "prj_web",
+          environmentId: "env_prod",
+          destinationId: "dst_web",
+          accessSummary: {
+            latestServerAppliedDomainRoute: {
+              url: "https://ops.example.test/app",
+              hostname: "ops.example.test",
+              scheme: "https",
+              providerKey: "traefik",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/app",
+              proxyKind: "traefik",
+              updatedAt,
+            },
+            latestGeneratedAccessRoute: {
+              url: "https://ops.example.test/",
+              hostname: "ops.example.test",
+              scheme: "https",
+              deploymentId: "dep_other",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              updatedAt,
+            },
+            proxyRouteStatus: "ready",
+          },
+        }),
+        createResource({
+          id: "res_other",
+          projectId: "prj_web",
+          environmentId: "env_prod",
+          accessSummary: {
+            latestServerAppliedDomainRoute: {
+              url: "https://ops.example.test/other",
+              hostname: "ops.example.test",
+              scheme: "https",
+              providerKey: "traefik",
+              deploymentId: "dep_other",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/other",
+              proxyKind: "traefik",
+              updatedAt,
+            },
+          },
+        }),
+      ],
+      deployments: [
+        createDeployment({ id: "dep_web" }),
+        createDeployment({ id: "dep_other", resourceId: "res_other" }),
+      ],
+    });
+
+    const result = await service.lookup(createExecutionContext({ entrypoint: "cli" }), {
+      routeId: "server-applied:res_web:dep_web:ops.example.test:/app",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+    });
+
+    expect(result).toMatchObject({
+      status: "found",
+      matchedSource: "server-applied-route",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      destinationId: "dst_web",
+      routeId: "server-applied:res_web:dep_web:ops.example.test:/app",
+      diagnosticId: "server-applied:res_web:dep_web:ops.example.test:/app",
+      routeSource: "server-applied",
+      proxyKind: "traefik",
+      observedAt: updatedAt,
+    });
+    expect(JSON.stringify(result)).not.toContain("res_other");
+  });
+
+  test("[RES-ACCESS-DIAG-APPLIED-009] preserves generated, durable, server-applied, and snapshot route sources", async () => {
+    const service = createService({ resources: [] });
+    const cases = [
+      ["generated-default", "generated-access-route"],
+      ["durable-domain", "durable-domain-binding-route"],
+      ["server-applied", "server-applied-route"],
+      ["deployment-snapshot", "deployment-snapshot-route"],
+    ] as const;
+
+    for (const [routeSource, matchedSource] of cases) {
+      const result = await service.lookup(createExecutionContext({ entrypoint: "cli" }), {
+        appliedRouteContext: {
+          schemaVersion: "applied-route-context/v1",
+          resourceId: `res_${routeSource}`,
+          deploymentId: `dep_${routeSource}`,
+          serverId: "srv_web",
+          destinationId: "dst_web",
+          routeId: `${routeSource}:res_web:dep_web:app.example.test:/`,
+          diagnosticId: `${routeSource}:res_web:dep_web:app.example.test:/`,
+          routeSource,
+          hostname: "app.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          providerKey: "traefik",
+          observedAt: updatedAt,
+        },
+      });
+
+      expect(result).toMatchObject({
+        status: "found",
+        matchedSource,
+        routeSource,
+        proxyKind: "traefik",
+        providerKey: "traefik",
+        observedAt: updatedAt,
+      });
+    }
+  });
+
+  test("[RES-ACCESS-DIAG-APPLIED-010] keeps applied lookup output redacted and read-only", async () => {
+    const service = createService({
+      resources: [
+        createResource({
+          id: "res_web",
+          projectId: "prj_web",
+          environmentId: "env_prod",
+          accessSummary: {
+            latestDurableDomainRoute: {
+              url: "https://app.example.test/private",
+              hostname: "app.example.test",
+              scheme: "https",
+              providerKey: "traefik",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/private",
+              proxyKind: "traefik",
+              updatedAt,
+            },
+            proxyRouteStatus: "ready",
+          },
+        }),
+      ],
+      bindings: [createDomainBinding({ pathPrefix: "/private" })],
+      deployments: [createDeployment({ id: "dep_web" })],
+    });
+
+    const result = await service.lookup(createExecutionContext({ entrypoint: "cli" }), {
+      diagnosticId: "durable-domain:res_web:dep_web:dbnd_web:app.example.test:/private",
+      hostname: "app.example.test",
+      path: "/private?token=secret",
+    });
+    const serialized = JSON.stringify(result);
+
+    expect(result).toMatchObject({
+      status: "found",
+      routeSource: "durable-domain",
+      routeStatus: "ready",
+      proxyKind: "traefik",
+    });
+    expect(serialized).not.toContain("token=secret");
+    expect(serialized).not.toContain("Authorization");
+    expect(serialized).not.toContain("Cookie");
+    expect(serialized).not.toContain("rawProviderPayload");
+  });
+
   test("[RES-ACCESS-DIAG-CONTEXT-001] resolves generated access route by hostname and path", async () => {
     const service = createService({
       resources: [
