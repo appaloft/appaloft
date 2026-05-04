@@ -18,6 +18,7 @@ import {
   type ResourceAccessFailureHttpStatus,
   type ResourceAccessFailureRendererTarget,
 } from "@appaloft/application";
+import { sanitizeAppliedRouteContextMetadata } from "@appaloft/application/resource-access-failure-diagnostics";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 
 export const traefikEdgeNetworkName = "appaloft-edge";
@@ -59,6 +60,7 @@ function shellQuote(input: string): string {
 
 export interface TraefikResourceAccessFailureMiddlewareInput {
   middlewareName?: string;
+  queryParams?: Record<string, string | undefined>;
   rendererPath?: string;
   serviceName?: string;
   serviceUrl?: string;
@@ -104,6 +106,24 @@ function safeRendererServiceUrl(input: string | undefined): string | null {
   }
 }
 
+function safeQueryParamName(input: string): string | null {
+  const normalized = input.replace(/[^a-zA-Z0-9_.-]/g, "");
+  return normalized.length > 0 ? normalized : null;
+}
+
+function queryParams(input: Record<string, string | undefined> | undefined): string {
+  if (!input) {
+    return "";
+  }
+
+  return Object.entries(input)
+    .flatMap(([key, value]) => {
+      const name = safeQueryParamName(key);
+      return name && value ? [`${name}=${encodeURIComponent(value)}`] : [];
+    })
+    .join("&");
+}
+
 export function renderTraefikResourceAccessFailureMiddleware(
   input: TraefikResourceAccessFailureMiddlewareInput = {},
 ): TraefikResourceAccessFailureMiddlewareConfig {
@@ -113,7 +133,10 @@ export function renderTraefikResourceAccessFailureMiddleware(
   const statuses =
     input.statuses && input.statuses.length > 0 ? input.statuses : defaultAccessFailureStatuses;
   const statusList = statuses.join(",");
-  const query = `${safeRendererPath(input.rendererPath)}?status={status}`;
+  const extraQuery = queryParams(input.queryParams);
+  const query = `${safeRendererPath(input.rendererPath)}?status={status}${
+    extraQuery ? `&${extraQuery}` : ""
+  }`;
 
   return {
     middlewareName,
@@ -186,6 +209,64 @@ function accessFailureMiddlewareConfig(
     serviceUrl,
     ...(input.middlewareName ? { middlewareName: input.middlewareName } : {}),
     ...(input.serviceName ? { serviceName: input.serviceName } : {}),
+  });
+}
+
+function routeAppliedContext(route: EdgeProxyRouteInput) {
+  const preferred =
+    route.appliedRouteContexts?.find((context) => route.domains.includes(context.hostname)) ??
+    route.appliedRouteContext ??
+    route.appliedRouteContexts?.[0];
+
+  return sanitizeAppliedRouteContextMetadata(preferred);
+}
+
+function routeAccessFailureQueryParams(route: EdgeProxyRouteInput): Record<string, string> | null {
+  const context = routeAppliedContext(route);
+  if (!context) {
+    return null;
+  }
+
+  return {
+    routeHost: context.hostname,
+    pathPrefix: context.pathPrefix,
+    resourceId: context.resourceId,
+    ...(context.deploymentId ? { deploymentId: context.deploymentId } : {}),
+    ...(context.domainBindingId ? { domainBindingId: context.domainBindingId } : {}),
+    ...(context.serverId ? { serverId: context.serverId } : {}),
+    ...(context.destinationId ? { destinationId: context.destinationId } : {}),
+    routeId: context.routeId,
+    diagnosticId: context.diagnosticId,
+    routeSource: context.routeSource,
+    routeStatus: "applied",
+    ...(context.providerKey ? { providerKey: context.providerKey } : {}),
+  };
+}
+
+function routeAccessFailureMiddlewareConfig(input: {
+  base: TraefikResourceAccessFailureMiddlewareConfig;
+  deploymentId: string;
+  index: number;
+  route: EdgeProxyRouteInput;
+}): TraefikResourceAccessFailureMiddlewareConfig {
+  const query = routeAccessFailureQueryParams(input.route);
+  if (!query) {
+    return input.base;
+  }
+
+  const middlewareName = safeTraefikName(
+    `${sanitizeRouteName({
+      deploymentId: input.deploymentId,
+      ...(input.index === 0 ? {} : { suffix: String(input.index) }),
+    })}-access-errors`,
+    input.base.middlewareName,
+  );
+
+  return renderTraefikResourceAccessFailureMiddleware({
+    middlewareName,
+    serviceName: input.base.serviceName,
+    ...(input.base.serviceUrl ? { serviceUrl: input.base.serviceUrl } : {}),
+    queryParams: query,
   });
 }
 
@@ -567,21 +648,38 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
         port: input.port,
         index,
         ...(accessFailureConfig
-          ? { accessFailureMiddlewareName: accessFailureConfig.middlewareName }
+          ? {
+              accessFailureMiddlewareName: routeAccessFailureMiddlewareConfig({
+                base: accessFailureConfig,
+                deploymentId: input.deploymentId,
+                index,
+                route,
+              }).middlewareName,
+            }
           : {}),
       }),
     );
+    const accessFailureLabels =
+      accessFailureConfig === null
+        ? []
+        : providerRoutes
+            .filter((route) => !isRedirectRoute(route))
+            .flatMap(
+              (route, index) =>
+                routeAccessFailureMiddlewareConfig({
+                  base: accessFailureConfig,
+                  deploymentId: input.deploymentId,
+                  index,
+                  route,
+                }).labels,
+            );
     const routeNotFoundLabels = input.resourceAccessFailureRenderer
       ? routeNotFoundFallbackLabels({
           deploymentId: input.deploymentId,
           renderer: input.resourceAccessFailureRenderer,
         })
       : [];
-    const labels = [
-      ...routeLabels,
-      ...(accessFailureConfig ? accessFailureConfig.labels : []),
-      ...routeNotFoundLabels,
-    ];
+    const labels = [...new Set([...routeLabels, ...accessFailureLabels, ...routeNotFoundLabels])];
 
     return ok({
       providerKey: this.key,

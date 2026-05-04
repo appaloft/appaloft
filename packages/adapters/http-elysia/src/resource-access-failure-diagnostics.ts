@@ -19,6 +19,17 @@ function firstQueryValue(searchParams: URLSearchParams, key: string): string | n
   return value && value.length > 0 ? value : null;
 }
 
+function firstHeaderValue(request: Request, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const value = request.headers.get(key)?.split(",")[0]?.trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
 function parseStatus(input: string | null): number | null {
   if (!input) {
     return null;
@@ -87,8 +98,12 @@ function buildDiagnostic(request: Request, now: () => string): ResourceAccessFai
   const statusCode = status === null ? null : resourceAccessFailureCodeFromHttpStatus(status);
   const selectedCode = code ?? (signal ? null : statusCode);
   const affectedUrl = firstQueryValue(url.searchParams, "affectedUrl");
-  const affectedHostname = firstQueryValue(url.searchParams, "host");
-  const affectedPath = firstQueryValue(url.searchParams, "path");
+  const affectedHostname =
+    firstQueryValue(url.searchParams, "host") ??
+    firstHeaderValue(request, "x-forwarded-host", "host");
+  const affectedPath =
+    firstQueryValue(url.searchParams, "path") ??
+    firstHeaderValue(request, "x-replaced-path", "x-forwarded-uri");
   const routeSource = parseRouteSource(firstQueryValue(url.searchParams, "routeSource"));
   const routeHost = firstQueryValue(url.searchParams, "routeHost");
   const pathPrefix = firstQueryValue(url.searchParams, "pathPrefix");
@@ -99,6 +114,7 @@ function buildDiagnostic(request: Request, now: () => string): ResourceAccessFai
   const destinationId = firstQueryValue(url.searchParams, "destinationId");
   const providerKey = firstQueryValue(url.searchParams, "providerKey");
   const routeId = firstQueryValue(url.searchParams, "routeId");
+  const diagnosticId = firstQueryValue(url.searchParams, "diagnosticId");
   const routeStatus = firstQueryValue(url.searchParams, "routeStatus");
   const appliedRouteContext = parseAppliedRouteContext(
     firstQueryValue(url.searchParams, "appliedRouteContext"),
@@ -127,6 +143,7 @@ function buildDiagnostic(request: Request, now: () => string): ResourceAccessFai
           ...(destinationId ? { destinationId } : {}),
           ...(providerKey ? { providerKey } : {}),
           ...(routeId ? { routeId } : {}),
+          ...(diagnosticId ? { diagnosticId } : {}),
           ...(routeSource ? { routeSource } : {}),
           ...(routeStatus ? { routeStatus } : {}),
         },

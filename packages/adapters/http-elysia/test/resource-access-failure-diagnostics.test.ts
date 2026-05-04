@@ -402,4 +402,56 @@ describe("resource access failure diagnostics HTTP renderer", () => {
     expect(serialized).not.toContain("token=secret");
     expect(serialized).not.toContain("rawProviderPayload");
   });
+
+  test("[RES-ACCESS-DIAG-REAL-002] captures real-proxy request metadata without leaking forwarded unsafe data", async () => {
+    const evidenceRecorder = new RecordingEvidenceRecorder();
+    const app = createTestApp({ evidenceRecorder });
+    const response = await app.handle(
+      new Request(
+        "http://localhost/.appaloft/resource-access-failure?status=502&routeHost=real.example.test&pathPrefix=/&resourceId=res_real&deploymentId=dep_real&domainBindingId=dbnd_real&serverId=srv_real&destinationId=dst_real&routeId=durable-domain%3Ares_real%3Adep_real%3Areal.example.test%3A%2F&diagnosticId=durable-domain%3Ares_real%3Adep_real%3Areal.example.test%3A%2F&routeSource=durable-domain&providerKey=traefik&routeStatus=applied",
+        {
+          headers: {
+            accept: "text/html",
+            authorization: "Bearer secret-token",
+            cookie: "session=secret",
+            "x-forwarded-host": "real.example.test",
+            "x-forwarded-uri": "/private?token=secret",
+            "x-request-id": "req_real_traefik",
+          },
+        },
+      ),
+    );
+
+    const text = await response.text();
+
+    expect(response.status).toBe(502);
+    expect(text).toContain("resource_access_upstream_connect_failed");
+    expect(text).toContain("req_real_traefik");
+    expect(evidenceRecorder.records).toHaveLength(1);
+    expect(evidenceRecorder.records[0]).toMatchObject({
+      requestId: "req_real_traefik",
+      diagnostic: {
+        affected: {
+          hostname: "real.example.test",
+          path: "/private",
+        },
+        route: {
+          diagnosticId: "durable-domain:res_real:dep_real:real.example.test:/",
+          resourceId: "res_real",
+          deploymentId: "dep_real",
+          domainBindingId: "dbnd_real",
+          serverId: "srv_real",
+          destinationId: "dst_real",
+          routeId: "durable-domain:res_real:dep_real:real.example.test:/",
+          routeSource: "durable-domain",
+          routeStatus: "applied",
+          providerKey: "traefik",
+        },
+      },
+    });
+    const serialized = JSON.stringify(evidenceRecorder.records[0]);
+    expect(serialized).not.toContain("secret-token");
+    expect(serialized).not.toContain("session=secret");
+    expect(serialized).not.toContain("token=secret");
+  });
 });

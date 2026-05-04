@@ -90,6 +90,17 @@ Then:
 | RES-ACCESS-DIAG-ROUTE-003 | contract | Running service renderer target | Appaloft backend service is listening and provider-backed route realization runs | Runtime passes a safe renderer target into provider route realization | A wildcard-bound service derives `host.docker.internal:<port>` automatically; loopback-only one-shot CLI style runtime does not inject a target unless an explicit reachable override is configured. |
 | RES-ACCESS-DIAG-ROUTE-004 | contract | Unmatched route fallback | Provider route realization receives a safe renderer service URL and no router matches a later request host/path | Provider renders a low-priority catch-all router that rewrites to `/.appaloft/resource-access-failure` and injects a provider-neutral `route-not-found` signal | The fallback excludes `/.well-known/acme-challenge/`, does not leak raw provider details, and preserves more-specific served or redirect routers as the primary match. |
 
+## Real Traefik Middleware E2E Matrix
+
+These rows are governed by
+[Real Traefik Access Failure Middleware E2E Baseline](../specs/030-real-traefik-access-failure-middleware-e2e/spec.md).
+
+| Test ID | Preferred automation | Case | Input/read state | Expected query relationship | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| RES-ACCESS-DIAG-REAL-001 | provider contract | Served route error middleware carries safe applied context | Traefik route realization receives a served route with `applied-route-context/v1` metadata and a safe renderer URL | Provider renders a Traefik `errors` middleware query that can invoke the existing renderer with safe route context | Middleware covers 404/502/503/504, points to `/.appaloft/resource-access-failure`, preserves safe route/resource/deployment/domain/server/destination ids when supplied, and omits raw provider payloads, headers, cookies, sensitive query strings, SSH credentials, private keys, and raw logs. |
+| RES-ACCESS-DIAG-REAL-002 | HTTP adapter integration | Real-proxy renderer capture normalizes request metadata | Renderer receives Traefik-style status, request id, forwarded host/path, and safe route context | Evidence capture records a `resource-access-failure/v1` envelope | Captured evidence includes request id, diagnostic id, host, path, code, phase, HTTP status, next action, and safe related ids without leaking unsafe request headers or provider text. |
+| RES-ACCESS-DIAG-REAL-003 | opt-in Docker e2e | Real Traefik upstream failure reaches Appaloft renderer | Real Traefik routes a request to an Appaloft-rendered served route whose upstream cannot be reached and the backend renderer is reachable | The existing evidence lookup can retrieve the captured request id | Response is a safe Appaloft diagnostic for the gateway failure, evidence lookup returns the safe envelope and related ids, and no repair, redeploy, rollback, route mutation, or provider-native raw parsing occurs. |
+
 ## Resource Observation Matrix
 
 | Test ID | Preferred automation | Case | Input/read state | Expected query relationship | Required assertion |
@@ -227,10 +238,16 @@ Executable tests now cover:
 - `RES-ACCESS-DIAG-STATIC-003` through runtime static-site Docker build asset packaging tests;
 - `RES-ACCESS-DIAG-STATIC-004` through application renderer and runtime packaging redaction tests;
 - `EDGE-PROXY-PROVIDER-010` as the Traefik provider contract row.
+- `RES-ACCESS-DIAG-REAL-001` through the Traefik provider contract test for served-route error
+  middleware query rendering with safe applied route context.
+- `RES-ACCESS-DIAG-REAL-002` through the HTTP renderer integration test for real-proxy forwarded
+  request metadata, request-id evidence capture, applied route context enrichment, and redaction.
+- `RES-ACCESS-DIAG-REAL-003` through the opt-in Docker e2e test that wires real Traefik to the
+  Appaloft renderer and then reads the captured request id through the existing evidence lookup.
 
-Remaining gaps include broader classification rows, real Traefik end-to-end error-middleware
-probing, provider-native metadata lookup beyond existing read models, a Web lookup form, and
-redaction rows beyond the current renderer-level assertions.
+Remaining gaps include broader classification rows, provider-native metadata lookup beyond safe
+Appaloft-applied metadata, a Web lookup form, and redaction rows beyond the current renderer-level
+assertions.
 
 ## Open Questions
 

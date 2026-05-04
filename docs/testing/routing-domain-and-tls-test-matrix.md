@@ -245,6 +245,7 @@ Then:
 | ROUTE-TLS-BOUNDARY-006 | integration | Server-applied canonical redirect alias | Pure CLI/SSH config deploy applies `redirectTo` alias route state through target proxy state | No managed `DomainBinding`, `Certificate`, or route-ownership aggregate is created for the alias; route state is target-local until a control-plane adoption flow maps it explicitly. |
 | ROUTE-TLS-BOUNDARY-007 | integration | Domain binding delete does not revoke/delete certificate | Active certificate is attached to a domain binding | `domain-bindings.delete` is attempted | Delete is blocked by active certificate state; no `certificate-revoked` or `certificate-deleted` event is recorded. |
 | ROUTE-TLS-BOUNDARY-008 | integration | Static access failure renderer packaging | Appaloft packages an adapter-owned static-site runtime with generated access or server-applied routes | Static renderer asset is included for `/.appaloft/resource-access-failure` | No managed `DomainBinding`, `Certificate`, route repair, redeploy, rollback, or provider-native metadata parsing is introduced. |
+| ROUTE-TLS-BOUNDARY-009 | opt-in e2e | Real Traefik access failure middleware | Real Traefik handles a gateway-generated access failure for an Appaloft-rendered route with safe applied context | `resource-access-failure/v1` evidence is captured and looked up by request id | No managed `DomainBinding`, `Certificate`, route repair, redeploy, rollback, route mutation, or provider-native raw metadata parsing is introduced. |
 
 ## Entry Surface Matrix
 
@@ -332,6 +333,11 @@ auth headers, cookies, sensitive query strings, private keys, or raw remote logs
 `ROUTE-TLS-READMODEL-017` is covered by the applied route context lookup baseline. The lookup is an
 internal read-only resolver over safe metadata and existing read state; it does not create managed
 domain, certificate, recovery, route repair, or provider-native parsing behavior.
+
+`ROUTE-TLS-BOUNDARY-009` is covered by the opt-in real Traefik access failure middleware e2e
+baseline in `apps/shell/test/e2e/routing-domain-and-tls-proxy.workflow.e2e.ts`. The row stays
+under the existing Docker proxy gate and proves the real edge failure path remains
+diagnostic/read-only behavior rather than route/domain/TLS lifecycle mutation.
 
 `DMBH-DOMAIN-001` is the domain-model hardening row for the no-behavior-change certificate
 admission and ready-gate refactor. It is bound to `packages/core/test/domain-binding.test.ts` and
