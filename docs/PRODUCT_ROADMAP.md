@@ -43,10 +43,12 @@ Version selection rules:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-04-30, the latest public GitHub Release is `v0.7.0`; root package,
+- [x] On 2026-05-04, the latest public GitHub Release is `v0.7.0`; root package,
   Release Please manifest, changelog, and latest fetched tag on `main` are `0.7.0`.
-- [x] On 2026-04-30, the active roadmap target moved to Phase 6 / `0.8.0`; Phase 6
-  remains incomplete until its required items and exit criteria are checked.
+- [x] On 2026-05-04, Phase 6 / `0.8.0` required items and exit criteria are checked
+  against the active operation catalog, source-of-truth docs, test matrices, and merged
+  implementation slices. `0.8.0` is the selected next release version, pending the Release Please
+  PR and release workflow checks.
 <!-- release-alignment:end -->
 
 Historical alignment notes:
@@ -587,7 +589,7 @@ Target: `0.8.0`.
 
 Release rule:
 
-- [ ] Select `0.8.0` only when all required Phase 6 items, earlier phase items, and exit criteria
+- [x] Select `0.8.0` only when all required Phase 6 items, earlier phase items, and exit criteria
   are checked. If any Phase 6 item remains unchecked, release a `0.7.x` patch instead.
 
 Already done:
@@ -764,13 +766,33 @@ Phase 6 verification notes from 2026-05-04 real Traefik access failure middlewar
   enhancements rather than prerequisites for closing the required `resource-access-failure`
   diagnostics row.
 
+Phase 6 release-gate verification notes from 2026-05-04:
+
+- Release readiness is a Sync Round over already-merged behavior; no ADR, operation catalog,
+  command/query schema, public operation, or implementation change is required.
+- Generated and configured access remains exposed through `ResourceAccessSummary`, with coverage in
+  resource access summary/projector, resource show/list, proxy preview, route intent/status, and
+  Web helper tests. Durable domain and server-applied routes remain separate route sources and keep
+  generated access available as fallback/context where specs require it.
+- Default generated-access policy configuration and disablement are active through
+  `default-access-domain-policies.configure`, `.list`, and `.show` in the operation catalog, CLI,
+  HTTP/oRPC, Web, Core Operations, Business Operation Map, and default access policy test coverage.
+- Custom domain and TLS lifecycle closure is active through domain binding create/confirm/show/
+  configure-route/delete-check/delete/retry-verification plus certificate issue-or-renew/import/
+  show/retry/revoke/delete. The governing routing/domain/TLS workflow, lifecycle specs, public docs,
+  operation catalog entries, CLI/API/Web surfaces, and test matrix rows are synchronized.
+- The merged real Traefik access failure middleware baseline closed the last required
+  `resource-access-failure` diagnostic row. Provider-native metadata lookup beyond safe
+  Appaloft-applied metadata and a Web lookup form remain future enhancements, not `0.8.0` release
+  blockers.
+
 Exit criteria:
 
-- [ ] A deployed HTTP app keeps exposing generated or configured access through
+- [x] A deployed HTTP app keeps exposing generated or configured access through
   `ResourceAccessSummary`.
-- [ ] Operators can configure or disable the default generated-access policy through explicit
+- [x] Operators can configure or disable the default generated-access policy through explicit
   operations.
-- [ ] A custom domain can be created, verified, issued/renewed or imported for TLS, observed,
+- [x] A custom domain can be created, verified, issued/renewed or imported for TLS, observed,
   retried, and removed through explicit operations.
 - [x] Access/proxy/log/health failures remain visible through Appaloft operations, not screenshots
   or raw server commands.
