@@ -379,6 +379,11 @@ Current boundary:
   route ownership without parsing provider-rendered labels/config. Evidence capture may prefer the
   same metadata before falling back to hostname/path lookup. This does not add a new operation key,
   command, route repair flow, or deployment admission field.
+- companion/static access failure rendering is an internal read/adapter capability under existing
+  resource access failure diagnostics. Static and one-shot CLI/SSH runtimes may package a
+  provider-neutral renderer asset for `resource-access-failure/v1` envelopes when no reachable
+  backend renderer service exists. This does not add a public operation, operation catalog row,
+  CLI/API/Web lookup form, route repair flow, or deployment admission field.
 - resource health is resource-owned observation governed by
   [ADR-020: Resource Health Observation](./decisions/ADR-020-resource-health-observation.md).
   `resources.health` is the active current health source for resource detail, project resource

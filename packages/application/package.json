@@ -6,6 +6,7 @@
     ".": "./src/index.ts",
     "./execution-context": "./src/execution-context.ts",
     "./messages": "./src/messages.ts",
+    "./resource-access-failure-diagnostics": "./src/resource-access-failure-diagnostics.ts",
     "./schemas": "./src/schemas.ts",
     "./operation-catalog": "./src/operation-catalog.ts"
   },
