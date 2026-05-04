@@ -9,6 +9,12 @@ import { showCertificateQueryInputSchema } from "./operations/certificates/show-
 import { configureDefaultAccessDomainPolicyCommandInputSchema } from "./operations/default-access-domain-policies/configure-default-access-domain-policy.command";
 import { listDefaultAccessDomainPoliciesQueryInputSchema } from "./operations/default-access-domain-policies/list-default-access-domain-policies.query";
 import { showDefaultAccessDomainPolicyQueryInputSchema } from "./operations/default-access-domain-policies/show-default-access-domain-policy.query";
+import { deleteDependencyResourceCommandInputSchema } from "./operations/dependency-resources/delete-dependency-resource.command";
+import { importPostgresDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-postgres-dependency-resource.command";
+import { listDependencyResourcesQueryInputSchema } from "./operations/dependency-resources/list-dependency-resources.query";
+import { provisionPostgresDependencyResourceCommandInputSchema } from "./operations/dependency-resources/provision-postgres-dependency-resource.command";
+import { renameDependencyResourceCommandInputSchema } from "./operations/dependency-resources/rename-dependency-resource.command";
+import { showDependencyResourceQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource.query";
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
@@ -100,6 +106,7 @@ type OperationDomain =
   | "credentials"
   | "environments"
   | "resources"
+  | "dependency-resources"
   | "storage-volumes"
   | "deployments"
   | "operator-work"
@@ -766,6 +773,90 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource proxy-config <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/proxy-configuration" },
+    },
+  },
+  {
+    key: "dependency-resources.provision-postgres",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "ProvisionPostgresDependencyResourceCommand",
+    handlerName: "ProvisionPostgresDependencyResourceCommandHandler",
+    serviceName: "ProvisionPostgresDependencyResourceUseCase",
+    inputSchema: provisionPostgresDependencyResourceCommandInputSchema,
+    serviceToken: tokens.provisionPostgresDependencyResourceUseCase,
+    transports: {
+      cli: "appaloft dependency postgres provision",
+      orpc: { method: "POST", path: "/api/dependency-resources/postgres/provision" },
+    },
+  },
+  {
+    key: "dependency-resources.import-postgres",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "ImportPostgresDependencyResourceCommand",
+    handlerName: "ImportPostgresDependencyResourceCommandHandler",
+    serviceName: "ImportPostgresDependencyResourceUseCase",
+    inputSchema: importPostgresDependencyResourceCommandInputSchema,
+    serviceToken: tokens.importPostgresDependencyResourceUseCase,
+    transports: {
+      cli: "appaloft dependency postgres import",
+      orpc: { method: "POST", path: "/api/dependency-resources/postgres/import" },
+    },
+  },
+  {
+    key: "dependency-resources.list",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "ListDependencyResourcesQuery",
+    handlerName: "ListDependencyResourcesQueryHandler",
+    serviceName: "ListDependencyResourcesQueryService",
+    inputSchema: listDependencyResourcesQueryInputSchema,
+    serviceToken: tokens.listDependencyResourcesQueryService,
+    transports: {
+      cli: "appaloft dependency list",
+      orpc: { method: "GET", path: "/api/dependency-resources" },
+    },
+  },
+  {
+    key: "dependency-resources.show",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "ShowDependencyResourceQuery",
+    handlerName: "ShowDependencyResourceQueryHandler",
+    serviceName: "ShowDependencyResourceQueryService",
+    inputSchema: showDependencyResourceQueryInputSchema,
+    serviceToken: tokens.showDependencyResourceQueryService,
+    transports: {
+      cli: "appaloft dependency show <dependencyResourceId>",
+      orpc: { method: "GET", path: "/api/dependency-resources/{dependencyResourceId}" },
+    },
+  },
+  {
+    key: "dependency-resources.rename",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "RenameDependencyResourceCommand",
+    handlerName: "RenameDependencyResourceCommandHandler",
+    serviceName: "RenameDependencyResourceUseCase",
+    inputSchema: renameDependencyResourceCommandInputSchema,
+    serviceToken: tokens.renameDependencyResourceUseCase,
+    transports: {
+      cli: "appaloft dependency rename <dependencyResourceId>",
+      orpc: { method: "POST", path: "/api/dependency-resources/{dependencyResourceId}/rename" },
+    },
+  },
+  {
+    key: "dependency-resources.delete",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "DeleteDependencyResourceCommand",
+    handlerName: "DeleteDependencyResourceCommandHandler",
+    serviceName: "DeleteDependencyResourceUseCase",
+    inputSchema: deleteDependencyResourceCommandInputSchema,
+    serviceToken: tokens.deleteDependencyResourceUseCase,
+    transports: {
+      cli: "appaloft dependency delete <dependencyResourceId>",
+      orpc: { method: "DELETE", path: "/api/dependency-resources/{dependencyResourceId}" },
     },
   },
   {

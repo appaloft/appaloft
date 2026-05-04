@@ -139,6 +139,7 @@ export function translateDomainError(error: LocalizableDomainError, t: AppaloftT
     case "resource_slug_conflict":
     case "resource_archived":
     case "resource_delete_blocked":
+    case "dependency_resource_delete_blocked":
     case "server_delete_blocked":
     case "server_inactive":
     case "credential_in_use":

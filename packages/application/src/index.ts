@@ -3,6 +3,8 @@ export * from "./certificate-messages";
 export * from "./cqrs";
 export * from "./default-access-domain-policy-handlers";
 export * from "./default-access-domain-policy-messages";
+export * from "./dependency-resource-handlers";
+export * from "./dependency-resource-messages";
 export * from "./deployment-handlers";
 export * from "./deployment-messages";
 export * from "./deployment-progress";
