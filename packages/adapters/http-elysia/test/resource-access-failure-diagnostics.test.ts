@@ -47,15 +47,26 @@ class RecordingEvidenceRecorder implements ResourceAccessFailureEvidenceRecorder
 }
 
 class StaticRouteContextLookup implements AutomaticRouteContextLookup {
-  calls: Array<{ hostname: string; path: string }> = [];
+  calls: Array<{
+    hostname?: string;
+    path?: string;
+    appliedRouteContext?: { resourceId: string };
+  }> = [];
 
-  async lookup(_context: ExecutionContext, input: { hostname: string; path: string }) {
-    this.calls.push({ hostname: input.hostname, path: input.path });
+  async lookup(
+    _context: ExecutionContext,
+    input: { hostname?: string; path?: string; appliedRouteContext?: { resourceId: string } },
+  ) {
+    this.calls.push({
+      ...(input.hostname ? { hostname: input.hostname } : {}),
+      ...(input.path ? { path: input.path } : {}),
+      ...(input.appliedRouteContext ? { appliedRouteContext: input.appliedRouteContext } : {}),
+    });
     return {
       schemaVersion: "automatic-route-context-lookup/v1" as const,
       status: "found" as const,
       matchedSource: "durable-domain-binding-route" as const,
-      hostname: input.hostname,
+      hostname: input.hostname ?? "app.example.test",
       pathPrefix: "/",
       resourceId: "res_web",
       deploymentId: "dep_web",
@@ -64,20 +75,58 @@ class StaticRouteContextLookup implements AutomaticRouteContextLookup {
       destinationId: "dst_web",
       providerKey: "traefik",
       routeId: "route_web",
+      diagnosticId: "route_web",
       routeSource: "durable-domain" as const,
       routeStatus: "ready",
+      proxyKind: "traefik" as const,
       confidence: "high" as const,
       nextAction: "diagnostic-summary" as const,
     };
   }
 }
 
-class FailingRouteContextLookup implements AutomaticRouteContextLookup {
-  calls = 0;
+class AppliedOnlyRouteContextLookup implements AutomaticRouteContextLookup {
+  calls: Array<{ hasAppliedRouteContext: boolean; hostname?: string; path?: string }> = [];
 
-  async lookup() {
-    this.calls += 1;
-    throw new Error("host/path lookup should not be called when applied metadata is supplied");
+  async lookup(
+    _context: ExecutionContext,
+    input: {
+      hostname?: string;
+      path?: string;
+      appliedRouteContext?: { resourceId: string };
+    },
+  ) {
+    this.calls.push({
+      hasAppliedRouteContext: Boolean(input.appliedRouteContext),
+      ...(input.hostname ? { hostname: input.hostname } : {}),
+      ...(input.path ? { path: input.path } : {}),
+    });
+    if (!input.appliedRouteContext) {
+      throw new Error(
+        "hostname/path fallback should not be used when applied metadata is supplied",
+      );
+    }
+
+    return {
+      schemaVersion: "automatic-route-context-lookup/v1" as const,
+      status: "found" as const,
+      matchedSource: "durable-domain-binding-route" as const,
+      hostname: "app.example.test",
+      pathPrefix: "/",
+      resourceId: "res_applied",
+      deploymentId: "dep_applied",
+      domainBindingId: "dbnd_applied",
+      serverId: "srv_applied",
+      destinationId: "dst_applied",
+      providerKey: "traefik",
+      routeId: "durable-domain:res_applied:dep_applied:app.example.test:/",
+      diagnosticId: "durable-domain:res_applied:dep_applied:app.example.test:/",
+      routeSource: "durable-domain" as const,
+      routeStatus: "applied",
+      proxyKind: "traefik" as const,
+      confidence: "high" as const,
+      nextAction: "diagnostic-summary" as const,
+    };
   }
 }
 
@@ -290,9 +339,9 @@ describe("resource access failure diagnostics HTTP renderer", () => {
     expect(serialized).not.toContain("token=secret");
   });
 
-  test("[RES-ACCESS-DIAG-APPLIED-004][RES-ACCESS-DIAG-APPLIED-005] prefers applied route metadata for captured evidence", async () => {
+  test("[RES-ACCESS-DIAG-APPLIED-004][RES-ACCESS-DIAG-APPLIED-005][RES-ACCESS-DIAG-APPLIED-008] prefers applied route metadata lookup for captured evidence", async () => {
     const evidenceRecorder = new RecordingEvidenceRecorder();
-    const routeContextLookup = new FailingRouteContextLookup();
+    const routeContextLookup = new AppliedOnlyRouteContextLookup();
     const app = createTestApp({ evidenceRecorder, routeContextLookup });
     const appliedRouteContext = encodeURIComponent(
       JSON.stringify({
@@ -328,7 +377,13 @@ describe("resource access failure diagnostics HTTP renderer", () => {
     );
 
     expect(response.status).toBe(504);
-    expect(routeContextLookup.calls).toBe(0);
+    expect(routeContextLookup.calls).toEqual([
+      {
+        hasAppliedRouteContext: true,
+        hostname: "app.example.test",
+        path: "/private",
+      },
+    ]);
     expect(evidenceRecorder.records).toHaveLength(1);
     expect(evidenceRecorder.records[0]?.diagnostic.route).toMatchObject({
       resourceId: "res_applied",
