@@ -55,6 +55,8 @@ import {
   DeactivateServerUseCase,
   DeleteCertificateCommandHandler,
   DeleteCertificateUseCase,
+  DeleteDependencyResourceCommandHandler,
+  DeleteDependencyResourceUseCase,
   DeleteDomainBindingCommandHandler,
   DeleteDomainBindingUseCase,
   DeleteResourceCommandHandler,
@@ -85,6 +87,8 @@ import {
   type ExecutionContext,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
+  ImportPostgresDependencyResourceCommandHandler,
+  ImportPostgresDependencyResourceUseCase,
   ImportResourceVariablesCommandHandler,
   ImportResourceVariablesUseCase,
   InspectServerCapacityQueryHandler,
@@ -96,6 +100,8 @@ import {
   ListCertificatesQueryService,
   ListDefaultAccessDomainPoliciesQueryHandler,
   ListDefaultAccessDomainPoliciesQueryService,
+  ListDependencyResourcesQueryHandler,
+  ListDependencyResourcesQueryService,
   ListDeploymentsQueryService,
   ListDomainBindingsQueryService,
   ListEnvironmentsQueryService,
@@ -120,9 +126,13 @@ import {
   OpenTerminalSessionUseCase,
   OperatorWorkQueryService,
   PromoteEnvironmentUseCase,
+  ProvisionPostgresDependencyResourceCommandHandler,
+  ProvisionPostgresDependencyResourceUseCase,
   RegisterServerUseCase,
   RelinkSourceLinkCommandHandler,
   RelinkSourceLinkUseCase,
+  RenameDependencyResourceCommandHandler,
+  RenameDependencyResourceUseCase,
   RenameEnvironmentCommandHandler,
   RenameEnvironmentUseCase,
   RenameProjectCommandHandler,
@@ -155,6 +165,8 @@ import {
   ShowCertificateQueryService,
   ShowDefaultAccessDomainPolicyQueryHandler,
   ShowDefaultAccessDomainPolicyQueryService,
+  ShowDependencyResourceQueryHandler,
+  ShowDependencyResourceQueryService,
   ShowDeploymentQueryHandler,
   ShowDeploymentQueryService,
   ShowDomainBindingQueryHandler,
@@ -265,6 +277,12 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ShowSshCredentialQueryHandler);
   container.registerSingleton(InspectServerCapacityQueryHandler);
   container.registerSingleton(CreateStorageVolumeCommandHandler);
+  container.registerSingleton(ProvisionPostgresDependencyResourceCommandHandler);
+  container.registerSingleton(ImportPostgresDependencyResourceCommandHandler);
+  container.registerSingleton(RenameDependencyResourceCommandHandler);
+  container.registerSingleton(DeleteDependencyResourceCommandHandler);
+  container.registerSingleton(ListDependencyResourcesQueryHandler);
+  container.registerSingleton(ShowDependencyResourceQueryHandler);
   container.registerSingleton(RenameStorageVolumeCommandHandler);
   container.registerSingleton(DeleteStorageVolumeCommandHandler);
   container.registerSingleton(ListStorageVolumesQueryHandler);
@@ -324,6 +342,30 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.unsetResourceVariableUseCase, UnsetResourceVariableUseCase);
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.showResourceQueryService, ShowResourceQueryService);
+  container.registerSingleton(
+    tokens.provisionPostgresDependencyResourceUseCase,
+    ProvisionPostgresDependencyResourceUseCase,
+  );
+  container.registerSingleton(
+    tokens.importPostgresDependencyResourceUseCase,
+    ImportPostgresDependencyResourceUseCase,
+  );
+  container.registerSingleton(
+    tokens.renameDependencyResourceUseCase,
+    RenameDependencyResourceUseCase,
+  );
+  container.registerSingleton(
+    tokens.deleteDependencyResourceUseCase,
+    DeleteDependencyResourceUseCase,
+  );
+  container.registerSingleton(
+    tokens.listDependencyResourcesQueryService,
+    ListDependencyResourcesQueryService,
+  );
+  container.registerSingleton(
+    tokens.showDependencyResourceQueryService,
+    ShowDependencyResourceQueryService,
+  );
   container.registerSingleton(tokens.createStorageVolumeUseCase, CreateStorageVolumeUseCase);
   container.registerSingleton(tokens.renameStorageVolumeUseCase, RenameStorageVolumeUseCase);
   container.registerSingleton(tokens.deleteStorageVolumeUseCase, DeleteStorageVolumeUseCase);

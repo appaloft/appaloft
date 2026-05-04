@@ -65,6 +65,9 @@ import {
   PgCertificateRetryCandidateReader,
   PgCertificateSecretStore,
   PgDefaultAccessDomainPolicyRepository,
+  PgDependencyResourceDeleteSafetyReader,
+  PgDependencyResourceReadModel,
+  PgDependencyResourceRepository,
   PgDeploymentReadModel,
   PgDeploymentRepository,
   PgDestinationRepository,
@@ -733,6 +736,14 @@ export function registerRuntimeDependencies(
   container.register(tokens.resourceRepository, {
     useFactory: instanceCachingFactory(() => new PgResourceRepository(input.database.db)),
   });
+  container.register(tokens.dependencyResourceRepository, {
+    useFactory: instanceCachingFactory(() => new PgDependencyResourceRepository(input.database.db)),
+  });
+  container.register(tokens.dependencyResourceDeleteSafetyReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgDependencyResourceDeleteSafetyReader(input.database.db),
+    ),
+  });
   container.register(tokens.storageVolumeRepository, {
     useFactory: instanceCachingFactory(() => new PgStorageVolumeRepository(input.database.db)),
   });
@@ -829,6 +840,15 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.resourceReadModel, {
     useFactory: instanceCachingFactory(() => new PgResourceReadModel(input.database.db)),
+  });
+  container.register(tokens.dependencyResourceReadModel, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new PgDependencyResourceReadModel(
+          input.database.db,
+          dependencyContainer.resolve(tokens.dependencyResourceDeleteSafetyReader),
+        ),
+    ),
   });
   container.register(tokens.storageVolumeReadModel, {
     useFactory: instanceCachingFactory(() => new PgStorageVolumeReadModel(input.database.db)),

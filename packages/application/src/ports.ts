@@ -42,6 +42,9 @@ import {
   type ProjectSelectionSpec,
   type Resource,
   type ResourceExposureMode,
+  type ResourceInstance,
+  type ResourceInstanceMutationSpec,
+  type ResourceInstanceSelectionSpec,
   type ResourceKind,
   type ResourceMutationSpec,
   type ResourceNetworkProtocol,
@@ -393,6 +396,40 @@ export interface StorageVolumeRepository {
     storageVolume: StorageVolume,
     spec: StorageVolumeMutationSpec,
   ): Promise<void>;
+}
+
+export interface DependencyResourceRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: ResourceInstanceSelectionSpec,
+  ): Promise<ResourceInstance | null>;
+  upsert(
+    context: RepositoryContext,
+    dependencyResource: ResourceInstance,
+    spec: ResourceInstanceMutationSpec,
+  ): Promise<void>;
+}
+
+export type DependencyResourceDeleteBlockerKind =
+  | "resource-binding"
+  | "backup-relationship"
+  | "provider-managed-unsafe"
+  | "deployment-snapshot-reference";
+
+export interface DependencyResourceDeleteBlocker {
+  kind: DependencyResourceDeleteBlockerKind;
+  relatedEntityId?: string;
+  relatedEntityType?: string;
+  count?: number;
+}
+
+export interface DependencyResourceDeleteSafetyReader {
+  findBlockers(
+    context: RepositoryContext,
+    input: {
+      dependencyResourceId: string;
+    },
+  ): Promise<Result<DependencyResourceDeleteBlocker[]>>;
 }
 
 export type ResourceDeletionBlockerKind =
@@ -2148,6 +2185,60 @@ export interface ShowStorageVolumeResult {
   generatedAt: string;
 }
 
+export type DependencyResourceKind = "postgres";
+export type DependencyResourceSourceMode = "appaloft-managed" | "imported-external";
+export type DependencyResourceLifecycleStatus = "provisioning" | "ready" | "degraded" | "deleted";
+
+export interface DependencyResourceConnectionSummary {
+  host: string;
+  port?: number;
+  databaseName?: string;
+  maskedConnection: string;
+  secretRef?: string;
+}
+
+export interface DependencyResourceBindingReadinessSummary {
+  status: "ready" | "blocked" | "not-implemented";
+  reason?: string;
+}
+
+export interface DependencyResourceSummary {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  name: string;
+  slug: string;
+  kind: DependencyResourceKind;
+  sourceMode: DependencyResourceSourceMode;
+  providerKey: string;
+  providerManaged: boolean;
+  description?: string;
+  lifecycleStatus: DependencyResourceLifecycleStatus;
+  connection?: DependencyResourceConnectionSummary;
+  bindingReadiness: DependencyResourceBindingReadinessSummary;
+  backupRelationship?: {
+    retentionRequired: boolean;
+    reason?: string;
+  };
+  deleteSafety?: {
+    blockers: DependencyResourceDeleteBlocker[];
+  };
+  createdAt: string;
+  deletedAt?: string;
+}
+
+export interface ListDependencyResourcesResult {
+  schemaVersion: "dependency-resources.list/v1";
+  items: DependencyResourceSummary[];
+  generatedAt: string;
+}
+
+export interface ShowDependencyResourceResult {
+  schemaVersion: "dependency-resources.show/v1";
+  dependencyResource: DependencyResourceSummary;
+  generatedAt: string;
+}
+
 export interface ResourceConfigEntryView {
   key: string;
   value: string;
@@ -3597,6 +3688,21 @@ export interface StorageVolumeReadModel {
     spec: StorageVolumeSelectionSpec,
   ): Promise<StorageVolumeSummary | null>;
   countAttachments(context: RepositoryContext, storageVolumeId: string): Promise<number>;
+}
+
+export interface DependencyResourceReadModel {
+  list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      kind?: DependencyResourceKind;
+    },
+  ): Promise<DependencyResourceSummary[]>;
+  findOne(
+    context: RepositoryContext,
+    spec: ResourceInstanceSelectionSpec,
+  ): Promise<DependencyResourceSummary | null>;
 }
 
 export interface DeploymentReadModel {

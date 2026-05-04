@@ -823,6 +823,13 @@ Current verification notes:
   This still does not satisfy the full `0.9.0` release rule while Postgres/Redis provisioning,
   dependency binding, backup/restore, recovery, auto-deploy, preview, and cluster runtime items
   remain open.
+- 2026-05-04 Phase 7 Postgres dependency resource lifecycle baseline implemented
+  provider-neutral provision/import/list/show/rename/delete over `ResourceInstance`, with masked
+  connection read models, future binding readiness, backup relationship metadata placeholders,
+  delete-safety blockers, CLI/oRPC/HTTP dispatch, and PG/PGlite persistence. This still does not
+  satisfy the full `0.9.0` release rule while Redis, dependency binding, secret rotation,
+  backup/restore, provider-native database realization, recovery, auto-deploy, preview, and cluster
+  runtime items remain open.
 
 Required:
 
@@ -832,7 +839,9 @@ Required:
 - [x] Add storage/volume create/list/show/update/delete.
 - [x] Add storage attach/detach, bind mount versus named volume, destination path validation, and
   backup relationship metadata.
-- [ ] Add Postgres provisioning/import/list/show/update/delete.
+- [x] Add provider-neutral Postgres dependency resource provision/import/list/show/rename/delete
+  baseline.
+- [ ] Add provider-native Postgres database realization and closed bind/backup/delete lifecycle.
 - [ ] Add Redis provisioning/import/list/show/update/delete.
 - [ ] Add dependency bind/unbind and binding secret rotation.
 - [ ] Add backup/restore for the minimum useful dependency-resource loop.

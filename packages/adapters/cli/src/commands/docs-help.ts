@@ -182,6 +182,23 @@ export const cliCommandDescriptions = {
   storageVolumeShow: withDocs("Show storage volume detail", "storage.volume-lifecycle"),
   storageVolumeRename: withDocs("Rename a storage volume", "storage.volume-lifecycle"),
   storageVolumeDelete: withDocs("Delete an unattached storage volume", "storage.volume-lifecycle"),
+  dependency: withDocs("Dependency resource operations", "resource.concept"),
+  dependencyPostgres: withDocs("Postgres dependency resource operations", "resource.concept"),
+  dependencyPostgresProvision: withDocs(
+    "Create an Appaloft-managed Postgres dependency resource record",
+    "resource.concept",
+  ),
+  dependencyPostgresImport: withDocs(
+    "Import an external Postgres dependency resource",
+    "resource.concept",
+  ),
+  dependencyList: withDocs("List dependency resources", "resource.concept"),
+  dependencyShow: withDocs("Show dependency resource detail", "resource.concept"),
+  dependencyRename: withDocs("Rename a dependency resource", "resource.concept"),
+  dependencyDelete: withDocs(
+    "Delete a dependency resource after safety checks",
+    "resource.concept",
+  ),
   resourceSetVariable: withDocs(
     "Set a resource-scoped variable override",
     "environment.variable-precedence",

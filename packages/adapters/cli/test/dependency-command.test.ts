@@ -1,0 +1,141 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
+
+import { describe, expect, test } from "bun:test";
+import {
+  type Command as AppCommand,
+  type Query as AppQuery,
+  type CommandBus,
+  type ExecutionContextFactory,
+  ImportPostgresDependencyResourceCommand,
+  ListDependencyResourcesQuery,
+  ProvisionPostgresDependencyResourceCommand,
+  type QueryBus,
+  ShowDependencyResourceQuery,
+} from "@appaloft/application";
+import { ok } from "@appaloft/core";
+
+function ensureReflectMetadata(): void {
+  const reflectObject = Reflect as typeof Reflect & {
+    defineMetadata?: (...args: unknown[]) => void;
+    getMetadata?: (...args: unknown[]) => unknown;
+    getOwnMetadata?: (...args: unknown[]) => unknown;
+    hasMetadata?: (...args: unknown[]) => boolean;
+    metadata?: (_metadataKey: unknown, _metadataValue: unknown) => ClassDecorator;
+  };
+
+  reflectObject.defineMetadata ??= () => {};
+  reflectObject.getMetadata ??= () => undefined;
+  reflectObject.getOwnMetadata ??= () => undefined;
+  reflectObject.hasMetadata ??= () => false;
+  reflectObject.metadata ??= () => () => {};
+}
+
+async function createCommandCaptureHarness(requestId: string) {
+  ensureReflectMetadata();
+  const { createExecutionContext } = await import("@appaloft/application");
+  const { createCliProgram } = await import("../src");
+  const commands: AppCommand<unknown>[] = [];
+  const queries: AppQuery<unknown>[] = [];
+  const commandBus = {
+    execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+      commands.push(command as AppCommand<unknown>);
+      return ok({ id: "rsi_pg" } as T);
+    },
+  } as unknown as CommandBus;
+  const queryBus = {
+    execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+      queries.push(query as AppQuery<unknown>);
+      return ok({} as T);
+    },
+  } as unknown as QueryBus;
+  const executionContextFactory: ExecutionContextFactory = {
+    create: (input) =>
+      createExecutionContext({
+        ...input,
+        requestId,
+      }),
+  };
+  const program = createCliProgram({
+    version: "0.1.0-test",
+    startServer: async () => {},
+    commandBus,
+    queryBus,
+    executionContextFactory,
+  });
+
+  return { commands, queries, program };
+}
+
+async function parseCli(program: { parseAsync(args: string[]): Promise<unknown> }, args: string[]) {
+  const writeStdout = process.stdout.write;
+  try {
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    await program.parseAsync(args);
+  } finally {
+    process.stdout.write = writeStdout;
+  }
+}
+
+describe("CLI dependency commands", () => {
+  test("[DEP-RES-PG-ENTRY-001] dependency postgres provision dispatches command", async () => {
+    const { commands, program } = await createCommandCaptureHarness("req_cli_dep_provision");
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "postgres",
+      "provision",
+      "--project",
+      "prj_demo",
+      "--environment",
+      "env_demo",
+      "--name",
+      "Main DB",
+    ]);
+
+    expect(commands[0]).toBeInstanceOf(ProvisionPostgresDependencyResourceCommand);
+    expect(commands[0]).toMatchObject({
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main DB",
+    });
+  });
+
+  test("[DEP-RES-PG-ENTRY-001] dependency postgres import dispatches command", async () => {
+    const { commands, program } = await createCommandCaptureHarness("req_cli_dep_import");
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "postgres",
+      "import",
+      "--project",
+      "prj_demo",
+      "--environment",
+      "env_demo",
+      "--name",
+      "External DB",
+      "--connection-url",
+      "postgres://app:secret@db.example.com/app",
+    ]);
+
+    expect(commands[0]).toBeInstanceOf(ImportPostgresDependencyResourceCommand);
+    expect(commands[0]).toMatchObject({
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "External DB",
+    });
+  });
+
+  test("[DEP-RES-PG-ENTRY-001] dependency list/show dispatch query bus", async () => {
+    const { program, queries } = await createCommandCaptureHarness("req_cli_dep_query");
+
+    await parseCli(program, ["node", "appaloft", "dependency", "list", "--project", "prj_demo"]);
+    await parseCli(program, ["node", "appaloft", "dependency", "show", "rsi_pg"]);
+
+    expect(queries[0]).toBeInstanceOf(ListDependencyResourcesQuery);
+    expect(queries[1]).toBeInstanceOf(ShowDependencyResourceQuery);
+  });
+});

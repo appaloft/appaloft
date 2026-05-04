@@ -166,6 +166,8 @@ export const domainError = {
   ): DomainError => createError("environment_locked", "user", message, details),
   resourceDeleteBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
     createError("resource_delete_blocked", "user", message, details),
+  dependencyResourceDeleteBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("dependency_resource_delete_blocked", "user", message, details),
   deploymentNotRedeployable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

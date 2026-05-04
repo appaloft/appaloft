@@ -1,5 +1,6 @@
 export * from "./certificate-messages";
 export * from "./default-access-domain-policy-messages";
+export * from "./dependency-resource-messages";
 export * from "./deployment-messages";
 export * from "./domain-binding-messages";
 export * from "./environment-messages";

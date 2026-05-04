@@ -21,6 +21,10 @@ export const tokens = {
   destinationRepository: Symbol.for("appaloft.destination_repository"),
   environmentRepository: Symbol.for("appaloft.environment_repository"),
   resourceRepository: Symbol.for("appaloft.resource_repository"),
+  dependencyResourceRepository: Symbol.for("appaloft.dependency_resource_repository"),
+  dependencyResourceDeleteSafetyReader: Symbol.for(
+    "appaloft.dependency_resource_delete_safety_reader",
+  ),
   storageVolumeRepository: Symbol.for("appaloft.storage_volume_repository"),
   resourceDeletionBlockerReader: Symbol.for("appaloft.resource_deletion_blocker_reader"),
   deploymentRepository: Symbol.for("appaloft.deployment_repository"),
@@ -42,6 +46,7 @@ export const tokens = {
   serverReadModel: Symbol.for("appaloft.server_read_model"),
   environmentReadModel: Symbol.for("appaloft.environment_read_model"),
   resourceReadModel: Symbol.for("appaloft.resource_read_model"),
+  dependencyResourceReadModel: Symbol.for("appaloft.dependency_resource_read_model"),
   storageVolumeReadModel: Symbol.for("appaloft.storage_volume_read_model"),
   resourceAccessFailureEvidenceRecorder: Symbol.for(
     "appaloft.resource_access_failure_evidence_recorder",
@@ -115,6 +120,18 @@ export const tokens = {
   detachResourceStorageUseCase: Symbol.for("appaloft.detach_resource_storage_use_case"),
   listResourcesQueryService: Symbol.for("appaloft.list_resources_query_service"),
   showResourceQueryService: Symbol.for("appaloft.show_resource_query_service"),
+  provisionPostgresDependencyResourceUseCase: Symbol.for(
+    "appaloft.provision_postgres_dependency_resource_use_case",
+  ),
+  importPostgresDependencyResourceUseCase: Symbol.for(
+    "appaloft.import_postgres_dependency_resource_use_case",
+  ),
+  renameDependencyResourceUseCase: Symbol.for("appaloft.rename_dependency_resource_use_case"),
+  deleteDependencyResourceUseCase: Symbol.for("appaloft.delete_dependency_resource_use_case"),
+  listDependencyResourcesQueryService: Symbol.for(
+    "appaloft.list_dependency_resources_query_service",
+  ),
+  showDependencyResourceQueryService: Symbol.for("appaloft.show_dependency_resource_query_service"),
   createStorageVolumeUseCase: Symbol.for("appaloft.create_storage_volume_use_case"),
   renameStorageVolumeUseCase: Symbol.for("appaloft.rename_storage_volume_use_case"),
   deleteStorageVolumeUseCase: Symbol.for("appaloft.delete_storage_volume_use_case"),
