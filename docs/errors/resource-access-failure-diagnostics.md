@@ -182,6 +182,11 @@ safe diagnostic envelope without unrelated ids, and the owner-facing next action
 existing diagnostic/read surface.
 for retained envelopes without exposing raw provider payloads.
 
+The companion/static renderer baseline reuses the same diagnostic codes and error details. It adds
+no new public error code, no new category, and no new phase. Static rendering can display only the
+safe fields supplied in the `resource-access-failure/v1` envelope; backend evidence lookup and
+automatic route context lookup remain existing read behavior when a backend renderer is reachable.
+
 ## Open Questions
 
 - Should the immediate public page include a short owner login link when the request host maps to a

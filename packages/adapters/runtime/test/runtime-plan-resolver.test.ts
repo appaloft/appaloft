@@ -183,7 +183,10 @@ describe("DefaultRuntimePlanResolver", () => {
   test("renders static site Docker builds for prebuilt publish directories", async () => {
     const { renderStaticSiteDockerBuild } = await import("../src/workspace-planners");
     const {
+      renderStaticAccessFailureRendererAsset,
       renderStaticServerConfig,
+      staticAccessFailureRendererAssetPath,
+      staticAccessFailureRendererRootPath,
       staticServerConfigAssetPath,
       staticServerConfigPath,
     } = await import("../src/workspace-planners/static-server-config");
@@ -197,6 +200,7 @@ describe("DefaultRuntimePlanResolver", () => {
         "FROM nginx:1.27-alpine",
         'COPY ["dist/","/usr/share/nginx/html/"]',
         `COPY ["${staticServerConfigAssetPath}","${staticServerConfigPath}"]`,
+        `COPY ["${staticAccessFailureRendererAssetPath}","${staticAccessFailureRendererRootPath}"]`,
         "EXPOSE 80",
         'CMD ["nginx","-g","daemon off;"]',
         "",
@@ -206,6 +210,10 @@ describe("DefaultRuntimePlanResolver", () => {
           relativePath: staticServerConfigAssetPath,
           contents: renderStaticServerConfig(),
         },
+        {
+          relativePath: staticAccessFailureRendererAssetPath,
+          contents: renderStaticAccessFailureRendererAsset(),
+        },
       ],
     });
   });
@@ -213,7 +221,10 @@ describe("DefaultRuntimePlanResolver", () => {
   test("renders static site Docker builds with build commands before the server stage", async () => {
     const { renderStaticSiteDockerBuild } = await import("../src/workspace-planners");
     const {
+      renderStaticAccessFailureRendererAsset,
       renderStaticServerConfig,
+      staticAccessFailureRendererAssetPath,
+      staticAccessFailureRendererRootPath,
       staticServerConfigAssetPath,
       staticServerConfigPath,
     } = await import("../src/workspace-planners/static-server-config");
@@ -235,6 +246,7 @@ describe("DefaultRuntimePlanResolver", () => {
         "FROM nginx:1.27-alpine",
         'COPY --from=build ["/app/dist/","/usr/share/nginx/html/"]',
         `COPY ["${staticServerConfigAssetPath}","${staticServerConfigPath}"]`,
+        `COPY ["${staticAccessFailureRendererAssetPath}","${staticAccessFailureRendererRootPath}"]`,
         "EXPOSE 80",
         'CMD ["nginx","-g","daemon off;"]',
         "",
@@ -243,6 +255,10 @@ describe("DefaultRuntimePlanResolver", () => {
         {
           relativePath: staticServerConfigAssetPath,
           contents: renderStaticServerConfig(),
+        },
+        {
+          relativePath: staticAccessFailureRendererAssetPath,
+          contents: renderStaticAccessFailureRendererAsset(),
         },
       ],
     });

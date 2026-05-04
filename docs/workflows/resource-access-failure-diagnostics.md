@@ -294,6 +294,13 @@ same sanitized `resource-access-failure/v1` envelope with safe related ids fille
 add a public operation or route repair surface. Provider-native raw metadata lookup, real Traefik
 e2e probing, and companion/static renderer support remain future hardening gaps.
 
+The companion/static renderer baseline adds shared application rendering helpers and a packaged
+static renderer asset for adapter-owned static runtimes. It can display a safe
+`resource-access-failure/v1` envelope without a reachable backend service and preserves safe route
+context when supplied. Backend renderers continue to use evidence capture and automatic route
+context lookup; static rendering without a backend does not perform lookup, provider-native raw
+metadata parsing, repair, redeploy, rollback, or route mutation.
+
 Existing `resources.health`, `resources.diagnostic-summary`, and
 `resources.proxy-configuration.preview` already provide the owner-facing read surfaces that the
 edge diagnostic page should link to or summarize after authentication.
