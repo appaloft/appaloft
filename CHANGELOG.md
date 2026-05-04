@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.7.1](https://github.com/appaloft/appaloft/compare/v0.7.0...v0.7.1) (2026-05-04)
+
+
+### Features
+
+* add access failure evidence lookup ([40009fe](https://github.com/appaloft/appaloft/commit/40009fec9fc5609ed45f4e83d846c8f5fc610417))
+* add applied route context lookup baseline ([6717f5a](https://github.com/appaloft/appaloft/commit/6717f5a5fb2d7d6f8736f71a571e060244d1d59b))
+* add applied route context metadata ([5e36986](https://github.com/appaloft/appaloft/commit/5e36986001df3424869cb496b0cab7d2ddf47861))
+* add automatic route context lookup ([f87fe77](https://github.com/appaloft/appaloft/commit/f87fe77747c8e4de78de3d382b061cca3f1796fc))
+* add domain binding lifecycle operations ([#149](https://github.com/appaloft/appaloft/issues/149)) ([1a5b927](https://github.com/appaloft/appaloft/commit/1a5b9279aceb185616ceedef9e8d9cf6c05683c8))
+* add real traefik access failure diagnostics baseline ([22fc170](https://github.com/appaloft/appaloft/commit/22fc1704540a521b339657f4f1e9310f7090aaac))
+* add static access failure renderer baseline ([7e662f2](https://github.com/appaloft/appaloft/commit/7e662f2404eb968d228dd4f6e5d19e6ac5796c5a))
+* close certificate lifecycle operations ([520a59b](https://github.com/appaloft/appaloft/commit/520a59b7def7eef058ed261177ebd35b41726b3c))
+* close certificate lifecycle operations ([0280b03](https://github.com/appaloft/appaloft/commit/0280b03451f10c9dd69052a2b634fd1ca50fb5d9))
+* redesign web console overview ([b9a70cd](https://github.com/appaloft/appaloft/commit/b9a70cd2aedca1d5b161ab427f81f07740f631a9))
+* redesign web console overview ([69a0e8e](https://github.com/appaloft/appaloft/commit/69a0e8e97f874043b58542b861924a4c12745456))
+
+
+### Bug Fixes
+
+* add access failure diagnostic baseline ([147a35d](https://github.com/appaloft/appaloft/commit/147a35dc9e623ace5952841ba7f9363af5101841))
+
+
+### Documentation
+
+* close 0.8.0 roadmap gate ([116792f](https://github.com/appaloft/appaloft/commit/116792fe6330d98bc003426a54849872e6136f3b))
+* close phase 6 route access contract ([#148](https://github.com/appaloft/appaloft/issues/148)) ([117d782](https://github.com/appaloft/appaloft/commit/117d7827ff85e2c111f303ac340d41fde0839e6d))
+* sync domain driven develop skill ([0335659](https://github.com/appaloft/appaloft/commit/033565976853a1653c701c92c095054cb9749776))
+* sync domain driven develop skill ([00ff078](https://github.com/appaloft/appaloft/commit/00ff0783f66790c4732bd07a0bc894d2a9d6431c))
+
+
+### Miscellaneous
+
+* refresh bun lockfile ([4e010c7](https://github.com/appaloft/appaloft/commit/4e010c76921635babf5ee57991daccd27d92f041))
+
 ## [0.7.0](https://github.com/appaloft/appaloft/compare/v0.6.0...v0.7.0) (2026-04-30)
 
 
