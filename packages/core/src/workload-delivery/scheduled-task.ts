@@ -690,6 +690,14 @@ export interface ScheduledTaskDefinitionSelectionSpec {
   accept<TResult>(visitor: ScheduledTaskDefinitionSelectionSpecVisitor<TResult>): TResult;
 }
 
+export interface ScheduledTaskDefinitionMutationSpecVisitor<TResult> {
+  visitUpsertScheduledTaskDefinition(spec: UpsertScheduledTaskDefinitionSpec): TResult;
+}
+
+export interface ScheduledTaskDefinitionMutationSpec {
+  accept<TResult>(visitor: ScheduledTaskDefinitionMutationSpecVisitor<TResult>): TResult;
+}
+
 export class ScheduledTaskDefinitionByIdSpec implements ScheduledTaskDefinitionSelectionSpec {
   private constructor(
     public readonly taskId: ScheduledTaskId,
@@ -702,6 +710,22 @@ export class ScheduledTaskDefinitionByIdSpec implements ScheduledTaskDefinitionS
 
   accept<TResult>(visitor: ScheduledTaskDefinitionSelectionSpecVisitor<TResult>): TResult {
     return visitor.visitScheduledTaskDefinitionById(this);
+  }
+}
+
+export class UpsertScheduledTaskDefinitionSpec implements ScheduledTaskDefinitionMutationSpec {
+  private constructor(
+    public readonly taskId: ScheduledTaskId,
+    public readonly resourceId: ResourceId,
+  ) {}
+
+  static fromTaskDefinition(task: ScheduledTaskDefinition): UpsertScheduledTaskDefinitionSpec {
+    const state = task.toState();
+    return new UpsertScheduledTaskDefinitionSpec(state.id, state.resourceId);
+  }
+
+  accept<TResult>(visitor: ScheduledTaskDefinitionMutationSpecVisitor<TResult>): TResult {
+    return visitor.visitUpsertScheduledTaskDefinition(this);
   }
 }
 

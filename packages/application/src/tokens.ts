@@ -202,6 +202,7 @@ export const tokens = {
   resourceRuntimeControlAttemptRecorder: Symbol.for(
     "appaloft.resource_runtime_control_attempt_recorder",
   ),
+  createScheduledTaskUseCase: Symbol.for("appaloft.create_scheduled_task_use_case"),
   runScheduledTaskNowUseCase: Symbol.for("appaloft.run_scheduled_task_now_use_case"),
   ingestSourceEventUseCase: Symbol.for("appaloft.ingest_source_event_use_case"),
   sourceEventVerificationPort: Symbol.for("appaloft.source_event_verification_port"),

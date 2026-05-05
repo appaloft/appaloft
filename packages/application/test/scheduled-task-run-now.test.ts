@@ -14,6 +14,7 @@ import {
   ScheduledTaskCommandIntent,
   ScheduledTaskConcurrencyPolicyValue,
   ScheduledTaskDefinition,
+  type ScheduledTaskDefinitionMutationSpec,
   type ScheduledTaskDefinitionSelectionSpec,
   ScheduledTaskDefinitionStatusValue,
   ScheduledTaskId,
@@ -59,6 +60,12 @@ class StaticScheduledTaskDefinitionRepository implements ScheduledTaskDefinition
       },
     });
   }
+
+  async upsert(
+    _context: RepositoryContext,
+    _task: ScheduledTaskDefinition,
+    _spec: ScheduledTaskDefinitionMutationSpec,
+  ): Promise<void> {}
 }
 
 class RecordingScheduledTaskRunAttemptRepository implements ScheduledTaskRunAttemptRepository {

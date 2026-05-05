@@ -20,6 +20,8 @@ logs. It is not active implementation coverage yet.
 | SCHED-TASK-DOMAIN-002 | Core domain | Invalid schedule or unsafe command intent. | Factory returns structured validation error; no `any` or primitive domain state leaks into aggregate state. |
 | SCHED-TASK-DOMAIN-003 | Core domain | Scheduled task run attempt state machine. | Run attempts start accepted, can start runtime execution, can finish as succeeded/failed/skipped, preserve Resource/task ownership without a Deployment id, and reject invalid transitions or unsafe failure summaries. |
 | SCHED-TASK-APP-001 | Application message model | Inactive scheduled task command/query messages. | Target scheduled-task and scheduled-task-run command/query schemas parse explicit operation inputs while operation catalog entries remain inactive. |
+| SCHED-TASK-CREATE-001 | Application command | User creates a scheduled task. | Command validates core scheduled-task fields, stores a Resource-owned task definition through the inactive repository port, and returns a safe task summary without activating operation catalog entries. |
+| SCHED-TASK-CREATE-002 | Application command | Resource is archived. | Create admission rejects before storing a task with a structured Resource lifecycle phase. |
 | SCHED-TASK-RUN-001 | Application command | User runs a task now. | Command returns `ok({ runId })` after admission; run state starts as accepted/pending/running according to workflow. |
 | SCHED-TASK-RUN-002 | Application command | Resource is archived. | Run admission rejects or skips before runtime execution with a structured resource lifecycle phase. |
 | SCHED-TASK-SCHED-001 | Scheduler | Enabled task is due. | Scheduler dispatches the same run admission path as run-now and records the same run shape. |
@@ -32,6 +34,9 @@ logs. It is not active implementation coverage yet.
 
 `SCHED-TASK-CATALOG-001` has inactive-catalog coverage and `SCHED-TASK-APP-001` has command/query
 message-shape coverage in `packages/application/test/scheduled-tasks-application-model.test.ts`.
+`SCHED-TASK-CREATE-001`, `SCHED-TASK-CREATE-002`, and unsafe command-intent coverage for
+`SCHED-TASK-SECRET-001` have inactive application create-admission coverage in
+`packages/application/test/scheduled-task-create.test.ts`.
 `SCHED-TASK-RUN-001` and `SCHED-TASK-RUN-002` have inactive application run-now admission coverage
 in `packages/application/test/scheduled-task-run-now.test.ts`.
 `SCHED-TASK-DOMAIN-001` through `SCHED-TASK-DOMAIN-003` have core coverage in
@@ -41,7 +46,7 @@ policy plus a Resource-owned scheduled task definition state with no deployment 
 the core scheduled-task run attempt lifecycle for accepted, running, succeeded, failed, and skipped
 states with safe terminal details and no Deployment id.
 
-Inactive application command/query schemas, messages, result DTOs, read-model ports, and run-now
-admission handler/use case exist. No operation catalog entries, remaining application handlers/use
-cases, persisted scheduled-task/run state, scheduler process manager, runtime adapter execution
-path, task-run logs, entrypoints, or public docs are active yet.
+Inactive application command/query schemas, messages, result DTOs, read-model ports, and create and
+run-now admission handlers/use cases exist. No operation catalog entries, remaining application
+handlers/use cases, persisted scheduled-task/run state, scheduler process manager, runtime adapter
+execution path, task-run logs, entrypoints, or public docs are active yet.
