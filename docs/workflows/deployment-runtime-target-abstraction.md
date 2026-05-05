@@ -193,17 +193,33 @@ Docker Swarm is a future runtime target backend, not a separate deployment comma
 
 It is the first cluster runtime target that must be completed on the path to `1.0.0`.
 
+The Spec Round is positioned in
+[Docker Swarm Runtime Target](../specs/045-docker-swarm-runtime-target/spec.md) and its
+[test matrix](../testing/docker-swarm-runtime-target-test-matrix.md).
+
 A Swarm backend must consume the same workload artifact, environment snapshot, resource network
-profile, and access-route snapshot, then render Swarm stack/service intent inside the adapter
-boundary.
+profile, health policy, and access-route snapshot, then render Swarm stack/service intent inside
+the adapter boundary.
 
-Before implementation, a Spec Round must define:
+Swarm-specific rules:
 
-- target registration and readiness rules for a Swarm manager target;
-- destination placement and isolation semantics;
-- registry push/pull requirements and secret masking;
-- service update strategy, rollback candidate identity, logs, health, and cleanup semantics;
-- how edge proxy route realization maps to Swarm services and networks.
+- target registration and readiness use provider-neutral `DeploymentTarget`/`Destination`
+  language, with `orchestrator-cluster` as target kind and `docker-swarm` as provider key when the
+  Code Round activates the schema/readiness support;
+- `deployments.create` remains ids-only and must reject stack, service, replica, update-policy,
+  registry-secret, ingress, manifest, or similar Swarm fields at the command/config boundary;
+- destination placement maps to adapter-owned stack/network isolation; sanitized target,
+  destination, resource, deployment, and runtime identity may be stored only when needed for
+  observation, diagnostics, cleanup, and rollback-candidate support;
+- registry credentials, pull secrets, environment secret values, rendered command output, and raw
+  Docker provider payloads must be masked before logs, diagnostics, errors, or read models expose
+  them;
+- rollout must preserve or restore the previous same-resource service until required apply, health,
+  route, and public verification gates pass;
+- `resources.runtime-logs`, `resources.health`, proxy/diagnostic summaries, and capacity
+  diagnostics must return normalized Appaloft shapes rather than Docker service API objects;
+- cleanup is scoped by resource, deployment, target, destination, and adapter-owned labels, and it
+  must not prune volumes, unrelated services, or Appaloft state roots.
 
 ## Kubernetes Target
 
