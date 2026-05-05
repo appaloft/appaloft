@@ -1172,7 +1172,12 @@ Current verification notes:
   anchor. Web controls and broader secret masking coverage remain open.
 - 2026-05-05 Phase 7 scheduled task secret redaction slice added shared scheduled-task secret
   detection/redaction for command intent, failure summaries, runtime output, runtime errors,
-  persisted read models, and generated tool descriptors. Web controls remain open.
+  persisted read models, and generated tool descriptors. Web controls remained open for the next
+  scheduled-task entrypoint slice.
+- 2026-05-05 Phase 7 scheduled task Web controls slice added Resource detail controls for
+  scheduled-task list/create, run-now, enable/disable, delete, recent run history, run-scoped logs,
+  and the stable scheduled-task public help anchor. Phase 7 remains open for Docker Swarm,
+  preview/cluster runtime, and any remaining roadmap exit criteria.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

@@ -41,7 +41,7 @@ Some entrypoints remain migration gaps until the full CLI/Web/docs surface is ac
 | SCHED-TASK-RUNNER-001 | Shell runner | Scheduled task runner is enabled. | Long-running shell composition can start an opt-in scheduled task runner that scans due tasks, admits scheduled runs, and drains the admitted runs through the worker. |
 | SCHED-TASK-LOGS-001 | Query/log adapter | Run emits output. | `scheduled-task-runs.logs` reads run-scoped logs; deployment and resource runtime logs are unchanged. |
 | SCHED-TASK-SECRET-001 | Redaction | Task input references secrets. | Definitions, runs, logs, errors, diagnostics, and tool descriptors expose only safe references and masked values. |
-| SCHED-TASK-ENTRY-001 | CLI/API/Web/MCP | Entrypoints are active. | CLI and HTTP/oRPC dispatch command/query messages through the catalog schemas; generated MCP descriptors consume the catalog entries; public docs/help links target stable scheduled-task anchors; Web controls remain a migration gap until implemented. |
+| SCHED-TASK-ENTRY-001 | CLI/API/Web/MCP | Entrypoints are active. | CLI, HTTP/oRPC, and Web controls dispatch command/query messages through catalog schemas; generated MCP descriptors consume the catalog entries; public docs/help links target stable scheduled-task anchors. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -49,7 +49,8 @@ Some entrypoints remain migration gaps until the full CLI/Web/docs surface is ac
 message-shape coverage in `packages/application/test/scheduled-tasks-application-model.test.ts`.
 HTTP/oRPC entrypoint coverage for `SCHED-TASK-ENTRY-001` lives in
 `packages/orpc/test/scheduled-task.http.test.ts`; CLI coverage lives in
-`packages/adapters/cli/test/scheduled-task-command.test.ts`.
+`packages/adapters/cli/test/scheduled-task-command.test.ts`; Web Resource-detail coverage lives in
+`apps/web/test/e2e-webview/home.webview.test.ts`.
 `SCHED-TASK-CREATE-001`, `SCHED-TASK-CREATE-002`, and unsafe command-intent coverage for
 `SCHED-TASK-SECRET-001` have application create-admission coverage in
 `packages/application/test/scheduled-task-create.test.ts`.
@@ -91,5 +92,5 @@ handlers/services, scheduled task persistence/read models, and hermetic runtime 
 exist. Shell composition can resolve the scheduled-task repositories, read models, runtime port,
 handlers, use cases, scheduler, and worker. The scheduled-task runner is configured off by default
 and can be enabled for long-running shell processes. Operation catalog entries, HTTP/oRPC routes,
-CLI commands, generated MCP descriptors, and public docs/help anchors are active; Web controls
-remain open.
+CLI commands, Web Resource-detail controls, generated MCP descriptors, and public docs/help anchors
+are active.
