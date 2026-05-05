@@ -34,7 +34,7 @@
 - [x] Add inactive `resources.configure-auto-deploy` application and persistence tests.
 - [ ] Add `SRC-AUTO-EVENT-001` matching push deployment dispatch tests.
 - [x] Add `SRC-AUTO-EVENT-002` dedupe tests.
-- [ ] Add `SRC-AUTO-EVENT-003` ignored ref tests.
+- [x] Add `SRC-AUTO-EVENT-003` ignored ref tests.
 - [x] Add `SRC-AUTO-EVENT-004` invalid signature tests.
 - [ ] Add `SRC-AUTO-ENTRY-001` CLI/HTTP/Web/schema tests.
 - [x] Add `SRC-AUTO-QUERY-001` and `SRC-AUTO-QUERY-002` source event read-model tests.
@@ -48,6 +48,7 @@
 - [x] Add source event command/query schemas, handlers, use cases, and tokens.
 - [x] Add provider-neutral source event normalization and verification ports.
 - [x] Add durable source event dedupe and read models.
+- [x] Add policy matching for ignored source event outcomes.
 - [ ] Dispatch matching events through existing deployment admission semantics.
 - [ ] Add CLI, HTTP/oRPC, and Web entrypoints only after tests pass.
 

@@ -62,6 +62,7 @@ export const tokens = {
     "appaloft.resource_access_failure_evidence_read_model",
   ),
   sourceEventRecorder: Symbol.for("appaloft.source_event_recorder"),
+  sourceEventPolicyReader: Symbol.for("appaloft.source_event_policy_reader"),
   sourceEventReadModel: Symbol.for("appaloft.source_event_read_model"),
   deploymentReadModel: Symbol.for("appaloft.deployment_read_model"),
   domainBindingReadModel: Symbol.for("appaloft.domain_binding_read_model"),

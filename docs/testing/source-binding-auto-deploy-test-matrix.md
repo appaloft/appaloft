@@ -6,8 +6,9 @@ Test-First / Code Round preparation for Phase 7 / `0.9.0`.
 
 Resource-owned auto-deploy policy domain behavior, application command handling, Resource
 repository persistence, source-event command/query handling, generic signed source-event
-verification, and durable source-event dedupe/read models have automation. Source event deployment
-dispatch, ingestion routes, entrypoints, and background workers are not active yet.
+verification, durable source-event dedupe/read models, and ignored policy-match outcomes have
+automation. Source event deployment dispatch, ingestion routes, entrypoints, and background workers
+are not active yet.
 
 ## Governing Sources
 
@@ -41,7 +42,7 @@ dispatch, ingestion routes, entrypoints, and background workers are not active y
 | --- | --- | --- | --- | --- |
 | `SRC-AUTO-EVENT-001` | Verified push event matches one enabled policy. | One deployment is accepted through existing deployment admission. | planned | Deferred gap |
 | `SRC-AUTO-EVENT-002` | Provider redelivers same event. | Durable source-event dedupe prevents duplicate source-event records and read model reports deduped; duplicate deployment prevention remains bound to the dispatch slice. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Partial |
-| `SRC-AUTO-EVENT-003` | Event ref does not match policy. | No deployment is created and read model reports ignored ref. | planned | Deferred gap |
+| `SRC-AUTO-EVENT-003` | Event ref does not match policy. | No deployment is created and read model reports ignored ref. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
 | `SRC-AUTO-EVENT-004` | Generic signed webhook has invalid signature. | Event rejects before policy matching; no deployment is created. | `packages/application/test/source-events.test.ts` | Partial |
 | `SRC-AUTO-EVENT-005` | Multiple Resources match one event. | Each matching Resource creates at most one coordinated deployment attempt. | planned | Deferred gap |
 
@@ -66,7 +67,7 @@ dispatch, ingestion routes, entrypoints, and background workers are not active y
 Resource source binding, source fingerprint link state, manual deployment admission,
 Resource-owned auto-deploy policy state behavior, inactive application command handling, and
 Resource repository persistence exist. Inactive source-event command/query handling, generic signed
-source-event verification, and durable source-event dedupe/read-model persistence also exist. This
-matrix still tracks the missing source event deployment dispatch and entrypoint surfaces. Code
-Round must not mark auto-deploy complete until these rows have stable automation or explicit
-deferred exceptions.
+source-event verification, durable source-event dedupe/read-model persistence, and policy matching
+for ignored ref outcomes also exist. This matrix still tracks the missing source event deployment
+dispatch and entrypoint surfaces. Code Round must not mark auto-deploy complete until these rows
+have stable automation or explicit deferred exceptions.

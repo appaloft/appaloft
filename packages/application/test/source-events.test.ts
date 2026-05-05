@@ -5,6 +5,9 @@ import {
   type RepositoryContext,
   type SourceEventListInput,
   type SourceEventListPage,
+  type SourceEventOutcomeUpdate,
+  type SourceEventPolicyCandidate,
+  type SourceEventPolicyReader,
   type SourceEventReadModel,
   type SourceEventRecord,
   type SourceEventRecorder,
@@ -47,6 +50,30 @@ class MemorySourceEventStore implements SourceEventRecorder, SourceEventReadMode
 
     this.records.push(cloneRecord(record));
     return cloneRecord(record);
+  }
+
+  async updateOutcome(
+    _context: RepositoryContext,
+    input: SourceEventOutcomeUpdate,
+  ): Promise<SourceEventRecord> {
+    const record = this.records.find((stored) => stored.sourceEventId === input.sourceEventId);
+    if (!record) {
+      throw new Error(`Source event ${input.sourceEventId} was not found`);
+    }
+
+    const { projectId: _currentProjectId, ...recordWithoutProject } = record;
+    const updated: SourceEventRecord = {
+      ...recordWithoutProject,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+      status: input.status,
+      matchedResourceIds: [...input.matchedResourceIds],
+      ignoredReasons: [...input.ignoredReasons],
+      policyResults: input.policyResults.map((result) => ({ ...result })),
+      createdDeploymentIds: [...input.createdDeploymentIds],
+    };
+    const index = this.records.indexOf(record);
+    this.records[index] = updated;
+    return cloneRecord(updated);
   }
 
   async list(
@@ -92,6 +119,32 @@ class MemorySourceEventStore implements SourceEventRecorder, SourceEventReadMode
           (!input.resourceId || record.matchedResourceIds.includes(input.resourceId)),
       ) ?? null
     );
+  }
+}
+
+class MemorySourceEventPolicyReader implements SourceEventPolicyReader {
+  constructor(private readonly candidates: SourceEventPolicyCandidate[]) {}
+
+  async listCandidates(
+    _context: RepositoryContext,
+    input: Parameters<SourceEventPolicyReader["listCandidates"]>[1],
+  ): Promise<SourceEventPolicyCandidate[]> {
+    return this.candidates
+      .filter(
+        (candidate) =>
+          candidate.sourceBinding.locator === input.sourceIdentity.locator ||
+          (candidate.sourceBinding.providerRepositoryId &&
+            candidate.sourceBinding.providerRepositoryId ===
+              input.sourceIdentity.providerRepositoryId) ||
+          (candidate.sourceBinding.repositoryFullName &&
+            candidate.sourceBinding.repositoryFullName === input.sourceIdentity.repositoryFullName),
+      )
+      .map((candidate) => ({
+        ...candidate,
+        refs: [...candidate.refs],
+        eventKinds: [...candidate.eventKinds],
+        sourceBinding: { ...candidate.sourceBinding },
+      }));
   }
 }
 
@@ -142,18 +195,26 @@ function sourceEventRecordFixture(): SourceEventRecord {
   };
 }
 
-function createHarness() {
+function createHarness(options: { policyCandidates?: SourceEventPolicyCandidate[] } = {}) {
   const context = createExecutionContext({
     requestId: "req_source_events_test",
     entrypoint: "system",
   });
   const sourceEvents = new MemorySourceEventStore();
   const clock = new FixedClock("2026-01-01T00:00:10.000Z");
+  const policyReader = options.policyCandidates
+    ? new MemorySourceEventPolicyReader(options.policyCandidates)
+    : undefined;
 
   return {
     context,
     sourceEvents,
-    ingest: new IngestSourceEventUseCase(sourceEvents, clock, new SequentialIdGenerator()),
+    ingest: new IngestSourceEventUseCase(
+      sourceEvents,
+      clock,
+      new SequentialIdGenerator(),
+      policyReader,
+    ),
     list: new ListSourceEventsQueryService(sourceEvents, clock),
     show: new ShowSourceEventQueryService(sourceEvents),
   };
@@ -281,6 +342,66 @@ describe("source event application baseline", () => {
     expect(sourceEvents.records[0]?.sourceIdentity.locator).toBe(
       "https://github.com/appaloft/demo",
     );
+  });
+
+  test("[SRC-AUTO-EVENT-003] ignores source events whose ref does not match Resource policy", async () => {
+    const { context, ingest, sourceEvents } = createHarness({
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            providerRepositoryId: "repo_1",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ],
+    });
+
+    const result = await ingest.execute(context, {
+      sourceKind: "github",
+      eventKind: "push",
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/demo",
+        providerRepositoryId: "repo_1",
+        repositoryFullName: "appaloft/demo",
+      },
+      ref: "feature/skip",
+      revision: "abc123",
+      deliveryId: "delivery_ref_skip",
+      verification: {
+        status: "verified",
+        method: "provider-signature",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      sourceEventId: "sevt_1",
+      status: "ignored",
+      matchedResourceIds: [],
+      createdDeploymentIds: [],
+      ignoredReasons: ["ref-not-matched"],
+    });
+    expect(sourceEvents.records[0]).toMatchObject({
+      sourceEventId: "sevt_1",
+      projectId: "prj_demo",
+      status: "ignored",
+      matchedResourceIds: [],
+      ignoredReasons: ["ref-not-matched"],
+      policyResults: [
+        {
+          resourceId: "res_web",
+          status: "ignored",
+          reason: "ref-not-matched",
+        },
+      ],
+    });
   });
 
   test("[SRC-AUTO-QUERY-001] lists source events by Resource scope", async () => {

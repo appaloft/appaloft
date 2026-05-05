@@ -7,6 +7,9 @@ import {
   type IdGenerator,
   type IngestSourceEventResult,
   type SourceEventIdentity,
+  type SourceEventIgnoredReason,
+  type SourceEventPolicyReader,
+  type SourceEventPolicyResult,
   type SourceEventRecord,
   type SourceEventRecorder,
   type SourceEventVerificationSummary,
@@ -28,6 +31,8 @@ export class IngestSourceEventUseCase {
     private readonly clock: Clock,
     @inject(tokens.idGenerator)
     private readonly idGenerator: IdGenerator,
+    @inject(tokens.sourceEventPolicyReader)
+    private readonly sourceEventPolicyReader?: SourceEventPolicyReader,
   ) {}
 
   async execute(
@@ -62,8 +67,20 @@ export class IngestSourceEventUseCase {
       });
     }
 
+    const outcome = this.sourceEventPolicyReader
+      ? await evaluateSourceEventPolicyMatch(
+          repositoryContext,
+          this.sourceEventPolicyReader,
+          input.sourceKind,
+          sourceIdentity,
+          input.eventKind,
+          input.ref,
+        )
+      : emptySourceEventOutcome();
+
     const record: SourceEventRecord = {
       sourceEventId: this.idGenerator.next("sevt"),
+      ...(outcome.projectId ? { projectId: outcome.projectId } : {}),
       sourceKind: input.sourceKind,
       eventKind: input.eventKind,
       sourceIdentity,
@@ -74,17 +91,124 @@ export class IngestSourceEventUseCase {
       dedupeKey,
       dedupeStatus: "new",
       verification: verificationFromInput(input.verification),
-      status: "accepted",
-      matchedResourceIds: [],
-      ignoredReasons: [],
-      policyResults: [],
-      createdDeploymentIds: [],
+      status: outcome.status,
+      matchedResourceIds: outcome.matchedResourceIds,
+      ignoredReasons: outcome.ignoredReasons,
+      policyResults: outcome.policyResults,
+      createdDeploymentIds: outcome.createdDeploymentIds,
       receivedAt: input.receivedAt ?? this.clock.now(),
     };
 
     const stored = await this.sourceEventRecorder.record(repositoryContext, record);
     return ok(resultFromRecord(stored));
   }
+}
+
+interface SourceEventOutcome {
+  status: "accepted" | "ignored" | "blocked";
+  projectId?: string;
+  matchedResourceIds: string[];
+  ignoredReasons: SourceEventIgnoredReason[];
+  policyResults: SourceEventPolicyResult[];
+  createdDeploymentIds: string[];
+}
+
+function emptySourceEventOutcome(): SourceEventOutcome {
+  return {
+    status: "accepted",
+    matchedResourceIds: [],
+    ignoredReasons: [],
+    policyResults: [],
+    createdDeploymentIds: [],
+  };
+}
+
+async function evaluateSourceEventPolicyMatch(
+  context: Parameters<SourceEventPolicyReader["listCandidates"]>[0],
+  sourceEventPolicyReader: SourceEventPolicyReader,
+  sourceKind: IngestSourceEventCommandPayload["sourceKind"],
+  sourceIdentity: SourceEventIdentity,
+  eventKind: IngestSourceEventCommandPayload["eventKind"],
+  ref: string,
+): Promise<SourceEventOutcome> {
+  const candidates = await sourceEventPolicyReader.listCandidates(context, {
+    sourceKind,
+    sourceIdentity,
+  });
+  if (candidates.length === 0) {
+    return {
+      status: "ignored",
+      matchedResourceIds: [],
+      ignoredReasons: ["no-matching-policy"],
+      policyResults: [],
+      createdDeploymentIds: [],
+    };
+  }
+
+  const policyResults: SourceEventPolicyResult[] = [];
+  const ignoredReasons = new Set<SourceEventIgnoredReason>();
+  const matchedResourceIds: string[] = [];
+  let projectId: string | undefined;
+
+  for (const candidate of candidates) {
+    projectId ??= candidate.projectId;
+
+    if (candidate.status === "blocked") {
+      ignoredReasons.add("policy-blocked");
+      policyResults.push({
+        resourceId: candidate.resourceId,
+        status: "blocked",
+        reason: "policy-blocked",
+      });
+      continue;
+    }
+
+    if (candidate.status === "disabled") {
+      ignoredReasons.add("policy-disabled");
+      policyResults.push({
+        resourceId: candidate.resourceId,
+        status: "ignored",
+        reason: "policy-disabled",
+      });
+      continue;
+    }
+
+    if (!candidate.eventKinds.includes(eventKind) || !candidate.refs.includes(ref)) {
+      ignoredReasons.add("ref-not-matched");
+      policyResults.push({
+        resourceId: candidate.resourceId,
+        status: "ignored",
+        reason: "ref-not-matched",
+      });
+      continue;
+    }
+
+    matchedResourceIds.push(candidate.resourceId);
+    policyResults.push({
+      resourceId: candidate.resourceId,
+      status: "matched",
+    });
+  }
+
+  if (matchedResourceIds.length > 0) {
+    return {
+      status: "accepted",
+      ...(projectId ? { projectId } : {}),
+      matchedResourceIds,
+      ignoredReasons: [...ignoredReasons],
+      policyResults,
+      createdDeploymentIds: [],
+    };
+  }
+
+  return {
+    status: ignoredReasons.has("policy-blocked") ? "blocked" : "ignored",
+    ...(projectId ? { projectId } : {}),
+    matchedResourceIds: [],
+    ignoredReasons: [...ignoredReasons],
+    policyResults,
+    createdDeploymentIds: [],
+  };
 }
 
 export function sourceEventDedupeKey(input: {
