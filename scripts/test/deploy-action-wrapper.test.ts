@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 
 const actionRoot = resolve(import.meta.dir, "../../.github/actions/deploy-action");
 const actionYaml = readFileSync(join(actionRoot, "action.yml"), "utf8");
+const readme = readFileSync(join(actionRoot, "README.md"), "utf8");
 const runDeployScript = join(actionRoot, "scripts/run-deploy.sh");
 
 function runDeploy(input: Record<string, string | undefined>) {
@@ -46,6 +47,7 @@ describe("deploy-action wrapper reference", () => {
     expect(actionYaml).toContain("using: composite");
     expect(actionYaml).toContain("scripts/install-appaloft.sh");
     expect(actionYaml).toContain("scripts/run-deploy.sh");
+    expect(actionYaml).toContain("command:");
     expect(actionYaml).toContain("appaloft-version");
     expect(actionYaml).toContain("preview-url");
     expect(actionYaml).not.toContain("project:");
@@ -172,6 +174,46 @@ describe("deploy-action wrapper reference", () => {
     }
   });
 
+  test("[CONFIG-FILE-ENTRY-019] maps preview-cleanup command to CLI cleanup", () => {
+    const result = runDeploy({
+      INPUT_COMMAND: "preview-cleanup",
+      INPUT_CONFIG: "appaloft.preview.yml",
+      INPUT_SOURCE: ".",
+      INPUT_SSH_HOST: "203.0.113.10",
+      INPUT_SSH_USER: "deploy",
+      INPUT_PREVIEW: "pull-request",
+      INPUT_PREVIEW_ID: "pr-42",
+      INPUT_PREVIEW_DOMAIN_TEMPLATE: "pr-42.preview.example.com",
+      INPUT_REQUIRE_PREVIEW_URL: "true",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv.slice(0, 4)).toEqual([
+        "/opt/appaloft/appaloft",
+        "preview",
+        "cleanup",
+        ".",
+      ]);
+      expect(result.argv).toContain("--config");
+      expect(result.argv).toContain("appaloft.preview.yml");
+      expect(result.argv).toContain("--server-host");
+      expect(result.argv).toContain("203.0.113.10");
+      expect(result.argv).toContain("--state-backend");
+      expect(result.argv).toContain("ssh-pglite");
+      expect(result.argv).toContain("--preview");
+      expect(result.argv).toContain("pull-request");
+      expect(result.argv).toContain("--preview-id");
+      expect(result.argv).toContain("pr-42");
+      expect(result.argv).not.toContain("--preview-domain-template");
+      expect(result.argv).not.toContain("--require-preview-url");
+      expect(result.argv).not.toContain("--preview-output-file");
+      expect(result.output).toContain("preview-id=pr-42");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
   test("[CONTROL-PLANE-ENTRY-002] unsupported control-plane inputs fail before mutation", () => {
     const result = runDeploy({
       INPUT_CONTROL_PLANE_MODE: "cloud",
@@ -216,5 +258,21 @@ describe("deploy-action wrapper reference", () => {
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }
+  });
+
+  test("[CONFIG-FILE-ENTRY-018][CONFIG-FILE-ENTRY-019] Marketplace README documents previews and cleanup safety", () => {
+    expect(readme).toContain("uses: appaloft/deploy-action@v1");
+    expect(readme).toContain("version: v0.9.0");
+    expect(readme).toContain("Minimal `appaloft.yml`");
+    expect(readme).toContain("pull_request:");
+    expect(readme).toContain(
+      "if: github.event.pull_request.head.repo.full_name == github.repository",
+    );
+    expect(readme).toContain("config: appaloft.preview.yml");
+    expect(readme).toContain("require-preview-url: true");
+    expect(readme).toContain("command: preview-cleanup");
+    expect(readme).toContain("types: [closed]");
+    expect(readme).toContain("Cleanup is idempotent");
+    expect(readme).toContain("Product-grade previews");
   });
 });

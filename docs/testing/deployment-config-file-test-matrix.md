@@ -351,19 +351,20 @@ tests because it runs the source checkout directly instead of installing a relea
 `appaloft/deploy-action` wrapper.
 
 The main repository now includes a reference composite wrapper at
-`.github/actions/deploy-action` with `action.yml`, install/checksum script, deploy script, and
+`.github/actions/deploy-action` with `action.yml`, Marketplace-facing README, install/checksum script, deploy script, and
 `scripts/test/deploy-action-wrapper.test.ts` coverage for `CONFIG-FILE-ENTRY-009`,
 `CONFIG-FILE-ENTRY-010`, `CONFIG-FILE-ENTRY-012`, `CONFIG-FILE-ENTRY-015`,
 `CONFIG-FILE-ENTRY-026`, and the current fail-before-mutation baseline for
 `CONTROL-PLANE-ENTRY-002`. This proves wrapper metadata, version/target install contract shape,
 SSH secret temp-key command mapping, PR preview flag mapping, CLI preview-output-file handling,
-no-config default behavior, and unsupported control-plane input rejection in this repository.
+preview cleanup command mapping, Marketplace README fork-safety/cleanup examples, no-config default
+behavior, and unsupported control-plane input rejection in this repository.
 
 Public `appaloft/deploy-action` release coverage is not complete yet. The main repository release
 workflow already produces CLI archives, the static Docker self-host installer, `checksums.txt`,
 `release-manifest.json`, and release notes, but the separate public wrapper repository still needs
-Marketplace README/examples, fixture or real-release install CI, wrapper-level cleanup
-input/examples, future overlay behavior, and tests for the public repository layout.
+promotion or mirroring of the reference README/examples, fixture or real-release install CI, future
+overlay behavior, and tests for the public repository layout.
 
 Profile drift visibility and default fail-before-deploy behavior for existing-resource drift are
 covered in `packages/adapters/cli/test/deployment-config.test.ts`. Existing-resource profile
