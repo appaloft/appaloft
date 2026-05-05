@@ -12,7 +12,10 @@
 ## Test-First
 
 - [x] `SWARM-TARGET-REG-001`: Swarm manager target registration accepts safe provider-neutral
-  target kind metadata. Readiness capability checks remain a follow-up.
+  target kind metadata.
+- [x] `SWARM-TARGET-REG-002`: Swarm manager readiness checks cover SSH reachability, Docker
+  daemon availability, active manager state, overlay network support, and edge proxy compatibility
+  without mutating stacks, services, or networks.
 - [x] `SWARM-TARGET-ADM-001`: `deployments.create` remains ids-only and rejects Swarm deployment
   fields.
 - [x] `SWARM-TARGET-ADM-002`: `deployments.create` rejects a Swarm target before acceptance when
@@ -35,7 +38,7 @@
 - [x] Add Swarm-capable target registration metadata support.
 - [x] Keep `deployments.create` and repository config Swarm-field admission rejection covered.
 - [x] Keep unsupported Swarm target runtime backend admission rejection covered.
-- [ ] Add Swarm manager readiness capability checks.
+- [x] Add Swarm manager readiness capability checks.
 - [x] Add Swarm runtime target backend descriptor and registry selection coverage.
 - [ ] Implement render/apply/verify/log/health/cleanup behind runtime adapters.
 - [ ] Add sanitized target identity persistence/read-model support where required.

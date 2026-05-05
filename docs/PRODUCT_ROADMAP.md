@@ -1197,6 +1197,10 @@ Current verification notes:
 - 2026-05-05 Phase 7 Docker Swarm help-link slice wired the Swarm target anchor into CLI
   `server register`, HTTP `POST /servers`, and Web server registration provider help. Swarm
   manager readiness and execution remain open.
+- 2026-05-05 Phase 7 Docker Swarm manager readiness slice bound `SWARM-TARGET-REG-002` to
+  `servers.test-connectivity` adapter coverage for SSH reachability, Docker daemon availability,
+  active manager state, overlay network support, and edge proxy compatibility without mutating
+  Swarm stacks, services, or networks. Swarm execution remains open.
 
 Required:
 
@@ -1238,8 +1242,8 @@ Required:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
   semantics, normalized read surfaces, public docs/help, and contract tests are implemented.
   Target-kind registration metadata, unsupported-backend admission, backend descriptor selection,
-  the public docs anchor, and CLI/API/Web help links are implemented; Swarm manager readiness and
-  execution remain open.
+  Swarm manager readiness, the public docs anchor, and CLI/API/Web help links are implemented;
+  Swarm execution remains open.
 
 Exit criteria:
 

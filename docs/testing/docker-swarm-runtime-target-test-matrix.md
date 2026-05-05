@@ -18,7 +18,8 @@ Code Rounds; no Swarm implementation is active yet.
 
 | ID | Layer | Scenario | Expected |
 | --- | --- | --- | --- |
-| SWARM-TARGET-REG-001 | Application/adapter contract | Register Swarm manager target metadata. | Target registration uses `orchestrator-cluster`, provider key `docker-swarm`, and safe provider-neutral metadata; raw Docker API payloads and secrets stay out of core/application state. Swarm manager readiness capability checks remain follow-up coverage. |
+| SWARM-TARGET-REG-001 | Application/adapter contract | Register Swarm manager target metadata. | Target registration uses `orchestrator-cluster`, provider key `docker-swarm`, and safe provider-neutral metadata; raw Docker API payloads and secrets stay out of core/application state. |
+| SWARM-TARGET-REG-002 | Runtime adapter readiness | Test Swarm manager readiness. | `servers.test-connectivity` checks SSH reachability, Docker daemon availability, active Swarm manager control-plane state, overlay network driver availability, and Swarm edge-proxy compatibility without creating stacks, services, or networks. |
 | SWARM-TARGET-ADM-001 | Command/API/CLI/Web schema | Swarm fields in deployment admission. | `deployments.create` rejects namespace, stack, service, replica, update policy, registry secret, ingress, or manifest fields with `validation_error` before deployment creation. |
 | SWARM-TARGET-ADM-002 | Application admission | Swarm target lacks required backend capability. | Safe pre-acceptance detection returns `runtime_target_unsupported` in phase `runtime-target-resolution`; no deployment is accepted. |
 | SWARM-TARGET-SELECT-001 | Application/runtime adapter | Select Swarm backend. | Runtime target registry chooses the `docker-swarm` backend by target kind, provider key, and required capabilities without hardcoded transport logic in use cases. |
@@ -37,7 +38,10 @@ Code Rounds; no Swarm implementation is active yet.
 ## Current Implementation Notes And Migration Gaps
 
 - `SWARM-TARGET-REG-001` has application/CLI/persistence coverage for safe target-kind metadata
-  registration. Swarm manager readiness remains follow-up coverage.
+  registration.
+- `SWARM-TARGET-REG-002` has runtime adapter coverage proving `servers.test-connectivity` runs
+  non-mutating Swarm manager readiness checks for SSH, Docker, active manager state, overlay
+  network support, and edge proxy compatibility.
 - `SWARM-TARGET-ADM-001` has command schema, public contract schema, HTTP route, repository config
   parser, and CLI config-dispatch coverage proving Swarm-specific deployment fields are rejected
   before deployment creation.
