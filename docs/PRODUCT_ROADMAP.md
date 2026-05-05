@@ -1058,6 +1058,13 @@ Current verification notes:
   global future tool-surface milestone, not by a source auto-deploy transport-specific shape. The
   full `0.9.0` release rule remains blocked by the deploy-action wrapper, preview, existing-resource
   profile drift, scheduled tasks, future MCP/tool descriptors, and cluster runtime items.
+- 2026-05-05 Phase 7 deploy-action reference wrapper slice added
+  `.github/actions/deploy-action` with composite action metadata, release-archive install/checksum
+  verification script, deploy invocation script, SSH private-key temp-file handling, PR preview flag
+  mapping, and `scripts/test/deploy-action-wrapper.test.ts` coverage. The roadmap row remains open
+  until this reference is promoted to the public `appaloft/deploy-action` repository with
+  Marketplace docs/examples, public wrapper CI, cleanup examples, and stable action-safe
+  `preview-url` output handling.
 
 Required:
 

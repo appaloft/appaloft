@@ -230,10 +230,11 @@ Remaining gaps:
   runtime planner mapping own those paths explicitly.
 - Stored Appaloft/external secret adapters beyond the headless `ci-env:` resolver are not wired into
   the config-file entry workflow yet.
-- Public GitHub Action wrapper install UX is not implemented yet. The main repository publishes
-  CLI release archives, the static Docker self-host installer, checksums, release manifest, and
-  release notes, but `appaloft/deploy-action` still needs its own repository, action metadata,
-  install/checksum scripts, README examples, and wrapper-level tests.
+- The main repository now has a reference `.github/actions/deploy-action` wrapper with action
+  metadata, install/checksum script, SSH secret temp-key handling, PR preview flag mapping, and
+  wrapper-level tests. The public `appaloft/deploy-action` install UX still needs its own
+  repository, Marketplace README examples, public wrapper CI, cleanup examples, and stable
+  action-safe output handling.
 - Action PR preview deploy is specified as an entry workflow in
   [GitHub Action PR Preview Deploy](../workflows/github-action-pr-preview-deploy.md). The CLI now
   supports preview-scoped source fingerprints, non-interactive preview environment selection,

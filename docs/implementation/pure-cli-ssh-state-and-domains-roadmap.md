@@ -190,11 +190,10 @@ selection overrides, not required setup.
   and route status separately from generated access routes and managed durable domain bindings.
 - Provider-local TLS diagnostics for pure CLI `tlsMode = auto` routes are exposed through proxy
   configuration and resource diagnostic summaries without creating managed `Certificate` state.
-- Public GitHub Action wrapper install UX is not implemented yet. The main repository release
-  workflow publishes CLI archives, the static Docker self-host installer, `checksums.txt`,
-  `release-manifest.json`, and release notes; a separate `appaloft/deploy-action` repository still
-  needs action metadata, install/checksum scripts, SSH secret to temp-key handling, wrapper tests,
-  and public README examples.
+- The main repository now has a reference `.github/actions/deploy-action` wrapper with action
+  metadata, install/checksum script, SSH secret temp-key handling, and wrapper tests. A separate
+  public `appaloft/deploy-action` repository still needs Marketplace README examples and public
+  wrapper CI before the install UX is release-complete.
 - Pure CLI mode has no always-on DNS observer, Appaloft certificate scheduler, or cleanup retry
   loop after the process exits.
 - Hosted/cloud adoption, GitHub App webhook previews, team auth, audit, and fleet visibility are
