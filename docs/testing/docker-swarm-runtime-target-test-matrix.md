@@ -3,8 +3,8 @@
 ## Scope
 
 This matrix covers Docker Swarm as the first cluster runtime target backend behind existing
-deployment, log, health, proxy, diagnostic, and capacity surfaces. It is target coverage for future
-Code Rounds; no Swarm implementation is active yet.
+deployment, log, health, proxy, diagnostic, and capacity surfaces. Early adapter-contract slices are
+implemented, but no Docker Swarm execution backend is active yet.
 
 ## Global References
 
@@ -51,6 +51,15 @@ Code Rounds; no Swarm implementation is active yet.
 - `SWARM-TARGET-ADM-002` has application admission coverage proving an `orchestrator-cluster` /
   `docker-swarm` target without required runtime backend capability returns
   `runtime_target_unsupported` before any deployment row is accepted.
+- `SWARM-TARGET-RENDER-001` has adapter contract coverage proving OCI image runtime artifact
+  intent, runtime environment snapshot variables, health policy, and access routes render to
+  adapter-owned Swarm stack/service intent.
+- `SWARM-TARGET-RENDER-002` has adapter contract coverage proving Compose runtime artifact intent
+  renders only when the public target service is explicit, and otherwise returns
+  `runtime_target_unsupported` in phase `runtime-target-render`.
+- `SWARM-TARGET-SECRET-001` has initial render-contract coverage proving runtime secret environment
+  values are converted to safe references and omitted from serialized render intent. Registry pull
+  credential and provider response redaction remain open with apply/log/diagnostic adapters.
 - `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
   explaining Swarm target registration, manager readiness expectations, image registry access,
   rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI `server register`,

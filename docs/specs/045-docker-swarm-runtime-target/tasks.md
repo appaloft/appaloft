@@ -22,7 +22,7 @@
   the runtime backend lacks required capabilities.
 - [x] `SWARM-TARGET-SELECT-001`: backend registry selects `docker-swarm` by target kind, provider
   key, and capabilities.
-- [ ] `SWARM-TARGET-RENDER-001`: OCI image and Compose artifact intent render to adapter-owned
+- [x] `SWARM-TARGET-RENDER-001`: OCI image and Compose artifact intent render to adapter-owned
   Swarm stack/service intent.
 - [ ] `SWARM-TARGET-APPLY-001`: rollout preserves or restores previous same-resource service until
   verification succeeds.
@@ -40,7 +40,8 @@
 - [x] Keep unsupported Swarm target runtime backend admission rejection covered.
 - [x] Add Swarm manager readiness capability checks.
 - [x] Add Swarm runtime target backend descriptor and registry selection coverage.
-- [ ] Implement render/apply/verify/log/health/cleanup behind runtime adapters.
+- [x] Implement adapter-owned render intent for OCI image and Compose workloads.
+- [ ] Implement apply/verify/log/health/cleanup behind runtime adapters.
 - [ ] Add sanitized target identity persistence/read-model support where required.
 - [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.
 

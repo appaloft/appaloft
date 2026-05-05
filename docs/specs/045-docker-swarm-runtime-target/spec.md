@@ -115,9 +115,14 @@ No new public operation key is accepted in this Spec Round.
   governing Spec Round accepts them.
 - The runtime target adapter package exposes a `docker-swarm` backend descriptor shape and registry
   selection coverage; the default runtime registry still does not activate Swarm execution.
+- The runtime adapter package now renders adapter-owned Docker Swarm runtime intent for OCI image
+  and Compose artifact workloads. Render output derives stack/service identity from Appaloft
+  resource, deployment, target, and destination context, maps runtime environment snapshots,
+  health policies, and access routes, and masks runtime secret values before they reach diagnostics
+  or tests.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
-- Swarm runtime target backend render/apply/verify/log/health/cleanup is not implemented.
+- Swarm runtime target backend apply/verify/log/health/cleanup is not implemented.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and
