@@ -924,6 +924,11 @@ Current verification notes:
   `source-events.show` as accepted candidates over existing Resource source binding and
   `deployments.create` admission semantics. It does not implement code yet, so the full `0.9.0`
   release rule remains blocked by auto-deploy Code Round, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 source event auto-deploy decision closure added
+  [ADR-037](./decisions/ADR-037-source-event-auto-deploy-ownership.md), selecting Resource-owned
+  auto-deploy policy, project/resource-scoped source event read models, Resource-scoped generic
+  webhook secret references, and a Phase 7 durable source-event record plus synchronous dispatch
+  baseline before Phase 8 outbox/inbox work.
 
 Required:
 

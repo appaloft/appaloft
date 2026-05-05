@@ -7,6 +7,14 @@ Spec Round for Phase 7 / `0.9.0`.
 This artifact positions source-binding auto-deploy before Code Round. It does not activate new
 commands, HTTP routes, Web actions, webhook endpoints, or background workers.
 
+## Governing Sources
+
+- [ADR-037: Source Event Auto Deploy Ownership](../../decisions/ADR-037-source-event-auto-deploy-ownership.md)
+- [Business Operation Map](../../BUSINESS_OPERATION_MAP.md)
+- [Deployment Config File Bootstrap](../../workflows/deployment-config-file-bootstrap.md)
+- [Source Binding Auto Deploy Test Matrix](../../testing/source-binding-auto-deploy-test-matrix.md)
+- [Source Binding Auto Deploy Implementation Plan](../../implementation/source-binding-auto-deploy-plan.md)
+
 ## Problem
 
 Appaloft already persists Resource source binding and source fingerprint link state, and it can
@@ -89,9 +97,9 @@ Minimum policy fields:
 - `dedupeWindow`: implementation-defined default recorded in docs and read models.
 - `createdBy` and `updatedAt` audit metadata.
 
-When the Resource source binding changes, the policy remains disabled or blocked until the new
-binding is explicitly acknowledged by `resources.configure-auto-deploy`. Code Round must choose one
-behavior and bind it in tests before implementation.
+When the Resource source binding changes, the policy remains blocked until the new binding is
+explicitly acknowledged by `resources.configure-auto-deploy`. The policy is not silently retargeted
+and not silently deleted, but source events must not create deployments while it is blocked.
 
 ## Event Ingestion Semantics
 
@@ -118,7 +126,7 @@ attempt must coordinate independently through the existing `resource-runtime` sc
 | `SRC-AUTO-SPEC-003` | Event is redelivered with same delivery id. | No duplicate deployment is created; read model reports deduped. |
 | `SRC-AUTO-SPEC-004` | Event ref does not match policy. | No deployment is created; read model reports ignored reason. |
 | `SRC-AUTO-SPEC-005` | Generic signed webhook has invalid signature. | Event is rejected before policy matching and no deployment is created. |
-| `SRC-AUTO-SPEC-006` | Resource source binding changes after policy creation. | Code Round blocks or disables policy according to the selected explicit rule. |
+| `SRC-AUTO-SPEC-006` | Resource source binding changes after policy creation. | Policy is blocked pending explicit acknowledgement and cannot create deployments. |
 
 ## Public Surfaces
 
@@ -131,12 +139,20 @@ The Code Round must decide and synchronize:
   recovery;
 - future MCP/tool descriptors generated from the same command/query schemas.
 
-## Open Questions Before Code Round
+## Decisions For Code Round
 
-- Should source event read models be retained globally or scoped by project/resource?
-- Does `resources.configure-auto-deploy` disable policy automatically when `resources.configure-source`
-  changes source binding, or does it keep policy enabled but blocked until acknowledgement?
-- Does generic signed webhook own a reusable secret credential aggregate, or does Phase 7 start with
-  one Resource-scoped secret reference?
-- Does the first Code Round require durable outbox/inbox, or can it use synchronous dispatch plus a
-  source-event record until Phase 8 process-state closure?
+ADR-037 answers the initial Code Round blockers:
+
+- source event read models are project/resource-scoped first; global operator rollups are future;
+- source binding changes block existing auto-deploy policies until explicit acknowledgement;
+- generic signed webhook starts with a Resource-scoped secret reference, not a reusable credential
+  aggregate;
+- Phase 7 may use durable source-event records plus synchronous deployment dispatch before Phase 8
+  outbox/inbox, but must not claim automatic background retry.
+
+Remaining Code Round design work:
+
+- exact command/query schema field names;
+- exact error codes and knowledge links;
+- public docs anchors and help text;
+- first implementation slice size.

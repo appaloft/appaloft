@@ -13,10 +13,18 @@
 
 ## Decision Follow-Up
 
-- [ ] Decide whether source event ownership/retry semantics require ADR-037 before Code Round.
-- [ ] Decide whether Resource auto-deploy policy disables or blocks after source binding changes.
-- [ ] Decide generic signed webhook secret custody and rotation model.
-- [ ] Decide first Code Round process-state baseline versus Phase 8 outbox/inbox dependency.
+- [x] Decide whether source event ownership/retry semantics require ADR-037 before Code Round.
+- [x] Decide whether Resource auto-deploy policy disables or blocks after source binding changes.
+- [x] Decide generic signed webhook secret custody and rotation model.
+- [x] Decide first Code Round process-state baseline versus Phase 8 outbox/inbox dependency.
+
+## Local Spec Follow-Up
+
+- [ ] Add `resources.configure-auto-deploy` command spec.
+- [ ] Add `source-events.ingest` command spec.
+- [ ] Add `source-events.list` and `source-events.show` query specs.
+- [ ] Add source auto-deploy error spec.
+- [ ] Add public docs/help anchors for setup, signatures, dedupe, ignored events, and recovery.
 
 ## Test-First Round
 

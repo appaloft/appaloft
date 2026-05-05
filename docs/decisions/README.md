@@ -61,6 +61,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-034: Deployment Recovery Readiness](./ADR-034-deployment-recovery-readiness.md) | Accepted | Defines shared readiness, retry, redeploy, rollback candidate, rollback, event, and error semantics before ADR-016 recovery operations become public again. |
 | [ADR-035: Certificate Lifecycle Closure](./ADR-035-certificate-lifecycle-closure.md) | Accepted | Defines certificate show, retry, revoke, and delete semantics, durable revoked/deleted states, and provider/imported behavior differences. |
 | [ADR-036: Dependency Resource Backup And Restore Lifecycle](./ADR-036-dependency-resource-backup-restore-lifecycle.md) | Accepted | Defines dependency resource backup restore points, in-place restore attempts, safe provider artifact handles, and delete-safety retention blockers. |
+| [ADR-037: Source Event Auto Deploy Ownership](./ADR-037-source-event-auto-deploy-ownership.md) | Accepted | Defines Resource-owned auto-deploy policy, source event ingestion/dedupe/read-model ownership, generic webhook secret scope, and Phase 7 process-state baseline. |
 
 ## Authoring Rules
 
