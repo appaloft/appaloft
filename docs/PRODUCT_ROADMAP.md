@@ -1077,6 +1077,11 @@ Current verification notes:
   serializable CLI/API metadata, and high-value deployment/resource/source-event mappings. The full
   `0.9.0` release rule remains blocked by the public deploy-action promotion, product-grade preview
   deployments, scheduled tasks, and cluster runtime items.
+- 2026-05-05 Phase 7 scheduled task resource Spec Round added ADR-039 and
+  `docs/specs/044-scheduled-task-resource-shape` to position Resource-owned scheduled task
+  definitions, run attempts, task-run logs, scheduler admission, and deployment-boundary separation.
+  The roadmap row remains open until operation catalog entries, persistence, scheduler/runtime
+  execution, entrypoints, and public docs are implemented.
 
 Required:
 
@@ -1110,7 +1115,7 @@ Required:
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
   retries.
 - [ ] Add scheduled task/cron resource shape with run history and logs after workload service
-  semantics are specified.
+  semantics are specified. ADR-039/spec matrix now position ownership and target operations.
 - [ ] Complete the Docker Swarm Spec Round and Code Round as the first cluster runtime target:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
   semantics, normalized read surfaces, and contract tests.
@@ -1263,7 +1268,8 @@ work below before GA.
   or user-owned wildcard preview access.
 - [ ] Product-grade preview deployment: create from PR event, list/show/update policy/delete on
   close, scoped env, GitHub App status/comments, and cleanup retries.
-- [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs.
+- [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs. Spec Round
+  positioned by ADR-039 and `docs/specs/044-scheduled-task-resource-shape`.
 - [x] Terminal session: open.
 - [ ] Terminal session: list/show/attach/close/expire, audit and redaction.
 - [ ] Outbox/inbox/job/process state: list/show/retry/cancel/dead-letter/prune, attempt ownership.
