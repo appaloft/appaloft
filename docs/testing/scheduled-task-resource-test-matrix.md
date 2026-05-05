@@ -28,4 +28,11 @@ logs. It is not active implementation coverage yet.
 
 ## Current Implementation Notes And Migration Gaps
 
-All rows are target coverage. No scheduled task implementation is active yet.
+`SCHED-TASK-DOMAIN-001` and `SCHED-TASK-DOMAIN-002` have core coverage in
+`packages/core/test/scheduled-task.test.ts`. The implemented slice adds dedicated value objects for
+schedule, timezone, command intent, timeout, retry, lifecycle status, and `forbid` concurrency
+policy plus a Resource-owned scheduled task definition state with no deployment id.
+
+No operation catalog entries, application commands/queries, persisted scheduled-task/run state,
+scheduler process manager, runtime adapter execution path, task-run logs, entrypoints, or public
+docs are active yet.

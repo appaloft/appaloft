@@ -220,6 +220,27 @@ export class StorageVolumeId extends IdentifierValue {
   }
 }
 
+const scheduledTaskIdBrand: unique symbol = Symbol("ScheduledTaskId");
+export class ScheduledTaskId extends IdentifierValue {
+  private [scheduledTaskIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ScheduledTaskId> {
+    return createIdentifierValue(
+      value,
+      "Scheduled task ID",
+      (normalized) => new ScheduledTaskId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): ScheduledTaskId {
+    return new ScheduledTaskId(value.trim());
+  }
+}
+
 const resourceStorageAttachmentIdBrand: unique symbol = Symbol("ResourceStorageAttachmentId");
 export class ResourceStorageAttachmentId extends IdentifierValue {
   private [resourceStorageAttachmentIdBrand]!: void;

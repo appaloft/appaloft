@@ -54,6 +54,9 @@ DDD or internal process-manager terminology.
 
 ## Migration Gaps
 
+- Core scheduled task definition value objects and Resource-owned definition state exist for
+  schedule, timezone, command intent, timeout, retry, lifecycle status, and `forbid` concurrency
+  validation. No run attempt state machine exists yet.
 - No operation catalog entries are active.
 - No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
 - No persisted scheduled-task/run state exists.

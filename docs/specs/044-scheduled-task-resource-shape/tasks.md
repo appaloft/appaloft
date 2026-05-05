@@ -11,8 +11,10 @@
 ## Test-First
 
 - [ ] `SCHED-TASK-CATALOG-001`: operation catalog entries appear only when activated.
-- [ ] `SCHED-TASK-DOMAIN-001`: task definition value objects validate schedule, timezone, command
-  intent, timeout, retry, and concurrency policy.
+- [x] `SCHED-TASK-DOMAIN-001`: task definition value objects validate schedule, timezone, command
+  intent, timeout, retry, status, and concurrency policy.
+- [x] `SCHED-TASK-DOMAIN-002`: invalid schedule or unsafe command intent returns structured
+  validation errors without primitive domain state.
 - [ ] `SCHED-TASK-RUN-001`: run-now accepts a run attempt without completing it synchronously.
 - [ ] `SCHED-TASK-SCHED-001`: scheduler dispatches through the same run admission use case.
 - [ ] `SCHED-TASK-LOGS-001`: task-run logs are separate from deployment/resource runtime logs.
@@ -20,7 +22,8 @@
 
 ## Implementation
 
-- [ ] Add core/application scheduled-task model.
+- [x] Add core scheduled-task definition value objects and Resource-owned state shape.
+- [ ] Add application scheduled-task command/query model.
 - [ ] Add persistence/read models.
 - [ ] Add scheduler process manager.
 - [ ] Add runtime adapter one-off task execution/log support.
