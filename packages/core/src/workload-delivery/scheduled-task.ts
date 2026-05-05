@@ -682,6 +682,16 @@ export interface CreateScheduledTaskDefinitionInput {
   createdAt: CreatedAt;
 }
 
+export interface UpdateScheduledTaskDefinitionInput {
+  schedule?: ScheduledTaskScheduleExpression;
+  timezone?: ScheduledTaskTimezone;
+  commandIntent?: ScheduledTaskCommandIntent;
+  timeoutSeconds?: ScheduledTaskTimeoutSeconds;
+  retryLimit?: ScheduledTaskRetryLimit;
+  concurrencyPolicy?: ScheduledTaskConcurrencyPolicyValue;
+  status?: ScheduledTaskDefinitionStatusValue;
+}
+
 export interface ScheduledTaskDefinitionSelectionSpecVisitor<TResult> {
   visitScheduledTaskDefinitionById(spec: ScheduledTaskDefinitionByIdSpec): TResult;
 }
@@ -768,6 +778,32 @@ export class ScheduledTaskDefinition extends AggregateRoot<
 
   isEnabled(): boolean {
     return this.state.status.isEnabled();
+  }
+
+  update(input: UpdateScheduledTaskDefinitionInput): Result<void> {
+    if (input.schedule) {
+      this.state.schedule = input.schedule;
+    }
+    if (input.timezone) {
+      this.state.timezone = input.timezone;
+    }
+    if (input.commandIntent) {
+      this.state.commandIntent = input.commandIntent;
+    }
+    if (input.timeoutSeconds) {
+      this.state.timeoutSeconds = input.timeoutSeconds;
+    }
+    if (input.retryLimit) {
+      this.state.retryLimit = input.retryLimit;
+    }
+    if (input.concurrencyPolicy) {
+      this.state.concurrencyPolicy = input.concurrencyPolicy;
+    }
+    if (input.status) {
+      this.state.status = input.status;
+    }
+
+    return ok(undefined);
   }
 
   toState(): ScheduledTaskDefinitionState {

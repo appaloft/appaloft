@@ -114,6 +114,7 @@ export * from "./operations/scheduled-tasks/run-scheduled-task-now.use-case";
 export * from "./operations/scheduled-tasks/scheduled-task-run-logs.query-service";
 export * from "./operations/scheduled-tasks/show-scheduled-task.query-service";
 export * from "./operations/scheduled-tasks/show-scheduled-task-run.query-service";
+export * from "./operations/scheduled-tasks/update-scheduled-task.use-case";
 export * from "./operations/servers/bootstrap-server-proxy.use-case";
 export * from "./operations/servers/check-server-delete-safety.query-service";
 export * from "./operations/servers/configure-server-credential.use-case";

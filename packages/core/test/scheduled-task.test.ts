@@ -101,6 +101,41 @@ describe("ScheduledTaskDefinition", () => {
       });
     }
   });
+
+  test("[SCHED-TASK-DOMAIN-001] updates definition fields through value objects", () => {
+    const task = ScheduledTaskDefinition.create({
+      id: ScheduledTaskId.rehydrate("tsk_daily_migration"),
+      resourceId: ResourceId.rehydrate("res_api"),
+      schedule: ScheduledTaskScheduleExpression.create("0 1 * * *")._unsafeUnwrap(),
+      timezone: ScheduledTaskTimezone.create("UTC")._unsafeUnwrap(),
+      commandIntent: ScheduledTaskCommandIntent.create("bun run migrate")._unsafeUnwrap(),
+      timeoutSeconds: ScheduledTaskTimeoutSeconds.create(600)._unsafeUnwrap(),
+      retryLimit: ScheduledTaskRetryLimit.create(2)._unsafeUnwrap(),
+      concurrencyPolicy: ScheduledTaskConcurrencyPolicyValue.forbid(),
+      status: ScheduledTaskDefinitionStatusValue.enabled(),
+      createdAt: CreatedAt.rehydrate("2026-05-05T00:00:00.000Z"),
+    })._unsafeUnwrap();
+
+    const updated = task.update({
+      schedule: ScheduledTaskScheduleExpression.create("0 2 * * *")._unsafeUnwrap(),
+      timezone: ScheduledTaskTimezone.create("Asia/Shanghai")._unsafeUnwrap(),
+      commandIntent: ScheduledTaskCommandIntent.create("bun run backup")._unsafeUnwrap(),
+      timeoutSeconds: ScheduledTaskTimeoutSeconds.create(900)._unsafeUnwrap(),
+      retryLimit: ScheduledTaskRetryLimit.create(0)._unsafeUnwrap(),
+      status: ScheduledTaskDefinitionStatusValue.disabled(),
+    });
+
+    expect(updated.isOk()).toBe(true);
+    const state = task.toState();
+    expect(state.schedule.value).toBe("0 2 * * *");
+    expect(state.timezone.value).toBe("Asia/Shanghai");
+    expect(state.commandIntent.value).toBe("bun run backup");
+    expect(state.timeoutSeconds.value).toBe(900);
+    expect(state.retryLimit.value).toBe(0);
+    expect(state.concurrencyPolicy.value).toBe("forbid");
+    expect(state.status.value).toBe("disabled");
+    expect(state.createdAt.value).toBe("2026-05-05T00:00:00.000Z");
+  });
 });
 
 describe("ScheduledTaskRunAttempt", () => {
