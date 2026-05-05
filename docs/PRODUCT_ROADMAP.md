@@ -1009,7 +1009,11 @@ Current verification notes:
 - 2026-05-05 Phase 7 resource auto-deploy entrypoint slice activated
   `resources.configure-auto-deploy` in `CORE_OPERATIONS.md`, the operation catalog, shell DI,
   CLI, and HTTP/oRPC with `SRC-AUTO-ENTRY-001` catalog coverage. Web settings UI, provider
-  ingestion routes, source event query surfaces, and future MCP/tool descriptors remain deferred.
+  ingestion routes, Web source event diagnostics, and future MCP/tool descriptors remain deferred.
+- 2026-05-05 Phase 7 source event read surface slice activated `source-events.list` and
+  `source-events.show` in `CORE_OPERATIONS.md`, the operation catalog, shell DI, CLI, and
+  HTTP/oRPC with `SRC-AUTO-QUERY-001`/`SRC-AUTO-QUERY-002` catalog coverage. Provider ingestion
+  routes, Web diagnostics, and future MCP/tool descriptors remain deferred.
 
 Required:
 

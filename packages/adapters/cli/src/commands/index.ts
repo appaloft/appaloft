@@ -14,6 +14,7 @@ import { projectCommand } from "./project.js";
 import { remoteStateCommand } from "./remote-state.js";
 import { resourceCommand } from "./resource.js";
 import { serverCommand } from "./server.js";
+import { sourceEventCommand } from "./source-event.js";
 import { sourceLinksCommand } from "./source-link.js";
 import { storageCommand } from "./storage.js";
 
@@ -38,6 +39,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     deployCommand,
     logsCommand,
     envCommand,
+    sourceEventCommand,
     sourceLinksCommand,
     remoteStateCommand,
     operatorWorkCommand,

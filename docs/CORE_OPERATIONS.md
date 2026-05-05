@@ -555,6 +555,31 @@ Current boundary:
   `resources.delete` source-link blocker checks. API/oRPC and Web relink surfaces remain future
   work until the review UX exists.
 
+## Source Events
+
+Business meaning:
+- source event records are safe, provider-neutral diagnostics for trusted source deliveries
+- source events may dispatch ordinary deployment attempts only through Resource-owned
+  auto-deploy policy and existing `deployments.create` admission
+- read surfaces expose dedupe, ignored/blocked, policy, and created deployment ids without raw
+  webhook payloads, signatures, provider tokens, or secret values
+
+Implemented operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| List source events | Query | `source-events.list` | `ListSourceEventsQuery` | `ListSourceEventsQueryInput` | `appaloft source-event list --resource <resourceId>` | `GET /api/source-events` |
+| Show source event | Query | `source-events.show` | `ShowSourceEventQuery` | `ShowSourceEventQueryInput` | `appaloft source-event show <sourceEventId> --resource <resourceId>` | `GET /api/source-events/{sourceEventId}` |
+
+Current boundary:
+- `source-events.list` and `source-events.show` are read-only diagnostics over persisted source
+  event records. They require project or Resource scope and must not replay events, retry failed
+  dispatch, mutate auto-deploy policy, or create deployments.
+- Provider webhook ingestion remains deferred until raw payload parsing, signature extraction,
+  provider-specific routes, and public help are aligned with `source-events.ingest`.
+- Web diagnostics remain deferred; CLI and HTTP/oRPC read surfaces are active for operator
+  diagnostics and API consumers.
+
 ## Deployments
 
 Business meaning:

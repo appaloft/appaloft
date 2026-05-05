@@ -1636,6 +1636,110 @@ export const configureResourceAutoDeployResponseSchema = z.object({
   blockedReason: z.enum(["source-binding-changed"]).optional(),
 });
 
+export const sourceEventSourceKindSchema = z.enum(["github", "gitlab", "generic-signed"]);
+export const sourceEventKindSchema = z.enum(["push", "tag"]);
+export const sourceEventStatusSchema = z.enum([
+  "accepted",
+  "deduped",
+  "ignored",
+  "blocked",
+  "dispatched",
+  "failed",
+]);
+export const sourceEventDedupeStatusSchema = z.enum(["new", "duplicate"]);
+export const sourceEventIgnoredReasonSchema = z.enum([
+  "no-matching-policy",
+  "ref-not-matched",
+  "policy-disabled",
+  "policy-blocked",
+]);
+export const sourceEventPolicyResultStatusSchema = z.enum([
+  "matched",
+  "ignored",
+  "blocked",
+  "dispatch-failed",
+  "dispatched",
+]);
+export const sourceEventPolicyResultReasonSchema = z.enum([
+  "ref-not-matched",
+  "policy-disabled",
+  "policy-blocked",
+  "dispatch-failed",
+]);
+
+export const listSourceEventsInputSchema = z.object({
+  projectId: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  status: sourceEventStatusSchema.optional(),
+  sourceKind: sourceEventSourceKindSchema.optional(),
+  limit: z.number().int().positive().max(100).optional(),
+  cursor: z.string().min(1).optional(),
+});
+
+export const showSourceEventInputSchema = z.object({
+  sourceEventId: z.string().min(1),
+  projectId: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+});
+
+export const sourceEventListItemSchema = z.object({
+  sourceEventId: z.string(),
+  projectId: z.string().optional(),
+  resourceIds: z.array(z.string()),
+  sourceKind: sourceEventSourceKindSchema,
+  eventKind: sourceEventKindSchema,
+  ref: z.string(),
+  revision: z.string(),
+  status: sourceEventStatusSchema,
+  dedupeStatus: sourceEventDedupeStatusSchema,
+  ignoredReasons: z.array(sourceEventIgnoredReasonSchema),
+  createdDeploymentIds: z.array(z.string()),
+  receivedAt: z.string(),
+});
+
+export const listSourceEventsResponseSchema = z.object({
+  items: z.array(sourceEventListItemSchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const sourceEventIdentitySchema = z.object({
+  locator: z.string(),
+  providerRepositoryId: z.string().optional(),
+  repositoryFullName: z.string().optional(),
+});
+
+export const sourceEventVerificationSummarySchema = z.object({
+  status: z.enum(["verified", "rejected"]),
+  method: z.enum(["provider-signature", "generic-hmac"]).optional(),
+  keyVersion: z.string().optional(),
+});
+
+export const sourceEventPolicyResultSchema = z.object({
+  resourceId: z.string(),
+  status: sourceEventPolicyResultStatusSchema,
+  reason: sourceEventPolicyResultReasonSchema.optional(),
+  deploymentId: z.string().optional(),
+  errorCode: z.string().optional(),
+});
+
+export const showSourceEventResponseSchema = z.object({
+  sourceEventId: z.string(),
+  projectId: z.string().optional(),
+  matchedResourceIds: z.array(z.string()),
+  sourceKind: sourceEventSourceKindSchema,
+  eventKind: sourceEventKindSchema,
+  sourceIdentity: sourceEventIdentitySchema,
+  ref: z.string(),
+  revision: z.string(),
+  verification: sourceEventVerificationSummarySchema,
+  status: sourceEventStatusSchema,
+  dedupeOfSourceEventId: z.string().optional(),
+  policyResults: z.array(sourceEventPolicyResultSchema),
+  createdDeploymentIds: z.array(z.string()),
+  receivedAt: z.string(),
+});
+
 export const attachResourceStorageInputSchema = z.object({
   resourceId: z.string().min(1),
   storageVolumeId: z.string().min(1),
@@ -3872,6 +3976,14 @@ export type ConfigureResourceAutoDeployInput = z.infer<
 export type ConfigureResourceAutoDeployResponse = z.infer<
   typeof configureResourceAutoDeployResponseSchema
 >;
+export type SourceEventListItem = z.infer<typeof sourceEventListItemSchema>;
+export type ListSourceEventsInput = z.infer<typeof listSourceEventsInputSchema>;
+export type ListSourceEventsResponse = z.infer<typeof listSourceEventsResponseSchema>;
+export type SourceEventIdentity = z.infer<typeof sourceEventIdentitySchema>;
+export type SourceEventVerificationSummary = z.infer<typeof sourceEventVerificationSummarySchema>;
+export type SourceEventPolicyResult = z.infer<typeof sourceEventPolicyResultSchema>;
+export type ShowSourceEventInput = z.infer<typeof showSourceEventInputSchema>;
+export type ShowSourceEventResponse = z.infer<typeof showSourceEventResponseSchema>;
 export type AttachResourceStorageInput = z.infer<typeof attachResourceStorageInputSchema>;
 export type AttachResourceStorageResponse = z.infer<typeof attachResourceStorageResponseSchema>;
 export type DetachResourceStorageInput = z.infer<typeof detachResourceStorageInputSchema>;

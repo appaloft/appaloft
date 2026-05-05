@@ -425,6 +425,36 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[SRC-AUTO-QUERY-001][SRC-AUTO-QUERY-002] source event reads are exposed through the active operation catalog", () => {
+    const listEntry = operationCatalog.find((candidate) => candidate.key === "source-events.list");
+    const showEntry = operationCatalog.find((candidate) => candidate.key === "source-events.show");
+
+    expect(listEntry).toMatchObject({
+      kind: "query",
+      domain: "source-events",
+      messageName: "ListSourceEventsQuery",
+      handlerName: "ListSourceEventsQueryHandler",
+      serviceName: "ListSourceEventsQueryService",
+      transports: {
+        cli: "appaloft source-event list --resource <resourceId> | --project <projectId>",
+        orpc: { method: "GET", path: "/api/source-events" },
+      },
+    });
+    expect(showEntry).toMatchObject({
+      kind: "query",
+      domain: "source-events",
+      messageName: "ShowSourceEventQuery",
+      handlerName: "ShowSourceEventQueryHandler",
+      serviceName: "ShowSourceEventQueryService",
+      transports: {
+        cli: "appaloft source-event show <sourceEventId> --resource <resourceId> | --project <projectId>",
+        orpc: { method: "GET", path: "/api/source-events/{sourceEventId}" },
+      },
+    });
+    expect(listEntry?.inputSchema).toBeDefined();
+    expect(showEntry?.inputSchema).toBeDefined();
+  });
+
   test("[RES-PROFILE-CONFIG-019] resource variable import is exposed through the active operation catalog", () => {
     const entry = operationCatalog.find(
       (candidate) => candidate.key === "resources.import-variables",

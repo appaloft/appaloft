@@ -40,7 +40,8 @@ Round authorization.
 - Store project/resource scoped read-model facts first; global operator source-event rollups remain
   future. `Status: project/resource scoped read-model filters implemented.`
 - Implement `source-events.list` and `source-events.show` from the local query specs. `Status:
-  inactive application query baseline implemented.`
+  application query baseline, durable persistence, CLI, HTTP/oRPC, operation catalog, and
+  CORE_OPERATIONS activation implemented; Web diagnostics remain future.`
 
 ### 4. Deployment Dispatch
 
@@ -54,6 +55,8 @@ Round authorization.
 ### 5. Entrypoints And Docs
 
 - Add CLI, HTTP/oRPC, and Web surfaces only after application behavior and persistence pass.
+  `Status: resources.configure-auto-deploy and source-events.list/show have CLI and HTTP/oRPC
+  surfaces; source-events.ingest provider routes and Web diagnostics remain future.`
 - Add public docs for setup, signatures, dedupe, ignored events, and manual recovery.
 - Add future MCP/tool descriptor mapping from operation catalog metadata.
 
