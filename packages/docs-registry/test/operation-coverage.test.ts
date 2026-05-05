@@ -313,4 +313,33 @@ describe("public docs operation coverage", () => {
       );
     }
   });
+
+  test("[SRC-AUTO-SURFACE-003] source auto-deploy operations record docs coverage", () => {
+    expect(getPublicDocsOperationCoverage("resources.configure-auto-deploy")).toMatchObject({
+      operationKey: "resources.configure-auto-deploy",
+      status: "documented",
+      topicId: "source.auto-deploy-setup",
+    });
+    expect(getPublicDocsOperationCoverage("source-events.ingest")).toMatchObject({
+      operationKey: "source-events.ingest",
+      status: "documented",
+      topicId: "source.auto-deploy-signatures",
+    });
+    expect(getPublicDocsOperationCoverage("source-events.list")).toMatchObject({
+      operationKey: "source-events.list",
+      status: "documented",
+      topicId: "source.auto-deploy-dedupe",
+    });
+    expect(getPublicDocsOperationCoverage("source-events.show")).toMatchObject({
+      operationKey: "source-events.show",
+      status: "documented",
+      topicId: "source.auto-deploy-ignored-events",
+    });
+    expect(publicDocsHelpTopics["source.auto-deploy-setup"].webSurfaces?.join("\n")).toContain(
+      "Resource detail auto-deploy settings",
+    );
+    expect(
+      publicDocsHelpTopics["source.auto-deploy-ignored-events"].webSurfaces?.join("\n"),
+    ).toContain("Resource detail source event diagnostics");
+  });
 });

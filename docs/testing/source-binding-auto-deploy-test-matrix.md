@@ -67,7 +67,7 @@ catalog entry and schemas.
 | `SRC-AUTO-ENTRY-002` | HTTP generic signed webhook receives source event. | Transport resolves `resource-secret:<KEY>`, verifies signature, dispatches provider-neutral source event command with `scopeResourceId`, and never persists raw payload/signature/secret. | `packages/orpc/test/source-event-generic-signed.http.test.ts`; `packages/application/test/source-events.test.ts`; package typechecks | Passing |
 | `SRC-AUTO-ENTRY-003` | Web Resource detail shows event-created deployment. | Deployment links back to safe source event facts and ignored/deduped events remain visible. | `apps/web/src/lib/console/source-events.test.ts`; `apps/web/src/routes/resources/[resourceId]/+page.svelte`; package typechecks | Passing |
 | `SRC-AUTO-ENTRY-004` | HTTP GitHub push webhook receives provider-signed source event. | Route `POST /api/integrations/github/source-events` verifies `X-Hub-Signature-256` against `APPALOFT_GITHUB_WEBHOOK_SECRET`, treats `ping` as a no-op, dispatches push events through the shared command schema, and keeps raw payload/signature/secret out of command input, logs, errors, and read models. | `packages/orpc/test/source-event-github.http.test.ts`; `packages/integrations/github/test/github-webhook.test.ts`; package typechecks | Passing |
-| `SRC-AUTO-SURFACE-003` | Public help links. | Setup, signatures, dedupe, ignored events, and recovery link to stable docs anchors in both locales. | `packages/orpc/test/docs-help.test.ts`; `packages/adapters/cli/test/docs-help.test.ts`; `apps/web/src/lib/console/docs-help.test.ts`; `packages/docs-registry/src/index.ts` | Passing |
+| `SRC-AUTO-SURFACE-003` | Public help links. | Setup, signatures, dedupe, ignored events, and recovery link to stable docs anchors in both locales, and active source auto-deploy operations have explicit public docs coverage rows. | `packages/orpc/test/docs-help.test.ts`; `packages/adapters/cli/test/docs-help.test.ts`; `apps/web/src/lib/console/docs-help.test.ts`; `packages/docs-registry/test/help-topics.test.ts`; `packages/docs-registry/test/operation-coverage.test.ts` | Passing |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -80,7 +80,7 @@ surfaces also exist. Matching source events can dispatch through the existing de
 use case at the application boundary. The Resource-scoped generic signed HTTP route now resolves
 `resource-secret:<KEY>`, verifies `X-Appaloft-Signature`, dispatches `source-events.ingest` with
 `scopeResourceId`, and keeps dedupe scoped to the route Resource. Event dispatch, dedupe, Web
-auto-deploy settings, Web source-event diagnostics, and public help-link coverage are now bound to
-automation. GitHub push webhook route verification, normalization, no-op ping handling, and safe
-rejection paths are active. Future MCP/tool descriptor generation remains an explicit deferred
-exception until the tool surface exists.
+auto-deploy settings, Web source-event diagnostics, public help-link coverage, and operation
+coverage rows are now bound to automation. GitHub push webhook route verification, normalization,
+no-op ping handling, and safe rejection paths are active. Future MCP/tool descriptor generation
+remains an explicit deferred exception until the tool surface exists.
