@@ -4,6 +4,7 @@ import {
   ConfigScopeValue,
   CreatedAt,
   Deployment,
+  DeploymentDependencyBindingSnapshotReadinessValue,
   DeploymentId,
   DeploymentStatusValue,
   DeploymentTargetDescriptor,
@@ -24,7 +25,13 @@ import {
   PlanStepText,
   ProjectId,
   ProviderKey,
+  ResourceBindingId,
+  ResourceBindingScopeValue,
+  ResourceBindingTargetName,
   ResourceId,
+  ResourceInjectionModeValue,
+  ResourceInstanceId,
+  ResourceInstanceKindValue,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
@@ -83,6 +90,7 @@ function deployment(input: {
     status: DeploymentStatusValue.rehydrate(input.status),
     runtimePlan: runtimePlan(),
     environmentSnapshot: snapshot(),
+    dependencyBindingReferences: [],
     logs: [],
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
     ...(input.supersededByDeploymentId
@@ -160,6 +168,42 @@ describe("Deployment", () => {
     expect(deployment.toState().runtimePlan.toState().execution.toState().metadata).toEqual({
       base: "image",
       phase: "execute",
+    });
+  });
+
+  test("[DEP-BIND-SNAP-REF-001] stores dependency binding safe references on the deployment snapshot", () => {
+    const created = Deployment.create({
+      id: DeploymentId.rehydrate("dep_demo"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      resourceId: ResourceId.rehydrate("res_demo"),
+      serverId: DeploymentTargetId.rehydrate("srv_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+      runtimePlan: runtimePlan(),
+      environmentSnapshot: snapshot(),
+      dependencyBindingReferences: [
+        {
+          bindingId: ResourceBindingId.rehydrate("rbd_pg"),
+          dependencyResourceId: ResourceInstanceId.rehydrate("rsi_pg"),
+          kind: ResourceInstanceKindValue.rehydrate("postgres"),
+          targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
+          scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+          injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+          snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
+        },
+      ],
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+
+    expect(created.toState().dependencyBindingReferences).toHaveLength(1);
+    expect(created.toState().dependencyBindingReferences[0]).toMatchObject({
+      bindingId: ResourceBindingId.rehydrate("rbd_pg"),
+      dependencyResourceId: ResourceInstanceId.rehydrate("rsi_pg"),
+      kind: ResourceInstanceKindValue.rehydrate("postgres"),
+      targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
+      scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+      injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+      snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
     });
   });
 });

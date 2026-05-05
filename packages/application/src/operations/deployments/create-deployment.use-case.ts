@@ -30,6 +30,7 @@ import {
   type ExecutionBackend,
   type MutationCoordinator,
   type RequestedDeploymentConfig,
+  type ResourceDependencyBindingReadModel,
   type RuntimePlanResolver,
   type RuntimeTargetBackendRegistry,
   type RuntimeTargetCapability,
@@ -42,6 +43,7 @@ import {
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
+import { createDependencyBindingSnapshotReferences } from "./dependency-binding-snapshot-references";
 import { type DeploymentFactory } from "./deployment.factory";
 import { type DeploymentContextBootstrapService } from "./deployment-config-bootstrap.service";
 import { type DeploymentContextResolver } from "./deployment-context.resolver";
@@ -494,6 +496,8 @@ export class CreateDeploymentUseCase {
     private readonly domainRouteBindingReader?: DomainRouteBindingReader,
     @inject(tokens.serverAppliedRouteStateRepository)
     private readonly serverAppliedRouteStateRepository?: ServerAppliedRouteDesiredStateReader,
+    @inject(tokens.resourceDependencyBindingReadModel)
+    private readonly resourceDependencyBindingReadModel?: ResourceDependencyBindingReadModel,
   ) {}
 
   private async persistDeployment(
@@ -634,6 +638,7 @@ export class CreateDeploymentUseCase {
       executionBackend,
       logger,
       mutationCoordinator,
+      resourceDependencyBindingReadModel,
       runtimeTargetBackendRegistry,
       deploymentProgressReporter,
       runtimePlanResolutionInputBuilder,
@@ -690,6 +695,14 @@ export class CreateDeploymentUseCase {
       });
       const snapshotResult = deploymentSnapshotFactory.create(environment, resource);
       const snapshot = yield* snapshotResult;
+      const dependencyBindingSummaries = resourceDependencyBindingReadModel
+        ? yield* await resourceDependencyBindingReadModel.list(repositoryContext, {
+            resourceId: resource.toState().id.value,
+          })
+        : [];
+      const dependencyBindingReferences = yield* createDependencyBindingSnapshotReferences(
+        dependencyBindingSummaries,
+      );
       const requestedDeploymentBase = yield* requestedDeploymentFromResource(resource);
       const targetContext = {
         projectId: project.toState().id.value,
@@ -804,6 +817,7 @@ export class CreateDeploymentUseCase {
               resource,
               runtimePlan,
               environmentSnapshot: snapshot,
+              dependencyBindingReferences,
               ...(latestRuntimeOwningDeployment
                 ? { supersedesDeploymentId: latestRuntimeOwningDeployment.toState().id }
                 : {}),

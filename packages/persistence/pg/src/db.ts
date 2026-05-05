@@ -45,6 +45,7 @@ import { resourceAccessFailureEvidenceMigration } from "./migrations/037_resourc
 import { storageVolumesMigration } from "./migrations/038_storage_volumes";
 import { dependencyResourcesMigration } from "./migrations/039_dependency_resources";
 import { resourceDependencyBindingsMigration } from "./migrations/040_resource_dependency_bindings";
+import { deploymentDependencyBindingReferencesMigration } from "./migrations/041_deployment_dependency_binding_references";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -179,6 +180,8 @@ class StaticMigrationProvider implements MigrationProvider {
       "038_storage_volumes": storageVolumesMigration,
       "039_dependency_resources": dependencyResourcesMigration,
       "040_resource_dependency_bindings": resourceDependencyBindingsMigration,
+      "041_deployment_dependency_binding_references":
+        deploymentDependencyBindingReferencesMigration,
     };
   }
 }

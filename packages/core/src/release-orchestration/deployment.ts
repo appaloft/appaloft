@@ -19,6 +19,7 @@ import {
   type StartedAt,
 } from "../shared/temporal";
 import { PlanStepText } from "../shared/text-values";
+import { type DeploymentDependencyBindingReferenceState } from "./dependency-binding-snapshot-reference";
 import {
   type DeploymentLogEntry,
   type ExecutionResult,
@@ -36,6 +37,7 @@ export interface DeploymentState {
   status: DeploymentStatusValue;
   runtimePlan: RuntimePlan;
   environmentSnapshot: EnvironmentSnapshot;
+  dependencyBindingReferences: DeploymentDependencyBindingReferenceState[];
   logs: DeploymentLogEntry[];
   createdAt: CreatedAt;
   startedAt?: StartedAt;
@@ -68,6 +70,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     destinationId: DestinationId;
     runtimePlan: RuntimePlan;
     environmentSnapshot: EnvironmentSnapshot;
+    dependencyBindingReferences?: DeploymentDependencyBindingReferenceState[];
     createdAt: CreatedAt;
     rollbackOfDeploymentId?: DeploymentId;
     supersedesDeploymentId?: DeploymentId;
@@ -88,6 +91,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
         status: DeploymentStatusValue.created(),
         runtimePlan: input.runtimePlan,
         environmentSnapshot: input.environmentSnapshot,
+        dependencyBindingReferences: [...(input.dependencyBindingReferences ?? [])],
         logs: [],
         createdAt: input.createdAt,
         ...(input.rollbackOfDeploymentId
@@ -106,6 +110,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
   static rehydrate(state: DeploymentState): Deployment {
     return new Deployment({
       ...state,
+      dependencyBindingReferences: [...(state.dependencyBindingReferences ?? [])],
       logs: [...state.logs],
     });
   }
@@ -264,6 +269,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
   toState(): DeploymentState {
     return {
       ...this.state,
+      dependencyBindingReferences: [...this.state.dependencyBindingReferences],
       logs: [...this.state.logs],
     };
   }

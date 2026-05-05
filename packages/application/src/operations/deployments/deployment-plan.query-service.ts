@@ -17,6 +17,7 @@ import {
   type DomainRouteBindingCandidate,
   type DomainRouteBindingReader,
   type RequestedDeploymentConfig,
+  type ResourceDependencyBindingReadModel,
   type RuntimePlanResolver,
   type RuntimeTargetBackendRegistry,
   type RuntimeTargetCapability,
@@ -27,6 +28,10 @@ import {
   type SourceDetector,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import {
+  createDependencyBindingSnapshotReferences,
+  dependencyBindingSnapshotSummaryFromReferences,
+} from "./dependency-binding-snapshot-references";
 import { type DeploymentContextResolver } from "./deployment-context.resolver";
 import { type DeploymentPlanQuery } from "./deployment-plan.query";
 import { type DeploymentSnapshotFactory } from "./deployment-snapshot.factory";
@@ -559,6 +564,8 @@ export class DeploymentPlanQueryService {
     private readonly domainRouteBindingReader?: DomainRouteBindingReader,
     @inject(tokens.serverAppliedRouteStateRepository)
     private readonly serverAppliedRouteStateRepository?: ServerAppliedRouteDesiredStateReader,
+    @inject(tokens.resourceDependencyBindingReadModel)
+    private readonly resourceDependencyBindingReadModel?: ResourceDependencyBindingReadModel,
   ) {}
 
   static contextMetadata(input: DeploymentPlanRuntimeContext): Record<string, string> {
@@ -592,6 +599,7 @@ export class DeploymentPlanQueryService {
       deploymentContextResolver,
       deploymentSnapshotFactory,
       domainRouteBindingReader,
+      resourceDependencyBindingReadModel,
       runtimePlanResolutionInputBuilder,
       runtimePlanResolver,
       runtimeTargetBackendRegistry,
@@ -609,6 +617,17 @@ export class DeploymentPlanQueryService {
         ...(query.destinationId ? { destinationId: query.destinationId } : {}),
       });
       const { project, environment, resource, server, destination } = resolvedContext;
+      const dependencyBindingSummaries = resourceDependencyBindingReadModel
+        ? yield* await resourceDependencyBindingReadModel.list(repositoryContext, {
+            resourceId: resource.toState().id.value,
+          })
+        : [];
+      const dependencyBindingReferences = yield* createDependencyBindingSnapshotReferences(
+        dependencyBindingSummaries,
+      );
+      const dependencyBindings = dependencyBindingSnapshotSummaryFromReferences(
+        dependencyBindingReferences,
+      );
 
       const resourceSource = yield* createResourceSourceDescriptor(resource);
       let detected = resourceSource;
@@ -629,6 +648,7 @@ export class DeploymentPlanQueryService {
             server,
             source: detected.source,
             sourceReasoning: detected.reasoning,
+            dependencyBindings,
           }),
         );
       }
@@ -691,6 +711,7 @@ export class DeploymentPlanQueryService {
             server,
             source: detected.source,
             sourceReasoning: detected.reasoning,
+            dependencyBindings,
           }),
         );
       }
@@ -711,6 +732,7 @@ export class DeploymentPlanQueryService {
             runtimePlan,
             sourceReasoning: detected.reasoning,
             server,
+            dependencyBindings,
             unsupportedReasons: [
               blockedReasonFromError(
                 domainError.runtimeTargetUnsupported(runtimeTargetBackend.error.message, {
@@ -742,6 +764,7 @@ export class DeploymentPlanQueryService {
           runtimePlan,
           sourceReasoning: detected.reasoning,
           server,
+          dependencyBindings,
         }),
       );
     });
@@ -756,6 +779,7 @@ function blockedDeploymentPlanPreview(input: {
   destination: import("@appaloft/core").Destination;
   source: SourceDescriptor;
   sourceReasoning: string[];
+  dependencyBindings?: DeploymentPlanPreview["dependencyBindings"];
   error: DomainError;
 }): DeploymentPlanPreview {
   const projectState = input.project.toState();
@@ -859,6 +883,7 @@ function blockedDeploymentPlanPreview(input: {
       enabled: false,
       kind: "none",
     },
+    ...(input.dependencyBindings ? { dependencyBindings: input.dependencyBindings } : {}),
     warnings: [],
     unsupportedReasons: [unsupportedReason],
     nextActions: nextActions([unsupportedReason]),
@@ -879,6 +904,7 @@ function deploymentPlanPreview(input: {
   runtimePlan: import("@appaloft/core").RuntimePlan;
   sourceReasoning: string[];
   includeCommandSpecs: boolean;
+  dependencyBindings?: DeploymentPlanPreview["dependencyBindings"];
   unsupportedReasons?: DeploymentPlanReason[];
 }): DeploymentPlanPreview {
   const projectState = input.project.toState();
@@ -1008,6 +1034,7 @@ function deploymentPlanPreview(input: {
       ...(execution.healthCheck?.http?.port ? { port: execution.healthCheck.http.port.value } : {}),
     },
     ...(access ? { access } : {}),
+    ...(input.dependencyBindings ? { dependencyBindings: input.dependencyBindings } : {}),
     warnings,
     unsupportedReasons,
     nextActions: nextActions(unsupportedReasons),

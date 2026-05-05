@@ -70,7 +70,14 @@ type DeploymentPlanQueryResult = Result<DeploymentPlanPreview, DomainError>;
 - sanitized install/build/package/start command specs;
 - internal port, exposure, target service, and health plan;
 - access/proxy route planning summary when already available;
+- dependency binding readiness summary for active Resource dependency bindings;
 - warnings, unsupported reasons, next actions, and `generatedAt`.
+
+The dependency binding readiness summary is safe reference metadata only. It may include binding id,
+dependency resource id, dependency kind, target name, scope, injection mode, snapshot readiness, and
+an explicit runtime-injection status of `deferred`. It must not include raw connection URLs,
+passwords, tokens, provider credentials, private keys, sensitive connection query parameters, raw
+secret references, materialized environment values, or runtime-rendered secret values.
 
 Blocked previews must include a stable blocked reason shape for every known
 unsupported/ambiguous/missing configuration:
@@ -109,6 +116,11 @@ Planning blockers should usually return `ok(...)` with `readiness.status = "bloc
 structured `unsupportedReasons` so Web, CLI, and tools can show remediation without treating a
 known unsupported plan as transport failure.
 
+Dependency binding not-ready or missing-reference diagnostics do not block this first slice of
+`deployments.plan` because runtime env injection remains deferred. The query may return a blocked
+dependency binding snapshot readiness inside the dependency binding section while the overall plan
+remains governed by source/runtime/network/target readiness.
+
 ## Entrypoints
 
 | Entrypoint | Mapping | Status |
@@ -144,4 +156,7 @@ known unsupported plan as transport failure.
   deployment input fields.
 - Access plan summary may initially report unavailable when existing read models cannot provide a
   safe summary.
+- Dependency binding summaries report safe snapshot-reference readiness only. Runtime environment
+  injection, raw secret materialization, secret rotation, Redis binding, backup/restore, and
+  provider-native database realization remain future work.
 - Draft profile preview before `resources.create` remains out of scope.
