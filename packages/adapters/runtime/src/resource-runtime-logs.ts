@@ -29,6 +29,7 @@ type RuntimeLogCloseReason = "completed" | "cancelled" | "source-ended";
 type RuntimeLogCommandKind =
   | "docker_logs"
   | "docker_compose_logs"
+  | "docker_swarm_service_logs"
   | "ssh_docker_logs"
   | "ssh_compose_logs";
 type RuntimeLogSpawnOptions = {
@@ -217,6 +218,7 @@ function targetMetadataValue(
 
 function runtimeInstanceId(context: ResourceRuntimeLogContext): string | undefined {
   return (
+    metadataValue(context, "swarm.serviceName") ??
     metadataValue(context, "containerName") ??
     metadataValue(context, "pid") ??
     metadataValue(context, "composeFile")
@@ -576,6 +578,10 @@ function isGenericSshRuntime(context: ResourceRuntimeLogContext): boolean {
   return context.deployment.runtimePlan.target.providerKey === "generic-ssh";
 }
 
+function isDockerSwarmRuntime(context: ResourceRuntimeLogContext): boolean {
+  return context.deployment.runtimePlan.target.providerKey === "docker-swarm";
+}
+
 function hostWithUsername(host: string, username?: string): string {
   return username && !host.includes("@") ? `${username}@${host}` : host;
 }
@@ -684,6 +690,22 @@ function dockerComposeLogsCommand(input: {
     ...(input.request.follow ? ["--follow"] : []),
     ...(input.request.serviceName ? [shellQuote(input.request.serviceName)] : []),
   ].join(" ");
+}
+
+function dockerSwarmServiceLogsCommand(input: {
+  serviceName: string;
+  request: ResourceRuntimeLogRequest;
+}): string[] {
+  return [
+    "docker",
+    "service",
+    "logs",
+    "--raw",
+    "--tail",
+    String(input.request.tailLines),
+    ...(input.request.follow ? ["--follow"] : []),
+    input.serviceName,
+  ];
 }
 
 async function createFileRuntimeLogStream(input: {
@@ -843,6 +865,37 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
         });
       }
       case "docker-container": {
+        if (isDockerSwarmRuntime(logContext)) {
+          const serviceName = metadataValue(logContext, "swarm.serviceName");
+          if (!serviceName) {
+            return err(
+              domainError.resourceRuntimeLogsUnavailable(
+                "Docker Swarm service name is not available",
+                {
+                  phase: "runtime-instance-resolution",
+                  step: "docker-swarm-service-name",
+                  resourceId: logContext.resource.id,
+                  deploymentId: logContext.deployment.id,
+                  runtimeKind: execution.kind,
+                },
+              ),
+            );
+          }
+
+          return ok(
+            createProcessRuntimeLogStream({
+              args: dockerSwarmServiceLogsCommand({ serviceName, request }),
+              command: "docker_swarm_service_logs",
+              context: logContext,
+              executionContext: context,
+              request,
+              signal,
+              spawnProcess: this.spawnProcess,
+              boundedProcessTimeoutMs: this.boundedProcessTimeoutMs,
+            }),
+          );
+        }
+
         const containerName = metadataValue(logContext, "containerName");
         if (!containerName) {
           return err(
