@@ -11,8 +11,10 @@ import { listDefaultAccessDomainPoliciesQueryInputSchema } from "./operations/de
 import { showDefaultAccessDomainPolicyQueryInputSchema } from "./operations/default-access-domain-policies/show-default-access-domain-policy.query";
 import { deleteDependencyResourceCommandInputSchema } from "./operations/dependency-resources/delete-dependency-resource.command";
 import { importPostgresDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-postgres-dependency-resource.command";
+import { importRedisDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-redis-dependency-resource.command";
 import { listDependencyResourcesQueryInputSchema } from "./operations/dependency-resources/list-dependency-resources.query";
 import { provisionPostgresDependencyResourceCommandInputSchema } from "./operations/dependency-resources/provision-postgres-dependency-resource.command";
+import { provisionRedisDependencyResourceCommandInputSchema } from "./operations/dependency-resources/provision-redis-dependency-resource.command";
 import { renameDependencyResourceCommandInputSchema } from "./operations/dependency-resources/rename-dependency-resource.command";
 import { showDependencyResourceQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource.query";
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
@@ -806,6 +808,34 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft dependency postgres import",
       orpc: { method: "POST", path: "/api/dependency-resources/postgres/import" },
+    },
+  },
+  {
+    key: "dependency-resources.provision-redis",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "ProvisionRedisDependencyResourceCommand",
+    handlerName: "ProvisionRedisDependencyResourceCommandHandler",
+    serviceName: "ProvisionRedisDependencyResourceUseCase",
+    inputSchema: provisionRedisDependencyResourceCommandInputSchema,
+    serviceToken: tokens.provisionRedisDependencyResourceUseCase,
+    transports: {
+      cli: "appaloft dependency redis provision",
+      orpc: { method: "POST", path: "/api/dependency-resources/redis/provision" },
+    },
+  },
+  {
+    key: "dependency-resources.import-redis",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "ImportRedisDependencyResourceCommand",
+    handlerName: "ImportRedisDependencyResourceCommandHandler",
+    serviceName: "ImportRedisDependencyResourceUseCase",
+    inputSchema: importRedisDependencyResourceCommandInputSchema,
+    serviceToken: tokens.importRedisDependencyResourceUseCase,
+    transports: {
+      cli: "appaloft dependency redis import",
+      orpc: { method: "POST", path: "/api/dependency-resources/redis/import" },
     },
   },
   {

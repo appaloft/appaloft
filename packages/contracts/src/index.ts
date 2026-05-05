@@ -1051,7 +1051,7 @@ export const dependencyResourceSummarySchema = z.object({
   environmentId: z.string(),
   name: z.string(),
   slug: z.string(),
-  kind: z.literal("postgres"),
+  kind: z.enum(["postgres", "redis"]),
   sourceMode: z.enum(["appaloft-managed", "imported-external"]),
   providerKey: z.string(),
   providerManaged: z.boolean(),

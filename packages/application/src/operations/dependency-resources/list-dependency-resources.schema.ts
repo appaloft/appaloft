@@ -5,7 +5,7 @@ import { nonEmptyTrimmedString } from "../shared-schema";
 export const listDependencyResourcesQueryInputSchema = z.object({
   projectId: nonEmptyTrimmedString("Project id").optional(),
   environmentId: nonEmptyTrimmedString("Environment id").optional(),
-  kind: z.enum(["postgres"]).optional(),
+  kind: z.enum(["postgres", "redis"]).optional(),
 });
 
 export type ListDependencyResourcesQueryInput = z.output<

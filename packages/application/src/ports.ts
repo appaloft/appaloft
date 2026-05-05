@@ -2220,7 +2220,7 @@ export interface ShowStorageVolumeResult {
   generatedAt: string;
 }
 
-export type DependencyResourceKind = "postgres";
+export type DependencyResourceKind = "postgres" | "redis";
 export type DependencyResourceSourceMode = "appaloft-managed" | "imported-external";
 export type DependencyResourceLifecycleStatus = "provisioning" | "ready" | "degraded" | "deleted";
 
@@ -2306,7 +2306,7 @@ export interface ResourceDependencyBindingSummary {
   dependencyResourceId: string;
   dependencyResourceName?: string;
   dependencyResourceSlug?: string;
-  kind: DependencyResourceKind;
+  kind: "postgres";
   sourceMode: DependencyResourceSourceMode;
   providerKey: string;
   providerManaged: boolean;
@@ -2324,7 +2324,7 @@ export interface ResourceDependencyBindingSummary {
 export interface DeploymentDependencyBindingSnapshotReferenceSummary {
   bindingId: string;
   dependencyResourceId: string;
-  kind: DependencyResourceKind;
+  kind: "postgres";
   targetName: string;
   scope: ResourceDependencyBindingTargetSummary["scope"];
   injectionMode: ResourceDependencyBindingTargetSummary["injectionMode"];

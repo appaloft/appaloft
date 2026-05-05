@@ -30,8 +30,10 @@ import { ListDependencyResourcesQuery, ShowDependencyResourceQuery } from "../sr
 import {
   DeleteDependencyResourceUseCase,
   ImportPostgresDependencyResourceUseCase,
+  ImportRedisDependencyResourceUseCase,
   ListDependencyResourcesQueryService,
   ProvisionPostgresDependencyResourceUseCase,
+  ProvisionRedisDependencyResourceUseCase,
   RenameDependencyResourceUseCase,
   ShowDependencyResourceQueryService,
 } from "../src/use-cases";
@@ -97,8 +99,26 @@ async function createHarness() {
       eventBus,
       logger,
     ),
+    importRedis: new ImportRedisDependencyResourceUseCase(
+      projects,
+      environments,
+      dependencyResources,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+    ),
     listDependencyResources: new ListDependencyResourcesQueryService(readModel, clock),
     provisionPostgres: new ProvisionPostgresDependencyResourceUseCase(
+      projects,
+      environments,
+      dependencyResources,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+    ),
+    provisionRedis: new ProvisionRedisDependencyResourceUseCase(
       projects,
       environments,
       dependencyResources,
@@ -302,5 +322,127 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         phase: "dependency-resource-delete-safety",
       },
     });
+  });
+
+  test("[DEP-RES-REDIS-PROVISION-001] provisions managed Redis metadata and emits event", async () => {
+    const { context, eventBus, provisionRedis } = await createHarness();
+
+    const result = await provisionRedis.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main Cache",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(eventBus.events).toContainEqual(
+      expect.objectContaining({
+        type: "dependency-resource-created",
+        aggregateId: result._unsafeUnwrap().id,
+      }),
+    );
+  });
+
+  test("[DEP-RES-REDIS-IMPORT-001] [DEP-RES-REDIS-READ-002] imports external Redis with masked read model", async () => {
+    const { context, importRedis, showDependencyResource } = await createHarness();
+
+    const created = await importRedis.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "External Cache",
+      connectionUrl: "rediss://default:super-secret@cache.example.com:6380/0?token=hidden",
+      secretRef: "secret://dependency/redis/external-cache",
+    });
+
+    expect(created.isOk()).toBe(true);
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({
+        dependencyResourceId: created._unsafeUnwrap().id,
+      })._unsafeUnwrap(),
+    );
+
+    const detail = JSON.stringify(shown._unsafeUnwrap());
+    expect(detail).toContain("********");
+    expect(detail).toContain("cache.example.com");
+    expect(detail).toContain('"kind":"redis"');
+    expect(detail).not.toContain("super-secret");
+    expect(detail).not.toContain("hidden");
+  });
+
+  test("[DEP-RES-REDIS-VALIDATION-001] rejects invalid Redis endpoint input", async () => {
+    const { context, importRedis } = await createHarness();
+
+    const result = await importRedis.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Broken Cache",
+      connectionUrl: "https://cache.example.com",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "dependency-resource-validation",
+      },
+    });
+  });
+
+  test("[DEP-RES-REDIS-READ-001] [DEP-RES-REDIS-RENAME-001] lists and renames Redis resources", async () => {
+    const { context, importRedis, listDependencyResources, renameDependencyResource } =
+      await createHarness();
+    const created = (
+      await importRedis.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "External Cache",
+        connectionUrl: "redis://default:secret@cache.example.com:6379/0",
+      })
+    )._unsafeUnwrap();
+
+    const renamed = await renameDependencyResource.execute(context, {
+      dependencyResourceId: created.id,
+      name: "Primary Cache",
+    });
+    const list = await listDependencyResources.execute(
+      context,
+      ListDependencyResourcesQuery.create({ projectId: "prj_demo", kind: "redis" })._unsafeUnwrap(),
+    );
+
+    expect(renamed.isOk()).toBe(true);
+    expect(list._unsafeUnwrap().items).toContainEqual(
+      expect.objectContaining({
+        id: created.id,
+        kind: "redis",
+        name: "Primary Cache",
+        slug: "primary-cache",
+      }),
+    );
+  });
+
+  test("[DEP-RES-REDIS-DELETE-001] [DEP-RES-REDIS-DELETE-002] deletes only unblocked Redis records", async () => {
+    const { context, deleteDependencyResource, deleteSafetyReader, importRedis } =
+      await createHarness();
+    const created = (
+      await importRedis.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "External Cache",
+        connectionUrl: "redis://default:secret@cache.example.com:6379/0",
+      })
+    )._unsafeUnwrap();
+    deleteSafetyReader.setBlockers(created.id, [{ kind: "resource-binding", count: 1 }]);
+
+    const blocked = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: created.id,
+    });
+    deleteSafetyReader.setBlockers(created.id, []);
+    const deleted = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: created.id,
+    });
+
+    expect(blocked.isErr()).toBe(true);
+    expect(blocked._unsafeUnwrapErr().code).toBe("dependency_resource_delete_blocked");
+    expect(deleted.isOk()).toBe(true);
   });
 });

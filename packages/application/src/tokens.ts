@@ -142,6 +142,12 @@ export const tokens = {
   importPostgresDependencyResourceUseCase: Symbol.for(
     "appaloft.import_postgres_dependency_resource_use_case",
   ),
+  provisionRedisDependencyResourceUseCase: Symbol.for(
+    "appaloft.provision_redis_dependency_resource_use_case",
+  ),
+  importRedisDependencyResourceUseCase: Symbol.for(
+    "appaloft.import_redis_dependency_resource_use_case",
+  ),
   renameDependencyResourceUseCase: Symbol.for("appaloft.rename_dependency_resource_use_case"),
   deleteDependencyResourceUseCase: Symbol.for("appaloft.delete_dependency_resource_use_case"),
   listDependencyResourcesQueryService: Symbol.for(

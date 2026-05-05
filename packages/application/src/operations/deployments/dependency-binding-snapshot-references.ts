@@ -14,7 +14,6 @@ import {
 } from "@appaloft/core";
 
 import {
-  type DependencyResourceKind,
   type DeploymentDependencyBindingSnapshotReferenceSummary,
   type DeploymentDependencyBindingSnapshotSummary,
   type ResourceDependencyBindingSummary,
@@ -89,11 +88,10 @@ export function createDependencyBindingSnapshotReferences(
 export function dependencyBindingReferenceSummary(
   reference: DeploymentDependencyBindingReferenceState,
 ): DeploymentDependencyBindingSnapshotReferenceSummary {
-  const kind: DependencyResourceKind = "postgres";
   return {
     bindingId: reference.bindingId.value,
     dependencyResourceId: reference.dependencyResourceId.value,
-    kind,
+    kind: "postgres",
     targetName: reference.targetName.value,
     scope: reference.scope.value,
     injectionMode: reference.injectionMode.value,

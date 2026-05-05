@@ -2,8 +2,8 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: ready for Test-First / Code Round
+- Round: Code Round / Post-Implementation Sync
+- Artifact state: implemented and aligned
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, additive public CLI/API/oRPC capability
 - Decision state: no-ADR-needed
@@ -81,7 +81,8 @@ slices.
 - Web/UI: deferred until a Web/Docs Round with i18n and tests.
 - Config: no repository config fields in this slice.
 - Events: reuse generic dependency resource domain events; no Redis-specific event is required.
-- Public docs/help: migration gap until Code/Docs Round activates the operation.
+- Public docs/help: migration gap; CLI/API help exposes the operation, while task-oriented public
+  docs are deferred to a later Docs Round.
 - Future MCP/tools: one operation per command/query; no compound "manage Redis" tool.
 
 ## Output Contracts

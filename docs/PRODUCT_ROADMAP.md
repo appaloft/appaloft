@@ -861,6 +861,12 @@ Current verification notes:
   inclusion, and CLI/oRPC/HTTP dispatch. It does not implement the Redis Code Round yet, so the
   full `0.9.0` release rule remains blocked by Redis, provider-native database realization,
   backup/restore, recovery, auto-deploy, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 Redis dependency resource lifecycle Code Round implemented
+  provider-neutral Redis provision/import plus list/show/rename/delete inclusion across core,
+  application, PG/PGlite persistence, contracts, CLI, and oRPC/HTTP dispatch. It does not create
+  provider-native Redis infrastructure or bind Redis to workloads yet, so the full `0.9.0` release
+  rule remains blocked by provider-native database realization, backup/restore, recovery,
+  auto-deploy, preview, and cluster runtime items.
 
 Required:
 
@@ -875,7 +881,7 @@ Required:
 - [x] Add provider-neutral Postgres dependency resource bind/unbind/list/show binding metadata
   baseline.
 - [ ] Add provider-native Postgres database realization and closed bind/backup/delete lifecycle.
-- [ ] Add Redis provisioning/import/list/show/update/delete.
+- [x] Add Redis provisioning/import/list/show/update/delete.
 - [x] Add dependency bind/unbind and binding secret rotation.
 - [ ] Add backup/restore for the minimum useful dependency-resource loop.
 - [x] Rebuild deployment show as a first-class query.

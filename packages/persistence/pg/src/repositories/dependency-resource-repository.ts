@@ -99,14 +99,15 @@ class KyselyResourceInstanceMutationVisitor
 {
   visitUpsertResourceInstance(spec: UpsertResourceInstanceSpec) {
     const state = spec.state;
-    const endpoint = state.postgresEndpoint
+    const dependencyEndpoint = state.postgresEndpoint ?? state.redisEndpoint;
+    const endpoint = dependencyEndpoint
       ? ({
-          host: state.postgresEndpoint.host.value,
-          ...(state.postgresEndpoint.port ? { port: state.postgresEndpoint.port.value } : {}),
-          ...(state.postgresEndpoint.databaseName
-            ? { databaseName: state.postgresEndpoint.databaseName.value }
+          host: dependencyEndpoint.host.value,
+          ...(dependencyEndpoint.port ? { port: dependencyEndpoint.port.value } : {}),
+          ...(dependencyEndpoint.databaseName
+            ? { databaseName: dependencyEndpoint.databaseName.value }
             : {}),
-          maskedConnection: state.postgresEndpoint.maskedConnection.value,
+          maskedConnection: dependencyEndpoint.maskedConnection.value,
         } satisfies SerializedDependencyEndpoint)
       : null;
     const backupRelationship = state.backupRelationship
@@ -183,9 +184,9 @@ function rehydrateResourceInstance(row: DependencyResourceRow): ResourceInstance
     providerKey: ProviderKey.rehydrate(row.provider_key),
     providerManaged: row.provider_managed,
     ...(row.description ? { description: DescriptionText.rehydrate(row.description) } : {}),
-    ...(endpoint
+    ...(endpoint && row.kind === "redis"
       ? {
-          postgresEndpoint: {
+          redisEndpoint: {
             host: DependencyResourceEndpointHost.rehydrate(endpoint.host),
             ...(endpoint.port
               ? { port: DependencyResourceEndpointPort.rehydrate(endpoint.port) }
@@ -196,7 +197,20 @@ function rehydrateResourceInstance(row: DependencyResourceRow): ResourceInstance
             maskedConnection: MaskedDependencyConnection.rehydrate(endpoint.maskedConnection),
           },
         }
-      : {}),
+      : endpoint
+        ? {
+            postgresEndpoint: {
+              host: DependencyResourceEndpointHost.rehydrate(endpoint.host),
+              ...(endpoint.port
+                ? { port: DependencyResourceEndpointPort.rehydrate(endpoint.port) }
+                : {}),
+              ...(endpoint.databaseName
+                ? { databaseName: DependencyResourceDatabaseName.rehydrate(endpoint.databaseName) }
+                : {}),
+              maskedConnection: MaskedDependencyConnection.rehydrate(endpoint.maskedConnection),
+            },
+          }
+        : {}),
     ...(row.connection_secret_ref
       ? { connectionSecretRef: DependencyResourceSecretRef.rehydrate(row.connection_secret_ref) }
       : {}),
@@ -383,7 +397,7 @@ export class PgDependencyResourceReadModel implements DependencyResourceReadMode
 
   async list(
     context: RepositoryContext,
-    input?: { projectId?: string; environmentId?: string; kind?: "postgres" },
+    input?: { projectId?: string; environmentId?: string; kind?: "postgres" | "redis" },
   ): Promise<DependencyResourceSummary[]> {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(

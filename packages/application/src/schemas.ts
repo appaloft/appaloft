@@ -10,8 +10,10 @@ export * from "./operations/default-access-domain-policies/list-default-access-d
 export * from "./operations/default-access-domain-policies/show-default-access-domain-policy.schema";
 export * from "./operations/dependency-resources/delete-dependency-resource.schema";
 export * from "./operations/dependency-resources/import-postgres-dependency-resource.schema";
+export * from "./operations/dependency-resources/import-redis-dependency-resource.schema";
 export * from "./operations/dependency-resources/list-dependency-resources.schema";
 export * from "./operations/dependency-resources/provision-postgres-dependency-resource.schema";
+export * from "./operations/dependency-resources/provision-redis-dependency-resource.schema";
 export * from "./operations/dependency-resources/rename-dependency-resource.schema";
 export * from "./operations/dependency-resources/show-dependency-resource.schema";
 export * from "./operations/deployments/create-deployment.schema";
