@@ -114,6 +114,26 @@ export interface DockerSwarmCleanupPlan {
   warnings: string[];
 }
 
+export type DockerSwarmApplyPlanStepName =
+  | "create-candidate-service"
+  | "verify-candidate-service"
+  | "promote-route-target"
+  | "cleanup-superseded-services";
+
+export interface DockerSwarmApplyPlanStep {
+  step: DockerSwarmApplyPlanStepName;
+  command: string;
+  displayCommand: string;
+}
+
+export interface DockerSwarmApplyPlan {
+  schemaVersion: "docker-swarm.apply-plan/v1";
+  serviceName: string;
+  preservesPreviousService: true;
+  steps: DockerSwarmApplyPlanStep[];
+  warnings: string[];
+}
+
 const defaultEdgeNetworkName = "appaloft-edge";
 const composeTargetServiceMetadataKeys = [
   "swarmTargetService",
@@ -134,7 +154,7 @@ function sanitizeDockerName(value: string, fallback: string): string {
 
 function renderStackName(identity: DockerSwarmRuntimeIdentityInput): string {
   return sanitizeDockerName(
-    `appaloft-${identity.resourceId}-${identity.destinationId}`,
+    `appaloft-${identity.resourceId}-${identity.destinationId}-${identity.deploymentId}`,
     "appaloft-runtime",
   );
 }
@@ -163,6 +183,52 @@ function dockerServiceLabelFilters(labels: Record<string, string>): string {
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([key, value]) => `--filter ${shellQuote(`label=${key}=${value}`)}`)
     .join(" ");
+}
+
+function dockerLabelFlags(labels: Record<string, string>): string {
+  return Object.entries(labels)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `--label ${shellQuote(`${key}=${value}`)}`)
+    .join(" ");
+}
+
+function dockerEnvironmentFlags(environment: readonly DockerSwarmEnvironmentVariableIntent[]): string {
+  return environment
+    .map((variable) =>
+      variable.secret
+        ? `--secret ${shellQuote(`source=${variable.name},target=${variable.name}`)}`
+        : `--env ${shellQuote(`${variable.name}=${variable.value ?? ""}`)}`,
+    )
+    .join(" ");
+}
+
+function dockerHealthFlags(health: DockerSwarmHealthIntent | undefined): string {
+  if (!health?.enabled) {
+    return "";
+  }
+
+  if (health.type === "command") {
+    return "--health-cmd '[redacted]'";
+  }
+
+  const http = health.http;
+  if (!http) {
+    return "";
+  }
+
+  const port = http.port ? `:${http.port}` : "";
+  const healthUrl = `${http.scheme}://${http.host}${port}${http.path}`;
+  return [
+    `--health-cmd ${shellQuote(`wget -q -O- ${healthUrl} >/dev/null`)}`,
+    `--health-interval ${shellQuote(`${health.intervalSeconds}s`)}`,
+    `--health-timeout ${shellQuote(`${health.timeoutSeconds}s`)}`,
+    `--health-retries ${shellQuote(`${health.retries}`)}`,
+    `--health-start-period ${shellQuote(`${health.startPeriodSeconds}s`)}`,
+  ].join(" ");
+}
+
+function commandParts(parts: readonly string[]): string {
+  return parts.filter((part) => part.trim().length > 0).join(" ");
 }
 
 function runtimeTargetUnsupported(input: {
@@ -413,4 +479,82 @@ export function renderDockerSwarmCleanupPlan(
     ],
     warnings: [],
   };
+}
+
+export function renderDockerSwarmApplyPlan(
+  intent: DockerSwarmRuntimeIntent,
+): Result<DockerSwarmApplyPlan> {
+  if (intent.workload.kind !== "image") {
+    return err(
+      runtimeTargetUnsupported({
+        missingCapability: "image-apply-plan",
+        message: "Docker Swarm apply planning currently requires an OCI image workload",
+      }),
+    );
+  }
+
+  const networkNames = [...new Set(intent.routes.map((route) => route.networkName))];
+  const primaryNetwork = networkNames[0] ?? defaultEdgeNetworkName;
+  const createCommand = commandParts([
+    "docker service create",
+    `--name ${shellQuote(intent.serviceName)}`,
+    dockerLabelFlags(intent.labels),
+    `--network ${shellQuote(primaryNetwork)}`,
+    dockerEnvironmentFlags(intent.environment),
+    dockerHealthFlags(intent.health),
+    shellQuote(intent.workload.image),
+  ]);
+
+  const verifyCommand = commandParts([
+    "docker service ps",
+    "--filter 'desired-state=running'",
+    shellQuote(intent.serviceName),
+  ]);
+  const promoteCommand = commandParts([
+    "docker service update",
+    `--label-add ${shellQuote("appaloft.route-candidate=ready")}`,
+    shellQuote(intent.serviceName),
+  ]);
+  const cleanupCommand = commandParts([
+    "docker service ls -q",
+    dockerServiceLabelFilters({
+      "appaloft.managed": "true",
+      "appaloft.resource-id": intent.labels["appaloft.resource-id"] ?? "",
+      "appaloft.destination-id": intent.labels["appaloft.destination-id"] ?? "",
+      "appaloft.runtime-target": "docker-swarm",
+    }),
+    "| while read -r service_id; do",
+    `current_deployment=$(docker service inspect "$service_id" --format ${shellQuote("{{ index .Spec.Labels \"appaloft.deployment-id\" }}")})`,
+    `if [ "$current_deployment" != ${shellQuote(intent.labels["appaloft.deployment-id"] ?? "")} ]; then docker service rm "$service_id"; fi`,
+    "done",
+  ]);
+
+  return ok({
+    schemaVersion: "docker-swarm.apply-plan/v1",
+    serviceName: intent.serviceName,
+    preservesPreviousService: true,
+    steps: [
+      {
+        step: "create-candidate-service",
+        command: createCommand,
+        displayCommand: createCommand,
+      },
+      {
+        step: "verify-candidate-service",
+        command: verifyCommand,
+        displayCommand: verifyCommand,
+      },
+      {
+        step: "promote-route-target",
+        command: promoteCommand,
+        displayCommand: promoteCommand,
+      },
+      {
+        step: "cleanup-superseded-services",
+        command: cleanupCommand,
+        displayCommand: cleanupCommand,
+      },
+    ],
+    warnings: [],
+  });
 }

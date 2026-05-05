@@ -48,6 +48,7 @@ import {
   VariableKindValue,
 } from "@appaloft/core";
 import {
+  renderDockerSwarmApplyPlan,
   renderDockerSwarmCleanupPlan,
   renderDockerSwarmRuntimeIntent,
 } from "../src/docker-swarm-runtime-intent";
@@ -193,8 +194,8 @@ describe("renderDockerSwarmRuntimeIntent", () => {
       image: "registry.example.com/team/app:sha",
       port: 3000,
     });
-    expect(intent.stackName).toBe("appaloft-res-api-dst-prod");
-    expect(intent.serviceName).toBe("appaloft-res-api-dst-prod_web");
+    expect(intent.stackName).toBe("appaloft-res-api-dst-prod-dep-123");
+    expect(intent.serviceName).toBe("appaloft-res-api-dst-prod-dep-123_web");
     expect(intent.labels).toMatchObject({
       "appaloft.managed": "true",
       "appaloft.resource-id": "res_api",
@@ -256,6 +257,7 @@ describe("renderDockerSwarmRuntimeIntent", () => {
       composeFile: "docker-compose.yml",
       targetServiceName: "web",
     });
+    expect(result._unsafeUnwrap().stackName).toBe("appaloft-res-api-dst-preview-dep-124");
   });
 
   test("[SWARM-TARGET-RENDER-002] rejects Compose intent without an unambiguous target service", () => {
@@ -313,5 +315,76 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     );
     expect(plan.commands[0]?.command).not.toContain("docker system prune");
     expect(plan.commands[0]?.command).not.toContain("docker volume");
+  });
+
+  test("[SWARM-TARGET-APPLY-001][SWARM-TARGET-ROUTE-001][SWARM-TARGET-SECRET-001] renders image apply plan as candidate rollout without public host ports", () => {
+    const intentResult = renderDockerSwarmRuntimeIntent({
+      runtimePlan: imageRuntimePlan(),
+      environmentSnapshot: runtimeEnvironmentSnapshot(),
+      identity: {
+        resourceId: "res_api",
+        deploymentId: "dep_123",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_prod",
+      },
+    });
+
+    expect(intentResult.isOk()).toBe(true);
+    const result = renderDockerSwarmApplyPlan(intentResult._unsafeUnwrap());
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.preservesPreviousService).toBe(true);
+    expect(plan.steps.map((step) => step.step)).toEqual([
+      "create-candidate-service",
+      "verify-candidate-service",
+      "promote-route-target",
+      "cleanup-superseded-services",
+    ]);
+
+    const createCommand = plan.steps[0]?.command ?? "";
+    expect(createCommand).toContain("docker service create");
+    expect(createCommand).toContain("--name 'appaloft-res-api-dst-prod-dep-123_web'");
+    expect(createCommand).toContain("--network 'appaloft-edge'");
+    expect(createCommand).toContain("--label 'appaloft.deployment-id=dep_123'");
+    expect(createCommand).toContain("--env 'PUBLIC_FLAG=enabled'");
+    expect(createCommand).toContain("--secret 'source=DATABASE_URL,target=DATABASE_URL'");
+    expect(createCommand).toContain("'registry.example.com/team/app:sha'");
+    expect(createCommand).not.toContain("--publish");
+    expect(createCommand).not.toContain("-p ");
+    expect(createCommand).not.toContain("postgres://secret-value");
+
+    expect(plan.steps[3]?.command ?? "").toContain("docker service rm");
+    expect(plan.steps[3]?.command ?? "").toContain("appaloft.destination-id=dst_prod");
+    expect(plan.steps[3]?.command ?? "").toContain("appaloft.runtime-target=docker-swarm");
+  });
+
+  test("[SWARM-TARGET-APPLY-001] keeps Compose apply planning unsupported until stack rollout execution is specified", () => {
+    const intentResult = renderDockerSwarmRuntimeIntent({
+      runtimePlan: composeRuntimePlan({ swarmTargetService: "web" }),
+      identity: {
+        resourceId: "res_api",
+        deploymentId: "dep_124",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_preview",
+      },
+    });
+
+    expect(intentResult.isOk()).toBe(true);
+    const result = renderDockerSwarmApplyPlan(intentResult._unsafeUnwrap());
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error.code).toBe("runtime_target_unsupported");
+      expect(result.error.details).toEqual(
+        expect.objectContaining({
+          phase: "runtime-target-render",
+          targetKind: "orchestrator-cluster",
+          providerKey: "docker-swarm",
+          missingCapability: "image-apply-plan",
+        }),
+      );
+    }
   });
 });
