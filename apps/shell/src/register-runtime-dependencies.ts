@@ -774,6 +774,12 @@ export function registerRuntimeDependencies(
   container.register(tokens.sourceEventReadModel, {
     useFactory: instanceCachingFactory(() => new PgSourceEventRepository(input.database.db)),
   });
+  container.register(tokens.sourceEventRecorder, {
+    useFactory: instanceCachingFactory(() => new PgSourceEventRepository(input.database.db)),
+  });
+  container.register(tokens.sourceEventPolicyReader, {
+    useFactory: instanceCachingFactory(() => new PgSourceEventRepository(input.database.db)),
+  });
   container.register(tokens.deploymentRepository, {
     useFactory: instanceCachingFactory(() => new PgDeploymentRepository(input.database.db)),
   });

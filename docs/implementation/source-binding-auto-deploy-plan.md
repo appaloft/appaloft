@@ -49,7 +49,8 @@ Round authorization.
   ref/disabled/blocked/no-match outcome evaluation implemented.`
 - Dispatch matching policies through existing deployment admission and `resource-runtime`
   coordination. `Status: application dispatcher invokes existing deployments.create admission and
-  records dispatched or dispatch-failed source event outcomes; entrypoints remain inactive.`
+  records dispatched or dispatch-failed source event outcomes; shell DI wiring is present;
+  provider webhook routes remain inactive.`
 - Preserve async acceptance, deployment snapshots, logs, recovery, and rollback semantics.
 
 ### 5. Entrypoints And Docs
