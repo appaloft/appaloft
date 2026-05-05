@@ -38,7 +38,7 @@ const retryableDeploymentStatuses = new Set<DeploymentStatus>(["failed", "cancel
 const recoveryCommandActive = {
   retry: true,
   redeploy: true,
-  rollback: false,
+  rollback: true,
 } as const;
 
 function reason(
@@ -244,8 +244,10 @@ function recommendedActions(input: {
       targetOperation: "deployments.rollback",
       label: "Roll back to a retained successful deployment",
       safeByDefault: false,
-      blockedReasonCode: "recovery-command-not-active",
       commandActive: recoveryCommandActive.rollback,
+      ...(recoveryCommandActive.rollback
+        ? {}
+        : { blockedReasonCode: "recovery-command-not-active" }),
     });
   }
 
@@ -412,7 +414,7 @@ export class DeploymentRecoveryReadinessQueryService {
           commandActive: recoveryCommandActive.rollback,
           reasons: [
             ...rollbackReasons,
-            ...(rollbackReady
+            ...(rollbackReady && !recoveryCommandActive.rollback
               ? [
                   reason("recovery-command-not-active", {
                     phase: "operation-catalog",

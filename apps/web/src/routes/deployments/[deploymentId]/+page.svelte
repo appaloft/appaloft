@@ -26,6 +26,7 @@
     type DeploymentProgressEvent,
     type RedeployDeploymentInput,
     type RetryDeploymentInput,
+    type RollbackDeploymentInput,
     shortDeploymentSourceCommitSha,
     sourceCommitShaForDeployment,
   } from "@appaloft/contracts";
@@ -69,7 +70,7 @@
   };
   type DeploymentDetailTab = "overview" | "logs" | "timeline" | "snapshot";
   type DeploymentLogEntry = DeploymentLogsResponse["logs"][number];
-  type DeploymentRecoveryAction = "retry" | "redeploy";
+  type DeploymentRecoveryAction = "retry" | "redeploy" | "rollback";
 
   const deploymentDetailTabs = ["overview", "logs", "timeline", "snapshot"] as const;
 
@@ -88,6 +89,7 @@
   let logsCopyState = $state<"idle" | "copied" | "failed">("idle");
   let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
   let deploymentRecoveryActionError = $state("");
+  let selectedRollbackCandidateId = $state("");
   let logsCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -155,6 +157,13 @@
   }));
   const redeployDeploymentMutation = createMutation(() => ({
     mutationFn: (input: RedeployDeploymentInput) => orpcClient.deployments.redeploy(input),
+    onSuccess: (result) => observeAcceptedRecoveryDeployment(result.id),
+    onError: (error) => {
+      deploymentRecoveryActionError = readErrorMessage(error);
+    },
+  }));
+  const rollbackDeploymentMutation = createMutation(() => ({
+    mutationFn: (input: RollbackDeploymentInput) => orpcClient.deployments.rollback(input),
     onSuccess: (result) => observeAcceptedRecoveryDeployment(result.id),
     onError: (error) => {
       deploymentRecoveryActionError = readErrorMessage(error);
@@ -234,20 +243,44 @@
         ? $t(i18nKeys.console.deployments.accessUrlCopyFailed)
         : $t(i18nKeys.console.deployments.copyAccessUrl),
   );
+  const recoveryActionPending = $derived(
+    retryDeploymentMutation.isPending ||
+      redeployDeploymentMutation.isPending ||
+      rollbackDeploymentMutation.isPending,
+  );
+  const rollbackDeploymentRecoveryCandidate = $derived(
+    recoveryReadiness?.rollback.candidates.find(
+      (candidate) =>
+        candidate.deploymentId === selectedRollbackCandidateId && candidate.rollbackReady,
+    ) ??
+      recoveryReadiness?.rollback.candidates.find(
+        (candidate) =>
+          candidate.deploymentId === recoveryReadiness.rollback.recommendedCandidateId &&
+          candidate.rollbackReady,
+      ) ??
+      recoveryReadiness?.rollback.candidates.find((candidate) => candidate.rollbackReady) ??
+      null,
+  );
   const retryDeploymentRecoveryAllowed = $derived(
     Boolean(
       recoveryReadiness?.retry.allowed &&
         recoveryReadiness.retry.commandActive &&
-        !retryDeploymentMutation.isPending &&
-        !redeployDeploymentMutation.isPending,
+        !recoveryActionPending,
     ),
   );
   const redeployDeploymentRecoveryAllowed = $derived(
     Boolean(
       recoveryReadiness?.redeploy.allowed &&
         recoveryReadiness.redeploy.commandActive &&
-        !retryDeploymentMutation.isPending &&
-        !redeployDeploymentMutation.isPending,
+        !recoveryActionPending,
+    ),
+  );
+  const rollbackDeploymentRecoveryAllowed = $derived(
+    Boolean(
+      recoveryReadiness?.rollback.allowed &&
+        recoveryReadiness.rollback.commandActive &&
+        rollbackDeploymentRecoveryCandidate &&
+        !recoveryActionPending,
     ),
   );
 
@@ -327,17 +360,31 @@
       return;
     }
 
-    if (!redeployDeploymentRecoveryAllowed) {
+    if (action === "redeploy") {
+      if (!redeployDeploymentRecoveryAllowed) {
+        return;
+      }
+
+      redeployDeploymentMutation.mutate({
+        resourceId: readiness.resourceId,
+        projectId: deployment.projectId,
+        environmentId: deployment.environmentId,
+        serverId: deployment.serverId,
+        destinationId: deployment.destinationId,
+        sourceDeploymentId: deployment.id,
+        readinessGeneratedAt: readiness.generatedAt,
+      });
       return;
     }
 
-    redeployDeploymentMutation.mutate({
+    if (!rollbackDeploymentRecoveryAllowed || !rollbackDeploymentRecoveryCandidate) {
+      return;
+    }
+
+    rollbackDeploymentMutation.mutate({
+      deploymentId: deployment.id,
+      rollbackCandidateDeploymentId: rollbackDeploymentRecoveryCandidate.deploymentId,
       resourceId: readiness.resourceId,
-      projectId: deployment.projectId,
-      environmentId: deployment.environmentId,
-      serverId: deployment.serverId,
-      destinationId: deployment.destinationId,
-      sourceDeploymentId: deployment.id,
       readinessGeneratedAt: readiness.generatedAt,
     });
   }
@@ -1110,6 +1157,37 @@
                       <li>{$t(i18nKeys.console.deployments.recoveryNoReasons)}</li>
                     {/each}
                   </ul>
+                  {#if recoveryReadiness.rollback.candidates.length > 0}
+                    <select
+                      class="mt-3 h-9 w-full rounded-md border bg-background px-2 text-sm"
+                      value={rollbackDeploymentRecoveryCandidate?.deploymentId ?? ""}
+                      disabled={recoveryActionPending}
+                      onchange={(event) => {
+                        selectedRollbackCandidateId = event.currentTarget.value;
+                      }}
+                    >
+                      {#each recoveryReadiness.rollback.candidates as candidate (candidate.deploymentId)}
+                        <option value={candidate.deploymentId} disabled={!candidate.rollbackReady}>
+                          {$t(i18nKeys.console.deployments.recoveryRollbackCandidate, {
+                            deploymentId: candidate.deploymentId,
+                          })}
+                          {candidate.artifactSummary ? ` - ${candidate.artifactSummary}` : ""}
+                        </option>
+                      {/each}
+                    </select>
+                  {/if}
+                  <Button
+                    type="button"
+                    size="sm"
+                    class="mt-3 w-full"
+                    disabled={!rollbackDeploymentRecoveryAllowed}
+                    onclick={() => runDeploymentRecoveryAction("rollback")}
+                  >
+                    <RefreshCw class="size-4" />
+                    {rollbackDeploymentMutation.isPending
+                      ? $t(i18nKeys.console.deployments.recoveryRollingBackAction)
+                      : $t(i18nKeys.console.deployments.recoveryRollbackAction)}
+                  </Button>
                 </div>
               </div>
             </section>

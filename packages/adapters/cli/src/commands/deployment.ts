@@ -11,6 +11,7 @@ import {
   ListDeploymentsQuery,
   RedeployDeploymentCommand,
   RetryDeploymentCommand,
+  RollbackDeploymentCommand,
   ShowDeploymentQuery,
   StreamDeploymentEventsQuery,
 } from "@appaloft/application";
@@ -135,6 +136,7 @@ const includeHistoryOption = Options.boolean("include-history").pipe(Options.wit
 const untilTerminalOption = Options.boolean("until-terminal").pipe(Options.withDefault(true));
 const readinessGeneratedAtOption = Options.text("readiness-generated-at").pipe(Options.optional);
 const sourceDeploymentOption = Options.text("source-deployment").pipe(Options.optional);
+const rollbackCandidateOption = Options.text("candidate");
 const deploymentStateBackendKinds = [
   "ssh-pglite",
   "local-pglite",
@@ -1510,6 +1512,25 @@ const redeployDeploymentCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRedeploy));
 
+const rollbackDeploymentCommand = EffectCommand.make(
+  "rollback",
+  {
+    deploymentId: deploymentIdArg,
+    candidate: rollbackCandidateOption,
+    resource: resourceOption,
+    readinessGeneratedAt: readinessGeneratedAtOption,
+  },
+  ({ candidate, deploymentId, readinessGeneratedAt, resource }) =>
+    runCommand(
+      RollbackDeploymentCommand.create({
+        deploymentId,
+        rollbackCandidateDeploymentId: candidate,
+        resourceId: optionalValue(resource),
+        readinessGeneratedAt: optionalValue(readinessGeneratedAt),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRollback));
+
 const streamDeploymentEventsCommand = EffectCommand.make(
   "events",
   {
@@ -1542,6 +1563,7 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
     deploymentRecoveryReadinessCommand,
     retryDeploymentCommand,
     redeployDeploymentCommand,
+    rollbackDeploymentCommand,
     streamDeploymentEventsCommand,
   ]),
 );

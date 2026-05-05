@@ -29,6 +29,7 @@ import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deploy
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
 import { redeployDeploymentCommandInputSchema } from "./operations/deployments/redeploy-deployment.command";
 import { retryDeploymentCommandInputSchema } from "./operations/deployments/retry-deployment.command";
+import { rollbackDeploymentCommandInputSchema } from "./operations/deployments/rollback-deployment.command";
 import { showDeploymentQueryInputSchema } from "./operations/deployments/show-deployment.query";
 import { streamDeploymentEventsQueryInputSchema } from "./operations/deployments/stream-deployment-events.query";
 import { checkDomainBindingDeleteSafetyQueryInputSchema } from "./operations/domain-bindings/check-domain-binding-delete-safety.query";
@@ -1341,6 +1342,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft deployments redeploy <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/redeploy" },
+    },
+  },
+  {
+    key: "deployments.rollback",
+    kind: "command",
+    domain: "deployments",
+    messageName: "RollbackDeploymentCommand",
+    handlerName: "RollbackDeploymentCommandHandler",
+    serviceName: "RollbackDeploymentUseCase",
+    inputSchema: rollbackDeploymentCommandInputSchema,
+    serviceToken: tokens.rollbackDeploymentUseCase,
+    transports: {
+      cli: "appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>",
+      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/rollback" },
     },
   },
   {

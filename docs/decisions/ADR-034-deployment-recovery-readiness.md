@@ -29,9 +29,9 @@ commands:
 | Operation | Kind | Public state after this ADR | Meaning |
 | --- | --- | --- | --- |
 | `deployments.recovery-readiness` | Query | Active read-only | Reads retry, redeploy, rollback readiness and candidate reasons for one deployment/resource context. |
-| `deployments.retry` | Command | Accepted candidate | Creates a new deployment attempt from the failed attempt's immutable snapshot intent. |
-| `deployments.redeploy` | Command | Accepted candidate | Creates a new deployment attempt from the current Resource profile. |
-| `deployments.rollback` | Command | Accepted candidate | Creates a new rollback deployment attempt from a selected successful rollback candidate snapshot/artifact. |
+| `deployments.retry` | Command | Active | Creates a new deployment attempt from the failed attempt's immutable snapshot intent. |
+| `deployments.redeploy` | Command | Active | Creates a new deployment attempt from the current Resource profile. |
+| `deployments.rollback` | Command | Active | Creates a new rollback deployment attempt from a selected successful rollback candidate snapshot/artifact. |
 
 `deployments.recovery-readiness` is active after its first Code Round updates
 `CORE_OPERATIONS.md`, `operation-catalog.ts`, the application query slice, HTTP/oRPC, CLI, Web, public
@@ -224,10 +224,9 @@ include secrets, raw environment values, private registry credentials, or unboun
 
 ## Migration Gaps
 
-Current code may retain low-level rollback helpers, runtime artifact fields, or historical rollback
-model objects, but they are internal only. Public recovery readiness is active as a read-only query.
-Public retry and redeploy entrypoints are active. Public rollback remains absent until a later Code
-Round implements the accepted candidate write command and updates the operation catalog.
+Current code retains rollback helper, runtime artifact, and historical rollback fields as active
+command support. Public recovery readiness is active as a read-only query. Public retry, redeploy,
+and rollback entrypoints are active.
 
 Current event-stream cursor gaps are observation gaps. They must not be used as recovery blockers
 unless the durable event/progress source itself is also the only available snapshot/artifact evidence.

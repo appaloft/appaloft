@@ -163,6 +163,7 @@ import {
   RetryDeploymentCommand,
   RetryDomainBindingVerificationCommand,
   RevokeCertificateCommand,
+  RollbackDeploymentCommand,
   RotateResourceDependencyBindingSecretCommand,
   RotateSshCredentialCommand,
   redeployDeploymentCommandInputSchema,
@@ -183,6 +184,7 @@ import {
   retryDeploymentCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
   revokeCertificateCommandInputSchema,
+  rollbackDeploymentCommandInputSchema,
   rotateResourceDependencyBindingSecretCommandInputSchema,
   rotateSshCredentialCommandInputSchema,
   SetEnvironmentVariableCommand,
@@ -319,6 +321,7 @@ import {
   retryDeploymentResponseSchema,
   retryDomainBindingVerificationResponseSchema,
   revokeCertificateResponseSchema,
+  rollbackDeploymentResponseSchema,
   rotateResourceDependencyBindingSecretResponseSchema,
   rotateSshCredentialResponseSchema,
   setResourceVariableResponseSchema,
@@ -2173,6 +2176,20 @@ export const redeployDeploymentProcedure = base
     executeCommand(context, RedeployDeploymentCommand.create(input)),
   );
 
+export const rollbackDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/{deploymentId}/rollback",
+    summary: "Roll back deployment",
+    description: apiRouteDescriptions.deploymentRecoveryReadiness,
+    successStatus: 201,
+  })
+  .input(rollbackDeploymentCommandInputSchema)
+  .output(rollbackDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RollbackDeploymentCommand.create(input)),
+  );
+
 export const showDeploymentProcedure = base
   .route({
     method: "GET",
@@ -2822,6 +2839,7 @@ export const appaloftOrpcRouter = {
     create: createDeploymentProcedure,
     retry: retryDeploymentProcedure,
     redeploy: redeployDeploymentProcedure,
+    rollback: rollbackDeploymentProcedure,
     plan: deploymentPlanProcedure,
     show: showDeploymentProcedure,
     recoveryReadiness: deploymentRecoveryReadinessProcedure,
@@ -3018,6 +3036,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/certificates/:certificateId/revoke",
     "/api/deployments",
     "/api/deployments/:deploymentId/retry",
+    "/api/deployments/:deploymentId/rollback",
     "/api/deployments/plan",
     "/api/deployments/:deploymentId",
     "/api/deployments/:deploymentId/recovery-readiness",

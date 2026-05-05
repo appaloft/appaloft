@@ -99,7 +99,8 @@ Minimum Code Round coverage:
   - Web semantic/browser coverage for enabled retry/redeploy buttons when readiness and operation
     active state allow them.
 - Regression:
-  - rollback remains inactive and readiness still reports `recovery-command-not-active` for rollback.
+  - rollback activation is owned by [Deployment Rollback](../041-deployment-rollback/spec.md);
+    retry/redeploy behavior must continue to pass after rollback becomes active.
 
 ## Risks And Migration Gaps
 

@@ -565,6 +565,7 @@ Implemented operations:
 | Read deployment recovery readiness | Query | `deployments.recovery-readiness` | `DeploymentRecoveryReadinessQuery` | `DeploymentRecoveryReadinessQueryInput` | `appaloft deployments recovery-readiness <deploymentId>` | `GET /api/deployments/{deploymentId}/recovery-readiness` |
 | Retry deployment attempt | Command | `deployments.retry` | `RetryDeploymentCommand` | `RetryDeploymentCommandInput` | `appaloft deployments retry <deploymentId>` | `POST /api/deployments/{deploymentId}/retry` |
 | Redeploy current resource profile | Command | `deployments.redeploy` | `RedeployDeploymentCommand` | `RedeployDeploymentCommandInput` | `appaloft deployments redeploy <resourceId>` | `POST /api/resources/{resourceId}/redeploy` |
+| Roll back deployment | Command | `deployments.rollback` | `RollbackDeploymentCommand` | `RollbackDeploymentCommandInput` | `appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>` | `POST /api/deployments/{deploymentId}/rollback` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `appaloft logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
 | Stream deployment events | Query | `deployments.stream-events` | `StreamDeploymentEventsQuery` | `StreamDeploymentEventsQueryInput` | `appaloft deployments events <deploymentId>` | `GET /api/deployments/{deploymentId}/events` and `GET /api/deployments/{deploymentId}/events/stream` |
 
@@ -616,9 +617,8 @@ Current boundary:
   logs on `deployments.logs`, or reintroduce `deployments.reattach` as a write command.
 - `deployments.recovery-readiness` is the active read-only recovery decision surface. It returns
   retry, redeploy, rollback, rollback-candidate, blocked-reason, and recommended-action facts for
-  Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. Retry and redeploy are active write commands
-  that must use its freshness marker when callers have one; rollback remains inactive until its own
-  Code Round.
+  Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. Retry, redeploy, and rollback are active write
+  commands that must use its freshness marker when callers have one.
 - mutation coordination is scope-based, not whole-server based:
   `deployments.create` coordinates by logical resource-runtime scope and
   `deployments.cleanup-preview` coordinates by logical preview-lifecycle scope. Low-level SSH
@@ -753,7 +753,7 @@ Current boundary:
   evidence and a planner registry. Mainstream web framework support is a workload-planner concern:
   planners choose base image, package manager/build tool commands, static output or packaged
   artifacts, and start commands while keeping Web/API/CLI command schemas provider-neutral.
-- cancel, manual deployment health check, redeploy, reattach, and rollback are not public
+- cancel, manual deployment health check, and reattach are not public
   operations in the v1 surface. They must be reintroduced only after new source-of-truth specs,
   test matrices, implementation plans, and Web/API/CLI contracts are accepted.
 - Deployment recovery readiness is active under
@@ -769,7 +769,7 @@ Current boundary:
   effective configuration, target, and destination at admission time. It is the "deploy current
   desired state again" operation, not a retry of an old snapshot. Its command implementation is scoped by
   [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md).
-- Future `deployments.rollback` creates a new rollback deployment attempt from a retained successful
+- `deployments.rollback` creates a new rollback deployment attempt from a retained successful
   candidate's immutable snapshot and Docker/OCI artifact identity. It does not re-plan from the
   current Resource profile and does not roll back databases, volumes, or external dependencies. Its
   command implementation is scoped by

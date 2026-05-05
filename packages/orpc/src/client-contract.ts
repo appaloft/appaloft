@@ -63,6 +63,7 @@ import {
   type RetryDeploymentCommandInput,
   type RetryDomainBindingVerificationCommandInput,
   type RevokeCertificateCommandInput,
+  type RollbackDeploymentCommandInput,
   type RotateSshCredentialCommandInput,
   type SetEnvironmentVariableCommandInput,
   type SetResourceVariableCommandInput,
@@ -158,6 +159,7 @@ import {
   type RetryDeploymentResponse,
   type RetryDomainBindingVerificationResponse,
   type RevokeCertificateResponse,
+  type RollbackDeploymentResponse,
   type RotateSshCredentialResponse,
   type SetResourceVariableResponse,
   type ShowCertificateResponse,
@@ -674,6 +676,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       RedeployDeploymentCommandInput,
       RedeployDeploymentResponse,
+      AppaloftClientError
+    >;
+    rollback: Client<
+      AppaloftClientContext,
+      RollbackDeploymentCommandInput,
+      RollbackDeploymentResponse,
       AppaloftClientError
     >;
     createStream: Client<
