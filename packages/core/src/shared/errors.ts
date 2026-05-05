@@ -164,6 +164,20 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("resource_auto_deploy_secret_required", "user", message, details),
+  sourceEventScopeRequired: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("source_event_scope_required", "user", message, details),
+  sourceEventNotFound: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("source_event_not_found", "user", message, details),
+  sourceEventReadUnavailable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("source_event_read_unavailable", "infra", message, details, retryable),
   serverInactive: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

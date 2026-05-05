@@ -402,6 +402,28 @@ export interface SourceLinksTable {
   metadata: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
 }
 
+export interface SourceEventsTable {
+  id: string;
+  project_id: string | null;
+  source_kind: string;
+  event_kind: string;
+  source_identity: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  ref: string;
+  revision: string;
+  delivery_id: string | null;
+  idempotency_key: string | null;
+  dedupe_key: string;
+  dedupe_status: string;
+  dedupe_of_source_event_id: string | null;
+  verification: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  status: string;
+  matched_resource_ids: ColumnType<string[], string[] | undefined, string[]>;
+  ignored_reasons: ColumnType<string[], string[] | undefined, string[]>;
+  policy_results: ColumnType<JsonRecord[], JsonRecord[] | undefined, JsonRecord[]>;
+  created_deployment_ids: ColumnType<string[], string[] | undefined, string[]>;
+  received_at: string;
+}
+
 type JsonRecord = Record<string, unknown>;
 
 export interface DefaultAccessDomainPoliciesTable {
@@ -528,6 +550,7 @@ export interface Database {
   audit_logs: AuditLogsTable;
   provider_job_logs: ProviderJobLogsTable;
   source_links: SourceLinksTable;
+  source_events: SourceEventsTable;
   default_access_domain_policies: DefaultAccessDomainPoliciesTable;
   server_applied_route_states: ServerAppliedRouteStatesTable;
   mutation_coordinations: MutationCoordinationsTable;

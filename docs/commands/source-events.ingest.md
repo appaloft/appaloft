@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted candidate integration boundary. Do not expose ingestion routes until provider adapters,
-verification, durable source event persistence, deployment dispatch, read models, error contracts,
-public docs/help, `CORE_OPERATIONS.md`, `operation-catalog.ts`, and tests are aligned in Code Round.
+Accepted candidate integration boundary. Inactive application command handling and durable
+source-event dedupe persistence exist. Do not expose ingestion routes until provider adapters,
+verification, deployment dispatch, read models, error contracts, public docs/help,
+`CORE_OPERATIONS.md`, `operation-catalog.ts`, and tests are aligned in Code Round.
 
 ## Governing Sources
 

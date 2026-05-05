@@ -28,13 +28,16 @@ Round authorization.
 
 ### 3. Source Event Ingestion
 
-- Add provider-neutral `source-events.ingest` command schema.
+- Add provider-neutral `source-events.ingest` command schema. `Status: inactive application
+  command baseline implemented.`
 - Add signature verification/normalization ports for Git provider and generic signed events.
 - Add durable source event records with dedupe keys, normalized facts, policy match results, ignored
-  reasons, and created deployment ids.
+  reasons, and created deployment ids. `Status: durable dedupe/read-model persistence baseline
+  implemented; policy match results and deployment ids are populated by later dispatch slices.`
 - Store project/resource scoped read-model facts first; global operator source-event rollups remain
-  future.
-- Implement `source-events.list` and `source-events.show` from the local query specs.
+  future. `Status: project/resource scoped read-model filters implemented.`
+- Implement `source-events.list` and `source-events.show` from the local query specs. `Status:
+  inactive application query baseline implemented.`
 
 ### 4. Deployment Dispatch
 

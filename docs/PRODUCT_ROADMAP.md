@@ -988,6 +988,11 @@ Current verification notes:
   `resources.configure-auto-deploy` command schema, handler, use case, and Resource repository
   persistence for policy JSON with application and PGlite coverage. The operation remains inactive
   until source event ingestion/dedupe/read models and CLI/HTTP/Web surfaces are aligned.
+- 2026-05-05 Phase 7 source event application/persistence slice added inactive
+  `source-events.ingest`, `source-events.list`, and `source-events.show` command/query schemas,
+  handlers, use/query services, source event recorder/read-model ports, and PGlite-backed durable
+  dedupe/read-model persistence. The operations remain inactive until provider verification,
+  deployment dispatch, operation catalog/Core Operations, and CLI/HTTP/Web surfaces are aligned.
 
 Required:
 
