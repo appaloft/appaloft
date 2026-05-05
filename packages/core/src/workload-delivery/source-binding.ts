@@ -205,6 +205,29 @@ export class GitRefText extends ScalarValueObject<string> {
   }
 }
 
+const sourceBindingFingerprintBrand: unique symbol = Symbol("SourceBindingFingerprint");
+export class SourceBindingFingerprint extends ScalarValueObject<string> {
+  private [sourceBindingFingerprintBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<SourceBindingFingerprint> {
+    return validateRequiredText(value, "Source binding fingerprint").map(
+      (normalized) => new SourceBindingFingerprint(normalized),
+    );
+  }
+
+  static fromSourceBindingState(state: ResourceSourceBindingState): SourceBindingFingerprint {
+    return new SourceBindingFingerprint(`srcfp_${hashSourceBindingState(state)}`);
+  }
+
+  static rehydrate(value: string): SourceBindingFingerprint {
+    return new SourceBindingFingerprint(value.trim());
+  }
+}
+
 const gitCommitShaBrand: unique symbol = Symbol("GitCommitShaText");
 export class GitCommitShaText extends ScalarValueObject<string> {
   private [gitCommitShaBrand]!: void;
@@ -447,6 +470,14 @@ export class ResourceSourceBinding extends ValueObject<ResourceSourceBindingStat
     return kind === "local-folder" || kind === "local-git" || kind === "compose";
   }
 
+  fingerprint(): SourceBindingFingerprint {
+    return SourceBindingFingerprint.fromSourceBindingState(this.state);
+  }
+
+  supportsAutoDeployPolicy(): boolean {
+    return isGitSourceKind(this.state.kind.value);
+  }
+
   toDeploymentSourceDescriptorState(): DeploymentSourceDescriptorState {
     const metadata = ResourceSourceBinding.metadataFromState(this.state);
     return {
@@ -460,6 +491,26 @@ export class ResourceSourceBinding extends ValueObject<ResourceSourceBindingStat
   toState(): ResourceSourceBindingState {
     return cloneResourceSourceBindingState(this.state);
   }
+}
+
+function hashSourceBindingState(state: ResourceSourceBindingState): string {
+  const components = [
+    state.kind.value,
+    state.locator.value,
+    state.gitRef?.value ?? "",
+    state.baseDirectory?.value ?? "",
+    state.repositoryId?.value ?? "",
+    state.repositoryFullName?.value ?? "",
+    state.defaultBranch?.value ?? "",
+  ].join("\u001f");
+  let hash = 0x811c9dc5;
+
+  for (let index = 0; index < components.length; index += 1) {
+    hash ^= components.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+
+  return hash.toString(16).padStart(8, "0");
 }
 
 export function cloneResourceSourceBindingState(

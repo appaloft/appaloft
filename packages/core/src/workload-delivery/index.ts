@@ -1,3 +1,4 @@
+export * from "./auto-deploy-policy";
 export * from "./resource";
 export * from "./resource-specifications";
 export * from "./source-binding";

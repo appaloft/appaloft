@@ -28,8 +28,9 @@
 
 ## Test-First Round
 
-- [ ] Add `SRC-AUTO-POLICY-001` Resource policy tests.
-- [ ] Add `SRC-AUTO-POLICY-002` source-binding guard tests.
+- [x] Add `SRC-AUTO-POLICY-001` Resource policy tests.
+- [x] Add `SRC-AUTO-POLICY-002` source-binding guard tests.
+- [x] Add `SRC-AUTO-POLICY-003` source-binding drift tests.
 - [ ] Add `SRC-AUTO-EVENT-001` matching push deployment dispatch tests.
 - [ ] Add `SRC-AUTO-EVENT-002` dedupe tests.
 - [ ] Add `SRC-AUTO-EVENT-003` ignored ref tests.
@@ -40,7 +41,7 @@
 
 ## Implementation
 
-- [ ] Add Resource auto-deploy policy domain model.
+- [x] Add Resource auto-deploy policy domain model.
 - [ ] Add source event command/query schemas, handlers, use cases, and tokens.
 - [ ] Add provider-neutral source event normalization and verification ports.
 - [ ] Add durable source event dedupe and read models.
@@ -49,7 +50,7 @@
 
 ## Verification
 
-- [ ] Run targeted core/application source auto-deploy tests.
+- [x] Run targeted core/application source auto-deploy tests.
 - [ ] Run targeted persistence tests.
 - [ ] Run targeted CLI/oRPC/HTTP tests.
 - [ ] Run targeted Web semantic/browser tests.

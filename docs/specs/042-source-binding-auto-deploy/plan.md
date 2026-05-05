@@ -108,7 +108,9 @@ Minimum stable test ids for Code Round:
 
 ## Code Round Readiness
 
-Ready for Test-First Round automation binding, not yet Code Round.
+Resource-owned auto-deploy policy domain behavior is implemented and bound to
+`SRC-AUTO-POLICY-001`, `SRC-AUTO-POLICY-002`, and `SRC-AUTO-POLICY-003` core tests.
 
-Before Code Round, bind governing matrix rows to automated tests and decide the first adapter slice
-for provider Git versus generic signed webhook ingestion.
+The broader feature remains before activation. Before CLI/HTTP/Web exposure, implement the
+application command, durable source event ingestion/dedupe/read models, and decide the first adapter
+slice for provider Git versus generic signed webhook ingestion.
