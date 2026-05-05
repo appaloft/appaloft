@@ -858,8 +858,8 @@ Current verification notes:
 
 Required:
 
-- [ ] Add resource-scoped environment variable operations.
-- [ ] Add secret operations with build/runtime exposure rules, masking, `.env` import/paste, and
+- [x] Add resource-scoped environment variable operations.
+- [x] Add secret operations with build/runtime exposure rules, masking, `.env` import/paste, and
   effective config queries.
 - [x] Add storage/volume create/list/show/update/delete.
 - [x] Add storage attach/detach, bind mount versus named volume, destination path validation, and
