@@ -23,8 +23,12 @@
 - [x] `SCHED-TASK-CREATE-001`: create accepts a Resource-owned task definition without activating
   operation catalog entries.
 - [x] `SCHED-TASK-CREATE-002`: Resource archive blocks task creation before persistence.
+- [x] `SCHED-TASK-QUERY-001`: task list/show queries wrap scheduled-task read models without
+  activating operation catalog entries.
+- [x] `SCHED-TASK-QUERY-002`: missing task show query returns structured not-found details.
 - [x] `SCHED-TASK-RUN-001`: run-now accepts a run attempt without completing it synchronously.
 - [x] `SCHED-TASK-RUN-002`: Resource archive blocks run-now before runtime execution.
+- [x] `SCHED-TASK-RUN-QUERY-001`: run list/show/log queries wrap run-specific read models.
 - [ ] `SCHED-TASK-SCHED-001`: scheduler dispatches through the same run admission use case.
 - [ ] `SCHED-TASK-LOGS-001`: task-run logs are separate from deployment/resource runtime logs.
 - [ ] `SCHED-TASK-SECRET-001`: task definitions, runs, logs, and errors mask secrets.
@@ -37,6 +41,7 @@
   ports.
 - [x] Add inactive application create task admission handler/use case.
 - [x] Add inactive application run-now admission handler/use case.
+- [x] Add inactive application read-query handlers/services for task and run history surfaces.
 - [ ] Add remaining application scheduled-task handlers/use cases.
 - [ ] Add persistence/read models.
 - [ ] Add scheduler process manager.

@@ -11,8 +11,8 @@ Spec-first slice for Resource-owned scheduled tasks, run attempts, history, and 
    run-attempt state transitions.`
 2. Add application command/query schemas, messages, handlers, use cases, and ports.
    `Status: inactive schemas, messages, result DTOs, and read-model ports are implemented;
-   create and run-now admission handlers/use cases are implemented; remaining handlers/use cases
-   remain open.`
+   create and run-now admission handlers/use cases are implemented; task/run read-query handlers
+   and services are implemented; update/delete handlers/use cases remain open.`
 3. Add persistence repository/read models for task definitions and run attempts.
 4. Add runtime target execution/log ports for one-off task runs.
 5. Add scheduler process manager that dispatches the same admission path as run-now.
