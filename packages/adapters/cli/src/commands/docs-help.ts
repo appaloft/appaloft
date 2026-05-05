@@ -42,6 +42,11 @@ export const cliDocsHrefs = {
   ),
   operatorWorkLedger: resolvePublicDocsHelpHref("operator.work-ledger"),
   remoteStateLock: resolvePublicDocsHelpHref("errors.remote-state-lock"),
+  sourceAutoDeploySetup: resolvePublicDocsHelpHref("source.auto-deploy-setup"),
+  sourceAutoDeploySignatures: resolvePublicDocsHelpHref("source.auto-deploy-signatures"),
+  sourceAutoDeployDedupe: resolvePublicDocsHelpHref("source.auto-deploy-dedupe"),
+  sourceAutoDeployIgnoredEvents: resolvePublicDocsHelpHref("source.auto-deploy-ignored-events"),
+  sourceAutoDeployRecovery: resolvePublicDocsHelpHref("source.auto-deploy-recovery"),
 } as const;
 
 export const cliCommandDescriptions = {
@@ -81,9 +86,9 @@ export const cliCommandDescriptions = {
   sourceEvent: withDocs("Source event diagnostics", "source.auto-deploy-setup"),
   sourceEventList: withDocs(
     "List source event deliveries for a project or resource",
-    "source.auto-deploy-setup",
+    "source.auto-deploy-dedupe",
   ),
-  sourceEventShow: withDocs("Show one source event delivery", "source.auto-deploy-setup"),
+  sourceEventShow: withDocs("Show one source event delivery", "source.auto-deploy-ignored-events"),
   remoteState: withDocs("Remote state diagnostics", "errors.remote-state-lock"),
   remoteStateLock: withDocs("SSH remote-state lock diagnostics", "errors.remote-state-lock"),
   remoteStateLockInspect: withDocs(

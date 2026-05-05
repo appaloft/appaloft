@@ -52,6 +52,21 @@ describe("CLI docs help links", () => {
     expect(cliDocsHrefs.operatorWorkLedger).toBe(
       "/docs/reference/errors-statuses/#operator-work-ledger",
     );
+    expect(cliDocsHrefs.sourceAutoDeploySetup).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-setup",
+    );
+    expect(cliDocsHrefs.sourceAutoDeploySignatures).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-signatures",
+    );
+    expect(cliDocsHrefs.sourceAutoDeployDedupe).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-dedupe",
+    );
+    expect(cliDocsHrefs.sourceAutoDeployIgnoredEvents).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-ignored-events",
+    );
+    expect(cliDocsHrefs.sourceAutoDeployRecovery).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-recovery",
+    );
 
     expect(cliCommandDescriptions.serverCredential).toContain(cliDocsHrefs.serverSshCredential);
     expect(cliCommandDescriptions.serverCredentialRotate).toContain(
@@ -87,5 +102,12 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.serverTerminal).toContain(cliDocsHrefs.serverTerminalSession);
     expect(cliCommandDescriptions.operatorWorkList).toContain(cliDocsHrefs.operatorWorkLedger);
     expect(cliCommandDescriptions.operatorWorkShow).toContain(cliDocsHrefs.operatorWorkLedger);
+    expect(cliCommandDescriptions.resourceConfigureAutoDeploy).toContain(
+      cliDocsHrefs.sourceAutoDeploySetup,
+    );
+    expect(cliCommandDescriptions.sourceEventList).toContain(cliDocsHrefs.sourceAutoDeployDedupe);
+    expect(cliCommandDescriptions.sourceEventShow).toContain(
+      cliDocsHrefs.sourceAutoDeployIgnoredEvents,
+    );
   });
 });

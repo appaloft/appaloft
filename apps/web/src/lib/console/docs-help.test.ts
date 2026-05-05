@@ -68,6 +68,21 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.diagnosticsSafeSupportPayload).toBe(
       "/docs/observe/diagnostics/#diagnostic-summary-copy-support-payload",
     );
+    expect(webDocsHrefs.sourceAutoDeploySetup).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-setup",
+    );
+    expect(webDocsHrefs.sourceAutoDeploySignatures).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-signatures",
+    );
+    expect(webDocsHrefs.sourceAutoDeployDedupe).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-dedupe",
+    );
+    expect(webDocsHrefs.sourceAutoDeployIgnoredEvents).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-ignored-events",
+    );
+    expect(webDocsHrefs.sourceAutoDeployRecovery).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-recovery",
+    );
   });
 
   test("[PUB-DOCS-010] owner-scoped Web forms mount help links for complex inputs", async () => {

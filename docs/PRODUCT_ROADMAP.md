@@ -1032,6 +1032,10 @@ Current verification notes:
   dispatch dedupe, multi-Resource provider-signed fanout, and invalid generic signed HTTP
   signatures. Web diagnostics, provider Git route adapters, and future MCP/tool descriptors remain
   deferred.
+- 2026-05-05 Phase 7 source auto-deploy public help slice exposed setup, signatures, dedupe,
+  ignored-event, and recovery anchors through API, CLI, and Web help registries with
+  `SRC-AUTO-SURFACE-003` automation. Web diagnostics, provider Git route adapters, and future
+  MCP/tool descriptors remain deferred.
 
 Required:
 

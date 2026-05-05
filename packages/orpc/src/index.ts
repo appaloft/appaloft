@@ -468,6 +468,10 @@ export const apiDocsHrefs = {
   storageVolumeLifecycle: resolvePublicDocsHelpHref("storage.volume-lifecycle"),
   dependencyResourceLifecycle: resolvePublicDocsHelpHref("resource.concept"),
   sourceAutoDeploySetup: resolvePublicDocsHelpHref("source.auto-deploy-setup"),
+  sourceAutoDeploySignatures: resolvePublicDocsHelpHref("source.auto-deploy-signatures"),
+  sourceAutoDeployDedupe: resolvePublicDocsHelpHref("source.auto-deploy-dedupe"),
+  sourceAutoDeployIgnoredEvents: resolvePublicDocsHelpHref("source.auto-deploy-ignored-events"),
+  sourceAutoDeployRecovery: resolvePublicDocsHelpHref("source.auto-deploy-recovery"),
 } as const;
 
 export const apiRouteDescriptions = {
@@ -811,11 +815,11 @@ export const apiRouteDescriptions = {
   ),
   listSourceEvents: routeDescription(
     "Lists safe source event deliveries for a project or resource.",
-    "source.auto-deploy-setup",
+    "source.auto-deploy-dedupe",
   ),
   showSourceEvent: routeDescription(
     "Reads one safe source event delivery with dedupe, policy, and dispatch details.",
-    "source.auto-deploy-setup",
+    "source.auto-deploy-ignored-events",
   ),
 } as const;
 export const createDeploymentRouteDescription = apiRouteDescriptions.createDeployment;
