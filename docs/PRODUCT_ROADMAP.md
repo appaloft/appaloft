@@ -892,6 +892,14 @@ Current verification notes:
   and delete-safety blockers for retained backups. Web affordances and provider-native Redis remain
   separate gaps, so the full `0.9.0` release rule remains blocked by recovery, auto-deploy, preview,
   and cluster runtime items.
+- 2026-05-05 Phase 7 deployment retry/redeploy Spec Round created
+  [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md) to activate
+  `deployments.retry` and `deployments.redeploy` under ADR-016/ADR-034. It narrows the next Code
+  Round to new deployment attempts from retained snapshot intent or current Resource profile,
+  shared deployment orchestration, recovery trigger metadata, resource-runtime coordination,
+  explicit CLI/oRPC/HTTP/Web surfaces, and rollback remaining inactive. It does not implement the
+  commands yet, so the full `0.9.0` release rule remains blocked by retry/redeploy Code Round,
+  rollback, auto-deploy, preview, and cluster runtime items.
 
 Required:
 

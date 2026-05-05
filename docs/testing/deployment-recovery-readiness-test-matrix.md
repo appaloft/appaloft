@@ -6,6 +6,10 @@ Active readiness-query matrix plus future recovery-command matrix. `deployments.
 has automated application and HTTP coverage. `deployments.retry`, `deployments.redeploy`, and
 `deployments.rollback` remain future write-command rows.
 
+The retry/redeploy write-command Code Round is scoped by
+[Deployment Retry And Redeploy](../specs/040-deployment-retry-redeploy/spec.md). Rollback remains a
+separate future Code Round.
+
 ## Governing Sources
 
 - [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
@@ -41,8 +45,11 @@ has automated application and HTTP coverage. `deployments.retry`, `deployments.r
 | `DEP-RETRY-001` | Retry admitted for failed attempt with retained snapshot intent. | Command returns accepted async result with a new attempt id and emits normal lifecycle events with `triggerKind = "retry"`. |
 | `DEP-RETRY-002` | Retry requested for active or successful attempt. | Command rejects with `deployment_not_retryable` and does not mutate the source attempt. |
 | `DEP-RETRY-003` | Retry readiness marker is stale. | Command rejects with `deployment_recovery_state_stale`. |
+| `DEP-RETRY-004` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without admitting competing retry work. |
 | `DEP-REDEPLOY-001` | Redeploy admitted for current valid Resource profile. | Command returns accepted async result with a new attempt id and resolves runtime inputs from current profile state. |
-| `DEP-REDEPLOY-002` | Source deployment has usable snapshot but current profile is invalid. | Command rejects redeploy; it does not fall back to retry semantics. |
+| `DEP-REDEPLOY-002` | Source deployment has usable snapshot but current profile differs. | Command creates a current-profile attempt and does not reuse the old snapshot as runtime truth. |
+| `DEP-REDEPLOY-003` | Source deployment has usable snapshot but current profile is invalid. | Command rejects redeploy; it does not fall back to retry semantics. |
+| `DEP-REDEPLOY-004` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without bypassing create/retry/rollback serialization. |
 | `DEP-ROLLBACK-001` | Rollback admitted with retained successful candidate. | Command returns accepted async result with a new rollback attempt id and emits `triggerKind = "rollback"`. |
 | `DEP-ROLLBACK-002` | Requested rollback candidate is missing or expired. | Command rejects with `deployment_rollback_candidate_not_found`. |
 | `DEP-ROLLBACK-003` | Requested candidate lacks artifact or environment snapshot. | Command rejects with `deployment_not_rollback_ready` and safe missing metadata detail. |
