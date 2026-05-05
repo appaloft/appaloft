@@ -469,8 +469,11 @@ Missing pieces before Action PR preview can be documented as supported:
 
 - `appaloft/deploy-action` wrapper repository and Marketplace README;
 - wrapper tests for install, secret mapping, fork-safety docs, cleanup, and GitHub
-  deployment/environment metadata cleanup behavior in the public wrapper repository;
-- public docs that distinguish Action-only preview deploy from product-grade GitHub App previews.
+  deployment/environment metadata cleanup behavior in the public wrapper repository.
+
+The public docs now distinguish Action-only preview deploy from product-grade GitHub App previews
+under `/docs/deploy/previews/#deployment-pr-preview-action-workflow` and
+`/docs/deploy/previews/#product-grade-preview-deployments`.
 
 Missing pieces for product-grade previews:
 

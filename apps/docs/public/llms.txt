@@ -8,6 +8,7 @@ Start here:
 - /docs/start/entrypoints/ - Web, CLI, HTTP API, and future MCP entrypoint selection
 - /docs/deploy/sources/ - Deployment source inputs
 - /docs/deploy/lifecycle/ - Deployment lifecycle: detect, plan, execute, verify, rollback
+- /docs/deploy/previews/ - Pull request previews, cleanup workflow, and product-grade preview differences
 - /docs/deploy/recovery/ - Relink, preview cleanup, retry, and rollback decisions
 - /docs/resources/scheduled-tasks/ - Scheduled tasks, run history, and task logs
 - /docs/observe/logs-health/ - Runtime logs and health summaries
