@@ -2,7 +2,7 @@
 
 ## Governing Sources
 
-- ADRs: ADR-010, ADR-012, ADR-014, ADR-016, ADR-024, ADR-025, ADR-026, ADR-028, ADR-029
+- ADRs: ADR-010, ADR-012, ADR-014, ADR-016, ADR-024, ADR-025, ADR-026, ADR-028, ADR-029, ADR-037
 - Operation map: `docs/BUSINESS_OPERATION_MAP.md`
 - Core operations: `docs/CORE_OPERATIONS.md`
 - Global contracts:
@@ -45,6 +45,8 @@
 
 - Add source event tables/read models for normalized safe facts, delivery status, ignored reasons,
   matched policies, and created deployment ids.
+- Scope first source event list/show read models by project and resource; global operator rollups
+  remain future.
 - Add Resource auto-deploy policy persistence through the owning Resource aggregate or a
   Resource-owned configuration table only if an ADR/spec explicitly chooses that shape.
 - Dedupe must be durable across process restarts.
@@ -89,18 +91,18 @@ Minimum stable test ids for Code Round:
 
 ## Risks And Migration Gaps
 
-- Durable process state and delivery retry semantics overlap with Phase 8 outbox/inbox work. Code
-  Round must either implement the minimum durable dedupe/read-model slice or explicitly defer
-  retries without pretending delivery is guaranteed.
-- Generic signed webhooks require a secret custody decision before implementation.
+- Durable process state and delivery retry semantics overlap with Phase 8 outbox/inbox work. ADR-037
+  permits a Phase 7 durable source-event record plus synchronous dispatch baseline, but automatic
+  retry remains deferred.
+- Generic signed webhooks start with Resource-scoped secret references; reusable webhook credentials
+  remain future.
 - GitHub App webhook ingestion and product-grade PR preview are adjacent but separate roadmap items.
 - Auto-deploy must not bypass `deployments.create` admission, resource-runtime coordination,
   environment snapshotting, or deployment recovery semantics.
 
 ## Code Round Readiness
 
-Not ready.
+Ready for local command/query/error/public-doc Spec Round, not yet Code Round.
 
-Before Code Round, answer the open policy/secret/process-state questions in `spec.md`, update or add
-the governing command/query/error/testing docs, and decide whether a new ADR is required for durable
-source event ownership and retry semantics.
+Before Code Round, update or add governing command/query/error/testing docs and public docs/help for
+the first implementation slice.

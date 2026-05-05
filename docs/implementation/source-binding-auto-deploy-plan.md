@@ -12,10 +12,10 @@ Round authorization.
 
 ### 1. Decision Closure
 
-- Decide source event ownership and durable retry boundaries.
-- Decide generic signed webhook secret custody and rotation.
-- Decide source-binding-change behavior for existing auto-deploy policies.
-- Update ADRs if those decisions change lifecycle, ownership, async acceptance, or durable state.
+- ADR-037 decides source event ownership and durable retry boundaries.
+- ADR-037 decides generic signed webhook secret custody and rotation baseline.
+- ADR-037 decides source-binding-change behavior for existing auto-deploy policies.
+- Remaining ADR work is required only if Code Round expands beyond ADR-037.
 
 ### 2. Policy Model
 
@@ -30,6 +30,8 @@ Round authorization.
 - Add signature verification/normalization ports for Git provider and generic signed events.
 - Add durable source event records with dedupe keys, normalized facts, policy match results, ignored
   reasons, and created deployment ids.
+- Store project/resource scoped read-model facts first; global operator source-event rollups remain
+  future.
 
 ### 4. Deployment Dispatch
 
@@ -48,6 +50,7 @@ Round authorization.
 
 Minimum before Code Round completion:
 
+- source auto-deploy local command/query/error specs are synchronized;
 - source auto-deploy test matrix rows have automation bindings;
 - operation map, `CORE_OPERATIONS.md`, operation catalog, public docs/help, and contracts are in
   sync;
