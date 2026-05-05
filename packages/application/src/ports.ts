@@ -41,6 +41,9 @@ import {
   type ProjectMutationSpec,
   type ProjectSelectionSpec,
   type Resource,
+  type ResourceBinding,
+  type ResourceBindingMutationSpec,
+  type ResourceBindingSelectionSpec,
   type ResourceExposureMode,
   type ResourceInstance,
   type ResourceInstanceMutationSpec,
@@ -407,6 +410,18 @@ export interface DependencyResourceRepository {
     context: RepositoryContext,
     dependencyResource: ResourceInstance,
     spec: ResourceInstanceMutationSpec,
+  ): Promise<void>;
+}
+
+export interface ResourceDependencyBindingRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: ResourceBindingSelectionSpec,
+  ): Promise<ResourceBinding | null>;
+  upsert(
+    context: RepositoryContext,
+    resourceBinding: ResourceBinding,
+    spec: ResourceBindingMutationSpec,
   ): Promise<void>;
 }
 
@@ -2239,6 +2254,57 @@ export interface ShowDependencyResourceResult {
   generatedAt: string;
 }
 
+export interface ResourceDependencyBindingTargetSummary {
+  targetName: string;
+  scope: "environment" | "release" | "build-only" | "runtime-only";
+  injectionMode: "env" | "file" | "reference";
+  secretRef?: string;
+}
+
+export interface ResourceDependencyBindingReadinessSummary {
+  status: "ready" | "blocked" | "not-implemented";
+  reason?: string;
+}
+
+export interface ResourceDependencyBindingSnapshotReadinessSummary {
+  status: "deferred" | "ready" | "blocked";
+  reason?: string;
+}
+
+export interface ResourceDependencyBindingSummary {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  dependencyResourceId: string;
+  dependencyResourceName?: string;
+  dependencyResourceSlug?: string;
+  kind: DependencyResourceKind;
+  sourceMode: DependencyResourceSourceMode;
+  providerKey: string;
+  providerManaged: boolean;
+  lifecycleStatus: DependencyResourceLifecycleStatus;
+  target: ResourceDependencyBindingTargetSummary;
+  connection?: DependencyResourceConnectionSummary;
+  bindingReadiness: ResourceDependencyBindingReadinessSummary;
+  snapshotReadiness: ResourceDependencyBindingSnapshotReadinessSummary;
+  status: "active" | "removed";
+  createdAt: string;
+  removedAt?: string;
+}
+
+export interface ListResourceDependencyBindingsResult {
+  schemaVersion: "resources.dependency-bindings.list/v1";
+  items: ResourceDependencyBindingSummary[];
+  generatedAt: string;
+}
+
+export interface ShowResourceDependencyBindingResult {
+  schemaVersion: "resources.dependency-bindings.show/v1";
+  binding: ResourceDependencyBindingSummary;
+  generatedAt: string;
+}
+
 export interface ResourceConfigEntryView {
   key: string;
   value: string;
@@ -3703,6 +3769,22 @@ export interface DependencyResourceReadModel {
     context: RepositoryContext,
     spec: ResourceInstanceSelectionSpec,
   ): Promise<DependencyResourceSummary | null>;
+}
+
+export interface ResourceDependencyBindingReadModel {
+  list(
+    context: RepositoryContext,
+    input: {
+      resourceId: string;
+    },
+  ): Promise<Result<ResourceDependencyBindingSummary[]>>;
+  findOne(
+    context: RepositoryContext,
+    input: {
+      resourceId: string;
+      bindingId: string;
+    },
+  ): Promise<Result<ResourceDependencyBindingSummary | null>>;
 }
 
 export interface DeploymentReadModel {

@@ -8,6 +8,8 @@ import {
   AttachResourceStorageCommandHandler,
   AttachResourceStorageUseCase,
   AutomaticRouteContextLookupService,
+  BindResourceDependencyCommandHandler,
+  BindResourceDependencyUseCase,
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
   BootstrapServerProxyCommandHandler,
   BootstrapServerProxyUseCase,
@@ -110,6 +112,8 @@ import {
   ListPluginsQueryService,
   ListProjectsQueryService,
   ListProvidersQueryService,
+  ListResourceDependencyBindingsQueryHandler,
+  ListResourceDependencyBindingsQueryService,
   ListResourcesQueryService,
   ListServersQueryService,
   ListSshCredentialsQueryService,
@@ -175,6 +179,8 @@ import {
   ShowOperatorWorkQueryHandler,
   ShowProjectQueryHandler,
   ShowProjectQueryService,
+  ShowResourceDependencyBindingQueryHandler,
+  ShowResourceDependencyBindingQueryService,
   ShowResourceQueryHandler,
   ShowResourceQueryService,
   ShowServerQueryService,
@@ -186,6 +192,8 @@ import {
   StreamDeploymentEventsQueryService,
   TestServerConnectivityUseCase,
   tokens,
+  UnbindResourceDependencyCommandHandler,
+  UnbindResourceDependencyUseCase,
   UnlockEnvironmentCommandHandler,
   UnlockEnvironmentUseCase,
   UnsetEnvironmentVariableUseCase,
@@ -277,6 +285,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ShowSshCredentialQueryHandler);
   container.registerSingleton(InspectServerCapacityQueryHandler);
   container.registerSingleton(CreateStorageVolumeCommandHandler);
+  container.registerSingleton(BindResourceDependencyCommandHandler);
+  container.registerSingleton(UnbindResourceDependencyCommandHandler);
+  container.registerSingleton(ListResourceDependencyBindingsQueryHandler);
+  container.registerSingleton(ShowResourceDependencyBindingQueryHandler);
   container.registerSingleton(ProvisionPostgresDependencyResourceCommandHandler);
   container.registerSingleton(ImportPostgresDependencyResourceCommandHandler);
   container.registerSingleton(RenameDependencyResourceCommandHandler);
@@ -365,6 +377,19 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.showDependencyResourceQueryService,
     ShowDependencyResourceQueryService,
+  );
+  container.registerSingleton(tokens.bindResourceDependencyUseCase, BindResourceDependencyUseCase);
+  container.registerSingleton(
+    tokens.unbindResourceDependencyUseCase,
+    UnbindResourceDependencyUseCase,
+  );
+  container.registerSingleton(
+    tokens.listResourceDependencyBindingsQueryService,
+    ListResourceDependencyBindingsQueryService,
+  );
+  container.registerSingleton(
+    tokens.showResourceDependencyBindingQueryService,
+    ShowResourceDependencyBindingQueryService,
   );
   container.registerSingleton(tokens.createStorageVolumeUseCase, CreateStorageVolumeUseCase);
   container.registerSingleton(tokens.renameStorageVolumeUseCase, RenameStorageVolumeUseCase);

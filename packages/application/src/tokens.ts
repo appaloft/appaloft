@@ -22,6 +22,9 @@ export const tokens = {
   environmentRepository: Symbol.for("appaloft.environment_repository"),
   resourceRepository: Symbol.for("appaloft.resource_repository"),
   dependencyResourceRepository: Symbol.for("appaloft.dependency_resource_repository"),
+  resourceDependencyBindingRepository: Symbol.for(
+    "appaloft.resource_dependency_binding_repository",
+  ),
   dependencyResourceDeleteSafetyReader: Symbol.for(
     "appaloft.dependency_resource_delete_safety_reader",
   ),
@@ -47,6 +50,7 @@ export const tokens = {
   environmentReadModel: Symbol.for("appaloft.environment_read_model"),
   resourceReadModel: Symbol.for("appaloft.resource_read_model"),
   dependencyResourceReadModel: Symbol.for("appaloft.dependency_resource_read_model"),
+  resourceDependencyBindingReadModel: Symbol.for("appaloft.resource_dependency_binding_read_model"),
   storageVolumeReadModel: Symbol.for("appaloft.storage_volume_read_model"),
   resourceAccessFailureEvidenceRecorder: Symbol.for(
     "appaloft.resource_access_failure_evidence_recorder",
@@ -118,8 +122,16 @@ export const tokens = {
   unsetResourceVariableUseCase: Symbol.for("appaloft.unset_resource_variable_use_case"),
   attachResourceStorageUseCase: Symbol.for("appaloft.attach_resource_storage_use_case"),
   detachResourceStorageUseCase: Symbol.for("appaloft.detach_resource_storage_use_case"),
+  bindResourceDependencyUseCase: Symbol.for("appaloft.bind_resource_dependency_use_case"),
+  unbindResourceDependencyUseCase: Symbol.for("appaloft.unbind_resource_dependency_use_case"),
   listResourcesQueryService: Symbol.for("appaloft.list_resources_query_service"),
   showResourceQueryService: Symbol.for("appaloft.show_resource_query_service"),
+  listResourceDependencyBindingsQueryService: Symbol.for(
+    "appaloft.list_resource_dependency_bindings_query_service",
+  ),
+  showResourceDependencyBindingQueryService: Symbol.for(
+    "appaloft.show_resource_dependency_binding_query_service",
+  ),
   provisionPostgresDependencyResourceUseCase: Symbol.for(
     "appaloft.provision_postgres_dependency_resource_use_case",
   ),

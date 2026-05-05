@@ -1069,6 +1069,36 @@ export const dependencyResourceSummarySchema = z.object({
   deletedAt: z.string().optional(),
 });
 
+export const resourceDependencyBindingSummarySchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  resourceId: z.string(),
+  dependencyResourceId: z.string(),
+  dependencyResourceName: z.string().optional(),
+  dependencyResourceSlug: z.string().optional(),
+  kind: z.literal("postgres"),
+  sourceMode: z.enum(["appaloft-managed", "imported-external"]),
+  providerKey: z.string(),
+  providerManaged: z.boolean(),
+  lifecycleStatus: z.enum(["provisioning", "ready", "degraded", "deleted"]),
+  target: z.object({
+    targetName: z.string(),
+    scope: z.enum(["environment", "release", "build-only", "runtime-only"]),
+    injectionMode: z.enum(["env", "file", "reference"]),
+    secretRef: z.string().optional(),
+  }),
+  connection: dependencyResourceConnectionSummarySchema.optional(),
+  bindingReadiness: dependencyResourceBindingReadinessSummarySchema,
+  snapshotReadiness: z.object({
+    status: z.enum(["deferred", "ready", "blocked"]),
+    reason: z.string().optional(),
+  }),
+  status: z.enum(["active", "removed"]),
+  createdAt: z.string(),
+  removedAt: z.string().optional(),
+});
+
 export const deploymentResourceInputSchema = z.object({
   name: z.string().min(1),
   kind: z
@@ -1648,6 +1678,26 @@ export const listDependencyResourcesResponseSchema = z.object({
 export const showDependencyResourceResponseSchema = z.object({
   schemaVersion: z.literal("dependency-resources.show/v1"),
   dependencyResource: dependencyResourceSummarySchema,
+  generatedAt: z.string(),
+});
+
+export const bindResourceDependencyResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const unbindResourceDependencyResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const listResourceDependencyBindingsResponseSchema = z.object({
+  schemaVersion: z.literal("resources.dependency-bindings.list/v1"),
+  items: z.array(resourceDependencyBindingSummarySchema),
+  generatedAt: z.string(),
+});
+
+export const showResourceDependencyBindingResponseSchema = z.object({
+  schemaVersion: z.literal("resources.dependency-bindings.show/v1"),
+  binding: resourceDependencyBindingSummarySchema,
   generatedAt: z.string(),
 });
 
@@ -3571,6 +3621,9 @@ export type DependencyResourceBackupRelationship = z.infer<
 >;
 export type DependencyResourceDeleteBlocker = z.infer<typeof dependencyResourceDeleteBlockerSchema>;
 export type DependencyResourceSummary = z.infer<typeof dependencyResourceSummarySchema>;
+export type ResourceDependencyBindingSummary = z.infer<
+  typeof resourceDependencyBindingSummarySchema
+>;
 export type ResourceConfigEntry = z.infer<typeof resourceConfigEntrySchema>;
 export type ResourceConfigOverrideSummary = z.infer<typeof resourceConfigOverrideSummarySchema>;
 export type ResourceEffectiveConfig = z.infer<typeof resourceEffectiveConfigSchema>;
@@ -3655,6 +3708,16 @@ export type DeleteStorageVolumeResponse = z.infer<typeof deleteStorageVolumeResp
 export type DependencyResourceResponse = z.infer<typeof dependencyResourceResponseSchema>;
 export type ListDependencyResourcesResponse = z.infer<typeof listDependencyResourcesResponseSchema>;
 export type ShowDependencyResourceResponse = z.infer<typeof showDependencyResourceResponseSchema>;
+export type BindResourceDependencyResponse = z.infer<typeof bindResourceDependencyResponseSchema>;
+export type UnbindResourceDependencyResponse = z.infer<
+  typeof unbindResourceDependencyResponseSchema
+>;
+export type ListResourceDependencyBindingsResponse = z.infer<
+  typeof listResourceDependencyBindingsResponseSchema
+>;
+export type ShowResourceDependencyBindingResponse = z.infer<
+  typeof showResourceDependencyBindingResponseSchema
+>;
 export type DomainBindingSummary = z.infer<typeof domainBindingSummarySchema>;
 export type CreateDomainBindingInput = z.infer<typeof createDomainBindingInputSchema>;
 export type CreateDomainBindingResponse = z.infer<typeof createDomainBindingResponseSchema>;

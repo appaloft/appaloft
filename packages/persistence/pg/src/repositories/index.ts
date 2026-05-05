@@ -18,6 +18,7 @@ export * from "./project-read-model";
 export * from "./project-repository";
 export * from "./resource-access-failure-evidence-projection";
 export * from "./resource-deletion-blocker-reader";
+export * from "./resource-dependency-binding-repository";
 export * from "./resource-read-model";
 export * from "./resource-repository";
 export * from "./server-applied-route-state-repository";
