@@ -128,6 +128,33 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[SWARM-TARGET-DOCS-001] Swarm runtime target help resolves to server docs", () => {
+    const topic = publicDocsHelpTopics["server.docker-swarm-target"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/servers/register-connect/#docker-swarm-runtime-target",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/servers/register-connect/#docker-swarm-runtime-target",
+    );
+    expect(topic.surfaces).toEqual(
+      expect.arrayContaining(["web", "cli", "http-api", "repository-config", "mcp"]),
+    );
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining([
+        "docker swarm",
+        "orchestrator cluster",
+        "runtime_target_unsupported",
+      ]),
+    );
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/045-docker-swarm-runtime-target/spec.md",
+        "docs/testing/docker-swarm-runtime-target-test-matrix.md",
+      ]),
+    );
+  });
+
   test("[ERROR-KNOWLEDGE-002] public error guides resolve docs, agent guide, and remedies", () => {
     const guide = findPublicDocsErrorGuide({
       code: "infra_error",

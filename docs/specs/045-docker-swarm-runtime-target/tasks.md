@@ -43,7 +43,7 @@
 
 ## Docs Round
 
-- [ ] Add public docs/help anchor for Docker Swarm runtime targets.
+- [x] Add public docs/help anchor for Docker Swarm runtime targets.
 - [ ] Add CLI/API descriptions and Web help links for Swarm target readiness and unsupported-field
   recovery.
 

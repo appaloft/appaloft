@@ -47,4 +47,8 @@ Code Rounds; no Swarm implementation is active yet.
 - `SWARM-TARGET-ADM-002` has application admission coverage proving an `orchestrator-cluster` /
   `docker-swarm` target without required runtime backend capability returns
   `runtime_target_unsupported` before any deployment row is accepted.
+- `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
+  explaining Swarm target registration, manager readiness expectations, image registry access,
+  rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI/API descriptions and
+  Web help links to that anchor remain follow-up coverage.
 - No Docker Swarm runtime target execution backend is active in the default registry yet.
