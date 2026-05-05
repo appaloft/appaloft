@@ -96,6 +96,7 @@ import {
   ImportPostgresDependencyResourceCommand,
   ImportRedisDependencyResourceCommand,
   ImportResourceVariablesCommand,
+  IngestSourceEventCommand,
   IssueOrRenewCertificateCommand,
   importCertificateCommandInputSchema,
   importPostgresDependencyResourceCommandInputSchema,
@@ -158,6 +159,7 @@ import {
   ResourceEffectiveConfigQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
+  type ResourceRepository,
   type ResourceRuntimeLogEvent,
   ResourceRuntimeLogsQuery,
   type ResourceRuntimeLogsQueryInput,
@@ -210,6 +212,7 @@ import {
   ShowSourceEventQuery,
   ShowSshCredentialQuery,
   ShowStorageVolumeQuery,
+  type SourceEventVerificationPort,
   StartResourceRuntimeCommand,
   StopResourceRuntimeCommand,
   StreamDeploymentEventsQuery,
@@ -238,6 +241,7 @@ import {
   TestServerConnectivityCommand,
   testDraftServerConnectivityCommandInputSchema,
   testRegisteredServerConnectivityCommandInputSchema,
+  toRepositoryContext,
   UnbindResourceDependencyCommand,
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
@@ -361,7 +365,15 @@ import {
   unlockEnvironmentResponseSchema,
   unsetResourceVariableResponseSchema,
 } from "@appaloft/contracts";
-import { type DomainError, type Result } from "@appaloft/core";
+import {
+  type DomainError,
+  domainError,
+  err,
+  ok,
+  ResourceByIdSpec,
+  ResourceId,
+  type Result,
+} from "@appaloft/core";
 import { resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
 import { resolveAppaloftLocaleFromHeaders, translateDomainError } from "@appaloft/i18n";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
@@ -376,6 +388,8 @@ export interface AppaloftOrpcContext {
   queryBus: QueryBus;
   logger: AppLogger;
   deploymentProgressObserver?: DeploymentProgressObserver;
+  resourceRepository?: ResourceRepository;
+  sourceEventVerificationPort?: SourceEventVerificationPort;
 }
 
 interface AppaloftOrpcRequestContext extends AppaloftOrpcContext {
@@ -393,6 +407,24 @@ export interface RequestContextRunner {
     callback: () => Promise<T>,
   ): Promise<T>;
 }
+
+const genericSignedSourceEventBodySchema = z
+  .object({
+    eventKind: z.enum(["push", "tag"]),
+    sourceIdentity: z
+      .object({
+        locator: z.string().trim().min(1),
+        providerRepositoryId: z.string().trim().min(1).optional(),
+        repositoryFullName: z.string().trim().min(1).optional(),
+      })
+      .strict(),
+    ref: z.string().trim().min(1),
+    revision: z.string().trim().min(1),
+    deliveryId: z.string().trim().min(1).optional(),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    receivedAt: z.string().trim().min(1).optional(),
+  })
+  .strict();
 
 const base = os.$context<AppaloftOrpcRequestContext>();
 const emptyResponseSchema = z.null();
@@ -977,6 +1009,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "terminal_session_policy_denied":
     case "terminal_session_not_found":
     case "source_event_scope_required":
+    case "resource_auto_deploy_secret_unavailable":
       return new ORPCError("BAD_REQUEST", {
         message,
         status: 400,
@@ -3013,6 +3046,202 @@ function createRequestRunner(
   return <T>(callback: () => Promise<T>) => callback();
 }
 
+function domainErrorHttpResponse(error: DomainError, context: ExecutionContext): Response {
+  const mapped = toOrpcError(error, context);
+  return Response.json(
+    {
+      error: {
+        code: error.code,
+        category: error.category,
+        message: mapped.message,
+        retryable: error.retryable,
+      },
+    },
+    {
+      status: mapped.status,
+    },
+  );
+}
+
+function sourceEventRouteUnavailableResponse(): Response {
+  return Response.json(
+    {
+      error: {
+        code: "source_event_ingestion_unavailable",
+        category: "infra",
+        message: "Source event ingestion is not available",
+        retryable: true,
+      },
+    },
+    {
+      status: 503,
+    },
+  );
+}
+
+function parseGenericSignedSourceEventBody(
+  rawBody: string,
+  executionContext: ExecutionContext,
+): Result<z.output<typeof genericSignedSourceEventBodySchema>> {
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(rawBody);
+  } catch {
+    return err(
+      domainError.validation("Generic signed source event body must be valid JSON", {
+        phase: "source-event-normalization",
+      }),
+    );
+  }
+
+  const parsed = genericSignedSourceEventBodySchema.safeParse(parsedJson);
+  if (!parsed.success) {
+    return err(
+      domainError.validation("Generic signed source event body is invalid", {
+        phase: "source-event-normalization",
+        issueCount: parsed.error.issues.length,
+        locale: executionContext.locale ?? null,
+      }),
+    );
+  }
+
+  return ok(parsed.data);
+}
+
+async function resolveGenericSignedSecretValue(
+  context: ExecutionContext,
+  resourceRepository: ResourceRepository,
+  resourceIdValue: string,
+): Promise<Result<string>> {
+  const resourceId = ResourceId.create(resourceIdValue);
+  if (resourceId.isErr()) {
+    return err(resourceId.error);
+  }
+
+  const resource = await resourceRepository.findOne(
+    toRepositoryContext(context),
+    ResourceByIdSpec.create(resourceId.value),
+  );
+  if (!resource) {
+    return err(domainError.notFound("resource", resourceId.value.value));
+  }
+
+  const state = resource.toState();
+  const secretRef = state.autoDeployPolicy?.genericWebhookSecretRef;
+  if (
+    !state.autoDeployPolicy ||
+    state.autoDeployPolicy.triggerKind.value !== "generic-signed-webhook" ||
+    !secretRef
+  ) {
+    return err(
+      domainError.resourceAutoDeploySecretUnavailable(
+        "Generic signed webhook secret is unavailable",
+        {
+          phase: "source-event-verification",
+          resourceId: resourceId.value.value,
+          refFamily: "resource-secret",
+        },
+      ),
+    );
+  }
+
+  const secretKey = secretRef.resourceVariableKey();
+  const variable = state.variables
+    .toState()
+    .find(
+      (candidate) =>
+        candidate.key.equals(secretKey) &&
+        candidate.scope.value === "resource" &&
+        candidate.exposure.value === "runtime" &&
+        (candidate.isSecret || candidate.kind.value === "secret"),
+    );
+
+  if (!variable) {
+    return err(
+      domainError.resourceAutoDeploySecretUnavailable(
+        "Generic signed webhook secret is unavailable",
+        {
+          phase: "source-event-verification",
+          resourceId: resourceId.value.value,
+          refFamily: "resource-secret",
+        },
+      ),
+    );
+  }
+
+  return ok(variable.value.value);
+}
+
+async function handleGenericSignedSourceEventRoute(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  request: Request;
+  resourceId: string;
+}): Promise<Response> {
+  const { context, executionContext, request, resourceId } = input;
+  if (!context.resourceRepository || !context.sourceEventVerificationPort) {
+    return sourceEventRouteUnavailableResponse();
+  }
+
+  const signature = request.headers.get("x-appaloft-signature") ?? "";
+  const rawBody = await request.text();
+  const body = parseGenericSignedSourceEventBody(rawBody, executionContext);
+  if (body.isErr()) {
+    return domainErrorHttpResponse(body.error, executionContext);
+  }
+
+  const secretValue = await resolveGenericSignedSecretValue(
+    executionContext,
+    context.resourceRepository,
+    resourceId,
+  );
+  if (secretValue.isErr()) {
+    return domainErrorHttpResponse(secretValue.error, executionContext);
+  }
+
+  const sourceIdentity = {
+    locator: body.value.sourceIdentity.locator,
+    ...(body.value.sourceIdentity.providerRepositoryId
+      ? { providerRepositoryId: body.value.sourceIdentity.providerRepositoryId }
+      : {}),
+    ...(body.value.sourceIdentity.repositoryFullName
+      ? { repositoryFullName: body.value.sourceIdentity.repositoryFullName }
+      : {}),
+  };
+  const verified = await context.sourceEventVerificationPort.verify(executionContext, {
+    sourceKind: "generic-signed",
+    eventKind: body.value.eventKind,
+    sourceIdentity,
+    ref: body.value.ref,
+    revision: body.value.revision,
+    rawBody,
+    signature,
+    secretValue: secretValue.value,
+    method: "generic-hmac",
+    ...(body.value.deliveryId ? { deliveryId: body.value.deliveryId } : {}),
+    ...(body.value.idempotencyKey ? { idempotencyKey: body.value.idempotencyKey } : {}),
+    ...(body.value.receivedAt ? { receivedAt: body.value.receivedAt } : {}),
+  });
+  if (verified.isErr()) {
+    return domainErrorHttpResponse(verified.error, executionContext);
+  }
+
+  const command = IngestSourceEventCommand.create({
+    ...verified.value,
+    scopeResourceId: resourceId,
+  });
+  if (command.isErr()) {
+    return domainErrorHttpResponse(command.error, executionContext);
+  }
+
+  const result = await context.commandBus.execute(executionContext, command.value);
+  if (result.isErr()) {
+    return domainErrorHttpResponse(result.error, executionContext);
+  }
+
+  return Response.json(result.value);
+}
+
 export function mountAppaloftOrpcRoutes(
   app: Elysia,
   context: AppaloftOrpcContext & {
@@ -3086,6 +3315,39 @@ export function mountAppaloftOrpcRoutes(
       return response;
     } catch (error) {
       context.logger.error("orpc_rpc_handler_unhandled_error", {
+        method: request.method,
+        url: request.url,
+        ...buildUnexpectedErrorContext(error),
+      });
+      throw error;
+    }
+  };
+
+  const genericSignedSourceEventRouteHandler = async ({
+    request,
+    params,
+  }: {
+    request: Request;
+    params: { resourceId: string };
+  }) => {
+    const executionContext = createRequestExecutionContext(
+      context.executionContextFactory,
+      "http",
+      request,
+    );
+    const run = createRequestRunner(request, executionContext, context.requestContextRunner);
+
+    try {
+      return await run(() =>
+        handleGenericSignedSourceEventRoute({
+          context,
+          executionContext,
+          request,
+          resourceId: params.resourceId,
+        }),
+      );
+    } catch (error) {
+      context.logger.error("generic_signed_source_event_route_unhandled_error", {
         method: request.method,
         url: request.url,
         ...buildUnexpectedErrorContext(error),
@@ -3188,6 +3450,14 @@ export function mountAppaloftOrpcRoutes(
   ] as const;
 
   let mounted = app;
+
+  mounted = mounted.post(
+    "/api/resources/:resourceId/source-events/generic-signed",
+    genericSignedSourceEventRouteHandler,
+    {
+      parse: "none",
+    },
+  ) as unknown as Elysia;
 
   mounted = mounted.all("/api/rpc", rpcRouteHandler, {
     parse: "none",

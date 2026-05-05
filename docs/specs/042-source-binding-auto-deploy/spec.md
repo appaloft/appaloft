@@ -182,9 +182,7 @@ ADR-037 answers the initial Code Round blockers:
 
 Remaining Test-First / Code Round work:
 
-- bind source auto-deploy matrix rows to concrete automated tests;
-- update `CORE_OPERATIONS.md` and `operation-catalog.ts` when activating the operations;
-- decide whether the first implementation slice includes generic signed webhook only or provider
-  Git webhook adapters as well;
-- add the Resource-scoped generic signed route with safe secret resolution and scoped matching;
+- bind remaining Web diagnostics and provider Git webhook rows to concrete automated tests;
+- provider-specific Git webhook adapters remain future; the first active ingestion route is generic
+  signed only;
 - implement transport help text and Web links against the registered public docs topics.

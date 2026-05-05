@@ -23,10 +23,12 @@ import {
   MarkServerAppliedRouteFailedSpec,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
+  type ResourceRepository,
   ServerAppliedRouteStateByRouteSetIdSpec,
   ServerAppliedRouteStateBySourceFingerprintSpec,
   ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
+  type SourceEventVerificationPort,
   SourceLinkBySourceFingerprintSpec,
   type SourceLinkRecord,
   type SourceLinkRepository,
@@ -347,6 +349,14 @@ export async function createAppComposition(
   const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
   const commandBus = resolveToken<CommandBus>(childContainer, tokens.commandBus);
   const queryBus = resolveToken<QueryBus>(childContainer, tokens.queryBus);
+  const resourceRepository = resolveToken<ResourceRepository>(
+    childContainer,
+    tokens.resourceRepository,
+  );
+  const sourceEventVerificationPort = resolveToken<SourceEventVerificationPort>(
+    childContainer,
+    tokens.sourceEventVerificationPort,
+  );
   const executionContextFactory = createExecutionContextFactory({
     idGenerator,
     tracer: telemetry.tracer,
@@ -400,6 +410,8 @@ export async function createAppComposition(
     certificateHttpChallengeTokenStore,
     resourceAccessFailureEvidenceRecorder,
     resourceAccessRouteContextLookup,
+    resourceRepository,
+    sourceEventVerificationPort,
     pluginRuntime,
     authRuntime,
     requestContextRunner,

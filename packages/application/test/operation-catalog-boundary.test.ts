@@ -455,6 +455,25 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(showEntry?.inputSchema).toBeDefined();
   });
 
+  test("[SRC-AUTO-ENTRY-002] source event ingest is exposed through the generic signed HTTP route", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "source-events.ingest");
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "source-events",
+      messageName: "IngestSourceEventCommand",
+      handlerName: "IngestSourceEventCommandHandler",
+      serviceName: "IngestSourceEventUseCase",
+      transports: {
+        orpc: {
+          method: "POST",
+          path: "/api/resources/{resourceId}/source-events/generic-signed",
+        },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[RES-PROFILE-CONFIG-019] resource variable import is exposed through the active operation catalog", () => {
     const entry = operationCatalog.find(
       (candidate) => candidate.key === "resources.import-variables",

@@ -17,6 +17,8 @@ import {
   ListServersQuery,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
+  type ResourceRepository,
+  type SourceEventVerificationPort,
   type TerminalSession,
   type TerminalSessionGateway,
   toRepositoryContext,
@@ -455,6 +457,8 @@ export function createHttpApp(input: {
   certificateHttpChallengeTokenStore?: CertificateHttpChallengeTokenStore;
   resourceAccessFailureEvidenceRecorder?: ResourceAccessFailureEvidenceRecorder;
   resourceAccessRouteContextLookup?: AutomaticRouteContextLookup;
+  resourceRepository?: ResourceRepository;
+  sourceEventVerificationPort?: SourceEventVerificationPort;
 }) {
   const pluginMiddlewares = input.pluginRuntime?.listHttpMiddlewares() ?? [];
   const pluginRoutes = input.pluginRuntime?.listHttpRoutes() ?? [];
@@ -1088,6 +1092,12 @@ export function createHttpApp(input: {
     executionContextFactory: input.executionContextFactory,
     queryBus: input.queryBus,
     logger: input.logger,
+    ...(input.resourceRepository ? { resourceRepository: input.resourceRepository } : {}),
+    ...(input.sourceEventVerificationPort
+      ? {
+          sourceEventVerificationPort: input.sourceEventVerificationPort,
+        }
+      : {}),
     ...(input.requestContextRunner
       ? {
           requestContextRunner: input.requestContextRunner,

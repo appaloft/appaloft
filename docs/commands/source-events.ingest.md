@@ -91,10 +91,12 @@ included in this command input, source event records, read models, errors, logs,
 5. Find enabled, unblocked Resource policies whose source binding and refs match the event.
 6. When `scopeResourceId` is present, discard all policy candidates except that Resource before
    dispatch evaluation.
-7. Record ignored or blocked reasons when no deployment is created.
-8. For each match, dispatch ordinary `deployments.create` with Resource/environment/runtime context
+7. Include `scopeResourceId` in the dedupe key so Resource-scoped generic signed routes do not
+   dedupe events across different Resources that share the same source identity and delivery id.
+8. Record ignored or blocked reasons when no deployment is created.
+9. For each match, dispatch ordinary `deployments.create` with Resource/environment/runtime context
    only; do not pass source event fields into deployment admission.
-9. Record created deployment ids or structured dispatch failure details.
+10. Record created deployment ids or structured dispatch failure details.
 
 ## Result
 
@@ -134,7 +136,7 @@ Use [Source Event Auto Deploy Error Spec](../errors/source-events.md). Minimum c
 | --- | --- | --- |
 | Web | No raw webhook ingestion; reads source event results. | Future |
 | CLI | Optional local smoke/diagnostic ingestion over normalized facts. | Future |
-| oRPC / HTTP | `POST /api/resources/{resourceId}/source-events/generic-signed` verifies Resource-scoped generic signed events; future provider-specific verified webhook routes dispatch this command. | Future Code Round |
+| oRPC / HTTP | `POST /api/resources/{resourceId}/source-events/generic-signed` verifies Resource-scoped generic signed events; future provider-specific verified webhook routes dispatch this command. | Active for generic signed route |
 | Automation / MCP | Future event ingest tool only when verification input is safe. | Future |
 
 ## Tests
@@ -147,3 +149,4 @@ Stable matrix coverage:
 - `SRC-AUTO-EVENT-004`
 - `SRC-AUTO-EVENT-005`
 - `SRC-AUTO-EVENT-006`
+- `SRC-AUTO-ENTRY-002`

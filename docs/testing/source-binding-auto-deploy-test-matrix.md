@@ -46,7 +46,7 @@ automation. Ingestion routes, entrypoints, and background workers are not active
 | `SRC-AUTO-EVENT-003` | Event ref does not match policy. | No deployment is created and read model reports ignored ref. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
 | `SRC-AUTO-EVENT-004` | Generic signed webhook has invalid signature. | Event rejects before policy matching; no deployment is created. | `packages/application/test/source-events.test.ts` | Partial |
 | `SRC-AUTO-EVENT-005` | Multiple Resources match one event. | Each matching Resource creates at most one coordinated deployment attempt. | planned | Deferred gap |
-| `SRC-AUTO-EVENT-006` | Resource-scoped generic signed webhook targets a source also used by another Resource. | Secret resolution and matching are limited to the route Resource; no other Resource deployment is dispatched. | planned | Deferred gap |
+| `SRC-AUTO-EVENT-006` | Resource-scoped generic signed webhook targets a source also used by another Resource. | Secret resolution and matching are limited to the route Resource; no other Resource deployment is dispatched. | `packages/application/test/source-events.test.ts` | Passing |
 
 ## Query Coverage
 
@@ -60,7 +60,7 @@ automation. Ingestion routes, entrypoints, and background workers are not active
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
 | `SRC-AUTO-ENTRY-001` | CLI, HTTP/oRPC, Web, and future MCP/tool configure auto-deploy. | Entrypoints reuse the same command/query schemas and operation keys. | `packages/application/test/operation-catalog-boundary.test.ts`; package typechecks | Partial |
-| `SRC-AUTO-ENTRY-002` | HTTP generic signed webhook receives source event. | Transport resolves `resource-secret:<KEY>`, verifies signature, dispatches provider-neutral source event command with `scopeResourceId`, and never persists raw payload/signature/secret. | planned | Deferred gap |
+| `SRC-AUTO-ENTRY-002` | HTTP generic signed webhook receives source event. | Transport resolves `resource-secret:<KEY>`, verifies signature, dispatches provider-neutral source event command with `scopeResourceId`, and never persists raw payload/signature/secret. | `packages/orpc/test/source-event-generic-signed.http.test.ts`; `packages/application/test/source-events.test.ts`; package typechecks | Passing |
 | `SRC-AUTO-ENTRY-003` | Web Resource detail shows event-created deployment. | Deployment links back to safe source event facts and ignored/deduped events remain visible. | planned | Deferred gap |
 | `SRC-AUTO-SURFACE-003` | Public help links. | Setup, signatures, dedupe, ignored events, and recovery link to stable docs anchors in both locales. | planned | Deferred gap |
 
@@ -72,7 +72,8 @@ Resource repository persistence exist. Source-event command/query handling, gene
 source-event verification, durable source-event dedupe/read-model persistence, policy matching for
 ignored ref outcomes, and active CLI/HTTP/oRPC source event read surfaces also exist. Matching
 source events can dispatch through the existing deployment admission use case at the application
-boundary. The next generic signed webhook Code Round is now governed by Resource-scoped
-`resource-secret:<KEY>` resolution and `scopeResourceId` matching. This matrix still tracks the
-missing ingestion routes and Web diagnostics. Code Round must not mark auto-deploy complete until
-these rows have stable automation or explicit deferred exceptions.
+boundary. The Resource-scoped generic signed HTTP route now resolves `resource-secret:<KEY>`,
+verifies `X-Appaloft-Signature`, dispatches `source-events.ingest` with `scopeResourceId`, and keeps
+dedupe scoped to the route Resource. This matrix still tracks missing provider-specific Git webhook
+ingestion and Web diagnostics. Code Round must not mark auto-deploy complete until these rows have
+stable automation or explicit deferred exceptions.

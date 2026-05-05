@@ -19,6 +19,7 @@ export class IngestSourceEventCommand extends Command<IngestSourceEventResult> {
   constructor(
     public readonly sourceKind: IngestSourceEventCommandPayload["sourceKind"],
     public readonly eventKind: IngestSourceEventCommandPayload["eventKind"],
+    public readonly scopeResourceId: string | undefined,
     public readonly sourceIdentity: IngestSourceEventCommandPayload["sourceIdentity"],
     public readonly ref: string,
     public readonly revision: string,
@@ -36,6 +37,7 @@ export class IngestSourceEventCommand extends Command<IngestSourceEventResult> {
         new IngestSourceEventCommand(
           parsed.sourceKind,
           parsed.eventKind,
+          trimToUndefined(parsed.scopeResourceId),
           parsed.sourceIdentity,
           parsed.ref,
           parsed.revision,
