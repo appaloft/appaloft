@@ -26,6 +26,8 @@
   Swarm stack/service intent.
 - [ ] `SWARM-TARGET-APPLY-001`: rollout preserves or restores previous same-resource service until
   verification succeeds.
+- [x] `SWARM-TARGET-APPLY-002`: fake-runner failed candidate rollout records deployment failure and
+  runs only deployment-scoped cleanup.
 - [ ] `SWARM-TARGET-OBS-001`: logs and health return normalized Appaloft read-model shapes.
 - [x] `SWARM-TARGET-CLEAN-001`: cleanup stays resource/deployment/destination scoped.
 - [ ] `SWARM-TARGET-ROUTE-001`: reverse-proxy access routes attach through Swarm service/network

@@ -168,6 +168,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
 
       if (result.isErr()) {
         logs.push(phaseLog("deploy", result.error.message, "error"));
+        await this.cleanupFailedCandidate(deployment, logs);
         return applyExecutionResult(
           deployment,
           executionResult({
@@ -184,6 +185,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       if (result.value.exitCode !== 0) {
         const message = result.value.stderr ?? `Docker Swarm command failed at ${step.step}`;
         logs.push(phaseLog("deploy", message, "error"));
+        await this.cleanupFailedCandidate(deployment, logs);
         return applyExecutionResult(
           deployment,
           executionResult({
@@ -271,5 +273,30 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       command: step.command,
       displayCommand: step.displayCommand,
     });
+  }
+
+  private async cleanupFailedCandidate(
+    deployment: Deployment,
+    logs: DeploymentLogEntry[],
+  ): Promise<void> {
+    const cleanupPlan = renderDockerSwarmCleanupPlan(deploymentIdentity(deployment));
+    for (const command of cleanupPlan.commands) {
+      const result = await this.runner.run(command);
+      logs.push(phaseLog("rollback", `cleanup-failed-candidate:${command.step}`));
+      if (result.isErr()) {
+        logs.push(phaseLog("rollback", result.error.message, "error"));
+        return;
+      }
+      if (result.value.exitCode !== 0) {
+        logs.push(
+          phaseLog(
+            "rollback",
+            result.value.stderr ?? `Docker Swarm cleanup failed at ${command.step}`,
+            "error",
+          ),
+        );
+        return;
+      }
+    }
   }
 }
