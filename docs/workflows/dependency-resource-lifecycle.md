@@ -25,8 +25,10 @@ Every read must dispatch one explicit query:
 - `resources.list-dependency-bindings`
 - `resources.show-dependency-binding`
 
-The workflow is not backup/restore, not provider-native database provisioning, not provider-native
-credential rotation, not runtime env injection, and not a deployment command.
+The current implemented workflow is not backup/restore, not provider-native database provisioning,
+not provider-native credential rotation, not runtime env injection, and not a deployment command.
+Provider-native Postgres realization is accepted for the next Code Round under
+[Postgres Provider-Native Realization](../specs/038-postgres-provider-native-realization/spec.md).
 
 ## Global References
 
@@ -41,6 +43,7 @@ credential rotation, not runtime env injection, and not a deployment command.
 - [Dependency Binding Deployment Snapshot Reference Baseline](../specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
 - [Dependency Binding Secret Rotation](../specs/036-dependency-binding-secret-rotation/spec.md)
 - [Redis Dependency Resource Lifecycle](../specs/037-redis-dependency-resource-lifecycle/spec.md)
+- [Postgres Provider-Native Realization](../specs/038-postgres-provider-native-realization/spec.md)
 - [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
 - [Dependency Resource Test Matrix](../testing/dependency-resource-test-matrix.md)
 - [Error Model](../errors/model.md)
@@ -50,7 +53,8 @@ credential rotation, not runtime env injection, and not a deployment command.
 
 The workflow lets operators:
 
-1. Provision an Appaloft-managed Postgres dependency resource record.
+1. Provision an Appaloft-managed Postgres dependency resource record, with provider-native
+   realization accepted for the next Code Round.
 2. Import an external Postgres dependency resource without exposing raw connection secrets later.
 3. List and show dependency resources with ownership, status, connection exposure policy, future
    binding readiness, and backup relationship metadata.
@@ -69,7 +73,7 @@ The workflow lets operators:
 
 | User intent | Operation | Mutates | Must not mutate |
 | --- | --- | --- | --- |
-| Provision managed Postgres | `dependency-resources.provision-postgres` | `ResourceInstance` | Provider-native database, Resource bindings, secrets rotation, runtime, deployment snapshots |
+| Provision managed Postgres | `dependency-resources.provision-postgres` | `ResourceInstance`; future provider-native realization attempt | Resource bindings, secrets rotation, runtime, deployment snapshots |
 | Import external Postgres | `dependency-resources.import-postgres` | `ResourceInstance` | External database, Resource bindings, runtime, deployment snapshots |
 | Provision managed Redis | `dependency-resources.provision-redis` | `ResourceInstance` | Provider-native Redis, Resource bindings, secrets rotation, runtime, deployment snapshots |
 | Import external Redis | `dependency-resources.import-redis` | `ResourceInstance` | External Redis, Resource bindings, runtime, deployment snapshots |
@@ -93,6 +97,24 @@ The workflow lets operators:
 
 Redis dependency resources reuse these source modes. Managed Redis records remain provider-neutral,
 while imported external Redis records capture only safe endpoint metadata and secret references.
+
+## Provider-Native Postgres Realization
+
+`dependency-resources.provision-postgres` is the public command that will own managed Postgres
+realization. The accepted provider-native slice changes Appaloft-managed Postgres from
+metadata-only intent to a durable realization lifecycle:
+
+- command admission persists a `ResourceInstance` and realization attempt;
+- provider follow-up stores safe provider handle, masked endpoint metadata, status, and sanitized
+  failure information;
+- command success means request accepted, not necessarily provider completion;
+- binding is allowed only when the dependency resource is realized and ready;
+- managed delete uses provider cleanup only after binding, backup, snapshot, and provider-safety
+  checks pass.
+
+Provider-native realization must not leak provider SDK response bodies, credentials, passwords,
+tokens, private keys, raw connection URLs, or command output into core state, read models, events,
+errors, logs, or public contracts.
 
 ## Connection Safety
 
@@ -157,8 +179,10 @@ before mutation when:
 - deployment snapshots or other retained references are reported by the safety reader.
 
 Failure uses stable structured errors and safe blocker details. Imported external delete never
-deletes the external database. Appaloft-managed delete never calls provider-native deletion in this
-slice.
+deletes the external database. Appaloft-managed delete never calls provider-native deletion in the
+current implemented slice. The accepted provider-native Postgres realization slice will replace
+that behavior only for realized managed Postgres resources after explicit provider delete safety
+and cleanup succeeds.
 
 ## Deployment Relationship
 
@@ -193,10 +217,12 @@ The current implementation adds Postgres dependency resource lifecycle records, 
 metadata, safe read models, real active-binding delete blockers, and safe dependency binding
 snapshot references. Binding secret rotation updates binding-scoped safe secret references for
 future deployment snapshots only. Redis dependency resource lifecycle records are implemented as
-provider-neutral safe metadata. Provider-native provisioning/deletion, backup/restore, runtime env
-injection, Web affordances, and runtime cleanup are future work.
+provider-neutral safe metadata. Provider-native Postgres realization is positioned for the next
+Code Round. Backup/restore, runtime env injection, Web affordances, and runtime cleanup remain
+future work.
 
 ## Open Questions
 
-- The provider-native delete handshake for managed Postgres remains deferred to the provider
-  provisioning slice.
+- Whether the first provider-native Code Round uses synchronous fake-provider completion or durable
+  background processing remains an implementation choice, but read models must expose the same safe
+  realization status shape either way.

@@ -30,6 +30,7 @@ for future deployment snapshot materialization and runtime injection.
 | Branch | Condition | Behavior | Result |
 | --- | --- | --- | --- |
 | Bind | Active Resource and ready Postgres Dependency Resource share project/environment | Persist active ResourceBinding. | `ok({ id })` |
+| Managed Postgres not realized | Appaloft-managed Postgres realization is pending, failed, unsupported, or deleted | Reject before mutation. | `resource_dependency_binding_blocked` or structured lifecycle/conflict error |
 | Cross context | Resource and Dependency Resource differ by project/environment | Reject before mutation. | `resource_dependency_binding_context_mismatch` |
 | Duplicate target | Same active Resource/Dependency/target policy exists | Reject before mutation. | `conflict`, `phase = resource-dependency-binding` |
 | Inactive participant | Resource or Dependency Resource is missing, archived, deleted, or not bindable | Reject before mutation. | `not_found`, lifecycle error, or validation error |
@@ -45,4 +46,5 @@ for future deployment snapshot materialization and runtime injection.
 
 The command does not write raw connection secrets, mutate historical deployment snapshots, inject
 runtime environment variables, create deployments, trigger redeploy/retry/rollback, create or
-delete provider-native databases, rotate secrets, or run backup/restore.
+delete provider-native databases, rotate secrets, or run backup/restore. After provider-native
+Postgres realization, binding admission must require a realized ready managed database.

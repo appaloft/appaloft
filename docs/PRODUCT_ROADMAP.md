@@ -867,6 +867,12 @@ Current verification notes:
   provider-native Redis infrastructure or bind Redis to workloads yet, so the full `0.9.0` release
   rule remains blocked by provider-native database realization, backup/restore, recovery,
   auto-deploy, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
+  `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
+  `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider
+  cleanup semantics. It does not implement the Code Round yet, so the full `0.9.0` release rule
+  remains blocked by provider-native database realization, backup/restore, recovery, auto-deploy,
+  preview, and cluster runtime items.
 
 Required:
 

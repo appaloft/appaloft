@@ -18,3 +18,8 @@ or deployment state.
 The dependency resource detail includes ownership, status, source mode, provider key, masked
 connection summary, binding readiness, backup relationship metadata, and delete-safety summary when
 available. Raw secret material must never be returned.
+
+After the provider-native Postgres realization Code Round, Appaloft-managed Postgres details may
+also include safe realization status, last attempt id, safe provider resource handle, sanitized
+failure code/category/phase, and masked provider endpoint metadata. Provider SDK payloads and raw
+connection secrets must never be returned.

@@ -413,8 +413,9 @@ Meaning:
 
 Rules:
 - source mode is either `appaloft-managed` or `imported-external`
-- Appaloft-managed Postgres in this slice is provider-neutral control-plane metadata; it does not
-  create provider-native databases, run runtime work, or mutate deployment snapshots
+- Appaloft-managed Postgres in the current implemented slice is provider-neutral control-plane
+  metadata; the accepted provider-native realization slice adds durable realization state and safe
+  provider handles without moving provider SDK concerns into core
 - imported external Postgres delete removes only the Appaloft control-plane record and must not
   imply external database deletion
 - connection read models expose only masked endpoint/connection metadata and secret references; raw
@@ -436,9 +437,10 @@ Current scope:
   [Dependency Binding Secret Rotation](./specs/036-dependency-binding-secret-rotation/spec.md)
 - Phase 7 Redis dependency resource lifecycle baseline under
   [Redis Dependency Resource Lifecycle](./specs/037-redis-dependency-resource-lifecycle/spec.md)
-- provider-native provisioning/deletion, provider-native credential rotation,
-  backup/restore, runtime env injection, and provider-native runtime materialization are future
-  Phase 7 work
+- Phase 7 provider-native Postgres realization accepted candidate under
+  [Postgres Provider-Native Realization](./specs/038-postgres-provider-native-realization/spec.md)
+- provider-native credential rotation, backup/restore, runtime env injection, and provider-native
+  runtime materialization are future Phase 7 work
 
 ### Release Orchestration
 
