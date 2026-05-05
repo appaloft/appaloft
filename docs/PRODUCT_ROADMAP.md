@@ -1086,6 +1086,10 @@ Current verification notes:
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm
   manager readiness and execution remain open.
+- 2026-05-05 Phase 7 Docker Swarm backend selection slice added the adapter-owned `docker-swarm`
+  backend descriptor shape and `SWARM-TARGET-SELECT-001` registry coverage. The default registry
+  still does not activate Swarm execution; readiness, render/apply/observe/cleanup, and public help
+  remain open.
 
 Required:
 

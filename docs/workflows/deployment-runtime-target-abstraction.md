@@ -298,6 +298,8 @@ Current implementation is single-server oriented:
 - `RuntimeTargetBackendRegistry` is an application port, and `packages/adapters/runtime` registers
   local-shell and generic-SSH as `single-server` runtime target backends with runtime capability
   descriptors.
+- `packages/adapters/runtime` exposes a `docker-swarm` backend descriptor shape and registry
+  selection coverage, but the default runtime registry still does not activate Swarm execution.
 - `RoutingExecutionBackend` selects the execution backend through the registry, with the in-memory
   backend retained as a compatibility fallback for unknown providers.
 - Local and SSH Docker/Compose code already lives in `packages/adapters/runtime`.
