@@ -111,6 +111,67 @@ describe("deploy-action wrapper reference", () => {
     }
   });
 
+  test("[CONFIG-FILE-ENTRY-026] publishes preview-url from CLI preview output file", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-preview-output-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const fakeAppaloft = join(workspace, "appaloft");
+    writeFileSync(
+      fakeAppaloft,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        'preview_output_file=""',
+        'while [ "$#" -gt 0 ]; do',
+        '  if [ "$1" = "--preview-output-file" ]; then',
+        "    shift",
+        '    preview_output_file="$1"',
+        "  fi",
+        "  shift || true",
+        "done",
+        'if [ -z "$preview_output_file" ]; then',
+        "  echo 'missing preview output file' >&2",
+        "  exit 1",
+        "fi",
+        "cat > \"$preview_output_file\" <<'EOF'",
+        "schema-version=deploy.preview-output/v1",
+        "deployment-id=dep_1",
+        "resource-id=res_1",
+        "preview-id=pr-43",
+        "deployment-status=succeeded",
+        "preview-url=https://generated.preview.example.com",
+        "EOF",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeAppaloft, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: fakeAppaloft,
+        GITHUB_OUTPUT: outputPath,
+        RUNNER_TEMP: workspace,
+        INPUT_SOURCE: ".",
+        INPUT_SSH_HOST: "203.0.113.10",
+        INPUT_PREVIEW: "pull-request",
+        INPUT_PREVIEW_ID: "pr-43",
+        INPUT_REQUIRE_PREVIEW_URL: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const output = readFileSync(outputPath, "utf8");
+      expect(output).toContain("preview-id=pr-43");
+      expect(output).toContain("preview-url=https://generated.preview.example.com");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   test("[CONTROL-PLANE-ENTRY-002] unsupported control-plane inputs fail before mutation", () => {
     const result = runDeploy({
       INPUT_CONTROL_PLANE_MODE: "cloud",

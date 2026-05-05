@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -1894,6 +1894,82 @@ describe("CLI deployment config entry workflow", () => {
       expect(errorText).toContain('"phase":"preview-access-resolution"');
       expect(errorText).toContain("preview_url_missing");
       expect(errorText).toContain("dep_1");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-ENTRY-026] deploy action PR preview writes action-safe preview output", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-output-"));
+    const outputFile = join(workspace, "preview-output.txt");
+    const harness = await createPreviewDeployCliHarness({
+      withRouteStore: true,
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_1",
+          status: "succeeded",
+          runtimePlan: {
+            execution: {
+              accessRoutes: [
+                {
+                  proxyKind: "traefik",
+                  domains: ["generated.preview.example.com"],
+                  pathPrefix: "/",
+                  tlsMode: "disabled",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/pull/126/merge",
+          GITHUB_HEAD_REF: "feature/preview",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(() =>
+            harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--method",
+              "workspace-commands",
+              "--start",
+              "bun run start",
+              "--port",
+              "4321",
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-126",
+              "--require-preview-url",
+              "--preview-output-file",
+              outputFile,
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]),
+          ),
+      );
+
+      expect(readFileSync(outputFile, "utf8")).toContain("schema-version=deploy.preview-output/v1");
+      expect(readFileSync(outputFile, "utf8")).toContain("preview-id=pr-126");
+      expect(readFileSync(outputFile, "utf8")).toContain(
+        "preview-url=http://generated.preview.example.com",
+      );
+      expect(harness.operations).toContain("ListDeploymentsQuery");
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }

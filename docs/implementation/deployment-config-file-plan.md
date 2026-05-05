@@ -233,14 +233,13 @@ Remaining gaps:
 - The main repository now has a reference `.github/actions/deploy-action` wrapper with action
   metadata, install/checksum script, SSH secret temp-key handling, PR preview flag mapping, and
   wrapper-level tests. The public `appaloft/deploy-action` install UX still needs its own
-  repository, Marketplace README examples, public wrapper CI, cleanup examples, and stable
-  action-safe output handling.
+  repository, Marketplace README examples, public wrapper CI, and cleanup examples.
 - Action PR preview deploy is specified as an entry workflow in
   [GitHub Action PR Preview Deploy](../workflows/github-action-pr-preview-deploy.md). The CLI now
   supports preview-scoped source fingerprints, non-interactive preview environment selection,
-  explicit preview config paths, `preview-domain-template` route intent, and implicit root-domain
-  skipping. The CLI preview cleanup command is also active, but the public wrapper inputs/examples
-  and stable `preview-url` output are not implemented yet.
+  explicit preview config paths, `preview-domain-template` route intent, implicit root-domain
+  skipping, and action-safe preview output files for `preview-url`. The CLI preview cleanup command
+  is also active, but public wrapper inputs/examples are not implemented yet.
 - CLI config deploy now resolves state backend selection, defaults trusted SSH-targeted config
   deploys to `ssh-pglite`, invokes a remote-state lifecycle hook before identity queries/mutations,
   and uses SSH remote-state lifecycle and mirror sync in shell-built CLI programs.

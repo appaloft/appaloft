@@ -415,10 +415,11 @@ The main repository now also contains a reference composite action under
 - `scripts/run-deploy.sh`, which maps trusted wrapper inputs to the existing CLI flags, writes
   `ssh-private-key` to a temp file, rejects future control-plane inputs before mutation, and maps PR
   preview inputs to `--preview`, `--preview-id`, `--preview-domain-template`, and
-  `--require-preview-url`;
+  `--require-preview-url`; it also passes a temp `--preview-output-file` and publishes
+  `preview-url` from the CLI-produced file when available;
 - `scripts/test/deploy-action-wrapper.test.ts` coverage for wrapper metadata, SSH key temp-file
-  cleanup, PR preview flag mapping, no-config default behavior, and unsupported control-plane input
-  rejection.
+  cleanup, PR preview flag mapping, CLI preview-output-file handling, no-config default behavior,
+  and unsupported control-plane input rejection.
 
 Missing pieces before public release:
 
@@ -431,8 +432,6 @@ Missing pieces before public release:
   domains;
 - add a wrapper-level CI test that verifies exact-version install from a fixture or real release;
 - decide whether generated docs examples use `version: latest` or a pinned version by default;
-- add stable CLI JSON output or diagnostic file support so the wrapper can expose `preview-url`
-  without parsing human text;
 - wire wrapper cleanup inputs or `args` examples to the active CLI preview cleanup command;
 - add control-plane mode inputs only after the CLI resolver/parser and structured unsupported
   errors exist;
