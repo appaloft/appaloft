@@ -1610,6 +1610,32 @@ export const configureResourceAccessResponseSchema = z.object({
   id: z.string(),
 });
 
+export const configureResourceAutoDeployInputSchema = z.object({
+  resourceId: z.string().min(1),
+  mode: z.enum(["enable", "disable", "replace", "acknowledge-source-binding"]),
+  sourceBindingFingerprint: z.string().min(1).optional(),
+  policy: z
+    .object({
+      triggerKind: z.enum(["git-push", "generic-signed-webhook"]),
+      refs: z.array(z.string().min(1)).min(1),
+      eventKinds: z.array(z.enum(["push", "tag"])).min(1),
+      genericWebhookSecretRef: z.string().min(1).optional(),
+      dedupeWindowSeconds: z.number().int().positive().optional(),
+    })
+    .optional(),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const configureResourceAutoDeployResponseSchema = z.object({
+  resourceId: z.string(),
+  status: z.enum(["enabled", "disabled", "blocked"]),
+  triggerKind: z.enum(["git-push", "generic-signed-webhook"]).optional(),
+  refs: z.array(z.string()).optional(),
+  eventKinds: z.array(z.enum(["push", "tag"])).optional(),
+  sourceBindingFingerprint: z.string().optional(),
+  blockedReason: z.enum(["source-binding-changed"]).optional(),
+});
+
 export const attachResourceStorageInputSchema = z.object({
   resourceId: z.string().min(1),
   storageVolumeId: z.string().min(1),
@@ -3840,6 +3866,12 @@ export type ConfigureResourceNetworkResponse = z.infer<
 >;
 export type ConfigureResourceAccessInput = z.infer<typeof configureResourceAccessInputSchema>;
 export type ConfigureResourceAccessResponse = z.infer<typeof configureResourceAccessResponseSchema>;
+export type ConfigureResourceAutoDeployInput = z.infer<
+  typeof configureResourceAutoDeployInputSchema
+>;
+export type ConfigureResourceAutoDeployResponse = z.infer<
+  typeof configureResourceAutoDeployResponseSchema
+>;
 export type AttachResourceStorageInput = z.infer<typeof attachResourceStorageInputSchema>;
 export type AttachResourceStorageResponse = z.infer<typeof attachResourceStorageResponseSchema>;
 export type DetachResourceStorageInput = z.infer<typeof detachResourceStorageInputSchema>;

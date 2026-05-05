@@ -2,10 +2,9 @@
 
 ## Status
 
-Accepted candidate. The core policy model, application command/use case, and Resource repository
-persistence baseline exist, but this command is not exposed until source event ingestion, source
-event read models, error contracts, public docs/help, `CORE_OPERATIONS.md`,
-`operation-catalog.ts`, CLI, HTTP/oRPC, Web, and tests are aligned in Code Round.
+Active command. The core policy model, application command/use case, Resource repository
+persistence, operation catalog, `CORE_OPERATIONS.md`, CLI, and HTTP/oRPC surfaces exist. Web
+settings UI and future MCP/tool descriptors remain deferred until those surfaces exist.
 
 ## Governing Sources
 
@@ -102,8 +101,8 @@ Use [Source Event Auto Deploy Error Spec](../errors/source-events.md). Minimum c
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
 | Web | Resource source/profile settings auto-deploy panel. | Future Code Round |
-| CLI | `appaloft resource auto-deploy configure <resourceId> ...`. | Future Code Round |
-| oRPC / HTTP | `POST /api/resources/{resourceId}/auto-deploy` using this command schema. | Future Code Round |
+| CLI | `appaloft resource auto-deploy <resourceId> ...`. | Active |
+| oRPC / HTTP | `POST /api/resources/{resourceId}/auto-deploy` using this command schema. | Active |
 | Automation / MCP | Future tool over the same operation key. | Future |
 
 ## Tests

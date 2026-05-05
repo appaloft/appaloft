@@ -406,6 +406,25 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[SRC-AUTO-ENTRY-001] resource auto-deploy configure is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find(
+      (candidate) => candidate.key === "resources.configure-auto-deploy",
+    );
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "resources",
+      messageName: "ConfigureResourceAutoDeployCommand",
+      handlerName: "ConfigureResourceAutoDeployCommandHandler",
+      serviceName: "ConfigureResourceAutoDeployUseCase",
+      transports: {
+        cli: "appaloft resource auto-deploy <resourceId>",
+        orpc: { method: "POST", path: "/api/resources/{resourceId}/auto-deploy" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[RES-PROFILE-CONFIG-019] resource variable import is exposed through the active operation catalog", () => {
     const entry = operationCatalog.find(
       (candidate) => candidate.key === "resources.import-variables",

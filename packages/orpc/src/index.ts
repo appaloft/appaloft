@@ -20,6 +20,7 @@ import {
   ConfigureDefaultAccessDomainPolicyCommand,
   ConfigureDomainBindingRouteCommand,
   ConfigureResourceAccessCommand,
+  ConfigureResourceAutoDeployCommand,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
@@ -42,6 +43,7 @@ import {
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureDomainBindingRouteCommandInputSchema,
   configureResourceAccessCommandInputSchema,
+  configureResourceAutoDeployCommandInputSchema,
   configureResourceHealthCommandInputSchema,
   configureResourceNetworkCommandInputSchema,
   configureResourceRuntimeCommandInputSchema,
@@ -254,6 +256,7 @@ import {
   configureDefaultAccessDomainPolicyResponseSchema,
   configureDomainBindingRouteResponseSchema,
   configureResourceAccessResponseSchema,
+  configureResourceAutoDeployResponseSchema,
   configureResourceHealthResponseSchema,
   configureResourceNetworkResponseSchema,
   configureResourceRuntimeResponseSchema,
@@ -529,6 +532,10 @@ export const apiRouteDescriptions = {
   configureResourceAccess: routeDescription(
     "Configures resource participation in generated default access route planning.",
     "resource.access-profile",
+  ),
+  configureResourceAutoDeploy: routeDescription(
+    "Configures a Resource-owned auto-deploy policy for trusted source events.",
+    "source.auto-deploy-setup",
   ),
   attachResourceStorage: routeDescription(
     "Attaches an existing storage volume to a resource at a validated destination path.",
@@ -1676,6 +1683,19 @@ export const configureResourceAccessProcedure = base
     executeCommand(context, ConfigureResourceAccessCommand.create(input)),
   );
 
+export const configureResourceAutoDeployProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/auto-deploy",
+    description: apiRouteDescriptions.configureResourceAutoDeploy,
+    successStatus: 200,
+  })
+  .input(configureResourceAutoDeployCommandInputSchema)
+  .output(configureResourceAutoDeployResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceAutoDeployCommand.create(input)),
+  );
+
 export const attachResourceStorageProcedure = base
   .route({
     method: "POST",
@@ -2821,6 +2841,7 @@ export const appaloftOrpcRouter = {
     configureHealth: configureResourceHealthProcedure,
     configureNetwork: configureResourceNetworkProcedure,
     configureAccess: configureResourceAccessProcedure,
+    configureAutoDeploy: configureResourceAutoDeployProcedure,
     attachStorage: attachResourceStorageProcedure,
     detachStorage: detachResourceStorageProcedure,
     configureRuntime: configureResourceRuntimeProcedure,

@@ -64,6 +64,7 @@ import { archiveResourceCommandInputSchema } from "./operations/resources/archiv
 import { attachResourceStorageCommandInputSchema } from "./operations/resources/attach-resource-storage.command";
 import { bindResourceDependencyCommandInputSchema } from "./operations/resources/bind-resource-dependency.command";
 import { configureResourceAccessCommandInputSchema } from "./operations/resources/configure-resource-access.command";
+import { configureResourceAutoDeployCommandInputSchema } from "./operations/resources/configure-resource-auto-deploy.command";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
 import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
 import { configureResourceRuntimeCommandInputSchema } from "./operations/resources/configure-resource-runtime.command";
@@ -620,6 +621,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource configure-access <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/access-profile" },
+    },
+  },
+  {
+    key: "resources.configure-auto-deploy",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceAutoDeployCommand",
+    handlerName: "ConfigureResourceAutoDeployCommandHandler",
+    serviceName: "ConfigureResourceAutoDeployUseCase",
+    inputSchema: configureResourceAutoDeployCommandInputSchema,
+    serviceToken: tokens.configureResourceAutoDeployUseCase,
+    transports: {
+      cli: "appaloft resource auto-deploy <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/auto-deploy" },
     },
   },
   {

@@ -54,8 +54,8 @@ export interface ConfigureResourceAutoDeployResult {
   resourceId: string;
   status: "enabled" | "disabled" | "blocked";
   triggerKind?: "git-push" | "generic-signed-webhook";
-  refs?: readonly string[];
-  eventKinds?: readonly ("push" | "tag")[];
+  refs?: string[];
+  eventKinds?: ("push" | "tag")[];
   sourceBindingFingerprint?: string;
   blockedReason?: "source-binding-changed";
 }

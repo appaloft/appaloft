@@ -57,7 +57,7 @@ automation. Ingestion routes, entrypoints, and background workers are not active
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `SRC-AUTO-ENTRY-001` | CLI, HTTP/oRPC, Web, and future MCP/tool configure auto-deploy. | Entrypoints reuse the same command/query schemas and operation keys. | planned | Deferred gap |
+| `SRC-AUTO-ENTRY-001` | CLI, HTTP/oRPC, Web, and future MCP/tool configure auto-deploy. | Entrypoints reuse the same command/query schemas and operation keys. | `packages/application/test/operation-catalog-boundary.test.ts`; package typechecks | Partial |
 | `SRC-AUTO-ENTRY-002` | HTTP generic signed webhook receives source event. | Transport verifies signature and dispatches provider-neutral source event command. | planned | Deferred gap |
 | `SRC-AUTO-ENTRY-003` | Web Resource detail shows event-created deployment. | Deployment links back to safe source event facts and ignored/deduped events remain visible. | planned | Deferred gap |
 | `SRC-AUTO-SURFACE-003` | Public help links. | Setup, signatures, dedupe, ignored events, and recovery link to stable docs anchors in both locales. | planned | Deferred gap |
