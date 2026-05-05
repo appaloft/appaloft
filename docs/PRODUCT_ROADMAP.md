@@ -900,6 +900,12 @@ Current verification notes:
   explicit CLI/oRPC/HTTP/Web surfaces, and rollback remaining inactive. It does not implement the
   commands yet, so the full `0.9.0` release rule remains blocked by retry/redeploy Code Round,
   rollback, auto-deploy, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 deployment retry/redeploy Code Round implemented active
+  `deployments.retry` and `deployments.redeploy` commands across core trigger/source metadata,
+  application handlers/use cases, resource-runtime coordination, PG/PGlite metadata persistence,
+  CLI, HTTP/oRPC, public docs, and Web recovery actions gated by readiness output. Rollback remains
+  inactive, so the full `0.9.0` release rule remains blocked by rollback, auto-deploy, preview, and
+  cluster runtime items.
 
 Required:
 
@@ -919,7 +925,7 @@ Required:
 - [x] Add backup/restore for the minimum useful dependency-resource loop.
 - [x] Rebuild deployment show as a first-class query.
 - [x] Rebuild deployment stream-events as a first-class query.
-- [ ] Rebuild deployment retry/redeploy under ADR-016.
+- [x] Rebuild deployment retry/redeploy under ADR-016.
 - [ ] Rebuild rollback under ADR-016 with retained artifacts, rollback candidates, lifecycle
   transitions, events, errors, Web/API/CLI affordances, and tests.
 - [ ] Add resource restart/stop/start only after runtime ownership and state semantics are

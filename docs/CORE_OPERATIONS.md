@@ -616,9 +616,9 @@ Current boundary:
   logs on `deployments.logs`, or reintroduce `deployments.reattach` as a write command.
 - `deployments.recovery-readiness` is the active read-only recovery decision surface. It returns
   retry, redeploy, rollback, rollback-candidate, blocked-reason, and recommended-action facts for
-  Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. It does not execute recovery and marks
-  `deployments.retry`, `deployments.redeploy`, and `deployments.rollback` as not active until their
-  own Code Rounds.
+  Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. Retry and redeploy are active write commands
+  that must use its freshness marker when callers have one; rollback remains inactive until its own
+  Code Round.
 - mutation coordination is scope-based, not whole-server based:
   `deployments.create` coordinates by logical resource-runtime scope and
   `deployments.cleanup-preview` coordinates by logical preview-lifecycle scope. Low-level SSH

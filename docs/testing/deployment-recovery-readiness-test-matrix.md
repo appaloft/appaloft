@@ -59,7 +59,7 @@ separate future Code Round.
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `DEP-RECOVERY-WEB-001` | Web deployment detail renders failed deployment. | UI uses readiness query output for recovery cards and blocked reasons; no hardcoded recovery branching in components. | `apps/web` Svelte semantic check | Passing |
+| `DEP-RECOVERY-WEB-001` | Web deployment detail renders failed deployment. | UI uses readiness query output for recovery cards, blocked reasons, and retry/redeploy action buttons gated by `allowed && commandActive`; rollback remains status-only. | `apps/web` Svelte semantic check | Passing |
 | `DEP-RECOVERY-CLI-001` | CLI inspects failed deployment interactively. | CLI exposes read-only `appaloft deployments recovery-readiness <deploymentId>` and prints readiness output from the shared query. | CLI typecheck / operation catalog | Passing |
 | `DEP-RECOVERY-HTTP-001` | HTTP/oRPC client requests readiness. | Response schema preserves booleans, candidate data, blocked reason codes, and generated state marker. | `packages/orpc/test/deployment-recovery-readiness.http.test.ts` | Passing |
 | `DEP-RECOVERY-MCP-001` | Future tool asks for deployment recovery options. | Tool output can map directly to `recoverable`, `retryable`, `redeployable`, `rollbackReady`, and safe next actions without bespoke policy. | future MCP descriptor | Deferred gap |
@@ -67,5 +67,6 @@ separate future Code Round.
 ## Current Implementation Notes And Migration Gaps
 
 The active readiness query has application and HTTP/oRPC automated coverage plus CLI/Web type-level
-coverage. Remaining deferred gaps belong to future write commands, richer target compatibility
-metadata, artifact retention/prune policy, and future MCP descriptors.
+coverage. Retry and redeploy write commands are active across CLI, HTTP/oRPC, and Web. Remaining
+deferred gaps belong to rollback, richer target compatibility metadata, artifact retention/prune
+policy, coordination fixtures, browser-flow coverage, and future MCP descriptors.
