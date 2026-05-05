@@ -3,10 +3,34 @@ import {
   type ResourceHealthProbeRequest,
   type ResourceHealthProbeResult,
   type ResourceHealthProbeRunner,
+  type ResourceRuntimeHealthProbeRequest,
+  type ResourceRuntimeHealthProbeResult,
 } from "@appaloft/application";
 import { domainError, err, ok, type DomainError, type Result } from "@appaloft/core";
 
 const responsePreviewLimit = 4096;
+const dockerSwarmHealthProbeTimeoutExitCode = 124;
+
+export interface RuntimeHealthCommandRunnerInput {
+  args: string[];
+  timeoutMs: number;
+}
+
+export interface RuntimeHealthCommandRunnerResult {
+  exitCode: number;
+  stdout?: string;
+  stderr?: string;
+}
+
+export type RuntimeHealthCommandRunner = (
+  input: RuntimeHealthCommandRunnerInput,
+) => Promise<Result<RuntimeHealthCommandRunnerResult, DomainError>>;
+
+interface DockerSwarmServiceTask {
+  currentState: string;
+  desiredState: string;
+  error?: string;
+}
 
 function normalizedProbeUrl(raw: string): Result<URL, DomainError> {
   try {
@@ -80,7 +104,267 @@ function failedProbe(input: {
   };
 }
 
+function stringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function parseDockerSwarmServiceTasks(stdout: string): Result<DockerSwarmServiceTask[], DomainError> {
+  const tasks: DockerSwarmServiceTask[] = [];
+
+  for (const line of stdout.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return err(
+        domainError.resourceHealthUnavailable("Docker Swarm service health output is invalid", {
+          phase: "runtime-live-probe",
+        }),
+      );
+    }
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return err(
+        domainError.resourceHealthUnavailable("Docker Swarm service health output is invalid", {
+          phase: "runtime-live-probe",
+        }),
+      );
+    }
+
+    const record = parsed as Record<string, unknown>;
+    const currentState = stringField(record, "CurrentState");
+    const desiredState = stringField(record, "DesiredState");
+    if (!currentState || !desiredState) {
+      return err(
+        domainError.resourceHealthUnavailable("Docker Swarm service health output is incomplete", {
+          phase: "runtime-live-probe",
+        }),
+      );
+    }
+
+    const taskError = stringField(record, "Error");
+    tasks.push({
+      currentState,
+      desiredState,
+      ...(taskError ? { error: taskError } : {}),
+    });
+  }
+
+  return ok(tasks);
+}
+
+function normalizedState(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isRunningTask(task: DockerSwarmServiceTask): boolean {
+  return (
+    normalizedState(task.desiredState) === "running" &&
+    normalizedState(task.currentState).startsWith("running")
+  );
+}
+
+function isStartingTask(task: DockerSwarmServiceTask): boolean {
+  const currentState = normalizedState(task.currentState);
+  return (
+    normalizedState(task.desiredState) === "running" &&
+    (currentState.startsWith("new") ||
+      currentState.startsWith("pending") ||
+      currentState.startsWith("assigned") ||
+      currentState.startsWith("accepted") ||
+      currentState.startsWith("preparing") ||
+      currentState.startsWith("starting"))
+  );
+}
+
+function isFailedTask(task: DockerSwarmServiceTask): boolean {
+  const currentState = normalizedState(task.currentState);
+  return (
+    normalizedState(task.desiredState) === "running" &&
+    (currentState.startsWith("failed") ||
+      currentState.startsWith("rejected") ||
+      currentState.startsWith("orphaned") ||
+      Boolean(task.error))
+  );
+}
+
+function serviceName(request: ResourceRuntimeHealthProbeRequest): Result<string, DomainError> {
+  const name = request.runtimeMetadata?.["swarm.serviceName"];
+  if (name && name.trim().length > 0) {
+    return ok(name);
+  }
+
+  return err(
+    domainError.resourceHealthUnavailable("Docker Swarm service name is not available", {
+      phase: "runtime-live-probe",
+      step: "docker-swarm-service-name",
+      resourceId: request.resourceId,
+      deploymentId: request.deploymentId,
+    }),
+  );
+}
+
+function failedRuntimeProbe(input: {
+  request: ResourceRuntimeHealthProbeRequest;
+  serviceName?: string;
+  observedAt: string;
+  durationMs: number;
+  exitCode?: number;
+  reasonCode: string;
+  message: string;
+  retriable?: boolean;
+}): ResourceRuntimeHealthProbeResult {
+  return {
+    lifecycle: "unknown",
+    health: "unknown",
+    observedAt: input.observedAt,
+    reasonCode: input.reasonCode,
+    message: input.message,
+    check: {
+      name: "runtime-service",
+      target: "container",
+      status: "failed",
+      observedAt: input.observedAt,
+      durationMs: input.durationMs,
+      ...(input.exitCode ? { exitCode: input.exitCode } : {}),
+      reasonCode: input.reasonCode,
+      phase: "runtime-live-probe",
+      message: input.message,
+      retriable: input.retriable ?? true,
+      metadata: {
+        providerKey: input.request.providerKey,
+        runtimeKind: input.request.runtimeKind,
+        ...(input.serviceName ? { serviceName: input.serviceName } : {}),
+      },
+    },
+  };
+}
+
+function dockerSwarmRuntimeProbeResult(input: {
+  request: ResourceRuntimeHealthProbeRequest;
+  serviceName: string;
+  observedAt: string;
+  durationMs: number;
+  tasks: DockerSwarmServiceTask[];
+}): ResourceRuntimeHealthProbeResult {
+  const activeTasks = input.tasks.filter((task) => normalizedState(task.desiredState) === "running");
+  const observedTasks = activeTasks.length > 0 ? activeTasks : input.tasks;
+  const runningTasks = observedTasks.filter(isRunningTask).length;
+  const failedTasks = observedTasks.filter(isFailedTask).length;
+  const startingTasks = observedTasks.filter(isStartingTask).length;
+  const taskCount = observedTasks.length;
+
+  if (taskCount === 0) {
+    return failedRuntimeProbe({
+      request: input.request,
+      serviceName: input.serviceName,
+      observedAt: input.observedAt,
+      durationMs: input.durationMs,
+      reasonCode: "docker_swarm_service_not_found",
+      message: "Docker Swarm service has no observable tasks.",
+    });
+  }
+
+  const lifecycle =
+    failedTasks > 0 ? "degraded" : runningTasks === taskCount ? "running" : "starting";
+  const health =
+    failedTasks > 0 ? "unhealthy" : runningTasks === taskCount ? "healthy" : "unknown";
+  const status = failedTasks > 0 ? "failed" : runningTasks === taskCount ? "passed" : "unknown";
+  const reasonCode =
+    failedTasks > 0
+      ? "docker_swarm_service_task_failed"
+      : runningTasks === taskCount
+        ? "docker_swarm_service_running"
+        : "docker_swarm_service_starting";
+
+  return {
+    lifecycle,
+    health,
+    observedAt: input.observedAt,
+    reasonCode,
+    ...(startingTasks > 0 && failedTasks === 0
+      ? { message: "Docker Swarm service tasks are still starting." }
+      : {}),
+    check: {
+      name: "runtime-service",
+      target: "container",
+      status,
+      observedAt: input.observedAt,
+      durationMs: input.durationMs,
+      reasonCode,
+      phase: "runtime-live-probe",
+      retriable: status !== "passed",
+      metadata: {
+        providerKey: input.request.providerKey,
+        runtimeKind: input.request.runtimeKind,
+        serviceName: input.serviceName,
+        taskCount: String(taskCount),
+        runningTasks: String(runningTasks),
+        failedTasks: String(failedTasks),
+      },
+    },
+  };
+}
+
+async function defaultRuntimeHealthCommandRunner(
+  input: RuntimeHealthCommandRunnerInput,
+): Promise<Result<RuntimeHealthCommandRunnerResult, DomainError>> {
+  try {
+    const process = Bun.spawn(input.args, {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const stdoutPromise = new Response(process.stdout).text();
+    const stderrPromise = new Response(process.stderr).text();
+    let timeout: Timer | undefined;
+    const timedOut = new Promise<"timeout">((resolve) => {
+      timeout = setTimeout(() => resolve("timeout"), input.timeoutMs);
+    });
+    const outcome = await Promise.race([process.exited, timedOut]);
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+
+    if (outcome === "timeout") {
+      process.kill();
+      const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise]);
+      return ok({
+        exitCode: dockerSwarmHealthProbeTimeoutExitCode,
+        stdout,
+        stderr: stderr || "Docker Swarm service health probe timed out.",
+      });
+    }
+
+    const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise]);
+    return ok({
+      exitCode: outcome,
+      stdout,
+      stderr,
+    });
+  } catch (error) {
+    return err(
+      domainError.resourceHealthUnavailable(
+        error instanceof Error ? error.message : "Docker Swarm service health probe failed",
+        {
+          phase: "runtime-live-probe",
+        },
+      ),
+    );
+  }
+}
+
 export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunner {
+  constructor(
+    private readonly runRuntimeHealthCommand: RuntimeHealthCommandRunner =
+      defaultRuntimeHealthCommandRunner,
+  ) {}
+
   async probe(
     context: ExecutionContext,
     request: ResourceHealthProbeRequest,
@@ -165,5 +449,71 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  async probeRuntime(
+    _context: ExecutionContext,
+    request: ResourceRuntimeHealthProbeRequest,
+  ): Promise<Result<ResourceRuntimeHealthProbeResult, DomainError>> {
+    if (request.providerKey !== "docker-swarm") {
+      return err(
+        domainError.resourceHealthUnavailable("Runtime health probe target is unsupported", {
+          phase: "runtime-live-probe",
+          providerKey: request.providerKey,
+        }),
+      );
+    }
+
+    const serviceNameResult = serviceName(request);
+    if (serviceNameResult.isErr()) {
+      return err(serviceNameResult.error);
+    }
+
+    const startedAt = Date.now();
+    const service = serviceNameResult.value;
+    const commandResult = await this.runRuntimeHealthCommand({
+      args: ["docker", "service", "ps", "--no-trunc", "--format", "{{json .}}", service],
+      timeoutMs: Math.max(1, request.timeoutSeconds) * 1000,
+    });
+    const observedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedAt;
+
+    if (commandResult.isErr()) {
+      return err(commandResult.error);
+    }
+
+    if (commandResult.value.exitCode !== 0) {
+      return ok(
+        failedRuntimeProbe({
+          request,
+          serviceName: service,
+          observedAt,
+          durationMs,
+          exitCode: commandResult.value.exitCode,
+          reasonCode:
+            commandResult.value.exitCode === dockerSwarmHealthProbeTimeoutExitCode
+              ? "docker_swarm_service_probe_timeout"
+              : "docker_swarm_service_probe_failed",
+          message:
+            commandResult.value.stderr?.trim() ||
+            "Docker Swarm service health probe could not inspect the service.",
+        }),
+      );
+    }
+
+    const tasksResult = parseDockerSwarmServiceTasks(commandResult.value.stdout ?? "");
+    if (tasksResult.isErr()) {
+      return err(tasksResult.error);
+    }
+
+    return ok(
+      dockerSwarmRuntimeProbeResult({
+        request,
+        serviceName: service,
+        observedAt,
+        durationMs,
+        tasks: tasksResult.value,
+      }),
+    );
   }
 }

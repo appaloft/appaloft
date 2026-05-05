@@ -79,8 +79,11 @@ implemented, but no Docker Swarm execution backend is active yet.
   failed candidate. Real Swarm rollback command behavior remains open.
 - `SWARM-TARGET-OBS-001` has initial runtime-log adapter coverage proving Swarm-backed OCI image
   deployments read `docker service logs` through sanitized `swarm.serviceName` metadata and return
-  normalized Appaloft runtime log lines with configured redaction applied. Swarm health observation
-  remains open under `SWARM-TARGET-OBS-002`.
+  normalized Appaloft runtime log lines with configured redaction applied.
+- `SWARM-TARGET-OBS-002` has initial application/adapter coverage proving `resources.health` can
+  request an opt-in Swarm runtime probe from sanitized `swarm.serviceName` metadata and normalize
+  `docker service ps` task state into Appaloft runtime health/check fields without exposing raw
+  Docker task payloads. Remote-manager probing and real Swarm smoke coverage remain open.
 - `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
   explaining Swarm target registration, manager readiness expectations, image registry access,
   rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI `server register`,

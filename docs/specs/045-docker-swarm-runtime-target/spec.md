@@ -139,10 +139,14 @@ No new public operation key is accepted in this Spec Round.
   logs` using the sanitized `swarm.serviceName` runtime metadata. Output remains the existing
   Appaloft `ResourceRuntimeLogLine` shape with resource/deployment/runtime context and configured
   redactions applied.
+- `resources.health` can run an opt-in live runtime probe for Swarm-backed OCI image deployments
+  when sanitized `swarm.serviceName` metadata is present. The runtime adapter reads `docker service
+  ps` and returns Appaloft `ResourceRuntimeHealthSection` and `ResourceHealthCheck` fields without
+  exposing raw Docker task payloads.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
-- Real Swarm command execution, failed-rollout rollback behavior, logs, health, and read-model
-  persistence are not implemented.
+- Real Swarm command execution, failed-rollout rollback behavior, remote-manager health/log
+  execution, and read-model persistence are not implemented.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and

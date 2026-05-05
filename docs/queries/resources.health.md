@@ -319,9 +319,13 @@ deployment context, runtime lifecycle from latest deployment state, resource acc
 route status, and bounded live HTTP/public probes when `mode = "live"` can resolve a safe URL. It
 does not mark a successful deployment as healthy without a configured/current health observation.
 
-Provider-native runtime inspection, Docker health-state inspection, command health checks, and
-scheduled health summary persistence are still future work. Unsupported live inspection sources
-are reported as source errors inside `ok(ResourceHealthSummary)`.
+Provider-native runtime inspection has initial Docker Swarm service-task coverage: when
+`mode = "live"` and `includeRuntimeProbe = true`, a Swarm-backed Docker container deployment with
+sanitized `swarm.serviceName` metadata can return normalized runtime health/check fields from
+`docker service ps` task state. Docker health-state inspection for single-container/Compose
+runtimes, command health checks, remote-manager Swarm probing, and scheduled health summary
+persistence are still future work. Unsupported live inspection sources are reported as source
+errors inside `ok(ResourceHealthSummary)`.
 
 Runtime deployment verification still checks local loopback or Docker container reachability during
 `deployments.create` execution and records deployment success/failure. That remains

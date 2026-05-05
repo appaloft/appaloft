@@ -29,7 +29,7 @@
 - [x] `SWARM-TARGET-APPLY-002`: fake-runner failed candidate rollout records deployment failure and
   runs only deployment-scoped cleanup.
 - [x] `SWARM-TARGET-OBS-001A`: Swarm service logs return normalized Appaloft runtime log lines.
-- [ ] `SWARM-TARGET-OBS-001B`: Swarm health returns normalized Appaloft health read-model shapes.
+- [x] `SWARM-TARGET-OBS-001B`: Swarm health returns normalized Appaloft health read-model shapes.
 - [x] `SWARM-TARGET-CLEAN-001`: cleanup stays resource/deployment/destination scoped.
 - [ ] `SWARM-TARGET-ROUTE-001`: reverse-proxy access routes attach through Swarm service/network
   identity without public workload host ports.
@@ -49,7 +49,8 @@
 - [x] Add opt-in fake Docker Swarm execution backend acceptance coverage for image apply and scoped
   cleanup.
 - [x] Add Swarm service log reading through the existing runtime log adapter.
-- [ ] Implement apply/verify/log/health/cleanup behind runtime adapters.
+- [x] Add Swarm service health inspection through the existing resource health query adapter.
+- [ ] Implement real apply/verify/cleanup behind runtime adapters.
 - [ ] Add sanitized target identity persistence/read-model support where required.
 - [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.
 
@@ -64,5 +65,5 @@
 - [x] Run targeted domain/application/adapter tests.
 - [x] Run fake Swarm backend acceptance tests.
 - [ ] Run opt-in real Swarm smoke tests when environment is available.
-- [ ] Run `bun run lint`.
-- [ ] Run `bun turbo run typecheck`.
+- [x] Run `bun run lint`.
+- [x] Run `bun turbo run typecheck`.
