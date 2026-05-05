@@ -4,7 +4,14 @@ import {
   type ScheduledTaskRuntimeExecutionResult,
   type ScheduledTaskRuntimePort,
 } from "@appaloft/application";
-import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  type DomainError,
+  domainError,
+  err,
+  ok,
+  redactScheduledTaskSecretText,
+  type Result,
+} from "@appaloft/core";
 
 export interface ScheduledTaskCommandRunnerInput {
   commandIntent: string;
@@ -27,8 +34,6 @@ export interface HermeticScheduledTaskRuntimeOptions {
   now?: () => string;
 }
 
-const secretPattern = /(BEGIN .*PRIVATE KEY|PRIVATE_KEY|SECRET_|PASSWORD=|TOKEN=|PASS=)/i;
-
 class DefaultHermeticScheduledTaskCommandRunner implements ScheduledTaskCommandRunner {
   async run(input: ScheduledTaskCommandRunnerInput): Promise<ScheduledTaskCommandRunnerResult> {
     if (/\bfail\b/i.test(input.commandIntent)) {
@@ -46,14 +51,7 @@ class DefaultHermeticScheduledTaskCommandRunner implements ScheduledTaskCommandR
 }
 
 function safeMessage(message: string, redactions: readonly string[]): string {
-  if (secretPattern.test(message)) {
-    return "********";
-  }
-
-  return redactions.reduce(
-    (text, redaction) => (redaction.length > 0 ? text.replaceAll(redaction, "********") : text),
-    message,
-  );
+  return redactScheduledTaskSecretText(message, redactions);
 }
 
 function logEntries(input: {

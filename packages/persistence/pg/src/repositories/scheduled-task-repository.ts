@@ -24,6 +24,7 @@ import {
   FinishedAt,
   ok,
   ResourceId,
+  redactScheduledTaskSecretText,
   ScheduledTaskCommandIntent,
   ScheduledTaskConcurrencyPolicyValue,
   ScheduledTaskDefinition,
@@ -221,7 +222,9 @@ function toScheduledTaskRunSummary(row: ScheduledTaskRunAttemptRow): ScheduledTa
       ? { finishedAt: normalizeTimestamp(row.finished_at) ?? row.finished_at }
       : {}),
     ...(row.exit_code !== null ? { exitCode: row.exit_code } : {}),
-    ...(row.failure_summary ? { failureSummary: row.failure_summary } : {}),
+    ...(row.failure_summary
+      ? { failureSummary: redactScheduledTaskSecretText(row.failure_summary) }
+      : {}),
     ...(row.skipped_reason
       ? {
           skippedReason: row.skipped_reason as NonNullable<
@@ -272,10 +275,8 @@ function rehydrateScheduledTaskRunAttempt(
   });
 }
 
-const logSecretPattern = /(BEGIN .*PRIVATE KEY|PRIVATE_KEY|SECRET_|PASSWORD=|TOKEN=|PASS=)/i;
-
 function safeLogMessage(message: string): string {
-  return logSecretPattern.test(message) ? "********" : message;
+  return redactScheduledTaskSecretText(message);
 }
 
 interface TimezoneMinuteParts {
@@ -427,7 +428,7 @@ function toScheduledTaskDefinitionSummary(
     resourceId: row.resource_id,
     schedule: row.schedule,
     timezone: row.timezone,
-    commandIntent: row.command_intent,
+    commandIntent: redactScheduledTaskSecretText(row.command_intent),
     timeoutSeconds: row.timeout_seconds,
     retryLimit: row.retry_limit,
     concurrencyPolicy:

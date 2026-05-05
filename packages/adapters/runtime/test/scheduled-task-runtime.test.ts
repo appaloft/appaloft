@@ -13,6 +13,12 @@ class StaticScheduledTaskCommandRunner implements ScheduledTaskCommandRunner {
   }
 }
 
+class ThrowingScheduledTaskCommandRunner implements ScheduledTaskCommandRunner {
+  async run(): ReturnType<ScheduledTaskCommandRunner["run"]> {
+    throw new Error("failed with postgres://app:secret@db.internal/app");
+  }
+}
+
 class NoopAppSpan implements AppSpan {
   addEvent(): void {}
   recordError(): void {}
@@ -115,5 +121,28 @@ describe("HermeticScheduledTaskRuntimePort", () => {
       ],
       failureSummary: "********",
     });
+  });
+
+  test("[SCHED-TASK-SECRET-001] masks secret-looking runtime errors", async () => {
+    const runtime = new HermeticScheduledTaskRuntimePort({
+      commandRunner: new ThrowingScheduledTaskCommandRunner(),
+      now: () => "2026-05-05T00:30:00.000Z",
+    });
+
+    const result = await runtime.execute(context(), {
+      runId: "str_manual",
+      taskId: "tsk_migrate",
+      resourceId: "res_api",
+      commandIntent: "bun run migrate",
+      timeoutSeconds: 600,
+    });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error.details).toMatchObject({
+        phase: "scheduled-task-runtime-execution",
+        error: "failed with ********",
+      });
+    }
   });
 });
