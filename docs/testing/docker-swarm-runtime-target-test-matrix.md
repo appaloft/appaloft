@@ -60,6 +60,10 @@ implemented, but no Docker Swarm execution backend is active yet.
 - `SWARM-TARGET-SECRET-001` has initial render-contract coverage proving runtime secret environment
   values are converted to safe references and omitted from serialized render intent. Registry pull
   credential and provider response redaction remain open with apply/log/diagnostic adapters.
+- `SWARM-TARGET-CLEAN-001` has initial adapter contract coverage proving Swarm service cleanup
+  selectors include Appaloft managed, resource, deployment, target, destination, and runtime-target
+  labels, and do not render broad Docker prune or volume commands. Active cleanup execution remains
+  open with the Swarm backend.
 - `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
   explaining Swarm target registration, manager readiness expectations, image registry access,
   rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI `server register`,

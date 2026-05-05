@@ -120,6 +120,9 @@ No new public operation key is accepted in this Spec Round.
   resource, deployment, target, and destination context, maps runtime environment snapshots,
   health policies, and access routes, and masks runtime secret values before they reach diagnostics
   or tests.
+- The runtime adapter package also renders a label-scoped Swarm cleanup plan for services owned by
+  the same Appaloft resource, deployment, target, destination, and runtime-target identity. The plan
+  is not wired to an execution backend yet.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
 - Swarm runtime target backend apply/verify/log/health/cleanup is not implemented.
