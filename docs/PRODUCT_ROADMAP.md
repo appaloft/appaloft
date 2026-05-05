@@ -1001,7 +1001,7 @@ Required:
 - [x] Rebuild deployment retry/redeploy under ADR-016.
 - [x] Rebuild rollback under ADR-016 with retained artifacts, rollback candidates, lifecycle
   transitions, events, errors, Web/API/CLI affordances, and tests.
-- [ ] Add resource restart/stop/start only after runtime ownership and state semantics are
+- [x] Add resource restart/stop/start only after runtime ownership and state semantics are
   specified.
 - [ ] Add source binding and auto-deploy.
 - [ ] Add push webhook and generic signed deploy webhook.
