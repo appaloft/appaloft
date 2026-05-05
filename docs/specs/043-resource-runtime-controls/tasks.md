@@ -24,19 +24,23 @@
 
 ## Test-First Round
 
-- [ ] Bind `RUNTIME-CTRL-STOP-001` to command/use-case and adapter tests.
-- [ ] Bind `RUNTIME-CTRL-START-001` to retained runtime metadata tests.
-- [ ] Bind `RUNTIME-CTRL-RESTART-001` to stop/start phase tests.
-- [ ] Bind `RUNTIME-CTRL-BLOCK-001` to missing/stale runtime metadata tests.
-- [ ] Bind `RUNTIME-CTRL-COORD-001` to `resource-runtime` coordination tests.
+- [x] Bind `RUNTIME-CTRL-STOP-001` to command/use-case tests.
+- [ ] Bind `RUNTIME-CTRL-STOP-001` to real adapter tests.
+- [x] Bind `RUNTIME-CTRL-START-001` to retained runtime metadata command/use-case tests.
+- [ ] Bind `RUNTIME-CTRL-START-001` to real adapter tests.
+- [x] Bind `RUNTIME-CTRL-RESTART-001` to stop/start phase command/use-case tests.
+- [ ] Bind `RUNTIME-CTRL-RESTART-001` to real adapter tests.
+- [x] Bind `RUNTIME-CTRL-BLOCK-001` to missing/stale runtime metadata tests.
+- [x] Bind `RUNTIME-CTRL-COORD-001` to `resource-runtime` coordination tests.
 - [x] Bind `RUNTIME-CTRL-READ-001` to `resources.health.latestRuntimeControl` readback tests.
 - [x] Bind `RUNTIME-CTRL-DOCS-001` to public docs/help anchor checks.
 - [ ] Bind `RUNTIME-CTRL-SURFACE-001` to CLI/HTTP/Web/docs coverage.
 
 ## Implementation
 
-- [ ] Add runtime-control command schemas, handlers, use cases, and tokens.
-- [ ] Add provider-neutral runtime target control port.
+- [x] Add runtime-control command schemas, handlers, use cases, and tokens.
+- [x] Add provider-neutral runtime target control port.
+- [x] Add runtime-control attempt recorder port.
 - [ ] Add durable runtime-control attempt/read model persistence.
 - [ ] Implement local/generic-SSH Docker and Compose runtime-control adapters.
 - [ ] Add CLI, HTTP/oRPC, and Web entrypoints only after tests pass.
@@ -44,12 +48,12 @@
 
 ## Verification
 
-- [ ] Run targeted runtime-control tests.
+- [x] Run targeted runtime-control tests.
 - [ ] Run targeted CLI/oRPC/HTTP tests.
 - [ ] Run targeted Web semantic/browser tests.
-- [ ] Run `bun run typecheck`.
-- [ ] Run `bun run lint`.
-- [ ] Run `git diff --check`.
+- [x] Run `bun run typecheck`.
+- [x] Run `bun run lint`.
+- [x] Run `git diff --check`.
 
 ## Post-Implementation Sync
 

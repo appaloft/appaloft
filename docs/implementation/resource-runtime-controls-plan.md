@@ -26,15 +26,18 @@ authorization.
 
 ### 2. Application Model
 
-- Add command schemas, handlers, and use cases.
-- Add runtime-control attempt/result types.
+- Command schemas, handlers, and a shared use case now exist in `packages/application`.
+- Runtime-control attempt/result types now exist for command results, recorder input, target
+  requests, and target results.
 - Resolve Resource and retained runtime metadata from read models or repositories without letting
   adapters decide business admission.
 - Coordinate through `resource-runtime`.
+- Remaining application-model gaps are tied to durable attempt persistence and public activation,
+  not command admission or normalized port shape.
 
 ### 3. Runtime Target Port
 
-- Add a provider-neutral runtime control port for stop/start/restart.
+- A provider-neutral runtime control port contract now exists for stop/start/restart.
 - Implement local/generic-SSH Docker and Compose adapters behind that port.
 - Return sanitized status, phase, and support details only.
 

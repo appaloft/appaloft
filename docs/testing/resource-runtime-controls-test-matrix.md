@@ -2,9 +2,13 @@
 
 ## Status
 
-Spec Round placeholder for Phase 7 / `0.9.0`.
+Application command/use-case slice for Phase 7 / `0.9.0`.
 
-No runtime stop/start/restart command, route, Web action, or adapter control port is active yet.
+Runtime stop/start/restart command schemas, handlers, use case orchestration, coordination
+policies, provider-neutral target port contract, and attempt-recorder contract exist in
+`packages/application`. No runtime stop/start/restart operation is active in CLI, HTTP/oRPC, Web,
+`CORE_OPERATIONS.md`, or `operation-catalog.ts` yet, and no real runtime adapter or PG/PGlite
+attempt persistence is implemented yet.
 
 ## Governing Sources
 
@@ -25,11 +29,11 @@ No runtime stop/start/restart command, route, Web action, or adapter control por
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `RUNTIME-CTRL-STOP-001` | Running Resource runtime receives stop. | Stop attempt is persisted and adapter receives normalized stop request. | planned | Deferred gap |
-| `RUNTIME-CTRL-START-001` | Stopped Resource runtime has retained metadata. | Start attempt is persisted and adapter receives normalized start request without deployment creation. | planned | Deferred gap |
-| `RUNTIME-CTRL-RESTART-001` | Running Resource runtime receives restart. | Restart attempt records stop/start phases and does not create a Deployment attempt. | planned | Deferred gap |
-| `RUNTIME-CTRL-BLOCK-001` | Runtime metadata is missing or stale. | Command returns stable blocked reason and suggests redeploy or recovery readiness. | planned | Deferred gap |
-| `RUNTIME-CTRL-COORD-001` | Deployment or recovery mutation is active for same resource-runtime scope. | Runtime control is blocked or returns coordination timeout without adapter execution. | planned | Deferred gap |
+| `RUNTIME-CTRL-STOP-001` | Running Resource runtime receives stop. | Stop attempt is persisted and adapter receives normalized stop request. | `packages/application/test/resource-runtime-control.test.ts` | Application slice passing; real adapter deferred |
+| `RUNTIME-CTRL-START-001` | Stopped Resource runtime has retained metadata. | Start attempt is persisted and adapter receives normalized start request without deployment creation. | `packages/application/test/resource-runtime-control.test.ts` | Application slice passing; real adapter deferred |
+| `RUNTIME-CTRL-RESTART-001` | Running Resource runtime receives restart. | Restart attempt records stop/start phases and does not create a Deployment attempt. | `packages/application/test/resource-runtime-control.test.ts` | Application slice passing; real adapter deferred |
+| `RUNTIME-CTRL-BLOCK-001` | Runtime metadata is missing or stale. | Command returns stable blocked reason and suggests redeploy or recovery readiness. | `packages/application/test/resource-runtime-control.test.ts` | Passing |
+| `RUNTIME-CTRL-COORD-001` | Deployment or recovery mutation is active for same resource-runtime scope. | Runtime control is blocked or returns coordination timeout without adapter execution. | `packages/application/test/resource-runtime-control.test.ts` | Passing |
 
 ## Readback Coverage
 
@@ -57,5 +61,12 @@ No runtime stop/start/restart command, route, Web action, or adapter control por
 Runtime logs and resource health observation are active. Deployment retry, redeploy, and rollback
 are active recovery operations. `resources.health` now has a typed optional
 `latestRuntimeControl` readback and public runtime-control help anchors have explicit registry
-coverage. Runtime stop/start/restart remains unimplemented until command/use-case, coordination,
-adapter, CLI/HTTP/Web, `CORE_OPERATIONS.md`, and operation catalog activation slices are aligned.
+coverage.
+
+Runtime stop/start/restart now has application-layer command schemas, command handlers, a shared
+use case, `resource-runtime` coordination policies, a provider-neutral runtime target port
+contract, and a runtime-control attempt recorder port. The command/use-case tests use fake target
+and recorder collaborators to prove admission, normalized request mapping, attempt record ordering,
+phase readback, and coordination scope. Runtime control remains inactive until real durable
+attempt persistence, runtime adapters, CLI/HTTP/Web entrypoints, `CORE_OPERATIONS.md`, and
+operation catalog activation slices are aligned.

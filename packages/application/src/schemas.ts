@@ -68,6 +68,7 @@ export * from "./operations/resources/resource-diagnostic-summary.schema";
 export * from "./operations/resources/resource-effective-config.schema";
 export * from "./operations/resources/resource-health.schema";
 export * from "./operations/resources/resource-proxy-configuration-preview.schema";
+export * from "./operations/resources/resource-runtime-control.schema";
 export * from "./operations/resources/resource-runtime-logs.schema";
 export * from "./operations/resources/set-resource-variable.schema";
 export * from "./operations/resources/show-resource.schema";
