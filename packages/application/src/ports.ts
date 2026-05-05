@@ -63,6 +63,7 @@ import {
   type RuntimeArtifactKind,
   type RuntimePlan,
   type ScheduledTaskDefinition,
+  type ScheduledTaskDefinitionMutationSpec,
   type ScheduledTaskDefinitionSelectionSpec,
   type ScheduledTaskRunAttempt,
   type ScheduledTaskRunAttemptMutationSpec,
@@ -402,6 +403,11 @@ export interface ScheduledTaskDefinitionRepository {
     context: RepositoryContext,
     spec: ScheduledTaskDefinitionSelectionSpec,
   ): Promise<ScheduledTaskDefinition | null>;
+  upsert(
+    context: RepositoryContext,
+    task: ScheduledTaskDefinition,
+    spec: ScheduledTaskDefinitionMutationSpec,
+  ): Promise<void>;
 }
 
 export interface ScheduledTaskRunAttemptRepository {

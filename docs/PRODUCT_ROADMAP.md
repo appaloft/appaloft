@@ -1102,6 +1102,11 @@ Current verification notes:
   synchronous execution, including disabled-task and archived-Resource admission blockers.
   Remaining handlers/use cases, persistence, scheduler/runtime execution, entrypoints, and public
   docs remain open.
+- 2026-05-05 Phase 7 scheduled task create admission slice added the inactive application
+  handler/use case and definition repository upsert contract to validate and store Resource-owned
+  task definitions, including archived-Resource and unsafe-command blockers. Update/delete/list/show
+  handlers, persistence/read models, scheduler/runtime execution, entrypoints, and public docs
+  remain open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

@@ -20,6 +20,9 @@
   summaries.
 - [x] `SCHED-TASK-APP-001`: inactive application command/query messages parse target
   scheduled-task inputs without activating operation catalog entries.
+- [x] `SCHED-TASK-CREATE-001`: create accepts a Resource-owned task definition without activating
+  operation catalog entries.
+- [x] `SCHED-TASK-CREATE-002`: Resource archive blocks task creation before persistence.
 - [x] `SCHED-TASK-RUN-001`: run-now accepts a run attempt without completing it synchronously.
 - [x] `SCHED-TASK-RUN-002`: Resource archive blocks run-now before runtime execution.
 - [ ] `SCHED-TASK-SCHED-001`: scheduler dispatches through the same run admission use case.
@@ -32,6 +35,7 @@
 - [x] Add core scheduled-task run attempt state machine.
 - [x] Add inactive application scheduled-task command/query schemas, messages, and read-model
   ports.
+- [x] Add inactive application create task admission handler/use case.
 - [x] Add inactive application run-now admission handler/use case.
 - [ ] Add remaining application scheduled-task handlers/use cases.
 - [ ] Add persistence/read models.

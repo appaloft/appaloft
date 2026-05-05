@@ -107,6 +107,7 @@ export * from "./operations/resources/show-resource.query-service";
 export * from "./operations/resources/show-resource-dependency-binding.query-service";
 export * from "./operations/resources/unbind-resource-dependency.use-case";
 export * from "./operations/resources/unset-resource-variable.use-case";
+export * from "./operations/scheduled-tasks/create-scheduled-task.use-case";
 export * from "./operations/scheduled-tasks/run-scheduled-task-now.use-case";
 export * from "./operations/servers/bootstrap-server-proxy.use-case";
 export * from "./operations/servers/check-server-delete-safety.query-service";

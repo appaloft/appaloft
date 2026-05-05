@@ -63,6 +63,10 @@ DDD or internal process-manager terminology.
 - Inactive application command/query schemas, messages, result DTOs, and read-model ports exist
   for the target scheduled-task and scheduled-task-run operations. They are not active operation
   catalog entries and have no handlers/use cases yet.
+- Inactive application create admission exists. It loads the owning Resource, rejects
+  archived/deleted Resources before storing the task, validates schedule/timezone/command
+  intent/timeout/retry/status/concurrency through core value objects, and stores a Resource-owned
+  task definition through the scheduled-task definition repository port.
 - Inactive application run-now admission exists. It loads the Resource-owned task, rejects disabled
   tasks or archived/deleted Resources before runtime execution, records an accepted manual run
   attempt, and returns a run id without starting the task command synchronously.
