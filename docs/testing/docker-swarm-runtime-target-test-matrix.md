@@ -44,4 +44,7 @@ Code Rounds; no Swarm implementation is active yet.
 - `SWARM-TARGET-SELECT-001` has adapter registry coverage proving an explicitly registered
   `docker-swarm` backend is selected only by `orchestrator-cluster`, provider key, and required
   capabilities.
+- `SWARM-TARGET-ADM-002` has application admission coverage proving an `orchestrator-cluster` /
+  `docker-swarm` target without required runtime backend capability returns
+  `runtime_target_unsupported` before any deployment row is accepted.
 - No Docker Swarm runtime target execution backend is active in the default registry yet.
