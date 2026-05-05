@@ -10,7 +10,7 @@
 
 ## Test-First
 
-- [ ] `SCHED-TASK-CATALOG-001`: operation catalog entries appear only when activated.
+- [x] `SCHED-TASK-CATALOG-001`: operation catalog entries appear when activated.
 - [x] `SCHED-TASK-DOMAIN-001`: task definition value objects validate schedule, timezone, command
   intent, timeout, retry, status, and concurrency policy.
 - [x] `SCHED-TASK-DOMAIN-002`: invalid schedule or unsafe command intent returns structured
@@ -18,19 +18,15 @@
 - [x] `SCHED-TASK-DOMAIN-003`: run attempt state starts accepted, transitions to running and
   terminal succeeded/failed/skipped states, and rejects invalid transitions or unsafe failure
   summaries.
-- [x] `SCHED-TASK-APP-001`: inactive application command/query messages parse target
-  scheduled-task inputs without activating operation catalog entries.
-- [x] `SCHED-TASK-CREATE-001`: create accepts a Resource-owned task definition without activating
-  operation catalog entries.
+- [x] `SCHED-TASK-APP-001`: application command/query messages parse target scheduled-task inputs
+  and align with active operation catalog entries.
+- [x] `SCHED-TASK-CREATE-001`: create accepts a Resource-owned task definition.
 - [x] `SCHED-TASK-CREATE-002`: Resource archive blocks task creation before persistence.
-- [x] `SCHED-TASK-QUERY-001`: task list/show queries wrap scheduled-task read models without
-  activating operation catalog entries.
+- [x] `SCHED-TASK-QUERY-001`: task list/show queries wrap scheduled-task read models.
 - [x] `SCHED-TASK-QUERY-002`: missing task show query returns structured not-found details.
-- [x] `SCHED-TASK-UPDATE-001`: update patches a Resource-owned task definition without activating
-  operation catalog entries.
+- [x] `SCHED-TASK-UPDATE-001`: update patches a Resource-owned task definition.
 - [x] `SCHED-TASK-UPDATE-002`: Resource archive blocks task updates before persistence.
-- [x] `SCHED-TASK-DELETE-001`: delete removes a Resource-owned task definition without activating
-  operation catalog entries.
+- [x] `SCHED-TASK-DELETE-001`: delete removes a Resource-owned task definition.
 - [x] `SCHED-TASK-DELETE-002`: Resource context mismatch blocks delete before persistence.
 - [x] `SCHED-TASK-RUN-001`: run-now accepts a run attempt without completing it synchronously.
 - [x] `SCHED-TASK-RUN-002`: Resource archive blocks run-now before runtime execution.
@@ -47,19 +43,20 @@
 - [x] `SCHED-TASK-WORKER-001`: accepted run worker invokes runtime execution and persists terminal
   run/log state.
 - [x] `SCHED-TASK-LOGS-001`: task-run logs are separate from deployment/resource runtime logs.
+- [x] `SCHED-TASK-ENTRY-001`: HTTP/oRPC entrypoints dispatch scheduled task command/query messages
+  through catalog schemas.
 - [ ] `SCHED-TASK-SECRET-001`: task definitions, runs, logs, and errors mask secrets.
 
 ## Implementation
 
 - [x] Add core scheduled-task definition value objects and Resource-owned state shape.
 - [x] Add core scheduled-task run attempt state machine.
-- [x] Add inactive application scheduled-task command/query schemas, messages, and read-model
-  ports.
-- [x] Add inactive application create task admission handler/use case.
-- [x] Add inactive application update task admission handler/use case.
-- [x] Add inactive application delete task admission handler/use case.
-- [x] Add inactive application run-now admission handler/use case.
-- [x] Add inactive application read-query handlers/services for task and run history surfaces.
+- [x] Add application scheduled-task command/query schemas, messages, and read-model ports.
+- [x] Add application create task admission handler/use case.
+- [x] Add application configure task admission handler/use case.
+- [x] Add application delete task admission handler/use case.
+- [x] Add application run-now admission handler/use case.
+- [x] Add application read-query handlers/services for task and run history surfaces.
 - [x] Add remaining application scheduled-task handlers/use cases.
 - [x] Add scheduled-task definition persistence repository/read model.
 - [x] Add scheduled-task run-attempt persistence repository/read model.
@@ -72,6 +69,10 @@
 - [x] Add runtime adapter one-off task execution/log support.
 - [x] Add accepted-run worker wiring.
 - [ ] Add CLI/API/Web/MCP surfaces.
+  - [x] Activate operation catalog and HTTP/oRPC surfaces.
+  - [ ] Add CLI commands.
+  - [ ] Add Web controls.
+  - [ ] Add public docs/help and verify generated MCP descriptors.
 
 ## Docs Round
 

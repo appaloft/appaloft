@@ -19,14 +19,14 @@ safe retry behavior without confusing them with deployments or hiding them as se
 
 ## Target Operations
 
-These operations are accepted candidates, not active catalog entries yet:
+These operations are active catalog entries with HTTP/oRPC routes:
 
 | Operation | Kind | Purpose |
 | --- | --- | --- |
 | `scheduled-tasks.create` | Command | Create a Resource-owned scheduled task definition. |
 | `scheduled-tasks.list` | Query | List task definitions for a Resource/project/environment context. |
 | `scheduled-tasks.show` | Query | Show one task definition with latest run summary. |
-| `scheduled-tasks.update` | Command | Change enabled state, schedule, command intent, timeout, retry, or concurrency policy. |
+| `scheduled-tasks.configure` | Command | Change enabled state, schedule, command intent, timeout, retry, or concurrency policy. |
 | `scheduled-tasks.delete` | Command | Remove or archive a task definition after safety checks. |
 | `scheduled-tasks.run-now` | Command | Accept an immediate run attempt for one task. |
 | `scheduled-task-runs.list` | Query | List run attempts for a task or Resource. |
@@ -60,14 +60,14 @@ DDD or internal process-manager terminology.
 - Core scheduled task run attempts exist with Resource/task ownership, manual or scheduled trigger
   kind, accepted/running/succeeded/failed/skipped lifecycle state, timestamps, safe exit/failure
   summary fields, and no Deployment id.
-- Inactive application command/query schemas, messages, result DTOs, and read-model ports exist
-  for the target scheduled-task and scheduled-task-run operations. They are not active operation
-  catalog entries and have no handlers/use cases yet.
+- Application command/query schemas, messages, result DTOs, and read-model ports exist for the
+  target scheduled-task and scheduled-task-run operations. The operation catalog and HTTP/oRPC
+  routes are active.
 - Inactive application create admission exists. It loads the owning Resource, rejects
   archived/deleted Resources before storing the task, validates schedule/timezone/command
   intent/timeout/retry/status/concurrency through core value objects, and stores a Resource-owned
   task definition through the scheduled-task definition repository port.
-- Inactive application update admission exists. It loads the Resource-owned task and Resource,
+- Inactive application configure admission exists. It loads the Resource-owned task and Resource,
   rejects archived/deleted Resources before storing changes, validates every patched field through
   core value objects, and persists through the same scheduled-task definition repository port.
 - Inactive application delete admission exists. It loads the Resource-owned task, verifies Resource
@@ -109,6 +109,7 @@ DDD or internal process-manager terminology.
   reader, run-log recorder, runtime port, handlers, use cases, scheduler, and accepted-run worker.
   An opt-in scheduled task runner config can start a shell timer that scans due tasks and drains
   admitted runs through the worker in long-running shell processes.
-- No operation catalog entries are active.
-- No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
-- The scheduled task runner is disabled by default until public entrypoints and docs are activated.
+- Operation catalog entries and HTTP/oRPC routes are active for scheduled tasks and run history.
+- CLI commands, Web controls, and public docs remain open. Generated MCP descriptors consume the
+  active operation catalog entries.
+- The scheduled task runner is disabled by default until operators explicitly enable it.

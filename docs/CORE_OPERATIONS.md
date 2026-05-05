@@ -303,6 +303,20 @@ Phase 7 storage operations:
 | Attach storage to resource | Command | `resources.attach-storage` | `AttachResourceStorageCommand` | `AttachResourceStorageCommandInput` | `appaloft resource storage attach <resourceId> <storageVolumeId> --destination-path <path>` | `POST /api/resources/{resourceId}/storage-attachments` |
 | Detach storage from resource | Command | `resources.detach-storage` | `DetachResourceStorageCommand` | `DetachResourceStorageCommandInput` | `appaloft resource storage detach <resourceId> <attachmentId>` | `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` |
 
+Phase 7 scheduled task operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| Create scheduled task | Command | `scheduled-tasks.create` | `CreateScheduledTaskCommand` | `CreateScheduledTaskCommandInput` | `appaloft scheduled-task create <resourceId>` | `POST /api/scheduled-tasks` |
+| List scheduled tasks | Query | `scheduled-tasks.list` | `ListScheduledTasksQuery` | `ListScheduledTasksQueryInput` | `appaloft scheduled-task list` | `GET /api/scheduled-tasks` |
+| Show scheduled task | Query | `scheduled-tasks.show` | `ShowScheduledTaskQuery` | `ShowScheduledTaskQueryInput` | `appaloft scheduled-task show <taskId>` | `GET /api/scheduled-tasks/{taskId}` |
+| Configure scheduled task | Command | `scheduled-tasks.configure` | `ConfigureScheduledTaskCommand` | `ConfigureScheduledTaskCommandInput` | `appaloft scheduled-task configure <taskId>` | `POST /api/scheduled-tasks/{taskId}` |
+| Delete scheduled task | Command | `scheduled-tasks.delete` | `DeleteScheduledTaskCommand` | `DeleteScheduledTaskCommandInput` | `appaloft scheduled-task delete <taskId>` | `DELETE /api/scheduled-tasks/{taskId}` |
+| Run scheduled task now | Command | `scheduled-tasks.run-now` | `RunScheduledTaskNowCommand` | `RunScheduledTaskNowCommandInput` | `appaloft scheduled-task run <taskId>` | `POST /api/scheduled-tasks/{taskId}/runs` |
+| List scheduled task runs | Query | `scheduled-task-runs.list` | `ListScheduledTaskRunsQuery` | `ListScheduledTaskRunsQueryInput` | `appaloft scheduled-task runs list` | `GET /api/scheduled-task-runs` |
+| Show scheduled task run | Query | `scheduled-task-runs.show` | `ShowScheduledTaskRunQuery` | `ShowScheduledTaskRunQueryInput` | `appaloft scheduled-task runs show <runId>` | `GET /api/scheduled-task-runs/{runId}` |
+| Read scheduled task run logs | Query | `scheduled-task-runs.logs` | `ScheduledTaskRunLogsQuery` | `ScheduledTaskRunLogsQueryInput` | `appaloft scheduled-task runs logs <runId>` | `GET /api/scheduled-task-runs/{runId}/logs` |
+
 Phase 7 dependency resource operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |

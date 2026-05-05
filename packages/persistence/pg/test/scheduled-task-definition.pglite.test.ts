@@ -146,7 +146,7 @@ describe("scheduled task definition persistence", () => {
       expect(persisted?.toState().commandIntent.value).toBe("bun run backup");
 
       persisted
-        ?.update({
+        ?.configure({
           schedule: ScheduledTaskScheduleExpression.create("0 2 * * *")._unsafeUnwrap(),
           status: ScheduledTaskDefinitionStatusValue.disabled(),
         })

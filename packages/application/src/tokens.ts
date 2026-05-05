@@ -208,7 +208,7 @@ export const tokens = {
     "appaloft.resource_runtime_control_attempt_recorder",
   ),
   createScheduledTaskUseCase: Symbol.for("appaloft.create_scheduled_task_use_case"),
-  updateScheduledTaskUseCase: Symbol.for("appaloft.update_scheduled_task_use_case"),
+  configureScheduledTaskUseCase: Symbol.for("appaloft.configure_scheduled_task_use_case"),
   deleteScheduledTaskUseCase: Symbol.for("appaloft.delete_scheduled_task_use_case"),
   listScheduledTasksQueryService: Symbol.for("appaloft.list_scheduled_tasks_query_service"),
   showScheduledTaskQueryService: Symbol.for("appaloft.show_scheduled_task_query_service"),

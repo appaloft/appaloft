@@ -3407,6 +3407,105 @@ export const deploymentLogsResponseSchema = z.object({
   logs: z.array(deploymentLogEntrySchema),
 });
 
+export const scheduledTaskRunStatusSchema = z.enum([
+  "accepted",
+  "running",
+  "succeeded",
+  "failed",
+  "skipped",
+]);
+
+export const scheduledTaskRunTriggerKindSchema = z.enum(["manual", "scheduled"]);
+
+export const scheduledTaskRunSummarySchema = z.object({
+  runId: z.string(),
+  taskId: z.string(),
+  resourceId: z.string(),
+  triggerKind: scheduledTaskRunTriggerKindSchema,
+  status: scheduledTaskRunStatusSchema,
+  createdAt: z.string(),
+  startedAt: z.string().optional(),
+  finishedAt: z.string().optional(),
+  exitCode: z.number().optional(),
+  failureSummary: z.string().optional(),
+  skippedReason: z.enum(["concurrency-forbidden", "resource-archived", "task-disabled"]).optional(),
+});
+
+export const scheduledTaskDefinitionSummarySchema = z.object({
+  taskId: z.string(),
+  resourceId: z.string(),
+  schedule: z.string(),
+  timezone: z.string(),
+  commandIntent: z.string(),
+  timeoutSeconds: z.number(),
+  retryLimit: z.number(),
+  concurrencyPolicy: z.enum(["forbid"]),
+  status: z.enum(["enabled", "disabled"]),
+  createdAt: z.string(),
+  updatedAt: z.string().optional(),
+  latestRun: scheduledTaskRunSummarySchema.optional(),
+});
+
+export const scheduledTaskCommandResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-tasks.command/v1"),
+  task: scheduledTaskDefinitionSummarySchema,
+});
+
+export const deleteScheduledTaskResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-tasks.delete/v1"),
+  taskId: z.string(),
+  resourceId: z.string(),
+  status: z.literal("deleted"),
+  deletedAt: z.string(),
+});
+
+export const runScheduledTaskNowResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-tasks.run-now/v1"),
+  run: scheduledTaskRunSummarySchema,
+});
+
+export const listScheduledTasksResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-tasks.list/v1"),
+  items: z.array(scheduledTaskDefinitionSummarySchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const showScheduledTaskResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-tasks.show/v1"),
+  task: scheduledTaskDefinitionSummarySchema,
+  generatedAt: z.string(),
+});
+
+export const listScheduledTaskRunsResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-task-runs.list/v1"),
+  items: z.array(scheduledTaskRunSummarySchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const showScheduledTaskRunResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-task-runs.show/v1"),
+  run: scheduledTaskRunSummarySchema,
+  generatedAt: z.string(),
+});
+
+export const scheduledTaskRunLogEntrySchema = z.object({
+  timestamp: z.string(),
+  stream: z.enum(["stdout", "stderr", "system"]),
+  message: z.string(),
+});
+
+export const scheduledTaskRunLogsResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-task-runs.logs/v1"),
+  runId: z.string(),
+  taskId: z.string(),
+  resourceId: z.string(),
+  entries: z.array(scheduledTaskRunLogEntrySchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
 export const deploymentObservedEventSchema = z.object({
   deploymentId: z.string(),
   sequence: z.number().int().positive(),
@@ -4192,6 +4291,19 @@ export type DeploymentAttemptRecoverySummary = z.infer<
 export type ShowDeploymentInput = z.infer<typeof showDeploymentInputSchema>;
 export type ShowDeploymentResponse = z.infer<typeof showDeploymentResponseSchema>;
 export type DeploymentLogsResponse = z.infer<typeof deploymentLogsResponseSchema>;
+export type ScheduledTaskRunStatus = z.infer<typeof scheduledTaskRunStatusSchema>;
+export type ScheduledTaskRunTriggerKind = z.infer<typeof scheduledTaskRunTriggerKindSchema>;
+export type ScheduledTaskRunSummary = z.infer<typeof scheduledTaskRunSummarySchema>;
+export type ScheduledTaskDefinitionSummary = z.infer<typeof scheduledTaskDefinitionSummarySchema>;
+export type ScheduledTaskCommandResponse = z.infer<typeof scheduledTaskCommandResponseSchema>;
+export type DeleteScheduledTaskResponse = z.infer<typeof deleteScheduledTaskResponseSchema>;
+export type RunScheduledTaskNowResponse = z.infer<typeof runScheduledTaskNowResponseSchema>;
+export type ListScheduledTasksResponse = z.infer<typeof listScheduledTasksResponseSchema>;
+export type ShowScheduledTaskResponse = z.infer<typeof showScheduledTaskResponseSchema>;
+export type ListScheduledTaskRunsResponse = z.infer<typeof listScheduledTaskRunsResponseSchema>;
+export type ShowScheduledTaskRunResponse = z.infer<typeof showScheduledTaskRunResponseSchema>;
+export type ScheduledTaskRunLogEntry = z.infer<typeof scheduledTaskRunLogEntrySchema>;
+export type ScheduledTaskRunLogsResponse = z.infer<typeof scheduledTaskRunLogsResponseSchema>;
 export type DeploymentObservedEvent = z.infer<typeof deploymentObservedEventSchema>;
 export type DeploymentEventStreamGap = z.infer<typeof deploymentEventStreamGapSchema>;
 export type DeploymentEventStreamEnvelope = z.infer<typeof deploymentEventStreamEnvelopeSchema>;

@@ -29,7 +29,7 @@ export const createScheduledTaskCommandInputSchema = z.object({
   idempotencyKey: nonEmptyTrimmedString("Idempotency key").optional(),
 });
 
-export const updateScheduledTaskCommandInputSchema = z.object({
+export const configureScheduledTaskCommandInputSchema = z.object({
   taskId: nonEmptyTrimmedString("Scheduled task id"),
   resourceId: nonEmptyTrimmedString("Resource id"),
   schedule: nonEmptyTrimmedString("Schedule").optional(),
@@ -96,9 +96,11 @@ export type CreateScheduledTaskCommandInput = z.input<typeof createScheduledTask
 export type CreateScheduledTaskCommandPayload = z.output<
   typeof createScheduledTaskCommandInputSchema
 >;
-export type UpdateScheduledTaskCommandInput = z.input<typeof updateScheduledTaskCommandInputSchema>;
-export type UpdateScheduledTaskCommandPayload = z.output<
-  typeof updateScheduledTaskCommandInputSchema
+export type ConfigureScheduledTaskCommandInput = z.input<
+  typeof configureScheduledTaskCommandInputSchema
+>;
+export type ConfigureScheduledTaskCommandPayload = z.output<
+  typeof configureScheduledTaskCommandInputSchema
 >;
 export type DeleteScheduledTaskCommandInput = z.input<typeof deleteScheduledTaskCommandInputSchema>;
 export type DeleteScheduledTaskCommandPayload = z.output<

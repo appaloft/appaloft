@@ -1111,9 +1111,9 @@ Current verification notes:
   and run-log query handlers/services over scheduled-task read-model ports with stable envelopes.
   Update/delete handlers, persistence/read models, scheduler/runtime execution, entrypoints, and
   public docs remain open.
-- 2026-05-05 Phase 7 scheduled task update admission slice added the inactive application
+- 2026-05-05 Phase 7 scheduled task configure admission slice added the inactive application
   handler/use case plus core VO-based definition patching to validate and store Resource-owned task
-  updates, including archived-Resource and unsafe-command blockers. Delete handler, persistence/read
+  configures, including archived-Resource and unsafe-command blockers. Delete handler, persistence/read
   models, scheduler/runtime execution, entrypoints, and public docs remain open.
 - 2026-05-05 Phase 7 scheduled task delete admission slice added the inactive application
   handler/use case and explicit definition delete mutation spec to remove Resource-owned task
@@ -1157,6 +1157,11 @@ Current verification notes:
   and long-running shell process wiring so enabled runners scan due tasks, admit scheduled runs,
   and drain admitted runs through the worker. Operation catalog entries, entrypoints, public docs,
   and broader secret masking coverage remain open.
+- 2026-05-05 Phase 7 scheduled task operation entrypoint slice activated
+  `scheduled-tasks.*` and `scheduled-task-runs.*` in `CORE_OPERATIONS.md`, the operation catalog,
+  and HTTP/oRPC routes with `SCHED-TASK-CATALOG-001`/`SCHED-TASK-ENTRY-001` coverage. CLI commands,
+  Web controls, public docs/help, generated MCP descriptor verification, and broader secret masking
+  coverage remain open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

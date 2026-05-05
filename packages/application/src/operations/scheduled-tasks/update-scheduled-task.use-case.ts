@@ -1,4 +1,5 @@
 import {
+  type ConfigureScheduledTaskDefinitionInput,
   domainError,
   err,
   ok,
@@ -16,7 +17,6 @@ import {
   ScheduledTaskTimeoutSeconds,
   ScheduledTaskTimezone,
   safeTry,
-  type UpdateScheduledTaskDefinitionInput,
   UpsertScheduledTaskDefinitionSpec,
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
@@ -29,7 +29,7 @@ import {
   type ScheduledTaskDefinitionSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
-import { type UpdateScheduledTaskCommandInput } from "./update-scheduled-task.command";
+import { type ConfigureScheduledTaskCommandInput } from "./update-scheduled-task.command";
 
 function taskSummaryFromDefinition(task: ScheduledTaskDefinition): ScheduledTaskDefinitionSummary {
   const state = task.toState();
@@ -48,7 +48,7 @@ function taskSummaryFromDefinition(task: ScheduledTaskDefinition): ScheduledTask
 }
 
 @injectable()
-export class UpdateScheduledTaskUseCase {
+export class ConfigureScheduledTaskUseCase {
   constructor(
     @inject(tokens.scheduledTaskDefinitionRepository)
     private readonly scheduledTaskDefinitionRepository: ScheduledTaskDefinitionRepository,
@@ -58,7 +58,7 @@ export class UpdateScheduledTaskUseCase {
 
   async execute(
     context: ExecutionContext,
-    input: UpdateScheduledTaskCommandInput,
+    input: ConfigureScheduledTaskCommandInput,
   ): Promise<Result<ScheduledTaskCommandResult>> {
     const { resourceRepository, scheduledTaskDefinitionRepository } = this;
     const repositoryContext = toRepositoryContext(context);
@@ -106,7 +106,7 @@ export class UpdateScheduledTaskUseCase {
         );
       }
 
-      const updates: UpdateScheduledTaskDefinitionInput = {};
+      const updates: ConfigureScheduledTaskDefinitionInput = {};
       if (input.schedule !== undefined) {
         updates.schedule = yield* ScheduledTaskScheduleExpression.create(input.schedule);
       }
@@ -131,7 +131,7 @@ export class UpdateScheduledTaskUseCase {
         updates.status = yield* ScheduledTaskDefinitionStatusValue.create(input.status);
       }
 
-      yield* task.update(updates);
+      yield* task.configure(updates);
 
       await scheduledTaskDefinitionRepository.upsert(
         repositoryContext,

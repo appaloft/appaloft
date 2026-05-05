@@ -4,20 +4,20 @@ import { CommandHandler, type CommandHandlerContract } from "../../cqrs";
 import { type ExecutionContext } from "../../execution-context";
 import { type ScheduledTaskCommandResult } from "../../ports";
 import { tokens } from "../../tokens";
-import { UpdateScheduledTaskCommand } from "./update-scheduled-task.command";
-import { type UpdateScheduledTaskUseCase } from "./update-scheduled-task.use-case";
+import { ConfigureScheduledTaskCommand } from "./update-scheduled-task.command";
+import { type ConfigureScheduledTaskUseCase } from "./update-scheduled-task.use-case";
 
-@CommandHandler(UpdateScheduledTaskCommand)
+@CommandHandler(ConfigureScheduledTaskCommand)
 @injectable()
-export class UpdateScheduledTaskCommandHandler
-  implements CommandHandlerContract<UpdateScheduledTaskCommand, ScheduledTaskCommandResult>
+export class ConfigureScheduledTaskCommandHandler
+  implements CommandHandlerContract<ConfigureScheduledTaskCommand, ScheduledTaskCommandResult>
 {
   constructor(
-    @inject(tokens.updateScheduledTaskUseCase)
-    private readonly useCase: UpdateScheduledTaskUseCase,
+    @inject(tokens.configureScheduledTaskUseCase)
+    private readonly useCase: ConfigureScheduledTaskUseCase,
   ) {}
 
-  handle(context: ExecutionContext, command: UpdateScheduledTaskCommand) {
+  handle(context: ExecutionContext, command: ConfigureScheduledTaskCommand) {
     return this.useCase.execute(context, {
       taskId: command.taskId,
       resourceId: command.resourceId,

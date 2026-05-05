@@ -116,7 +116,7 @@ describe("ScheduledTaskDefinition", () => {
       createdAt: CreatedAt.rehydrate("2026-05-05T00:00:00.000Z"),
     })._unsafeUnwrap();
 
-    const updated = task.update({
+    const updated = task.configure({
       schedule: ScheduledTaskScheduleExpression.create("0 2 * * *")._unsafeUnwrap(),
       timezone: ScheduledTaskTimezone.create("Asia/Shanghai")._unsafeUnwrap(),
       commandIntent: ScheduledTaskCommandIntent.create("bun run backup")._unsafeUnwrap(),
