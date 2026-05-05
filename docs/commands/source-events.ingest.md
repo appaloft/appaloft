@@ -2,12 +2,10 @@
 
 ## Status
 
-Accepted candidate integration boundary. Inactive application command handling, generic signed
-source-event verification, durable source-event dedupe persistence, and policy matching for ignored
-or blocked outcomes exist. A matching source-event dispatcher can invoke existing
-`deployments.create` admission and durably update source-event outcomes. Do not expose ingestion
-routes until provider adapters, read models, error contracts, public docs/help,
-`CORE_OPERATIONS.md`, `operation-catalog.ts`, and tests are aligned in Code Round.
+Accepted active integration boundary. Application command handling, generic signed verification,
+GitHub push verification/normalization, durable source-event dedupe persistence, policy matching
+for ignored or blocked outcomes, deployment dispatch, read models, public docs/help,
+`CORE_OPERATIONS.md`, `operation-catalog.ts`, and tests are aligned for the active HTTP routes.
 
 ## Governing Sources
 
@@ -148,7 +146,7 @@ Use [Source Event Auto Deploy Error Spec](../errors/source-events.md). Minimum c
 | --- | --- | --- |
 | Web | No raw webhook ingestion; reads source event results. | Active for Resource detail list |
 | CLI | Optional local smoke/diagnostic ingestion over normalized facts. | Future |
-| oRPC / HTTP | `POST /api/resources/{resourceId}/source-events/generic-signed` verifies Resource-scoped generic signed events. `POST /api/integrations/github/source-events` is the accepted GitHub push route for the next Code Round. | Active for generic signed route; GitHub route planned |
+| oRPC / HTTP | `POST /api/resources/{resourceId}/source-events/generic-signed` verifies Resource-scoped generic signed events. `POST /api/integrations/github/source-events` verifies GitHub push events and treats GitHub `ping` as a no-op. | Active |
 | Automation / MCP | Future event ingest tool only when verification input is safe. | Future |
 
 ## Tests

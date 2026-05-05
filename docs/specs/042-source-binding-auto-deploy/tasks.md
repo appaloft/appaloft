@@ -54,7 +54,7 @@
 - [x] Add policy matching for ignored source event outcomes.
 - [x] Dispatch matching events through existing deployment admission semantics.
 - [x] Add CLI, HTTP/oRPC, and Web entrypoints for generic signed ingestion and source event reads.
-- [ ] Add GitHub push webhook route after `SRC-AUTO-EVENT-007`, `SRC-AUTO-EVENT-008`, and
+- [x] Add GitHub push webhook route after `SRC-AUTO-EVENT-007`, `SRC-AUTO-EVENT-008`, and
   `SRC-AUTO-ENTRY-004` tests exist.
 
 ## Verification

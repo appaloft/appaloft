@@ -568,22 +568,22 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Ingest source event | Command | `source-events.ingest` | `IngestSourceEventCommand` | `IngestSourceEventCommandInput` | Not exposed | `POST /api/resources/{resourceId}/source-events/generic-signed` |
+| Ingest source event | Command | `source-events.ingest` | `IngestSourceEventCommand` | `IngestSourceEventCommandInput` | Not exposed | `POST /api/resources/{resourceId}/source-events/generic-signed`<br>`POST /api/integrations/github/source-events` |
 | List source events | Query | `source-events.list` | `ListSourceEventsQuery` | `ListSourceEventsQueryInput` | `appaloft source-event list --resource <resourceId>` | `GET /api/source-events` |
 | Show source event | Query | `source-events.show` | `ShowSourceEventQuery` | `ShowSourceEventQueryInput` | `appaloft source-event show <sourceEventId> --resource <resourceId>` | `GET /api/source-events/{sourceEventId}` |
 
 Current boundary:
-- `source-events.ingest` is active only for the Resource-scoped generic signed HTTP route. It
-  resolves the Resource policy's `resource-secret:<KEY>` reference, verifies
-  `X-Appaloft-Signature`, dispatches a scoped provider-neutral ingest command, and does not persist
-  raw payloads, signatures, or secret values.
+- `source-events.ingest` is active for the Resource-scoped generic signed HTTP route and the
+  system-scoped GitHub push webhook route. Generic signed ingestion resolves the Resource policy's
+  `resource-secret:<KEY>` reference and verifies `X-Appaloft-Signature`; GitHub ingestion verifies
+  `X-Hub-Signature-256` with `APPALOFT_GITHUB_WEBHOOK_SECRET`, treats `ping` as a no-op, and
+  dispatches push events without `scopeResourceId` so policy matching can fan out. Neither route
+  persists raw payloads, signatures, or secret values.
 - `source-events.list` and `source-events.show` are read-only diagnostics over persisted source
   event records. They require project or Resource scope and must not replay events, retry failed
   dispatch, mutate auto-deploy policy, or create deployments.
-- Provider-specific Git webhook ingestion remains deferred until provider payload parsing and
-  signature extraction are implemented. The planned first provider route is
-  `POST /api/integrations/github/source-events` with `APPALOFT_GITHUB_WEBHOOK_SECRET` and GitHub
-  `X-Hub-Signature-256` verification.
+- Additional provider-specific Git webhook ingestion remains deferred until provider payload
+  parsing and signature extraction are specified and tested.
 - Web Resource detail source-event diagnostics consume `source-events.list`; CLI and HTTP/oRPC
   read surfaces are active for operator diagnostics and API consumers.
 

@@ -10,6 +10,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   enrichResourceAccessFailureDiagnosticWithRouteContext,
+  type GitHubSourceEventWebhookVerifier,
   ListDeploymentsQuery,
   ListEnvironmentsQuery,
   ListProjectsQuery,
@@ -459,6 +460,7 @@ export function createHttpApp(input: {
   resourceAccessRouteContextLookup?: AutomaticRouteContextLookup;
   resourceRepository?: ResourceRepository;
   sourceEventVerificationPort?: SourceEventVerificationPort;
+  githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
 }) {
   const pluginMiddlewares = input.pluginRuntime?.listHttpMiddlewares() ?? [];
   const pluginRoutes = input.pluginRuntime?.listHttpRoutes() ?? [];
@@ -1096,6 +1098,16 @@ export function createHttpApp(input: {
     ...(input.sourceEventVerificationPort
       ? {
           sourceEventVerificationPort: input.sourceEventVerificationPort,
+        }
+      : {}),
+    ...(input.githubSourceEventWebhookVerifier
+      ? {
+          githubSourceEventWebhookVerifier: input.githubSourceEventWebhookVerifier,
+        }
+      : {}),
+    ...(input.config.githubWebhookSecret
+      ? {
+          githubWebhookSecret: input.config.githubWebhookSecret,
         }
       : {}),
     ...(input.requestContextRunner

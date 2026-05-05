@@ -202,6 +202,7 @@ export const tokens = {
   ),
   ingestSourceEventUseCase: Symbol.for("appaloft.ingest_source_event_use_case"),
   sourceEventVerificationPort: Symbol.for("appaloft.source_event_verification_port"),
+  githubSourceEventWebhookVerifier: Symbol.for("appaloft.github_source_event_webhook_verifier"),
   listSourceEventsQueryService: Symbol.for("appaloft.list_source_events_query_service"),
   showSourceEventQueryService: Symbol.for("appaloft.show_source_event_query_service"),
   openTerminalSessionUseCase: Symbol.for("appaloft.open_terminal_session_use_case"),

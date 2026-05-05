@@ -126,5 +126,5 @@ implemented and bound to
 `SRC-AUTO-EVENT-004`, `SRC-AUTO-QUERY-001`, and `SRC-AUTO-QUERY-002` core/application/PGlite
 tests.
 
-The broader feature remains partially active. Generic signed ingestion is active; the next provider
-adapter slice is GitHub push webhook verification and normalization through the governed HTTP route.
+The broader feature remains partially active. Generic signed ingestion and GitHub push webhook
+verification/normalization are active through governed HTTP routes.

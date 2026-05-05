@@ -1026,16 +1026,16 @@ Current verification notes:
 - 2026-05-05 Phase 7 generic signed webhook route slice activated
   `POST /api/resources/{resourceId}/source-events/generic-signed` with Resource-scoped
   `resource-secret:<KEY>` resolution, `X-Appaloft-Signature` HMAC verification, scoped source-event
-  ingestion, and `SRC-AUTO-ENTRY-002`/`SRC-AUTO-EVENT-006` automation. Web diagnostics, provider
-  Git ingestion, and future MCP/tool descriptors remain deferred.
+  ingestion, and `SRC-AUTO-ENTRY-002`/`SRC-AUTO-EVENT-006` automation. At that point Web
+  diagnostics, provider Git ingestion, and future MCP/tool descriptors remained deferred.
 - 2026-05-05 Phase 7 source-event coverage slice closed the remaining event matrix rows for
   dispatch dedupe, multi-Resource provider-signed fanout, and invalid generic signed HTTP
-  signatures. Web diagnostics, provider Git route adapters, and future MCP/tool descriptors remain
-  deferred.
+  signatures. At that point Web diagnostics, provider Git route adapters, and future MCP/tool
+  descriptors remained deferred.
 - 2026-05-05 Phase 7 source auto-deploy public help slice exposed setup, signatures, dedupe,
   ignored-event, and recovery anchors through API, CLI, and Web help registries with
-  `SRC-AUTO-SURFACE-003` automation. Web diagnostics, provider Git route adapters, and future
-  MCP/tool descriptors remain deferred.
+  `SRC-AUTO-SURFACE-003` automation. At that point Web diagnostics, provider Git route adapters,
+  and future MCP/tool descriptors remained deferred.
 - 2026-05-05 Phase 7 source auto-deploy Web diagnostics slice added Resource detail source-event
   diagnostics backed by `source-events.list`, including safe created-deployment links, dedupe
   visibility, ignored-policy reasons, and `SRC-AUTO-ENTRY-003` Web automation. Provider Git route
@@ -1043,9 +1043,13 @@ Current verification notes:
 - 2026-05-05 Phase 7 GitHub push webhook Spec Round extended ADR-037 and source-event specs with
   the first provider Git route, `POST /api/integrations/github/source-events`, using
   `APPALOFT_GITHUB_WEBHOOK_SECRET`, `X-Hub-Signature-256`, `X-GitHub-Delivery`, and planned
-  `SRC-AUTO-EVENT-007`/`SRC-AUTO-EVENT-008`/`SRC-AUTO-ENTRY-004` automation. It does not implement
-  the route yet, so the full `0.9.0` release rule remains blocked by provider Git route adapters,
-  preview, and cluster runtime items.
+  `SRC-AUTO-EVENT-007`/`SRC-AUTO-EVENT-008`/`SRC-AUTO-ENTRY-004` automation.
+- 2026-05-05 Phase 7 GitHub push webhook route slice activated
+  `POST /api/integrations/github/source-events` with provider signature verification,
+  normalization of safe GitHub push facts, delivery id dedupe input, no-op `ping`, shell config
+  wiring, and `SRC-AUTO-EVENT-007`/`SRC-AUTO-EVENT-008`/`SRC-AUTO-ENTRY-004` automation. The full
+  `0.9.0` release rule remains blocked by preview, future MCP/tool descriptors, and cluster
+  runtime items.
 
 Required:
 

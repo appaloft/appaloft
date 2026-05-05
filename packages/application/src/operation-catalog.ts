@@ -156,6 +156,10 @@ export interface OperationCatalogEntry {
       method: "GET" | "POST" | "DELETE";
       path: string;
     };
+    orpcAdditional?: {
+      method: "GET" | "POST" | "DELETE";
+      path: string;
+    }[];
     orpcStream?: {
       method: "GET" | "POST";
       path: string;
@@ -1564,6 +1568,12 @@ export const operationCatalog = [
         method: "POST",
         path: "/api/resources/{resourceId}/source-events/generic-signed",
       },
+      orpcAdditional: [
+        {
+          method: "POST",
+          path: "/api/integrations/github/source-events",
+        },
+      ],
     },
   },
   {

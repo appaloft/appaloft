@@ -455,7 +455,7 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(showEntry?.inputSchema).toBeDefined();
   });
 
-  test("[SRC-AUTO-ENTRY-002] source event ingest is exposed through the generic signed HTTP route", () => {
+  test("[SRC-AUTO-ENTRY-002][SRC-AUTO-ENTRY-004] source event ingest exposes governed HTTP routes", () => {
     const entry = operationCatalog.find((candidate) => candidate.key === "source-events.ingest");
 
     expect(entry).toMatchObject({
@@ -469,6 +469,12 @@ describe("operation catalog aggregate mutation boundary", () => {
           method: "POST",
           path: "/api/resources/{resourceId}/source-events/generic-signed",
         },
+        orpcAdditional: [
+          {
+            method: "POST",
+            path: "/api/integrations/github/source-events",
+          },
+        ],
       },
     });
     expect(entry?.inputSchema).toBeDefined();

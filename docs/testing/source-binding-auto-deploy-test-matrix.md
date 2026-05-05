@@ -48,8 +48,8 @@ workers are not active yet.
 | `SRC-AUTO-EVENT-004` | Generic signed webhook has invalid signature. | Event rejects before policy matching; no deployment is created. | `packages/application/test/source-events.test.ts`; `packages/orpc/test/source-event-generic-signed.http.test.ts` | Passing |
 | `SRC-AUTO-EVENT-005` | Multiple Resources match one event. | Each matching Resource creates at most one coordinated deployment attempt. | `packages/application/test/source-events.test.ts` | Passing |
 | `SRC-AUTO-EVENT-006` | Resource-scoped generic signed webhook targets a source also used by another Resource. | Secret resolution and matching are limited to the route Resource; no other Resource deployment is dispatched. | `packages/application/test/source-events.test.ts` | Passing |
-| `SRC-AUTO-EVENT-007` | GitHub push webhook has a valid provider signature. | Transport normalizes safe GitHub source facts, uses `X-GitHub-Delivery` for dedupe, dispatches `source-events.ingest` without `scopeResourceId`, and matching may fan out to multiple Resources. | planned: `packages/orpc/test/source-event-github.http.test.ts`; `packages/integrations/github/test/github-webhook.test.ts` | Planned |
-| `SRC-AUTO-EVENT-008` | GitHub webhook is missing configured secret, missing/invalid signature, unsupported event kind, or unsafe payload shape. | Route rejects before command dispatch; no source event or deployment is created; errors contain only safe provider/config metadata. | planned: `packages/orpc/test/source-event-github.http.test.ts`; `packages/integrations/github/test/github-webhook.test.ts`; `packages/config/test/index.test.ts` | Planned |
+| `SRC-AUTO-EVENT-007` | GitHub push webhook has a valid provider signature. | Transport normalizes safe GitHub source facts, uses `X-GitHub-Delivery` for dedupe, dispatches `source-events.ingest` without `scopeResourceId`, and matching may fan out to multiple Resources. | `packages/orpc/test/source-event-github.http.test.ts`; `packages/integrations/github/test/github-webhook.test.ts` | Passing |
+| `SRC-AUTO-EVENT-008` | GitHub webhook is missing configured secret, missing/invalid signature, unsupported event kind, or unsafe payload shape. | Route rejects before command dispatch; no source event or deployment is created; errors contain only safe provider/config metadata. | `packages/orpc/test/source-event-github.http.test.ts`; `packages/integrations/github/test/github-webhook.test.ts`; `packages/config/test/index.test.ts` | Passing |
 
 ## Query Coverage
 
@@ -65,7 +65,7 @@ workers are not active yet.
 | `SRC-AUTO-ENTRY-001` | CLI, HTTP/oRPC, Web, and future MCP/tool configure auto-deploy. | Entrypoints reuse the same command/query schemas and operation keys. | `packages/application/test/operation-catalog-boundary.test.ts`; package typechecks | Partial |
 | `SRC-AUTO-ENTRY-002` | HTTP generic signed webhook receives source event. | Transport resolves `resource-secret:<KEY>`, verifies signature, dispatches provider-neutral source event command with `scopeResourceId`, and never persists raw payload/signature/secret. | `packages/orpc/test/source-event-generic-signed.http.test.ts`; `packages/application/test/source-events.test.ts`; package typechecks | Passing |
 | `SRC-AUTO-ENTRY-003` | Web Resource detail shows event-created deployment. | Deployment links back to safe source event facts and ignored/deduped events remain visible. | `apps/web/src/lib/console/source-events.test.ts`; `apps/web/src/routes/resources/[resourceId]/+page.svelte`; package typechecks | Passing |
-| `SRC-AUTO-ENTRY-004` | HTTP GitHub push webhook receives provider-signed source event. | Route `POST /api/integrations/github/source-events` verifies `X-Hub-Signature-256` against `APPALOFT_GITHUB_WEBHOOK_SECRET`, treats `ping` as a no-op, dispatches push events through the shared command schema, and keeps raw payload/signature/secret out of command input, logs, errors, and read models. | planned: `packages/orpc/test/source-event-github.http.test.ts`; package typechecks | Planned |
+| `SRC-AUTO-ENTRY-004` | HTTP GitHub push webhook receives provider-signed source event. | Route `POST /api/integrations/github/source-events` verifies `X-Hub-Signature-256` against `APPALOFT_GITHUB_WEBHOOK_SECRET`, treats `ping` as a no-op, dispatches push events through the shared command schema, and keeps raw payload/signature/secret out of command input, logs, errors, and read models. | `packages/orpc/test/source-event-github.http.test.ts`; `packages/integrations/github/test/github-webhook.test.ts`; package typechecks | Passing |
 | `SRC-AUTO-SURFACE-003` | Public help links. | Setup, signatures, dedupe, ignored events, and recovery link to stable docs anchors in both locales. | `packages/orpc/test/docs-help.test.ts`; `packages/adapters/cli/test/docs-help.test.ts`; `apps/web/src/lib/console/docs-help.test.ts`; `packages/docs-registry/src/index.ts` | Passing |
 
 ## Current Implementation Notes And Migration Gaps
@@ -79,8 +79,6 @@ source events can dispatch through the existing deployment admission use case at
 boundary. The Resource-scoped generic signed HTTP route now resolves `resource-secret:<KEY>`,
 verifies `X-Appaloft-Signature`, dispatches `source-events.ingest` with `scopeResourceId`, and keeps
 dedupe scoped to the route Resource. Event dispatch, dedupe, Web source-event diagnostics, and
-public help-link coverage are now bound to automation. GitHub push webhook route shape and secret
-custody are specified but not implemented; provider-specific Git webhook ingestion remains deferred
-until `SRC-AUTO-EVENT-007`, `SRC-AUTO-EVENT-008`, and `SRC-AUTO-ENTRY-004` pass. Code Round must
-not mark auto-deploy complete until remaining rows have stable automation or explicit deferred
-exceptions.
+public help-link coverage are now bound to automation. GitHub push webhook route verification,
+normalization, no-op ping handling, and safe rejection paths are active. Code Round must not mark
+auto-deploy complete until remaining rows have stable automation or explicit deferred exceptions.

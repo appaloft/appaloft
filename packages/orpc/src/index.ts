@@ -92,6 +92,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   environmentEffectivePrecedenceQueryInputSchema,
+  type GitHubSourceEventWebhookVerifier,
   ImportCertificateCommand,
   ImportPostgresDependencyResourceCommand,
   ImportRedisDependencyResourceCommand,
@@ -390,6 +391,8 @@ export interface AppaloftOrpcContext {
   deploymentProgressObserver?: DeploymentProgressObserver;
   resourceRepository?: ResourceRepository;
   sourceEventVerificationPort?: SourceEventVerificationPort;
+  githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
+  githubWebhookSecret?: string;
 }
 
 interface AppaloftOrpcRequestContext extends AppaloftOrpcContext {
@@ -1019,6 +1022,15 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
       return new ORPCError("BAD_REQUEST", {
         message,
         status: 400,
+        data: {
+          domainCode: error.code,
+          locale: context.locale,
+        },
+      });
+    case "source_event_provider_webhook_not_configured":
+      return new ORPCError("SERVICE_UNAVAILABLE", {
+        message,
+        status: 503,
         data: {
           domainCode: error.code,
           locale: context.locale,
@@ -3248,6 +3260,62 @@ async function handleGenericSignedSourceEventRoute(input: {
   return Response.json(result.value);
 }
 
+async function handleGitHubSourceEventRoute(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  request: Request;
+}): Promise<Response> {
+  const { context, executionContext, request } = input;
+  if (!context.githubSourceEventWebhookVerifier) {
+    return sourceEventRouteUnavailableResponse();
+  }
+
+  const secretValue = context.githubWebhookSecret?.trim();
+  if (!secretValue) {
+    return domainErrorHttpResponse(
+      domainError.sourceEventProviderWebhookNotConfigured(
+        "GitHub source event webhook secret is not configured",
+        {
+          phase: "source-event-verification",
+          sourceKind: "github",
+        },
+      ),
+      executionContext,
+    );
+  }
+
+  const eventName = request.headers.get("x-github-event")?.trim() ?? "";
+  const deliveryId = request.headers.get("x-github-delivery")?.trim();
+  const signature = request.headers.get("x-hub-signature-256") ?? "";
+  const rawBody = await request.text();
+  const verified = await context.githubSourceEventWebhookVerifier.verify(executionContext, {
+    eventName,
+    rawBody,
+    signature,
+    secretValue,
+    ...(deliveryId ? { deliveryId } : {}),
+  });
+  if (verified.isErr()) {
+    return domainErrorHttpResponse(verified.error, executionContext);
+  }
+
+  if (verified.value.outcome === "noop") {
+    return new Response(null, { status: 204 });
+  }
+
+  const command = IngestSourceEventCommand.create(verified.value.sourceEvent);
+  if (command.isErr()) {
+    return domainErrorHttpResponse(command.error, executionContext);
+  }
+
+  const result = await context.commandBus.execute(executionContext, command.value);
+  if (result.isErr()) {
+    return domainErrorHttpResponse(result.error, executionContext);
+  }
+
+  return Response.json(result.value);
+}
+
 export function mountAppaloftOrpcRoutes(
   app: Elysia,
   context: AppaloftOrpcContext & {
@@ -3362,6 +3430,32 @@ export function mountAppaloftOrpcRoutes(
     }
   };
 
+  const githubSourceEventRouteHandler = async ({ request }: { request: Request }) => {
+    const executionContext = createRequestExecutionContext(
+      context.executionContextFactory,
+      "http",
+      request,
+    );
+    const run = createRequestRunner(request, executionContext, context.requestContextRunner);
+
+    try {
+      return await run(() =>
+        handleGitHubSourceEventRoute({
+          context,
+          executionContext,
+          request,
+        }),
+      );
+    } catch (error) {
+      context.logger.error("github_source_event_route_unhandled_error", {
+        method: request.method,
+        url: request.url,
+        ...buildUnexpectedErrorContext(error),
+      });
+      throw error;
+    }
+  };
+
   const routes = [
     "/api/projects",
     "/api/projects/:projectId",
@@ -3456,6 +3550,10 @@ export function mountAppaloftOrpcRoutes(
   ] as const;
 
   let mounted = app;
+
+  mounted = mounted.post("/api/integrations/github/source-events", githubSourceEventRouteHandler, {
+    parse: "none",
+  }) as unknown as Elysia;
 
   mounted = mounted.post(
     "/api/resources/:resourceId/source-events/generic-signed",
