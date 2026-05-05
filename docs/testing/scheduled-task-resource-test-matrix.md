@@ -31,6 +31,8 @@ logs. It is not active implementation coverage yet.
 | SCHED-TASK-RUN-001 | Application command | User runs a task now. | Command returns `ok({ runId })` after admission; run state starts as accepted/pending/running according to workflow. |
 | SCHED-TASK-RUN-002 | Application command | Resource is archived. | Run admission rejects or skips before runtime execution with a structured resource lifecycle phase. |
 | SCHED-TASK-RUN-QUERY-001 | Application query/log adapter | User lists or shows task runs or reads run logs. | Query handlers wrap run-specific read models with stable schema versions and generated timestamps while deployment/resource runtime logs remain unchanged. |
+| SCHED-TASK-PERSIST-001 | Persistence/read model | Task definition is stored and queried. | Postgres/PGlite repository rehydrates the Resource-owned task aggregate and read model lists/shows task definitions by Resource/project/environment/status filters. |
+| SCHED-TASK-PERSIST-002 | Persistence mutation | Task definition is deleted. | Postgres/PGlite repository delete mutation removes the Resource-owned definition from show/list read models without touching deployment history. |
 | SCHED-TASK-SCHED-001 | Scheduler | Enabled task is due. | Scheduler dispatches the same run admission path as run-now and records the same run shape. |
 | SCHED-TASK-SCHED-002 | Scheduler/concurrency | Previous run is non-terminal. | Default `forbid` policy prevents concurrent runtime execution and records safe skip/rejection state. |
 | SCHED-TASK-LOGS-001 | Query/log adapter | Run emits output. | `scheduled-task-runs.logs` reads run-scoped logs; deployment and resource runtime logs are unchanged. |
@@ -59,8 +61,10 @@ schedule, timezone, command intent, timeout, retry, lifecycle status, and `forbi
 policy plus a Resource-owned scheduled task definition state with no deployment id. They also add
 the core scheduled-task run attempt lifecycle for accepted, running, succeeded, failed, and skipped
 states with safe terminal details and no Deployment id.
+`SCHED-TASK-PERSIST-001` and `SCHED-TASK-PERSIST-002` have PGlite coverage in
+`packages/persistence/pg/test/scheduled-task-definition.pglite.test.ts`.
 
 Inactive application command/query schemas, messages, result DTOs, read-model ports, create,
 update, delete, and run-now admission handlers/use cases, and read-query handlers/services exist. No
-operation catalog entries, persisted scheduled-task/run state, scheduler process manager, runtime
-adapter execution path, task-run logs, entrypoints, or public docs are active yet.
+operation catalog entries, persisted run-attempt/run-log state, scheduler process manager, runtime
+adapter execution path, entrypoints, or public docs are active yet.

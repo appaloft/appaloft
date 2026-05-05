@@ -529,6 +529,19 @@ export interface ResourceRuntimeControlAttemptsTable {
   updated_at: UpdatableTimestampColumn;
 }
 
+export interface ScheduledTaskDefinitionsTable {
+  id: string;
+  resource_id: string;
+  schedule: string;
+  timezone: string;
+  command_intent: string;
+  timeout_seconds: number;
+  retry_limit: number;
+  concurrency_policy: string;
+  status: string;
+  created_at: TimestampColumn;
+}
+
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
@@ -558,4 +571,5 @@ export interface Database {
   process_attempt_journal: ProcessAttemptJournalTable;
   resource_access_failure_evidence: ResourceAccessFailureEvidenceTable;
   resource_runtime_control_attempts: ResourceRuntimeControlAttemptsTable;
+  scheduled_task_definitions: ScheduledTaskDefinitionsTable;
 }

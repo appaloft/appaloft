@@ -55,6 +55,7 @@ import { resourceRuntimeControlAttemptsMigration } from "./migrations/047_resour
 import { resourceAutoDeployPolicyMigration } from "./migrations/048_resource_auto_deploy_policy";
 import { sourceEventsMigration } from "./migrations/049_source_events";
 import { serverTargetKindMigration } from "./migrations/050_server_target_kind";
+import { scheduledTaskDefinitionsMigration } from "./migrations/051_scheduled_task_definitions";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -201,6 +202,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "048_resource_auto_deploy_policy": resourceAutoDeployPolicyMigration,
       "049_source_events": sourceEventsMigration,
       "050_server_target_kind": serverTargetKindMigration,
+      "051_scheduled_task_definitions": scheduledTaskDefinitionsMigration,
     };
   }
 }
