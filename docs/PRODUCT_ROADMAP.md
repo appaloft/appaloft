@@ -1130,6 +1130,11 @@ Current verification notes:
 - 2026-05-05 Phase 7 scheduled task run-log persistence slice added Postgres/PGlite storage and
   a run-scoped read model for scheduled task output with secret-looking message masking. Scheduler
   dispatch, runtime execution, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task scheduler admission slice added an inactive application
+  scheduler process manager, due-candidate reader port, and shared run admission service so due
+  scheduled tasks record `scheduled` trigger run attempts through the same checks as run-now.
+  Due-candidate persistence, shell runner, runtime execution, entrypoints, and public docs remain
+  open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

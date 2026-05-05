@@ -419,6 +419,22 @@ export interface ScheduledTaskRunAttemptRepository {
   ): Promise<void>;
 }
 
+export interface ScheduledTaskDueCandidate {
+  taskId: string;
+  resourceId: string;
+  scheduledFor: string;
+}
+
+export interface ScheduledTaskDueCandidateReader {
+  listDue(
+    context: RepositoryContext,
+    input: {
+      now: string;
+      limit: number;
+    },
+  ): Promise<ScheduledTaskDueCandidate[]>;
+}
+
 export interface StorageVolumeRepository {
   findOne(
     context: RepositoryContext,

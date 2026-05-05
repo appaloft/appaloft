@@ -26,14 +26,21 @@ import {
   ScheduledTaskTimezone,
   UpsertResourceSpec,
 } from "@appaloft/core";
-import { FixedClock, MemoryResourceRepository, SequenceIdGenerator } from "@appaloft/testkit";
+import {
+  FixedClock,
+  MemoryResourceRepository,
+  NoopLogger,
+  SequenceIdGenerator,
+} from "@appaloft/testkit";
 
 import { createExecutionContext, type RepositoryContext, toRepositoryContext } from "../src";
 import {
   type ScheduledTaskDefinitionRepository,
+  type ScheduledTaskDueCandidate,
+  type ScheduledTaskDueCandidateReader,
   type ScheduledTaskRunAttemptRepository,
 } from "../src/ports";
-import { RunScheduledTaskNowUseCase, ScheduledTaskRunAdmissionService } from "../src/use-cases";
+import { ScheduledTaskRunAdmissionService, ScheduledTaskScheduler } from "../src/use-cases";
 
 class StaticScheduledTaskDefinitionRepository implements ScheduledTaskDefinitionRepository {
   constructor(private readonly task: ScheduledTaskDefinition | null) {}
@@ -87,31 +94,40 @@ class RecordingScheduledTaskRunAttemptRepository implements ScheduledTaskRunAtte
   }
 }
 
-function resourceFixture(input?: {
-  id?: string;
-  lifecycleStatus?: "active" | "archived" | "deleted";
-}): Resource {
+class StaticScheduledTaskDueCandidateReader implements ScheduledTaskDueCandidateReader {
+  readonly inputs: Parameters<ScheduledTaskDueCandidateReader["listDue"]>[1][] = [];
+
+  constructor(private readonly candidates: ScheduledTaskDueCandidate[]) {}
+
+  async listDue(
+    _context: RepositoryContext,
+    input: Parameters<ScheduledTaskDueCandidateReader["listDue"]>[1],
+  ): Promise<ScheduledTaskDueCandidate[]> {
+    this.inputs.push(input);
+    return this.candidates.slice(0, input.limit);
+  }
+}
+
+function resourceFixture(): Resource {
   return Resource.rehydrate({
-    id: ResourceId.rehydrate(input?.id ?? "res_api"),
+    id: ResourceId.rehydrate("res_api"),
     projectId: ProjectId.rehydrate("prj_demo"),
     environmentId: EnvironmentId.rehydrate("env_demo"),
     name: ResourceName.rehydrate("API"),
     slug: ResourceSlug.rehydrate("api"),
     kind: ResourceKindValue.rehydrate("application"),
     services: [],
-    lifecycleStatus: ResourceLifecycleStatusValue.rehydrate(input?.lifecycleStatus ?? "active"),
+    lifecycleStatus: ResourceLifecycleStatusValue.active(),
     createdAt: CreatedAt.rehydrate("2026-05-05T00:00:00.000Z"),
   });
 }
 
 function scheduledTaskFixture(input?: {
-  taskId?: string;
-  resourceId?: string;
   status?: "enabled" | "disabled";
 }): ScheduledTaskDefinition {
   return ScheduledTaskDefinition.create({
-    id: ScheduledTaskId.rehydrate(input?.taskId ?? "tsk_daily_migration"),
-    resourceId: ResourceId.rehydrate(input?.resourceId ?? "res_api"),
+    id: ScheduledTaskId.rehydrate("tsk_daily_migration"),
+    resourceId: ResourceId.rehydrate("res_api"),
     schedule: ScheduledTaskScheduleExpression.rehydrate("0 1 * * *"),
     timezone: ScheduledTaskTimezone.rehydrate("UTC"),
     commandIntent: ScheduledTaskCommandIntent.rehydrate("bun run migrate"),
@@ -128,108 +144,96 @@ function scheduledTaskFixture(input?: {
 
 async function createHarness(input?: {
   task?: ScheduledTaskDefinition | null;
-  resource?: Resource;
+  candidates?: ScheduledTaskDueCandidate[];
 }) {
   const context = createExecutionContext({
-    requestId: "req_scheduled_task_run_now_test",
+    requestId: "req_scheduled_task_scheduler_test",
     entrypoint: "system",
   });
   const resourceRepository = new MemoryResourceRepository();
-  const resource = input?.resource ?? resourceFixture();
   await resourceRepository.upsert(
     toRepositoryContext(context),
-    resource,
-    UpsertResourceSpec.fromResource(resource),
+    resourceFixture(),
+    UpsertResourceSpec.fromResource(resourceFixture()),
   );
   const runAttemptRepository = new RecordingScheduledTaskRunAttemptRepository();
+  const dueReader = new StaticScheduledTaskDueCandidateReader(
+    input?.candidates ?? [
+      {
+        taskId: "tsk_daily_migration",
+        resourceId: "res_api",
+        scheduledFor: "2026-05-05T00:00:00.000Z",
+      },
+    ],
+  );
+  const clock = new FixedClock("2026-05-05T00:10:00.000Z");
+  const admission = new ScheduledTaskRunAdmissionService(
+    new StaticScheduledTaskDefinitionRepository(input?.task ?? scheduledTaskFixture()),
+    runAttemptRepository,
+    resourceRepository,
+    new SequenceIdGenerator(),
+    clock,
+  );
 
   return {
     context,
+    dueReader,
     runAttemptRepository,
-    useCase: new RunScheduledTaskNowUseCase(
-      new ScheduledTaskRunAdmissionService(
-        new StaticScheduledTaskDefinitionRepository(input?.task ?? scheduledTaskFixture()),
-        runAttemptRepository,
-        resourceRepository,
-        new SequenceIdGenerator(),
-        new FixedClock("2026-05-05T00:10:00.000Z"),
-      ),
-    ),
+    scheduler: new ScheduledTaskScheduler(dueReader, admission, clock, new NoopLogger()),
   };
 }
 
-describe("RunScheduledTaskNowUseCase", () => {
-  test("[SCHED-TASK-RUN-001] accepts run-now without executing the task synchronously", async () => {
-    const { context, runAttemptRepository, useCase } = await createHarness();
+describe("ScheduledTaskScheduler", () => {
+  test("[SCHED-TASK-SCHED-001] dispatches due tasks through scheduled run admission", async () => {
+    const { context, dueReader, runAttemptRepository, scheduler } = await createHarness();
 
-    const result = await useCase.execute(context, {
-      taskId: "tsk_daily_migration",
-      resourceId: "res_api",
-    });
+    const result = await scheduler.run(context, { limit: 5 });
 
     expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toMatchObject({
-      schemaVersion: "scheduled-tasks.run-now/v1",
-      run: {
-        runId: "str_0001",
-        taskId: "tsk_daily_migration",
-        resourceId: "res_api",
-        triggerKind: "manual",
-        status: "accepted",
-        createdAt: "2026-05-05T00:10:00.000Z",
-      },
+    expect(dueReader.inputs).toEqual([{ now: "2026-05-05T00:10:00.000Z", limit: 5 }]);
+    expect(result._unsafeUnwrap()).toEqual({
+      scanned: 1,
+      dispatched: [
+        {
+          taskId: "tsk_daily_migration",
+          resourceId: "res_api",
+          scheduledFor: "2026-05-05T00:00:00.000Z",
+          run: {
+            runId: "str_0001",
+            taskId: "tsk_daily_migration",
+            resourceId: "res_api",
+            triggerKind: "scheduled",
+            status: "accepted",
+            createdAt: "2026-05-05T00:10:00.000Z",
+          },
+        },
+      ],
+      failed: [],
     });
-    expect(result._unsafeUnwrap().run).not.toHaveProperty("startedAt");
-    expect(result._unsafeUnwrap().run).not.toHaveProperty("finishedAt");
     expect(runAttemptRepository.records).toHaveLength(1);
-    expect(runAttemptRepository.records[0]?.toState().status.value).toBe("accepted");
+    expect(runAttemptRepository.records[0]?.toState().triggerKind.value).toBe("scheduled");
   });
 
-  test("[SCHED-TASK-RUN-002] rejects archived Resources before runtime execution", async () => {
-    const { context, runAttemptRepository, useCase } = await createHarness({
-      resource: resourceFixture({ lifecycleStatus: "archived" }),
-    });
-
-    const result = await useCase.execute(context, {
-      taskId: "tsk_daily_migration",
-      resourceId: "res_api",
-    });
-
-    expect(result.isErr()).toBe(true);
-    expect(runAttemptRepository.records).toHaveLength(0);
-
-    if (result.isErr()) {
-      expect(result.error.code).toBe("resource_archived");
-      expect(result.error.details).toMatchObject({
-        phase: "scheduled-task-run-admission",
-        resourceId: "res_api",
-        taskId: "tsk_daily_migration",
-        lifecycleStatus: "archived",
-      });
-    }
-  });
-
-  test("[SCHED-TASK-RUN-001] rejects disabled task definitions before recording a run", async () => {
-    const { context, runAttemptRepository, useCase } = await createHarness({
+  test("[SCHED-TASK-SCHED-001] records scheduler admission failures without runtime execution", async () => {
+    const { context, runAttemptRepository, scheduler } = await createHarness({
       task: scheduledTaskFixture({ status: "disabled" }),
     });
 
-    const result = await useCase.execute(context, {
-      taskId: "tsk_daily_migration",
-      resourceId: "res_api",
+    const result = await scheduler.run(context);
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({
+      scanned: 1,
+      dispatched: [],
+      failed: [
+        {
+          taskId: "tsk_daily_migration",
+          resourceId: "res_api",
+          scheduledFor: "2026-05-05T00:00:00.000Z",
+          errorCode: "conflict",
+        },
+      ],
     });
-
-    expect(result.isErr()).toBe(true);
     expect(runAttemptRepository.records).toHaveLength(0);
-
-    if (result.isErr()) {
-      expect(result.error.code).toBe("conflict");
-      expect(result.error.details).toMatchObject({
-        phase: "scheduled-task-run-admission",
-        taskId: "tsk_daily_migration",
-        resourceId: "res_api",
-        status: "disabled",
-      });
-    }
   });
 });

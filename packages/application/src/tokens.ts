@@ -23,6 +23,7 @@ export const tokens = {
   resourceRepository: Symbol.for("appaloft.resource_repository"),
   scheduledTaskDefinitionRepository: Symbol.for("appaloft.scheduled_task_definition_repository"),
   scheduledTaskRunAttemptRepository: Symbol.for("appaloft.scheduled_task_run_attempt_repository"),
+  scheduledTaskDueCandidateReader: Symbol.for("appaloft.scheduled_task_due_candidate_reader"),
   dependencyResourceRepository: Symbol.for("appaloft.dependency_resource_repository"),
   dependencyResourceBackupRepository: Symbol.for("appaloft.dependency_resource_backup_repository"),
   resourceDependencyBindingRepository: Symbol.for(
@@ -213,7 +214,9 @@ export const tokens = {
   listScheduledTaskRunsQueryService: Symbol.for("appaloft.list_scheduled_task_runs_query_service"),
   showScheduledTaskRunQueryService: Symbol.for("appaloft.show_scheduled_task_run_query_service"),
   scheduledTaskRunLogsQueryService: Symbol.for("appaloft.scheduled_task_run_logs_query_service"),
+  scheduledTaskRunAdmissionService: Symbol.for("appaloft.scheduled_task_run_admission_service"),
   runScheduledTaskNowUseCase: Symbol.for("appaloft.run_scheduled_task_now_use_case"),
+  scheduledTaskScheduler: Symbol.for("appaloft.scheduled_task_scheduler"),
   ingestSourceEventUseCase: Symbol.for("appaloft.ingest_source_event_use_case"),
   sourceEventVerificationPort: Symbol.for("appaloft.source_event_verification_port"),
   githubSourceEventWebhookVerifier: Symbol.for("appaloft.github_source_event_webhook_verifier"),

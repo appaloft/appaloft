@@ -41,7 +41,7 @@
   definitions from read models.
 - [x] `SCHED-TASK-PERSIST-003`: run-attempt repository/read model persists accepted/running/terminal
   runs and exposes latest run summaries.
-- [ ] `SCHED-TASK-SCHED-001`: scheduler dispatches through the same run admission use case.
+- [x] `SCHED-TASK-SCHED-001`: scheduler dispatches through the same run admission use case.
 - [x] `SCHED-TASK-LOGS-001`: task-run logs are separate from deployment/resource runtime logs.
 - [ ] `SCHED-TASK-SECRET-001`: task definitions, runs, logs, and errors mask secrets.
 
@@ -61,7 +61,7 @@
 - [x] Add scheduled-task run-attempt persistence repository/read model.
 - [x] Add scheduled-task run-log persistence/read model.
 - [x] Add persistence/read models.
-- [ ] Add scheduler process manager.
+- [x] Add scheduler process manager.
 - [ ] Add runtime adapter one-off task execution/log support.
 - [ ] Add CLI/API/Web/MCP surfaces.
 
