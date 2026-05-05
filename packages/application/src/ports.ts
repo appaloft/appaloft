@@ -67,6 +67,7 @@ import {
   type ScheduledTaskDefinitionSelectionSpec,
   type ScheduledTaskRunAttempt,
   type ScheduledTaskRunAttemptMutationSpec,
+  type ScheduledTaskRunAttemptSelectionSpec,
   type Server,
   type ServerMutationSpec,
   type ServerSelectionSpec,
@@ -412,6 +413,10 @@ export interface ScheduledTaskDefinitionRepository {
 }
 
 export interface ScheduledTaskRunAttemptRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: ScheduledTaskRunAttemptSelectionSpec,
+  ): Promise<ScheduledTaskRunAttempt | null>;
   upsert(
     context: RepositoryContext,
     runAttempt: ScheduledTaskRunAttempt,
@@ -2661,6 +2666,23 @@ export interface ScheduledTaskRunLogReadModel {
       limit?: number;
     },
   ): Promise<Omit<ScheduledTaskRunLogsResult, "schemaVersion" | "generatedAt">>;
+}
+
+export interface ScheduledTaskRunLogRecord {
+  id: string;
+  runId: string;
+  taskId: string;
+  resourceId: string;
+  timestamp: string;
+  stream: ScheduledTaskRunLogEntry["stream"];
+  message: string;
+}
+
+export interface ScheduledTaskRunLogRecorder {
+  recordMany(
+    context: RepositoryContext,
+    records: ScheduledTaskRunLogRecord[],
+  ): Promise<Result<{ recorded: number }, DomainError>>;
 }
 
 export interface ScheduledTaskRuntimeExecutionRequest {

@@ -44,6 +44,8 @@
 - [x] `SCHED-TASK-SCHED-001`: scheduler dispatches through the same run admission use case.
 - [x] `SCHED-TASK-RUNTIME-001`: runtime adapter executes one-off task commands and returns
   run-scoped logs/results.
+- [x] `SCHED-TASK-WORKER-001`: accepted run worker invokes runtime execution and persists terminal
+  run/log state.
 - [x] `SCHED-TASK-LOGS-001`: task-run logs are separate from deployment/resource runtime logs.
 - [ ] `SCHED-TASK-SECRET-001`: task definitions, runs, logs, and errors mask secrets.
 
@@ -65,6 +67,7 @@
 - [x] Add persistence/read models.
 - [x] Add scheduler process manager.
 - [x] Add runtime adapter one-off task execution/log support.
+- [x] Add accepted-run worker wiring.
 - [ ] Add CLI/API/Web/MCP surfaces.
 
 ## Docs Round

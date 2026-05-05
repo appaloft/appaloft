@@ -1140,6 +1140,11 @@ Current verification notes:
   results, run-scoped stdout/stderr logs, exit codes, timestamps, and secret-looking output masking.
   Accepted-run worker wiring, due-candidate persistence, shell runner, entrypoints, and public docs
   remain open.
+- 2026-05-05 Phase 7 scheduled task accepted-run worker slice added inactive application worker
+  orchestration, run-attempt lookup, run-log recording, and Postgres/PGlite recorder support so
+  accepted runs can transition through running to terminal state after runtime execution. Automatic
+  shell/background runner wiring, due-candidate persistence, entrypoints, and public docs remain
+  open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

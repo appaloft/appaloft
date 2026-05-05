@@ -28,6 +28,7 @@ import {
   ScheduledTaskId,
   ScheduledTaskRetryLimit,
   ScheduledTaskRunAttempt,
+  ScheduledTaskRunAttemptByIdSpec,
   ScheduledTaskRunExitCode,
   ScheduledTaskRunFailureSummary,
   ScheduledTaskRunId,
@@ -276,6 +277,7 @@ describe("scheduled task definition persistence", () => {
       PgScheduledTaskDefinitionRepository,
       PgScheduledTaskReadModel,
       PgScheduledTaskRunAttemptRepository,
+      PgScheduledTaskRunLogRecorder,
       PgScheduledTaskRunReadModel,
     } = await import("../src");
     const database = await createDatabase({
@@ -321,6 +323,7 @@ describe("scheduled task definition persistence", () => {
       const taskReadModel = new PgScheduledTaskReadModel(database.db);
       const runAttempts = new PgScheduledTaskRunAttemptRepository(database.db);
       const runReadModel = new PgScheduledTaskRunReadModel(database.db);
+      const logRecorder = new PgScheduledTaskRunLogRecorder(database.db);
       const task = taskFixture();
 
       await projects.upsert(context, project, UpsertProjectSpec.fromProject(project));
@@ -380,6 +383,25 @@ describe("scheduled task definition persistence", () => {
         taskId: "tsk_backup",
         resourceId: "res_api",
       });
+      const persistedRun = await runAttempts.findOne(
+        context,
+        ScheduledTaskRunAttemptByIdSpec.create({
+          runId: ScheduledTaskRunId.rehydrate("str_manual"),
+          taskId: ScheduledTaskId.rehydrate("tsk_backup"),
+          resourceId: ResourceId.rehydrate("res_api"),
+        }),
+      );
+      const recorded = await logRecorder.recordMany(context, [
+        {
+          id: "stlog_attempt",
+          runId: "str_manual",
+          taskId: "tsk_backup",
+          resourceId: "res_api",
+          timestamp: "2026-05-05T00:20:31.000Z",
+          stream: "system",
+          message: "terminal state recorded",
+        },
+      ]);
 
       expect(runs.items).toEqual([
         {
@@ -401,6 +423,8 @@ describe("scheduled task definition persistence", () => {
         expect(shown).toEqual(expectedRun);
         expect(taskSummary?.latestRun).toEqual(expectedRun);
       }
+      expect(persistedRun?.toState().status.value).toBe("failed");
+      expect(recorded.isOk()).toBe(true);
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });
@@ -417,6 +441,7 @@ describe("scheduled task definition persistence", () => {
       PgResourceRepository,
       PgScheduledTaskDefinitionRepository,
       PgScheduledTaskRunAttemptRepository,
+      PgScheduledTaskRunLogRecorder,
       PgScheduledTaskRunLogReadModel,
     } = await import("../src");
     const database = await createDatabase({
@@ -460,6 +485,7 @@ describe("scheduled task definition persistence", () => {
       const resources = new PgResourceRepository(database.db);
       const tasks = new PgScheduledTaskDefinitionRepository(database.db);
       const runAttempts = new PgScheduledTaskRunAttemptRepository(database.db);
+      const logRecorder = new PgScheduledTaskRunLogRecorder(database.db);
       const logReadModel = new PgScheduledTaskRunLogReadModel(database.db);
       const task = taskFixture();
       const runAttempt = ScheduledTaskRunAttempt.create({
@@ -483,29 +509,26 @@ describe("scheduled task definition persistence", () => {
         runAttempt,
         UpsertScheduledTaskRunAttemptSpec.fromRunAttempt(runAttempt),
       );
-      await database.db
-        .insertInto("scheduled_task_run_logs")
-        .values([
-          {
-            id: "stlog_1",
-            run_id: "str_manual",
-            task_id: "tsk_backup",
-            resource_id: "res_api",
-            logged_at: "2026-05-05T00:20:01.000Z",
-            stream: "stdout",
-            message: "backup started",
-          },
-          {
-            id: "stlog_2",
-            run_id: "str_manual",
-            task_id: "tsk_backup",
-            resource_id: "res_api",
-            logged_at: "2026-05-05T00:20:02.000Z",
-            stream: "stderr",
-            message: "TOKEN=secret leaked by child process",
-          },
-        ])
-        .execute();
+      const recorded = await logRecorder.recordMany(context, [
+        {
+          id: "stlog_1",
+          runId: "str_manual",
+          taskId: "tsk_backup",
+          resourceId: "res_api",
+          timestamp: "2026-05-05T00:20:01.000Z",
+          stream: "stdout",
+          message: "backup started",
+        },
+        {
+          id: "stlog_2",
+          runId: "str_manual",
+          taskId: "tsk_backup",
+          resourceId: "res_api",
+          timestamp: "2026-05-05T00:20:02.000Z",
+          stream: "stderr",
+          message: "TOKEN=secret leaked by child process",
+        },
+      ]);
 
       const logs = await logReadModel.read(context, {
         runId: "str_manual",
@@ -514,6 +537,7 @@ describe("scheduled task definition persistence", () => {
         limit: 10,
       });
 
+      expect(recorded.isOk()).toBe(true);
       expect(logs).toEqual({
         runId: "str_manual",
         taskId: "tsk_backup",

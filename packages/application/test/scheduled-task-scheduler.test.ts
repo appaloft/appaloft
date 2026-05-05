@@ -21,6 +21,7 @@ import {
   ScheduledTaskRetryLimit,
   type ScheduledTaskRunAttempt,
   type ScheduledTaskRunAttemptMutationSpec,
+  type ScheduledTaskRunAttemptSelectionSpec,
   ScheduledTaskScheduleExpression,
   ScheduledTaskTimeoutSeconds,
   ScheduledTaskTimezone,
@@ -83,6 +84,27 @@ class StaticScheduledTaskDefinitionRepository implements ScheduledTaskDefinition
 class RecordingScheduledTaskRunAttemptRepository implements ScheduledTaskRunAttemptRepository {
   readonly records: ScheduledTaskRunAttempt[] = [];
   readonly specs: ScheduledTaskRunAttemptMutationSpec[] = [];
+
+  async findOne(
+    _context: RepositoryContext,
+    spec: ScheduledTaskRunAttemptSelectionSpec,
+  ): Promise<ScheduledTaskRunAttempt | null> {
+    return spec.accept({
+      visitScheduledTaskRunAttemptById: (selection) =>
+        this.records.find((run) => {
+          if (!run.id.equals(selection.runId)) {
+            return false;
+          }
+          if (selection.taskId && !run.belongsToTask(selection.taskId)) {
+            return false;
+          }
+          if (selection.resourceId && !run.belongsToResource(selection.resourceId)) {
+            return false;
+          }
+          return true;
+        }) ?? null,
+    });
+  }
 
   async upsert(
     _context: RepositoryContext,

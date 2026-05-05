@@ -857,12 +857,40 @@ export interface CreateScheduledTaskRunAttemptInput {
   createdAt: CreatedAt;
 }
 
+export interface ScheduledTaskRunAttemptSelectionSpecVisitor<TResult> {
+  visitScheduledTaskRunAttemptById(spec: ScheduledTaskRunAttemptByIdSpec): TResult;
+}
+
+export interface ScheduledTaskRunAttemptSelectionSpec {
+  accept<TResult>(visitor: ScheduledTaskRunAttemptSelectionSpecVisitor<TResult>): TResult;
+}
+
 export interface ScheduledTaskRunAttemptMutationSpecVisitor<TResult> {
   visitUpsertScheduledTaskRunAttempt(spec: UpsertScheduledTaskRunAttemptSpec): TResult;
 }
 
 export interface ScheduledTaskRunAttemptMutationSpec {
   accept<TResult>(visitor: ScheduledTaskRunAttemptMutationSpecVisitor<TResult>): TResult;
+}
+
+export class ScheduledTaskRunAttemptByIdSpec implements ScheduledTaskRunAttemptSelectionSpec {
+  private constructor(
+    public readonly runId: ScheduledTaskRunId,
+    public readonly taskId?: ScheduledTaskId,
+    public readonly resourceId?: ResourceId,
+  ) {}
+
+  static create(input: {
+    runId: ScheduledTaskRunId;
+    taskId?: ScheduledTaskId;
+    resourceId?: ResourceId;
+  }): ScheduledTaskRunAttemptByIdSpec {
+    return new ScheduledTaskRunAttemptByIdSpec(input.runId, input.taskId, input.resourceId);
+  }
+
+  accept<TResult>(visitor: ScheduledTaskRunAttemptSelectionSpecVisitor<TResult>): TResult {
+    return visitor.visitScheduledTaskRunAttemptById(this);
+  }
 }
 
 export class UpsertScheduledTaskRunAttemptSpec implements ScheduledTaskRunAttemptMutationSpec {

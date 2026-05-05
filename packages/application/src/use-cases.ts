@@ -114,6 +114,7 @@ export * from "./operations/scheduled-tasks/list-scheduled-tasks.query-service";
 export * from "./operations/scheduled-tasks/run-scheduled-task-now.use-case";
 export * from "./operations/scheduled-tasks/scheduled-task-run-admission.service";
 export * from "./operations/scheduled-tasks/scheduled-task-run-logs.query-service";
+export * from "./operations/scheduled-tasks/scheduled-task-run-worker";
 export * from "./operations/scheduled-tasks/scheduled-task-scheduler";
 export * from "./operations/scheduled-tasks/show-scheduled-task.query-service";
 export * from "./operations/scheduled-tasks/show-scheduled-task-run.query-service";
