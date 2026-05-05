@@ -1,6 +1,7 @@
 import { domainError } from "../shared/errors";
 import { err, ok, type Result } from "../shared/result";
 import { type UpdatedAt } from "../shared/temporal";
+import { ConfigKey } from "../shared/text-values";
 import { ScalarValueObject, ValueObject } from "../shared/value-object";
 import { type GitRefText, type SourceBindingFingerprint } from "./source-binding";
 
@@ -13,6 +14,7 @@ const triggerKinds = ["git-push", "generic-signed-webhook"] as const;
 const sourceEventKinds = ["push", "tag"] as const;
 const policyStatuses = ["enabled", "disabled", "blocked"] as const;
 const blockedReasons = ["source-binding-changed"] as const;
+const resourceSecretRefPrefix = "resource-secret:";
 
 function includesValue<TValue extends string>(
   values: readonly TValue[],
@@ -187,11 +189,42 @@ export class ResourceAutoDeploySecretRef extends ScalarValueObject<string> {
       );
     }
 
-    return ok(new ResourceAutoDeploySecretRef(normalized));
+    if (!normalized.startsWith(resourceSecretRefPrefix)) {
+      return err(
+        autoDeployValidationError(
+          "Generic signed webhook secret reference must use resource-secret:<KEY>",
+          {
+            field: "policy.genericWebhookSecretRef",
+            refFamily: "resource-secret",
+          },
+        ),
+      );
+    }
+
+    const configKey = ConfigKey.create(normalized.slice(resourceSecretRefPrefix.length));
+    if (configKey.isErr()) {
+      return err(
+        autoDeployValidationError(
+          "Generic signed webhook secret reference must include a Resource variable key",
+          {
+            field: "policy.genericWebhookSecretRef",
+            refFamily: "resource-secret",
+          },
+        ),
+      );
+    }
+
+    return ok(
+      new ResourceAutoDeploySecretRef(`${resourceSecretRefPrefix}${configKey.value.value}`),
+    );
   }
 
   static rehydrate(value: string): ResourceAutoDeploySecretRef {
     return new ResourceAutoDeploySecretRef(value.trim());
+  }
+
+  resourceVariableKey(): ConfigKey {
+    return ConfigKey.rehydrate(this.value.slice(resourceSecretRefPrefix.length));
   }
 }
 

@@ -52,6 +52,8 @@ Rules:
   binding and unblocks the existing policy only when it still matches the current source kind.
 - `genericWebhookSecretRef` is required when `triggerKind = "generic-signed-webhook"` and must be a
   safe reference/version handle, never a secret value.
+- The first accepted generic signed reference format is `resource-secret:<KEY>`, where `<KEY>` is a
+  Resource-owned runtime secret variable on the same Resource.
 
 ## Admission
 
@@ -62,9 +64,11 @@ The command must:
 3. Reject missing, archived, or deleted Resources.
 4. Reject enable/replace when the Resource has no compatible source binding.
 5. Reject generic signed webhook policy without a safe Resource-scoped secret reference.
-6. Bind the policy to the current source binding fingerprint.
-7. Persist policy state on the Resource-owned configuration boundary.
-8. Return safe policy status and blocked reason, if any.
+6. Reject generic signed webhook policy when the reference is not in the accepted
+   `resource-secret:<KEY>` family.
+7. Bind the policy to the current source binding fingerprint.
+8. Persist policy state on the Resource-owned configuration boundary.
+9. Return safe policy status and blocked reason, if any.
 
 When `resources.configure-source` changes the Resource source binding after policy creation, the
 policy becomes blocked pending explicit acknowledgement by this command.
@@ -95,6 +99,11 @@ Use [Source Event Auto Deploy Error Spec](../errors/source-events.md). Minimum c
 - `resource_auto_deploy_secret_required`
 - `resource_auto_deploy_secret_unavailable`
 - `validation_error`
+
+`resource_auto_deploy_secret_required` is used when no generic signed secret reference is supplied.
+`resource_auto_deploy_secret_unavailable` is used when a supplied `resource-secret:<KEY>` reference
+cannot be resolved to a Resource-owned runtime secret variable on the same Resource during webhook
+verification.
 
 ## Entrypoints
 
