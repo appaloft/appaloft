@@ -2,6 +2,7 @@ import {
   CreatedAt,
   Deployment,
   type Deployment as DeploymentAggregate,
+  type DeploymentDependencyBindingReferenceState,
   DeploymentId,
   type Destination,
   type EnvironmentProfile,
@@ -35,6 +36,7 @@ export class DeploymentFactory {
     resource: Resource;
     runtimePlan: RuntimePlan;
     environmentSnapshot: EnvironmentSnapshot;
+    dependencyBindingReferences?: DeploymentDependencyBindingReferenceState[];
     supersedesDeploymentId?: DeploymentId;
   }): Result<DeploymentAggregate> {
     const { clock, idGenerator } = this;
@@ -53,6 +55,9 @@ export class DeploymentFactory {
         runtimePlan: input.runtimePlan,
         environmentSnapshot: input.environmentSnapshot,
         createdAt,
+        ...(input.dependencyBindingReferences
+          ? { dependencyBindingReferences: input.dependencyBindingReferences }
+          : {}),
         ...(input.supersedesDeploymentId
           ? { supersedesDeploymentId: input.supersedesDeploymentId }
           : {}),
@@ -80,6 +85,7 @@ export class DeploymentFactory {
         resourceId: state.resourceId,
         runtimePlan: state.runtimePlan,
         environmentSnapshot: state.environmentSnapshot,
+        dependencyBindingReferences: state.dependencyBindingReferences,
         createdAt,
         rollbackOfDeploymentId: input.rollbackOfDeploymentId,
       });

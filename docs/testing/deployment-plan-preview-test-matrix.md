@@ -29,6 +29,8 @@ creating a deployment attempt, publishing deployment events, or executing runtim
 | DPP-QUERY-007 | integration | Prebuilt image path | Returns artifact kind `prebuilt-image`, sanitized image identity, and no build command specs. |
 | DPP-QUERY-008 | integration | Custom command image path | Returns custom/workspace command image intent with sanitized install/build/start command specs. |
 | DPP-QUERY-009 | integration | Access plan unavailable | Returns plan readiness independently from access warning `access-plan-unavailable` when route planning summary cannot be read. |
+| DEP-BIND-SNAP-REF-005 | integration | Dependency binding snapshot readiness preview | Resource has an active Postgres dependency binding | Returns safe dependency binding snapshot readiness, reference metadata, and runtime injection deferred without deployment id or execution. |
+| DEP-BIND-SNAP-REF-004 | integration | Not-ready dependency binding preview diagnostic | Resource has an active binding whose dependency metadata is not ready for safe snapshot reference | Returns a blocked dependency binding snapshot readiness diagnostic while keeping overall deployment plan admission non-blocking for this slice. |
 | DMBH-RES-DPP-001 | unit/integration | Resource-owned preview predicates | Plan preview evaluates the same resource source, source inspection enrichment, and internal-port requirements as deployment admission. |
 
 ## Side-Effect Matrix
@@ -39,6 +41,7 @@ creating a deployment attempt, publishing deployment events, or executing runtim
 | DPP-SIDE-EFFECT-002 | integration | No deployment events | Querying a plan does not publish `deployment-requested`, `build-requested`, `deployment-started`, `deployment-succeeded`, or `deployment-failed`. |
 | DPP-SIDE-EFFECT-003 | integration | No runtime execution | Runtime backend build/run/verify/proxy methods are not called. |
 | DPP-SIDE-EFFECT-004 | contract | `deployments.create` remains ids-only | Adding `deployments.plan` does not add source/runtime/network/framework fields to `deployments.create`. |
+| DPP-SIDE-EFFECT-005 | integration | Dependency binding preview has no mutation | Querying a plan with dependency bindings does not create deployments, mutate bindings, materialize env vars, or emit deployment events. |
 
 ## Entrypoint Matrix
 

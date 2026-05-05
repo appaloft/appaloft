@@ -34,6 +34,7 @@ provisioning, not runtime env injection, and not a deployment command.
 - [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [Postgres Dependency Resource Lifecycle](../specs/033-postgres-dependency-resource-lifecycle/spec.md)
 - [Dependency Resource Binding Baseline](../specs/034-dependency-resource-binding-baseline/spec.md)
+- [Dependency Binding Deployment Snapshot Reference Baseline](../specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
 - [Dependency Resource Test Matrix](../testing/dependency-resource-test-matrix.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -51,7 +52,8 @@ The workflow lets operators:
 5. Bind a Postgres dependency resource to a Resource with safe target metadata.
 6. List/show Resource dependency binding summaries without exposing raw secrets.
 7. Unbind without deleting the dependency resource or any external/provider database.
-8. Delete only dependency resources that pass safety checks.
+8. Record provider-neutral safe dependency binding references in new deployment attempt snapshots.
+9. Delete only dependency resources that pass safety checks.
 
 ## Operation Boundaries
 
@@ -63,10 +65,11 @@ The workflow lets operators:
 | Show dependency resource | `dependency-resources.show` | Nothing | Any aggregate or runtime state |
 | Rename dependency resource | `dependency-resources.rename` | Dependency resource name/slug | Bindings, backup metadata, provider state, runtime, snapshots |
 | Delete dependency resource | `dependency-resources.delete` | Dependency resource lifecycle/tombstone | External/provider database, bindings, backup data, runtime cleanup |
-| Bind dependency to Resource | `resources.bind-dependency` | ResourceBinding | Provider database, ResourceInstance lifecycle, runtime, deployment snapshots |
+| Bind dependency to Resource | `resources.bind-dependency` | ResourceBinding | Provider database, ResourceInstance lifecycle, runtime, historical deployment snapshots |
 | Unbind dependency from Resource | `resources.unbind-dependency` | ResourceBinding lifecycle/tombstone | Dependency resource, external/provider database, runtime cleanup, snapshots |
 | List Resource dependency bindings | `resources.list-dependency-bindings` | Nothing | Any aggregate or runtime state |
 | Show Resource dependency binding | `resources.show-dependency-binding` | Nothing | Any aggregate or runtime state |
+| Create deployment with dependency binding references | `deployments.create` | Deployment attempt snapshot | ResourceBinding lifecycle, Dependency Resource lifecycle, raw secrets, runtime env injection |
 
 ## Postgres Source Modes
 
@@ -135,13 +138,18 @@ slice.
 
 ## Deployment Relationship
 
-Dependency resources do not change deployment admission in this slice. A future binding/snapshot
-slice may copy provider-neutral binding references into immutable deployment snapshots, but raw
-connection secrets must not be written into snapshots.
+Dependency resources do not add input fields to deployment admission in this slice.
+`deployments.create` copies provider-neutral safe binding references from active Resource
+dependency bindings into the immutable Deployment attempt snapshot. The copied reference may include
+binding id, dependency resource id, dependency kind, target name, scope, injection mode, and
+snapshot readiness. It must not include raw connection secrets, provider credentials, sensitive
+connection query parameters, materialized environment values, or runtime-rendered secret values.
 
 `resources.bind-dependency` and `resources.unbind-dependency` do not mutate historical deployment
-snapshots and do not inject current runtime environment variables. Binding read models report
-snapshot materialization as deferred until a future snapshot binding slice exists.
+snapshots and do not inject current runtime environment variables. New deployments see active
+bindings at admission time only. Removed bindings are excluded from new snapshots. Missing or
+not-ready dependency metadata is a readiness diagnostic in this first snapshot reference slice, not
+a deployment admission blocker, because runtime env injection remains deferred.
 
 `deployments.create` must not accept dependency resource, database URL, username, password, or
 secret-rotation fields.
@@ -158,9 +166,9 @@ secret-rotation fields.
 ## Current Implementation Notes And Migration Gaps
 
 This Code Round adds Postgres dependency resource lifecycle records, Resource binding metadata, safe
-read models, and real active-binding delete blockers. Redis, secret rotation, provider-native
-provisioning/deletion, backup/restore, deployment snapshot materialization, Web affordances, and
-runtime cleanup are future work.
+read models, real active-binding delete blockers, and safe dependency binding snapshot references.
+Redis, secret rotation, provider-native provisioning/deletion, backup/restore, runtime env
+injection, Web affordances, and runtime cleanup are future work.
 
 ## Open Questions
 

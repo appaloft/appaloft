@@ -195,8 +195,13 @@ function toSummary(row: BindingSummaryRow): ResourceDependencyBindingSummary {
       status: "ready",
     },
     snapshotReadiness: {
-      status: "deferred",
-      reason: "deployment snapshot dependency binding materialization is deferred",
+      status:
+        row.dependency_lifecycle_status === "ready" && row.lifecycle_status === "active"
+          ? "ready"
+          : "blocked",
+      ...(row.dependency_lifecycle_status === "ready" && row.lifecycle_status === "active"
+        ? {}
+        : { reason: "dependency binding is not ready for deployment snapshot reference" }),
     },
     status: row.lifecycle_status as ResourceDependencyBindingSummary["status"],
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,

@@ -233,6 +233,11 @@ export interface DeploymentsTable {
     Record<string, unknown>,
     Record<string, unknown>
   >;
+  dependency_binding_references: ColumnType<
+    Record<string, unknown>[],
+    Record<string, unknown>[] | undefined,
+    Record<string, unknown>[]
+  >;
   logs: ColumnType<Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]>;
   created_at: TimestampColumn;
   started_at: string | null;

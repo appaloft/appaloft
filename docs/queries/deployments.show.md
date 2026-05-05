@@ -139,7 +139,9 @@ Required behavior:
   environment, target/server, and destination when the read model can resolve them.
 - `snapshot` contains immutable attempt context such as runtime strategy, runtime target backend,
   access route snapshot, source commit/ref/image identity, requested runtime name, and placement
-  metadata. It must describe what this attempt used, not what the resource currently uses.
+  metadata. It also contains safe dependency binding references copied at deployment admission when
+  active Resource dependency bindings existed. It must describe what this attempt used, not what the
+  resource currently uses.
 - `timeline` contains normalized attempt events/progress summaries already available from persisted
   state or safely derived read models. It is not a live stream.
 - `latestFailure` contains the latest structured error/progress failure summary when one exists.
@@ -165,6 +167,11 @@ Current resource health remains `resources.health`.
 Current public access summary remains resource-scoped through `ResourceAccessSummary` and
 resource/detail queries.
 Detailed attempt logs remain `deployments.logs`.
+
+Dependency binding snapshot references remain deployment-attempt-owned history. They must not be
+recomputed from current `ResourceBinding` state during `deployments.show`, and they must not expose
+raw connection URLs, passwords, tokens, provider credentials, private keys, sensitive query
+parameters, raw secret values, materialized environment values, or runtime-rendered secret values.
 
 ## Section Semantics
 
@@ -216,6 +223,11 @@ Deployment recovery readiness is active under ADR-034. `deployments.show` keeps 
 actions out of `nextActions`; when `includeRecoverySummary` is requested, its compact recovery
 summary is derived from the same `deployments.recovery-readiness` query service and not recomputed
 independently by the detail query.
+
+Dependency binding snapshot references are additive immutable snapshot output. They report safe
+binding identity, dependency resource identity/kind, target name, scope, injection mode, and
+snapshot readiness. Runtime env injection remains deferred and is not implied by the presence of a
+reference.
 
 ## Open Questions
 
