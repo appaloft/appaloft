@@ -1170,6 +1170,9 @@ Current verification notes:
   `/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle`, registered
   `scheduled-task.resource-lifecycle`, and wired CLI/HTTP descriptions to the stable scheduled-task
   anchor. Web controls and broader secret masking coverage remain open.
+- 2026-05-05 Phase 7 scheduled task secret redaction slice added shared scheduled-task secret
+  detection/redaction for command intent, failure summaries, runtime output, runtime errors,
+  persisted read models, and generated tool descriptors. Web controls remain open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

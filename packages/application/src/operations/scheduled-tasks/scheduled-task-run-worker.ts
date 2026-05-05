@@ -4,6 +4,7 @@ import {
   FinishedAt,
   ok,
   type Result,
+  redactScheduledTaskSecretText,
   ScheduledTaskDefinitionByIdSpec,
   ScheduledTaskId,
   ScheduledTaskRunAttemptByIdSpec,
@@ -55,7 +56,9 @@ function runSummaryFromAttempt(
     ...(state.startedAt ? { startedAt: state.startedAt.value } : {}),
     ...(state.finishedAt ? { finishedAt: state.finishedAt.value } : {}),
     ...(state.exitCode ? { exitCode: state.exitCode.value } : {}),
-    ...(state.failureSummary ? { failureSummary: state.failureSummary.value } : {}),
+    ...(state.failureSummary
+      ? { failureSummary: redactScheduledTaskSecretText(state.failureSummary.value) }
+      : {}),
     ...(state.skippedReason ? { skippedReason: state.skippedReason.value } : {}),
   };
 }

@@ -103,6 +103,10 @@ scheduled task definitions, run-now, run history, and run logs. Web controls rem
   scheduled-task-run-specific table, reads them through the run-log read model by run/task/Resource,
   pages by log timestamp cursor, and masks secret-looking log messages before returning read-model
   entries.
+- Scheduled task secret redaction exists for command-intent validation, failure summaries, runtime
+  output, runtime errors, persisted read-model output, and generated tool descriptors. Read models
+  defensively mask legacy unsafe command intent, run failure summaries, and run logs before
+  returning public DTOs.
 - Scheduled task due-candidate read-model support exists for Postgres/PGlite. It scans enabled
   task definitions, evaluates the accepted schedule subset for the current timezone-aware minute,
   and suppresses candidates already admitted as scheduled runs in that same minute.

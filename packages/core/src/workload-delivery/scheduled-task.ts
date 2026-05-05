@@ -69,11 +69,45 @@ function includesValue<TValue extends string>(
   return values.includes(value as TValue);
 }
 
-function containsUnsafeSecretText(value: string): boolean {
-  return (
-    /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(value) ||
-    /\b(?:password|secret|token|private[_ -]?key)\s*[:=]/i.test(value) ||
-    /\b(?:ghp_|github_pat_|xox[baprs]-|sk-[A-Za-z0-9_-]{16,})/.test(value)
+const scheduledTaskSecretRedaction = "********";
+
+function scheduledTaskSecretDetectionPatterns(): RegExp[] {
+  return [
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
+    /\b(?:password|passwd|pwd|secret|token|api[_-]?key|private[_ -]?key)\s*[:=]\s*\S+/i,
+    /\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}/i,
+    /\b(?:ghp_|github_pat_|xox[baprs]-|sk-[A-Za-z0-9_-]{16,})[A-Za-z0-9_-]*/i,
+    /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:[^\s@/]+@[^\s]+/i,
+  ];
+}
+
+function scheduledTaskSecretReplacementPatterns(): RegExp[] {
+  return [
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----/gi,
+    /\b(?:password|passwd|pwd|secret|token|api[_-]?key|private[_ -]?key)\s*[:=]\s*\S+/gi,
+    /\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi,
+    /\b(?:ghp_|github_pat_|xox[baprs]-|sk-[A-Za-z0-9_-]{16,})[A-Za-z0-9_-]*/gi,
+    /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:[^\s@/]+@[^\s]+/gi,
+  ];
+}
+
+export function containsScheduledTaskSecretText(value: string): boolean {
+  return scheduledTaskSecretDetectionPatterns().some((pattern) => pattern.test(value));
+}
+
+export function redactScheduledTaskSecretText(
+  value: string,
+  additionalRedactions: readonly string[] = [],
+): string {
+  const redactedByPattern = scheduledTaskSecretReplacementPatterns().reduce(
+    (text, pattern) => text.replace(pattern, scheduledTaskSecretRedaction),
+    value,
+  );
+
+  return additionalRedactions.reduce(
+    (text, redaction) =>
+      redaction.length > 0 ? text.replaceAll(redaction, scheduledTaskSecretRedaction) : text,
+    redactedByPattern,
   );
 }
 
@@ -251,7 +285,7 @@ export class ScheduledTaskCommandIntent extends ScalarValueObject<string> {
       );
     }
 
-    if (containsUnsafeSecretText(normalized)) {
+    if (containsScheduledTaskSecretText(normalized)) {
       return err(
         scheduledTaskValidationError("Scheduled task command intent must not contain secrets", {
           field: "commandIntent",
@@ -637,7 +671,7 @@ export class ScheduledTaskRunFailureSummary extends ScalarValueObject<string> {
       );
     }
 
-    if (containsUnsafeSecretText(normalized)) {
+    if (containsScheduledTaskSecretText(normalized)) {
       return err(
         scheduledTaskRunValidationError(
           "Scheduled task run failure summary must not contain secrets",

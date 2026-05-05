@@ -55,7 +55,8 @@ HTTP/oRPC entrypoint coverage for `SCHED-TASK-ENTRY-001` lives in
 `packages/application/test/scheduled-task-create.test.ts`.
 `SCHED-TASK-QUERY-001`, `SCHED-TASK-QUERY-002`, and `SCHED-TASK-RUN-QUERY-001` have application
 read-query coverage in `packages/application/test/scheduled-task-read-queries.test.ts`.
-`SCHED-TASK-UPDATE-001`, `SCHED-TASK-UPDATE-002`, and unsafe command-intent coverage for
+`SCHED-TASK-UPDATE-001`, `SCHED-TASK-UPDATE-002`, unsafe command-intent coverage, and legacy
+unsafe command output masking for
 `SCHED-TASK-SECRET-001` have application update-admission coverage in
 `packages/application/test/scheduled-task-update.test.ts`.
 `SCHED-TASK-DELETE-001` and `SCHED-TASK-DELETE-002` have application delete-admission
@@ -65,8 +66,9 @@ in `packages/application/test/scheduled-task-run-now.test.ts`.
 `SCHED-TASK-SCHED-001` has application scheduler admission coverage in
 `packages/application/test/scheduled-task-scheduler.test.ts` and Postgres/PGlite due-candidate
 read-model coverage in `packages/persistence/pg/test/scheduled-task-definition.pglite.test.ts`.
-`SCHED-TASK-RUNTIME-001` and one runtime-output masking path for `SCHED-TASK-SECRET-001` have
-adapter coverage in `packages/adapters/runtime/test/scheduled-task-runtime.test.ts`.
+`SCHED-TASK-RUNTIME-001`, runtime-output masking, and runtime-error masking for
+`SCHED-TASK-SECRET-001` have adapter coverage in
+`packages/adapters/runtime/test/scheduled-task-runtime.test.ts`.
 `SCHED-TASK-WORKER-001` has application worker coverage in
 `packages/application/test/scheduled-task-run-worker.test.ts`.
 `SCHED-TASK-RUNNER-001` has shell runner and configuration coverage in
@@ -78,9 +80,10 @@ policy plus a Resource-owned scheduled task definition state with no deployment 
 the core scheduled-task run attempt lifecycle for accepted, running, succeeded, failed, and skipped
 states with safe terminal details and no Deployment id.
 `SCHED-TASK-PERSIST-001` through `SCHED-TASK-PERSIST-003` and `SCHED-TASK-LOGS-001` have PGlite
-coverage in `packages/persistence/pg/test/scheduled-task-definition.pglite.test.ts`. The run-log
-coverage also exercises one log masking path for `SCHED-TASK-SECRET-001`, while the full secret
-matrix remains open for definitions, runs, errors, diagnostics, and tool descriptors.
+coverage in `packages/persistence/pg/test/scheduled-task-definition.pglite.test.ts`. The PGlite
+coverage also exercises defensive read-model masking for legacy unsafe command intent, run failure
+summary, and run-log output. Generated tool descriptor coverage for `SCHED-TASK-SECRET-001` lives in
+`packages/ai/mcp/test/tool-descriptors.test.ts`.
 
 Inactive application command/query schemas, messages, result DTOs, read-model ports, create,
 update, delete, run-now admission, scheduler admission, accepted-run worker, read-query

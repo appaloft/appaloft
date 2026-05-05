@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
   CreatedAt,
+  containsScheduledTaskSecretText,
   FinishedAt,
   ResourceId,
+  redactScheduledTaskSecretText,
   ScheduledTaskCommandIntent,
   ScheduledTaskConcurrencyPolicyValue,
   ScheduledTaskDefinition,
@@ -73,6 +75,9 @@ describe("ScheduledTaskDefinition", () => {
     const invalidSchedule = ScheduledTaskScheduleExpression.create("every weekday");
     const outOfRangeSchedule = ScheduledTaskScheduleExpression.create("99 * * * *");
     const unsafeCommand = ScheduledTaskCommandIntent.create("TOKEN=secret bun run sync");
+    const unsafeConnectionCommand = ScheduledTaskCommandIntent.create(
+      "psql postgres://app:secret@db.internal/app",
+    );
     const invalidTimeout = ScheduledTaskTimeoutSeconds.create(0);
     const invalidRetry = ScheduledTaskRetryLimit.create(12);
     const unsupportedConcurrency = ScheduledTaskConcurrencyPolicyValue.create("parallel");
@@ -81,6 +86,7 @@ describe("ScheduledTaskDefinition", () => {
     expect(invalidSchedule.isErr()).toBe(true);
     expect(outOfRangeSchedule.isErr()).toBe(true);
     expect(unsafeCommand.isErr()).toBe(true);
+    expect(unsafeConnectionCommand.isErr()).toBe(true);
     expect(invalidTimeout.isErr()).toBe(true);
     expect(invalidRetry.isErr()).toBe(true);
     expect(unsupportedConcurrency.isErr()).toBe(true);
@@ -212,12 +218,16 @@ describe("ScheduledTaskRunAttempt", () => {
     const unsupportedStatus = ScheduledTaskRunStatusValue.create("queued");
     const invalidExitCode = ScheduledTaskRunExitCode.create(300);
     const unsafeFailureSummary = ScheduledTaskRunFailureSummary.create("token=secret");
+    const unsafeConnectionFailure = ScheduledTaskRunFailureSummary.create(
+      "failed to connect to postgres://app:secret@db.internal/app",
+    );
 
     expect(scheduledTrigger.isOk()).toBe(true);
     expect(unsupportedTrigger.isErr()).toBe(true);
     expect(unsupportedStatus.isErr()).toBe(true);
     expect(invalidExitCode.isErr()).toBe(true);
     expect(unsafeFailureSummary.isErr()).toBe(true);
+    expect(unsafeConnectionFailure.isErr()).toBe(true);
 
     const skipped = ScheduledTaskRunAttempt.create({
       id: ScheduledTaskRunId.rehydrate("str_daily_migration_skipped"),
@@ -294,5 +304,15 @@ describe("ScheduledTaskRunAttempt", () => {
         field: "failureSummary",
       });
     }
+  });
+
+  test("[SCHED-TASK-SECRET-001] redacts scheduled task secret-looking text defensively", () => {
+    const message =
+      "failed with Authorization: Bearer abcdefghijklmnop and postgres://app:secret@db/app";
+
+    expect(containsScheduledTaskSecretText(message)).toBe(true);
+    expect(redactScheduledTaskSecretText(message, ["abcdefghijklmnop"])).toBe(
+      "failed with Authorization: ******** and ********",
+    );
   });
 });

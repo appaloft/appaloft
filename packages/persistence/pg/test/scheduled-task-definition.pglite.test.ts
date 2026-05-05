@@ -49,6 +49,7 @@ function taskFixture(input?: {
   resourceId?: string;
   schedule?: string;
   timezone?: string;
+  commandIntent?: string;
   status?: "enabled" | "disabled";
   createdAt?: string;
 }) {
@@ -59,7 +60,9 @@ function taskFixture(input?: {
       input?.schedule ?? "0 1 * * *",
     )._unsafeUnwrap(),
     timezone: ScheduledTaskTimezone.create(input?.timezone ?? "UTC")._unsafeUnwrap(),
-    commandIntent: ScheduledTaskCommandIntent.create("bun run backup")._unsafeUnwrap(),
+    commandIntent: input?.commandIntent
+      ? ScheduledTaskCommandIntent.rehydrate(input.commandIntent)
+      : ScheduledTaskCommandIntent.create("bun run backup")._unsafeUnwrap(),
     timeoutSeconds: ScheduledTaskTimeoutSeconds.create(600)._unsafeUnwrap(),
     retryLimit: ScheduledTaskRetryLimit.create(2)._unsafeUnwrap(),
     concurrencyPolicy: ScheduledTaskConcurrencyPolicyValue.forbid(),
@@ -134,7 +137,17 @@ describe("scheduled task definition persistence", () => {
       await resources.upsert(context, resource, UpsertResourceSpec.fromResource(resource));
 
       const task = taskFixture();
+      const legacyTask = taskFixture({
+        id: "tsk_legacy",
+        commandIntent: "psql postgres://app:secret@db.internal/app",
+        createdAt: "2026-05-05T00:11:00.000Z",
+      });
       await tasks.upsert(context, task, UpsertScheduledTaskDefinitionSpec.fromTaskDefinition(task));
+      await tasks.upsert(
+        context,
+        legacyTask,
+        UpsertScheduledTaskDefinitionSpec.fromTaskDefinition(legacyTask),
+      );
 
       const persisted = await tasks.findOne(
         context,
@@ -170,6 +183,10 @@ describe("scheduled task definition persistence", () => {
         taskId: "tsk_backup",
         resourceId: "res_api",
       });
+      const legacyShown = await readModel.show(context, {
+        taskId: "tsk_legacy",
+        resourceId: "res_api",
+      });
 
       expect(list.items).toMatchObject([
         {
@@ -187,6 +204,7 @@ describe("scheduled task definition persistence", () => {
         status: "disabled",
         createdAt: "2026-05-05T00:10:00.000Z",
       });
+      expect(legacyShown?.commandIntent).toBe("psql ********");
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });
@@ -369,9 +387,9 @@ describe("scheduled task definition persistence", () => {
         .markFailed({
           finishedAt: FinishedAt.rehydrate("2026-05-05T00:20:30.000Z"),
           exitCode: ScheduledTaskRunExitCode.rehydrate(1),
-          failureSummary: ScheduledTaskRunFailureSummary.create(
-            "Command exited with code 1",
-          )._unsafeUnwrap(),
+          failureSummary: ScheduledTaskRunFailureSummary.rehydrate(
+            "failed with postgres://app:secret@db.internal/app",
+          ),
         })
         ._unsafeUnwrap();
       await runAttempts.upsert(
@@ -426,7 +444,7 @@ describe("scheduled task definition persistence", () => {
           startedAt: "2026-05-05T00:20:05.000Z",
           finishedAt: "2026-05-05T00:20:30.000Z",
           exitCode: 1,
-          failureSummary: "Command exited with code 1",
+          failureSummary: "failed with ********",
         },
       ]);
       const expectedRun = runs.items[0];
@@ -655,6 +673,15 @@ describe("scheduled task definition persistence", () => {
           stream: "stderr",
           message: "TOKEN=secret leaked by child process",
         },
+        {
+          id: "stlog_3",
+          runId: "str_manual",
+          taskId: "tsk_backup",
+          resourceId: "res_api",
+          timestamp: "2026-05-05T00:20:03.000Z",
+          stream: "stderr",
+          message: "postgres://app:secret@db.internal/app leaked by child process",
+        },
       ]);
 
       const logs = await logReadModel.read(context, {
@@ -678,7 +705,12 @@ describe("scheduled task definition persistence", () => {
           {
             timestamp: "2026-05-05T00:20:02.000Z",
             stream: "stderr",
-            message: "********",
+            message: "******** leaked by child process",
+          },
+          {
+            timestamp: "2026-05-05T00:20:03.000Z",
+            stream: "stderr",
+            message: "******** leaked by child process",
           },
         ],
       });

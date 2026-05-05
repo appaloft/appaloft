@@ -202,4 +202,23 @@ describe("ConfigureScheduledTaskUseCase", () => {
       });
     }
   });
+
+  test("[SCHED-TASK-SECRET-001] masks legacy unsafe command intent in command output", async () => {
+    const legacyTask = ScheduledTaskDefinition.rehydrate({
+      ...taskFixture().toState(),
+      commandIntent: ScheduledTaskCommandIntent.rehydrate(
+        "psql postgres://app:secret@db.internal/app",
+      ),
+    });
+    const { context, useCase } = await createHarness({ task: legacyTask });
+
+    const result = await useCase.execute(context, {
+      taskId: "tsk_backup",
+      resourceId: "res_api",
+      schedule: "0 3 * * *",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().task.commandIntent).toBe("psql ********");
+  });
 });

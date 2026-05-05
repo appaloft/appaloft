@@ -81,4 +81,24 @@ describe("MCP tool descriptors", () => {
     });
     expect(toolContractsByOperationKey.has("server.docker-swarm-target")).toBe(false);
   });
+
+  test("[SCHED-TASK-SECRET-001] scheduled task descriptors do not contain secret examples", () => {
+    for (const operationKey of [
+      "scheduled-tasks.create",
+      "scheduled-tasks.configure",
+      "scheduled-tasks.run-now",
+      "scheduled-task-runs.logs",
+    ]) {
+      const descriptor = toolContractsByOperationKey.get(operationKey);
+      expect(descriptor, operationKey).toBeDefined();
+      expect(
+        [
+          descriptor?.description ?? "",
+          descriptor?.cliCommand ?? "",
+          descriptor?.httpRoute ?? "",
+          ...(descriptor?.alternateHttpRoutes ?? []),
+        ].join("\n"),
+      ).not.toMatch(/(?:password|secret|token)\s*[:=]/i);
+    }
+  });
 });

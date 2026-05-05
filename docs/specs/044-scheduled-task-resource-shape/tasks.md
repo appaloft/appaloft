@@ -45,7 +45,8 @@
 - [x] `SCHED-TASK-LOGS-001`: task-run logs are separate from deployment/resource runtime logs.
 - [x] `SCHED-TASK-ENTRY-001`: HTTP/oRPC entrypoints dispatch scheduled task command/query messages
   through catalog schemas.
-- [ ] `SCHED-TASK-SECRET-001`: task definitions, runs, logs, and errors mask secrets.
+- [x] `SCHED-TASK-SECRET-001`: task definitions, runs, logs, errors, diagnostics, and tool
+  descriptors mask secrets.
 
 ## Implementation
 
@@ -68,6 +69,8 @@
 - [x] Add opt-in scheduled-task shell runner.
 - [x] Add runtime adapter one-off task execution/log support.
 - [x] Add accepted-run worker wiring.
+- [x] Add broader scheduled-task secret redaction across definition, run, log, runtime-error, and
+  generated tool descriptor boundaries.
 - [ ] Add CLI/API/Web/MCP surfaces.
   - [x] Activate operation catalog and HTTP/oRPC surfaces.
   - [x] Add CLI commands.
