@@ -6,9 +6,10 @@ Test-First / Code Round preparation for Phase 7 / `0.9.0`.
 
 Resource-owned auto-deploy policy domain behavior, application command handling, Resource
 repository persistence, source-event command/query handling, generic signed source-event
-verification, durable source-event dedupe/read models, and ignored policy-match outcomes have
-automation. Source event deployment dispatch through existing deployment admission has application
-automation. Ingestion routes, entrypoints, and background workers are not active yet.
+verification, durable source-event dedupe/read models, ignored policy-match outcomes, and Web
+source-event diagnostics have automation. Source event deployment dispatch through existing
+deployment admission has application automation. Provider-specific ingestion routes and background
+workers are not active yet.
 
 ## Governing Sources
 
@@ -61,7 +62,7 @@ automation. Ingestion routes, entrypoints, and background workers are not active
 | --- | --- | --- | --- | --- |
 | `SRC-AUTO-ENTRY-001` | CLI, HTTP/oRPC, Web, and future MCP/tool configure auto-deploy. | Entrypoints reuse the same command/query schemas and operation keys. | `packages/application/test/operation-catalog-boundary.test.ts`; package typechecks | Partial |
 | `SRC-AUTO-ENTRY-002` | HTTP generic signed webhook receives source event. | Transport resolves `resource-secret:<KEY>`, verifies signature, dispatches provider-neutral source event command with `scopeResourceId`, and never persists raw payload/signature/secret. | `packages/orpc/test/source-event-generic-signed.http.test.ts`; `packages/application/test/source-events.test.ts`; package typechecks | Passing |
-| `SRC-AUTO-ENTRY-003` | Web Resource detail shows event-created deployment. | Deployment links back to safe source event facts and ignored/deduped events remain visible. | planned | Deferred gap |
+| `SRC-AUTO-ENTRY-003` | Web Resource detail shows event-created deployment. | Deployment links back to safe source event facts and ignored/deduped events remain visible. | `apps/web/src/lib/console/source-events.test.ts`; `apps/web/src/routes/resources/[resourceId]/+page.svelte`; package typechecks | Passing |
 | `SRC-AUTO-SURFACE-003` | Public help links. | Setup, signatures, dedupe, ignored events, and recovery link to stable docs anchors in both locales. | `packages/orpc/test/docs-help.test.ts`; `packages/adapters/cli/test/docs-help.test.ts`; `apps/web/src/lib/console/docs-help.test.ts`; `packages/docs-registry/src/index.ts` | Passing |
 
 ## Current Implementation Notes And Migration Gaps
@@ -74,7 +75,7 @@ ignored ref outcomes, and active CLI/HTTP/oRPC source event read surfaces also e
 source events can dispatch through the existing deployment admission use case at the application
 boundary. The Resource-scoped generic signed HTTP route now resolves `resource-secret:<KEY>`,
 verifies `X-Appaloft-Signature`, dispatches `source-events.ingest` with `scopeResourceId`, and keeps
-dedupe scoped to the route Resource. Event dispatch, dedupe, and public help-link coverage are now
-bound to automation; provider-specific Git webhook ingestion and Web diagnostics remain deferred.
-Code Round must not mark auto-deploy complete until these rows have stable automation or explicit
-deferred exceptions.
+dedupe scoped to the route Resource. Event dispatch, dedupe, Web source-event diagnostics, and
+public help-link coverage are now bound to automation; provider-specific Git webhook ingestion
+remains deferred. Code Round must not mark auto-deploy complete until remaining rows have stable
+automation or explicit deferred exceptions.

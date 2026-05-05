@@ -582,8 +582,8 @@ Current boundary:
   dispatch, mutate auto-deploy policy, or create deployments.
 - Provider-specific Git webhook ingestion remains deferred until provider payload parsing and
   signature extraction are implemented.
-- Web diagnostics remain deferred; CLI and HTTP/oRPC read surfaces are active for operator
-  diagnostics and API consumers.
+- Web Resource detail source-event diagnostics consume `source-events.list`; CLI and HTTP/oRPC
+  read surfaces are active for operator diagnostics and API consumers.
 
 ## Deployments
 

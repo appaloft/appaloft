@@ -182,7 +182,7 @@ ADR-037 answers the initial Code Round blockers:
 
 Remaining Test-First / Code Round work:
 
-- bind remaining Web diagnostics and provider Git webhook rows to concrete automated tests;
+- bind remaining provider Git webhook rows to concrete automated tests;
 - provider-specific Git webhook adapters remain future; the first active ingestion route is generic
   signed only;
-- implement transport help text and Web links against the registered public docs topics.
+- transport help text and Web links are implemented against the registered public docs topics.

@@ -41,7 +41,7 @@ Round authorization.
   future. `Status: project/resource scoped read-model filters implemented.`
 - Implement `source-events.list` and `source-events.show` from the local query specs. `Status:
   application query baseline, durable persistence, CLI, HTTP/oRPC, operation catalog, and
-  CORE_OPERATIONS activation implemented; Web diagnostics remain future.`
+  CORE_OPERATIONS activation implemented; Web Resource detail source-event diagnostics are active.`
 
 ### 4. Deployment Dispatch
 
@@ -59,7 +59,7 @@ Round authorization.
 - Add CLI, HTTP/oRPC, and Web surfaces only after application behavior and persistence pass.
   `Status: resources.configure-auto-deploy and source-events.list/show have CLI and HTTP/oRPC
   surfaces; source-events.ingest has the Resource-scoped generic signed HTTP route; provider Git
-  routes and Web diagnostics remain future.`
+  routes remain future; Web Resource detail source-event diagnostics are active.`
 - Add public docs for setup, signatures, dedupe, ignored events, and manual recovery.
 - Add future MCP/tool descriptor mapping from operation catalog metadata.
 
