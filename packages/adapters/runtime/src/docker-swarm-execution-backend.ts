@@ -13,6 +13,7 @@ import {
   domainError,
   err,
   ok,
+  redactScheduledTaskSecretText,
   type Deployment,
   type RollbackPlan,
   type Result,
@@ -74,6 +75,25 @@ function deploymentIdentity(deployment: Deployment): DockerSwarmRuntimeIdentityI
   };
 }
 
+function deploymentSecretRedactions(deployment: Deployment): string[] {
+  return deployment
+    .toState()
+    .environmentSnapshot.variables.filter((variable) => variable.isSecret)
+    .map((variable) => variable.value)
+    .filter((value) => value.length > 0);
+}
+
+function safeFailureMessage(message: string, redactions: readonly string[]): string {
+  const redactedPrivateKeyBlocks = message.replace(
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----/gi,
+    "********",
+  );
+
+  return redactScheduledTaskSecretText(redactedPrivateKeyBlocks, redactions)
+    .replace(/cookie:\s*[^\s]+/gi, "Cookie: ********")
+    .replace(/([?&](?:password|secret|token|api[_-]?key)=)[^&\s]+/gi, "$1********");
+}
+
 function applyExecutionResult(
   deployment: Deployment,
   result: ExecutionResult,
@@ -127,36 +147,39 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
   ): Promise<Result<{ deployment: Deployment }>> {
     const state = deployment.toState();
     const identity = deploymentIdentity(deployment);
+    const redactions = deploymentSecretRedactions(deployment);
     const intentResult = renderDockerSwarmRuntimeIntent({
       runtimePlan: state.runtimePlan,
       environmentSnapshot: state.environmentSnapshot,
       identity,
     });
     if (intentResult.isErr()) {
+      const message = safeFailureMessage(intentResult.error.message, redactions);
       return applyExecutionResult(
         deployment,
         executionResult({
           status: "failed",
           exitCode: 1,
-          logs: [phaseLog("deploy", intentResult.error.message, "error")],
+          logs: [phaseLog("deploy", message, "error")],
           retryable: false,
           errorCode: intentResult.error.code,
-          metadata: { phase: "runtime-target-render", message: intentResult.error.message },
+          metadata: { phase: "runtime-target-render", message },
         }),
       );
     }
 
     const applyPlanResult = renderDockerSwarmApplyPlan(intentResult.value);
     if (applyPlanResult.isErr()) {
+      const message = safeFailureMessage(applyPlanResult.error.message, redactions);
       return applyExecutionResult(
         deployment,
         executionResult({
           status: "failed",
           exitCode: 1,
-          logs: [phaseLog("deploy", applyPlanResult.error.message, "error")],
+          logs: [phaseLog("deploy", message, "error")],
           retryable: false,
           errorCode: applyPlanResult.error.code,
-          metadata: { phase: "runtime-target-apply", message: applyPlanResult.error.message },
+          metadata: { phase: "runtime-target-apply", message },
         }),
       );
     }
@@ -167,8 +190,9 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       logs.push(phaseLog(step.step === "verify-candidate-service" ? "verify" : "deploy", step.step));
 
       if (result.isErr()) {
-        logs.push(phaseLog("deploy", result.error.message, "error"));
-        await this.cleanupFailedCandidate(deployment, logs);
+        const message = safeFailureMessage(result.error.message, redactions);
+        logs.push(phaseLog("deploy", message, "error"));
+        await this.cleanupFailedCandidate(deployment, logs, redactions);
         return applyExecutionResult(
           deployment,
           executionResult({
@@ -177,15 +201,18 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
             logs,
             retryable: true,
             errorCode: result.error.code,
-            metadata: { phase: step.step, message: result.error.message },
+            metadata: { phase: step.step, message },
           }),
         );
       }
 
       if (result.value.exitCode !== 0) {
-        const message = result.value.stderr ?? `Docker Swarm command failed at ${step.step}`;
+        const message = safeFailureMessage(
+          result.value.stderr ?? `Docker Swarm command failed at ${step.step}`,
+          redactions,
+        );
         logs.push(phaseLog("deploy", message, "error"));
-        await this.cleanupFailedCandidate(deployment, logs);
+        await this.cleanupFailedCandidate(deployment, logs, redactions);
         return applyExecutionResult(
           deployment,
           executionResult({
@@ -278,20 +305,26 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
   private async cleanupFailedCandidate(
     deployment: Deployment,
     logs: DeploymentLogEntry[],
+    redactions: readonly string[],
   ): Promise<void> {
     const cleanupPlan = renderDockerSwarmCleanupPlan(deploymentIdentity(deployment));
     for (const command of cleanupPlan.commands) {
       const result = await this.runner.run(command);
       logs.push(phaseLog("rollback", `cleanup-failed-candidate:${command.step}`));
       if (result.isErr()) {
-        logs.push(phaseLog("rollback", result.error.message, "error"));
+        logs.push(
+          phaseLog("rollback", safeFailureMessage(result.error.message, redactions), "error"),
+        );
         return;
       }
       if (result.value.exitCode !== 0) {
         logs.push(
           phaseLog(
             "rollback",
-            result.value.stderr ?? `Docker Swarm cleanup failed at ${command.step}`,
+            safeFailureMessage(
+              result.value.stderr ?? `Docker Swarm cleanup failed at ${command.step}`,
+              redactions,
+            ),
             "error",
           ),
         );

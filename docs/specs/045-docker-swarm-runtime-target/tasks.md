@@ -35,8 +35,10 @@
   verification and attach to the Swarm service/network identity without public workload host ports.
 - [ ] `SWARM-TARGET-ROUTE-001B`: end-to-end reverse-proxy route realization is verified against a
   real Swarm edge proxy.
-- [ ] `SWARM-TARGET-SECRET-001`: registry credentials, pull secrets, env values, and rendered
-  command/provider payloads are redacted.
+- [x] `SWARM-TARGET-SECRET-001A`: Swarm command failure output stored in deployment logs and
+  metadata is redacted.
+- [ ] `SWARM-TARGET-SECRET-001B`: registry credentials, pull secrets, env values, and all rendered
+  command/provider payloads are redacted across real Swarm execution.
 
 ## Implementation
 
@@ -53,6 +55,7 @@
 - [x] Add Swarm service log reading through the existing runtime log adapter.
 - [x] Add Swarm service health inspection through the existing resource health query adapter.
 - [x] Add post-verification Traefik route label promotion to the Swarm image apply plan.
+- [x] Redact Swarm command failure output before deployment logs/metadata capture.
 - [ ] Implement real apply/verify/cleanup behind runtime adapters.
 - [ ] Add sanitized target identity persistence/read-model support where required.
 - [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.

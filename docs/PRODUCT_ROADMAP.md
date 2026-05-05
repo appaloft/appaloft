@@ -1246,6 +1246,11 @@ Current verification notes:
   creation, promoted only after candidate verification, and target the Swarm edge network without
   public workload host-port publication. End-to-end route realization against a real Swarm edge
   proxy remains open.
+- 2026-05-06 Phase 7 Docker Swarm failure-redaction slice bound initial
+  `SWARM-TARGET-SECRET-001` coverage to the opt-in Swarm execution backend: command failure output
+  is redacted before deployment logs and execution metadata capture common auth headers, cookies,
+  key/value secrets, URL credentials, private-key blocks, or exact deployment snapshot secret
+  values. Full registry/pull-secret handling across real Swarm execution remains open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1311,7 +1316,8 @@ Required:
   Swarm manager readiness, adapter-owned OCI/Compose render intent, OCI image apply-plan rendering,
   label-scoped cleanup plan rendering, opt-in fake backend acceptance coverage, Swarm runtime-log
   observation, Swarm health observation, initial Traefik route label promotion, the public docs
-  anchor, and CLI/API/Web help links are implemented; real Swarm execution remains open.
+  anchor, command-failure redaction, and CLI/API/Web help links are implemented; real Swarm
+  execution remains open.
 
 Exit criteria:
 
