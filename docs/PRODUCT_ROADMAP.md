@@ -1101,6 +1101,9 @@ Current verification notes:
   `server.docker-swarm-target` help topic and bilingual
   `/docs/servers/register-connect/#docker-swarm-runtime-target` anchor. CLI/API descriptions and
   Web help links remain open with Swarm readiness and execution.
+- 2026-05-05 Phase 7 Docker Swarm help-link slice wired the Swarm target anchor into CLI
+  `server register`, HTTP `POST /servers`, and Web server registration provider help. Swarm
+  manager readiness and execution remain open.
 
 Required:
 
@@ -1142,7 +1145,7 @@ Required:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
   semantics, normalized read surfaces, public docs/help, and contract tests are implemented.
   Target-kind registration metadata, unsupported-backend admission, backend descriptor selection,
-  and the public docs anchor are implemented; Swarm manager readiness, CLI/API/Web help links, and
+  the public docs anchor, and CLI/API/Web help links are implemented; Swarm manager readiness and
   execution remain open.
 
 Exit criteria:

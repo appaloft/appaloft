@@ -49,6 +49,8 @@ Code Rounds; no Swarm implementation is active yet.
   `runtime_target_unsupported` before any deployment row is accepted.
 - `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
   explaining Swarm target registration, manager readiness expectations, image registry access,
-  rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI/API descriptions and
-  Web help links to that anchor remain follow-up coverage.
+  rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI `server register`,
+  HTTP `POST /servers`, and Web server registration provider help link to that anchor. Future MCP
+  descriptors continue to expose `servers.register` from the operation catalog without adding a
+  Swarm-specific tool.
 - No Docker Swarm runtime target execution backend is active in the default registry yet.

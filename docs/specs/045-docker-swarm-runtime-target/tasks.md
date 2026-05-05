@@ -39,12 +39,12 @@
 - [x] Add Swarm runtime target backend descriptor and registry selection coverage.
 - [ ] Implement render/apply/verify/log/health/cleanup behind runtime adapters.
 - [ ] Add sanitized target identity persistence/read-model support where required.
-- [ ] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.
+- [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.
 
 ## Docs Round
 
 - [x] Add public docs/help anchor for Docker Swarm runtime targets.
-- [ ] Add CLI/API descriptions and Web help links for Swarm target readiness and unsupported-field
+- [x] Add CLI/API descriptions and Web help links for Swarm target readiness and unsupported-field
   recovery.
 
 ## Verification

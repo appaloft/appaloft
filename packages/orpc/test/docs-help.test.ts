@@ -40,6 +40,9 @@ describe("HTTP API docs help links", () => {
     expect(apiDocsHrefs.terminalSession).toBe(
       "/docs/servers/operations/proxy-and-terminal/#server-terminal-session",
     );
+    expect(apiDocsHrefs.serverDockerSwarmTarget).toBe(
+      "/docs/servers/register-connect/#docker-swarm-runtime-target",
+    );
     expect(apiDocsHrefs.operatorWorkLedger).toBe(
       "/docs/reference/errors-statuses/#operator-work-ledger",
     );
@@ -61,6 +64,7 @@ describe("HTTP API docs help links", () => {
     );
 
     expect(apiRouteDescriptions.configureServerCredential).toContain(apiDocsHrefs.serverCredential);
+    expect(apiRouteDescriptions.registerServer).toContain(apiDocsHrefs.serverDockerSwarmTarget);
     expect(apiRouteDescriptions.rotateSshCredential).toContain(apiDocsHrefs.serverCredential);
     expect(apiRouteDescriptions.setEnvironmentVariable).toContain(
       apiDocsHrefs.environmentVariablePrecedence,

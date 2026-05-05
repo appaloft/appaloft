@@ -6,6 +6,7 @@ export const webDocsHrefs = {
   deploymentPlanPreview: resolvePublicDocsHelpHref("deployment.plan-preview"),
   deploymentSource: resolvePublicDocsHelpHref("deployment.source"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
+  serverDockerSwarmTarget: resolvePublicDocsHelpHref("server.docker-swarm-target"),
   serverSshCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
   serverConnectivityTest: resolvePublicDocsHelpHref("server.connectivity-test"),
   serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),

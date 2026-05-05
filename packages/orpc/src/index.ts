@@ -447,6 +447,7 @@ export const apiDocsHrefs = {
   serverCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
   serverConnectivity: resolvePublicDocsHelpHref("server.connectivity-test"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
+  serverDockerSwarmTarget: resolvePublicDocsHelpHref("server.docker-swarm-target"),
   serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),
   environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
   environmentDiffPromote: resolvePublicDocsHelpHref("environment.diff-promote"),
@@ -492,6 +493,10 @@ export const apiRouteDescriptions = {
     "deployment.recovery-readiness",
   ),
   projectLifecycle: routeDescription("Read, rename, and archive projects.", "project.lifecycle"),
+  registerServer: routeDescription(
+    "Registers a deployment target. Docker Swarm target metadata is accepted, but Swarm execution requires a matching runtime backend.",
+    "server.docker-swarm-target",
+  ),
   showServer: routeDescription(
     "Reads one deployment target with proxy status and usage rollups.",
     "server.deployment-target",
@@ -1476,6 +1481,7 @@ export const registerServerProcedure = base
   .route({
     method: "POST",
     path: "/servers",
+    description: apiRouteDescriptions.registerServer,
     successStatus: 201,
   })
   .input(registerServerCommandInputSchema)

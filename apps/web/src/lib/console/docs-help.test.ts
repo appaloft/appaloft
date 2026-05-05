@@ -22,6 +22,9 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.serverConnectivityTest).toBe(
       "/docs/servers/register-connect/#server-connectivity-test",
     );
+    expect(webDocsHrefs.serverDockerSwarmTarget).toBe(
+      "/docs/servers/register-connect/#docker-swarm-runtime-target",
+    );
     expect(webDocsHrefs.environmentVariablePrecedence).toBe(
       "/docs/environments/variables/precedence/#environment-variable-precedence",
     );
@@ -185,5 +188,11 @@ describe("console docs help links", () => {
     expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
       "serverTerminalSession",
     );
+    expect(
+      await readFile(
+        new URL("../../lib/components/console/ServerRegistrationForm.svelte", import.meta.url),
+        "utf8",
+      ),
+    ).toContain("serverDockerSwarmTarget");
   });
 });

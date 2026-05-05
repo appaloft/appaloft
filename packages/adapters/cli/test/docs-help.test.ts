@@ -51,6 +51,9 @@ describe("CLI docs help links", () => {
     expect(cliDocsHrefs.serverTerminalSession).toBe(
       "/docs/servers/operations/proxy-and-terminal/#server-terminal-session",
     );
+    expect(cliDocsHrefs.serverDockerSwarmTarget).toBe(
+      "/docs/servers/register-connect/#docker-swarm-runtime-target",
+    );
     expect(cliDocsHrefs.remoteStateLock).toBe("/docs/reference/errors-statuses/#remote-state-lock");
     expect(cliDocsHrefs.operatorWorkLedger).toBe(
       "/docs/reference/errors-statuses/#operator-work-ledger",
@@ -72,6 +75,7 @@ describe("CLI docs help links", () => {
     );
 
     expect(cliCommandDescriptions.serverCredential).toContain(cliDocsHrefs.serverSshCredential);
+    expect(cliCommandDescriptions.serverRegister).toContain(cliDocsHrefs.serverDockerSwarmTarget);
     expect(cliCommandDescriptions.serverCredentialRotate).toContain(
       cliDocsHrefs.serverSshCredential,
     );

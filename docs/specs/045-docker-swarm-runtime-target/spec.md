@@ -88,8 +88,9 @@ No new public operation key is accepted in this Spec Round.
 - Events: existing deployment events remain canonical; Swarm-specific lifecycle detail is runtime
   target diagnostic/read-model data unless a future event spec accepts new event facts.
 - Public docs/help: the public server docs now expose the `docker-swarm-runtime-target` anchor for
-  deployment target/runtime backend guidance. CLI/API descriptions and Web help links still need to
-  point at that anchor when Swarm readiness and unsupported-field recovery surfaces are expanded.
+  deployment target/runtime backend guidance. CLI `server register`, HTTP `POST /servers`, and Web
+  server registration provider help point at that anchor for Swarm target readiness and
+  unsupported-field recovery guidance.
 - Future MCP/tools: generated descriptors remain operation-catalog based and must not add a
   Swarm-specific deployment tool.
 
@@ -120,7 +121,7 @@ No new public operation key is accepted in this Spec Round.
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and
   `/docs/servers/register-connect/#docker-swarm-runtime-target` anchor. CLI/API descriptions and
-  Web help links for Swarm-specific readiness and unsupported-field recovery remain open.
+  the Web server registration provider help link now point to the anchor.
 - Resource profile fields for replicas, update policy, or registry secret selection remain
   deferred until a target/profile configuration Spec Round accepts them.
 
