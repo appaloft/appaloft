@@ -1016,6 +1016,27 @@ describe("CreateDeploymentUseCase", () => {
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
   });
 
+  test("[SWARM-TARGET-ADM-001] rejects Swarm deployment fields at command schema boundary", () => {
+    const command = CreateDeploymentCommand.create({
+      projectId: "prj_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      namespace: "prod",
+      stack: "web",
+      service: "api",
+      replicas: 3,
+      updatePolicy: "start-first",
+      registrySecret: "resource-secret:REGISTRY_TOKEN",
+      ingress: { host: "www.example.com" },
+      manifest: { services: {} },
+    } as never);
+
+    expect(command.isErr()).toBe(true);
+    expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+
   test("adds runtime context metadata for workload diagnostics", async () => {
     const runtimePlanResolver = new CapturingRuntimePlanResolver();
     const { context, createDeploymentInput, createDeploymentUseCase } =

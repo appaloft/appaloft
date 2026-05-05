@@ -1082,6 +1082,10 @@ Current verification notes:
   definitions, run attempts, task-run logs, scheduler admission, and deployment-boundary separation.
   The roadmap row remains open until operation catalog entries, persistence, scheduler/runtime
   execution, entrypoints, and public docs are implemented.
+- 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
+  command schema, public contract schema, HTTP route, repository config parser, and CLI
+  config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm
+  manager readiness and execution remain open.
 
 Required:
 

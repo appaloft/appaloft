@@ -2,7 +2,7 @@
 
 ## Status
 
-Spec Round: positioned; Code Round not started.
+Spec Round: positioned; Code Round in partial slices.
 
 ## Problem
 
@@ -108,12 +108,15 @@ No new public operation key is accepted in this Spec Round.
 - Swarm target registration can persist provider-neutral `orchestrator-cluster` target kind
   metadata with provider key `docker-swarm`; Swarm manager readiness capability checks are not
   implemented.
+- `deployments.create` and repository config parsing reject Swarm-specific deployment fields before
+  deployment creation; target/profile configuration fields for Swarm remain deferred until a
+  governing Spec Round accepts them.
 - Swarm runtime target backend render/apply/verify/log/health/cleanup is not implemented.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help anchors for Swarm are not created yet.
-- Repository config and resource profile fields for replicas, update policy, or registry secret
-  selection remain deferred until a target/profile configuration Spec Round accepts them.
+- Resource profile fields for replicas, update policy, or registry secret selection remain
+  deferred until a target/profile configuration Spec Round accepts them.
 
 ## Open Questions
 

@@ -589,6 +589,51 @@ describe("CLI deployment config entry workflow", () => {
     expect(queries).toHaveLength(0);
   });
 
+  test("[SWARM-TARGET-ADM-001] deploy --config rejects Swarm fields before command dispatch", async () => {
+    ensureReflectMetadata();
+    const harness = await createPreviewDeployCliHarness();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-swarm-config-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: dockerfile",
+        "swarm:",
+        "  stack: web",
+        "  service: api",
+        "  replicas: 3",
+        "  updatePolicy: start-first",
+        "  registrySecret: resource-secret:REGISTRY_TOKEN",
+        "",
+      ].join("\n"),
+    );
+
+    try {
+      const result = await withMutedProcessOutput(() =>
+        harness.program
+          .parseAsync(["node", "appaloft", "deploy", workspace, "--config", configPath])
+          .then(
+            () => ({ ok: true as const }),
+            (error: unknown) => ({ ok: false as const, error }),
+          ),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new Error("Expected Swarm config fields to fail before dispatch");
+      }
+      const errorText = String(result.error);
+      expect(errorText).toContain('"code":"validation_error"');
+      expect(errorText).toContain("unsupported_config_field");
+      expect(errorText).toContain(configPath);
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.commands).toHaveLength(0);
+  });
+
   test("[CONFIG-FILE-DOMAIN-001] access domains persist desired state before ids-only deployment", async () => {
     ensureReflectMetadata();
     const { createExecutionContext } = await import("@appaloft/application");

@@ -243,6 +243,36 @@ describe("Appaloft deployment config schema", () => {
     expect(nested.success).toBe(false);
   });
 
+  test("[SWARM-TARGET-ADM-001] rejects Swarm target fields from repository config", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      runtime: {
+        strategy: "dockerfile",
+      },
+      swarm: {
+        stack: "web",
+        service: "api",
+        replicas: 3,
+        updatePolicy: "start-first",
+        registrySecret: "resource-secret:REGISTRY_TOKEN",
+      },
+    });
+
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.message).toContain("unsupported_config_field");
+      expect(parsed.error.issues[0]?.path).toEqual(["swarm"]);
+    }
+
+    const nested = parseAppaloftDeploymentConfig({
+      runtime: {
+        strategy: "dockerfile",
+        replicas: 3,
+      },
+    });
+
+    expect(nested.success).toBe(false);
+  });
+
   test("[CONFIG-FILE-PROFILE-004] rejects source-root path escapes and absolute paths", () => {
     const escapesSourceRoot = parseAppaloftDeploymentConfig({
       source: {

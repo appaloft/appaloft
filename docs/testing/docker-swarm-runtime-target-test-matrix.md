@@ -36,4 +36,9 @@ Code Rounds; no Swarm implementation is active yet.
 
 ## Current Implementation Notes And Migration Gaps
 
-All rows are target coverage. No Docker Swarm runtime target backend is active yet.
+- `SWARM-TARGET-REG-001` has application/CLI/persistence coverage for safe target-kind metadata
+  registration. Swarm manager readiness remains follow-up coverage.
+- `SWARM-TARGET-ADM-001` has command schema, public contract schema, HTTP route, repository config
+  parser, and CLI config-dispatch coverage proving Swarm-specific deployment fields are rejected
+  before deployment creation.
+- No Docker Swarm runtime target backend is active yet.
