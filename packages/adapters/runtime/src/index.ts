@@ -1241,6 +1241,17 @@ const singleServerDockerCapabilities: RuntimeTargetCapability[] = [
   "proxy.route",
 ];
 
+export function createDockerSwarmRuntimeTargetBackendDescriptor(input: {
+  capabilities: RuntimeTargetCapability[];
+}): RuntimeTargetBackendDescriptor {
+  return {
+    key: "docker-swarm",
+    providerKey: "docker-swarm",
+    targetKinds: ["orchestrator-cluster"],
+    capabilities: [...input.capabilities],
+  };
+}
+
 export function createDefaultRuntimeTargetBackendRegistry(input: {
   localBackend: ExecutionBackend;
   sshBackend: ExecutionBackend;

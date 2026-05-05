@@ -41,4 +41,7 @@ Code Rounds; no Swarm implementation is active yet.
 - `SWARM-TARGET-ADM-001` has command schema, public contract schema, HTTP route, repository config
   parser, and CLI config-dispatch coverage proving Swarm-specific deployment fields are rejected
   before deployment creation.
-- No Docker Swarm runtime target backend is active yet.
+- `SWARM-TARGET-SELECT-001` has adapter registry coverage proving an explicitly registered
+  `docker-swarm` backend is selected only by `orchestrator-cluster`, provider key, and required
+  capabilities.
+- No Docker Swarm runtime target execution backend is active in the default registry yet.
