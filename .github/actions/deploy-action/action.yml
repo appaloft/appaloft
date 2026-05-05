@@ -2,6 +2,10 @@ name: Appaloft Deploy
 description: Install the Appaloft CLI and run the repository deployment workflow.
 
 inputs:
+  command:
+    description: Wrapper command to run. Use deploy for deployments or preview-cleanup for pull request cleanup.
+    required: false
+    default: deploy
   version:
     description: Appaloft CLI release tag, for example v0.9.0. Use latest for the latest stable release.
     required: false
@@ -115,6 +119,7 @@ runs:
       shell: bash
       env:
         APPALOFT_BIN: ${{ steps.install.outputs.appaloft-bin }}
+        INPUT_COMMAND: ${{ inputs.command }}
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_SOURCE: ${{ inputs.source }}
         INPUT_RUNTIME_NAME: ${{ inputs.runtime-name }}

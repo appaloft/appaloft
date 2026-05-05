@@ -452,8 +452,10 @@ preview-scoped source fingerprints, non-interactive preview environment selectio
 implicit-root-domain skip rule needed for Action-style execution. CLI/action profile flags must
 remain in sync with config profile fields so Action previews can be expressed without generating a
 temporary config file. The main repository now includes a reference `.github/actions/deploy-action`
-composite wrapper that maps trusted PR preview inputs to the CLI and handles SSH private-key
-temp-file custody. The public `appaloft/deploy-action` repository is not yet implemented.
+composite wrapper that maps trusted PR preview inputs to the CLI, handles SSH private-key temp-file
+custody, maps `command: preview-cleanup` to `appaloft preview cleanup`, and includes
+Marketplace-facing examples. The public `appaloft/deploy-action` repository is not yet
+implemented.
 
 The main Appaloft repository now includes `.github/workflows/deploy-docs-preview.yml` as a
 repository-authored docs preview workflow over the same CLI path. It classifies PRs whose changed
@@ -467,9 +469,11 @@ preview feature; it does not replace the public `appaloft/deploy-action` wrapper
 
 Missing pieces before Action PR preview can be documented as supported:
 
-- `appaloft/deploy-action` wrapper repository and Marketplace README;
-- wrapper tests for install, secret mapping, fork-safety docs, cleanup, and GitHub
-  deployment/environment metadata cleanup behavior in the public wrapper repository.
+- `appaloft/deploy-action` wrapper repository;
+- promotion or mirroring of the reference Marketplace README, action metadata, scripts, and tests
+  into that repository;
+- wrapper tests for fixture or real-release install and GitHub deployment/environment metadata
+  cleanup behavior in the public wrapper repository.
 
 The public docs now distinguish Action-only preview deploy from product-grade GitHub App previews
 under `/docs/deploy/previews/#deployment-pr-preview-action-workflow` and

@@ -1218,6 +1218,11 @@ Current verification notes:
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
   Marketplace README, and public wrapper tests remain open.
+- 2026-05-05 Phase 7 deploy-action wrapper cleanup/README slice added `command:
+  preview-cleanup` to the reference composite action, a Marketplace-facing README with deploy, PR
+  preview, close-event cleanup, fork-safety, minimal config, and reserved control-plane examples,
+  plus wrapper tests for cleanup mapping and README safety examples. The public
+  `appaloft/deploy-action` repository and public wrapper CI/layout tests remain open.
 
 Required:
 
@@ -1247,7 +1252,8 @@ Required:
 - [ ] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
   GitHub Actions workflow. Public docs now distinguish Action-only workflow-file previews from
   future product-grade control-plane previews, but the public `appaloft/deploy-action` wrapper
-  repository, Marketplace README, and wrapper CI/tests remain open.
+  repository, public wrapper CI/layout tests, and promotion of the reference action assets remain
+  open.
 - [x] Add existing-resource profile-drift handling.
 - [ ] Add product-grade preview deployments after source binding and webhook ingestion are durable,
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
