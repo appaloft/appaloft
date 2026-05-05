@@ -60,6 +60,13 @@ implemented, but no Docker Swarm execution backend is active yet.
 - `SWARM-TARGET-SECRET-001` has initial render-contract coverage proving runtime secret environment
   values are converted to safe references and omitted from serialized render intent. Registry pull
   credential and provider response redaction remain open with apply/log/diagnostic adapters.
+- `SWARM-TARGET-APPLY-001` has initial adapter contract coverage proving OCI image apply planning
+  creates a deployment-specific candidate service before verification, route promotion, and
+  superseded-service cleanup. Active command execution, failure rollback, and persistence/read-model
+  updates remain open with the Swarm backend.
+- `SWARM-TARGET-ROUTE-001` has initial apply-plan coverage proving image workloads attach to the
+  Swarm overlay network without public host-port publication. Active edge-proxy route realization
+  remains open.
 - `SWARM-TARGET-CLEAN-001` has initial adapter contract coverage proving Swarm service cleanup
   selectors include Appaloft managed, resource, deployment, target, destination, and runtime-target
   labels, and do not render broad Docker prune or volume commands. Active cleanup execution remains

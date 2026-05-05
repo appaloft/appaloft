@@ -120,6 +120,11 @@ No new public operation key is accepted in this Spec Round.
   resource, deployment, target, and destination context, maps runtime environment snapshots,
   health policies, and access routes, and masks runtime secret values before they reach diagnostics
   or tests.
+- OCI image runtime intent now also renders an adapter-owned apply plan that creates a
+  deployment-specific candidate service, keeps workload traffic on Swarm networks without public
+  host-port publication, orders verification before route promotion and superseded-service cleanup,
+  and keeps secret environment values as safe Docker secret references. The plan is not wired to an
+  execution backend yet.
 - The runtime adapter package also renders a label-scoped Swarm cleanup plan for services owned by
   the same Appaloft resource, deployment, target, destination, and runtime-target identity. The plan
   is not wired to an execution backend yet.
