@@ -185,6 +185,10 @@ export const cliCommandDescriptions = {
     "Configure resource generated access profile",
     "resource.access-profile",
   ),
+  resourceConfigureAutoDeploy: withDocs(
+    "Configure resource auto-deploy policy",
+    "source.auto-deploy-setup",
+  ),
   resourceStorage: withDocs("Resource storage attachment operations", "storage.volume-lifecycle"),
   resourceAttachStorage: withDocs(
     "Attach storage to a resource at a destination path",

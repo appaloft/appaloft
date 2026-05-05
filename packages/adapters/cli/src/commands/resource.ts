@@ -3,6 +3,8 @@ import {
   AttachResourceStorageCommand,
   BindResourceDependencyCommand,
   ConfigureResourceAccessCommand,
+  ConfigureResourceAutoDeployCommand,
+  type ConfigureResourceAutoDeployCommandInput,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
@@ -90,6 +92,27 @@ const sourceDefaultBranchOption = Options.text("default-branch").pipe(Options.op
 const sourceImageNameOption = Options.text("image-name").pipe(Options.optional);
 const sourceImageTagOption = Options.text("image-tag").pipe(Options.optional);
 const sourceImageDigestOption = Options.text("image-digest").pipe(Options.optional);
+const autoDeployModes = ["enable", "disable", "replace", "acknowledge-source-binding"] as const;
+const autoDeployTriggerKinds = ["git-push", "generic-signed-webhook"] as const;
+const autoDeployEventKinds = ["push", "tag"] as const;
+const autoDeployModeOption = Options.choice("mode", autoDeployModes);
+const autoDeployTriggerKindOption = Options.choice("trigger-kind", autoDeployTriggerKinds).pipe(
+  Options.optional,
+);
+const autoDeployRefOption = Options.text("ref").pipe(Options.repeated);
+const autoDeployEventKindOption = Options.choice("event-kind", autoDeployEventKinds).pipe(
+  Options.repeated,
+);
+const autoDeploySourceBindingFingerprintOption = Options.text("source-binding-fingerprint").pipe(
+  Options.optional,
+);
+const autoDeployGenericWebhookSecretRefOption = Options.text("generic-webhook-secret-ref").pipe(
+  Options.optional,
+);
+const autoDeployDedupeWindowSecondsOption = Options.text("dedupe-window-seconds").pipe(
+  Options.optional,
+);
+const autoDeployIdempotencyKeyOption = Options.text("idempotency-key").pipe(Options.optional);
 const runtimeStrategyOption = Options.choice("strategy", runtimePlanStrategies).pipe(
   Options.withDefault("auto"),
 );
@@ -760,6 +783,66 @@ const configureAccessCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureAccess));
 
+const configureAutoDeployCommand = EffectCommand.make(
+  "auto-deploy",
+  {
+    resourceId: resourceIdArg,
+    mode: autoDeployModeOption,
+    triggerKind: autoDeployTriggerKindOption,
+    refs: autoDeployRefOption,
+    eventKinds: autoDeployEventKindOption,
+    sourceBindingFingerprint: autoDeploySourceBindingFingerprintOption,
+    genericWebhookSecretRef: autoDeployGenericWebhookSecretRefOption,
+    dedupeWindowSeconds: autoDeployDedupeWindowSecondsOption,
+    idempotencyKey: autoDeployIdempotencyKeyOption,
+    json: jsonOption,
+  },
+  ({
+    dedupeWindowSeconds,
+    eventKinds,
+    genericWebhookSecretRef,
+    idempotencyKey,
+    json,
+    mode,
+    refs,
+    resourceId,
+    sourceBindingFingerprint,
+    triggerKind,
+  }) => {
+    void json;
+    const triggerKindValue = optionalValue(triggerKind);
+    const sourceBindingFingerprintValue = optionalValue(sourceBindingFingerprint);
+    const genericWebhookSecretRefValue = optionalValue(genericWebhookSecretRef);
+    const dedupeWindowSecondsValue = optionalNumber(dedupeWindowSeconds);
+    const idempotencyKeyValue = optionalValue(idempotencyKey);
+    const selectedEventKinds = eventKinds as (typeof autoDeployEventKinds)[number][];
+    const policy: NonNullable<ConfigureResourceAutoDeployCommandInput["policy"]> | undefined =
+      mode === "enable" || mode === "replace"
+        ? {
+            triggerKind: triggerKindValue ?? "git-push",
+            refs,
+            eventKinds: selectedEventKinds.length > 0 ? [...selectedEventKinds] : ["push"],
+            ...(genericWebhookSecretRefValue
+              ? { genericWebhookSecretRef: genericWebhookSecretRefValue }
+              : {}),
+            ...(dedupeWindowSecondsValue ? { dedupeWindowSeconds: dedupeWindowSecondsValue } : {}),
+          }
+        : undefined;
+
+    return runCommand(
+      ConfigureResourceAutoDeployCommand.create({
+        resourceId,
+        mode,
+        ...(sourceBindingFingerprintValue
+          ? { sourceBindingFingerprint: sourceBindingFingerprintValue }
+          : {}),
+        ...(policy ? { policy } : {}),
+        ...(idempotencyKeyValue ? { idempotencyKey: idempotencyKeyValue } : {}),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureAutoDeploy));
+
 const attachStorageCommand = EffectCommand.make(
   "attach",
   {
@@ -952,6 +1035,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     configureHealthCommand,
     configureNetworkCommand,
     configureAccessCommand,
+    configureAutoDeployCommand,
     storageCommand,
     dependencyCommand,
     proxyConfigCommand,

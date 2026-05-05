@@ -31,6 +31,8 @@ import {
   ConfigureDomainBindingRouteUseCase,
   ConfigureResourceAccessCommandHandler,
   ConfigureResourceAccessUseCase,
+  ConfigureResourceAutoDeployCommandHandler,
+  ConfigureResourceAutoDeployUseCase,
   ConfigureResourceHealthCommandHandler,
   ConfigureResourceHealthUseCase,
   ConfigureResourceNetworkCommandHandler,
@@ -341,6 +343,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ConfigureServerEdgeProxyCommandHandler);
   container.registerSingleton(ConfigureDomainBindingRouteCommandHandler);
   container.registerSingleton(ConfigureResourceAccessCommandHandler);
+  container.registerSingleton(ConfigureResourceAutoDeployCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
@@ -449,6 +452,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.configureResourceAccessUseCase,
     ConfigureResourceAccessUseCase,
+  );
+  container.registerSingleton(
+    tokens.configureResourceAutoDeployUseCase,
+    ConfigureResourceAutoDeployUseCase,
   );
   container.registerSingleton(
     tokens.configureResourceHealthUseCase,
