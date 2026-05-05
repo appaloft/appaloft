@@ -107,8 +107,9 @@ No new public operation key is accepted in this Spec Round.
 ## Current Implementation Notes And Migration Gaps
 
 - Swarm target registration can persist provider-neutral `orchestrator-cluster` target kind
-  metadata with provider key `docker-swarm`; Swarm manager readiness capability checks are not
-  implemented.
+  metadata with provider key `docker-swarm`; `servers.test-connectivity` now runs non-mutating
+  Swarm manager readiness checks for SSH reachability, Docker availability, active manager state,
+  overlay network support, and Swarm edge-proxy compatibility.
 - `deployments.create` and repository config parsing reject Swarm-specific deployment fields before
   deployment creation; target/profile configuration fields for Swarm remain deferred until a
   governing Spec Round accepts them.

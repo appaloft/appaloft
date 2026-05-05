@@ -133,6 +133,22 @@ function createServer(): DeploymentTargetState {
   };
 }
 
+function createSwarmServer(): DeploymentTargetState {
+  return {
+    id: DeploymentTargetId.rehydrate("srv_swarm"),
+    name: DeploymentTargetName.rehydrate("swarm"),
+    host: HostAddress.rehydrate("deploy@swarm-manager.internal"),
+    port: PortNumber.rehydrate(22),
+    providerKey: ProviderKey.rehydrate("docker-swarm"),
+    targetKind: TargetKindValue.rehydrate("orchestrator-cluster"),
+    edgeProxy: {
+      kind: EdgeProxyKindValue.rehydrate("none"),
+      status: EdgeProxyStatusValue.rehydrate("disabled"),
+    },
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  };
+}
+
 function createContext(): ExecutionContext {
   return {
     requestId: "req_server_connectivity",
@@ -204,5 +220,56 @@ describe("RuntimeServerConnectivityChecker", () => {
         }),
       ]),
     );
+  });
+
+  test("[SWARM-TARGET-REG-002] checks Docker Swarm manager readiness through SSH", async () => {
+    const capturedCommands: string[] = [];
+    const checker = new RuntimeServerConnectivityChecker(undefined, (command, args) => {
+      capturedCommands.push([command, ...args].join(" "));
+      return {
+        status: 0,
+        stdout: "ok",
+        stderr: "",
+      };
+    });
+    const result = await checker.test(createContext(), {
+      server: createSwarmServer(),
+    });
+
+    expect(result.isOk()).toBe(true);
+    const connectivity = result._unsafeUnwrap();
+    expect(connectivity.status).toBe("healthy");
+    expect(connectivity.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "ssh",
+          status: "passed",
+          metadata: expect.objectContaining({
+            providerKey: "docker-swarm",
+            targetKind: "orchestrator-cluster",
+          }),
+        }),
+        expect.objectContaining({
+          name: "docker",
+          status: "passed",
+        }),
+        expect.objectContaining({
+          name: "swarm-manager",
+          status: "passed",
+        }),
+        expect.objectContaining({
+          name: "swarm-overlay-network",
+          status: "passed",
+        }),
+        expect.objectContaining({
+          name: "swarm-edge-proxy",
+          status: "skipped",
+        }),
+      ]),
+    );
+    expect(capturedCommands.join("\n")).toContain("docker info");
+    expect(capturedCommands.join("\n")).not.toContain("docker stack");
+    expect(capturedCommands.join("\n")).not.toContain("docker service");
+    expect(capturedCommands.join("\n")).not.toContain("docker network create");
   });
 });
