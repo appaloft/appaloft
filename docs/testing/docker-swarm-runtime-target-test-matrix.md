@@ -88,6 +88,10 @@ implemented, but no Docker Swarm execution backend is active yet.
   from candidate service creation and added only in the post-verification `promote-route-target`
   step against the Swarm edge network. End-to-end route realization against a real Swarm edge proxy
   remains open.
+- `SWARM-TARGET-SECRET-001` has initial fake-backend coverage proving Swarm command failure output
+  is redacted before deployment logs and execution metadata capture common auth headers, cookies,
+  key/value secrets, URL credentials, private-key blocks, or exact deployment snapshot secret
+  values. Full registry/pull-secret handling across real Swarm execution remains open.
 - `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
   explaining Swarm target registration, manager readiness expectations, image registry access,
   rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI `server register`,

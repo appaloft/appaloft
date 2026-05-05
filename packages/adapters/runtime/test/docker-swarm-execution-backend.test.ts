@@ -95,6 +95,31 @@ class FailingVerifySwarmCommandRunner implements DockerSwarmCommandRunner {
   }
 }
 
+class SecretLeakingVerifySwarmCommandRunner implements DockerSwarmCommandRunner {
+  readonly calls: DockerSwarmCommandRunnerInput[] = [];
+
+  async run(
+    input: DockerSwarmCommandRunnerInput,
+  ): Promise<Result<DockerSwarmCommandRunnerResult>> {
+    this.calls.push(input);
+    if (input.step === "verify-candidate-service") {
+      return ok({
+        exitCode: 22,
+        stderr: [
+          "Authorization: Bearer raw-registry-token",
+          "Cookie: session=raw-cookie",
+          "password=raw-password",
+          "postgres://secret-value",
+          "ssh://deploy:raw-ssh-password@example.test",
+          "-----BEGIN PRIVATE KEY----- raw-key -----END PRIVATE KEY-----",
+        ].join(" "),
+      });
+    }
+
+    return ok({ exitCode: 0 });
+  }
+}
+
 function createContext(): ExecutionContext {
   return {
     entrypoint: "system",
@@ -293,5 +318,28 @@ describe("DockerSwarmExecutionBackend", () => {
     expect(runner.calls[2]?.command).toContain("--filter 'label=appaloft.resource-id=res_api'");
     expect(runner.calls[2]?.command).not.toContain("docker system prune");
     expect(runner.calls[2]?.command).not.toContain("docker volume");
+  });
+
+  test("[SWARM-TARGET-SECRET-001] redacts Swarm command failure output in deployment logs and metadata", async () => {
+    const runner = new SecretLeakingVerifySwarmCommandRunner();
+    const backend = new DockerSwarmExecutionBackend(runner);
+
+    const result = await backend.execute(createContext(), runningDeployment());
+
+    expect(result.isOk()).toBe(true);
+    const deployment = result._unsafeUnwrap().deployment.toState();
+    const serialized = JSON.stringify({
+      logs: deployment.logs,
+      metadata: deployment.runtimePlan.execution.metadata,
+    });
+
+    expect(serialized).toContain("********");
+    expect(serialized).not.toContain("raw-registry-token");
+    expect(serialized).not.toContain("raw-cookie");
+    expect(serialized).not.toContain("raw-password");
+    expect(serialized).not.toContain("postgres://secret-value");
+    expect(serialized).not.toContain("raw-ssh-password");
+    expect(serialized).not.toContain("raw-key");
+    expect(serialized).not.toContain("BEGIN PRIVATE KEY");
   });
 });
