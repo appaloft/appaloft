@@ -127,4 +127,35 @@ describe("ConfigureResourceAutoDeployUseCase", () => {
     });
     expect(eventBus.events).toHaveLength(0);
   });
+
+  test("[SRC-AUTO-POLICY-004] rejects arbitrary generic signed webhook secret refs", async () => {
+    const { context, eventBus, repositoryContext, resources, useCase } = await createHarness();
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_web",
+      mode: "enable",
+      policy: {
+        triggerKind: "generic-signed-webhook",
+        refs: ["main"],
+        eventKinds: ["push"],
+        genericWebhookSecretRef: "APPALOFT_WEBHOOK_SECRET",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "auto-deploy-policy-admission",
+        field: "policy.genericWebhookSecretRef",
+        refFamily: "resource-secret",
+      },
+    });
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    expect(persisted?.toState().autoDeployPolicy).toBeUndefined();
+    expect(eventBus.events).toHaveLength(0);
+  });
 });

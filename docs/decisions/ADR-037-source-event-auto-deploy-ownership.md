@@ -91,6 +91,22 @@ referenced secret through existing secret operations and then acknowledging the 
 A future reusable webhook credential aggregate may be added only after a separate ADR/spec defines
 cross-resource ownership, rotation, audit, and delete-safety behavior.
 
+The initial accepted Resource-scoped reference format is:
+
+```text
+resource-secret:<RESOURCE_VARIABLE_KEY>
+```
+
+The referenced key must resolve to an active variable on the same Resource with `exposure =
+"runtime"` and secret classification (`isSecret = true` or `kind = "secret"`). The resolver must
+not read environment-scope variables, dependency binding secrets, certificate secrets, provider
+tokens, or arbitrary secret refs for generic signed webhook verification.
+
+Generic signed webhook routes must be Resource-scoped and must pass that Resource id into the
+source-event ingestion boundary. Matching for a Resource-scoped generic signed event is limited to
+that Resource, even if another Resource has the same source identity and ref. Provider-signed Git
+events may still fan out to multiple matching Resource policies.
+
 ## Process State And Retry Baseline
 
 The first Code Round does not require the Phase 8 durable outbox/inbox baseline.
@@ -138,6 +154,18 @@ Every active entrypoint must map to the same operation semantics:
 
 Transport adapters may own provider-specific signature extraction and raw payload parsing, but they
 must dispatch provider-neutral source event commands into application behavior.
+
+The first generic signed HTTP route shape is:
+
+```text
+POST /api/resources/{resourceId}/source-events/generic-signed
+```
+
+It resolves `genericWebhookSecretRef`, verifies the raw request body with HMAC SHA-256 using the
+`X-Appaloft-Signature` header (`sha256=<hex>` or bare hex), normalizes safe JSON body fields into
+provider-neutral source event facts, and dispatches `source-events.ingest` with `scopeResourceId =
+resourceId`. Raw request body, signature header, and secret values must not be persisted in source
+event records, error details, read models, logs, or events.
 
 ## Consequences
 

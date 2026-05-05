@@ -86,7 +86,9 @@ Out of scope for the first Code Round:
 - Always-on cloud runner execution.
 - Deployment queueing beyond the accepted async lifecycle and operation coordination contracts.
 - Provider-native branch protection or required status check policy.
-- Secrets rotation or new credential storage semantics.
+- Secrets rotation, reusable webhook credential aggregates, provider-native secret backends, or
+  arbitrary secret reference resolution beyond the first Resource-scoped `resource-secret:<KEY>`
+  format.
 
 ## Policy Semantics
 
@@ -122,6 +124,24 @@ and not silently deleted, but source events must not create deployments while it
 If multiple Resources match one event, Appaloft may create multiple deployment attempts, but each
 attempt must coordinate independently through the existing `resource-runtime` scope.
 
+Provider-signed Git events may fan out to multiple matching Resource policies. Generic signed
+webhook events are different: the first Phase 7 route is Resource-scoped, verifies with that
+Resource's `resource-secret:<KEY>` policy reference, and passes `scopeResourceId` into
+`source-events.ingest`. A Resource-scoped generic signed event must never deploy a different
+Resource even when another Resource shares the same source identity and ref.
+
+The first generic signed HTTP route is:
+
+```text
+POST /api/resources/{resourceId}/source-events/generic-signed
+```
+
+The route verifies the raw JSON body with `X-Appaloft-Signature` (`sha256=<hex>` or bare SHA-256
+HMAC hex). The request body may include only normalized source facts: `eventKind`, `sourceIdentity`,
+`ref`, `revision`, optional `deliveryId`, optional `idempotencyKey`, and optional `receivedAt`.
+Raw payloads, signature headers, secret values, provider tokens, and credential-bearing source URLs
+must not be persisted.
+
 ## Acceptance Criteria
 
 | ID | Scenario | Expected result |
@@ -132,6 +152,7 @@ attempt must coordinate independently through the existing `resource-runtime` sc
 | `SRC-AUTO-SPEC-004` | Event ref does not match policy. | No deployment is created; read model reports ignored reason. |
 | `SRC-AUTO-SPEC-005` | Generic signed webhook has invalid signature. | Event is rejected before policy matching and no deployment is created. |
 | `SRC-AUTO-SPEC-006` | Resource source binding changes after policy creation. | Policy is blocked pending explicit acknowledgement and cannot create deployments. |
+| `SRC-AUTO-SPEC-007` | Resource-scoped generic signed webhook matches a source shared by another Resource. | Only the Resource named in the webhook route is eligible for deployment dispatch. |
 
 ## Public Surfaces
 
@@ -154,8 +175,8 @@ ADR-037 answers the initial Code Round blockers:
 
 - source event read models are project/resource-scoped first; global operator rollups are future;
 - source binding changes block existing auto-deploy policies until explicit acknowledgement;
-- generic signed webhook starts with a Resource-scoped secret reference, not a reusable credential
-  aggregate;
+- generic signed webhook starts with a Resource-scoped `resource-secret:<KEY>` reference, not a
+  reusable credential aggregate, and its route is Resource-scoped;
 - Phase 7 may use durable source-event records plus synchronous deployment dispatch before Phase 8
   outbox/inbox, but must not claim automatic background retry.
 
@@ -165,4 +186,5 @@ Remaining Test-First / Code Round work:
 - update `CORE_OPERATIONS.md` and `operation-catalog.ts` when activating the operations;
 - decide whether the first implementation slice includes generic signed webhook only or provider
   Git webhook adapters as well;
+- add the Resource-scoped generic signed route with safe secret resolution and scoped matching;
 - implement transport help text and Web links against the registered public docs topics.

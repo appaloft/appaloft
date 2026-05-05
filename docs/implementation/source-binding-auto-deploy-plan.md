@@ -29,10 +29,12 @@ Round authorization.
 ### 3. Source Event Ingestion
 
 - Add provider-neutral `source-events.ingest` command schema. `Status: inactive application
-  command baseline implemented.`
+  command baseline implemented; next generic signed route slice must add Resource-scoped
+  `scopeResourceId` admission before activation.`
 - Add signature verification/normalization ports for Git provider and generic signed events.
   `Status: generic signed source-event verification port implemented; provider-specific Git
-  verification adapters remain future.`
+  verification adapters remain future; secret-value resolution for `resource-secret:<KEY>` remains
+  the next transport/application boundary.`
 - Add durable source event records with dedupe keys, normalized facts, policy match results, ignored
   reasons, and created deployment ids. `Status: durable dedupe/read-model persistence baseline
   implemented; ignored policy-match outcomes are populated for non-matching refs; deployment ids are
@@ -46,7 +48,8 @@ Round authorization.
 ### 4. Deployment Dispatch
 
 - Evaluate enabled policies in application logic. `Status: policy candidate lookup and ignored
-  ref/disabled/blocked/no-match outcome evaluation implemented.`
+  ref/disabled/blocked/no-match outcome evaluation implemented; Resource-scoped generic signed
+  matching must restrict candidates to `scopeResourceId`.`
 - Dispatch matching policies through existing deployment admission and `resource-runtime`
   coordination. `Status: application dispatcher invokes existing deployments.create admission and
   records dispatched or dispatch-failed source event outcomes; shell DI wiring is present;
@@ -58,6 +61,9 @@ Round authorization.
 - Add CLI, HTTP/oRPC, and Web surfaces only after application behavior and persistence pass.
   `Status: resources.configure-auto-deploy and source-events.list/show have CLI and HTTP/oRPC
   surfaces; source-events.ingest provider routes and Web diagnostics remain future.`
+- Add the Resource-scoped generic signed HTTP route
+  `POST /api/resources/{resourceId}/source-events/generic-signed` after `resource-secret:<KEY>`
+  resolution, `scopeResourceId` matching, and entrypoint tests are implemented.
 - Add public docs for setup, signatures, dedupe, ignored events, and manual recovery.
 - Add future MCP/tool descriptor mapping from operation catalog metadata.
 

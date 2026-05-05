@@ -17,6 +17,7 @@ import {
   PortNumber,
   ProjectId,
   Resource,
+  ResourceAutoDeploySecretRef,
   ResourceAutoDeployTriggerKindValue,
   ResourceExposureModeValue,
   ResourceGeneratedAccessModeValue,
@@ -326,6 +327,34 @@ describe("Resource", () => {
     expect(resource.pullDomainEvents().map((event) => event.type)).toContain(
       "resource-auto-deploy-policy-configured",
     );
+  });
+
+  test("[SRC-AUTO-POLICY-004] accepts only Resource variable secret references for generic signed webhooks", () => {
+    const validSecretRef = ResourceAutoDeploySecretRef.create(
+      "resource-secret:APPALOFT_WEBHOOK_SECRET",
+    );
+    expect(validSecretRef.isOk()).toBe(true);
+    expect(validSecretRef._unsafeUnwrap().resourceVariableKey().value).toBe(
+      "APPALOFT_WEBHOOK_SECRET",
+    );
+
+    for (const candidate of [
+      "APPALOFT_WEBHOOK_SECRET",
+      "env-secret:APPALOFT_WEBHOOK_SECRET",
+      "resource-secret:",
+    ]) {
+      const secretRef = ResourceAutoDeploySecretRef.create(candidate);
+
+      expect(secretRef.isErr()).toBe(true);
+      if (secretRef.isErr()) {
+        expect(secretRef.error.code).toBe("validation_error");
+        expect(secretRef.error.details).toMatchObject({
+          phase: "auto-deploy-policy-admission",
+          field: "policy.genericWebhookSecretRef",
+          refFamily: "resource-secret",
+        });
+      }
+    }
   });
 
   test("[SRC-AUTO-POLICY-002] rejects auto-deploy when source binding is missing", () => {

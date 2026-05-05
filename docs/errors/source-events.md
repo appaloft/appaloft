@@ -23,7 +23,7 @@ active only when their owning command/query slices are implemented.
 | `resource_auto_deploy_source_missing` | `application` or `conflict` | `auto-deploy-policy-admission` | No | `resources.configure-auto-deploy` | resource id, required source kind when known |
 | `resource_auto_deploy_policy_blocked` | `conflict` | `auto-deploy-policy-admission` | No | `resources.configure-auto-deploy`, `source-events.ingest` | resource id, blocked reason, source binding fingerprint when safe |
 | `resource_auto_deploy_secret_required` | `validation` | `auto-deploy-policy-admission` | No | `resources.configure-auto-deploy` | resource id, trigger kind |
-| `resource_auto_deploy_secret_unavailable` | `application` or `infra` | `auto-deploy-policy-admission` | Conditional | `resources.configure-auto-deploy`, `source-events.ingest` | resource id, secret reference id/version when safe |
+| `resource_auto_deploy_secret_unavailable` | `application` or `infra` | `auto-deploy-policy-admission` or `source-event-verification` | Conditional | `resources.configure-auto-deploy`, `source-events.ingest` | resource id, secret reference id/version when safe |
 | `source_event_signature_invalid` | `integration` or `validation` | `source-event-verification` | No | `source-events.ingest` | source kind, event kind, delivery id or idempotency key when safe |
 | `source_event_unsupported_kind` | `validation` | `source-event-normalization` | No | `source-events.ingest` | source kind, event kind |
 | `source_event_dispatch_failed` | `application` or `infra` | `source-event-dispatch` | Conditional | `source-events.ingest` | source event id, resource id, deployment id when created, underlying safe error code |
@@ -58,3 +58,9 @@ Reason codes may appear in source event read models without being top-level erro
 Error details and source event read models must not include raw webhook payloads, signatures,
 webhook secret values, provider tokens, raw authorization headers, private source URLs with
 credentials, or unbounded provider error output.
+
+For the first generic signed webhook slice, `genericWebhookSecretRef` resolves only through the
+`resource-secret:<KEY>` family. The referenced value must be a Resource-owned runtime secret
+variable on the same Resource. Missing, non-secret, build-time, environment-scope, dependency,
+certificate, provider-token, or arbitrary secret references return
+`resource_auto_deploy_secret_unavailable` without exposing the raw key value or secret value.
