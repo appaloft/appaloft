@@ -1,3 +1,4 @@
+export * from "./operations/source-events/create-deployment-source-event-dispatcher";
 export * from "./operations/source-events/generic-signed-source-event-verifier";
 export * from "./operations/source-events/ingest-source-event.handler";
 export * from "./operations/source-events/ingest-source-event.use-case";

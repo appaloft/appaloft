@@ -63,6 +63,7 @@ export const tokens = {
   ),
   sourceEventRecorder: Symbol.for("appaloft.source_event_recorder"),
   sourceEventPolicyReader: Symbol.for("appaloft.source_event_policy_reader"),
+  sourceEventDeploymentDispatcher: Symbol.for("appaloft.source_event_deployment_dispatcher"),
   sourceEventReadModel: Symbol.for("appaloft.source_event_read_model"),
   deploymentReadModel: Symbol.for("appaloft.deployment_read_model"),
   domainBindingReadModel: Symbol.for("appaloft.domain_binding_read_model"),

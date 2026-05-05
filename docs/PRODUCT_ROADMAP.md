@@ -1001,6 +1001,11 @@ Current verification notes:
   ignored ref/disabled/blocked/no-match outcome evaluation with `SRC-AUTO-EVENT-003` application
   and PGlite coverage. Matching deployment dispatch, operation catalog/Core Operations, and
   CLI/HTTP/Web surfaces remain inactive.
+- 2026-05-05 Phase 7 source event deployment dispatch slice added an application dispatcher that
+  invokes existing `deployments.create` admission for matching source events and records dispatched
+  or dispatch-failed source event outcomes with `SRC-AUTO-EVENT-001` application coverage.
+  Operation catalog/Core Operations, provider ingestion routes, and CLI/HTTP/Web surfaces remain
+  inactive.
 
 Required:
 

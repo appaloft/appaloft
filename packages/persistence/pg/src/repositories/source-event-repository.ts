@@ -102,17 +102,19 @@ export class PgSourceEventRepository
   ): Promise<SourceEventPolicyCandidate[]> {
     const rows = await this.db
       .selectFrom("resources")
+      .leftJoin("destinations", "destinations.id", "resources.destination_id")
       .select([
-        "id",
-        "project_id",
-        "environment_id",
-        "destination_id",
-        "source_binding",
-        "auto_deploy_policy",
+        "resources.id",
+        "resources.project_id",
+        "resources.environment_id",
+        "resources.destination_id",
+        "resources.source_binding",
+        "resources.auto_deploy_policy",
+        "destinations.server_id as server_id",
       ])
-      .where("auto_deploy_policy", "is not", null)
-      .where("source_binding", "is not", null)
-      .where("lifecycle_status", "!=", "deleted")
+      .where("resources.auto_deploy_policy", "is not", null)
+      .where("resources.source_binding", "is not", null)
+      .where("resources.lifecycle_status", "!=", "deleted")
       .execute();
 
     const candidates: SourceEventPolicyCandidate[] = [];
@@ -133,6 +135,7 @@ export class PgSourceEventRepository
         projectId: row.project_id,
         environmentId: row.environment_id,
         resourceId: row.id,
+        ...(row.server_id ? { serverId: row.server_id } : {}),
         ...(row.destination_id ? { destinationId: row.destination_id } : {}),
         status: policy.status,
         refs: [...policy.refs],

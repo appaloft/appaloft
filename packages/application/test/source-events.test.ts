@@ -3,6 +3,8 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   type RepositoryContext,
+  type SourceEventDeploymentDispatcher,
+  type SourceEventDeploymentDispatchInput,
   type SourceEventListInput,
   type SourceEventListPage,
   type SourceEventOutcomeUpdate,
@@ -13,9 +15,11 @@ import {
   type SourceEventRecorder,
   type SourceEventShowInput,
 } from "@appaloft/application";
+import { ok } from "@appaloft/core";
 import { FixedClock } from "@appaloft/testkit";
 
 import { createExecutionContext } from "../src";
+import { CreateDeploymentSourceEventDispatcher } from "../src/operations/source-events/create-deployment-source-event-dispatcher";
 import { GenericSignedSourceEventVerifier } from "../src/operations/source-events/generic-signed-source-event-verifier";
 import { IngestSourceEventUseCase } from "../src/operations/source-events/ingest-source-event.use-case";
 import { ListSourceEventsQuery } from "../src/operations/source-events/list-source-events.query";
@@ -148,6 +152,20 @@ class MemorySourceEventPolicyReader implements SourceEventPolicyReader {
   }
 }
 
+class MemorySourceEventDeploymentDispatcher implements SourceEventDeploymentDispatcher {
+  readonly inputs: SourceEventDeploymentDispatchInput[] = [];
+
+  constructor(private readonly deploymentIds: string[] = ["dep_1"]) {}
+
+  async dispatch(
+    _context: Parameters<SourceEventDeploymentDispatcher["dispatch"]>[0],
+    input: SourceEventDeploymentDispatchInput,
+  ): ReturnType<SourceEventDeploymentDispatcher["dispatch"]> {
+    this.inputs.push({ ...input });
+    return ok({ deploymentId: this.deploymentIds.shift() ?? "dep_fallback" });
+  }
+}
+
 function cloneRecord(record: SourceEventRecord): SourceEventRecord {
   return {
     ...record,
@@ -195,7 +213,12 @@ function sourceEventRecordFixture(): SourceEventRecord {
   };
 }
 
-function createHarness(options: { policyCandidates?: SourceEventPolicyCandidate[] } = {}) {
+function createHarness(
+  options: {
+    policyCandidates?: SourceEventPolicyCandidate[];
+    deploymentDispatcher?: SourceEventDeploymentDispatcher;
+  } = {},
+) {
   const context = createExecutionContext({
     requestId: "req_source_events_test",
     entrypoint: "system",
@@ -214,6 +237,7 @@ function createHarness(options: { policyCandidates?: SourceEventPolicyCandidate[
       clock,
       new SequentialIdGenerator(),
       policyReader,
+      options.deploymentDispatcher,
     ),
     list: new ListSourceEventsQueryService(sourceEvents, clock),
     show: new ShowSourceEventQueryService(sourceEvents),
@@ -342,6 +366,112 @@ describe("source event application baseline", () => {
     expect(sourceEvents.records[0]?.sourceIdentity.locator).toBe(
       "https://github.com/appaloft/demo",
     );
+  });
+
+  test("[SRC-AUTO-EVENT-001] dispatches matching source events through deployment admission", async () => {
+    const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher(["dep_1"]);
+    const { context, ingest, sourceEvents } = createHarness({
+      deploymentDispatcher,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          serverId: "srv_prod",
+          destinationId: "dst_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            providerRepositoryId: "repo_1",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ],
+    });
+
+    const result = await ingest.execute(context, {
+      sourceKind: "github",
+      eventKind: "push",
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/demo",
+        providerRepositoryId: "repo_1",
+        repositoryFullName: "appaloft/demo",
+      },
+      ref: "main",
+      revision: "abc123",
+      deliveryId: "delivery_matching_push",
+      verification: {
+        status: "verified",
+        method: "provider-signature",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      sourceEventId: "sevt_1",
+      status: "dispatched",
+      matchedResourceIds: ["res_web"],
+      createdDeploymentIds: ["dep_1"],
+      ignoredReasons: [],
+    });
+    expect(deploymentDispatcher.inputs).toEqual([
+      {
+        sourceEventId: "sevt_1",
+        projectId: "prj_demo",
+        environmentId: "env_prod",
+        resourceId: "res_web",
+        serverId: "srv_prod",
+        destinationId: "dst_prod",
+      },
+    ]);
+    expect(sourceEvents.records[0]).toMatchObject({
+      sourceEventId: "sevt_1",
+      projectId: "prj_demo",
+      status: "dispatched",
+      matchedResourceIds: ["res_web"],
+      createdDeploymentIds: ["dep_1"],
+      policyResults: [
+        {
+          resourceId: "res_web",
+          status: "dispatched",
+          deploymentId: "dep_1",
+        },
+      ],
+    });
+  });
+
+  test("source event deployment dispatcher reuses create deployment admission input", async () => {
+    const calls: unknown[] = [];
+    const dispatcher = new CreateDeploymentSourceEventDispatcher({
+      async execute(_context, input) {
+        calls.push(input);
+        return ok({ id: "dep_admission" });
+      },
+    });
+    const { context } = createHarness();
+
+    const result = await dispatcher.dispatch(context, {
+      sourceEventId: "sevt_1",
+      projectId: "prj_demo",
+      environmentId: "env_prod",
+      resourceId: "res_web",
+      serverId: "srv_prod",
+      destinationId: "dst_prod",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ deploymentId: "dep_admission" });
+    expect(calls).toEqual([
+      {
+        projectId: "prj_demo",
+        environmentId: "env_prod",
+        resourceId: "res_web",
+        serverId: "srv_prod",
+        destinationId: "dst_prod",
+      },
+    ]);
   });
 
   test("[SRC-AUTO-EVENT-003] ignores source events whose ref does not match Resource policy", async () => {

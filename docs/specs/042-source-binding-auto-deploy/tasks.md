@@ -32,7 +32,7 @@
 - [x] Add `SRC-AUTO-POLICY-002` source-binding guard tests.
 - [x] Add `SRC-AUTO-POLICY-003` source-binding drift tests.
 - [x] Add inactive `resources.configure-auto-deploy` application and persistence tests.
-- [ ] Add `SRC-AUTO-EVENT-001` matching push deployment dispatch tests.
+- [x] Add `SRC-AUTO-EVENT-001` matching push deployment dispatch tests.
 - [x] Add `SRC-AUTO-EVENT-002` dedupe tests.
 - [x] Add `SRC-AUTO-EVENT-003` ignored ref tests.
 - [x] Add `SRC-AUTO-EVENT-004` invalid signature tests.
@@ -49,7 +49,7 @@
 - [x] Add provider-neutral source event normalization and verification ports.
 - [x] Add durable source event dedupe and read models.
 - [x] Add policy matching for ignored source event outcomes.
-- [ ] Dispatch matching events through existing deployment admission semantics.
+- [x] Dispatch matching events through existing deployment admission semantics.
 - [ ] Add CLI, HTTP/oRPC, and Web entrypoints only after tests pass.
 
 ## Verification

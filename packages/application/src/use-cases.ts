@@ -124,6 +124,7 @@ export * from "./operations/servers/rotate-ssh-credential.use-case";
 export * from "./operations/servers/show-server.query-service";
 export * from "./operations/servers/show-ssh-credential.query-service";
 export * from "./operations/servers/test-server-connectivity.use-case";
+export * from "./operations/source-events/create-deployment-source-event-dispatcher";
 export * from "./operations/source-events/generic-signed-source-event-verifier";
 export * from "./operations/source-events/ingest-source-event.use-case";
 export * from "./operations/source-events/list-source-events.query-service";

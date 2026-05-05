@@ -6,8 +6,10 @@ import {
   type Clock,
   type IdGenerator,
   type IngestSourceEventResult,
+  type SourceEventDeploymentDispatcher,
   type SourceEventIdentity,
   type SourceEventIgnoredReason,
+  type SourceEventPolicyCandidate,
   type SourceEventPolicyReader,
   type SourceEventPolicyResult,
   type SourceEventRecord,
@@ -33,6 +35,8 @@ export class IngestSourceEventUseCase {
     private readonly idGenerator: IdGenerator,
     @inject(tokens.sourceEventPolicyReader)
     private readonly sourceEventPolicyReader?: SourceEventPolicyReader,
+    @inject(tokens.sourceEventDeploymentDispatcher)
+    private readonly sourceEventDeploymentDispatcher?: SourceEventDeploymentDispatcher,
   ) {}
 
   async execute(
@@ -67,6 +71,7 @@ export class IngestSourceEventUseCase {
       });
     }
 
+    const sourceEventId = this.idGenerator.next("sevt");
     const outcome = this.sourceEventPolicyReader
       ? await evaluateSourceEventPolicyMatch(
           repositoryContext,
@@ -79,7 +84,7 @@ export class IngestSourceEventUseCase {
       : emptySourceEventOutcome();
 
     const record: SourceEventRecord = {
-      sourceEventId: this.idGenerator.next("sevt"),
+      sourceEventId,
       ...(outcome.projectId ? { projectId: outcome.projectId } : {}),
       sourceKind: input.sourceKind,
       eventKind: input.eventKind,
@@ -100,6 +105,22 @@ export class IngestSourceEventUseCase {
     };
 
     const stored = await this.sourceEventRecorder.record(repositoryContext, record);
+    if (
+      this.sourceEventDeploymentDispatcher &&
+      stored.sourceEventId === sourceEventId &&
+      outcome.dispatchTargets.length > 0
+    ) {
+      const dispatched = await dispatchSourceEventDeployments(
+        context,
+        this.sourceEventRecorder,
+        this.sourceEventDeploymentDispatcher,
+        repositoryContext,
+        stored,
+        outcome.dispatchTargets,
+      );
+      return ok(resultFromRecord(dispatched));
+    }
+
     return ok(resultFromRecord(stored));
   }
 }
@@ -111,6 +132,7 @@ interface SourceEventOutcome {
   ignoredReasons: SourceEventIgnoredReason[];
   policyResults: SourceEventPolicyResult[];
   createdDeploymentIds: string[];
+  dispatchTargets: SourceEventPolicyCandidate[];
 }
 
 function emptySourceEventOutcome(): SourceEventOutcome {
@@ -120,6 +142,7 @@ function emptySourceEventOutcome(): SourceEventOutcome {
     ignoredReasons: [],
     policyResults: [],
     createdDeploymentIds: [],
+    dispatchTargets: [],
   };
 }
 
@@ -142,12 +165,14 @@ async function evaluateSourceEventPolicyMatch(
       ignoredReasons: ["no-matching-policy"],
       policyResults: [],
       createdDeploymentIds: [],
+      dispatchTargets: [],
     };
   }
 
   const policyResults: SourceEventPolicyResult[] = [];
   const ignoredReasons = new Set<SourceEventIgnoredReason>();
   const matchedResourceIds: string[] = [];
+  const dispatchTargets: SourceEventPolicyCandidate[] = [];
   let projectId: string | undefined;
 
   for (const candidate of candidates) {
@@ -184,6 +209,7 @@ async function evaluateSourceEventPolicyMatch(
     }
 
     matchedResourceIds.push(candidate.resourceId);
+    dispatchTargets.push(candidate);
     policyResults.push({
       resourceId: candidate.resourceId,
       status: "matched",
@@ -198,6 +224,7 @@ async function evaluateSourceEventPolicyMatch(
       ignoredReasons: [...ignoredReasons],
       policyResults,
       createdDeploymentIds: [],
+      dispatchTargets,
     };
   }
 
@@ -208,7 +235,72 @@ async function evaluateSourceEventPolicyMatch(
     ignoredReasons: [...ignoredReasons],
     policyResults,
     createdDeploymentIds: [],
+    dispatchTargets: [],
   };
+}
+
+async function dispatchSourceEventDeployments(
+  context: ExecutionContext,
+  sourceEventRecorder: SourceEventRecorder,
+  sourceEventDeploymentDispatcher: SourceEventDeploymentDispatcher,
+  repositoryContext: Parameters<SourceEventRecorder["updateOutcome"]>[0],
+  record: SourceEventRecord,
+  targets: SourceEventPolicyCandidate[],
+): Promise<SourceEventRecord> {
+  const dispatchResults = new Map<string, SourceEventPolicyResult>();
+  const createdDeploymentIds: string[] = [];
+
+  for (const target of targets) {
+    if (!target.serverId) {
+      dispatchResults.set(target.resourceId, {
+        resourceId: target.resourceId,
+        status: "dispatch-failed",
+        reason: "dispatch-failed",
+        errorCode: "source_event_dispatch_failed",
+      });
+      continue;
+    }
+
+    const result = await sourceEventDeploymentDispatcher.dispatch(context, {
+      sourceEventId: record.sourceEventId,
+      projectId: target.projectId,
+      environmentId: target.environmentId,
+      resourceId: target.resourceId,
+      serverId: target.serverId,
+      ...(target.destinationId ? { destinationId: target.destinationId } : {}),
+    });
+    if (result.isErr()) {
+      dispatchResults.set(target.resourceId, {
+        resourceId: target.resourceId,
+        status: "dispatch-failed",
+        reason: "dispatch-failed",
+        errorCode: result.error.code,
+      });
+      continue;
+    }
+
+    createdDeploymentIds.push(result.value.deploymentId);
+    dispatchResults.set(target.resourceId, {
+      resourceId: target.resourceId,
+      status: "dispatched",
+      deploymentId: result.value.deploymentId,
+    });
+  }
+
+  const policyResults = record.policyResults.map(
+    (policyResult) => dispatchResults.get(policyResult.resourceId) ?? policyResult,
+  );
+  const hasDispatchFailure = policyResults.some((result) => result.status === "dispatch-failed");
+
+  return sourceEventRecorder.updateOutcome(repositoryContext, {
+    sourceEventId: record.sourceEventId,
+    status: hasDispatchFailure ? "failed" : "dispatched",
+    ...(record.projectId ? { projectId: record.projectId } : {}),
+    matchedResourceIds: [...record.matchedResourceIds],
+    ignoredReasons: [...record.ignoredReasons],
+    policyResults,
+    createdDeploymentIds,
+  });
 }
 
 export function sourceEventDedupeKey(input: {
