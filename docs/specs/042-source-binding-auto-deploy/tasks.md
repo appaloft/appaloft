@@ -20,11 +20,11 @@
 
 ## Local Spec Follow-Up
 
-- [ ] Add `resources.configure-auto-deploy` command spec.
-- [ ] Add `source-events.ingest` command spec.
-- [ ] Add `source-events.list` and `source-events.show` query specs.
-- [ ] Add source auto-deploy error spec.
-- [ ] Add public docs/help anchors for setup, signatures, dedupe, ignored events, and recovery.
+- [x] Add `resources.configure-auto-deploy` command spec.
+- [x] Add `source-events.ingest` command spec.
+- [x] Add `source-events.list` and `source-events.show` query specs.
+- [x] Add source auto-deploy error spec.
+- [x] Add public docs/help anchors for setup, signatures, dedupe, ignored events, and recovery.
 
 ## Test-First Round
 
@@ -35,6 +35,8 @@
 - [ ] Add `SRC-AUTO-EVENT-003` ignored ref tests.
 - [ ] Add `SRC-AUTO-EVENT-004` invalid signature tests.
 - [ ] Add `SRC-AUTO-ENTRY-001` CLI/HTTP/Web/schema tests.
+- [ ] Add `SRC-AUTO-QUERY-001` and `SRC-AUTO-QUERY-002` source event read-model tests.
+- [ ] Add `SRC-AUTO-SURFACE-003` public docs/help anchor tests.
 
 ## Implementation
 

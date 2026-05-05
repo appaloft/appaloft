@@ -52,7 +52,9 @@ Current status:
   documented topic, not-applicable reason, or explicit migration gap. The current operation catalog
   maps to documented public topics.
 - `PUB-DOCS-003` is covered for registered help topics by `@appaloft/docs-registry`; full
-  enforcement for every Web/CLI/API/MCP help target is still incomplete.
+  enforcement for every Web/CLI/API/MCP help target is still incomplete. Source auto-deploy now has
+  registered stub anchors for setup, signatures, dedupe, ignored events, and recovery before Code
+  Round activation.
 - `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
   a dedicated automated link checker does not exist yet.
 - `PUB-DOCS-005` is covered for registered help topics by tests that resolve each locale page and
@@ -86,7 +88,8 @@ Current status:
   bundle documentation of `APPALOFT_DOCS_STATIC_DIR`.
 - `PUB-DOCS-016` is covered for initial high-confusion access and resource profile topics by
   `@appaloft/docs-registry` topic metadata and
-  `docs/documentation/public-docs-traceability.md`.
+  `docs/documentation/public-docs-traceability.md`. Source auto-deploy traceability is recorded as
+  future Web/CLI/API surface coverage until those operations are active.
 - `PUB-DOCS-017` is covered for registered public error guides by
   `packages/docs-registry/test/help-topics.test.ts`.
 

@@ -12,6 +12,11 @@ commands, HTTP routes, Web actions, webhook endpoints, or background workers.
 - [ADR-037: Source Event Auto Deploy Ownership](../../decisions/ADR-037-source-event-auto-deploy-ownership.md)
 - [Business Operation Map](../../BUSINESS_OPERATION_MAP.md)
 - [Deployment Config File Bootstrap](../../workflows/deployment-config-file-bootstrap.md)
+- [resources.configure-auto-deploy](../../commands/resources.configure-auto-deploy.md)
+- [source-events.ingest](../../commands/source-events.ingest.md)
+- [source-events.list](../../queries/source-events.list.md)
+- [source-events.show](../../queries/source-events.show.md)
+- [Source Event Auto Deploy Error Spec](../../errors/source-events.md)
 - [Source Binding Auto Deploy Test Matrix](../../testing/source-binding-auto-deploy-test-matrix.md)
 - [Source Binding Auto Deploy Implementation Plan](../../implementation/source-binding-auto-deploy-plan.md)
 
@@ -135,8 +140,12 @@ The Code Round must decide and synchronize:
 - CLI commands for configuring policy and inspecting source events;
 - HTTP/oRPC routes for policy commands and source event ingestion;
 - Web Resource detail/settings affordances for enabling/disabling auto-deploy;
-- public docs anchors for auto-deploy setup, generic signed webhook setup, dedupe behavior, and
-  recovery;
+- public docs anchors:
+  - `/docs/deploy/sources/#source-auto-deploy-setup`;
+  - `/docs/deploy/sources/#source-auto-deploy-signatures`;
+  - `/docs/deploy/sources/#source-auto-deploy-dedupe`;
+  - `/docs/deploy/sources/#source-auto-deploy-ignored-events`;
+  - `/docs/deploy/sources/#source-auto-deploy-recovery`;
 - future MCP/tool descriptors generated from the same command/query schemas.
 
 ## Decisions For Code Round
@@ -150,9 +159,10 @@ ADR-037 answers the initial Code Round blockers:
 - Phase 7 may use durable source-event records plus synchronous deployment dispatch before Phase 8
   outbox/inbox, but must not claim automatic background retry.
 
-Remaining Code Round design work:
+Remaining Test-First / Code Round work:
 
-- exact command/query schema field names;
-- exact error codes and knowledge links;
-- public docs anchors and help text;
-- first implementation slice size.
+- bind source auto-deploy matrix rows to concrete automated tests;
+- update `CORE_OPERATIONS.md` and `operation-catalog.ts` when activating the operations;
+- decide whether the first implementation slice includes generic signed webhook only or provider
+  Git webhook adapters as well;
+- implement transport help text and Web links against the registered public docs topics.

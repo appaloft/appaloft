@@ -157,5 +157,5 @@ This decision governs:
 - [Source Binding And Auto Deploy](../specs/042-source-binding-auto-deploy/spec.md)
 - [Source Binding Auto Deploy Test Matrix](../testing/source-binding-auto-deploy-test-matrix.md)
 - [Source Binding Auto Deploy Implementation Plan](../implementation/source-binding-auto-deploy-plan.md)
-- future `resources.configure-auto-deploy`, `source-events.ingest`, `source-events.list`, and
+- `resources.configure-auto-deploy`, `source-events.ingest`, `source-events.list`, and
   `source-events.show` specs.

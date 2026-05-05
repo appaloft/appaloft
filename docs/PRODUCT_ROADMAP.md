@@ -929,6 +929,10 @@ Current verification notes:
   auto-deploy policy, project/resource-scoped source event read models, Resource-scoped generic
   webhook secret references, and a Phase 7 durable source-event record plus synchronous dispatch
   baseline before Phase 8 outbox/inbox work.
+- 2026-05-05 Phase 7 source auto-deploy local specs added command/query/error contracts and public
+  docs/help anchors for setup, signatures, dedupe, ignored events, and recovery. The work remains in
+  Test-First/Code Round preparation until matrix rows have automation bindings and the operations
+  are activated in `CORE_OPERATIONS.md` and the operation catalog.
 
 Required:
 
