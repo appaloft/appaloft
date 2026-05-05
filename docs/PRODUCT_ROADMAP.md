@@ -918,6 +918,12 @@ Current verification notes:
   across core/application command handling, PG/PGlite metadata persistence, operation catalog,
   CLI, HTTP/oRPC, public docs, and Web recovery candidate actions gated by readiness output. The
   full `0.9.0` release rule remains blocked by auto-deploy, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 source binding and auto-deploy Spec Round created
+  [Source Binding And Auto Deploy](./specs/042-source-binding-auto-deploy/spec.md). It positions
+  `resources.configure-auto-deploy`, `source-events.ingest`, `source-events.list`, and
+  `source-events.show` as accepted candidates over existing Resource source binding and
+  `deployments.create` admission semantics. It does not implement code yet, so the full `0.9.0`
+  release rule remains blocked by auto-deploy Code Round, preview, and cluster runtime items.
 
 Required:
 
