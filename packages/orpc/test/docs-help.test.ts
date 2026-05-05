@@ -41,6 +41,21 @@ describe("HTTP API docs help links", () => {
       "/docs/reference/errors-statuses/#operator-work-ledger",
     );
     expect(apiDocsHrefs.deploymentPlan).toBe("/docs/deploy/lifecycle/#deployment-plan-preview");
+    expect(apiDocsHrefs.sourceAutoDeploySetup).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-setup",
+    );
+    expect(apiDocsHrefs.sourceAutoDeploySignatures).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-signatures",
+    );
+    expect(apiDocsHrefs.sourceAutoDeployDedupe).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-dedupe",
+    );
+    expect(apiDocsHrefs.sourceAutoDeployIgnoredEvents).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-ignored-events",
+    );
+    expect(apiDocsHrefs.sourceAutoDeployRecovery).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-recovery",
+    );
 
     expect(apiRouteDescriptions.configureServerCredential).toContain(apiDocsHrefs.serverCredential);
     expect(apiRouteDescriptions.rotateSshCredential).toContain(apiDocsHrefs.serverCredential);
@@ -63,5 +78,12 @@ describe("HTTP API docs help links", () => {
     expect(apiRouteDescriptions.openTerminalSession).toContain(apiDocsHrefs.terminalSession);
     expect(apiRouteDescriptions.operatorWorkLedger).toContain(apiDocsHrefs.operatorWorkLedger);
     expect(apiRouteDescriptions.deploymentPlan).toContain(apiDocsHrefs.deploymentPlan);
+    expect(apiRouteDescriptions.configureResourceAutoDeploy).toContain(
+      apiDocsHrefs.sourceAutoDeploySetup,
+    );
+    expect(apiRouteDescriptions.listSourceEvents).toContain(apiDocsHrefs.sourceAutoDeployDedupe);
+    expect(apiRouteDescriptions.showSourceEvent).toContain(
+      apiDocsHrefs.sourceAutoDeployIgnoredEvents,
+    );
   });
 });
