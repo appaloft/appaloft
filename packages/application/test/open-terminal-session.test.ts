@@ -157,6 +157,7 @@ function serverSummary(overrides: Partial<ServerSummary> = {}): ServerSummary {
     host: "127.0.0.1",
     port: 22,
     providerKey: "local-shell",
+    targetKind: "single-server",
     lifecycleStatus: "active",
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,

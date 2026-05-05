@@ -96,8 +96,13 @@ appaloft server register \
   --host 203.0.113.10 \
   --port 22 \
   --provider generic-ssh \
+  --target-kind single-server \
   --proxy-kind traefik
 ```
+
+`--target-kind orchestrator-cluster` records a cluster-shaped deployment target for future
+cluster backends such as Docker Swarm. It does not by itself make the target ready for deployments;
+readiness still depends on the registered runtime backend capabilities and connectivity checks.
 
 ```bash title="Run connectivity test"
 appaloft server test srv_primary

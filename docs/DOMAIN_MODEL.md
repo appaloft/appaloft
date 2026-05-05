@@ -662,9 +662,9 @@ Current scope:
 - may host the default `ssh-pglite` Appaloft state backend for CLI/GitHub Actions deployments,
   while PostgreSQL/PGlite selected backends persist source link state and server-applied proxy route
   desired/applied state through dedicated application persistence adapters
-- current code includes provisional future target-kind values; they must be replaced with the
-  canonical target model from ADR-023 before cluster targets become public or persisted by new
-  features
+- current code uses the canonical target-kind values `single-server` and `orchestrator-cluster`;
+  cluster runtime providers such as Docker Swarm still require backend readiness and execution
+  support before they are deployable
 
 ### Destination
 

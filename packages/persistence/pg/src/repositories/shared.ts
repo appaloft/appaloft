@@ -1054,7 +1054,9 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
     host: HostAddress.rehydrate(row.host),
     port: PortNumber.rehydrate(row.port),
     providerKey: ProviderKey.rehydrate(row.provider_key),
-    targetKind: TargetKindValue.rehydrate("single-server"),
+    targetKind: TargetKindValue.rehydrate(
+      row.target_kind as "single-server" | "orchestrator-cluster",
+    ),
     lifecycleStatus: DeploymentTargetLifecycleStatusValue.rehydrate(
       row.lifecycle_status as "active" | "inactive" | "deleted",
     ),

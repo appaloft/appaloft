@@ -97,8 +97,12 @@ appaloft server register \
   --host 203.0.113.10 \
   --port 22 \
   --provider generic-ssh \
+  --target-kind single-server \
   --proxy-kind traefik
 ```
+
+`--target-kind orchestrator-cluster` 会记录一个集群形态的部署目标，用于未来的 Docker Swarm
+等集群 backend。它本身不会让目标可用于部署；是否就绪仍取决于已注册的 runtime backend 能力和连接检查。
 
 ```bash title="运行连接测试"
 appaloft server test srv_primary

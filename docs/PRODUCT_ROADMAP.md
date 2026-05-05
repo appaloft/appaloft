@@ -1122,6 +1122,8 @@ Required:
 - [ ] Complete the Docker Swarm Code Round as the first cluster runtime target:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
   semantics, normalized read surfaces, public docs/help, and contract tests are implemented.
+  Target-kind registration metadata is implemented; Swarm manager readiness and execution remain
+  open.
 
 Exit criteria:
 

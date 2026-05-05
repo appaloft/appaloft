@@ -70,7 +70,7 @@ export const executionStrategyKinds = [
 
 export type ExecutionStrategyKind = (typeof executionStrategyKinds)[number];
 
-export const targetKinds = ["single-server", "future-multi-server", "future-k8s"] as const;
+export const targetKinds = ["single-server", "orchestrator-cluster"] as const;
 
 export type TargetKind = (typeof targetKinds)[number];
 

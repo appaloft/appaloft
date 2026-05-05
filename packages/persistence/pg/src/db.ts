@@ -54,6 +54,7 @@ import { deploymentRollbackMetadataMigration } from "./migrations/046_deployment
 import { resourceRuntimeControlAttemptsMigration } from "./migrations/047_resource_runtime_control_attempts";
 import { resourceAutoDeployPolicyMigration } from "./migrations/048_resource_auto_deploy_policy";
 import { sourceEventsMigration } from "./migrations/049_source_events";
+import { serverTargetKindMigration } from "./migrations/050_server_target_kind";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -199,6 +200,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "047_resource_runtime_control_attempts": resourceRuntimeControlAttemptsMigration,
       "048_resource_auto_deploy_policy": resourceAutoDeployPolicyMigration,
       "049_source_events": sourceEventsMigration,
+      "050_server_target_kind": serverTargetKindMigration,
     };
   }
 }
