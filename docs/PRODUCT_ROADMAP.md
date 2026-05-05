@@ -1051,6 +1051,13 @@ Current verification notes:
   source auto-deploy row remains unchecked until the `SRC-AUTO-ENTRY-001` Web settings/tool
   metadata gap is closed. The full `0.9.0` release rule remains blocked by that gap, preview,
   future MCP/tool descriptors, and cluster runtime items.
+- 2026-05-05 Phase 7 source auto-deploy Web settings slice exposed the safe Resource detail
+  auto-deploy policy summary and source binding fingerprint, added Web configure/disable/
+  acknowledge actions through `resources.configure-auto-deploy`, and moved `SRC-AUTO-ENTRY-001` to
+  Passing. Future MCP/tool descriptor generation remains governed by the operation catalog and the
+  global future tool-surface milestone, not by a source auto-deploy transport-specific shape. The
+  full `0.9.0` release rule remains blocked by the deploy-action wrapper, preview, existing-resource
+  profile drift, scheduled tasks, future MCP/tool descriptors, and cluster runtime items.
 
 Required:
 
@@ -1075,7 +1082,7 @@ Required:
   transitions, events, errors, Web/API/CLI affordances, and tests.
 - [x] Add resource restart/stop/start only after runtime ownership and state semantics are
   specified.
-- [ ] Add source binding and auto-deploy.
+- [x] Add source binding and auto-deploy.
 - [x] Add push webhook and generic signed deploy webhook.
 - [ ] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
   GitHub Actions workflow.

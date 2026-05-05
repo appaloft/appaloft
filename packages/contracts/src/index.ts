@@ -1293,6 +1293,7 @@ export const resourceDetailSourceProfileSchema = z.object({
   ]),
   locator: z.string(),
   displayName: z.string(),
+  sourceBindingFingerprint: z.string(),
   gitRef: z.string().optional(),
   commitSha: z.string().optional(),
   baseDirectory: z.string().optional(),
@@ -1304,6 +1305,18 @@ export const resourceDetailSourceProfileSchema = z.object({
   imageTag: z.string().optional(),
   imageDigest: z.string().optional(),
   metadata: z.record(z.string(), z.string()).optional(),
+});
+
+export const resourceAutoDeployPolicySummarySchema = z.object({
+  status: z.enum(["enabled", "disabled", "blocked"]),
+  triggerKind: z.enum(["git-push", "generic-signed-webhook"]),
+  refs: z.array(z.string()),
+  eventKinds: z.array(z.enum(["push", "tag"])),
+  sourceBindingFingerprint: z.string(),
+  blockedReason: z.enum(["source-binding-changed"]).optional(),
+  genericWebhookSecretRef: z.string().optional(),
+  dedupeWindowSeconds: z.number().int().positive().optional(),
+  updatedAt: z.string(),
 });
 
 export const resourceSourceBindingInputSchema = z.object({
@@ -1428,6 +1441,7 @@ export const resourceDetailSchema = z.object({
   schemaVersion: z.literal("resources.show/v1"),
   resource: resourceDetailIdentitySchema,
   source: resourceDetailSourceProfileSchema.optional(),
+  autoDeployPolicy: resourceAutoDeployPolicySummarySchema.optional(),
   runtimeProfile: resourceDetailRuntimeProfileSchema.optional(),
   networkProfile: resourceNetworkProfileSchema.optional(),
   accessProfile: resourceAccessProfileSchema.optional(),

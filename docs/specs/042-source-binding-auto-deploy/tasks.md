@@ -56,6 +56,7 @@
 - [x] Add CLI, HTTP/oRPC, and Web entrypoints for generic signed ingestion and source event reads.
 - [x] Add GitHub push webhook route after `SRC-AUTO-EVENT-007`, `SRC-AUTO-EVENT-008`, and
   `SRC-AUTO-ENTRY-004` tests exist.
+- [x] Add Web Resource settings for `resources.configure-auto-deploy`.
 
 ## Verification
 
