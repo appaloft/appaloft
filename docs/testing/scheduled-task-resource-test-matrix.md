@@ -79,5 +79,6 @@ matrix remains open for definitions, runs, errors, diagnostics, and tool descrip
 Inactive application command/query schemas, messages, result DTOs, read-model ports, create,
 update, delete, run-now admission, scheduler admission, accepted-run worker, read-query
 handlers/services, scheduled task persistence/read models, and hermetic runtime adapter support
-exist. No operation catalog entries, shell scheduler/background worker runner, entrypoints, or
-public docs are active yet.
+exist. Shell composition can resolve the inactive scheduled-task repositories, read models,
+runtime port, handlers, use cases, scheduler, and worker. No operation catalog entries, shell
+scheduler/background worker runner, entrypoints, or public docs are active yet.

@@ -53,6 +53,8 @@ import {
   CreateEnvironmentUseCase,
   CreateProjectUseCase,
   CreateResourceUseCase,
+  CreateScheduledTaskCommandHandler,
+  CreateScheduledTaskUseCase,
   CreateSshCredentialUseCase,
   CreateStorageVolumeCommandHandler,
   CreateStorageVolumeUseCase,
@@ -68,6 +70,8 @@ import {
   DeleteDomainBindingUseCase,
   DeleteResourceCommandHandler,
   DeleteResourceUseCase,
+  DeleteScheduledTaskCommandHandler,
+  DeleteScheduledTaskUseCase,
   DeleteServerCommandHandler,
   DeleteServerUseCase,
   DeleteSshCredentialCommandHandler,
@@ -133,6 +137,10 @@ import {
   ListResourceDependencyBindingsQueryHandler,
   ListResourceDependencyBindingsQueryService,
   ListResourcesQueryService,
+  ListScheduledTaskRunsQueryHandler,
+  ListScheduledTaskRunsQueryService,
+  ListScheduledTasksQueryHandler,
+  ListScheduledTasksQueryService,
   ListServersQueryService,
   ListSourceEventsQueryHandler,
   ListSourceEventsQueryService,
@@ -200,7 +208,14 @@ import {
   RotateResourceDependencyBindingSecretUseCase,
   RotateSshCredentialCommandHandler,
   RotateSshCredentialUseCase,
+  RunScheduledTaskNowCommandHandler,
+  RunScheduledTaskNowUseCase,
   RuntimePlanResolutionInputBuilder,
+  ScheduledTaskRunAdmissionService,
+  ScheduledTaskRunLogsQueryHandler,
+  ScheduledTaskRunLogsQueryService,
+  ScheduledTaskRunWorker,
+  ScheduledTaskScheduler,
   SetEnvironmentVariableUseCase,
   SetResourceVariableCommandHandler,
   SetResourceVariableUseCase,
@@ -224,6 +239,10 @@ import {
   ShowResourceDependencyBindingQueryService,
   ShowResourceQueryHandler,
   ShowResourceQueryService,
+  ShowScheduledTaskQueryHandler,
+  ShowScheduledTaskQueryService,
+  ShowScheduledTaskRunQueryHandler,
+  ShowScheduledTaskRunQueryService,
   ShowServerQueryService,
   ShowSourceEventQueryHandler,
   ShowSourceEventQueryService,
@@ -244,6 +263,8 @@ import {
   UnsetEnvironmentVariableUseCase,
   UnsetResourceVariableCommandHandler,
   UnsetResourceVariableUseCase,
+  UpdateScheduledTaskCommandHandler,
+  UpdateScheduledTaskUseCase,
 } from "@appaloft/application";
 import { type DomainError, ok, type Result } from "@appaloft/core";
 import { type DependencyContainer } from "tsyringe";
@@ -357,6 +378,15 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
   container.registerSingleton(ConfigureResourceSourceCommandHandler);
+  container.registerSingleton(CreateScheduledTaskCommandHandler);
+  container.registerSingleton(UpdateScheduledTaskCommandHandler);
+  container.registerSingleton(DeleteScheduledTaskCommandHandler);
+  container.registerSingleton(RunScheduledTaskNowCommandHandler);
+  container.registerSingleton(ListScheduledTasksQueryHandler);
+  container.registerSingleton(ShowScheduledTaskQueryHandler);
+  container.registerSingleton(ListScheduledTaskRunsQueryHandler);
+  container.registerSingleton(ShowScheduledTaskRunQueryHandler);
+  container.registerSingleton(ScheduledTaskRunLogsQueryHandler);
   container.registerSingleton(AttachResourceStorageCommandHandler);
   container.registerSingleton(DetachResourceStorageCommandHandler);
   container.registerSingleton(SetResourceVariableCommandHandler);
@@ -495,6 +525,33 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.unsetResourceVariableUseCase, UnsetResourceVariableUseCase);
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.showResourceQueryService, ShowResourceQueryService);
+  container.registerSingleton(tokens.createScheduledTaskUseCase, CreateScheduledTaskUseCase);
+  container.registerSingleton(tokens.updateScheduledTaskUseCase, UpdateScheduledTaskUseCase);
+  container.registerSingleton(tokens.deleteScheduledTaskUseCase, DeleteScheduledTaskUseCase);
+  container.registerSingleton(tokens.runScheduledTaskNowUseCase, RunScheduledTaskNowUseCase);
+  container.registerSingleton(
+    tokens.scheduledTaskRunAdmissionService,
+    ScheduledTaskRunAdmissionService,
+  );
+  container.registerSingleton(tokens.scheduledTaskRunWorker, ScheduledTaskRunWorker);
+  container.registerSingleton(tokens.scheduledTaskScheduler, ScheduledTaskScheduler);
+  container.registerSingleton(
+    tokens.listScheduledTasksQueryService,
+    ListScheduledTasksQueryService,
+  );
+  container.registerSingleton(tokens.showScheduledTaskQueryService, ShowScheduledTaskQueryService);
+  container.registerSingleton(
+    tokens.listScheduledTaskRunsQueryService,
+    ListScheduledTaskRunsQueryService,
+  );
+  container.registerSingleton(
+    tokens.showScheduledTaskRunQueryService,
+    ShowScheduledTaskRunQueryService,
+  );
+  container.registerSingleton(
+    tokens.scheduledTaskRunLogsQueryService,
+    ScheduledTaskRunLogsQueryService,
+  );
   container.registerSingleton(
     tokens.provisionPostgresDependencyResourceUseCase,
     ProvisionPostgresDependencyResourceUseCase,
