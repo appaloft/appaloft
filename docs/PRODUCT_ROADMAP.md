@@ -933,6 +933,9 @@ Current verification notes:
   docs/help anchors for setup, signatures, dedupe, ignored events, and recovery. The work remains in
   Test-First/Code Round preparation until matrix rows have automation bindings and the operations
   are activated in `CORE_OPERATIONS.md` and the operation catalog.
+- 2026-05-05 Phase 7 public documentation sync added stable storage volume and dependency resource
+  pages, and closed docs-registry coverage for active storage, dependency, backup/restore,
+  dependency-binding, retry, redeploy, and rollback operations.
 
 Required:
 
