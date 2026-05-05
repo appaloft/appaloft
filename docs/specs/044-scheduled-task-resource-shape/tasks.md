@@ -18,6 +18,8 @@
 - [x] `SCHED-TASK-DOMAIN-003`: run attempt state starts accepted, transitions to running and
   terminal succeeded/failed/skipped states, and rejects invalid transitions or unsafe failure
   summaries.
+- [x] `SCHED-TASK-APP-001`: inactive application command/query messages parse target
+  scheduled-task inputs without activating operation catalog entries.
 - [ ] `SCHED-TASK-RUN-001`: run-now accepts a run attempt without completing it synchronously.
 - [ ] `SCHED-TASK-SCHED-001`: scheduler dispatches through the same run admission use case.
 - [ ] `SCHED-TASK-LOGS-001`: task-run logs are separate from deployment/resource runtime logs.
@@ -27,7 +29,9 @@
 
 - [x] Add core scheduled-task definition value objects and Resource-owned state shape.
 - [x] Add core scheduled-task run attempt state machine.
-- [ ] Add application scheduled-task command/query model.
+- [x] Add inactive application scheduled-task command/query schemas, messages, and read-model
+  ports.
+- [ ] Add application scheduled-task handlers/use cases.
 - [ ] Add persistence/read models.
 - [ ] Add scheduler process manager.
 - [ ] Add runtime adapter one-off task execution/log support.

@@ -8,6 +8,7 @@ export * from "./operation-catalog";
 export * from "./operator-work-messages";
 export * from "./project-messages";
 export * from "./resource-messages";
+export * from "./scheduled-task-messages";
 export * from "./server-messages";
 export * from "./source-event-messages";
 export * from "./source-link-messages";

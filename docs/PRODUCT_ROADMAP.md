@@ -1093,6 +1093,10 @@ Current verification notes:
   state with manual/scheduled trigger kind, accepted/running/succeeded/failed/skipped transitions,
   safe exit/failure details, and no Deployment id. Application run admission, persistence,
   scheduler/runtime execution, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task application-contract slice added inactive command/query
+  schemas, messages, result DTOs, and read-model ports for scheduled task definitions, run-now,
+  run history, and run logs while keeping operation catalog entries inactive. Application handlers,
+  use cases, persistence, scheduler/runtime execution, entrypoints, and public docs remain open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

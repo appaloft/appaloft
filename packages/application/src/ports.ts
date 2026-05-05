@@ -2474,6 +2474,153 @@ export interface ResourceConfigOverrideSummary {
   overriddenScopes: ConfigScope[];
 }
 
+export type ScheduledTaskConcurrencyPolicy = "forbid";
+export type ScheduledTaskDefinitionStatus = "enabled" | "disabled";
+export type ScheduledTaskRunTriggerKind = "manual" | "scheduled";
+export type ScheduledTaskRunStatus = "accepted" | "running" | "succeeded" | "failed" | "skipped";
+export type ScheduledTaskRunSkippedReason =
+  | "concurrency-forbidden"
+  | "resource-archived"
+  | "task-disabled";
+
+export interface ScheduledTaskRunSummary {
+  runId: string;
+  taskId: string;
+  resourceId: string;
+  triggerKind: ScheduledTaskRunTriggerKind;
+  status: ScheduledTaskRunStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  exitCode?: number;
+  failureSummary?: string;
+  skippedReason?: ScheduledTaskRunSkippedReason;
+}
+
+export interface ScheduledTaskDefinitionSummary {
+  taskId: string;
+  resourceId: string;
+  schedule: string;
+  timezone: string;
+  commandIntent: string;
+  timeoutSeconds: number;
+  retryLimit: number;
+  concurrencyPolicy: ScheduledTaskConcurrencyPolicy;
+  status: ScheduledTaskDefinitionStatus;
+  createdAt: string;
+  updatedAt?: string;
+  latestRun?: ScheduledTaskRunSummary;
+}
+
+export interface ScheduledTaskCommandResult {
+  schemaVersion: "scheduled-tasks.command/v1";
+  task: ScheduledTaskDefinitionSummary;
+}
+
+export interface DeleteScheduledTaskResult {
+  schemaVersion: "scheduled-tasks.delete/v1";
+  taskId: string;
+  resourceId: string;
+  status: "deleted";
+  deletedAt: string;
+}
+
+export interface RunScheduledTaskNowResult {
+  schemaVersion: "scheduled-tasks.run-now/v1";
+  run: ScheduledTaskRunSummary;
+}
+
+export interface ListScheduledTasksResult {
+  schemaVersion: "scheduled-tasks.list/v1";
+  items: ScheduledTaskDefinitionSummary[];
+  nextCursor?: string;
+  generatedAt: string;
+}
+
+export interface ShowScheduledTaskResult {
+  schemaVersion: "scheduled-tasks.show/v1";
+  task: ScheduledTaskDefinitionSummary;
+  generatedAt: string;
+}
+
+export interface ListScheduledTaskRunsResult {
+  schemaVersion: "scheduled-task-runs.list/v1";
+  items: ScheduledTaskRunSummary[];
+  nextCursor?: string;
+  generatedAt: string;
+}
+
+export interface ShowScheduledTaskRunResult {
+  schemaVersion: "scheduled-task-runs.show/v1";
+  run: ScheduledTaskRunSummary;
+  generatedAt: string;
+}
+
+export interface ScheduledTaskRunLogEntry {
+  timestamp: string;
+  stream: "stdout" | "stderr" | "system";
+  message: string;
+}
+
+export interface ScheduledTaskRunLogsResult {
+  schemaVersion: "scheduled-task-runs.logs/v1";
+  runId: string;
+  taskId: string;
+  resourceId: string;
+  entries: ScheduledTaskRunLogEntry[];
+  nextCursor?: string;
+  generatedAt: string;
+}
+
+export interface ScheduledTaskReadModel {
+  list(
+    context: RepositoryContext,
+    input: {
+      projectId?: string;
+      environmentId?: string;
+      resourceId?: string;
+      status?: ScheduledTaskDefinitionStatus;
+      limit?: number;
+      cursor?: string;
+    },
+  ): Promise<Omit<ListScheduledTasksResult, "schemaVersion" | "generatedAt">>;
+  show(
+    context: RepositoryContext,
+    input: { taskId: string; resourceId?: string },
+  ): Promise<ScheduledTaskDefinitionSummary | null>;
+}
+
+export interface ScheduledTaskRunReadModel {
+  list(
+    context: RepositoryContext,
+    input: {
+      taskId?: string;
+      resourceId?: string;
+      status?: ScheduledTaskRunStatus;
+      triggerKind?: ScheduledTaskRunTriggerKind;
+      limit?: number;
+      cursor?: string;
+    },
+  ): Promise<Omit<ListScheduledTaskRunsResult, "schemaVersion" | "generatedAt">>;
+  show(
+    context: RepositoryContext,
+    input: { runId: string; taskId?: string; resourceId?: string },
+  ): Promise<ScheduledTaskRunSummary | null>;
+}
+
+export interface ScheduledTaskRunLogReadModel {
+  read(
+    context: RepositoryContext,
+    input: {
+      runId: string;
+      taskId?: string;
+      resourceId?: string;
+      cursor?: string;
+      limit?: number;
+    },
+  ): Promise<Omit<ScheduledTaskRunLogsResult, "schemaVersion" | "generatedAt">>;
+}
+
 export type ResourceHealthOverall =
   | "healthy"
   | "degraded"
