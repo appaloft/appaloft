@@ -431,8 +431,11 @@ Current scope:
   [Dependency Resource Binding Baseline](./specs/034-dependency-resource-binding-baseline/spec.md)
 - Phase 7 deployment snapshot safe reference baseline under
   [Dependency Binding Deployment Snapshot Reference Baseline](./specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
-- Redis, secret rotation, provider-native provisioning/deletion, backup/restore, runtime env
-  injection, and provider-native runtime materialization are future Phase 7 work
+- Phase 7 binding secret rotation is specified as an accepted candidate under
+  [Dependency Binding Secret Rotation](./specs/036-dependency-binding-secret-rotation/spec.md)
+- Redis, provider-native provisioning/deletion, provider-native credential rotation,
+  backup/restore, runtime env injection, and provider-native runtime materialization are future
+  Phase 7 work
 
 ### Release Orchestration
 
@@ -847,7 +850,7 @@ Rules:
   project/environment ownership in this slice
 - binding stores only provider-neutral safe metadata: Resource reference, Dependency Resource
   reference, target name/profile label, scope, injection mode, safe secret reference pointer,
-  lifecycle status, and timestamps
+  safe secret version/rotation metadata, lifecycle status, and timestamps
 - binding must not store raw connection strings, raw passwords, tokens, auth headers, cookies, SSH
   credentials, provider tokens, private keys, sensitive query parameters, or raw environment values
 - binding scope and injection mode must remain coherent
@@ -856,6 +859,9 @@ Rules:
   owns the cross-VO coherence rule
 - unbind removes/tombstones only the association; it must not delete the dependency resource,
   external/provider database, runtime state, backup data, or historical deployment snapshot
+- binding secret rotation replaces only the binding-scoped safe secret reference/version for future
+  deployments; it must not rotate provider-native credentials, inject runtime env, restart runtime,
+  or rewrite historical deployment snapshots
 
 Current scope:
 - wired into Phase 7 Postgres Dependency Resource Binding Baseline through
@@ -863,6 +869,8 @@ Current scope:
   `resources.list-dependency-bindings`, and `resources.show-dependency-binding`
 - new deployment attempts copy active binding metadata into safe dependency binding snapshot
   references
+- `resources.rotate-dependency-binding-secret` is specified as an accepted candidate and awaits Code
+  Round
 - runtime env injection remains deferred
 
 ### ResourceInstance

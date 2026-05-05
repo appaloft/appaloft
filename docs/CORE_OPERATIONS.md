@@ -329,6 +329,11 @@ Current boundary:
   injection remains deferred. Unbind removes only the binding association; it does not delete the
   dependency resource, external/provider database, runtime state, backup data, or historical
   snapshots.
+- `resources.rotate-dependency-binding-secret` is specified as an accepted candidate under
+  [Dependency Binding Secret Rotation](./specs/036-dependency-binding-secret-rotation/spec.md), but
+  is not an implemented operation yet. It must be added to this implemented operations table and to
+  `packages/application/src/operation-catalog.ts` in the same Code Round that activates the
+  command.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).
