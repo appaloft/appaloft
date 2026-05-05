@@ -47,6 +47,7 @@ import {
   ConfirmDomainBindingOwnershipUseCase,
   CreateDependencyResourceBackupCommandHandler,
   CreateDependencyResourceBackupUseCase,
+  CreateDeploymentSourceEventDispatcher,
   CreateDeploymentUseCase,
   CreateDomainBindingUseCase,
   CreateEnvironmentUseCase,
@@ -97,6 +98,7 @@ import {
   EnvironmentEffectivePrecedenceQueryHandler,
   EnvironmentEffectivePrecedenceQueryService,
   type ExecutionContext,
+  GenericSignedSourceEventVerifier,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
   ImportPostgresDependencyResourceCommandHandler,
@@ -105,6 +107,8 @@ import {
   ImportRedisDependencyResourceUseCase,
   ImportResourceVariablesCommandHandler,
   ImportResourceVariablesUseCase,
+  IngestSourceEventCommandHandler,
+  IngestSourceEventUseCase,
   InspectServerCapacityQueryHandler,
   InspectServerCapacityQueryService,
   IssueCertificateOnCertificateRequestedHandler,
@@ -348,6 +352,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ConfigureDomainBindingRouteCommandHandler);
   container.registerSingleton(ConfigureResourceAccessCommandHandler);
   container.registerSingleton(ConfigureResourceAutoDeployCommandHandler);
+  container.registerSingleton(IngestSourceEventCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
@@ -462,6 +467,12 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.configureResourceAutoDeployUseCase,
     ConfigureResourceAutoDeployUseCase,
+  );
+  container.registerSingleton(tokens.ingestSourceEventUseCase, IngestSourceEventUseCase);
+  container.registerSingleton(tokens.sourceEventVerificationPort, GenericSignedSourceEventVerifier);
+  container.registerSingleton(
+    tokens.sourceEventDeploymentDispatcher,
+    CreateDeploymentSourceEventDispatcher,
   );
   container.registerSingleton(
     tokens.configureResourceHealthUseCase,

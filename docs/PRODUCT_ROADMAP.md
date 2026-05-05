@@ -1014,6 +1014,11 @@ Current verification notes:
   `source-events.show` in `CORE_OPERATIONS.md`, the operation catalog, shell DI, CLI, and
   HTTP/oRPC with `SRC-AUTO-QUERY-001`/`SRC-AUTO-QUERY-002` catalog coverage. Provider ingestion
   routes, Web diagnostics, and future MCP/tool descriptors remain deferred.
+- 2026-05-05 Phase 7 source event ingestion shell wiring slice registered the inactive
+  `source-events.ingest` command handler/use case, generic signed verifier, source-event
+  recorder/policy reader/read model, and deployment dispatcher in the shell composition root.
+  Provider webhook routes, secret-value resolution for generic signed verification, Web
+  diagnostics, and future MCP/tool descriptors remain deferred.
 
 Required:
 
