@@ -52,6 +52,7 @@ import { dependencyResourceBackupsMigration } from "./migrations/044_dependency_
 import { deploymentRecoveryMetadataMigration } from "./migrations/045_deployment_recovery_metadata";
 import { deploymentRollbackMetadataMigration } from "./migrations/046_deployment_rollback_metadata";
 import { resourceRuntimeControlAttemptsMigration } from "./migrations/047_resource_runtime_control_attempts";
+import { resourceAutoDeployPolicyMigration } from "./migrations/048_resource_auto_deploy_policy";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -195,6 +196,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "045_deployment_recovery_metadata": deploymentRecoveryMetadataMigration,
       "046_deployment_rollback_metadata": deploymentRollbackMetadataMigration,
       "047_resource_runtime_control_attempts": resourceRuntimeControlAttemptsMigration,
+      "048_resource_auto_deploy_policy": resourceAutoDeployPolicyMigration,
     };
   }
 }

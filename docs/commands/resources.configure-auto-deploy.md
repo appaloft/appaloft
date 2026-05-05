@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted candidate. Do not expose this command until source event ingestion, source event read
-models, error contracts, public docs/help, `CORE_OPERATIONS.md`, `operation-catalog.ts`, CLI,
-HTTP/oRPC, Web, and tests are aligned in Code Round.
+Accepted candidate. The core policy model, application command/use case, and Resource repository
+persistence baseline exist, but this command is not exposed until source event ingestion, source
+event read models, error contracts, public docs/help, `CORE_OPERATIONS.md`,
+`operation-catalog.ts`, CLI, HTTP/oRPC, Web, and tests are aligned in Code Round.
 
 ## Governing Sources
 

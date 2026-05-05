@@ -31,6 +31,7 @@
 - [x] Add `SRC-AUTO-POLICY-001` Resource policy tests.
 - [x] Add `SRC-AUTO-POLICY-002` source-binding guard tests.
 - [x] Add `SRC-AUTO-POLICY-003` source-binding drift tests.
+- [x] Add inactive `resources.configure-auto-deploy` application and persistence tests.
 - [ ] Add `SRC-AUTO-EVENT-001` matching push deployment dispatch tests.
 - [ ] Add `SRC-AUTO-EVENT-002` dedupe tests.
 - [ ] Add `SRC-AUTO-EVENT-003` ignored ref tests.
@@ -42,6 +43,8 @@
 ## Implementation
 
 - [x] Add Resource auto-deploy policy domain model.
+- [x] Add inactive `resources.configure-auto-deploy` command schema, handler, use case, and
+  Resource repository persistence.
 - [ ] Add source event command/query schemas, handlers, use cases, and tokens.
 - [ ] Add provider-neutral source event normalization and verification ports.
 - [ ] Add durable source event dedupe and read models.
@@ -51,6 +54,7 @@
 ## Verification
 
 - [x] Run targeted core/application source auto-deploy tests.
+- [x] Run targeted Resource auto-deploy policy persistence tests.
 - [ ] Run targeted persistence tests.
 - [ ] Run targeted CLI/oRPC/HTTP tests.
 - [ ] Run targeted Web semantic/browser tests.

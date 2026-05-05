@@ -4,6 +4,8 @@ export * from "./operations/resources/attach-resource-storage.use-case";
 export * from "./operations/resources/bind-resource-dependency.handler";
 export * from "./operations/resources/bind-resource-dependency.use-case";
 export * from "./operations/resources/configure-resource-access.handler";
+export * from "./operations/resources/configure-resource-auto-deploy.handler";
+export * from "./operations/resources/configure-resource-auto-deploy.use-case";
 export * from "./operations/resources/configure-resource-health.handler";
 export * from "./operations/resources/configure-resource-network.handler";
 export * from "./operations/resources/configure-resource-runtime.handler";

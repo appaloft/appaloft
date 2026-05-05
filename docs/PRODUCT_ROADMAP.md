@@ -984,6 +984,10 @@ Current verification notes:
   and source-binding-change blocking semantics with `SRC-AUTO-POLICY-001` through
   `SRC-AUTO-POLICY-003` core coverage. The operations remain inactive until application commands,
   durable source event ingestion/dedupe/read models, and CLI/HTTP/Web surfaces are aligned.
+- 2026-05-05 Phase 7 source auto-deploy policy application/persistence slice added inactive
+  `resources.configure-auto-deploy` command schema, handler, use case, and Resource repository
+  persistence for policy JSON with application and PGlite coverage. The operation remains inactive
+  until source event ingestion/dedupe/read models and CLI/HTTP/Web surfaces are aligned.
 
 Required:
 

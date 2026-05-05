@@ -81,6 +81,7 @@ export * from "./operations/resources/attach-resource-storage.use-case";
 export * from "./operations/resources/automatic-route-context-lookup.service";
 export * from "./operations/resources/bind-resource-dependency.use-case";
 export * from "./operations/resources/configure-resource-access.use-case";
+export * from "./operations/resources/configure-resource-auto-deploy.use-case";
 export * from "./operations/resources/configure-resource-health.use-case";
 export * from "./operations/resources/configure-resource-network.use-case";
 export * from "./operations/resources/configure-resource-runtime.use-case";
