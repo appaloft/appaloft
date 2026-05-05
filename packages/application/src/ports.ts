@@ -3999,6 +3999,16 @@ export interface SourceEventRecord {
   receivedAt: string;
 }
 
+export interface SourceEventOutcomeUpdate {
+  sourceEventId: string;
+  status: SourceEventStatus;
+  projectId?: string;
+  matchedResourceIds: string[];
+  ignoredReasons: SourceEventIgnoredReason[];
+  policyResults: SourceEventPolicyResult[];
+  createdDeploymentIds: string[];
+}
+
 export interface SourceEventListInput {
   projectId?: string;
   resourceId?: string;
@@ -4105,9 +4115,35 @@ export interface SourceEventVerificationPort {
   ): Promise<Result<VerifiedSourceEventInput>>;
 }
 
+export interface SourceEventPolicyCandidate {
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  destinationId?: string;
+  status: "enabled" | "disabled" | "blocked";
+  refs: string[];
+  eventKinds: SourceEventKind[];
+  sourceBinding: SourceEventIdentity;
+  blockedReason?: "source-binding-changed";
+}
+
+export interface SourceEventPolicyReader {
+  listCandidates(
+    context: RepositoryContext,
+    input: {
+      sourceKind: SourceEventSourceKind;
+      sourceIdentity: SourceEventIdentity;
+    },
+  ): Promise<SourceEventPolicyCandidate[]>;
+}
+
 export interface SourceEventRecorder {
   findByDedupeKey(context: RepositoryContext, dedupeKey: string): Promise<SourceEventRecord | null>;
   record(context: RepositoryContext, record: SourceEventRecord): Promise<SourceEventRecord>;
+  updateOutcome(
+    context: RepositoryContext,
+    input: SourceEventOutcomeUpdate,
+  ): Promise<SourceEventRecord>;
 }
 
 export interface SourceEventReadModel {

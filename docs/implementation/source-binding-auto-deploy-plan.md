@@ -35,7 +35,8 @@ Round authorization.
   verification adapters remain future.`
 - Add durable source event records with dedupe keys, normalized facts, policy match results, ignored
   reasons, and created deployment ids. `Status: durable dedupe/read-model persistence baseline
-  implemented; policy match results and deployment ids are populated by later dispatch slices.`
+  implemented; ignored policy-match outcomes are populated for non-matching refs; deployment ids are
+  populated by later dispatch slices.`
 - Store project/resource scoped read-model facts first; global operator source-event rollups remain
   future. `Status: project/resource scoped read-model filters implemented.`
 - Implement `source-events.list` and `source-events.show` from the local query specs. `Status:
@@ -43,7 +44,9 @@ Round authorization.
 
 ### 4. Deployment Dispatch
 
-- Evaluate enabled policies in application logic.
+- Evaluate enabled policies in application logic. `Status: policy candidate lookup and ignored
+  ref/disabled/blocked/no-match outcome evaluation implemented; matching deployment dispatch
+  remains future.`
 - Dispatch matching policies through existing deployment admission and `resource-runtime`
   coordination.
 - Preserve async acceptance, deployment snapshots, logs, recovery, and rollback semantics.

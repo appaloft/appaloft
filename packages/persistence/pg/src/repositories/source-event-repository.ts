@@ -2,11 +2,15 @@ import {
   type RepositoryContext,
   type SourceEventDedupeStatus,
   type SourceEventDetail,
+  type SourceEventIdentity,
   type SourceEventIgnoredReason,
   type SourceEventKind,
   type SourceEventListInput,
   type SourceEventListItem,
   type SourceEventListPage,
+  type SourceEventOutcomeUpdate,
+  type SourceEventPolicyCandidate,
+  type SourceEventPolicyReader,
   type SourceEventPolicyResult,
   type SourceEventReadModel,
   type SourceEventRecord,
@@ -19,11 +23,18 @@ import {
 import { type Insertable, type Kysely, type Selectable, sql } from "kysely";
 
 import { type Database, type SourceEventsTable } from "../schema";
-import { type RepositoryExecutor, resolveRepositoryExecutor } from "./shared";
+import {
+  type RepositoryExecutor,
+  resolveRepositoryExecutor,
+  type SerializedResourceAutoDeployPolicy,
+  type SerializedResourceSourceBinding,
+} from "./shared";
 
 type SourceEventRow = Selectable<SourceEventsTable>;
 
-export class PgSourceEventRepository implements SourceEventRecorder, SourceEventReadModel {
+export class PgSourceEventRepository
+  implements SourceEventRecorder, SourceEventReadModel, SourceEventPolicyReader
+{
   constructor(private readonly db: Kysely<Database>) {}
 
   async findByDedupeKey(
@@ -54,6 +65,84 @@ export class PgSourceEventRepository implements SourceEventRecorder, SourceEvent
 
     const existing = await findByDedupeKey(executor, record.dedupeKey);
     return existing ? recordFromRow(existing) : record;
+  }
+
+  async updateOutcome(
+    context: RepositoryContext,
+    input: SourceEventOutcomeUpdate,
+  ): Promise<SourceEventRecord> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    const updated = await executor
+      .updateTable("source_events")
+      .set({
+        project_id: input.projectId ?? null,
+        status: input.status,
+        matched_resource_ids: input.matchedResourceIds,
+        ignored_reasons: input.ignoredReasons,
+        policy_results: input.policyResults.map((result) => ({ ...result })),
+        created_deployment_ids: input.createdDeploymentIds,
+      })
+      .where("id", "=", input.sourceEventId)
+      .returningAll()
+      .executeTakeFirst();
+
+    if (!updated) {
+      throw new Error(`Source event ${input.sourceEventId} was not found`);
+    }
+
+    return recordFromRow(updated);
+  }
+
+  async listCandidates(
+    _context: RepositoryContext,
+    input: {
+      sourceKind: SourceEventSourceKind;
+      sourceIdentity: SourceEventIdentity;
+    },
+  ): Promise<SourceEventPolicyCandidate[]> {
+    const rows = await this.db
+      .selectFrom("resources")
+      .select([
+        "id",
+        "project_id",
+        "environment_id",
+        "destination_id",
+        "source_binding",
+        "auto_deploy_policy",
+      ])
+      .where("auto_deploy_policy", "is not", null)
+      .where("source_binding", "is not", null)
+      .where("lifecycle_status", "!=", "deleted")
+      .execute();
+
+    const candidates: SourceEventPolicyCandidate[] = [];
+    const expectedTriggerKind = triggerKindForSourceEvent(input.sourceKind);
+    for (const row of rows) {
+      const sourceBinding = serializedSourceBinding(row.source_binding);
+      const policy = serializedAutoDeployPolicy(row.auto_deploy_policy);
+      if (
+        !sourceBinding ||
+        !policy ||
+        policy.triggerKind !== expectedTriggerKind ||
+        !sourceBindingMatches(input.sourceIdentity, sourceBinding)
+      ) {
+        continue;
+      }
+
+      candidates.push({
+        projectId: row.project_id,
+        environmentId: row.environment_id,
+        resourceId: row.id,
+        ...(row.destination_id ? { destinationId: row.destination_id } : {}),
+        status: policy.status,
+        refs: [...policy.refs],
+        eventKinds: [...policy.eventKinds],
+        sourceBinding: sourceIdentityFromBinding(sourceBinding),
+        ...(policy.blockedReason ? { blockedReason: policy.blockedReason } : {}),
+      });
+    }
+
+    return candidates;
   }
 
   async list(
@@ -127,6 +216,157 @@ async function findByDedupeKey(
     .selectAll()
     .where("dedupe_key", "=", dedupeKey)
     .executeTakeFirst();
+}
+
+function triggerKindForSourceEvent(
+  sourceKind: SourceEventSourceKind,
+): SerializedResourceAutoDeployPolicy["triggerKind"] {
+  return sourceKind === "generic-signed" ? "generic-signed-webhook" : "git-push";
+}
+
+function serializedSourceBinding(
+  value: Record<string, unknown> | null,
+): SerializedResourceSourceBinding | null {
+  if (
+    !value ||
+    typeof value.kind !== "string" ||
+    typeof value.locator !== "string" ||
+    typeof value.displayName !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    kind: value.kind as SerializedResourceSourceBinding["kind"],
+    locator: value.locator,
+    displayName: value.displayName,
+    ...(typeof value.gitRef === "string" ? { gitRef: value.gitRef } : {}),
+    ...(typeof value.commitSha === "string" ? { commitSha: value.commitSha } : {}),
+    ...(typeof value.baseDirectory === "string" ? { baseDirectory: value.baseDirectory } : {}),
+    ...(typeof value.originalLocator === "string"
+      ? { originalLocator: value.originalLocator }
+      : {}),
+    ...(typeof value.repositoryId === "string" ? { repositoryId: value.repositoryId } : {}),
+    ...(typeof value.repositoryFullName === "string"
+      ? { repositoryFullName: value.repositoryFullName }
+      : {}),
+    ...(typeof value.defaultBranch === "string" ? { defaultBranch: value.defaultBranch } : {}),
+    ...(typeof value.imageName === "string" ? { imageName: value.imageName } : {}),
+    ...(typeof value.imageTag === "string" ? { imageTag: value.imageTag } : {}),
+    ...(typeof value.imageDigest === "string" ? { imageDigest: value.imageDigest } : {}),
+    ...(isStringRecord(value.metadata) ? { metadata: value.metadata } : {}),
+  };
+}
+
+function serializedAutoDeployPolicy(
+  value: Record<string, unknown> | null,
+): SerializedResourceAutoDeployPolicy | null {
+  if (
+    !value ||
+    !isAutoDeployPolicyStatus(value.status) ||
+    !isAutoDeployTriggerKind(value.triggerKind) ||
+    !Array.isArray(value.refs) ||
+    !Array.isArray(value.eventKinds) ||
+    typeof value.sourceBindingFingerprint !== "string" ||
+    typeof value.updatedAt !== "string"
+  ) {
+    return null;
+  }
+
+  const refs = value.refs.filter((ref): ref is string => typeof ref === "string");
+  const eventKinds = value.eventKinds.filter(isSourceEventKind);
+  if (refs.length !== value.refs.length || eventKinds.length !== value.eventKinds.length) {
+    return null;
+  }
+
+  return {
+    status: value.status,
+    triggerKind: value.triggerKind,
+    refs,
+    eventKinds,
+    sourceBindingFingerprint: value.sourceBindingFingerprint,
+    updatedAt: value.updatedAt,
+    ...(value.blockedReason === "source-binding-changed"
+      ? { blockedReason: value.blockedReason }
+      : {}),
+    ...(typeof value.genericWebhookSecretRef === "string"
+      ? { genericWebhookSecretRef: value.genericWebhookSecretRef }
+      : {}),
+    ...(typeof value.dedupeWindowSeconds === "number"
+      ? { dedupeWindowSeconds: value.dedupeWindowSeconds }
+      : {}),
+  };
+}
+
+function sourceBindingMatches(
+  sourceIdentity: SourceEventIdentity,
+  sourceBinding: SerializedResourceSourceBinding,
+): boolean {
+  if (
+    sourceIdentity.providerRepositoryId &&
+    sourceBinding.repositoryId &&
+    sourceIdentity.providerRepositoryId.trim() === sourceBinding.repositoryId.trim()
+  ) {
+    return true;
+  }
+
+  if (
+    sourceIdentity.repositoryFullName &&
+    sourceBinding.repositoryFullName &&
+    sourceIdentity.repositoryFullName.trim().toLowerCase() ===
+      sourceBinding.repositoryFullName.trim().toLowerCase()
+  ) {
+    return true;
+  }
+
+  return safeSourceLocator(sourceIdentity.locator) === safeSourceLocator(sourceBinding.locator);
+}
+
+function sourceIdentityFromBinding(
+  sourceBinding: SerializedResourceSourceBinding,
+): SourceEventIdentity {
+  return {
+    locator: safeSourceLocator(sourceBinding.locator),
+    ...(sourceBinding.repositoryId ? { providerRepositoryId: sourceBinding.repositoryId } : {}),
+    ...(sourceBinding.repositoryFullName
+      ? { repositoryFullName: sourceBinding.repositoryFullName }
+      : {}),
+  };
+}
+
+function safeSourceLocator(locator: string): string {
+  try {
+    const parsed = new URL(locator);
+    parsed.username = "";
+    parsed.password = "";
+    return parsed.toString();
+  } catch {
+    return locator.trim();
+  }
+}
+
+function isAutoDeployPolicyStatus(
+  value: unknown,
+): value is SerializedResourceAutoDeployPolicy["status"] {
+  return value === "enabled" || value === "disabled" || value === "blocked";
+}
+
+function isAutoDeployTriggerKind(
+  value: unknown,
+): value is SerializedResourceAutoDeployPolicy["triggerKind"] {
+  return value === "git-push" || value === "generic-signed-webhook";
+}
+
+function isSourceEventKind(value: unknown): value is SourceEventKind {
+  return value === "push" || value === "tag";
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Object.values(value).every((item) => typeof item === "string")
+  );
 }
 
 function insertableFromRecord(record: SourceEventRecord): Insertable<SourceEventsTable> {

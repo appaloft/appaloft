@@ -997,6 +997,10 @@ Current verification notes:
   shape and generic signed HMAC verifier with `SRC-AUTO-EVENT-004` invalid-signature coverage. Git
   provider adapters, source event deployment dispatch, operation catalog/Core Operations, and
   CLI/HTTP/Web surfaces remain inactive.
+- 2026-05-05 Phase 7 source event policy matching slice added Resource policy candidate lookup and
+  ignored ref/disabled/blocked/no-match outcome evaluation with `SRC-AUTO-EVENT-003` application
+  and PGlite coverage. Matching deployment dispatch, operation catalog/Core Operations, and
+  CLI/HTTP/Web surfaces remain inactive.
 
 Required:
 
