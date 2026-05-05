@@ -1040,6 +1040,12 @@ Current verification notes:
   diagnostics backed by `source-events.list`, including safe created-deployment links, dedupe
   visibility, ignored-policy reasons, and `SRC-AUTO-ENTRY-003` Web automation. Provider Git route
   adapters and future MCP/tool descriptors remain deferred.
+- 2026-05-05 Phase 7 GitHub push webhook Spec Round extended ADR-037 and source-event specs with
+  the first provider Git route, `POST /api/integrations/github/source-events`, using
+  `APPALOFT_GITHUB_WEBHOOK_SECRET`, `X-Hub-Signature-256`, `X-GitHub-Delivery`, and planned
+  `SRC-AUTO-EVENT-007`/`SRC-AUTO-EVENT-008`/`SRC-AUTO-ENTRY-004` automation. It does not implement
+  the route yet, so the full `0.9.0` release rule remains blocked by provider Git route adapters,
+  preview, and cluster runtime items.
 
 Required:
 

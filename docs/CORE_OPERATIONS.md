@@ -581,7 +581,9 @@ Current boundary:
   event records. They require project or Resource scope and must not replay events, retry failed
   dispatch, mutate auto-deploy policy, or create deployments.
 - Provider-specific Git webhook ingestion remains deferred until provider payload parsing and
-  signature extraction are implemented.
+  signature extraction are implemented. The planned first provider route is
+  `POST /api/integrations/github/source-events` with `APPALOFT_GITHUB_WEBHOOK_SECRET` and GitHub
+  `X-Hub-Signature-256` verification.
 - Web Resource detail source-event diagnostics consume `source-events.list`; CLI and HTTP/oRPC
   read surfaces are active for operator diagnostics and API consumers.
 

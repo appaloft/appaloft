@@ -16,6 +16,7 @@
 - [x] Decide whether source event ownership/retry semantics require ADR-037 before Code Round.
 - [x] Decide whether Resource auto-deploy policy disables or blocks after source binding changes.
 - [x] Decide generic signed webhook secret custody and rotation model.
+- [x] Decide GitHub push webhook route shape and system-scoped secret custody baseline.
 - [x] Decide first Code Round process-state baseline versus Phase 8 outbox/inbox dependency.
 
 ## Local Spec Follow-Up
@@ -36,9 +37,11 @@
 - [x] Add `SRC-AUTO-EVENT-002` dedupe tests.
 - [x] Add `SRC-AUTO-EVENT-003` ignored ref tests.
 - [x] Add `SRC-AUTO-EVENT-004` invalid signature tests.
-- [ ] Add `SRC-AUTO-ENTRY-001` CLI/HTTP/Web/schema tests.
+- [x] Add `SRC-AUTO-ENTRY-001` CLI/HTTP/Web/schema tests.
 - [x] Add `SRC-AUTO-QUERY-001` and `SRC-AUTO-QUERY-002` source event read-model tests.
-- [ ] Add `SRC-AUTO-SURFACE-003` public docs/help anchor tests.
+- [x] Add `SRC-AUTO-SURFACE-003` public docs/help anchor tests.
+- [ ] Add `SRC-AUTO-EVENT-007`, `SRC-AUTO-EVENT-008`, and `SRC-AUTO-ENTRY-004` GitHub webhook
+  route tests.
 
 ## Implementation
 
@@ -50,18 +53,20 @@
 - [x] Add durable source event dedupe and read models.
 - [x] Add policy matching for ignored source event outcomes.
 - [x] Dispatch matching events through existing deployment admission semantics.
-- [ ] Add CLI, HTTP/oRPC, and Web entrypoints only after tests pass.
+- [x] Add CLI, HTTP/oRPC, and Web entrypoints for generic signed ingestion and source event reads.
+- [ ] Add GitHub push webhook route after `SRC-AUTO-EVENT-007`, `SRC-AUTO-EVENT-008`, and
+  `SRC-AUTO-ENTRY-004` tests exist.
 
 ## Verification
 
 - [x] Run targeted core/application source auto-deploy tests.
 - [x] Run targeted Resource auto-deploy policy persistence tests.
 - [x] Run targeted persistence tests.
-- [ ] Run targeted CLI/oRPC/HTTP tests.
-- [ ] Run targeted Web semantic/browser tests.
-- [ ] Run `bun run typecheck`.
-- [ ] Run `bun run lint`.
-- [ ] Run `git diff --check`.
+- [x] Run targeted CLI/oRPC/HTTP tests for active generic signed/read surfaces.
+- [x] Run targeted Web semantic tests for source event diagnostics.
+- [x] Run `bun run typecheck` through the branch pre-push gate for active slices.
+- [x] Run `bun run lint` for active slices.
+- [x] Run `git diff --check` for active slices.
 
 ## Post-Implementation Sync
 

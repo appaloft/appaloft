@@ -67,6 +67,9 @@
   - policy command/query routes;
   - provider/generic event ingestion route using shared input schema after transport-specific
     signature extraction.
+  - GitHub push route: `POST /api/integrations/github/source-events` using
+    `APPALOFT_GITHUB_WEBHOOK_SECRET`, `X-Hub-Signature-256`, `X-GitHub-Delivery`, and
+    `X-GitHub-Event = push`.
 - Web:
   - Resource settings affordance for enable/disable and selector display;
   - Resource/deployment detail link to source event that triggered deployment.
@@ -92,6 +95,10 @@ Minimum stable test ids for Code Round:
 - `SRC-AUTO-EVENT-002`: duplicate delivery does not create duplicate deployment.
 - `SRC-AUTO-EVENT-003`: non-matching ref is ignored with safe reason.
 - `SRC-AUTO-EVENT-004`: invalid generic signature rejects before policy matching.
+- `SRC-AUTO-EVENT-007`: valid GitHub push signature normalizes safe provider facts and fanout
+  dispatch remains unscoped.
+- `SRC-AUTO-EVENT-008`: missing GitHub webhook config, invalid signature, unsupported event kind,
+  or unsafe payload rejects before command dispatch.
 - `SRC-AUTO-ENTRY-001`: CLI, HTTP/oRPC, Web, and future MCP/tool schemas map to the same
   operations.
 
@@ -102,7 +109,10 @@ Minimum stable test ids for Code Round:
   retry remains deferred.
 - Generic signed webhooks start with Resource-scoped secret references; reusable webhook credentials
   remain future.
-- GitHub App webhook ingestion and product-grade PR preview are adjacent but separate roadmap items.
+- GitHub push webhooks start with one system-scoped runtime-config secret. Reusable provider
+  webhook credentials and rotation history remain future.
+- GitHub App preview lifecycle and product-grade PR preview are adjacent but separate roadmap
+  items.
 - Auto-deploy must not bypass `deployments.create` admission, resource-runtime coordination,
   environment snapshotting, or deployment recovery semantics.
 
@@ -116,6 +126,5 @@ implemented and bound to
 `SRC-AUTO-EVENT-004`, `SRC-AUTO-QUERY-001`, and `SRC-AUTO-QUERY-002` core/application/PGlite
 tests.
 
-The broader feature remains before activation. Before CLI/HTTP/Web exposure, implement the
-deployment dispatch through existing deployment admission and decide the first adapter slice for
-provider Git versus generic signed webhook ingestion.
+The broader feature remains partially active. Generic signed ingestion is active; the next provider
+adapter slice is GitHub push webhook verification and normalization through the governed HTTP route.

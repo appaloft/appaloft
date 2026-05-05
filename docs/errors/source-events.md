@@ -25,6 +25,7 @@ active only when their owning command/query slices are implemented.
 | `resource_auto_deploy_secret_required` | `validation` | `auto-deploy-policy-admission` | No | `resources.configure-auto-deploy` | resource id, trigger kind |
 | `resource_auto_deploy_secret_unavailable` | `application` or `infra` | `auto-deploy-policy-admission` or `source-event-verification` | Conditional | `resources.configure-auto-deploy`, `source-events.ingest` | resource id, secret reference id/version when safe |
 | `source_event_signature_invalid` | `integration` or `validation` | `source-event-verification` | No | `source-events.ingest` | source kind, event kind, delivery id or idempotency key when safe |
+| `source_event_provider_webhook_not_configured` | `infra` | `source-event-verification` | Yes | `source-events.ingest` transport route | source kind, provider key, missing config key name |
 | `source_event_unsupported_kind` | `validation` | `source-event-normalization` | No | `source-events.ingest` | source kind, event kind |
 | `source_event_dispatch_failed` | `application` or `infra` | `source-event-dispatch` | Conditional | `source-events.ingest` | source event id, resource id, deployment id when created, underlying safe error code |
 | `source_event_scope_required` | `validation` | `source-event-read` | No | `source-events.list`, `source-events.show` | required scope kind |
@@ -64,3 +65,10 @@ For the first generic signed webhook slice, `genericWebhookSecretRef` resolves o
 variable on the same Resource. Missing, non-secret, build-time, environment-scope, dependency,
 certificate, provider-token, or arbitrary secret references return
 `resource_auto_deploy_secret_unavailable` without exposing the raw key value or secret value.
+
+For the first GitHub provider webhook slice, `APPALOFT_GITHUB_WEBHOOK_SECRET` is a runtime
+configuration secret used only by the HTTP transport route. Missing configuration returns
+`source_event_provider_webhook_not_configured` before provider payload normalization or command
+dispatch. Invalid or missing GitHub signature headers return `source_event_signature_invalid`. Error
+details must not include the configured secret, raw body, signature header value, provider token, or
+unbounded provider payload content.

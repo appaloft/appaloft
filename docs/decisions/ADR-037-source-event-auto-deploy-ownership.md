@@ -107,6 +107,55 @@ source-event ingestion boundary. Matching for a Resource-scoped generic signed e
 that Resource, even if another Resource has the same source identity and ref. Provider-signed Git
 events may still fan out to multiple matching Resource policies.
 
+## Provider Git Webhook Secret
+
+The first provider-specific Git webhook route is GitHub push ingestion. It uses a system-scoped
+integration webhook secret supplied through runtime configuration, not a Resource-scoped secret
+reference and not a reusable credential aggregate.
+
+The accepted configuration key is:
+
+```text
+APPALOFT_GITHUB_WEBHOOK_SECRET
+```
+
+`AppConfig` may also expose this as `githubWebhookSecret`. The value is transport-only secret
+material. It must not be persisted in source event records, command input, read models, events,
+logs, errors, operation catalog metadata, or public docs examples. Rotation for the Phase 7 baseline
+is an operator config change plus process reload/restart; reusable provider webhook credentials,
+rotation history, audit, and delete-safety are future work.
+
+The first GitHub route shape is:
+
+```text
+POST /api/integrations/github/source-events
+```
+
+It verifies `X-Hub-Signature-256` (`sha256=<hex>`) over the raw request body using HMAC SHA-256 and
+the configured GitHub webhook secret. It uses `X-GitHub-Delivery` as the provider delivery id and
+`X-GitHub-Event` to select the normalizer.
+
+The first supported event is `push`. A verified push event normalizes:
+
+- `sourceKind = "github"`;
+- `eventKind = "push"`;
+- `sourceIdentity.locator` from the repository clone or HTML URL;
+- `sourceIdentity.providerRepositoryId` from `repository.id`;
+- `sourceIdentity.repositoryFullName` from `repository.full_name`;
+- `ref` from the Git ref, with `refs/heads/` stripped for branch refs;
+- `revision` from `after`;
+- `deliveryId` from `X-GitHub-Delivery`.
+
+Provider-signed GitHub events are not Resource-scoped and must not pass `scopeResourceId` to
+`source-events.ingest`; policy matching may fan out to every matching enabled Resource policy. The
+route may handle GitHub `ping` as a transport no-op for setup validation, but it must not create a
+source event record or deployment attempt for `ping`.
+
+If the configured webhook secret is missing, the route must reject before parsing provider facts or
+dispatching the ingest command with a stable safe configuration error. Invalid signatures or missing
+signature headers reject before command dispatch. Unsupported GitHub event kinds reject without
+persisting a source event.
+
 ## Process State And Retry Baseline
 
 The first Code Round does not require the Phase 8 durable outbox/inbox baseline.
