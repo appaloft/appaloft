@@ -354,6 +354,23 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(createCommand).not.toContain("--publish");
     expect(createCommand).not.toContain("-p ");
     expect(createCommand).not.toContain("postgres://secret-value");
+    expect(createCommand).not.toContain("traefik.http.routers");
+
+    const promoteCommand = plan.steps[2]?.command ?? "";
+    expect(plan.routeLabels).toContain("traefik.enable=true");
+    expect(plan.routeLabels).toContain("traefik.docker.network=appaloft-edge");
+    expect(plan.routeLabels).toContain(
+      "traefik.http.routers.appaloft-res-api-dst-prod-dep-123-web.rule=Host(`pr-1.example.com`)",
+    );
+    expect(plan.routeLabels).toContain(
+      "traefik.http.services.appaloft-res-api-dst-prod-dep-123-web-svc.loadbalancer.server.port=3000",
+    );
+    expect(promoteCommand).toContain(
+      "--label-add 'traefik.http.routers.appaloft-res-api-dst-prod-dep-123-web.rule=Host(`pr-1.example.com`)'",
+    );
+    expect(promoteCommand).toContain(
+      "--label-add 'traefik.http.services.appaloft-res-api-dst-prod-dep-123-web-svc.loadbalancer.server.port=3000'",
+    );
 
     expect(plan.steps[3]?.command ?? "").toContain("docker service rm");
     expect(plan.steps[3]?.command ?? "").toContain("appaloft.destination-id=dst_prod");

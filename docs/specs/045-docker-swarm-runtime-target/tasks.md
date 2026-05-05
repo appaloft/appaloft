@@ -31,8 +31,10 @@
 - [x] `SWARM-TARGET-OBS-001A`: Swarm service logs return normalized Appaloft runtime log lines.
 - [x] `SWARM-TARGET-OBS-001B`: Swarm health returns normalized Appaloft health read-model shapes.
 - [x] `SWARM-TARGET-CLEAN-001`: cleanup stays resource/deployment/destination scoped.
-- [ ] `SWARM-TARGET-ROUTE-001`: reverse-proxy access routes attach through Swarm service/network
-  identity without public workload host ports.
+- [x] `SWARM-TARGET-ROUTE-001A`: Traefik reverse-proxy labels are promoted only after candidate
+  verification and attach to the Swarm service/network identity without public workload host ports.
+- [ ] `SWARM-TARGET-ROUTE-001B`: end-to-end reverse-proxy route realization is verified against a
+  real Swarm edge proxy.
 - [ ] `SWARM-TARGET-SECRET-001`: registry credentials, pull secrets, env values, and rendered
   command/provider payloads are redacted.
 
@@ -50,6 +52,7 @@
   cleanup.
 - [x] Add Swarm service log reading through the existing runtime log adapter.
 - [x] Add Swarm service health inspection through the existing resource health query adapter.
+- [x] Add post-verification Traefik route label promotion to the Swarm image apply plan.
 - [ ] Implement real apply/verify/cleanup behind runtime adapters.
 - [ ] Add sanitized target identity persistence/read-model support where required.
 - [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.

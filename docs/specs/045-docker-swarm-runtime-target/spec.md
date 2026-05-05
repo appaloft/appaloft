@@ -143,10 +143,13 @@ No new public operation key is accepted in this Spec Round.
   when sanitized `swarm.serviceName` metadata is present. The runtime adapter reads `docker service
   ps` and returns Appaloft `ResourceRuntimeHealthSection` and `ResourceHealthCheck` fields without
   exposing raw Docker task payloads.
+- Swarm image apply planning now renders Traefik route labels into the `promote-route-target` step
+  only. Candidate service creation remains un-routed; route labels are applied after candidate
+  verification and target the Swarm edge network without public workload host-port publication.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
 - Real Swarm command execution, failed-rollout rollback behavior, remote-manager health/log
-  execution, and read-model persistence are not implemented.
+  execution, end-to-end Swarm route smoke coverage, and read-model persistence are not implemented.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and
