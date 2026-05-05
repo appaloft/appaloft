@@ -33,6 +33,12 @@ export interface CertificateRetrySchedulerConfig {
   batchSize: number;
 }
 
+export interface ScheduledTaskRunnerConfig {
+  enabled: boolean;
+  intervalSeconds: number;
+  batchSize: number;
+}
+
 export interface AppConfig {
   appName: string;
   appVersion: string;
@@ -68,6 +74,7 @@ export interface AppConfig {
   defaultAccessDomain: DefaultAccessDomainConfig;
   certificateProvider: CertificateProviderConfig;
   certificateRetryScheduler: CertificateRetrySchedulerConfig;
+  scheduledTaskRunner: ScheduledTaskRunnerConfig;
   enabledSystemPlugins: string[];
   configFilePath?: string;
 }
@@ -116,6 +123,11 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
     enabled: true,
     intervalSeconds: 300,
     defaultRetryDelaySeconds: 300,
+    batchSize: 25,
+  },
+  scheduledTaskRunner: {
+    enabled: false,
+    intervalSeconds: 60,
     batchSize: 25,
   },
   enabledSystemPlugins: [],
@@ -320,6 +332,20 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(env.APPALOFT_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE) ??
     parsePositiveInteger(certificateRetryScheduler.batchSize) ??
     defaults.certificateRetryScheduler.batchSize;
+  const scheduledTaskRunner =
+    source.flags?.scheduledTaskRunner ??
+    fileConfig.scheduledTaskRunner ??
+    defaults.scheduledTaskRunner;
+  const scheduledTaskRunnerEnabled =
+    parseBoolean(env.APPALOFT_SCHEDULED_TASK_RUNNER_ENABLED) ?? scheduledTaskRunner.enabled;
+  const scheduledTaskRunnerIntervalSeconds =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_TASK_RUNNER_INTERVAL_SECONDS) ??
+    parsePositiveInteger(scheduledTaskRunner.intervalSeconds) ??
+    defaults.scheduledTaskRunner.intervalSeconds;
+  const scheduledTaskRunnerBatchSize =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_TASK_RUNNER_BATCH_SIZE) ??
+    parsePositiveInteger(scheduledTaskRunner.batchSize) ??
+    defaults.scheduledTaskRunner.batchSize;
   const resourceAccessFailureRendererUrl = normalizeHttpUrl(
     source.flags?.resourceAccessFailureRendererUrl ??
       env.APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL ??
@@ -546,6 +572,11 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       intervalSeconds: certificateRetrySchedulerIntervalSeconds,
       defaultRetryDelaySeconds: certificateRetryDefaultDelaySeconds,
       batchSize: certificateRetrySchedulerBatchSize,
+    },
+    scheduledTaskRunner: {
+      enabled: scheduledTaskRunnerEnabled,
+      intervalSeconds: scheduledTaskRunnerIntervalSeconds,
+      batchSize: scheduledTaskRunnerBatchSize,
     },
     enabledSystemPlugins,
     ...(source.configFilePath ? { configFilePath: source.configFilePath } : {}),

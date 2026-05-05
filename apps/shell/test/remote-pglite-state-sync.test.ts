@@ -59,6 +59,11 @@ function testConfig(
       defaultRetryDelaySeconds: 300,
       batchSize: 25,
     },
+    scheduledTaskRunner: {
+      enabled: false,
+      intervalSeconds: 60,
+      batchSize: 25,
+    },
     enabledSystemPlugins: [],
   };
 }

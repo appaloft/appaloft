@@ -25,6 +25,8 @@ import {
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
   type ResourceRepository,
+  type ScheduledTaskRunWorker,
+  type ScheduledTaskScheduler,
   ServerAppliedRouteStateByRouteSetIdSpec,
   ServerAppliedRouteStateBySourceFingerprintSpec,
   ServerAppliedRouteStateByTargetSpec,
@@ -62,6 +64,7 @@ import { registerRuntimeDependencies } from "./register-runtime-dependencies";
 import { createReloadableDatabase } from "./reloadable-database";
 import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
 import { resourceAccessFailureRendererTargetForStartedServer } from "./resource-access-failure-renderer-target";
+import { createScheduledTaskRunner } from "./scheduled-task-runner";
 
 export interface AppComposition {
   config: AppConfig;
@@ -397,6 +400,21 @@ export async function createAppComposition(
     executionContextFactory,
     logger,
   });
+  const scheduledTaskScheduler = resolveToken<ScheduledTaskScheduler>(
+    childContainer,
+    tokens.scheduledTaskScheduler,
+  );
+  const scheduledTaskRunWorker = resolveToken<ScheduledTaskRunWorker>(
+    childContainer,
+    tokens.scheduledTaskRunWorker,
+  );
+  const scheduledTaskRunner = createScheduledTaskRunner({
+    config: config.scheduledTaskRunner,
+    scheduler: scheduledTaskScheduler,
+    worker: scheduledTaskRunWorker,
+    executionContextFactory,
+    logger,
+  });
   const webStaticDir = await resolveWebStaticDir(config, options);
   const docsStaticDir = await resolveDocsStaticDir(config, options);
 
@@ -450,6 +468,7 @@ export async function createAppComposition(
     });
 
     certificateRetrySchedulerRunner.start();
+    scheduledTaskRunner.start();
   };
 
   const cliProgram = createCliProgram({
@@ -501,6 +520,7 @@ export async function createAppComposition(
     startServer,
     async shutdown(): Promise<void> {
       certificateRetrySchedulerRunner.stop();
+      scheduledTaskRunner.stop();
       serverHandle?.stop?.();
       await telemetry.shutdown();
       await database.close();

@@ -222,6 +222,11 @@ describe("resolveConfig", () => {
       defaultRetryDelaySeconds: 300,
       batchSize: 25,
     });
+    expect(config.scheduledTaskRunner).toEqual({
+      enabled: false,
+      intervalSeconds: 60,
+      batchSize: 25,
+    });
   });
 
   test("allows enabling ACME certificate provider through environment", () => {
@@ -266,6 +271,22 @@ describe("resolveConfig", () => {
       intervalSeconds: 30,
       defaultRetryDelaySeconds: 45,
       batchSize: 7,
+    });
+  });
+
+  test("allows configuring the scheduled task runner through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_SCHEDULED_TASK_RUNNER_ENABLED: "true",
+        APPALOFT_SCHEDULED_TASK_RUNNER_INTERVAL_SECONDS: "15",
+        APPALOFT_SCHEDULED_TASK_RUNNER_BATCH_SIZE: "3",
+      },
+    });
+
+    expect(config.scheduledTaskRunner).toEqual({
+      enabled: true,
+      intervalSeconds: 15,
+      batchSize: 3,
     });
   });
 });
