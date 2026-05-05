@@ -18,9 +18,11 @@ This matrix covers the Phase 7 Postgres dependency resource lifecycle baseline:
 - deployment snapshot safe binding reference capture for active Postgres Resource bindings
 - Redis dependency resource lifecycle
 - provider-native Postgres realization scenarios
+- dependency resource backup/restore planned scenarios
 
-It does not cover backup/restore, provider-native Redis provisioning or provider-native credential
-rotation, runtime env injection, runtime cleanup, redeploy, or rollback.
+It does not cover provider-native Redis provisioning or provider-native credential rotation, runtime
+env injection, runtime cleanup, redeploy, rollback, scheduled backup policies, backup prune/delete,
+or cross-resource restore.
 
 ## Global References
 
@@ -30,13 +32,21 @@ rotation, runtime env injection, runtime cleanup, redeploy, or rollback.
 - [Dependency Binding Secret Rotation](../specs/036-dependency-binding-secret-rotation/spec.md)
 - [Redis Dependency Resource Lifecycle](../specs/037-redis-dependency-resource-lifecycle/spec.md)
 - [Postgres Provider-Native Realization](../specs/038-postgres-provider-native-realization/spec.md)
+- [Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md)
 - [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
+- [dependency-resource-backup-requested](../events/dependency-resource-backup-requested.md)
+- [dependency-resource-backup-completed](../events/dependency-resource-backup-completed.md)
+- [dependency-resource-backup-failed](../events/dependency-resource-backup-failed.md)
+- [dependency-resource-restore-requested](../events/dependency-resource-restore-requested.md)
+- [dependency-resource-restore-completed](../events/dependency-resource-restore-completed.md)
+- [dependency-resource-restore-failed](../events/dependency-resource-restore-failed.md)
 - [Dependency Resource Lifecycle Workflow](../workflows/dependency-resource-lifecycle.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-025](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [ADR-026](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
+- [ADR-036](../decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md)
 
 ## Coverage Rows
 
@@ -94,13 +104,24 @@ rotation, runtime env injection, runtime cleanup, redeploy, or rollback.
 | DEP-RES-PG-NATIVE-006 | `dependency-resources.delete` | Application | Realized managed Postgres is protected by binding, backup, snapshot, or provider safety blocker. | Returns `dependency_resource_delete_blocked`, no provider cleanup request is made. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts`; `packages/application/test/dependency-resource-binding.test.ts` |
 | DEP-RES-PG-NATIVE-007 | `dependency-resources.provision-postgres` | Application/provider | Selected provider lacks managed Postgres capability. | Returns `provider_capability_unsupported`, phase `dependency-resource-realization-admission`, no mutation unless explicit metadata-only mode is requested. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
 | DEP-RES-PG-NATIVE-008 | Operation catalog / CLI / oRPC / HTTP | Entrypoint/contract | Provider-native realization upgrades existing provision/delete behavior. | Entrypoints reuse or explicitly extend application schemas, dispatch command/query buses, and expose no provider SDK shape or raw secret field. | `packages/application/test/operation-catalog-boundary.test.ts`; `packages/adapters/cli/test/dependency-command.test.ts`; `packages/orpc/test/dependency-resource.http.test.ts`; `packages/contracts/test/dependency-resource-contract.test.ts` |
+| DEP-RES-BACKUP-001 | `dependency-resources.create-backup` | Core/application/provider | Active ready dependency resource has provider backup capability. | Persists a `DependencyResourceBackup` attempt, returns `ok({ id })`, and emits `dependency-resource-backup-requested` without leaking secrets. | Planned: `packages/core/test/dependency-resource-backup.test.ts`; `packages/application/test/dependency-resource-backup-restore.test.ts` |
+| DEP-RES-BACKUP-002 | provider backup result / `dependency-resources.show-backup` | Core/application/read model | Provider backup succeeds with safe artifact metadata. | Backup status becomes `ready`, safe restore point metadata is visible, delete safety is blocked by retention, and `dependency-resource-backup-completed` is emitted. | Planned: `packages/application/test/dependency-resource-backup-restore.test.ts`; `packages/persistence/pg/test/dependency-resource-backup.pglite.test.ts`; `packages/contracts/test/dependency-resource-backup-contract.test.ts` |
+| DEP-RES-BACKUP-003 | provider backup result / `dependency-resources.show-backup` | Application/read model | Provider backup fails after command admission. | Original command remains accepted; backup status becomes `failed`; sanitized failure metadata is visible; `dependency-resource-backup-failed` is emitted. | Planned: `packages/application/test/dependency-resource-backup-restore.test.ts` |
+| DEP-RES-BACKUP-004 | `dependency-resources.create-backup` | Application/provider | Dependency resource is missing, deleted, pending, degraded, unsupported, or lacks required secret reference. | Admission returns structured `not_found`, `dependency_resource_backup_blocked`, or `provider_capability_unsupported`; no backup attempt is persisted when admission fails. | Planned: `packages/application/test/dependency-resource-backup-restore.test.ts` |
+| DEP-RES-BACKUP-005 | `dependency-resources.list-backups`; `dependency-resources.show-backup` | Query/read model/contract | Backups exist for one dependency resource. | Returns safe owner, dependency kind, status, attempt ids, artifact handle, retention, size/checksum when safe, latest restore status, and sanitized failure metadata only. | Planned: `packages/application/test/dependency-resource-backup-restore.test.ts`; `packages/contracts/test/dependency-resource-backup-contract.test.ts` |
+| DEP-RES-BACKUP-006 | `dependency-resources.restore-backup` | Core/application/provider | Ready restore point belongs to the target dependency resource and acknowledgements are supplied. | Persists a restore attempt, returns `ok({ id })`, and emits `dependency-resource-restore-requested` without mutating ResourceBindings, snapshots, or runtime state. | Planned: `packages/core/test/dependency-resource-backup.test.ts`; `packages/application/test/dependency-resource-backup-restore.test.ts` |
+| DEP-RES-BACKUP-007 | provider restore result / `dependency-resources.show-backup` | Application/read model | Provider restore succeeds. | Restore attempt status becomes `completed`, safe restore metadata is refreshed, and `dependency-resource-restore-completed` is emitted. | Planned: `packages/application/test/dependency-resource-backup-restore.test.ts`; `packages/persistence/pg/test/dependency-resource-backup.pglite.test.ts` |
+| DEP-RES-BACKUP-008 | provider restore result / `dependency-resources.show-backup` | Application/read model | Provider restore fails after command admission. | Original restore command remains accepted; restore attempt status becomes `failed`; sanitized failure metadata is visible; `dependency-resource-restore-failed` is emitted. | Planned: `packages/application/test/dependency-resource-backup-restore.test.ts` |
+| DEP-RES-BACKUP-009 | `dependency-resources.restore-backup` | Application/provider | Restore point is missing, failed, deleted, cross-resource, target is unusable, acknowledgements are missing, or provider capability is absent. | Admission returns structured blocked/not-found/unsupported error and does not start provider restore. | Planned: `packages/application/test/dependency-resource-backup-restore.test.ts` |
+| DEP-RES-BACKUP-010 | `dependency-resources.delete` | Core/application/persistence | Dependency resource has retained ready backup or in-flight backup/restore attempt. | Delete returns `dependency_resource_delete_blocked`, reports backup blocker metadata, and does not call provider delete. | Planned: `packages/core/test/dependency-resource-backup.test.ts`; `packages/application/test/dependency-resource-backup-restore.test.ts`; `packages/persistence/pg/test/dependency-resource-backup.pglite.test.ts` |
+| DEP-RES-BACKUP-011 | Operation catalog / CLI / oRPC / HTTP | Entrypoint/contract | Backup/restore operations become active during Code Round. | Entrypoints dispatch explicit command/query messages, reuse schemas, and expose no provider SDK shape, raw dump, or raw secret field. | Planned: `packages/application/test/operation-catalog-boundary.test.ts`; `packages/adapters/cli/test/dependency-command.test.ts`; `packages/orpc/test/dependency-resource.http.test.ts` |
 
 ## Required Non-Coverage Assertions
 
 Tests must assert Postgres dependency resource commands do not:
 
 - rotate provider-native database credentials;
-- run backup/restore;
+- run scheduled backup policy, backup prune/delete, export/download, or cross-resource restore;
 - mutate historical deployment snapshots;
 - restart, stop, prune, or clean runtime state;
 - expose raw connection strings, passwords, tokens, auth headers, cookies, SSH credentials,
@@ -114,5 +135,6 @@ snapshot references for active Postgres bindings. Binding secret rotation is imp
 binding-scoped safe reference/version metadata only. Redis dependency resource lifecycle is
 implemented as provider-neutral safe metadata. Provider-native Postgres realization is implemented
 through a hermetic provider capability with safe realization state and managed delete cleanup.
-Provider-native Redis lifecycle, backup/restore, runtime env injection, Web affordances, and
-runtime cleanup remain future Phase 7 work.
+Backup/restore is specified by ADR-036/039 with planned matrix rows and remains unimplemented until
+Code Round. Provider-native Redis lifecycle, runtime env injection, Web affordances, and runtime
+cleanup remain future Phase 7 work.

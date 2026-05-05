@@ -311,6 +311,10 @@ Phase 7 dependency resource operations:
 | Show dependency resource | Query | `dependency-resources.show` | `ShowDependencyResourceQuery` | `ShowDependencyResourceQueryInput` | `appaloft dependency show <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}` |
 | Rename dependency resource | Command | `dependency-resources.rename` | `RenameDependencyResourceCommand` | `RenameDependencyResourceCommandInput` | `appaloft dependency rename <dependencyResourceId> --name <name>` | `POST /api/dependency-resources/{dependencyResourceId}/rename` |
 | Delete dependency resource | Command | `dependency-resources.delete` | `DeleteDependencyResourceCommand` | `DeleteDependencyResourceCommandInput` | `appaloft dependency delete <dependencyResourceId>` | `DELETE /api/dependency-resources/{dependencyResourceId}` |
+| Create dependency resource backup | Accepted candidate command | `dependency-resources.create-backup` | `CreateDependencyResourceBackupCommand` | `CreateDependencyResourceBackupCommandInput` | `appaloft dependency backup create <dependencyResourceId>` | `POST /api/dependency-resources/{dependencyResourceId}/backups` |
+| List dependency resource backups | Accepted candidate query | `dependency-resources.list-backups` | `ListDependencyResourceBackupsQuery` | `ListDependencyResourceBackupsQueryInput` | `appaloft dependency backup list <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}/backups` |
+| Show dependency resource backup | Accepted candidate query | `dependency-resources.show-backup` | `ShowDependencyResourceBackupQuery` | `ShowDependencyResourceBackupQueryInput` | `appaloft dependency backup show <backupId>` | `GET /api/dependency-resources/backups/{backupId}` |
+| Restore dependency resource backup | Accepted candidate command | `dependency-resources.restore-backup` | `RestoreDependencyResourceBackupCommand` | `RestoreDependencyResourceBackupCommandInput` | `appaloft dependency backup restore <backupId>` | `POST /api/dependency-resources/backups/{backupId}/restore` |
 | Bind dependency to resource | Command | `resources.bind-dependency` | `BindResourceDependencyCommand` | `BindResourceDependencyCommandInput` | `appaloft resource dependency bind <resourceId>` | `POST /api/resources/{resourceId}/dependency-bindings` |
 | Unbind dependency from resource | Command | `resources.unbind-dependency` | `UnbindResourceDependencyCommand` | `UnbindResourceDependencyCommandInput` | `appaloft resource dependency unbind <resourceId> <bindingId>` | `DELETE /api/resources/{resourceId}/dependency-bindings/{bindingId}` |
 | Rotate resource dependency binding secret | Command | `resources.rotate-dependency-binding-secret` | `RotateResourceDependencyBindingSecretCommand` | `RotateResourceDependencyBindingSecretCommandInput` | `appaloft resource dependency rotate-secret <resourceId> <bindingId>` | `POST /api/resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations` |
@@ -347,6 +351,12 @@ Current boundary:
 - Redis dependency resources are provider-neutral `ResourceInstance` records in this slice. Managed
   Redis records do not create provider-native Redis infrastructure, imported external Redis delete
   removes only Appaloft's record, and list/show output masks Redis connection secrets.
+- Dependency resource backup/restore is governed by
+  [ADR-036](./decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md) and
+  [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md).
+  The accepted candidate operations create safe restore points and restore them in place through
+  provider capabilities without exposing raw dumps, restarting workloads, redeploying Resources, or
+  rewriting deployment snapshots. They become active operation catalog entries during Code Round.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).
