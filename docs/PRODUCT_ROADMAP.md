@@ -1223,6 +1223,11 @@ Current verification notes:
   Swarm network without public host-port publication, orders verification before route promotion and
   superseded-service cleanup, and keeps runtime secrets as Docker secret references. Active Swarm
   execution, failed-rollout rollback, persistence/read-model updates, logs, and health remain open.
+- 2026-05-06 Phase 7 Docker Swarm fake backend slice added an opt-in
+  `DockerSwarmExecutionBackend` with injected command-runner acceptance coverage for image apply
+  and scoped cleanup. The backend is not registered in the default runtime registry; real Swarm
+  command execution, failed-rollout rollback behavior, logs, health, and read-model persistence
+  remain open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1286,8 +1291,8 @@ Required:
   semantics, normalized read surfaces, public docs/help, and contract tests are implemented.
   Target-kind registration metadata, unsupported-backend admission, backend descriptor selection,
   Swarm manager readiness, adapter-owned OCI/Compose render intent, OCI image apply-plan rendering,
-  label-scoped cleanup plan rendering, the public docs anchor, and CLI/API/Web help links are
-  implemented; Swarm execution remains open.
+  label-scoped cleanup plan rendering, opt-in fake backend acceptance coverage, the public docs
+  anchor, and CLI/API/Web help links are implemented; real Swarm execution remains open.
 
 Exit criteria:
 

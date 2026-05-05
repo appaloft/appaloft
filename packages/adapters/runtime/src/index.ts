@@ -123,6 +123,12 @@ export {
   type DockerSwarmWorkloadIntent,
 } from "./docker-swarm-runtime-intent";
 export {
+  DockerSwarmExecutionBackend,
+  type DockerSwarmCommandRunner,
+  type DockerSwarmCommandRunnerInput,
+  type DockerSwarmCommandRunnerResult,
+} from "./docker-swarm-execution-backend";
+export {
   HermeticScheduledTaskRuntimePort,
   type HermeticScheduledTaskRuntimeOptions,
   type ScheduledTaskCommandRunner,
