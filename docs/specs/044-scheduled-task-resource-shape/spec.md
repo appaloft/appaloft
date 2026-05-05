@@ -102,7 +102,10 @@ DDD or internal process-manager terminology.
   scheduled-task-run-specific table, reads them through the run-log read model by run/task/Resource,
   pages by log timestamp cursor, and masks secret-looking log messages before returning read-model
   entries.
+- Scheduled task due-candidate read-model support exists for Postgres/PGlite. It scans enabled
+  task definitions, evaluates the accepted schedule subset for the current timezone-aware minute,
+  and suppresses candidates already admitted as scheduled runs in that same minute.
 - No operation catalog entries are active.
 - No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
-- No due-candidate persistence/read model, shell scheduler runner, or background worker runner that
-  automatically drains accepted scheduled-task runs exists.
+- No shell scheduler runner or background worker runner that automatically drains accepted
+  scheduled-task runs exists.
