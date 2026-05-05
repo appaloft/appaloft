@@ -67,6 +67,9 @@ DDD or internal process-manager terminology.
   archived/deleted Resources before storing the task, validates schedule/timezone/command
   intent/timeout/retry/status/concurrency through core value objects, and stores a Resource-owned
   task definition through the scheduled-task definition repository port.
+- Inactive application update admission exists. It loads the Resource-owned task and Resource,
+  rejects archived/deleted Resources before storing changes, validates every patched field through
+  core value objects, and persists through the same scheduled-task definition repository port.
 - Inactive application read-query handlers/services exist for task list/show, run list/show, and
   run logs. They wrap scheduled-task read-model ports with stable schema versions and generated
   timestamps but do not activate persistence, operation catalog entries, or entrypoints.

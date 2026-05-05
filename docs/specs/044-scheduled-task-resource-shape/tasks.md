@@ -26,6 +26,9 @@
 - [x] `SCHED-TASK-QUERY-001`: task list/show queries wrap scheduled-task read models without
   activating operation catalog entries.
 - [x] `SCHED-TASK-QUERY-002`: missing task show query returns structured not-found details.
+- [x] `SCHED-TASK-UPDATE-001`: update patches a Resource-owned task definition without activating
+  operation catalog entries.
+- [x] `SCHED-TASK-UPDATE-002`: Resource archive blocks task updates before persistence.
 - [x] `SCHED-TASK-RUN-001`: run-now accepts a run attempt without completing it synchronously.
 - [x] `SCHED-TASK-RUN-002`: Resource archive blocks run-now before runtime execution.
 - [x] `SCHED-TASK-RUN-QUERY-001`: run list/show/log queries wrap run-specific read models.
@@ -40,6 +43,7 @@
 - [x] Add inactive application scheduled-task command/query schemas, messages, and read-model
   ports.
 - [x] Add inactive application create task admission handler/use case.
+- [x] Add inactive application update task admission handler/use case.
 - [x] Add inactive application run-now admission handler/use case.
 - [x] Add inactive application read-query handlers/services for task and run history surfaces.
 - [ ] Add remaining application scheduled-task handlers/use cases.
