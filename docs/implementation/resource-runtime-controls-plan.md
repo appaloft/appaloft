@@ -14,8 +14,13 @@ authorization.
 
 - ADR-038 decides runtime-control ownership, coordination, process-state baseline, and public
   semantics.
-- Add local command specs for `resources.runtime.stop`, `resources.runtime.start`, and
+- Local command specs now exist for `resources.runtime.stop`, `resources.runtime.start`, and
   `resources.runtime.restart`.
+- Runtime-control error and blocked-reason vocabulary now lives in
+  `docs/errors/resource-runtime-controls.md`.
+- First-slice attempt readback is specified as `resources.health.latestRuntimeControl`.
+- Public docs/help anchors now exist for runtime controls, restart versus redeploy, and blocked
+  start recovery.
 - Add error spec and blocked reason vocabulary.
 - Decide readback placement for runtime-control attempt status.
 

@@ -55,7 +55,8 @@ Current status:
 - `PUB-DOCS-003` is covered for registered help topics by `@appaloft/docs-registry`; full
   enforcement for every Web/CLI/API/MCP help target is still incomplete. Source auto-deploy now has
   registered stub anchors for setup, signatures, dedupe, ignored events, and recovery before Code
-  Round activation.
+  Round activation. Resource runtime controls now have registered stub anchors for runtime
+  controls, restart versus redeploy, and blocked start before Code Round activation.
 - `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
   a dedicated automated link checker does not exist yet.
 - `PUB-DOCS-005` is covered for registered help topics by tests that resolve each locale page and
@@ -92,7 +93,8 @@ Current status:
   `docs/documentation/public-docs-traceability.md`. Source auto-deploy traceability is recorded as
   future Web/CLI/API surface coverage until those operations are active. Phase 7 storage,
   dependency resource, backup/restore, and recovery-command traceability is recorded for active
-  CLI/HTTP/API operations.
+  CLI/HTTP/API operations. Resource runtime control traceability is recorded as future
+  Web/CLI/API/MCP surface coverage until those commands are active.
 - `PUB-DOCS-017` is covered for registered public error guides by
   `packages/docs-registry/test/help-topics.test.ts`.
 
