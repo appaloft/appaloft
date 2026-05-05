@@ -1153,6 +1153,10 @@ Current verification notes:
   repositories, read models, due-candidate reader, run-log recorder, runtime port, command/query
   handlers, use cases, scheduler, and accepted-run worker in the shell DI root. Automatic
   shell/background runner wiring, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task shell runner slice added opt-in scheduled task runner config
+  and long-running shell process wiring so enabled runners scan due tasks, admit scheduled runs,
+  and drain admitted runs through the worker. Operation catalog entries, entrypoints, public docs,
+  and broader secret masking coverage remain open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

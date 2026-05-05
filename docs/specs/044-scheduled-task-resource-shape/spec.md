@@ -107,8 +107,8 @@ DDD or internal process-manager terminology.
   and suppresses candidates already admitted as scheduled runs in that same minute.
 - Shell composition registrations exist for scheduled-task repositories, read models, due-candidate
   reader, run-log recorder, runtime port, handlers, use cases, scheduler, and accepted-run worker.
-  No public transport or automatic timer starts those components yet.
+  An opt-in scheduled task runner config can start a shell timer that scans due tasks and drains
+  admitted runs through the worker in long-running shell processes.
 - No operation catalog entries are active.
 - No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
-- No shell scheduler runner or background worker runner that automatically drains accepted
-  scheduled-task runs exists.
+- The scheduled task runner is disabled by default until public entrypoints and docs are activated.
