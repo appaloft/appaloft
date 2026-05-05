@@ -285,7 +285,11 @@ export const i18nKeys = {
       recoveryReasonRuntimeArtifactMissing:
         "console:deployments.recoveryReasonRuntimeArtifactMissing",
       recoveryReasonSnapshotMissing: "console:deployments.recoveryReasonSnapshotMissing",
+      recoveryRedeployAction: "console:deployments.recoveryRedeployAction",
+      recoveryRedeployingAction: "console:deployments.recoveryRedeployingAction",
       recoveryRedeployTitle: "console:deployments.recoveryRedeployTitle",
+      recoveryRetryAction: "console:deployments.recoveryRetryAction",
+      recoveryRetryingAction: "console:deployments.recoveryRetryingAction",
       recoveryRetryTitle: "console:deployments.recoveryRetryTitle",
       recoveryRollbackTitle: "console:deployments.recoveryRollbackTitle",
       recoveryTitle: "console:deployments.recoveryTitle",

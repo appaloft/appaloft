@@ -475,9 +475,10 @@ internal capability, but public rollback behavior is rebuild-required under ADR-
 
 ADR-034 accepts the recovery operation boundaries. `deployments.recovery-readiness` is now the active
 read-only shared recovery decision query in `CORE_OPERATIONS.md`, `operation-catalog.ts`,
-HTTP/oRPC, CLI, and Web detail. `deployments.retry`, `deployments.redeploy`, and
-`deployments.rollback` remain accepted candidate write commands only until later Code Rounds add
-their command handlers, tests, public docs/help, and entrypoints.
+HTTP/oRPC, CLI, and Web detail. `deployments.retry` and `deployments.redeploy` are active write
+commands in `CORE_OPERATIONS.md`, `operation-catalog.ts`, HTTP/oRPC, CLI, and Web recovery actions.
+`deployments.rollback` remains an accepted candidate write command until a later Code Round adds its
+handler, retained-candidate policy, tests, public docs/help, and entrypoints.
 
 `deployments.show` is now active in the public catalog, CLI, HTTP/oRPC, and Web detail path.
 `deployments.logs` remains the separate bounded log surface, and future event-stream or reconnect
