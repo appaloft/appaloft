@@ -9,6 +9,7 @@ import {
   type ConfigureDefaultAccessDomainPolicyCommandInput,
   type ConfigureDomainBindingRouteCommandInput,
   type ConfigureResourceAccessCommandInput,
+  type ConfigureResourceAutoDeployCommandInput,
   type ConfigureResourceHealthCommandInput,
   type ConfigureResourceNetworkCommandInput,
   type ConfigureResourceRuntimeCommandInput,
@@ -100,6 +101,7 @@ import {
   type ConfigureDefaultAccessDomainPolicyResponse,
   type ConfigureDomainBindingRouteResponse,
   type ConfigureResourceAccessResponse,
+  type ConfigureResourceAutoDeployResponse,
   type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkResponse,
   type ConfigureResourceRuntimeResponse,
@@ -468,6 +470,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ConfigureResourceAccessCommandInput,
       ConfigureResourceAccessResponse,
+      AppaloftClientError
+    >;
+    configureAutoDeploy: Client<
+      AppaloftClientContext,
+      ConfigureResourceAutoDeployCommandInput,
+      ConfigureResourceAutoDeployResponse,
       AppaloftClientError
     >;
     configureRuntime: Client<

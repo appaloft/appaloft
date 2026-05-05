@@ -26,6 +26,7 @@
   import type {
     ArchiveResourceInput,
     CertificateSummary,
+    ConfigureResourceAutoDeployInput,
     ConfigureResourceAccessInput,
     ConfigureResourceHealthInput,
     ConfigureResourceNetworkInput,
@@ -119,10 +120,14 @@
   type GeneratedAccessMode = AccessProfileInput["generatedAccessMode"];
   type SourceProfileInput = ConfigureResourceSourceInput["source"];
   type SourceKind = SourceProfileInput["kind"];
+  type AutoDeployPolicyInput = NonNullable<ConfigureResourceAutoDeployInput["policy"]>;
+  type AutoDeployTriggerKind = AutoDeployPolicyInput["triggerKind"];
+  type AutoDeployEventKind = AutoDeployPolicyInput["eventKinds"][number];
   type DomainRouteMode = "serve" | "redirect";
   type RedirectStatusText = "301" | "302" | "307" | "308";
   type ResourceSettingsSection =
     | "profile"
+    | "auto-deploy"
     | "configuration"
     | "domains"
     | "health"
@@ -133,6 +138,7 @@
   const resourceDetailTabs = ["settings", "deployments", "source-events", "logs", "terminal"] as const;
   const resourceSettingsSections = [
     "profile",
+    "auto-deploy",
     "configuration",
     "domains",
     "health",
@@ -246,6 +252,7 @@
     resourceEffectiveConfigQuery.data ?? null,
   );
   const resourceSourceEvents = $derived(resourceSourceEventsQuery.data?.items ?? []);
+  const autoDeployPolicy = $derived(resourceDetail?.autoDeployPolicy ?? null);
   const profileDiagnostics = $derived(resourceDetail?.diagnostics ?? []);
   const resourceHealthOverall = $derived.by((): ResourceHealthViewStatus => {
     if (
@@ -340,6 +347,17 @@
   let sourceImageName = $state("");
   let sourceImageTag = $state("");
   let sourceImageDigest = $state("");
+  let autoDeployFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let autoDeployFormStateKey = $state("");
+  let autoDeployTriggerKind = $state<AutoDeployTriggerKind>("git-push");
+  let autoDeployRefs = $state("");
+  let autoDeployEventKind = $state<AutoDeployEventKind>("push");
+  let autoDeployGenericWebhookSecretRef = $state("");
+  let autoDeployDedupeWindowSeconds = $state("");
   let runtimeFormResourceId = $state("");
   let runtimeStrategy = $state<RuntimePlanStrategy>("auto");
   let runtimeInstallCommand = $state("");
@@ -482,6 +500,9 @@
   );
   const sourceKindIsGit = $derived(isGitSourceKind(sourceKind));
   const sourceKindIsDockerImage = $derived(sourceKind === "docker-image");
+  const sourceSupportsAutoDeploy = $derived(
+    Boolean(resourceDetail?.source && isGitSourceKind(resourceDetail.source.kind)),
+  );
   const canConfigureSource = $derived(
     Boolean(
       resource &&
@@ -489,6 +510,27 @@
         sourceKind &&
         sourceLocator.trim() &&
         (!sourceKindIsDockerImage || !(sourceImageTag.trim() && sourceImageDigest.trim())),
+    ),
+  );
+  const canConfigureAutoDeploy = $derived(
+    Boolean(
+      resource &&
+        !isResourceArchived &&
+        sourceSupportsAutoDeploy &&
+        autoDeployRefs.trim() &&
+        (autoDeployTriggerKind !== "generic-signed-webhook" ||
+          autoDeployGenericWebhookSecretRef.trim()) &&
+        (!autoDeployDedupeWindowSeconds.trim() ||
+          isPositiveIntegerText(autoDeployDedupeWindowSeconds)),
+    ),
+  );
+  const canAcknowledgeAutoDeploySource = $derived(
+    Boolean(
+      resource &&
+        !isResourceArchived &&
+        autoDeployPolicy?.status === "blocked" &&
+        autoDeployPolicy.blockedReason === "source-binding-changed" &&
+        resourceDetail?.source?.sourceBindingFingerprint,
     ),
   );
   const networkTargetServiceRequired = $derived(
@@ -722,6 +764,27 @@
       sourceFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.sourceProfileSaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureResourceAutoDeployMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceAutoDeployInput) =>
+      orpcClient.resources.configureAutoDeploy(input),
+    onSuccess: (result) => {
+      autoDeployFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.autoDeploySaved),
+        detail: autoDeployStatusLabel(result.status),
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: ["source-events", "resource", resourceId] });
+    },
+    onError: (error) => {
+      autoDeployFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.autoDeploySaveFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -1361,6 +1424,35 @@
       return;
     }
 
+    const stateKey = [
+      resource.id,
+      resourceDetail?.source?.sourceBindingFingerprint ?? "no-source",
+      autoDeployPolicy?.updatedAt ?? "no-policy",
+    ].join(":");
+    if (autoDeployFormStateKey === stateKey) {
+      return;
+    }
+
+    autoDeployFormStateKey = stateKey;
+    autoDeployTriggerKind = autoDeployPolicy?.triggerKind ?? "git-push";
+    autoDeployRefs =
+      autoDeployPolicy?.refs.join(", ") ??
+      resourceDetail?.source?.gitRef ??
+      resourceDetail?.source?.defaultBranch ??
+      "main";
+    autoDeployEventKind = autoDeployPolicy?.eventKinds[0] ?? "push";
+    autoDeployGenericWebhookSecretRef = autoDeployPolicy?.genericWebhookSecretRef ?? "";
+    autoDeployDedupeWindowSeconds = autoDeployPolicy?.dedupeWindowSeconds
+      ? String(autoDeployPolicy.dedupeWindowSeconds)
+      : "";
+    autoDeployFeedback = null;
+  });
+
+  $effect(() => {
+    if (!browser || !resource) {
+      return;
+    }
+
     if (runtimeFormResourceId === resource.id) {
       return;
     }
@@ -1617,6 +1709,13 @@
     );
   }
 
+  function parseAutoDeployRefs(value: string): string[] {
+    return value
+      .split(/[\n,]/)
+      .map((ref) => ref.trim())
+      .filter((ref) => ref.length > 0);
+  }
+
   function configureResourceSource(event: SubmitEvent): void {
     event.preventDefault();
 
@@ -1647,6 +1746,68 @@
     configureResourceSourceMutation.mutate({
       resourceId: resource.id,
       source,
+    });
+  }
+
+  function configureResourceAutoDeploy(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (
+      !resource ||
+      !canConfigureAutoDeploy ||
+      configureResourceAutoDeployMutation.isPending
+    ) {
+      return;
+    }
+
+    const genericWebhookSecretRef = autoDeployGenericWebhookSecretRef.trim();
+    const dedupeWindowSeconds = autoDeployDedupeWindowSeconds.trim();
+    const policy: AutoDeployPolicyInput = {
+      triggerKind: autoDeployTriggerKind,
+      refs: parseAutoDeployRefs(autoDeployRefs),
+      eventKinds: [autoDeployEventKind],
+      ...(autoDeployTriggerKind === "generic-signed-webhook" && genericWebhookSecretRef
+        ? { genericWebhookSecretRef }
+        : {}),
+      ...(dedupeWindowSeconds ? { dedupeWindowSeconds: Number(dedupeWindowSeconds) } : {}),
+    };
+
+    autoDeployFeedback = null;
+    configureResourceAutoDeployMutation.mutate({
+      resourceId: resource.id,
+      mode: autoDeployPolicy ? "replace" : "enable",
+      policy,
+    });
+  }
+
+  function disableResourceAutoDeploy(): void {
+    if (!resource || isResourceArchived || configureResourceAutoDeployMutation.isPending) {
+      return;
+    }
+
+    autoDeployFeedback = null;
+    configureResourceAutoDeployMutation.mutate({
+      resourceId: resource.id,
+      mode: "disable",
+    });
+  }
+
+  function acknowledgeAutoDeploySourceBinding(): void {
+    const sourceBindingFingerprint = resourceDetail?.source?.sourceBindingFingerprint;
+    if (
+      !resource ||
+      !sourceBindingFingerprint ||
+      !canAcknowledgeAutoDeploySource ||
+      configureResourceAutoDeployMutation.isPending
+    ) {
+      return;
+    }
+
+    autoDeployFeedback = null;
+    configureResourceAutoDeployMutation.mutate({
+      resourceId: resource.id,
+      mode: "acknowledge-source-binding",
+      sourceBindingFingerprint,
     });
   }
 
@@ -2004,6 +2165,8 @@
     switch (section) {
       case "profile":
         return $t(i18nKeys.console.resources.profileTitle);
+      case "auto-deploy":
+        return $t(i18nKeys.console.resources.autoDeployTitle);
       case "configuration":
         return $t(i18nKeys.console.resources.configurationTitle);
       case "domains":
@@ -2036,6 +2199,48 @@
       case "dockerfile-inline":
       case "zip-artifact":
         return kind;
+    }
+  }
+
+  function autoDeployTriggerKindLabel(kind: AutoDeployTriggerKind): string {
+    switch (kind) {
+      case "generic-signed-webhook":
+        return $t(i18nKeys.console.resources.autoDeployTriggerGenericSigned);
+      case "git-push":
+        return $t(i18nKeys.console.resources.autoDeployTriggerGitPush);
+    }
+  }
+
+  function autoDeployEventKindLabel(kind: AutoDeployEventKind): string {
+    switch (kind) {
+      case "push":
+        return $t(i18nKeys.console.resources.autoDeployEventPush);
+      case "tag":
+        return $t(i18nKeys.console.resources.autoDeployEventTag);
+    }
+  }
+
+  function autoDeployStatusLabel(status: NonNullable<typeof autoDeployPolicy>["status"]): string {
+    switch (status) {
+      case "blocked":
+        return $t(i18nKeys.console.resources.autoDeployStatusBlocked);
+      case "disabled":
+        return $t(i18nKeys.console.resources.autoDeployStatusDisabled);
+      case "enabled":
+        return $t(i18nKeys.console.resources.autoDeployStatusEnabled);
+    }
+  }
+
+  function autoDeployStatusVariant(
+    status: NonNullable<typeof autoDeployPolicy>["status"],
+  ): "default" | "destructive" | "outline" | "secondary" {
+    switch (status) {
+      case "blocked":
+        return "destructive";
+      case "disabled":
+        return "outline";
+      case "enabled":
+        return "default";
     }
   }
 
@@ -3593,6 +3798,228 @@
                   </div>
                 </section>
               </div>
+
+              {:else if activeSettingsSection === "auto-deploy"}
+              <section id="resource-auto-deploy-settings" class="space-y-4">
+                <form
+                  id="resource-auto-deploy-form"
+                  class="rounded-md border bg-background p-4"
+                  onsubmit={configureResourceAutoDeploy}
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.autoDeployTitle)}
+                        </h2>
+                        <DocsHelpLink
+                          href={webDocsHrefs.sourceAutoDeploySetup}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                        />
+                        <DocsHelpLink
+                          href={webDocsHrefs.sourceAutoDeploySignatures}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                        />
+                        {#if autoDeployPolicy}
+                          <Badge variant={autoDeployStatusVariant(autoDeployPolicy.status)}>
+                            {autoDeployStatusLabel(autoDeployPolicy.status)}
+                          </Badge>
+                        {:else}
+                          <Badge variant="outline">
+                            {$t(i18nKeys.console.resources.autoDeployStatusDisabled)}
+                          </Badge>
+                        {/if}
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.autoDeployDescription)}
+                      </p>
+                    </div>
+
+                    <div class="flex shrink-0 flex-wrap gap-2">
+                      {#if canAcknowledgeAutoDeploySource}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={configureResourceAutoDeployMutation.isPending}
+                          onclick={acknowledgeAutoDeploySourceBinding}
+                        >
+                          <Check class="size-4" />
+                          {$t(i18nKeys.console.resources.autoDeployAcknowledgeSource)}
+                        </Button>
+                      {/if}
+                      {#if autoDeployPolicy}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isResourceArchived || configureResourceAutoDeployMutation.isPending}
+                          onclick={disableResourceAutoDeploy}
+                        >
+                          <Square class="size-4" />
+                          {$t(i18nKeys.console.resources.autoDeployDisable)}
+                        </Button>
+                      {/if}
+                    </div>
+                  </div>
+
+                  {#if !resourceDetail?.source}
+                    <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-3 py-2 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.autoDeploySourceMissing)}
+                    </div>
+                  {:else if !sourceSupportsAutoDeploy}
+                    <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-3 py-2 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.autoDeploySourceUnsupported)}
+                    </div>
+                  {/if}
+
+                  {#if autoDeployPolicy?.status === "blocked"}
+                    <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                      <p class="font-medium">
+                        {$t(i18nKeys.console.resources.autoDeployStatusBlocked)}
+                      </p>
+                      {#if autoDeployPolicy.blockedReason === "source-binding-changed"}
+                        <p class="mt-1 text-xs leading-5">
+                          {$t(i18nKeys.console.resources.autoDeployBlockedSourceChanged)}
+                        </p>
+                      {/if}
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.console.resources.autoDeployTriggerKind)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.sourceAutoDeploySetup}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
+                      <Select.Root bind:value={autoDeployTriggerKind} type="single">
+                        <Select.Trigger class="w-full">
+                          {autoDeployTriggerKindLabel(autoDeployTriggerKind)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="git-push">
+                            {$t(i18nKeys.console.resources.autoDeployTriggerGitPush)}
+                          </Select.Item>
+                          <Select.Item value="generic-signed-webhook">
+                            {$t(i18nKeys.console.resources.autoDeployTriggerGenericSigned)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-auto-deploy-refs">
+                      <span>{$t(i18nKeys.console.resources.autoDeployRefs)}</span>
+                      <Input
+                        id="resource-auto-deploy-refs"
+                        bind:value={autoDeployRefs}
+                        autocomplete="off"
+                        placeholder={$t(i18nKeys.console.resources.autoDeployRefsPlaceholder)}
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.resources.autoDeployEventKind)}</span>
+                      <Select.Root bind:value={autoDeployEventKind} type="single">
+                        <Select.Trigger class="w-full">
+                          {autoDeployEventKindLabel(autoDeployEventKind)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="push">
+                            {$t(i18nKeys.console.resources.autoDeployEventPush)}
+                          </Select.Item>
+                          <Select.Item value="tag">
+                            {$t(i18nKeys.console.resources.autoDeployEventTag)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label
+                      class="space-y-1.5 text-sm font-medium"
+                      for="resource-auto-deploy-dedupe-window"
+                    >
+                      <span>{$t(i18nKeys.console.resources.autoDeployDedupeWindowSeconds)}</span>
+                      <Input
+                        id="resource-auto-deploy-dedupe-window"
+                        bind:value={autoDeployDedupeWindowSeconds}
+                        autocomplete="off"
+                        inputmode="numeric"
+                      />
+                    </label>
+
+                    {#if autoDeployTriggerKind === "generic-signed-webhook"}
+                      <label
+                        class="space-y-1.5 text-sm font-medium sm:col-span-2"
+                        for="resource-auto-deploy-generic-secret-ref"
+                      >
+                        <span class="inline-flex items-center gap-1.5">
+                          {$t(i18nKeys.console.resources.autoDeployGenericWebhookSecretRef)}
+                          <DocsHelpLink
+                            href={webDocsHrefs.sourceAutoDeploySignatures}
+                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                            className="size-5"
+                          />
+                        </span>
+                        <Input
+                          id="resource-auto-deploy-generic-secret-ref"
+                          bind:value={autoDeployGenericWebhookSecretRef}
+                          autocomplete="off"
+                          placeholder={$t(
+                            i18nKeys.console.resources.autoDeployGenericWebhookSecretRefPlaceholder,
+                          )}
+                        />
+                      </label>
+                    {/if}
+                  </div>
+
+                  {#if autoDeployPolicy}
+                    <dl class="mt-4 grid gap-3 rounded-md border bg-muted/20 p-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                      <div class="min-w-0">
+                        <dt class="text-muted-foreground">
+                          {$t(i18nKeys.console.resources.autoDeployCurrentFingerprint)}
+                        </dt>
+                        <dd class="truncate font-mono">{autoDeployPolicy.sourceBindingFingerprint}</dd>
+                      </div>
+                      <div class="min-w-0">
+                        <dt class="text-muted-foreground">
+                          {$t(i18nKeys.console.resources.autoDeployUpdatedAt)}
+                        </dt>
+                        <dd class="font-medium">{formatTime(autoDeployPolicy.updatedAt)}</dd>
+                      </div>
+                    </dl>
+                  {/if}
+
+                  {#if autoDeployFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        autoDeployFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{autoDeployFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{autoDeployFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={
+                        !canConfigureAutoDeploy || configureResourceAutoDeployMutation.isPending
+                      }
+                    >
+                      <GitBranch class="size-4" />
+                      {configureResourceAutoDeployMutation.isPending
+                        ? $t(i18nKeys.common.actions.saving)
+                        : $t(i18nKeys.common.actions.save)}
+                    </Button>
+                  </div>
+                </form>
+              </section>
 
               {:else if activeSettingsSection === "configuration"}
               <section id="resource-overview-configuration" class="space-y-4">

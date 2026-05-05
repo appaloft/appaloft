@@ -3,8 +3,9 @@
 ## Status
 
 Active command. The core policy model, application command/use case, Resource repository
-persistence, operation catalog, `CORE_OPERATIONS.md`, CLI, and HTTP/oRPC surfaces exist. Web
-settings UI and future MCP/tool descriptors remain deferred until those surfaces exist.
+persistence, operation catalog, `CORE_OPERATIONS.md`, CLI, HTTP/oRPC, and Web Resource settings
+surfaces exist. Future MCP/tool descriptors remain deferred until the tool surface exists and must
+be generated from the same operation key and command schema.
 
 ## Governing Sources
 
@@ -109,7 +110,7 @@ verification.
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource source/profile settings auto-deploy panel. | Future Code Round |
+| Web | Resource source/profile settings auto-deploy panel. | Active |
 | CLI | `appaloft resource auto-deploy <resourceId> ...`. | Active |
 | oRPC / HTTP | `POST /api/resources/{resourceId}/auto-deploy` using this command schema. | Active |
 | Automation / MCP | Future tool over the same operation key. | Future |
@@ -122,3 +123,4 @@ Stable matrix coverage:
 - `SRC-AUTO-POLICY-002`
 - `SRC-AUTO-POLICY-003`
 - `SRC-AUTO-EVENT-004`
+- `SRC-AUTO-ENTRY-001`

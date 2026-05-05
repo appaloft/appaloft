@@ -62,9 +62,12 @@ Round authorization.
 - Add CLI, HTTP/oRPC, and Web surfaces only after application behavior and persistence pass.
   `Status: resources.configure-auto-deploy and source-events.list/show have CLI and HTTP/oRPC
   surfaces; source-events.ingest has the Resource-scoped generic signed HTTP route and the GitHub
-  push HTTP route; Web Resource detail source-event diagnostics are active.`
+  push HTTP route; Web Resource detail auto-deploy settings and source-event diagnostics are
+  active.`
 - Add public docs for setup, signatures, dedupe, ignored events, and manual recovery.
-- Add future MCP/tool descriptor mapping from operation catalog metadata.
+- Add future MCP/tool descriptor mapping from operation catalog metadata. `Status: deferred until
+  the tool surface exists; source auto-deploy active entrypoints already share the operation catalog
+  entry and schemas.`
 
 ## Verification Gate
 
@@ -74,4 +77,4 @@ Minimum before Code Round completion:
 - operation map, `CORE_OPERATIONS.md`, operation catalog, public docs/help, and contracts are in
   sync;
 - `bun run typecheck`, `bun run lint`, and targeted source auto-deploy tests pass;
-- remaining gaps are recorded under the source spec and roadmap.
+- remaining gaps or explicit deferred exceptions are recorded under the source spec and roadmap.

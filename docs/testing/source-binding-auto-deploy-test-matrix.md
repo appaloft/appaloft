@@ -6,10 +6,11 @@ Test-First / Code Round preparation for Phase 7 / `0.9.0`.
 
 Resource-owned auto-deploy policy domain behavior, application command handling, Resource
 repository persistence, source-event command/query handling, generic signed source-event
-verification, durable source-event dedupe/read models, ignored policy-match outcomes, and Web
-source-event diagnostics have automation. Source event deployment dispatch through existing
-deployment admission has application automation. Provider-specific ingestion routes and background
-workers are not active yet.
+verification, durable source-event dedupe/read models, ignored policy-match outcomes, Web
+auto-deploy settings, and Web source-event diagnostics have automation. Source event deployment
+dispatch through existing deployment admission has application automation. Future MCP/tool
+descriptor generation is deferred until the tool surface exists and must use the same operation
+catalog entry and schemas.
 
 ## Governing Sources
 
@@ -62,7 +63,7 @@ workers are not active yet.
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `SRC-AUTO-ENTRY-001` | CLI, HTTP/oRPC, Web, and future MCP/tool configure auto-deploy. | Entrypoints reuse the same command/query schemas and operation keys. | `packages/application/test/operation-catalog-boundary.test.ts`; package typechecks | Partial |
+| `SRC-AUTO-ENTRY-001` | CLI, HTTP/oRPC, Web, and future MCP/tool configure auto-deploy. | Active entrypoints reuse the same command/query schemas and operation keys; future MCP/tool descriptors remain generated from the operation catalog instead of transport-only shapes. | `packages/application/test/operation-catalog-boundary.test.ts`; `packages/application/test/show-resource.test.ts`; `apps/web/src/lib/console/auto-deploy.test.ts`; package typechecks | Passing |
 | `SRC-AUTO-ENTRY-002` | HTTP generic signed webhook receives source event. | Transport resolves `resource-secret:<KEY>`, verifies signature, dispatches provider-neutral source event command with `scopeResourceId`, and never persists raw payload/signature/secret. | `packages/orpc/test/source-event-generic-signed.http.test.ts`; `packages/application/test/source-events.test.ts`; package typechecks | Passing |
 | `SRC-AUTO-ENTRY-003` | Web Resource detail shows event-created deployment. | Deployment links back to safe source event facts and ignored/deduped events remain visible. | `apps/web/src/lib/console/source-events.test.ts`; `apps/web/src/routes/resources/[resourceId]/+page.svelte`; package typechecks | Passing |
 | `SRC-AUTO-ENTRY-004` | HTTP GitHub push webhook receives provider-signed source event. | Route `POST /api/integrations/github/source-events` verifies `X-Hub-Signature-256` against `APPALOFT_GITHUB_WEBHOOK_SECRET`, treats `ping` as a no-op, dispatches push events through the shared command schema, and keeps raw payload/signature/secret out of command input, logs, errors, and read models. | `packages/orpc/test/source-event-github.http.test.ts`; `packages/integrations/github/test/github-webhook.test.ts`; package typechecks | Passing |
@@ -71,14 +72,15 @@ workers are not active yet.
 ## Current Implementation Notes And Migration Gaps
 
 Resource source binding, source fingerprint link state, manual deployment admission,
-Resource-owned auto-deploy policy state behavior, active configure command entrypoints, and
-Resource repository persistence exist. Source-event command/query handling, generic signed
-source-event verification, durable source-event dedupe/read-model persistence, policy matching for
-ignored ref outcomes, and active CLI/HTTP/oRPC source event read surfaces also exist. Matching
-source events can dispatch through the existing deployment admission use case at the application
-boundary. The Resource-scoped generic signed HTTP route now resolves `resource-secret:<KEY>`,
-verifies `X-Appaloft-Signature`, dispatches `source-events.ingest` with `scopeResourceId`, and keeps
-dedupe scoped to the route Resource. Event dispatch, dedupe, Web source-event diagnostics, and
-public help-link coverage are now bound to automation. GitHub push webhook route verification,
-normalization, no-op ping handling, and safe rejection paths are active. Code Round must not mark
-auto-deploy complete until remaining rows have stable automation or explicit deferred exceptions.
+Resource-owned auto-deploy policy state behavior, active configure command entrypoints, Web
+auto-deploy settings, and Resource repository persistence exist. Source-event command/query
+handling, generic signed source-event verification, durable source-event dedupe/read-model
+persistence, policy matching for ignored ref outcomes, and active CLI/HTTP/oRPC source event read
+surfaces also exist. Matching source events can dispatch through the existing deployment admission
+use case at the application boundary. The Resource-scoped generic signed HTTP route now resolves
+`resource-secret:<KEY>`, verifies `X-Appaloft-Signature`, dispatches `source-events.ingest` with
+`scopeResourceId`, and keeps dedupe scoped to the route Resource. Event dispatch, dedupe, Web
+auto-deploy settings, Web source-event diagnostics, and public help-link coverage are now bound to
+automation. GitHub push webhook route verification, normalization, no-op ping handling, and safe
+rejection paths are active. Future MCP/tool descriptor generation remains an explicit deferred
+exception until the tool surface exists.

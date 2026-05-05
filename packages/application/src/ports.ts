@@ -2078,6 +2078,7 @@ export interface ResourceDetailSourceProfile {
   kind: SourceKind;
   locator: string;
   displayName: string;
+  sourceBindingFingerprint: string;
   gitRef?: string;
   commitSha?: string;
   baseDirectory?: string;
@@ -2089,6 +2090,18 @@ export interface ResourceDetailSourceProfile {
   imageTag?: string;
   imageDigest?: string;
   metadata?: Record<string, string>;
+}
+
+export interface ResourceDetailAutoDeployPolicy {
+  status: "enabled" | "disabled" | "blocked";
+  triggerKind: "git-push" | "generic-signed-webhook";
+  refs: string[];
+  eventKinds: SourceEventKind[];
+  sourceBindingFingerprint: string;
+  blockedReason?: "source-binding-changed";
+  genericWebhookSecretRef?: string;
+  dedupeWindowSeconds?: number;
+  updatedAt: string;
 }
 
 export interface ResourceDetailRuntimeProfile {
@@ -2188,6 +2201,7 @@ export interface ResourceDetail {
   schemaVersion: "resources.show/v1";
   resource: ResourceDetailIdentity;
   source?: ResourceDetailSourceProfile;
+  autoDeployPolicy?: ResourceDetailAutoDeployPolicy;
   runtimeProfile?: ResourceDetailRuntimeProfile;
   networkProfile?: ResourceDetailNetworkProfile;
   accessProfile?: ResourceAccessProfile;
