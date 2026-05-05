@@ -15,15 +15,18 @@ This matrix covers the Phase 7 Postgres dependency resource lifecycle baseline:
 - `resources.list-dependency-bindings`
 - `resources.show-dependency-binding`
 - deployment snapshot safe binding reference capture for active Postgres Resource bindings
+- accepted-candidate Resource dependency binding secret rotation
 
-It does not cover Redis, secret rotation, backup/restore, provider-native Postgres provisioning,
-runtime env injection, runtime cleanup, redeploy, or rollback.
+It does not cover Redis, backup/restore, provider-native Postgres provisioning or provider-native
+credential rotation, runtime env injection, runtime cleanup, redeploy, or rollback.
 
 ## Global References
 
 - [Postgres Dependency Resource Lifecycle](../specs/033-postgres-dependency-resource-lifecycle/spec.md)
 - [Dependency Resource Binding Baseline](../specs/034-dependency-resource-binding-baseline/spec.md)
 - [Dependency Binding Deployment Snapshot Reference Baseline](../specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
+- [Dependency Binding Secret Rotation](../specs/036-dependency-binding-secret-rotation/spec.md)
+- [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
 - [Dependency Resource Lifecycle Workflow](../workflows/dependency-resource-lifecycle.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -64,13 +67,19 @@ runtime env injection, runtime cleanup, redeploy, or rollback.
 | DEP-BIND-SNAP-REF-004 | `deployments.plan`; `deployments.create` | Application/read model | Resource has an active binding whose dependency metadata is not ready for safe snapshot reference. | Deployment admission is not blocked in this slice; readiness reports blocked snapshot readiness and runtime injection remains deferred. | `packages/application/test/create-deployment.test.ts`; `packages/application/test/deployment-plan-preview.test.ts` |
 | DEP-BIND-SNAP-REF-005 | `deployments.plan` | Query/read model | Resource has an active Postgres dependency binding. | Preview reports safe dependency binding snapshot readiness and runtime injection deferred without creating a deployment, events, or runtime work. | `packages/application/test/deployment-plan-preview.test.ts`; `packages/contracts/test/deployment-plan-preview-contract.test.ts` |
 | DEP-BIND-SNAP-REF-006 | `deployments.show` | Query/read model | Deployment was accepted with dependency binding references. | Show response reports immutable dependency binding references captured at admission, not current Resource binding state. | `packages/application/test/show-deployment.test.ts`; `packages/contracts/test/deployment-dependency-binding-snapshot-contract.test.ts` |
+| DEP-BIND-ROTATE-001 | `resources.rotate-dependency-binding-secret` | Core/application | Rotate active ResourceBinding secret reference. | Persists a new safe binding secret reference/version, emits `resource-dependency-binding-secret-rotated`, and performs no provider-native database, runtime, or snapshot rewrite side effect. | Planned: `packages/core/test/resource-binding.test.ts`; `packages/application/test/dependency-resource-binding.test.ts` |
+| DEP-BIND-ROTATE-002 | `resources.rotate-dependency-binding-secret` | Application | Missing, removed, or cross-resource binding. | Returns `not_found` or `resource_dependency_binding_rotation_blocked`, no mutation. | Planned: `packages/application/test/dependency-resource-binding.test.ts` |
+| DEP-BIND-ROTATE-003 | `resources.rotate-dependency-binding-secret`; binding read models | Application/read model | Secret-bearing rotation input is provided. | No raw password, token, auth header, cookie, SSH credential, provider token, private key, sensitive query, raw connection URL, previous plaintext, or materialized env value appears in output, event, error, log, or snapshot. | Planned: `packages/application/test/dependency-resource-binding.test.ts`; `packages/persistence/pg/test/dependency-resource-binding.pglite.test.ts` |
+| DEP-BIND-ROTATE-004 | deployment snapshot boundary | Application/read model | Deployment captured an old binding reference before rotation. | Later rotation does not rewrite historical deployment snapshot references; `deployments.show` reports the captured reference. | Planned: `packages/application/test/create-deployment.test.ts`; `packages/application/test/show-deployment.test.ts`; `packages/persistence/pg/test/deployment-repository.pglite.test.ts` |
+| DEP-BIND-ROTATE-005 | `resources.list-dependency-bindings`; `resources.show-dependency-binding` | Query/read model | Binding secret reference was rotated. | Returns safe current rotation metadata and snapshot readiness without raw or previous plaintext secret material. | Planned: `packages/application/test/dependency-resource-binding.test.ts`; `packages/persistence/pg/test/dependency-resource-binding.pglite.test.ts` |
+| DEP-BIND-ROTATE-006 | Operation catalog / CLI / oRPC / HTTP | Entrypoint | Binding secret rotation operation is public after Code Round. | Entrypoints dispatch `RotateResourceDependencyBindingSecretCommand`, reuse application schema, and expose no generic update operation. | Planned: `packages/application/test/operation-catalog-boundary.test.ts`; `packages/adapters/cli/test/dependency-command.test.ts`; `packages/orpc/test/dependency-resource.http.test.ts` |
 
 ## Required Non-Coverage Assertions
 
 Tests must assert Postgres dependency resource commands do not:
 
 - create provider-native databases;
-- rotate secrets;
+- rotate provider-native database credentials;
 - run backup/restore;
 - mutate historical deployment snapshots;
 - restart, stop, prune, or clean runtime state;
@@ -81,6 +90,6 @@ Tests must assert Postgres dependency resource commands do not:
 
 This baseline implements Postgres dependency resource control-plane records, Resource binding
 metadata, safe read models, active-binding delete blockers, and provider-neutral safe deployment
-snapshot references for active Postgres bindings. Redis, binding secret rotation, provider-native
-Postgres lifecycle, backup/restore, runtime env injection, Web affordances, and runtime cleanup
-remain future Phase 7 work.
+snapshot references for active Postgres bindings. Binding secret rotation is specified with planned
+matrix rows but is not implemented. Redis, provider-native Postgres lifecycle, backup/restore,
+runtime env injection, Web affordances, and runtime cleanup remain future Phase 7 work.

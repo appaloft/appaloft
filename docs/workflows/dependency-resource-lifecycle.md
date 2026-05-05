@@ -21,8 +21,11 @@ Every read must dispatch one explicit query:
 - `resources.list-dependency-bindings`
 - `resources.show-dependency-binding`
 
-The workflow is not secret rotation, not backup/restore, not provider-native database
-provisioning, not runtime env injection, and not a deployment command.
+`resources.rotate-dependency-binding-secret` is an accepted candidate for the next binding
+lifecycle slice. It is not active until Code Round adds catalog, transport, persistence, and tests.
+
+The workflow is not backup/restore, not provider-native database provisioning, not provider-native
+credential rotation, not runtime env injection, and not a deployment command.
 
 ## Global References
 
@@ -35,6 +38,8 @@ provisioning, not runtime env injection, and not a deployment command.
 - [Postgres Dependency Resource Lifecycle](../specs/033-postgres-dependency-resource-lifecycle/spec.md)
 - [Dependency Resource Binding Baseline](../specs/034-dependency-resource-binding-baseline/spec.md)
 - [Dependency Binding Deployment Snapshot Reference Baseline](../specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
+- [Dependency Binding Secret Rotation](../specs/036-dependency-binding-secret-rotation/spec.md)
+- [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
 - [Dependency Resource Test Matrix](../testing/dependency-resource-test-matrix.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -53,7 +58,9 @@ The workflow lets operators:
 6. List/show Resource dependency binding summaries without exposing raw secrets.
 7. Unbind without deleting the dependency resource or any external/provider database.
 8. Record provider-neutral safe dependency binding references in new deployment attempt snapshots.
-9. Delete only dependency resources that pass safety checks.
+9. Rotate a binding-scoped secret reference for future deployment snapshots without changing
+   historical deployments.
+10. Delete only dependency resources that pass safety checks.
 
 ## Operation Boundaries
 
@@ -67,6 +74,7 @@ The workflow lets operators:
 | Delete dependency resource | `dependency-resources.delete` | Dependency resource lifecycle/tombstone | External/provider database, bindings, backup data, runtime cleanup |
 | Bind dependency to Resource | `resources.bind-dependency` | ResourceBinding | Provider database, ResourceInstance lifecycle, runtime, historical deployment snapshots |
 | Unbind dependency from Resource | `resources.unbind-dependency` | ResourceBinding lifecycle/tombstone | Dependency resource, external/provider database, runtime cleanup, snapshots |
+| Rotate binding secret reference | `resources.rotate-dependency-binding-secret` | ResourceBinding safe secret reference/version | Provider database credentials, Dependency Resource lifecycle, runtime env injection, historical deployment snapshots |
 | List Resource dependency bindings | `resources.list-dependency-bindings` | Nothing | Any aggregate or runtime state |
 | Show Resource dependency binding | `resources.show-dependency-binding` | Nothing | Any aggregate or runtime state |
 | Create deployment with dependency binding references | `deployments.create` | Deployment attempt snapshot | ResourceBinding lifecycle, Dependency Resource lifecycle, raw secrets, runtime env injection |
@@ -116,10 +124,18 @@ Resource dependency bindings store only provider-neutral control-plane metadata:
 - binding target name/profile label;
 - scope and injection mode;
 - safe secret reference pointer when present;
+- safe secret version or rotated-at metadata when the binding secret reference has been rotated;
 - active/removed status and timestamps.
 
 They must not store raw connection strings, raw passwords, tokens, auth headers, cookies, SSH
 credentials, provider tokens, private keys, sensitive query parameters, or raw environment values.
+
+`resources.rotate-dependency-binding-secret` replaces only the binding-scoped safe secret reference
+or version used by future deployment snapshot references. It must reject missing or removed
+bindings, require explicit acknowledgement that historical deployment snapshots remain unchanged,
+and publish `resource-dependency-binding-secret-rotated` only after the new safe reference is
+durably persisted. Rotation does not prove runtime reachability, update provider-native database
+passwords, inject runtime environment variables, or schedule redeploy.
 
 ## Delete Safety
 
@@ -165,10 +181,12 @@ secret-rotation fields.
 
 ## Current Implementation Notes And Migration Gaps
 
-This Code Round adds Postgres dependency resource lifecycle records, Resource binding metadata, safe
-read models, real active-binding delete blockers, and safe dependency binding snapshot references.
-Redis, secret rotation, provider-native provisioning/deletion, backup/restore, runtime env
-injection, Web affordances, and runtime cleanup are future work.
+The current implementation adds Postgres dependency resource lifecycle records, Resource binding
+metadata, safe read models, real active-binding delete blockers, and safe dependency binding
+snapshot references.
+Binding secret rotation is specified as an accepted candidate but not implemented. Redis,
+provider-native provisioning/deletion, backup/restore, runtime env injection, Web affordances, and
+runtime cleanup are future work.
 
 ## Open Questions
 

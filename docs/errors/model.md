@@ -141,6 +141,7 @@ Codes must be stable identifiers, not localized text. Examples:
 | `deployment_not_rollback_ready` | `application` or `conflict` | phase `recovery-admission`; deployment id, resource id, requested rollback candidate id when provided, blocked reason code, missing artifact/snapshot/environment detail when safe |
 | `deployment_rollback_candidate_not_found` | `not-found` | phase `recovery-admission`; deployment id, resource id, rollback candidate id, retention horizon when known |
 | `deployment_recovery_state_stale` | `conflict` | phase `recovery-admission`; deployment id, resource id, readiness generated time, current deployment status/version when known |
+| `resource_dependency_binding_rotation_blocked` | `conflict` | phase `resource-dependency-binding-secret-rotation`; resource id, binding id, current binding state, blocker reason code |
 | `coordination_timeout` | `timeout` | coordination scope kind/key, coordination mode, waited seconds, retry hint when available |
 | `provider_error` | `integration` | provider key and operation |
 | `runtime_target_unsupported` | `application` or `integration` | target kind, provider key, missing capability, selected target/destination context |

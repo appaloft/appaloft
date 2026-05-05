@@ -843,6 +843,12 @@ Current verification notes:
   injection remains deferred. This still does not satisfy the full `0.9.0` release rule while
   secret rotation, runtime injection, provider-native database realization, Redis, backup/restore,
   recovery, auto-deploy, preview, and cluster runtime items remain open.
+- 2026-05-05 Phase 7 dependency binding secret rotation Spec Round positioned
+  `resources.rotate-dependency-binding-secret` as the next ResourceBinding lifecycle candidate,
+  with stable matrix rows for safe rotation metadata, snapshot immutability, and entrypoint
+  dispatch. It does not implement the command yet, so the full `0.9.0` release rule remains
+  blocked by binding secret rotation Code Round, runtime injection, provider-native database
+  realization, Redis, backup/restore, recovery, auto-deploy, preview, and cluster runtime items.
 
 Required:
 
