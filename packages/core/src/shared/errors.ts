@@ -152,6 +152,14 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("resource_archived", "user", message, details),
+  resourceAutoDeploySourceMissing: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_auto_deploy_source_missing", "user", message, details),
+  resourceAutoDeploySecretRequired: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_auto_deploy_secret_required", "user", message, details),
   serverInactive: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

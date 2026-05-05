@@ -67,8 +67,18 @@ import {
 } from "../shared/text-values";
 import { ScalarValueObject } from "../shared/value-object";
 import {
+  cloneResourceAutoDeployPolicyState,
+  ResourceAutoDeployPolicy,
+  type ResourceAutoDeployPolicyState,
+  type ResourceAutoDeploySecretRef,
+  type ResourceAutoDeployTriggerKindValue,
+  type SourceEventDedupeWindowSeconds,
+  type SourceEventKindValue,
+} from "./auto-deploy-policy";
+import {
   cloneResourceSourceBindingState,
   type DeploymentSourceDescriptorState,
+  type GitRefText,
   ResourceSourceBinding,
   type ResourceSourceBindingState,
 } from "./source-binding";
@@ -431,6 +441,7 @@ export interface ResourceState {
   kind: ResourceKindValue;
   services: ResourceServiceState[];
   sourceBinding?: ResourceSourceBindingState;
+  autoDeployPolicy?: ResourceAutoDeployPolicyState;
   runtimeProfile?: ResourceRuntimeProfileState;
   networkProfile?: ResourceNetworkProfileState;
   accessProfile?: ResourceAccessProfileState;
@@ -481,6 +492,21 @@ function cloneResourceStorageAttachmentState(
   attachment: ResourceStorageAttachmentState,
 ): ResourceStorageAttachmentState {
   return { ...attachment };
+}
+
+function resourceAutoDeploySourceMissingError(input: {
+  resourceId: ResourceId;
+  sourceKind?: string;
+}) {
+  return domainError.resourceAutoDeploySourceMissing(
+    "Auto-deploy requires a compatible Resource source binding",
+    {
+      phase: "auto-deploy-policy-admission",
+      resourceId: input.resourceId.value,
+      requiredSourceKind: "git",
+      ...(input.sourceKind ? { sourceKind: input.sourceKind } : {}),
+    },
+  );
 }
 
 export type ResourceVariableState = ReturnType<EnvironmentConfigSet["toState"]>[number];
@@ -881,6 +907,9 @@ export class Resource extends AggregateRoot<ResourceState> {
               ...cloneResourceSourceBindingState(state.sourceBinding),
             },
           }
+        : {}),
+      ...(state.autoDeployPolicy
+        ? { autoDeployPolicy: cloneResourceAutoDeployPolicyState(state.autoDeployPolicy) }
         : {}),
       ...(state.runtimeProfile
         ? { runtimeProfile: cloneResourceRuntimeProfileState(state.runtimeProfile) }
@@ -1567,6 +1596,15 @@ export class Resource extends AggregateRoot<ResourceState> {
 
     const normalizedSourceBinding = sourceBinding.value.toState();
     this.state.sourceBinding = cloneResourceSourceBindingState(normalizedSourceBinding);
+    if (this.state.autoDeployPolicy) {
+      const policy = ResourceAutoDeployPolicy.rehydrate(
+        this.state.autoDeployPolicy,
+      ).blockIfSourceBindingChanged({
+        currentSourceBindingFingerprint: sourceBinding.value.fingerprint(),
+        changedAt: input.configuredAt,
+      });
+      this.state.autoDeployPolicy = policy.toState();
+    }
 
     this.recordDomainEvent("resource-source-configured", input.configuredAt, {
       resourceId: this.state.id.value,
@@ -1578,6 +1616,65 @@ export class Resource extends AggregateRoot<ResourceState> {
     });
 
     return ok(undefined);
+  }
+
+  configureAutoDeployPolicy(input: {
+    triggerKind: ResourceAutoDeployTriggerKindValue;
+    refs: readonly GitRefText[];
+    eventKinds: readonly SourceEventKindValue[];
+    configuredAt: UpdatedAt;
+    genericWebhookSecretRef?: ResourceAutoDeploySecretRef;
+    dedupeWindowSeconds?: SourceEventDedupeWindowSeconds;
+  }): Result<ResourceAutoDeployPolicyState> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-auto-deploy");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    if (!this.state.sourceBinding) {
+      return err(resourceAutoDeploySourceMissingError({ resourceId: this.state.id }));
+    }
+
+    const sourceBinding = ResourceSourceBinding.rehydrate(this.state.sourceBinding);
+    if (!sourceBinding.supportsAutoDeployPolicy()) {
+      return err(
+        resourceAutoDeploySourceMissingError({
+          resourceId: this.state.id,
+          sourceKind: this.state.sourceBinding.kind.value,
+        }),
+      );
+    }
+
+    const policy = ResourceAutoDeployPolicy.create({
+      triggerKind: input.triggerKind,
+      refs: input.refs,
+      eventKinds: input.eventKinds,
+      sourceBindingFingerprint: sourceBinding.fingerprint(),
+      updatedAt: input.configuredAt,
+      ...(input.genericWebhookSecretRef
+        ? { genericWebhookSecretRef: input.genericWebhookSecretRef }
+        : {}),
+      ...(input.dedupeWindowSeconds ? { dedupeWindowSeconds: input.dedupeWindowSeconds } : {}),
+    });
+    if (policy.isErr()) {
+      return err(policy.error);
+    }
+
+    this.state.autoDeployPolicy = policy.value.toState();
+
+    this.recordDomainEvent("resource-auto-deploy-policy-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      status: this.state.autoDeployPolicy.status.value,
+      triggerKind: this.state.autoDeployPolicy.triggerKind.value,
+      refs: this.state.autoDeployPolicy.refs.map((ref) => ref.value),
+      eventKinds: this.state.autoDeployPolicy.eventKinds.map((eventKind) => eventKind.value),
+      sourceBindingFingerprint: this.state.autoDeployPolicy.sourceBindingFingerprint.value,
+      configuredAt: input.configuredAt.value,
+    });
+
+    return ok(cloneResourceAutoDeployPolicyState(this.state.autoDeployPolicy));
   }
 
   accept<TContext, TResult>(
@@ -1597,6 +1694,9 @@ export class Resource extends AggregateRoot<ResourceState> {
               ...cloneResourceSourceBindingState(this.state.sourceBinding),
             },
           }
+        : {}),
+      ...(this.state.autoDeployPolicy
+        ? { autoDeployPolicy: cloneResourceAutoDeployPolicyState(this.state.autoDeployPolicy) }
         : {}),
       ...(this.state.runtimeProfile
         ? { runtimeProfile: cloneResourceRuntimeProfileState(this.state.runtimeProfile) }

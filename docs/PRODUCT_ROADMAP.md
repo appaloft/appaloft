@@ -979,6 +979,11 @@ Current verification notes:
   `CORE_OPERATIONS.md`, the operation catalog, HTTP/oRPC, CLI, and Web Resource detail controls
   with public docs links and `RUNTIME-CTRL-SURFACE-001` HTTP coverage. Future MCP/tool descriptors
   remain deferred until the tool surface exists.
+- 2026-05-05 Phase 7 source auto-deploy policy Code Round slice added Resource-owned
+  auto-deploy policy state, source binding fingerprint binding, missing-source admission blockers,
+  and source-binding-change blocking semantics with `SRC-AUTO-POLICY-001` through
+  `SRC-AUTO-POLICY-003` core coverage. The operations remain inactive until application commands,
+  durable source event ingestion/dedupe/read models, and CLI/HTTP/Web surfaces are aligned.
 
 Required:
 

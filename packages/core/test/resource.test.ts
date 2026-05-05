@@ -8,6 +8,7 @@ import {
   EnvironmentId,
   EnvironmentSnapshotId,
   GeneratedAt,
+  GitRefText,
   HealthCheckIntervalSeconds,
   HealthCheckRetryCount,
   HealthCheckStartPeriodSeconds,
@@ -16,6 +17,7 @@ import {
   PortNumber,
   ProjectId,
   Resource,
+  ResourceAutoDeployTriggerKindValue,
   ResourceExposureModeValue,
   ResourceGeneratedAccessModeValue,
   ResourceId,
@@ -26,6 +28,7 @@ import {
   ResourceServiceName,
   RoutePathPrefix,
   RuntimePlanStrategyValue,
+  SourceEventKindValue,
   SourceKindValue,
   SourceLocator,
   StaticPublishDirectory,
@@ -288,5 +291,104 @@ describe("Resource", () => {
         isSecret: true,
       }),
     ]);
+  });
+
+  test("[SRC-AUTO-POLICY-001] persists auto-deploy policy without mutating source binding", () => {
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("application"),
+      sourceBinding: {
+        kind: SourceKindValue.rehydrate("git-public"),
+        locator: SourceLocator.rehydrate("https://github.com/appaloft/demo"),
+        displayName: DisplayNameText.rehydrate("appaloft/demo"),
+        gitRef: GitRefText.rehydrate("main"),
+      },
+    })._unsafeUnwrap();
+    const beforeSource = resource.toState().sourceBinding;
+
+    const configured = resource.configureAutoDeployPolicy({
+      triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate("git-push"),
+      refs: [GitRefText.rehydrate("main")],
+      eventKinds: [SourceEventKindValue.rehydrate("push")],
+      configuredAt: UpdatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
+    });
+
+    expect(configured.isOk()).toBe(true);
+    const state = resource.toState();
+    expect(state.sourceBinding).toEqual(beforeSource);
+    expect(state.autoDeployPolicy?.status.value).toBe("enabled");
+    expect(state.autoDeployPolicy?.triggerKind.value).toBe("git-push");
+    expect(state.autoDeployPolicy?.refs.map((ref) => ref.value)).toEqual(["main"]);
+    expect(state.autoDeployPolicy?.eventKinds.map((eventKind) => eventKind.value)).toEqual([
+      "push",
+    ]);
+    expect(state.autoDeployPolicy?.sourceBindingFingerprint.value).toMatch(/^srcfp_[a-f0-9]{8}$/);
+    expect(resource.pullDomainEvents().map((event) => event.type)).toContain(
+      "resource-auto-deploy-policy-configured",
+    );
+  });
+
+  test("[SRC-AUTO-POLICY-002] rejects auto-deploy when source binding is missing", () => {
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("application"),
+    })._unsafeUnwrap();
+
+    const configured = resource.configureAutoDeployPolicy({
+      triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate("git-push"),
+      refs: [GitRefText.rehydrate("main")],
+      eventKinds: [SourceEventKindValue.rehydrate("push")],
+      configuredAt: UpdatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
+    });
+
+    expect(configured.isErr()).toBe(true);
+    if (configured.isErr()) {
+      expect(configured.error.code).toBe("resource_auto_deploy_source_missing");
+      expect(configured.error.details).toMatchObject({
+        phase: "auto-deploy-policy-admission",
+        resourceId: "res_demo",
+        requiredSourceKind: "git",
+      });
+    }
+  });
+
+  test("[SRC-AUTO-POLICY-003] blocks auto-deploy policy when source binding changes", () => {
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("application"),
+      sourceBinding: {
+        kind: SourceKindValue.rehydrate("git-public"),
+        locator: SourceLocator.rehydrate("https://github.com/appaloft/demo"),
+        displayName: DisplayNameText.rehydrate("appaloft/demo"),
+        gitRef: GitRefText.rehydrate("main"),
+      },
+    })._unsafeUnwrap();
+    resource
+      .configureAutoDeployPolicy({
+        triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate("git-push"),
+        refs: [GitRefText.rehydrate("main")],
+        eventKinds: [SourceEventKindValue.rehydrate("push")],
+        configuredAt: UpdatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
+      })
+      ._unsafeUnwrap();
+    const originalFingerprint = resource.toState().autoDeployPolicy?.sourceBindingFingerprint.value;
+
+    resource
+      .configureSourceBinding({
+        sourceBinding: {
+          kind: SourceKindValue.rehydrate("git-public"),
+          locator: SourceLocator.rehydrate("https://github.com/appaloft/demo"),
+          displayName: DisplayNameText.rehydrate("appaloft/demo"),
+          gitRef: GitRefText.rehydrate("release"),
+        },
+        configuredAt: UpdatedAt.rehydrate("2026-01-01T00:04:00.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const policy = resource.toState().autoDeployPolicy;
+    expect(policy?.sourceBindingFingerprint.value).toBe(originalFingerprint);
+    expect(policy?.status.value).toBe("blocked");
+    expect(policy?.blockedReason?.value).toBe("source-binding-changed");
+    expect(policy?.updatedAt.value).toBe("2026-01-01T00:04:00.000Z");
   });
 });
