@@ -14,27 +14,27 @@
 ## Architecture Approach
 
 - Core:
-  - Add a `DependencyResourceBackup` aggregate/process model with value-object state for ids,
+  - Added a `DependencyResourceBackup` aggregate/process model with value-object state for ids,
     statuses, timestamps, artifact handles, retention metadata, and sanitized failure metadata.
-  - Extend `ResourceInstance` delete safety and backup eligibility behavior without storing raw
+  - Extended `ResourceInstance` delete safety and backup eligibility behavior without storing raw
     provider artifacts or dump material.
-  - Keep all domain-significant fields as value objects.
+  - Kept all domain-significant fields as value objects.
 - Application:
-  - Add explicit command/query messages and handlers for create backup, restore backup, list
+  - Added explicit command/query messages and handlers for create backup, restore backup, list
     backups, and show backup.
-  - Add provider capability ports for dependency resource backup and restore with safe DTOs.
-  - Coordinate admission, persistence, event publication, provider execution, and safe failure
+  - Added provider capability ports for dependency resource backup and restore with safe DTOs.
+  - Coordinated admission, persistence, event publication, provider execution, and safe failure
     recording through use cases.
 - Persistence/read models:
-  - Persist backup attempts, restore points, restore attempts, retention metadata, and sanitized
+  - Persisted backup attempts, restore points, restore attempts, retention metadata, and sanitized
     failure metadata.
-  - Extend dependency resource delete-safety readers so retained backups and in-flight attempts
+  - Extended dependency resource delete-safety readers so retained backups and in-flight attempts
     block delete.
-  - Add safe backup list/show read models.
+  - Added safe backup list/show read models.
 - Entrypoints:
-  - Add operation catalog entries during Code Round.
-  - Add CLI and oRPC/HTTP dispatch using command/query schemas.
-  - Keep Web/public docs as an explicit migration gap unless completed in the same PR.
+  - Added operation catalog entries during Code Round.
+  - Added CLI and oRPC/HTTP dispatch using command/query schemas.
+  - Kept Web/public docs as an explicit migration gap.
 
 ## Roadmap And Compatibility
 
@@ -60,10 +60,9 @@
 ## Risks And Migration Gaps
 
 - Durable outbox/inbox and background worker retry are global migration gaps. The first Code Round
-  may use synchronous hermetic provider execution while preserving attempt state and events.
+  uses synchronous hermetic provider execution while preserving attempt state and events.
 - Restore is destructive provider work. The command must require explicit acknowledgements and must
   not restart workloads or imply app-level consistency.
 - Backup/restore support depends on provider capabilities for each dependency kind. Unsupported
   providers must fail admission with stable structured errors.
-- Web/public documentation affordances remain a migration gap unless completed in the same PR.
-
+- Web/public documentation affordances remain a migration gap for a later Docs/Web round.

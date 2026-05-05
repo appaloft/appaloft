@@ -8,8 +8,6 @@ List safe backup and restore point summaries for one dependency resource.
 
 - `dependencyResourceId`
 - optional `status`
-- optional `limit`
-- optional `cursor`
 
 ## Success
 
@@ -27,3 +25,6 @@ payloads, or command output.
 No mutation, provider inspection, dump download, restore, backup prune/delete, runtime work, or
 deployment snapshot mutation.
 
+## Current Implementation Notes
+
+Pagination is deferred; this slice supports dependency-resource id filtering plus optional status.

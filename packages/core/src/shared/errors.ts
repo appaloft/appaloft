@@ -178,6 +178,10 @@ export const domainError = {
     createError("resource_delete_blocked", "user", message, details),
   dependencyResourceDeleteBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
     createError("dependency_resource_delete_blocked", "user", message, details),
+  dependencyResourceBackupBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("dependency_resource_backup_blocked", "user", message, details),
+  dependencyResourceRestoreBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("dependency_resource_restore_blocked", "user", message, details),
   deploymentNotRedeployable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

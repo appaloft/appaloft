@@ -22,6 +22,7 @@ export const tokens = {
   environmentRepository: Symbol.for("appaloft.environment_repository"),
   resourceRepository: Symbol.for("appaloft.resource_repository"),
   dependencyResourceRepository: Symbol.for("appaloft.dependency_resource_repository"),
+  dependencyResourceBackupRepository: Symbol.for("appaloft.dependency_resource_backup_repository"),
   resourceDependencyBindingRepository: Symbol.for(
     "appaloft.resource_dependency_binding_repository",
   ),
@@ -51,6 +52,7 @@ export const tokens = {
   environmentReadModel: Symbol.for("appaloft.environment_read_model"),
   resourceReadModel: Symbol.for("appaloft.resource_read_model"),
   dependencyResourceReadModel: Symbol.for("appaloft.dependency_resource_read_model"),
+  dependencyResourceBackupReadModel: Symbol.for("appaloft.dependency_resource_backup_read_model"),
   resourceDependencyBindingReadModel: Symbol.for("appaloft.resource_dependency_binding_read_model"),
   storageVolumeReadModel: Symbol.for("appaloft.storage_volume_read_model"),
   resourceAccessFailureEvidenceRecorder: Symbol.for(
@@ -151,10 +153,23 @@ export const tokens = {
   renameDependencyResourceUseCase: Symbol.for("appaloft.rename_dependency_resource_use_case"),
   deleteDependencyResourceUseCase: Symbol.for("appaloft.delete_dependency_resource_use_case"),
   managedPostgresProvider: Symbol.for("appaloft.managed_postgres_provider"),
+  dependencyResourceBackupProvider: Symbol.for("appaloft.dependency_resource_backup_provider"),
+  createDependencyResourceBackupUseCase: Symbol.for(
+    "appaloft.create_dependency_resource_backup_use_case",
+  ),
+  restoreDependencyResourceBackupUseCase: Symbol.for(
+    "appaloft.restore_dependency_resource_backup_use_case",
+  ),
   listDependencyResourcesQueryService: Symbol.for(
     "appaloft.list_dependency_resources_query_service",
   ),
   showDependencyResourceQueryService: Symbol.for("appaloft.show_dependency_resource_query_service"),
+  listDependencyResourceBackupsQueryService: Symbol.for(
+    "appaloft.list_dependency_resource_backups_query_service",
+  ),
+  showDependencyResourceBackupQueryService: Symbol.for(
+    "appaloft.show_dependency_resource_backup_query_service",
+  ),
   createStorageVolumeUseCase: Symbol.for("appaloft.create_storage_volume_use_case"),
   renameStorageVolumeUseCase: Symbol.for("appaloft.rename_storage_volume_use_case"),
   deleteStorageVolumeUseCase: Symbol.for("appaloft.delete_storage_volume_use_case"),

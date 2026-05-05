@@ -66,6 +66,8 @@ import {
   PgCertificateSecretStore,
   PgDefaultAccessDomainPolicyRepository,
   PgDependencyBindingSecretStore,
+  PgDependencyResourceBackupReadModel,
+  PgDependencyResourceBackupRepository,
   PgDependencyResourceDeleteSafetyReader,
   PgDependencyResourceReadModel,
   PgDependencyResourceRepository,
@@ -742,6 +744,11 @@ export function registerRuntimeDependencies(
   container.register(tokens.dependencyResourceRepository, {
     useFactory: instanceCachingFactory(() => new PgDependencyResourceRepository(input.database.db)),
   });
+  container.register(tokens.dependencyResourceBackupRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgDependencyResourceBackupRepository(input.database.db),
+    ),
+  });
   container.register(tokens.resourceDependencyBindingRepository, {
     useFactory: instanceCachingFactory(
       () => new PgResourceDependencyBindingRepository(input.database.db),
@@ -859,6 +866,11 @@ export function registerRuntimeDependencies(
           input.database.db,
           dependencyContainer.resolve(tokens.dependencyResourceDeleteSafetyReader),
         ),
+    ),
+  });
+  container.register(tokens.dependencyResourceBackupReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgDependencyResourceBackupReadModel(input.database.db),
     ),
   });
   container.register(tokens.resourceDependencyBindingReadModel, {

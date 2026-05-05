@@ -2,8 +2,8 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: planned for Code Round
+- Round: Code Round
+- Artifact state: implemented with hermetic provider capability
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, additive dependency resource lifecycle commands and read
   models
@@ -15,9 +15,10 @@ Operators can create safe backup restore points for dependency resources and res
 restore point back into the same dependency resource without exposing raw database dumps, connection
 secrets, provider credentials, or runtime environment values.
 
-This closes the first backup/restore gap in the Phase 7 dependency-resource loop. It does not
-restart workloads, redeploy Resources, perform deployment rollback, schedule recurring backups, or
-delete backup artifacts.
+This closes the first backup/restore gap in the Phase 7 dependency-resource loop for ready
+Postgres and Redis dependency resources with provider capability support. It does not restart
+workloads, redeploy Resources, perform deployment rollback, schedule recurring backups, or delete
+backup artifacts.
 
 ## Discover Findings
 
@@ -91,10 +92,11 @@ delete backup artifacts.
   - `appaloft dependency backup list <dependencyResourceId>`
   - `appaloft dependency backup show <backupId>`
   - `appaloft dependency backup restore <backupId>`
-- Web/UI: migration gap unless a Docs/Web round adds affordances in the same PR.
+- Web/UI: migration gap; no Web console affordance in this Code Round.
 - Events: add provider-safe lifecycle event specs for backup requested/completed/failed and restore
   requested/completed/failed.
-- Public docs/help: record a stable public docs anchor or explicit migration gap during Code Round.
+- Public docs/help: migration gap; CLI and HTTP descriptions point at the existing dependency
+  resource lifecycle help section until a Docs Round adds task-oriented public docs.
 - Future MCP/tools: one operation per command/query over the same application schemas.
 
 ## Output Contracts
@@ -143,11 +145,11 @@ operation, phase, attempt id, blocker code, and sanitized provider failure metad
 - No provider-native credential rotation.
 - No provider SDK types in `core`, contracts, CLI, Web, events, or read models.
 
-## Open Questions
+## Current Implementation Notes And Migration Gaps
 
-- Whether Code Round stores restore attempts inside `DependencyResourceBackup` or a separate
-  process table can be decided during implementation, as long as the public state contract and
-  delete-safety behavior stay unchanged.
-- Durable outbox/process retry remains a platform migration gap. The first Code Round may use a
-  synchronous hermetic provider adapter while preserving durable attempt state.
-
+- Code stores the latest restore attempt inside `DependencyResourceBackup` and persists it as safe
+  JSON metadata in the backup repository.
+- Provider backup/restore execution is synchronous through a hermetic shell/test provider port in
+  this slice. Durable outbox/process retry remains a platform migration gap.
+- The first provider implementation supports Appaloft-managed Postgres and imported external
+  Postgres/Redis metadata. Provider-native Redis realization remains a separate Phase 7 gap.

@@ -220,6 +220,17 @@ export const cliCommandDescriptions = {
     "Delete a dependency resource after safety checks",
     "resource.concept",
   ),
+  dependencyBackup: withDocs("Dependency resource backup operations", "resource.concept"),
+  dependencyBackupCreate: withDocs(
+    "Create a backup restore point for a dependency resource",
+    "resource.concept",
+  ),
+  dependencyBackupList: withDocs("List dependency resource backups", "resource.concept"),
+  dependencyBackupShow: withDocs("Show dependency resource backup detail", "resource.concept"),
+  dependencyBackupRestore: withDocs(
+    "Restore a dependency resource backup in place",
+    "resource.concept",
+  ),
   resourceSetVariable: withDocs(
     "Set a resource-scoped variable override",
     "environment.variable-precedence",
