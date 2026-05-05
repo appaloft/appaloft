@@ -1036,6 +1036,10 @@ Current verification notes:
   ignored-event, and recovery anchors through API, CLI, and Web help registries with
   `SRC-AUTO-SURFACE-003` automation. Web diagnostics, provider Git route adapters, and future
   MCP/tool descriptors remain deferred.
+- 2026-05-05 Phase 7 source auto-deploy Web diagnostics slice added Resource detail source-event
+  diagnostics backed by `source-events.list`, including safe created-deployment links, dedupe
+  visibility, ignored-policy reasons, and `SRC-AUTO-ENTRY-003` Web automation. Provider Git route
+  adapters and future MCP/tool descriptors remain deferred.
 
 Required:
 

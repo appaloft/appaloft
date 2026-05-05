@@ -4,7 +4,7 @@
 
 Active read model. Application query handling, durable source-event read-model persistence,
 `CORE_OPERATIONS.md`, the operation catalog, CLI, and HTTP/oRPC read surfaces are aligned. Web
-diagnostics and future MCP/tool descriptors remain deferred.
+detail drawer/page and future MCP/tool descriptors remain deferred.
 
 ## Governing Sources
 

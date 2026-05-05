@@ -44,6 +44,7 @@ import {
   type ListGitHubRepositoriesQueryInput,
   type ListOperatorWorkQueryInput,
   type ListResourcesQueryInput,
+  type ListSourceEventsQueryInput,
   type ListSshCredentialsQueryInput,
   type LockEnvironmentCommandInput,
   type OpenTerminalSessionCommandInput,
@@ -77,6 +78,7 @@ import {
   type ShowProjectQueryInput,
   type ShowResourceQueryInput,
   type ShowServerQueryInput,
+  type ShowSourceEventQueryInput,
   type ShowSshCredentialQueryInput,
   type StartResourceRuntimeCommandInput,
   type StopResourceRuntimeCommandInput,
@@ -141,6 +143,7 @@ import {
   type ListProvidersResponse,
   type ListResourcesResponse,
   type ListServersResponse,
+  type ListSourceEventsResponse,
   type ListSshCredentialsResponse,
   type LockEnvironmentResponse,
   type PromoteEnvironmentResponse,
@@ -173,6 +176,7 @@ import {
   type ShowOperatorWorkResponse,
   type ShowProjectResponse,
   type ShowServerResponse,
+  type ShowSourceEventResponse,
   type ShowSshCredentialResponse,
   type StartResourceRuntimeResponse,
   type StopResourceRuntimeResponse,
@@ -746,6 +750,20 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ShowOperatorWorkQueryInput,
       ShowOperatorWorkResponse,
+      AppaloftClientError
+    >;
+  };
+  sourceEvents: {
+    list: Client<
+      AppaloftClientContext,
+      ListSourceEventsQueryInput,
+      ListSourceEventsResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowSourceEventQueryInput,
+      ShowSourceEventResponse,
       AppaloftClientError
     >;
   };

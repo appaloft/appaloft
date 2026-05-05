@@ -17,6 +17,7 @@
     RefreshCw,
     RotateCw,
     Route,
+    GitBranch,
     ShieldCheck,
     Square,
     Terminal,
@@ -43,6 +44,7 @@
     ResourceRuntimeLogEvent,
     ResourceRuntimeLogLine,
     ResourceSummary,
+    SourceEventListItem,
     RestartResourceRuntimeInput,
     SetResourceVariableInput,
     StartResourceRuntimeInput,
@@ -72,6 +74,11 @@
     type CurrentResourceAccessRouteKind,
   } from "$lib/console/resource-access-route";
   import {
+    sourceEventDeploymentHref,
+    sourceEventRevisionLabel,
+    sourceEventVisibleOutcomes,
+  } from "$lib/console/source-events";
+  import {
     findEnvironment,
     findProject,
     findServer,
@@ -94,7 +101,7 @@
     typeof globalThis & {
       appaloftDesktop?: AppaloftDesktopBridge;
     };
-  type ResourceDetailTab = "settings" | "deployments" | "logs" | "terminal";
+  type ResourceDetailTab = "settings" | "deployments" | "source-events" | "logs" | "terminal";
   type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
   type ResourceAccessRoute = CurrentResourceAccessRoute["route"];
   type ResourceAccessKind = "domain-binding" | CurrentResourceAccessRouteKind;
@@ -123,7 +130,7 @@
     | "diagnostics";
   type ResourceVariableKind = SetResourceVariableInput["kind"];
   type ResourceVariableExposure = SetResourceVariableInput["exposure"];
-  const resourceDetailTabs = ["settings", "deployments", "logs", "terminal"] as const;
+  const resourceDetailTabs = ["settings", "deployments", "source-events", "logs", "terminal"] as const;
   const resourceSettingsSections = [
     "profile",
     "configuration",
@@ -182,6 +189,18 @@
       staleTime: 5_000,
     }),
   );
+  const resourceSourceEventsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["source-events", "resource", resourceId],
+      queryFn: () =>
+        orpcClient.sourceEvents.list({
+          resourceId,
+          limit: 25,
+        }),
+      enabled: browser && resourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
 
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
@@ -226,6 +245,7 @@
   const resourceEffectiveConfig = $derived<ResourceEffectiveConfig | null>(
     resourceEffectiveConfigQuery.data ?? null,
   );
+  const resourceSourceEvents = $derived(resourceSourceEventsQuery.data?.items ?? []);
   const profileDiagnostics = $derived(resourceDetail?.diagnostics ?? []);
   const resourceHealthOverall = $derived.by((): ResourceHealthViewStatus => {
     if (
@@ -1950,6 +1970,8 @@
     switch (tab) {
       case "deployments":
         return $t(i18nKeys.common.domain.deployments);
+      case "source-events":
+        return $t(i18nKeys.console.resources.sourceEventsTab);
       case "logs":
         return $t(i18nKeys.console.resources.logsTab);
       case "settings":
@@ -2014,6 +2036,63 @@
       case "dockerfile-inline":
       case "zip-artifact":
         return kind;
+    }
+  }
+
+  function sourceEventStatusLabel(status: SourceEventListItem["status"]): string {
+    switch (status) {
+      case "accepted":
+        return $t(i18nKeys.console.resources.sourceEventStatusAccepted);
+      case "blocked":
+        return $t(i18nKeys.common.status.blocked);
+      case "deduped":
+        return $t(i18nKeys.console.resources.sourceEventStatusDeduped);
+      case "dispatched":
+        return $t(i18nKeys.console.resources.sourceEventStatusDispatched);
+      case "failed":
+        return $t(i18nKeys.common.status.failed);
+      case "ignored":
+        return $t(i18nKeys.console.resources.sourceEventStatusIgnored);
+    }
+  }
+
+  function sourceEventStatusVariant(
+    status: SourceEventListItem["status"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "dispatched":
+        return "default";
+      case "accepted":
+      case "deduped":
+        return "secondary";
+      case "blocked":
+      case "failed":
+        return "destructive";
+      case "ignored":
+        return "outline";
+    }
+  }
+
+  function sourceEventDedupeStatusLabel(
+    status: SourceEventListItem["dedupeStatus"],
+  ): string {
+    return status === "duplicate"
+      ? $t(i18nKeys.console.resources.sourceEventDedupeDuplicate)
+      : $t(i18nKeys.console.resources.sourceEventDedupeNew);
+  }
+
+  function sourceEventIgnoredReasonLabel(
+    reason: SourceEventListItem["ignoredReasons"][number],
+  ): string {
+    switch (reason) {
+      case "no-matching-policy":
+        return $t(i18nKeys.console.resources.sourceEventIgnoredNoMatchingPolicy);
+      case "policy-blocked":
+        return $t(i18nKeys.console.resources.sourceEventIgnoredPolicyBlocked);
+      case "policy-disabled":
+        return $t(i18nKeys.console.resources.sourceEventIgnoredPolicyDisabled);
+      case "ref-not-matched":
+        return $t(i18nKeys.console.resources.sourceEventIgnoredRefNotMatched);
     }
   }
 
@@ -2625,6 +2704,145 @@
                 </div>
               {/if}
             </div>
+          </section>
+        </Tabs.Content>
+
+        <Tabs.Content value="source-events" class="mt-0">
+          <section id="resource-source-events" class="space-y-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.resources.sourceEventsTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.sourceAutoDeployDedupe}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                  />
+                  <DocsHelpLink
+                    href={webDocsHrefs.sourceAutoDeployIgnoredEvents}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                  />
+                  <DocsHelpLink
+                    href={webDocsHrefs.sourceAutoDeployRecovery}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                  />
+                </div>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.sourceEventsDescription)}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={resourceSourceEventsQuery.isFetching}
+                onclick={() => resourceSourceEventsQuery.refetch()}
+              >
+                <RefreshCw
+                  class={["size-4", resourceSourceEventsQuery.isFetching ? "animate-spin" : ""]}
+                />
+                {$t(i18nKeys.console.resources.sourceEventsRefresh)}
+              </Button>
+            </div>
+
+            {#if resourceSourceEventsQuery.isPending}
+              <div class="space-y-3">
+                <Skeleton class="h-28 w-full" />
+                <Skeleton class="h-28 w-full" />
+              </div>
+            {:else if resourceSourceEventsQuery.error}
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                <p class="font-medium">
+                  {$t(i18nKeys.console.resources.sourceEventsLoadFailed)}
+                </p>
+                <p class="mt-1 break-all text-xs">
+                  {readErrorMessage(resourceSourceEventsQuery.error)}
+                </p>
+              </div>
+            {:else if resourceSourceEvents.length === 0}
+              <div class="border-y bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.resources.sourceEventsEmpty)}
+              </div>
+            {:else}
+              <div class="space-y-3">
+                {#each resourceSourceEvents as sourceEvent (sourceEvent.sourceEventId)}
+                  {@const outcomes = sourceEventVisibleOutcomes(sourceEvent)}
+                  <article class="rounded-md border bg-card p-4">
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div class="min-w-0 space-y-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="bg-muted p-2">
+                            <GitBranch class="size-4" />
+                          </div>
+                          <span class="font-mono text-sm font-medium">
+                            {sourceEvent.sourceEventId}
+                          </span>
+                          <Badge variant={sourceEventStatusVariant(sourceEvent.status)}>
+                            {sourceEventStatusLabel(sourceEvent.status)}
+                          </Badge>
+                          <Badge variant="outline">
+                            {sourceEventDedupeStatusLabel(sourceEvent.dedupeStatus)}
+                          </Badge>
+                        </div>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                          <span>
+                            {$t(i18nKeys.console.resources.sourceEventsRef)}:
+                            <code class="rounded bg-muted px-1 py-0.5">{sourceEvent.ref}</code>
+                          </span>
+                          <span>
+                            {$t(i18nKeys.console.resources.sourceEventsRevision)}:
+                            <code class="rounded bg-muted px-1 py-0.5">
+                              {sourceEventRevisionLabel(sourceEvent.revision)}
+                            </code>
+                          </span>
+                          <span>
+                            {$t(i18nKeys.console.resources.sourceEventsReceived)}:
+                            {formatTime(sourceEvent.receivedAt)}
+                          </span>
+                        </div>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span>
+                            {$t(i18nKeys.console.resources.sourceEventsSourceKind)}:
+                            {sourceEvent.sourceKind}
+                          </span>
+                          <span>
+                            {$t(i18nKeys.console.resources.sourceEventsEventKind)}:
+                            {sourceEvent.eventKind}
+                          </span>
+                        </div>
+                      </div>
+
+                      {#if outcomes.length > 0}
+                        <div class="flex max-w-full flex-wrap gap-2 lg:max-w-md lg:justify-end">
+                          {#each outcomes as outcome (`${outcome.kind}-${outcome.value}`)}
+                            {#if outcome.kind === "created-deployment"}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                href={sourceEventDeploymentHref(outcome.value)}
+                              >
+                                {$t(i18nKeys.console.resources.sourceEventsCreatedDeployment)}
+                                <span class="font-mono">{outcome.value}</span>
+                              </Button>
+                            {:else if outcome.kind === "dedupe"}
+                              <Badge variant="secondary">
+                                {$t(i18nKeys.console.resources.sourceEventsDedupeStatus)}:
+                                {sourceEventDedupeStatusLabel(outcome.value)}
+                              </Badge>
+                            {:else}
+                              <Badge variant="outline">
+                                {$t(i18nKeys.console.resources.sourceEventIgnoredReason)}:
+                                {sourceEventIgnoredReasonLabel(outcome.value)}
+                              </Badge>
+                            {/if}
+                          {/each}
+                        </div>
+                      {/if}
+                    </div>
+                  </article>
+                {/each}
+              </div>
+            {/if}
           </section>
         </Tabs.Content>
 

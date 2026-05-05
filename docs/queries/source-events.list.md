@@ -3,8 +3,8 @@
 ## Status
 
 Active read model. Application query handling, durable source-event read-model persistence,
-`CORE_OPERATIONS.md`, the operation catalog, CLI, and HTTP/oRPC read surfaces are aligned. Web
-diagnostics and future MCP/tool descriptors remain deferred.
+`CORE_OPERATIONS.md`, the operation catalog, CLI, HTTP/oRPC, and Web Resource detail diagnostics
+are aligned. Future MCP/tool descriptors remain deferred.
 
 ## Governing Sources
 
@@ -79,7 +79,7 @@ Use [Source Event Auto Deploy Error Spec](../errors/source-events.md). Minimum c
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource auto-deploy event list and diagnostics panel. | Future Code Round |
+| Web | Resource detail source events tab with created-deployment links, dedupe, and ignored reasons. | Active |
 | CLI | `appaloft source-event list --resource <resourceId>` or `--project <projectId>`. | Active |
 | oRPC / HTTP | `GET /api/source-events` with project/resource scope filters. | Active |
 | Automation / MCP | Future read-only query/tool. | Future |
