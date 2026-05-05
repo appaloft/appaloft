@@ -2,8 +2,9 @@
 
 ## Status
 
-Readiness query Code Round implemented. Retry, redeploy, and rollback command slices remain future
-work.
+Readiness query Code Round implemented. Retry and redeploy command slices are active. Rollback
+remains a future command slice scoped by
+[Deployment Rollback](../specs/041-deployment-rollback/spec.md).
 
 ## Governing Sources
 

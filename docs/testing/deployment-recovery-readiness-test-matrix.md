@@ -50,10 +50,11 @@ separate future Code Round.
 | `DEP-REDEPLOY-002` | Source deployment has usable snapshot but current profile differs. | Command creates a current-profile attempt and does not reuse the old snapshot as runtime truth. | planned application fixture | Deferred gap |
 | `DEP-REDEPLOY-003` | Source deployment has usable snapshot but current profile is invalid. | Command rejects redeploy; it does not fall back to retry semantics. | planned application fixture | Deferred gap |
 | `DEP-REDEPLOY-004` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without bypassing create/retry/rollback serialization. | planned coordination fixture | Deferred gap |
-| `DEP-ROLLBACK-001` | Rollback admitted with retained successful candidate. | Command returns accepted async result with a new rollback attempt id and emits `triggerKind = "rollback"`. | future rollback Code Round | Deferred gap |
-| `DEP-ROLLBACK-002` | Requested rollback candidate is missing or expired. | Command rejects with `deployment_rollback_candidate_not_found`. | future rollback Code Round | Deferred gap |
-| `DEP-ROLLBACK-003` | Requested candidate lacks artifact or environment snapshot. | Command rejects with `deployment_not_rollback_ready` and safe missing metadata detail. | future rollback Code Round | Deferred gap |
-| `DEP-ROLLBACK-004` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without admitting competing recovery work. | future rollback Code Round | Deferred gap |
+| `DEP-ROLLBACK-001` | Rollback admitted with retained successful candidate. | Command returns accepted async result with a new rollback attempt id and emits `triggerKind = "rollback"` plus source/candidate metadata. | planned in `docs/specs/041-deployment-rollback` | Deferred gap |
+| `DEP-ROLLBACK-002` | Requested rollback candidate is missing, expired, wrong-resource, or not visible. | Command rejects with `deployment_rollback_candidate_not_found`. | planned in `docs/specs/041-deployment-rollback` | Deferred gap |
+| `DEP-ROLLBACK-003` | Requested candidate lacks artifact, snapshot, or safe stateless rollback support. | Command rejects with `deployment_not_rollback_ready` and safe missing metadata detail. | planned in `docs/specs/041-deployment-rollback` | Deferred gap |
+| `DEP-ROLLBACK-004` | Rollback readiness marker is stale. | Command rejects with `deployment_recovery_state_stale`. | planned in `docs/specs/041-deployment-rollback` | Deferred gap |
+| `DEP-ROLLBACK-005` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without admitting competing recovery work. | planned in `docs/specs/041-deployment-rollback` | Deferred gap |
 
 ## Entrypoint Coverage
 

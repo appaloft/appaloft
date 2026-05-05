@@ -226,8 +226,8 @@ include secrets, raw environment values, private registry credentials, or unboun
 
 Current code may retain low-level rollback helpers, runtime artifact fields, or historical rollback
 model objects, but they are internal only. Public recovery readiness is active as a read-only query.
-Public retry, redeploy, and rollback entrypoints remain absent until later Code Rounds implement the
-accepted candidate write commands and update the operation catalog.
+Public retry and redeploy entrypoints are active. Public rollback remains absent until a later Code
+Round implements the accepted candidate write command and updates the operation catalog.
 
 Current event-stream cursor gaps are observation gaps. They must not be used as recovery blockers
 unless the durable event/progress source itself is also the only available snapshot/artifact evidence.
