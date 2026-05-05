@@ -27,6 +27,9 @@ describe("CLI docs help links", () => {
     expect(cliDocsHrefs.resourceRuntimeProfile).toBe(
       "/docs/resources/profiles/source-runtime/#resource-runtime-profile",
     );
+    expect(cliDocsHrefs.resourceProfileDrift).toBe(
+      "/docs/resources/profiles/source-runtime/#resource-profile-drift",
+    );
     expect(cliDocsHrefs.resourceAccessProfile).toBe(
       "/docs/access/generated-routes/#resource-access-profile",
     );
@@ -81,6 +84,7 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.resourceConfigureRuntime).toContain(
       cliDocsHrefs.resourceRuntimeProfile,
     );
+    expect(cliCommandDescriptions.resourceShow).toContain(cliDocsHrefs.resourceProfileDrift);
     expect(cliCommandDescriptions.resourceConfigureAccess).toContain(
       cliDocsHrefs.resourceAccessProfile,
     );

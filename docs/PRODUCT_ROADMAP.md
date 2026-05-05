@@ -181,8 +181,8 @@ Still blocking 1.0.0:
 - [ ] Top-level resource CRUD/lifecycle is uneven across projects, servers, credentials, resources,
   deployments, domain bindings, certificates, default access policy, dependency resources, storage,
   webhooks, and internal process state.
-- [ ] Resource profile drift handling and remaining non-resource lifecycle gaps are still major
-  horizontal work. Resource detail/profile editing affordances are Phase 4 closure work.
+- [ ] Remaining non-resource lifecycle gaps are still major horizontal work. Resource profile drift
+  visibility is active; configuration drift redaction remains a focused follow-up.
 - [ ] Retry/redeploy, cancel, and rollback are not public operations. `deployments.show` and
   `deployments.stream-events` are already active.
 - [ ] `deployments.create` progress stream is still create-time observation; standalone replay/follow
@@ -456,8 +456,8 @@ Phase 4 resource profile editing verification notes from 2026-04-27:
 - CLI, HTTP/oRPC, Web help, and future MCP/tool naming all point at the existing operation keys,
   command/query schemas, and docs-registry topics for source/runtime/network/access/health/
   configuration profile editing. No generic `resources.update` surface is introduced.
-- Resource profile drift visibility remains a later resource/internal-state ledger item; it is not
-  part of this Phase 4 resource detail/profile editing closure.
+- Resource profile drift visibility was deferred from this Phase 4 resource detail/profile editing
+  closure and is now tracked by the Phase 7 profile-drift entries below.
 
 Exit criteria:
 
@@ -1056,8 +1056,8 @@ Current verification notes:
   acknowledge actions through `resources.configure-auto-deploy`, and moved `SRC-AUTO-ENTRY-001` to
   Passing. Future MCP/tool descriptor generation remains governed by the operation catalog and the
   global future tool-surface milestone, not by a source auto-deploy transport-specific shape. The
-  full `0.9.0` release rule remains blocked by the deploy-action wrapper, preview, existing-resource
-  profile drift, scheduled tasks, future MCP/tool descriptors, and cluster runtime items.
+  full `0.9.0` release rule remains blocked by the deploy-action wrapper, preview, scheduled tasks,
+  future MCP/tool descriptors, and cluster runtime items.
 - 2026-05-05 Phase 7 deploy-action reference wrapper slice added
   `.github/actions/deploy-action` with composite action metadata, release-archive install/checksum
   verification script, deploy invocation script, SSH private-key temp-file handling, PR preview flag
@@ -1065,6 +1065,11 @@ Current verification notes:
   until this reference is promoted to the public `appaloft/deploy-action` repository with
   Marketplace docs/examples, public wrapper CI, cleanup examples, and stable action-safe
   `preview-url` output handling.
+- 2026-05-05 Phase 7 existing-resource profile-drift help slice closed the stable public
+  `resource.profile-drift` help topic, Web Resource diagnostics help link, CLI `resource show`
+  help target, HTTP route description, docs traceability, and matrix/task sync. Default
+  existing-resource drift remains fail-before-deploy; effective configuration drift redaction is
+  retained as a focused follow-up under `RES-PROFILE-DRIFT-003`.
 
 Required:
 
@@ -1093,7 +1098,7 @@ Required:
 - [x] Add push webhook and generic signed deploy webhook.
 - [ ] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
   GitHub Actions workflow.
-- [ ] Add existing-resource profile-drift handling.
+- [x] Add existing-resource profile-drift handling.
 - [ ] Add product-grade preview deployments after source binding and webhook ingestion are durable,
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
   retries.
@@ -1213,7 +1218,7 @@ work below before GA.
   effective config, health, logs, proxy preview, diagnostics, archive/delete, and Web detail
   observation.
 - [x] Resource: reusable access-profile mutation semantics where specs require separate commands.
-- [ ] Resource: profile drift visibility.
+- [x] Resource: profile drift visibility.
 - [x] Source link: relink through CLI.
 - [ ] Source link: list/show/delete or archive, PostgreSQL/control-plane persistence before API/Web.
 - [x] Deployment attempt: create/list/show/logs.
@@ -1341,11 +1346,11 @@ External baseline research points to this practical minimum:
 
 Recommended next Spec Rounds before broad Code Rounds:
 
-- [ ] Resource profile lifecycle: remaining profile drift visibility, reset/delete policy
-  semantics, and test matrix coverage after source/runtime/network/access profile configuration.
-  Resource profile drift visibility now has a Spec Round artifact at
+- [ ] Resource profile lifecycle: reset/delete policy semantics and remaining profile/config drift
+  redaction coverage after source/runtime/network/access profile configuration. Resource profile
+  drift visibility now has a Spec Round artifact at
   [docs/specs/011-resource-profile-drift-visibility](./specs/011-resource-profile-drift-visibility/spec.md);
-  Code Round, public docs/help, and reset/delete policy semantics remain unchecked.
+  Code Round and public docs/help are active, while reset/delete policy semantics remain unchecked.
 - [x] SSH credential lifecycle: `credentials.show` masked detail and usage visibility plus
   `credentials.delete-ssh` delete-when-unused safety across CLI, API, and Web typed confirmation.
 - [x] Framework support tier matrix: fixed-version detector/planner fixtures cover the current

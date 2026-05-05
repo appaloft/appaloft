@@ -284,9 +284,12 @@ operations without changing deployment command boundaries.
 Direct-port user-facing configuration remains blocked until placement conflict guards, adapter
 behavior, and tests are implemented in the same Code Round.
 
-Resource profile drift visibility is now specified as a future read/preflight slice in
-[Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md). It is
-not implemented by the completed Phase 4 profile editing closure.
+Resource profile drift visibility is active as a read/preflight slice in
+[Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md):
+`resources.show` can return sectioned diagnostics, config deploy stops before deployment for
+unapplied existing-resource profile drift, and public help links point to the profile drift
+troubleshooting anchor. Configuration drift over effective Resource config remains a deferred
+redaction-focused follow-up.
 
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
 `resources.configure-access`,

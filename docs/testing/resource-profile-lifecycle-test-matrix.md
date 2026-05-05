@@ -160,6 +160,12 @@ Automated coverage now exists for:
   `RES-PROFILE-SHOW-005` in `packages/application/test/show-resource.test.ts`;
 - `RES-PROFILE-SHOW-003` in `packages/application/test/show-resource.test.ts`;
 - `RES-PROFILE-DELETE-008` show omission in `packages/application/test/show-resource.test.ts`;
+- `RES-PROFILE-DRIFT-001` in `packages/application/test/show-resource.test.ts`;
+- `RES-PROFILE-DRIFT-002` and `CONFIG-FILE-PROFILE-006` in
+  `packages/adapters/cli/test/deployment-config.test.ts`;
+- `RES-PROFILE-DRIFT-004` in `packages/orpc/test/resource-show.http.test.ts`;
+- `RES-PROFILE-DRIFT-005` through the Resource detail diagnostics panel and docs-help static
+  assertions in `apps/web/src/lib/console/docs-help.test.ts`;
 - `RES-PROFILE-SOURCE-001`, `RES-PROFILE-SOURCE-002`, `RES-PROFILE-SOURCE-003`,
   `RES-PROFILE-SOURCE-004`, and `RES-PROFILE-SOURCE-005` in
   `packages/application/test/configure-resource-source.test.ts`;
@@ -213,5 +219,7 @@ Automated coverage now exists for:
 no-behavior-change domain unit row that supports existing deployment admission and plan-preview
 rows rather than a new public capability.
 
-`RES-PROFILE-SOURCE-006` remains future event-consumer projection work. `RES-PROFILE-DELETE-009`
-event payload coverage is asserted through the successful delete command test.
+`RES-PROFILE-DRIFT-003` remains deferred until configuration drift compares effective Resource
+config against entry config with key/exposure/scope/reference-only diagnostics. `RES-PROFILE-SOURCE-006`
+remains future event-consumer projection work. `RES-PROFILE-DELETE-009` event payload coverage is
+asserted through the successful delete command test.

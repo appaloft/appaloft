@@ -365,8 +365,9 @@ Marketplace README/examples, fixture or real-release install CI, generated acces
 wrapper-level cleanup input/examples, future overlay behavior, and tests for the public repository
 layout.
 
-Profile drift visibility and default fail-before-deploy behavior for existing-resource drift,
-existing-resource profile operation sequencing through explicit apply steps using
+Profile drift visibility and default fail-before-deploy behavior for existing-resource drift are
+covered in `packages/adapters/cli/test/deployment-config.test.ts`. Existing-resource profile
+operation sequencing through explicit apply steps using
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
 `resources.configure-access`, `resources.configure-health`, `resources.set-variable`, and
 `resources.unset-variable`,

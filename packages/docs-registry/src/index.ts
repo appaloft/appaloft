@@ -608,6 +608,42 @@ export const publicDocsHelpTopics = {
       "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource runtime profile form",
     ],
   },
+  "resource.profile-drift": {
+    id: "resource.profile-drift",
+    title: "Resource profile drift",
+    description:
+      "How to read and fix differences between the current Resource profile, entry config, and deployment snapshots.",
+    page: {
+      "zh-CN": "resources/profiles/source-runtime",
+      "en-US": "en/resources/profiles/source-runtime",
+    },
+    anchor: "resource-profile-drift",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "repository-config", "mcp"],
+    relatedOperation: "resources.show",
+    aliases: [
+      "profile drift",
+      "resource_profile_drift",
+      "existing resource drift",
+      "config deploy drift",
+      "deployment snapshot drift",
+      "资源配置漂移",
+      "资源 profile 漂移",
+    ],
+    specReferences: [
+      "docs/specs/011-resource-profile-drift-visibility/spec.md",
+      "docs/queries/resources.show.md",
+      "docs/workflows/deployment-config-file-bootstrap.md",
+      "docs/testing/resource-profile-lifecycle-test-matrix.md",
+      "docs/testing/deployment-config-file-test-matrix.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource diagnostics panel",
+    ],
+  },
   "resource.health-profile": {
     id: "resource.health-profile",
     title: "Resource health profile",
