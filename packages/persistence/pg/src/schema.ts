@@ -177,6 +177,11 @@ export interface DependencyResourcesTable {
     Record<string, unknown> | null
   >;
   connection_secret_ref: string | null;
+  provider_realization: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
   backup_relationship: ColumnType<
     Record<string, unknown> | null,
     Record<string, unknown> | null,

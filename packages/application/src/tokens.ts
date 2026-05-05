@@ -150,6 +150,7 @@ export const tokens = {
   ),
   renameDependencyResourceUseCase: Symbol.for("appaloft.rename_dependency_resource_use_case"),
   deleteDependencyResourceUseCase: Symbol.for("appaloft.delete_dependency_resource_use_case"),
+  managedPostgresProvider: Symbol.for("appaloft.managed_postgres_provider"),
   listDependencyResourcesQueryService: Symbol.for(
     "appaloft.list_dependency_resources_query_service",
   ),

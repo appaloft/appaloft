@@ -873,6 +873,12 @@ Current verification notes:
   cleanup semantics. It does not implement the Code Round yet, so the full `0.9.0` release rule
   remains blocked by provider-native database realization, backup/restore, recovery, auto-deploy,
   preview, and cluster runtime items.
+- 2026-05-05 Phase 7 Postgres provider-native realization Code Round implemented durable
+  realization state, hermetic managed Postgres provider capability, safe provider handles and
+  masked endpoint read models, bind readiness admission for managed Postgres, and managed provider
+  cleanup before delete tombstone. Backup/restore remains a separate required slice, so the full
+  `0.9.0` release rule remains blocked by backup/restore, recovery, auto-deploy, preview, and
+  cluster runtime items.
 
 Required:
 

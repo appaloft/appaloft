@@ -39,6 +39,11 @@ import {
   type ImportedCertificateMaterialValidationResult,
   type ImportedCertificateSecretStoreInput,
   type ImportedCertificateSecretStoreResult,
+  type ManagedPostgresDeleteInput,
+  type ManagedPostgresDeleteResult,
+  type ManagedPostgresProviderPort,
+  type ManagedPostgresRealizationInput,
+  type ManagedPostgresRealizationResult,
   type MutationCoordinator,
   type MutationCoordinatorRunExclusiveInput,
   type ProjectReadModel,
@@ -263,6 +268,67 @@ export class FakeDependencyBindingSecretStore implements DependencyBindingSecret
       secretRef: `${this.secretRefPrefix}://${input.bindingId}/${input.secretVersion}`,
       secretVersion: input.secretVersion,
     });
+  }
+}
+
+export class FakeManagedPostgresProvider implements ManagedPostgresProviderPort {
+  readonly realized: ManagedPostgresRealizationInput[] = [];
+  readonly deleted: ManagedPostgresDeleteInput[] = [];
+  private supportedProviderKeys = new Set(["appaloft-managed-postgres"]);
+
+  constructor(
+    private realizationResult?: Result<ManagedPostgresRealizationResult, DomainError>,
+    private deleteResult?: Result<ManagedPostgresDeleteResult, DomainError>,
+  ) {}
+
+  setSupportedProviderKeys(providerKeys: string[]): void {
+    this.supportedProviderKeys = new Set(providerKeys);
+  }
+
+  setRealizationResult(result: Result<ManagedPostgresRealizationResult, DomainError>): void {
+    this.realizationResult = result;
+  }
+
+  setDeleteResult(result: Result<ManagedPostgresDeleteResult, DomainError>): void {
+    this.deleteResult = result;
+  }
+
+  supports(providerKey: string): boolean {
+    return this.supportedProviderKeys.has(providerKey);
+  }
+
+  async realize(
+    context: ExecutionContext,
+    input: ManagedPostgresRealizationInput,
+  ): Promise<Result<ManagedPostgresRealizationResult, DomainError>> {
+    void context;
+    this.realized.push(input);
+    return (
+      this.realizationResult ??
+      ok({
+        providerResourceHandle: `pg/${input.dependencyResourceId}`,
+        endpoint: {
+          host: `${input.slug}.postgres.internal`,
+          port: 5432,
+          databaseName: input.slug.replaceAll("-", "_"),
+          maskedConnection: `postgres://app:********@${input.slug}.postgres.internal:5432/${input.slug.replaceAll(
+            "-",
+            "_",
+          )}`,
+        },
+        secretRef: `secret://dependency/postgres/${input.dependencyResourceId}`,
+        realizedAt: input.requestedAt,
+      })
+    );
+  }
+
+  async delete(
+    context: ExecutionContext,
+    input: ManagedPostgresDeleteInput,
+  ): Promise<Result<ManagedPostgresDeleteResult, DomainError>> {
+    void context;
+    this.deleted.push(input);
+    return this.deleteResult ?? ok({ deletedAt: input.requestedAt });
   }
 }
 
@@ -1091,6 +1157,32 @@ export class MemoryDependencyResourceReadModel implements DependencyResourceRead
               ...(endpoint.databaseName ? { databaseName: endpoint.databaseName.value } : {}),
               maskedConnection: endpoint.maskedConnection.value,
               ...(state.connectionSecretRef ? { secretRef: state.connectionSecretRef.value } : {}),
+            },
+          }
+        : {}),
+      ...(state.providerRealization
+        ? {
+            providerRealization: {
+              status: state.providerRealization.status.value,
+              attemptId: state.providerRealization.attemptId.value,
+              attemptedAt: state.providerRealization.attemptedAt.value,
+              ...(state.providerRealization.providerResourceHandle
+                ? {
+                    providerResourceHandle: state.providerRealization.providerResourceHandle.value,
+                  }
+                : {}),
+              ...(state.providerRealization.realizedAt
+                ? { realizedAt: state.providerRealization.realizedAt.value }
+                : {}),
+              ...(state.providerRealization.failedAt
+                ? { failedAt: state.providerRealization.failedAt.value }
+                : {}),
+              ...(state.providerRealization.failureCode
+                ? { failureCode: state.providerRealization.failureCode.value }
+                : {}),
+              ...(state.providerRealization.failureMessage
+                ? { failureMessage: state.providerRealization.failureMessage.value }
+                : {}),
             },
           }
         : {}),

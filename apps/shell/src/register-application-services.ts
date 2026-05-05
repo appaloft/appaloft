@@ -123,6 +123,11 @@ import {
   ListStorageVolumesQueryService,
   LockEnvironmentCommandHandler,
   LockEnvironmentUseCase,
+  type ManagedPostgresDeleteInput,
+  type ManagedPostgresDeleteResult,
+  type ManagedPostgresProviderPort,
+  type ManagedPostgresRealizationInput,
+  type ManagedPostgresRealizationResult,
   MarkDomainReadyOnCertificateImportedHandler,
   MarkDomainReadyOnCertificateIssuedHandler,
   MarkDomainReadyOnDeploymentFinishedHandler,
@@ -224,6 +229,39 @@ class ShellCertificateProviderSelectionPolicy implements CertificateProviderSele
   }
 }
 
+class ShellManagedPostgresProvider implements ManagedPostgresProviderPort {
+  supports(providerKey: string): boolean {
+    return providerKey === "appaloft-managed-postgres";
+  }
+
+  async realize(
+    context: ExecutionContext,
+    input: ManagedPostgresRealizationInput,
+  ): Promise<Result<ManagedPostgresRealizationResult, DomainError>> {
+    void context;
+    const databaseName = input.slug.replaceAll("-", "_");
+    return ok({
+      providerResourceHandle: `pg/${input.dependencyResourceId}`,
+      endpoint: {
+        host: `${input.slug}.postgres.internal`,
+        port: 5432,
+        databaseName,
+        maskedConnection: `postgres://app:********@${input.slug}.postgres.internal:5432/${databaseName}`,
+      },
+      secretRef: `secret://dependency/postgres/${input.dependencyResourceId}`,
+      realizedAt: input.requestedAt,
+    });
+  }
+
+  async delete(
+    context: ExecutionContext,
+    input: ManagedPostgresDeleteInput,
+  ): Promise<Result<ManagedPostgresDeleteResult, DomainError>> {
+    void context;
+    return ok({ deletedAt: input.requestedAt });
+  }
+}
+
 export function registerApplicationServices(container: DependencyContainer): void {
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
   container.registerSingleton(MarkDomainReadyOnDomainBoundHandler);
@@ -312,6 +350,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.certificateProviderSelectionPolicy,
     ShellCertificateProviderSelectionPolicy,
   );
+  container.registerSingleton(tokens.managedPostgresProvider, ShellManagedPostgresProvider);
   container.registerSingleton(tokens.domainOwnershipVerifier, PublicDnsDomainOwnershipVerifier);
   container.registerSingleton(tokens.archiveProjectUseCase, ArchiveProjectUseCase);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);

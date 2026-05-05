@@ -2232,6 +2232,17 @@ export interface DependencyResourceConnectionSummary {
   secretRef?: string;
 }
 
+export interface DependencyResourceProviderRealizationSummary {
+  status: "pending" | "ready" | "failed" | "delete-pending" | "deleted";
+  attemptId: string;
+  attemptedAt: string;
+  providerResourceHandle?: string;
+  realizedAt?: string;
+  failedAt?: string;
+  failureCode?: string;
+  failureMessage?: string;
+}
+
 export interface DependencyResourceBindingReadinessSummary {
   status: "ready" | "blocked" | "not-implemented";
   reason?: string;
@@ -2250,6 +2261,7 @@ export interface DependencyResourceSummary {
   description?: string;
   lifecycleStatus: DependencyResourceLifecycleStatus;
   connection?: DependencyResourceConnectionSummary;
+  providerRealization?: DependencyResourceProviderRealizationSummary;
   bindingReadiness: DependencyResourceBindingReadinessSummary;
   backupRelationship?: {
     retentionRequired: boolean;
@@ -3838,6 +3850,53 @@ export interface ResourceDependencyBindingReadModel {
       bindingId: string;
     },
   ): Promise<Result<ResourceDependencyBindingSummary | null>>;
+}
+
+export interface ManagedPostgresRealizationInput {
+  dependencyResourceId: string;
+  projectId: string;
+  environmentId: string;
+  providerKey: string;
+  name: string;
+  slug: string;
+  attemptId: string;
+  requestedAt: string;
+}
+
+export interface ManagedPostgresRealizationResult {
+  providerResourceHandle: string;
+  endpoint: {
+    host: string;
+    port?: number;
+    databaseName?: string;
+    maskedConnection: string;
+  };
+  secretRef?: string;
+  realizedAt: string;
+}
+
+export interface ManagedPostgresDeleteInput {
+  dependencyResourceId: string;
+  providerKey: string;
+  providerResourceHandle: string;
+  attemptId: string;
+  requestedAt: string;
+}
+
+export interface ManagedPostgresDeleteResult {
+  deletedAt: string;
+}
+
+export interface ManagedPostgresProviderPort {
+  supports(providerKey: string): boolean;
+  realize(
+    context: ExecutionContext,
+    input: ManagedPostgresRealizationInput,
+  ): Promise<Result<ManagedPostgresRealizationResult, DomainError>>;
+  delete(
+    context: ExecutionContext,
+    input: ManagedPostgresDeleteInput,
+  ): Promise<Result<ManagedPostgresDeleteResult, DomainError>>;
 }
 
 export interface DeploymentReadModel {

@@ -1023,6 +1023,17 @@ export const dependencyResourceConnectionSummarySchema = z.object({
   secretRef: z.string().optional(),
 });
 
+export const dependencyResourceProviderRealizationSummarySchema = z.object({
+  status: z.enum(["pending", "ready", "failed", "delete-pending", "deleted"]),
+  attemptId: z.string(),
+  attemptedAt: z.string(),
+  providerResourceHandle: z.string().optional(),
+  realizedAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  failureCode: z.string().optional(),
+  failureMessage: z.string().optional(),
+});
+
 export const dependencyResourceBindingReadinessSummarySchema = z.object({
   status: z.enum(["ready", "blocked", "not-implemented"]),
   reason: z.string().optional(),
@@ -1058,6 +1069,7 @@ export const dependencyResourceSummarySchema = z.object({
   description: z.string().optional(),
   lifecycleStatus: z.enum(["provisioning", "ready", "degraded", "deleted"]),
   connection: dependencyResourceConnectionSummarySchema.optional(),
+  providerRealization: dependencyResourceProviderRealizationSummarySchema.optional(),
   bindingReadiness: dependencyResourceBindingReadinessSummarySchema,
   backupRelationship: dependencyResourceBackupRelationshipSchema.optional(),
   deleteSafety: z

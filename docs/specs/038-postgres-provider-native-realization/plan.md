@@ -60,8 +60,8 @@
 
 ## Risks And Migration Gaps
 
-- Durable process/outbox ownership is still incomplete globally. The first Code Round may use a
-  synchronous fake provider adapter while preserving the durable attempt/status contract.
+- Durable process/outbox ownership is still incomplete globally. This Code Round uses a synchronous
+  hermetic provider adapter while preserving the durable attempt/status contract.
 - Backup/restore remains a separate Phase 7 slice; this work only preserves blockers and safe
   metadata needed by that loop.
 - Runtime environment injection remains deferred; binding readiness does not mean a running

@@ -323,10 +323,11 @@ Current boundary:
   deployment record
 - provider-backed dependency resources remain `ResourceInstance`; they are not the same aggregate
   as project resources
-- Postgres dependency resources are provider-neutral `ResourceInstance` records in this slice.
-  Appaloft-managed Postgres records do not create provider-native databases yet, imported external
-  Postgres delete removes only Appaloft's record, and list/show output masks connection secrets.
-- Provider-native Postgres realization is accepted for the next Code Round through the existing
+- Postgres dependency resources are `ResourceInstance` records. Appaloft-managed Postgres records
+  now carry provider-native realization state through a hermetic provider capability, imported
+  external Postgres delete removes only Appaloft's record, and list/show output masks connection
+  secrets.
+- Provider-native Postgres realization is implemented through the existing
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` boundaries. It is governed by
   [Postgres Provider-Native Realization](./specs/038-postgres-provider-native-realization/spec.md)
