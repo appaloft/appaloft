@@ -1135,6 +1135,11 @@ Current verification notes:
   scheduled tasks record `scheduled` trigger run attempts through the same checks as run-now.
   Due-candidate persistence, shell runner, runtime execution, entrypoints, and public docs remain
   open.
+- 2026-05-05 Phase 7 scheduled task runtime adapter slice added an inactive application
+  scheduled-task runtime port and hermetic runtime adapter for one-off task command execution
+  results, run-scoped stdout/stderr logs, exit codes, timestamps, and secret-looking output masking.
+  Accepted-run worker wiring, due-candidate persistence, shell runner, entrypoints, and public docs
+  remain open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

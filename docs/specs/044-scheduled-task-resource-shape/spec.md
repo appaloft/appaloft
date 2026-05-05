@@ -83,6 +83,10 @@ DDD or internal process-manager terminology.
   a scheduler-specific port, dispatches each due candidate through the same shared run admission
   service as run-now, records accepted `scheduled` trigger runs, and reports per-candidate
   admission failures without starting runtime execution.
+- Inactive scheduled-task runtime adapter support exists. The application owns a one-off task
+  runtime port contract, and the runtime adapter package provides a hermetic implementation that
+  returns scheduled-task-run-scoped stdout/stderr log entries, terminal status, exit code,
+  timestamps, and masked secret-looking output without using deployment/resource runtime logs.
 - Scheduled task definition persistence exists for Postgres/PGlite. It stores Resource-owned task
   definitions, supports repository find/upsert/delete through explicit specs, and supports
   list/show read-model filtering by project, environment, Resource, status, cursor, and limit.
@@ -96,5 +100,5 @@ DDD or internal process-manager terminology.
   entries.
 - No operation catalog entries are active.
 - No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
-- No due-candidate persistence/read model, shell scheduler runner, or runtime adapter execution path
-  exists.
+- No due-candidate persistence/read model, shell scheduler runner, or accepted-run worker that
+  invokes the runtime adapter and persists terminal run/log state exists.

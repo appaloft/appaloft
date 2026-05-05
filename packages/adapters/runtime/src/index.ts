@@ -104,6 +104,13 @@ export {
 } from "./resource-runtime-control-target";
 export { RuntimeResourceRuntimeLogReader } from "./resource-runtime-logs";
 export {
+  HermeticScheduledTaskRuntimePort,
+  type HermeticScheduledTaskRuntimeOptions,
+  type ScheduledTaskCommandRunner,
+  type ScheduledTaskCommandRunnerInput,
+  type ScheduledTaskCommandRunnerResult,
+} from "./scheduled-task-runtime";
+export {
   parseDockerSizeToBytes,
   parseRuntimeTargetCapacityOutput,
   renderRuntimeTargetCapacityScript,
