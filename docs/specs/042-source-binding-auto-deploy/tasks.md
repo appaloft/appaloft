@@ -40,7 +40,7 @@
 - [x] Add `SRC-AUTO-ENTRY-001` CLI/HTTP/Web/schema tests.
 - [x] Add `SRC-AUTO-QUERY-001` and `SRC-AUTO-QUERY-002` source event read-model tests.
 - [x] Add `SRC-AUTO-SURFACE-003` public docs/help anchor tests.
-- [ ] Add `SRC-AUTO-EVENT-007`, `SRC-AUTO-EVENT-008`, and `SRC-AUTO-ENTRY-004` GitHub webhook
+- [x] Add `SRC-AUTO-EVENT-007`, `SRC-AUTO-EVENT-008`, and `SRC-AUTO-ENTRY-004` GitHub webhook
   route tests.
 
 ## Implementation
@@ -70,5 +70,5 @@
 
 ## Post-Implementation Sync
 
-- [ ] Reconcile ADRs, command/query specs, event specs, error specs, test matrix, public docs,
+- [x] Reconcile ADRs, command/query specs, event specs, error specs, test matrix, public docs,
   operation catalog, `CORE_OPERATIONS.md`, and roadmap notes after Code Round.

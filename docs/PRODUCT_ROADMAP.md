@@ -1048,8 +1048,9 @@ Current verification notes:
   `POST /api/integrations/github/source-events` with provider signature verification,
   normalization of safe GitHub push facts, delivery id dedupe input, no-op `ping`, shell config
   wiring, and `SRC-AUTO-EVENT-007`/`SRC-AUTO-EVENT-008`/`SRC-AUTO-ENTRY-004` automation. The full
-  `0.9.0` release rule remains blocked by preview, future MCP/tool descriptors, and cluster
-  runtime items.
+  source auto-deploy row remains unchecked until the `SRC-AUTO-ENTRY-001` Web settings/tool
+  metadata gap is closed. The full `0.9.0` release rule remains blocked by that gap, preview,
+  future MCP/tool descriptors, and cluster runtime items.
 
 Required:
 
@@ -1075,7 +1076,7 @@ Required:
 - [x] Add resource restart/stop/start only after runtime ownership and state semantics are
   specified.
 - [ ] Add source binding and auto-deploy.
-- [ ] Add push webhook and generic signed deploy webhook.
+- [x] Add push webhook and generic signed deploy webhook.
 - [ ] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
   GitHub Actions workflow.
 - [ ] Add existing-resource profile-drift handling.
