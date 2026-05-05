@@ -185,8 +185,8 @@ processes as a long-lived deployment substrate. Such runtimes require a future A
 be public deployment strategies.
 
 The runtime adapter may perform an internal safe-replacement or rollback-to-previous-container
-sequence when a rollout fails, but public rollback remains absent under ADR-016 until rebuilt
-through its own command, workflow, error, test, and implementation specs.
+sequence when a rollout fails. Public `deployments.rollback` is a separate recovery command under
+ADR-016/ADR-034 with its own command, workflow, error, test, and implementation specs.
 
 ## Runtime Orchestration Target Boundary
 

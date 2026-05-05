@@ -914,6 +914,10 @@ Current verification notes:
   surfaces, and no stateful data rollback. It does not implement the command yet, so the full
   `0.9.0` release rule remains blocked by rollback Code Round, auto-deploy, preview, and cluster
   runtime items.
+- 2026-05-05 Phase 7 deployment rollback Code Round implemented active `deployments.rollback`
+  across core/application command handling, PG/PGlite metadata persistence, operation catalog,
+  CLI, HTTP/oRPC, public docs, and Web recovery candidate actions gated by readiness output. The
+  full `0.9.0` release rule remains blocked by auto-deploy, preview, and cluster runtime items.
 
 Required:
 
@@ -934,7 +938,7 @@ Required:
 - [x] Rebuild deployment show as a first-class query.
 - [x] Rebuild deployment stream-events as a first-class query.
 - [x] Rebuild deployment retry/redeploy under ADR-016.
-- [ ] Rebuild rollback under ADR-016 with retained artifacts, rollback candidates, lifecycle
+- [x] Rebuild rollback under ADR-016 with retained artifacts, rollback candidates, lifecycle
   transitions, events, errors, Web/API/CLI affordances, and tests.
 - [ ] Add resource restart/stop/start only after runtime ownership and state semantics are
   specified.

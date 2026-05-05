@@ -283,7 +283,7 @@ export const zhCN = {
       recoveryCandidateCount: "{{count}} 个回滚候选",
       recoveryCommandNotActive: "已规格化，尚未激活",
       recoveryDescription:
-        "恢复 readiness 会先检查持久化部署、快照、artifact 和资源状态，再允许重试或重新部署。回滚会在对应 Code Round 完成前保持不可用。",
+        "恢复 readiness 会先检查持久化部署、快照、artifact 和资源状态，再允许重试、重新部署或回滚。",
       recoveryNoReasons: "readiness query 没有发现阻塞原因。",
       recoveryReasonAttemptNotTerminal: "部署仍在运行或等待完成。",
       recoveryReasonAttemptStatusNotRecoverable: "这个部署状态不可恢复。",
@@ -299,6 +299,9 @@ export const zhCN = {
       recoveryRetryAction: "立即重试",
       recoveryRetryingAction: "重试中",
       recoveryRetryTitle: "重试",
+      recoveryRollbackAction: "立即回滚",
+      recoveryRollbackCandidate: "候选 {{deploymentId}}",
+      recoveryRollingBackAction: "回滚中",
       recoveryRollbackTitle: "回滚",
       recoveryTitle: "恢复就绪",
       runtimePlanDescription: "从 detect 到 plan 生成的可执行计划。",

@@ -50,8 +50,8 @@ Current deferred gaps for this slice:
 
 ### 3. Rollback Command Slice
 
-- Add `deployments.rollback` command and handler only after retained artifact/snapshot fixtures are
-  executable.
+- `deployments.rollback` is active after retained artifact/snapshot fixtures and command admission
+  tests were promoted out of deferred state.
 - Create a new rollback attempt from the selected successful candidate's retained snapshot and
   Docker/OCI artifact identity.
 - Reject missing candidate, expired retention, incompatible target, or unsupported stateful data
@@ -61,7 +61,7 @@ Current deferred gaps for this slice:
 
 - Web deployment detail shows recovery cards and blocked reasons from readiness output.
 - CLI failed-deployment inspection suggests only readiness-backed actions.
-- HTTP/oRPC exposes the readiness query and later commands through catalog-backed routes.
+- HTTP/oRPC exposes the readiness query and active recovery commands through catalog-backed routes.
 - Public docs/help anchors describe retry, redeploy, rollback, blocked reasons, and stream gap
   behavior without DDD/CQRS terminology.
 

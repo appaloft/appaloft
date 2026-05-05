@@ -241,7 +241,12 @@ describe("DeploymentRecoveryReadinessQueryService", () => {
 
     expect(readiness.rollbackReady).toBe(true);
     expect(readiness.rollbackCandidateCount).toBe(1);
+    expect(readiness.rollback.allowed).toBe(true);
+    expect(readiness.rollback.commandActive).toBe(true);
     expect(readiness.rollback.recommendedCandidateId).toBe("dep_success");
+    expect(readiness.rollback.reasons.map((reason) => reason.code)).not.toContain(
+      "recovery-command-not-active",
+    );
     expect(readiness.rollback.candidates).toEqual([
       expect.objectContaining({
         deploymentId: "dep_success",
@@ -249,6 +254,12 @@ describe("DeploymentRecoveryReadinessQueryService", () => {
         artifactSummary: "registry.example.com/acme/web@sha256:demo",
       }),
     ]);
+    expect(readiness.recommendedActions).toContainEqual(
+      expect.objectContaining({
+        targetOperation: "deployments.rollback",
+        commandActive: true,
+      }),
+    );
   });
 
   test("[DEP-RECOVERY-READINESS-007] keeps successful candidates blocked when artifact identity is missing", async () => {

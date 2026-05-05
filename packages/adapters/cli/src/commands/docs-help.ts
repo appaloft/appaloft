@@ -62,6 +62,10 @@ export const cliCommandDescriptions = {
     "Redeploy the current resource profile",
     "deployment.recovery-readiness",
   ),
+  deploymentRollback: withDocs(
+    "Roll back to a retained successful deployment candidate",
+    "deployment.recovery-readiness",
+  ),
   deploymentEvents: withDocs(
     "Replay or follow deployment lifecycle events",
     "deployment.lifecycle",

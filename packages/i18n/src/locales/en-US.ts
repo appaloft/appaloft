@@ -283,7 +283,7 @@ export const enUS = {
       recoveryCandidateCount: "{{count}} rollback candidates",
       recoveryCommandNotActive: "Specified, not active",
       recoveryDescription:
-        "Readiness uses durable deployment, snapshot, artifact, and resource state before admitting retry or redeploy. Rollback remains unavailable until its Code Round.",
+        "Readiness uses durable deployment, snapshot, artifact, and resource state before admitting retry, redeploy, or rollback.",
       recoveryNoReasons: "No blockers from the readiness query.",
       recoveryReasonAttemptNotTerminal: "Deployment is still running or waiting to finish.",
       recoveryReasonAttemptStatusNotRecoverable: "This deployment status is not recoverable.",
@@ -299,6 +299,9 @@ export const enUS = {
       recoveryRetryAction: "Retry now",
       recoveryRetryingAction: "Retrying",
       recoveryRetryTitle: "Retry",
+      recoveryRollbackAction: "Roll back now",
+      recoveryRollbackCandidate: "Candidate {{deploymentId}}",
+      recoveryRollingBackAction: "Rolling back",
       recoveryRollbackTitle: "Rollback",
       recoveryTitle: "Recovery readiness",
       runtimePlanDescription: "The executable plan generated from detect and plan.",

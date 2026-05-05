@@ -13,6 +13,7 @@ import {
   type QueryBus,
   RedeployDeploymentCommand,
   RetryDeploymentCommand,
+  RollbackDeploymentCommand,
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
@@ -165,6 +166,50 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommand).toMatchObject({
       resourceId: "res_demo",
       sourceDeploymentId: "dep_failed",
+      readinessGeneratedAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
+  test("[DEP-ROLLBACK-ENTRY-001] dispatches RollbackDeploymentCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_rollback" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments/dep_failed/rollback", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          rollbackCandidateDeploymentId: "dep_success",
+          resourceId: "res_demo",
+          readinessGeneratedAt: "2026-01-01T00:00:10.000Z",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ id: "dep_rollback" });
+    expect(capturedCommand).toBeInstanceOf(RollbackDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      deploymentId: "dep_failed",
+      rollbackCandidateDeploymentId: "dep_success",
+      resourceId: "res_demo",
       readinessGeneratedAt: "2026-01-01T00:00:10.000Z",
     });
   });

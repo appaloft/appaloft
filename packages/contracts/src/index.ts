@@ -2644,8 +2644,16 @@ export const redeployDeploymentInputSchema = z.object({
   readinessGeneratedAt: z.string().optional(),
 });
 
+export const rollbackDeploymentInputSchema = z.object({
+  deploymentId: z.string().min(1),
+  rollbackCandidateDeploymentId: z.string().min(1),
+  resourceId: z.string().min(1).optional(),
+  readinessGeneratedAt: z.string().optional(),
+});
+
 export const retryDeploymentResponseSchema = createDeploymentResponseSchema;
 export const redeployDeploymentResponseSchema = createDeploymentResponseSchema;
+export const rollbackDeploymentResponseSchema = createDeploymentResponseSchema;
 
 export const listDeploymentsResponseSchema = z.object({
   items: z.array(deploymentSummarySchema),
@@ -3919,6 +3927,8 @@ export type RetryDeploymentInput = z.infer<typeof retryDeploymentInputSchema>;
 export type RetryDeploymentResponse = z.infer<typeof retryDeploymentResponseSchema>;
 export type RedeployDeploymentInput = z.infer<typeof redeployDeploymentInputSchema>;
 export type RedeployDeploymentResponse = z.infer<typeof redeployDeploymentResponseSchema>;
+export type RollbackDeploymentInput = z.infer<typeof rollbackDeploymentInputSchema>;
+export type RollbackDeploymentResponse = z.infer<typeof rollbackDeploymentResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
 export type OperatorWorkKind = z.infer<typeof operatorWorkKindSchema>;
 export type OperatorWorkStatus = z.infer<typeof operatorWorkStatusSchema>;

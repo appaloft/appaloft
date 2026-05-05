@@ -23,7 +23,7 @@
 - [x] Add Web semantic tests for retry/redeploy actions enabled only from readiness and
   operation-active state.
 - [ ] Add Web browser-flow tests for retry/redeploy actions.
-- [x] Add regression coverage proving rollback remains inactive in readiness/Web surfaces.
+- [x] Add regression coverage proving retry/redeploy remain active after rollback activation.
 
 ## Implementation
 
@@ -37,8 +37,7 @@
 - [x] Add `RedeployDeploymentCommand`, schema, handler, use case, and tokens.
 - [x] Add resource-runtime mutation coordination policies for retry and redeploy.
 - [x] Persist recovery metadata in PG and memory testkit repositories/read models.
-- [x] Update recovery readiness command-active state for retry/redeploy while keeping rollback
-  inactive.
+- [x] Update recovery readiness command-active state for retry/redeploy.
 
 ## Entrypoints And Docs
 
@@ -48,7 +47,7 @@
 - [x] Add oRPC/HTTP routes.
 - [x] Enable Web deployment recovery actions with i18n and shared readiness gating.
 - [x] Update public docs/docs matrix status for active retry/redeploy command surfaces.
-- [x] Keep rollback command/action unavailable until rollback Code Round.
+- [x] Leave rollback command/action to the separate rollback Code Round.
 
 ## Verification
 

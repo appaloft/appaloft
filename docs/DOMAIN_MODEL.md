@@ -506,9 +506,9 @@ Boundary rule:
 - deployment logs are attempt/progress records; application runtime logs are resource-owned
   observation and must not be treated as Deployment aggregate state unless a future ADR introduces
   persisted runtime log archival
-- public rollback remains absent under ADR-016, but rollback plans in the v1 model are expected to
-  reference prior deployment snapshots and Docker/OCI runtime artifact identity rather than
-  reconstructing host-process command state
+- public rollback is active under ADR-016/ADR-034, and rollback plans in the v1 model reference
+  prior deployment snapshots and Docker/OCI runtime artifact identity rather than reconstructing
+  host-process command state
 
 ### Identity & Governance
 

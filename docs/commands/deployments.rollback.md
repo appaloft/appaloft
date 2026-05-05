@@ -2,11 +2,10 @@
 
 ## Status
 
-Accepted candidate. The Code Round is scoped by
-[Deployment Rollback](../specs/041-deployment-rollback/spec.md). Do not expose this command until
-`deployments.recovery-readiness`, this command spec, the error spec, test matrix, implementation
-plan, public docs/help, `CORE_OPERATIONS.md`, and `operation-catalog.ts` are aligned in that Code
-Round.
+Active command. The Code Round is scoped by
+[Deployment Rollback](../specs/041-deployment-rollback/spec.md). It is exposed only through aligned
+readiness, error, test matrix, implementation plan, public docs/help, `CORE_OPERATIONS.md`, and
+`operation-catalog.ts` surfaces.
 
 ## Governing Sources
 

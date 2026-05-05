@@ -16,9 +16,9 @@
 - [x] Add core tests for rollback trigger/source/candidate metadata.
 - [x] Add application tests for `DEP-ROLLBACK-001` through `DEP-ROLLBACK-005`.
 - [x] Add PG/PGlite persistence tests for rollback trigger/source/candidate metadata.
-- [ ] Add CLI and oRPC/HTTP dispatch tests for `DEP-ROLLBACK-ENTRY-001`.
-- [ ] Add Web semantic/browser tests for candidate selection and rollback action gating.
-- [ ] Add regression tests proving retry/redeploy remain active after rollback activation.
+- [x] Add CLI and oRPC/HTTP dispatch tests for `DEP-ROLLBACK-ENTRY-001`.
+- [x] Add Web semantic/browser tests for candidate selection and rollback action gating.
+- [x] Add regression tests proving retry/redeploy remain active after rollback activation.
 
 ## Implementation
 
@@ -29,18 +29,18 @@
 - [x] Add `RollbackDeploymentCommand`, schema, handler, use case, and tokens.
 - [x] Add resource-runtime mutation coordination policy for rollback.
 - [x] Persist rollback metadata in PG and memory testkit repositories/read models.
-- [ ] Update recovery readiness command-active state for rollback after all entrypoints and tests are
+- [x] Update recovery readiness command-active state for rollback after all entrypoints and tests are
   active.
 
 ## Entrypoints And Docs
 
-- [ ] Add operation catalog entry for `deployments.rollback`.
-- [ ] Update `docs/CORE_OPERATIONS.md` active command row.
-- [ ] Add CLI command.
-- [ ] Add oRPC/HTTP route.
-- [ ] Enable Web rollback candidate selection/action with i18n and shared readiness gating.
-- [ ] Update public docs/docs matrix status for active rollback command surface.
-- [ ] Keep stateful data rollback explicitly unsupported in public docs/help.
+- [x] Add operation catalog entry for `deployments.rollback`.
+- [x] Update `docs/CORE_OPERATIONS.md` active command row.
+- [x] Add CLI command.
+- [x] Add oRPC/HTTP route.
+- [x] Enable Web rollback candidate selection/action with i18n and shared readiness gating.
+- [x] Update public docs/docs matrix status for active rollback command surface.
+- [x] Keep stateful data rollback explicitly unsupported in public docs/help.
 
 ## Verification
 
