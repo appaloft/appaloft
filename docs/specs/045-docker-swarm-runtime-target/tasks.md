@@ -15,6 +15,8 @@
   target kind metadata. Readiness capability checks remain a follow-up.
 - [x] `SWARM-TARGET-ADM-001`: `deployments.create` remains ids-only and rejects Swarm deployment
   fields.
+- [x] `SWARM-TARGET-ADM-002`: `deployments.create` rejects a Swarm target before acceptance when
+  the runtime backend lacks required capabilities.
 - [x] `SWARM-TARGET-SELECT-001`: backend registry selects `docker-swarm` by target kind, provider
   key, and capabilities.
 - [ ] `SWARM-TARGET-RENDER-001`: OCI image and Compose artifact intent render to adapter-owned
@@ -32,6 +34,7 @@
 
 - [x] Add Swarm-capable target registration metadata support.
 - [x] Keep `deployments.create` and repository config Swarm-field admission rejection covered.
+- [x] Keep unsupported Swarm target runtime backend admission rejection covered.
 - [ ] Add Swarm manager readiness capability checks.
 - [x] Add Swarm runtime target backend descriptor and registry selection coverage.
 - [ ] Implement render/apply/verify/log/health/cleanup behind runtime adapters.

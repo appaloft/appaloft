@@ -1090,6 +1090,10 @@ Current verification notes:
   backend descriptor shape and `SWARM-TARGET-SELECT-001` registry coverage. The default registry
   still does not activate Swarm execution; readiness, render/apply/observe/cleanup, and public help
   remain open.
+- 2026-05-05 Phase 7 Docker Swarm unsupported-backend admission slice bound
+  `SWARM-TARGET-ADM-002` to application coverage proving `deployments.create` returns
+  `runtime_target_unsupported` before accepting a deployment when a Swarm target lacks required
+  runtime backend capabilities.
 
 Required:
 

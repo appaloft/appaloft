@@ -190,7 +190,7 @@ class StaticRuntimePlanResolver implements RuntimePlanResolver {
         port: PortNumber.rehydrate(3000),
       }),
       target: DeploymentTargetDescriptor.rehydrate({
-        kind: TargetKindValue.rehydrate("single-server"),
+        kind: input.server.targetKind,
         providerKey: input.server.providerKey,
         serverIds: [input.server.id],
         metadata: {
@@ -362,7 +362,7 @@ class StaticRuntimeTargetBackendRegistry implements RuntimeTargetBackendRegistry
 
   constructor(private readonly supported = true) {}
 
-  find(): Result<RuntimeTargetBackend> {
+  find(input: Parameters<RuntimeTargetBackendRegistry["find"]>[0]): Result<RuntimeTargetBackend> {
     if (this.supported) {
       return ok(this.backend);
     }
@@ -370,9 +370,9 @@ class StaticRuntimeTargetBackendRegistry implements RuntimeTargetBackendRegistry
     return err(
       domainError.runtimeTargetUnsupported("Runtime target backend is not registered", {
         phase: "runtime-target-resolution",
-        targetKind: "single-server",
-        providerKey: "generic-ssh",
-        missingCapability: "runtime.apply",
+        targetKind: input.targetKind,
+        providerKey: input.providerKey,
+        missingCapability: input.requiredCapabilities?.[0] ?? "runtime.apply",
       }),
     );
   }
@@ -550,6 +550,8 @@ async function createDeploymentFixture(
     executionBackend?: ExecutionBackend;
     runtimeTargetBackendRegistry?: RuntimeTargetBackendRegistry;
     edgeProxyKind?: "traefik" | "caddy";
+    serverProviderKey?: string;
+    serverTargetKind?: "single-server" | "orchestrator-cluster";
     domainRouteBindingReader?: DomainRouteBindingReader;
     serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader;
   } = {},
@@ -583,7 +585,8 @@ async function createDeploymentFixture(
     name: DeploymentTargetName.rehydrate("demo-server"),
     host: HostAddress.rehydrate("127.0.0.1"),
     port: PortNumber.rehydrate(22),
-    providerKey: ProviderKey.rehydrate("generic-ssh"),
+    providerKey: ProviderKey.rehydrate(options.serverProviderKey ?? "generic-ssh"),
+    targetKind: TargetKindValue.rehydrate(options.serverTargetKind ?? "single-server"),
     ...(options.edgeProxyKind
       ? { edgeProxyKind: EdgeProxyKindValue.rehydrate(options.edgeProxyKind) }
       : {}),
@@ -2699,6 +2702,35 @@ describe("CreateDeploymentUseCase", () => {
       runtimePlanStrategy: "auto",
       targetKind: "single-server",
       targetProviderKey: "generic-ssh",
+    });
+    expect(deployments.items.size).toBe(0);
+  });
+
+  test("[SWARM-TARGET-ADM-002] rejects unsupported Swarm target backend before acceptance", async () => {
+    const { context, createDeploymentInput, createDeploymentUseCase, deployments } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        serverProviderKey: "docker-swarm",
+        serverTargetKind: "orchestrator-cluster",
+        runtimeTargetBackendRegistry: new StaticRuntimeTargetBackendRegistry(false),
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("runtime_target_unsupported");
+    expect(error.details).toMatchObject({
+      commandName: "deployments.create",
+      phase: "runtime-target-resolution",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      runtimePlanStrategy: "auto",
+      targetKind: "orchestrator-cluster",
+      targetProviderKey: "docker-swarm",
+      providerKey: "docker-swarm",
     });
     expect(deployments.items.size).toBe(0);
   });

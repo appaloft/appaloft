@@ -113,6 +113,8 @@ No new public operation key is accepted in this Spec Round.
   governing Spec Round accepts them.
 - The runtime target adapter package exposes a `docker-swarm` backend descriptor shape and registry
   selection coverage; the default runtime registry still does not activate Swarm execution.
+- Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
+  acceptance when the runtime backend registry cannot satisfy required capabilities.
 - Swarm runtime target backend render/apply/verify/log/health/cleanup is not implemented.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
