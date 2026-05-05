@@ -110,11 +110,12 @@ Minimum stable test ids for Code Round:
 
 Resource-owned auto-deploy policy domain behavior, inactive `resources.configure-auto-deploy`
 application command handling, Resource repository persistence, inactive source-event command/query
-handling, and durable source-event dedupe/read models are implemented and bound to
+handling, generic signed source-event verification, and durable source-event dedupe/read models are
+implemented and bound to
 `SRC-AUTO-POLICY-001`, `SRC-AUTO-POLICY-002`, `SRC-AUTO-POLICY-003`, `SRC-AUTO-EVENT-002`,
-`SRC-AUTO-QUERY-001`, and `SRC-AUTO-QUERY-002` core/application/PGlite tests.
+`SRC-AUTO-EVENT-004`, `SRC-AUTO-QUERY-001`, and `SRC-AUTO-QUERY-002` core/application/PGlite
+tests.
 
 The broader feature remains before activation. Before CLI/HTTP/Web exposure, implement the
-provider-neutral verification/normalization ports, deployment dispatch through existing deployment
-admission, and decide the first adapter slice for provider Git versus generic signed webhook
-ingestion.
+deployment dispatch through existing deployment admission and decide the first adapter slice for
+provider Git versus generic signed webhook ingestion.

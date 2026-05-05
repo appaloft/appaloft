@@ -31,6 +31,8 @@ Round authorization.
 - Add provider-neutral `source-events.ingest` command schema. `Status: inactive application
   command baseline implemented.`
 - Add signature verification/normalization ports for Git provider and generic signed events.
+  `Status: generic signed source-event verification port implemented; provider-specific Git
+  verification adapters remain future.`
 - Add durable source event records with dedupe keys, normalized facts, policy match results, ignored
   reasons, and created deployment ids. `Status: durable dedupe/read-model persistence baseline
   implemented; policy match results and deployment ids are populated by later dispatch slices.`

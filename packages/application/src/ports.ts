@@ -4066,6 +4066,45 @@ export interface IngestSourceEventResult {
   dedupeOfSourceEventId?: string;
 }
 
+export interface VerifiedSourceEventInput {
+  sourceKind: SourceEventSourceKind;
+  eventKind: SourceEventKind;
+  sourceIdentity: SourceEventIdentity;
+  ref: string;
+  revision: string;
+  deliveryId?: string;
+  idempotencyKey?: string;
+  verification: {
+    status: "verified";
+    method: SourceEventVerificationMethod;
+    keyVersion?: string;
+  };
+  receivedAt?: string;
+}
+
+export interface SourceEventVerificationInput {
+  sourceKind: SourceEventSourceKind;
+  eventKind: SourceEventKind;
+  sourceIdentity: SourceEventIdentity;
+  ref: string;
+  revision: string;
+  rawBody: string;
+  signature: string;
+  secretValue: string;
+  method: SourceEventVerificationMethod;
+  deliveryId?: string;
+  idempotencyKey?: string;
+  keyVersion?: string;
+  receivedAt?: string;
+}
+
+export interface SourceEventVerificationPort {
+  verify(
+    context: ExecutionContext,
+    input: SourceEventVerificationInput,
+  ): Promise<Result<VerifiedSourceEventInput>>;
+}
+
 export interface SourceEventRecorder {
   findByDedupeKey(context: RepositoryContext, dedupeKey: string): Promise<SourceEventRecord | null>;
   record(context: RepositoryContext, record: SourceEventRecord): Promise<SourceEventRecord>;
