@@ -404,6 +404,7 @@ Implemented now:
 - foundational `ResourceInstance`
 - foundational `ResourceBinding`
 - Postgres Resource binding baseline: bind/unbind/list/show safe metadata
+- Resource binding secret rotation safe reference/version metadata
 
 ### Postgres Dependency Resource
 
@@ -431,9 +432,11 @@ Current scope:
   [Dependency Resource Binding Baseline](./specs/034-dependency-resource-binding-baseline/spec.md)
 - Phase 7 deployment snapshot safe reference baseline under
   [Dependency Binding Deployment Snapshot Reference Baseline](./specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
-- Phase 7 binding secret rotation is specified as an accepted candidate under
+- Phase 7 binding secret rotation baseline under
   [Dependency Binding Secret Rotation](./specs/036-dependency-binding-secret-rotation/spec.md)
-- Redis, provider-native provisioning/deletion, provider-native credential rotation,
+- Phase 7 Redis dependency resource lifecycle is an accepted candidate under
+  [Redis Dependency Resource Lifecycle](./specs/037-redis-dependency-resource-lifecycle/spec.md)
+- provider-native provisioning/deletion, provider-native credential rotation,
   backup/restore, runtime env injection, and provider-native runtime materialization are future
   Phase 7 work
 
@@ -869,8 +872,8 @@ Current scope:
   `resources.list-dependency-bindings`, and `resources.show-dependency-binding`
 - new deployment attempts copy active binding metadata into safe dependency binding snapshot
   references
-- `resources.rotate-dependency-binding-secret` is specified as an accepted candidate and awaits Code
-  Round
+- `resources.rotate-dependency-binding-secret` updates the safe binding secret reference/version
+  used by future deployments
 - runtime env injection remains deferred
 
 ### ResourceInstance

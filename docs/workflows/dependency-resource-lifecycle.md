@@ -15,6 +15,11 @@ This first slice is Postgres-only. Every mutation must dispatch one explicit ope
 - `resources.unbind-dependency`
 - `resources.rotate-dependency-binding-secret`
 
+`dependency-resources.provision-redis` and `dependency-resources.import-redis` are accepted
+candidate commands for the next Redis dependency resource lifecycle slice. Generic
+`dependency-resources.list/show/rename/delete` should include Redis after that Code Round extends
+schemas, read models, and tests.
+
 Every read must dispatch one explicit query:
 
 - `dependency-resources.list`
@@ -37,6 +42,7 @@ credential rotation, not runtime env injection, and not a deployment command.
 - [Dependency Resource Binding Baseline](../specs/034-dependency-resource-binding-baseline/spec.md)
 - [Dependency Binding Deployment Snapshot Reference Baseline](../specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
 - [Dependency Binding Secret Rotation](../specs/036-dependency-binding-secret-rotation/spec.md)
+- [Redis Dependency Resource Lifecycle](../specs/037-redis-dependency-resource-lifecycle/spec.md)
 - [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
 - [Dependency Resource Test Matrix](../testing/dependency-resource-test-matrix.md)
 - [Error Model](../errors/model.md)
@@ -58,7 +64,8 @@ The workflow lets operators:
 8. Record provider-neutral safe dependency binding references in new deployment attempt snapshots.
 9. Rotate a binding-scoped secret reference for future deployment snapshots without changing
    historical deployments.
-10. Delete only dependency resources that pass safety checks.
+10. Register Redis dependency resources as safe provider-neutral records after the Redis Code Round.
+11. Delete only dependency resources that pass safety checks.
 
 ## Operation Boundaries
 
@@ -66,6 +73,8 @@ The workflow lets operators:
 | --- | --- | --- | --- |
 | Provision managed Postgres | `dependency-resources.provision-postgres` | `ResourceInstance` | Provider-native database, Resource bindings, secrets rotation, runtime, deployment snapshots |
 | Import external Postgres | `dependency-resources.import-postgres` | `ResourceInstance` | External database, Resource bindings, runtime, deployment snapshots |
+| Provision managed Redis | `dependency-resources.provision-redis` | ResourceInstance after Code Round | Provider-native Redis, Resource bindings, secrets rotation, runtime, deployment snapshots |
+| Import external Redis | `dependency-resources.import-redis` | ResourceInstance after Code Round | External Redis, Resource bindings, runtime, deployment snapshots |
 | List dependency resources | `dependency-resources.list` | Nothing | Any aggregate or runtime state |
 | Show dependency resource | `dependency-resources.show` | Nothing | Any aggregate or runtime state |
 | Rename dependency resource | `dependency-resources.rename` | Dependency resource name/slug | Bindings, backup metadata, provider state, runtime, snapshots |
@@ -83,6 +92,10 @@ The workflow lets operators:
 | --- | --- | --- |
 | `appaloft-managed` | project/environment/name/provider key | Appaloft owns a control-plane record for a future provider-managed Postgres resource. First slice does not create provider-native databases. |
 | `imported-external` | project/environment/name/endpoint plus secret ref or connection secret input | Appaloft records an external Postgres dependency for future binding. Delete removes only the Appaloft record. |
+
+The Redis Code Round must reuse these source modes for `redis` dependency resources. Managed Redis
+records remain provider-neutral, while imported external Redis records capture only safe endpoint
+metadata and secret references.
 
 ## Connection Safety
 
@@ -182,9 +195,9 @@ secret-rotation fields.
 The current implementation adds Postgres dependency resource lifecycle records, Resource binding
 metadata, safe read models, real active-binding delete blockers, and safe dependency binding
 snapshot references. Binding secret rotation updates binding-scoped safe secret references for
-future deployment snapshots only.
-Redis, provider-native provisioning/deletion, backup/restore, runtime env injection, Web
-affordances, and runtime cleanup are future work.
+future deployment snapshots only. Redis dependency resource lifecycle is specified as an accepted
+candidate but not implemented. Provider-native provisioning/deletion, backup/restore, runtime env
+injection, Web affordances, and runtime cleanup are future work.
 
 ## Open Questions
 

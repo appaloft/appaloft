@@ -16,8 +16,9 @@ This matrix covers the Phase 7 Postgres dependency resource lifecycle baseline:
 - `resources.list-dependency-bindings`
 - `resources.show-dependency-binding`
 - deployment snapshot safe binding reference capture for active Postgres Resource bindings
+- accepted-candidate Redis dependency resource lifecycle
 
-It does not cover Redis, backup/restore, provider-native Postgres provisioning or provider-native
+It does not cover backup/restore, provider-native Postgres/Redis provisioning or provider-native
 credential rotation, runtime env injection, runtime cleanup, redeploy, or rollback.
 
 ## Global References
@@ -26,6 +27,7 @@ credential rotation, runtime env injection, runtime cleanup, redeploy, or rollba
 - [Dependency Resource Binding Baseline](../specs/034-dependency-resource-binding-baseline/spec.md)
 - [Dependency Binding Deployment Snapshot Reference Baseline](../specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
 - [Dependency Binding Secret Rotation](../specs/036-dependency-binding-secret-rotation/spec.md)
+- [Redis Dependency Resource Lifecycle](../specs/037-redis-dependency-resource-lifecycle/spec.md)
 - [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
 - [Dependency Resource Lifecycle Workflow](../workflows/dependency-resource-lifecycle.md)
 - [Error Model](../errors/model.md)
@@ -73,6 +75,15 @@ credential rotation, runtime env injection, runtime cleanup, redeploy, or rollba
 | DEP-BIND-ROTATE-004 | deployment snapshot boundary | Application/read model | Deployment captured an old binding reference before rotation. | Later rotation does not rewrite historical deployment snapshot references; `deployments.show` reports the captured reference. | `packages/application/test/create-deployment.test.ts`; `packages/application/test/show-deployment.test.ts` |
 | DEP-BIND-ROTATE-005 | `resources.list-dependency-bindings`; `resources.show-dependency-binding` | Query/read model | Binding secret reference was rotated. | Returns safe current rotation metadata and snapshot readiness without raw or previous plaintext secret material. | `packages/application/test/dependency-resource-binding.test.ts`; `packages/persistence/pg/test/dependency-resource-binding.pglite.test.ts` |
 | DEP-BIND-ROTATE-006 | Operation catalog / CLI / oRPC / HTTP | Entrypoint | Binding secret rotation operation is public after Code Round. | Entrypoints dispatch `RotateResourceDependencyBindingSecretCommand`, reuse application schema, and expose no generic update operation. | `packages/application/test/operation-catalog-boundary.test.ts`; `packages/adapters/cli/test/dependency-command.test.ts`; `packages/orpc/test/dependency-resource.http.test.ts` |
+| DEP-RES-REDIS-PROVISION-001 | `dependency-resources.provision-redis` | Core/application | Provision managed Redis record. | Persists Appaloft-managed `redis` ResourceInstance, emits `dependency-resource-created`, and performs no provider-native Redis action. | Planned: `packages/core/test/redis-dependency-resource.test.ts`; `packages/application/test/redis-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-REDIS-IMPORT-001 | `dependency-resources.import-redis` | Application | Import external Redis. | Persists imported-external Redis with connection secret boundary and masked read model. | Planned: `packages/application/test/redis-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-REDIS-VALIDATION-001 | `dependency-resources.provision-redis`; `dependency-resources.import-redis` | Core/application | Invalid Redis name/slug/host/port/database/TLS/connection metadata. | Returns `validation_error`, `phase = dependency-resource-validation`, no mutation. | Planned: `packages/core/test/redis-dependency-resource.test.ts`; `packages/application/test/redis-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-REDIS-READ-001 | `dependency-resources.list`; `dependency-resources.show` | Query/read model | Managed and imported Redis resources exist. | Returns safe ownership, status, exposure, binding readiness, and backup relationship summaries with kind `redis`. | Planned: `packages/application/test/redis-dependency-resource-lifecycle.test.ts`; `packages/persistence/pg/test/dependency-resource.pglite.test.ts` |
+| DEP-RES-REDIS-READ-002 | `dependency-resources.list`; `dependency-resources.show` | Query/read model | Raw Redis connection secret was provided at import. | No raw password, ACL credential, token, auth header, cookie, TLS private key, provider token, private key, raw URI, or sensitive query appears in output. | Planned: `packages/application/test/redis-dependency-resource-lifecycle.test.ts`; `packages/persistence/pg/test/dependency-resource.pglite.test.ts` |
+| DEP-RES-REDIS-RENAME-001 | `dependency-resources.rename` | Application | Rename active Redis dependency resource. | Changes name/slug only; binding/backup/provider/runtime/snapshot metadata remains unchanged. | Planned: `packages/application/test/redis-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-REDIS-DELETE-001 | `dependency-resources.delete` | Application | Delete imported external Redis resource with no blockers. | Tombstones Appaloft record only and does not imply external/provider Redis deletion. | Planned: `packages/core/test/redis-dependency-resource.test.ts`; `packages/application/test/redis-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-REDIS-DELETE-002 | `dependency-resources.delete` | Application | Delete Redis resource with binding, backup, provider-managed unsafe, or retained snapshot/reference blockers. | Returns `dependency_resource_delete_blocked`, no mutation, no provider/runtime cleanup. | Planned: `packages/application/test/redis-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-REDIS-ENTRY-001 | Operation catalog / CLI / oRPC / HTTP | Entrypoint | Redis dependency resource operations are public after Code Round. | Entrypoints dispatch explicit Redis provision/import messages, reuse schemas, and expose no generic update operation. | Planned: `packages/application/test/operation-catalog-boundary.test.ts`; `packages/adapters/cli/test/dependency-command.test.ts`; `packages/orpc/test/dependency-resource.http.test.ts` |
 
 ## Required Non-Coverage Assertions
 
@@ -91,6 +102,7 @@ Tests must assert Postgres dependency resource commands do not:
 This baseline implements Postgres dependency resource control-plane records, Resource binding
 metadata, safe read models, active-binding delete blockers, and provider-neutral safe deployment
 snapshot references for active Postgres bindings. Binding secret rotation is implemented for
-binding-scoped safe reference/version metadata only. Redis, provider-native Postgres lifecycle,
-backup/restore, runtime env injection, Web affordances, and runtime cleanup remain future Phase 7
-work.
+binding-scoped safe reference/version metadata only. Redis dependency resource lifecycle is
+specified with planned matrix rows but is not implemented. Provider-native Postgres/Redis
+lifecycle, backup/restore, runtime env injection, Web affordances, and runtime cleanup remain
+future Phase 7 work.

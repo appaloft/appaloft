@@ -335,6 +335,11 @@ Current boundary:
   that historical snapshots remain unchanged, and it does not rotate provider-native database
   credentials, inject runtime environment variables, schedule redeploy, or rewrite historical
   deployment snapshots.
+- `dependency-resources.provision-redis` and `dependency-resources.import-redis` are accepted
+  candidates under
+  [Redis Dependency Resource Lifecycle](./specs/037-redis-dependency-resource-lifecycle/spec.md).
+  They must be added to this implemented operations table and to
+  `packages/application/src/operation-catalog.ts` in the same Code Round that activates Redis.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).
