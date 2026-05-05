@@ -151,6 +151,8 @@ import {
   ProvisionPostgresDependencyResourceUseCase,
   ProvisionRedisDependencyResourceCommandHandler,
   ProvisionRedisDependencyResourceUseCase,
+  RedeployDeploymentCommandHandler,
+  RedeployDeploymentUseCase,
   RegisterServerUseCase,
   RelinkSourceLinkCommandHandler,
   RelinkSourceLinkUseCase,
@@ -176,6 +178,8 @@ import {
   RestoreDependencyResourceBackupUseCase,
   RetryCertificateCommandHandler,
   RetryCertificateUseCase,
+  RetryDeploymentCommandHandler,
+  RetryDeploymentUseCase,
   RetryDomainBindingVerificationCommandHandler,
   RetryDomainBindingVerificationUseCase,
   RevokeCertificateCommandHandler,
@@ -355,6 +359,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ShowDeploymentQueryHandler);
   container.registerSingleton(DeploymentPlanQueryHandler);
   container.registerSingleton(DeploymentRecoveryReadinessQueryHandler);
+  container.registerSingleton(RetryDeploymentCommandHandler);
+  container.registerSingleton(RedeployDeploymentCommandHandler);
   container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
@@ -599,6 +605,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.deploymentFactory, DeploymentFactory);
   container.registerSingleton(tokens.deploymentLifecycleService, DeploymentLifecycleService);
   container.registerSingleton(tokens.createDeploymentUseCase, CreateDeploymentUseCase);
+  container.registerSingleton(tokens.retryDeploymentUseCase, RetryDeploymentUseCase);
+  container.registerSingleton(tokens.redeployDeploymentUseCase, RedeployDeploymentUseCase);
   container.registerSingleton(tokens.cleanupPreviewUseCase, CleanupPreviewUseCase);
   container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);
   container.registerSingleton(

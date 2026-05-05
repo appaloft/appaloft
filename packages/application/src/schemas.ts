@@ -21,6 +21,8 @@ export * from "./operations/deployments/deployment-logs.schema";
 export * from "./operations/deployments/deployment-plan.schema";
 export * from "./operations/deployments/deployment-recovery-readiness.schema";
 export * from "./operations/deployments/list-deployments.schema";
+export * from "./operations/deployments/redeploy-deployment.schema";
+export * from "./operations/deployments/retry-deployment.schema";
 export * from "./operations/deployments/show-deployment.schema";
 export * from "./operations/deployments/stream-deployment-events.schema";
 export * from "./operations/domain-bindings/check-domain-binding-delete-safety.schema";

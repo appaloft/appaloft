@@ -51,6 +51,7 @@ import {
   DeploymentTargetLifecycleStatusValue,
   DeploymentTargetName,
   DeploymentTargetUsername,
+  DeploymentTriggerKindValue,
   DescriptionText,
   DestinationId,
   DestinationKindValue,
@@ -202,6 +203,7 @@ type EnvironmentLifecycleStatusInput = Parameters<
   typeof EnvironmentLifecycleStatusValue.rehydrate
 >[0];
 type DeploymentStatusInput = Parameters<typeof DeploymentStatusValue.rehydrate>[0];
+type DeploymentTriggerKindInput = Parameters<typeof DeploymentTriggerKindValue.rehydrate>[0];
 type DestinationKindInput = Parameters<typeof DestinationKindValue.rehydrate>[0];
 type DeploymentPhaseInput = Parameters<typeof DeploymentPhaseValue.rehydrate>[0];
 type LogLevelInput = Parameters<typeof LogLevelValue.rehydrate>[0];
@@ -1683,6 +1685,12 @@ export function rehydrateDeploymentRow(row: Selectable<Database["deployments"]>)
     ),
     logs: rehydrateDeploymentLogs(row.logs),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
+    triggerKind: DeploymentTriggerKindValue.rehydrate(
+      row.trigger_kind as DeploymentTriggerKindInput,
+    ),
+    ...(row.source_deployment_id
+      ? { sourceDeploymentId: DeploymentId.rehydrate(row.source_deployment_id) }
+      : {}),
     ...(startedAt ? { startedAt: StartedAt.rehydrate(startedAt) } : {}),
     ...(finishedAt ? { finishedAt: FinishedAt.rehydrate(finishedAt) } : {}),
     ...(row.rollback_of_deployment_id

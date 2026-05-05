@@ -142,6 +142,7 @@ import {
   provisionRedisDependencyResourceCommandInputSchema,
   type Query,
   type QueryBus,
+  RedeployDeploymentCommand,
   RegisterServerCommand,
   RenameDependencyResourceCommand,
   RenameEnvironmentCommand,
@@ -159,10 +160,12 @@ import {
   type ResourceRuntimeLogsResult,
   RestoreDependencyResourceBackupCommand,
   RetryCertificateCommand,
+  RetryDeploymentCommand,
   RetryDomainBindingVerificationCommand,
   RevokeCertificateCommand,
   RotateResourceDependencyBindingSecretCommand,
   RotateSshCredentialCommand,
+  redeployDeploymentCommandInputSchema,
   registerServerCommandInputSchema,
   renameDependencyResourceCommandInputSchema,
   renameEnvironmentCommandInputSchema,
@@ -177,6 +180,7 @@ import {
   resourceRuntimeLogsQueryInputSchema,
   restoreDependencyResourceBackupCommandInputSchema,
   retryCertificateCommandInputSchema,
+  retryDeploymentCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
   revokeCertificateCommandInputSchema,
   rotateResourceDependencyBindingSecretCommandInputSchema,
@@ -297,6 +301,7 @@ import {
   lockEnvironmentResponseSchema,
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
+  redeployDeploymentResponseSchema,
   registerServerResponseSchema,
   renameEnvironmentResponseSchema,
   renameProjectResponseSchema,
@@ -311,6 +316,7 @@ import {
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
   retryCertificateResponseSchema,
+  retryDeploymentResponseSchema,
   retryDomainBindingVerificationResponseSchema,
   revokeCertificateResponseSchema,
   rotateResourceDependencyBindingSecretResponseSchema,
@@ -2139,6 +2145,34 @@ export const createDeploymentProcedure = base
     executeCommand(context, CreateDeploymentCommand.create(input)),
   );
 
+export const retryDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/{deploymentId}/retry",
+    summary: "Retry deployment",
+    description: apiRouteDescriptions.deploymentRecoveryReadiness,
+    successStatus: 201,
+  })
+  .input(retryDeploymentCommandInputSchema)
+  .output(retryDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RetryDeploymentCommand.create(input)),
+  );
+
+export const redeployDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/redeploy",
+    summary: "Redeploy resource",
+    description: apiRouteDescriptions.deploymentRecoveryReadiness,
+    successStatus: 201,
+  })
+  .input(redeployDeploymentCommandInputSchema)
+  .output(redeployDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RedeployDeploymentCommand.create(input)),
+  );
+
 export const showDeploymentProcedure = base
   .route({
     method: "GET",
@@ -2786,6 +2820,8 @@ export const appaloftOrpcRouter = {
   deployments: {
     list: listDeploymentsProcedure,
     create: createDeploymentProcedure,
+    retry: retryDeploymentProcedure,
+    redeploy: redeployDeploymentProcedure,
     plan: deploymentPlanProcedure,
     show: showDeploymentProcedure,
     recoveryReadiness: deploymentRecoveryReadinessProcedure,
@@ -2952,6 +2988,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources",
     "/api/resources/:resourceId",
     "/api/resources/:resourceId/archive",
+    "/api/resources/:resourceId/redeploy",
     "/api/resources/:resourceId/source",
     "/api/resources/:resourceId/health",
     "/api/resources/:resourceId/health-policy",
@@ -2980,6 +3017,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/certificates/:certificateId/retries",
     "/api/certificates/:certificateId/revoke",
     "/api/deployments",
+    "/api/deployments/:deploymentId/retry",
     "/api/deployments/plan",
     "/api/deployments/:deploymentId",
     "/api/deployments/:deploymentId/recovery-readiness",

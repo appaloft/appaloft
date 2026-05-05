@@ -563,6 +563,8 @@ Implemented operations:
 | List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
 | Show deployment detail | Query | `deployments.show` | `ShowDeploymentQuery` | `ShowDeploymentQueryInput` | `appaloft deployments show <deploymentId>` | `GET /api/deployments/{deploymentId}` |
 | Read deployment recovery readiness | Query | `deployments.recovery-readiness` | `DeploymentRecoveryReadinessQuery` | `DeploymentRecoveryReadinessQueryInput` | `appaloft deployments recovery-readiness <deploymentId>` | `GET /api/deployments/{deploymentId}/recovery-readiness` |
+| Retry deployment attempt | Command | `deployments.retry` | `RetryDeploymentCommand` | `RetryDeploymentCommandInput` | `appaloft deployments retry <deploymentId>` | `POST /api/deployments/{deploymentId}/retry` |
+| Redeploy current resource profile | Command | `deployments.redeploy` | `RedeployDeploymentCommand` | `RedeployDeploymentCommandInput` | `appaloft deployments redeploy <resourceId>` | `POST /api/resources/{resourceId}/redeploy` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `appaloft logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
 | Stream deployment events | Query | `deployments.stream-events` | `StreamDeploymentEventsQuery` | `StreamDeploymentEventsQueryInput` | `appaloft deployments events <deploymentId>` | `GET /api/deployments/{deploymentId}/events` and `GET /api/deployments/{deploymentId}/events/stream` |
 
@@ -759,13 +761,13 @@ Current boundary:
   The `deployments.recovery-readiness` query is the shared read-only source for retry, redeploy,
   rollback candidate, and rollback readiness across Web, CLI, HTTP/oRPC, and future MCP/tool
   surfaces.
-- Future `deployments.retry` creates a new deployment attempt from a failed/interrupted/canceled/
+- `deployments.retry` creates a new deployment attempt from a failed/interrupted/canceled/
   superseded attempt's immutable snapshot intent. It does not replay old events and does not mutate
-  the old attempt. Its Code Round is scoped by
+  the old attempt. Its command implementation is scoped by
   [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md).
-- Future `deployments.redeploy` creates a new deployment attempt from the current Resource profile,
+- `deployments.redeploy` creates a new deployment attempt from the current Resource profile,
   effective configuration, target, and destination at admission time. It is the "deploy current
-  desired state again" operation, not a retry of an old snapshot. Its Code Round is scoped by
+  desired state again" operation, not a retry of an old snapshot. Its command implementation is scoped by
   [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md).
 - Future `deployments.rollback` creates a new rollback deployment attempt from a retained successful
   candidate's immutable snapshot and Docker/OCI artifact identity. It does not re-plan from the

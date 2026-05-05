@@ -33,6 +33,16 @@ export const mutationCoordinationPolicies = {
     scopeKind: "resource-runtime",
     mode: "supersede-active",
   }),
+  retryDeployment: policy({
+    operationKey: "deployments.retry",
+    scopeKind: "resource-runtime",
+    mode: "serialize-with-bounded-wait",
+  }),
+  redeployDeployment: policy({
+    operationKey: "deployments.redeploy",
+    scopeKind: "resource-runtime",
+    mode: "supersede-active",
+  }),
   cleanupPreview: policy({
     operationKey: "deployments.cleanup-preview",
     scopeKind: "preview-lifecycle",

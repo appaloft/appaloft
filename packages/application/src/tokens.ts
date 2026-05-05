@@ -198,6 +198,8 @@ export const tokens = {
   diffEnvironmentsQueryService: Symbol.for("appaloft.diff_environments_query_service"),
   promoteEnvironmentUseCase: Symbol.for("appaloft.promote_environment_use_case"),
   createDeploymentUseCase: Symbol.for("appaloft.create_deployment_use_case"),
+  retryDeploymentUseCase: Symbol.for("appaloft.retry_deployment_use_case"),
+  redeployDeploymentUseCase: Symbol.for("appaloft.redeploy_deployment_use_case"),
   cleanupPreviewUseCase: Symbol.for("appaloft.cleanup_preview_use_case"),
   createDomainBindingUseCase: Symbol.for("appaloft.create_domain_binding_use_case"),
   configureDomainBindingRouteUseCase: Symbol.for(

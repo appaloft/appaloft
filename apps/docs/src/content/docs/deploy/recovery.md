@@ -54,19 +54,21 @@ appaloft deployments recovery-readiness <deploymentId>
 - 可用的 rollback candidates，以及候选是否缺少 artifact 或快照。
 - 安全的下一步建议，例如查看详情、日志、事件流或诊断摘要。
 
-当前 `retry`、`redeploy`、`rollback` 写命令还没有启用。即使 readiness 判断某个动作在技术上可行，也会通过 `recovery-command-not-active` 说明该命令仍未激活。
+当前 `retry` 和 `redeploy` 写命令已启用。`rollback` 仍未启用；当 rollback 在技术上可行时，`recovery-command-not-active` 只表示 rollback 命令仍未激活。
 
 <h2 id="deployment-recovery-retry">Retry</h2>
 
 Retry 的语义是“基于失败部署的不可变 snapshot intent 创建新的部署 attempt”。它不是重放旧事件，也不是在旧 attempt 中继续执行失败阶段。
 
-在 retry 命令启用前，readiness 只会告诉你它是否具备同一意图重试所需的快照和运行时输入。
+检查 readiness 后，可以运行 `appaloft deployments retry <deploymentId>`，或调用 `POST /api/deployments/{deploymentId}/retry`。
 
 <h2 id="deployment-recovery-redeploy">Redeploy</h2>
 
 Redeploy 的语义是“使用当前 Resource profile 再部署一次”。它会读取当前资源配置、环境配置、target 和 destination，不复用旧部署快照。
 
 如果当前 Resource profile 缺失、漂移或不再能通过 admission，readiness 会把 redeploy 标记为阻塞。
+
+检查 readiness 后，可以运行 `appaloft deployments redeploy <resourceId>`，或调用 `POST /api/resources/{resourceId}/redeploy`。
 
 <h2 id="deployment-recovery-rollback">Rollback</h2>
 

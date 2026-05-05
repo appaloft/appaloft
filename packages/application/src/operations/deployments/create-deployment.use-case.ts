@@ -1,5 +1,7 @@
 import {
   type Deployment,
+  DeploymentId,
+  type DeploymentTriggerKindValue,
   type Destination,
   domainError,
   type Environment,
@@ -625,6 +627,11 @@ export class CreateDeploymentUseCase {
   async execute(
     context: ExecutionContext,
     input: CreateDeploymentCommandInput,
+    recovery?: {
+      triggerKind: DeploymentTriggerKindValue;
+      sourceDeploymentId?: string;
+      ownerLabel: "deployments.create" | "deployments.redeploy";
+    },
   ): Promise<Result<{ id: string }>> {
     const {
       deploymentFactory,
@@ -791,9 +798,12 @@ export class CreateDeploymentUseCase {
       }
       const admittedDeploymentResult = await mutationCoordinator.runExclusive({
         context,
-        policy: mutationCoordinationPolicies.createDeployment,
+        policy:
+          recovery?.ownerLabel === "deployments.redeploy"
+            ? mutationCoordinationPolicies.redeployDeployment
+            : mutationCoordinationPolicies.createDeployment,
         scope: deploymentResourceRuntimeScope({ resource, server, destination }),
-        owner: createCoordinationOwner(context, "deployments.create"),
+        owner: createCoordinationOwner(context, recovery?.ownerLabel ?? "deployments.create"),
         work: async () =>
           safeTry(async function* () {
             const latestDeployment = await deploymentRepository.findOne(
@@ -818,6 +828,16 @@ export class CreateDeploymentUseCase {
               runtimePlan,
               environmentSnapshot: snapshot,
               dependencyBindingReferences,
+              ...(recovery
+                ? {
+                    triggerKind: recovery.triggerKind,
+                    ...(recovery.sourceDeploymentId
+                      ? {
+                          sourceDeploymentId: DeploymentId.rehydrate(recovery.sourceDeploymentId),
+                        }
+                      : {}),
+                  }
+                : {}),
               ...(latestRuntimeOwningDeployment
                 ? { supersedesDeploymentId: latestRuntimeOwningDeployment.toState().id }
                 : {}),

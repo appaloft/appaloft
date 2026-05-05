@@ -4,6 +4,7 @@ import {
   type Deployment as DeploymentAggregate,
   type DeploymentDependencyBindingReferenceState,
   DeploymentId,
+  DeploymentTriggerKindValue,
   type Destination,
   type EnvironmentProfile,
   type EnvironmentSnapshot,
@@ -37,6 +38,8 @@ export class DeploymentFactory {
     runtimePlan: RuntimePlan;
     environmentSnapshot: EnvironmentSnapshot;
     dependencyBindingReferences?: DeploymentDependencyBindingReferenceState[];
+    triggerKind?: DeploymentTriggerKindValue;
+    sourceDeploymentId?: DeploymentId;
     supersedesDeploymentId?: DeploymentId;
   }): Result<DeploymentAggregate> {
     const { clock, idGenerator } = this;
@@ -58,6 +61,8 @@ export class DeploymentFactory {
         ...(input.dependencyBindingReferences
           ? { dependencyBindingReferences: input.dependencyBindingReferences }
           : {}),
+        ...(input.triggerKind ? { triggerKind: input.triggerKind } : {}),
+        ...(input.sourceDeploymentId ? { sourceDeploymentId: input.sourceDeploymentId } : {}),
         ...(input.supersedesDeploymentId
           ? { supersedesDeploymentId: input.supersedesDeploymentId }
           : {}),
@@ -87,7 +92,40 @@ export class DeploymentFactory {
         environmentSnapshot: state.environmentSnapshot,
         dependencyBindingReferences: state.dependencyBindingReferences,
         createdAt,
+        triggerKind: state.triggerKind,
+        sourceDeploymentId: state.id,
         rollbackOfDeploymentId: input.rollbackOfDeploymentId,
+      });
+    });
+  }
+
+  createRetry(input: {
+    deployment: DeploymentAggregate;
+    supersedesDeploymentId?: DeploymentId;
+  }): Result<DeploymentAggregate> {
+    const { clock, idGenerator } = this;
+    const state = input.deployment.toState();
+
+    return safeTry(function* () {
+      const deploymentId = yield* DeploymentId.create(idGenerator.next("dep"));
+      const createdAt = yield* CreatedAt.create(clock.now());
+
+      return Deployment.create({
+        id: deploymentId,
+        projectId: state.projectId,
+        serverId: state.serverId,
+        destinationId: state.destinationId,
+        environmentId: state.environmentId,
+        resourceId: state.resourceId,
+        runtimePlan: state.runtimePlan,
+        environmentSnapshot: state.environmentSnapshot,
+        dependencyBindingReferences: state.dependencyBindingReferences,
+        createdAt,
+        triggerKind: DeploymentTriggerKindValue.retry(),
+        sourceDeploymentId: state.id,
+        ...(input.supersedesDeploymentId
+          ? { supersedesDeploymentId: input.supersedesDeploymentId }
+          : {}),
       });
     });
   }

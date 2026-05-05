@@ -9,6 +9,8 @@ import {
   DeploymentRecoveryReadinessQuery,
   type DeploymentSummary,
   ListDeploymentsQuery,
+  RedeployDeploymentCommand,
+  RetryDeploymentCommand,
   ShowDeploymentQuery,
   StreamDeploymentEventsQuery,
 } from "@appaloft/application";
@@ -68,6 +70,7 @@ import { cliCommandDescriptions, cliDocsHrefs } from "./docs-help.js";
 
 const pathOrSourceArg = Args.text({ name: "pathOrSource" }).pipe(Args.optional);
 const deploymentIdArg = Args.text({ name: "deploymentId" });
+const resourceIdArg = Args.text({ name: "resourceId" });
 
 const sourceBaseDirectoryOption = Options.text("source-base-directory").pipe(Options.optional);
 const projectOption = Options.text("project").pipe(Options.optional);
@@ -130,6 +133,8 @@ const deploymentCursorOption = Options.text("cursor").pipe(Options.optional);
 const deploymentHistoryLimitOption = Options.text("history-limit").pipe(Options.withDefault("100"));
 const includeHistoryOption = Options.boolean("include-history").pipe(Options.withDefault(true));
 const untilTerminalOption = Options.boolean("until-terminal").pipe(Options.withDefault(true));
+const readinessGeneratedAtOption = Options.text("readiness-generated-at").pipe(Options.optional);
+const sourceDeploymentOption = Options.text("source-deployment").pipe(Options.optional);
 const deploymentStateBackendKinds = [
   "ssh-pglite",
   "local-pglite",
@@ -1455,6 +1460,56 @@ const deploymentRecoveryReadinessCommand = EffectCommand.make(
   ({ deploymentId }) => runQuery(DeploymentRecoveryReadinessQuery.create({ deploymentId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRecoveryReadiness));
 
+const retryDeploymentCommand = EffectCommand.make(
+  "retry",
+  {
+    deploymentId: deploymentIdArg,
+    resource: resourceOption,
+    readinessGeneratedAt: readinessGeneratedAtOption,
+  },
+  ({ deploymentId, readinessGeneratedAt, resource }) =>
+    runCommand(
+      RetryDeploymentCommand.create({
+        deploymentId,
+        resourceId: optionalValue(resource),
+        readinessGeneratedAt: optionalValue(readinessGeneratedAt),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRetry));
+
+const redeployDeploymentCommand = EffectCommand.make(
+  "redeploy",
+  {
+    resourceId: resourceIdArg,
+    project: projectOption,
+    environment: environmentOption,
+    server: serverOption,
+    destination: destinationOption,
+    sourceDeployment: sourceDeploymentOption,
+    readinessGeneratedAt: readinessGeneratedAtOption,
+  },
+  ({
+    destination,
+    environment,
+    project,
+    readinessGeneratedAt,
+    resourceId,
+    server,
+    sourceDeployment,
+  }) =>
+    runCommand(
+      RedeployDeploymentCommand.create({
+        resourceId,
+        projectId: optionalValue(project),
+        environmentId: optionalValue(environment),
+        serverId: optionalValue(server),
+        destinationId: optionalValue(destination),
+        sourceDeploymentId: optionalValue(sourceDeployment),
+        readinessGeneratedAt: optionalValue(readinessGeneratedAt),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRedeploy));
+
 const streamDeploymentEventsCommand = EffectCommand.make(
   "events",
   {
@@ -1485,6 +1540,8 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
     showDeploymentCommand,
     deploymentPlanCommand,
     deploymentRecoveryReadinessCommand,
+    retryDeploymentCommand,
+    redeployDeploymentCommand,
     streamDeploymentEventsCommand,
   ]),
 );

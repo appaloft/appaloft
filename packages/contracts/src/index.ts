@@ -2578,6 +2578,8 @@ export const deploymentSummarySchema = z.object({
     "canceled",
     "rolled-back",
   ]),
+  triggerKind: z.enum(["create", "retry", "redeploy", "rollback"]).optional(),
+  sourceDeploymentId: z.string().optional(),
   sourceCommitSha: z.string().optional(),
   runtimePlan: runtimePlanSchema,
   environmentSnapshot: z.object({
@@ -2624,6 +2626,25 @@ export const createDeploymentInputSchema = z
 export const createDeploymentResponseSchema = z.object({
   id: z.string(),
 });
+
+export const retryDeploymentInputSchema = z.object({
+  deploymentId: z.string().min(1),
+  resourceId: z.string().min(1).optional(),
+  readinessGeneratedAt: z.string().optional(),
+});
+
+export const redeployDeploymentInputSchema = z.object({
+  resourceId: z.string().min(1),
+  projectId: z.string().min(1).optional(),
+  environmentId: z.string().min(1).optional(),
+  serverId: z.string().min(1).optional(),
+  destinationId: z.string().min(1).optional(),
+  sourceDeploymentId: z.string().min(1).optional(),
+  readinessGeneratedAt: z.string().optional(),
+});
+
+export const retryDeploymentResponseSchema = createDeploymentResponseSchema;
+export const redeployDeploymentResponseSchema = createDeploymentResponseSchema;
 
 export const listDeploymentsResponseSchema = z.object({
   items: z.array(deploymentSummarySchema),
@@ -3893,6 +3914,10 @@ export type DeploymentProgressEvent = z.infer<typeof deploymentProgressEventSche
 export type DeploymentResourceInput = z.infer<typeof deploymentResourceInputSchema>;
 export type CreateDeploymentInput = z.infer<typeof createDeploymentInputSchema>;
 export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
+export type RetryDeploymentInput = z.infer<typeof retryDeploymentInputSchema>;
+export type RetryDeploymentResponse = z.infer<typeof retryDeploymentResponseSchema>;
+export type RedeployDeploymentInput = z.infer<typeof redeployDeploymentInputSchema>;
+export type RedeployDeploymentResponse = z.infer<typeof redeployDeploymentResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
 export type OperatorWorkKind = z.infer<typeof operatorWorkKindSchema>;
 export type OperatorWorkStatus = z.infer<typeof operatorWorkStatusSchema>;

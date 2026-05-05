@@ -2185,6 +2185,10 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
           serverId: deployment.serverId.value,
           destinationId: deployment.destinationId.value,
           status: deployment.status.value,
+          triggerKind: deployment.triggerKind.value,
+          ...(deployment.sourceDeploymentId
+            ? { sourceDeploymentId: deployment.sourceDeploymentId.value }
+            : {}),
           ...(sourceCommitSha ? { sourceCommitSha } : {}),
           runtimePlan: {
             id: deployment.runtimePlan.id,

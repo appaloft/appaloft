@@ -109,6 +109,7 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
     serverId: "srv_demo",
     destinationId: "dst_demo",
     status: "failed",
+    triggerKind: "create",
     sourceCommitSha: "abcdef1234567890",
     runtimePlan: {
       id: "rplan_demo",
@@ -174,24 +175,24 @@ function unwrap(result: Result<DeploymentRecoveryReadiness>): DeploymentRecovery
 }
 
 describe("DeploymentRecoveryReadinessQueryService", () => {
-  test("[DEP-RECOVERY-READINESS-001] reports retry facts for failed attempts without activating retry command", async () => {
+  test("[DEP-RECOVERY-READINESS-001] reports retry facts for failed attempts with active retry command", async () => {
     const readiness = unwrap(await createService().execute(createTestContext(), createQuery()));
 
     expect(readiness.schemaVersion).toBe("deployments.recovery-readiness/v1");
     expect(readiness.deploymentId).toBe("dep_failed");
     expect(readiness.retryable).toBe(true);
     expect(readiness.retry).toMatchObject({
-      allowed: false,
-      commandActive: false,
+      allowed: true,
+      commandActive: true,
       targetOperation: "deployments.retry",
     });
-    expect(readiness.retry.reasons.map((reason) => reason.code)).toContain(
+    expect(readiness.retry.reasons.map((reason) => reason.code)).not.toContain(
       "recovery-command-not-active",
     );
     expect(readiness.recommendedActions).toContainEqual(
       expect.objectContaining({
         targetOperation: "deployments.retry",
-        blockedReasonCode: "recovery-command-not-active",
+        commandActive: true,
       }),
     );
   });

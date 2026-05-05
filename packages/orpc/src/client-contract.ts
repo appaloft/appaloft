@@ -48,6 +48,7 @@ import {
   type LockEnvironmentCommandInput,
   type OpenTerminalSessionCommandInput,
   type PromoteEnvironmentCommandInput,
+  type RedeployDeploymentCommandInput,
   type RegisterServerCommandInput,
   type RenameEnvironmentCommandInput,
   type RenameProjectCommandInput,
@@ -59,6 +60,7 @@ import {
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
   type RetryCertificateCommandInput,
+  type RetryDeploymentCommandInput,
   type RetryDomainBindingVerificationCommandInput,
   type RevokeCertificateCommandInput,
   type RotateSshCredentialCommandInput,
@@ -139,6 +141,7 @@ import {
   type LockEnvironmentResponse,
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
+  type RedeployDeploymentResponse,
   type RegisterServerResponse,
   type RenameEnvironmentResponse,
   type RenameProjectResponse,
@@ -152,6 +155,7 @@ import {
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
   type RetryCertificateResponse,
+  type RetryDeploymentResponse,
   type RetryDomainBindingVerificationResponse,
   type RevokeCertificateResponse,
   type RotateSshCredentialResponse,
@@ -658,6 +662,18 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       CreateDeploymentCommandInput,
       CreateDeploymentResponse,
+      AppaloftClientError
+    >;
+    retry: Client<
+      AppaloftClientContext,
+      RetryDeploymentCommandInput,
+      RetryDeploymentResponse,
+      AppaloftClientError
+    >;
+    redeploy: Client<
+      AppaloftClientContext,
+      RedeployDeploymentCommandInput,
+      RedeployDeploymentResponse,
       AppaloftClientError
     >;
     createStream: Client<
