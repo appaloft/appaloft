@@ -27,7 +27,7 @@
 - [ ] `SWARM-TARGET-APPLY-001`: rollout preserves or restores previous same-resource service until
   verification succeeds.
 - [ ] `SWARM-TARGET-OBS-001`: logs and health return normalized Appaloft read-model shapes.
-- [ ] `SWARM-TARGET-CLEAN-001`: cleanup stays resource/deployment/destination scoped.
+- [x] `SWARM-TARGET-CLEAN-001`: cleanup stays resource/deployment/destination scoped.
 - [ ] `SWARM-TARGET-ROUTE-001`: reverse-proxy access routes attach through Swarm service/network
   identity without public workload host ports.
 - [ ] `SWARM-TARGET-SECRET-001`: registry credentials, pull secrets, env values, and rendered
@@ -43,6 +43,8 @@
 - [x] Implement adapter-owned render intent for OCI image and Compose workloads.
 - [x] Add adapter-owned image apply-plan rendering for deployment-specific candidate services.
 - [x] Add adapter-owned label-scoped cleanup plan rendering for Swarm services.
+- [x] Add opt-in fake Docker Swarm execution backend acceptance coverage for image apply and scoped
+  cleanup.
 - [ ] Implement apply/verify/log/health/cleanup behind runtime adapters.
 - [ ] Add sanitized target identity persistence/read-model support where required.
 - [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.
@@ -55,8 +57,8 @@
 
 ## Verification
 
-- [ ] Run targeted domain/application/adapter tests.
-- [ ] Run fake Swarm backend acceptance tests.
+- [x] Run targeted domain/application/adapter tests.
+- [x] Run fake Swarm backend acceptance tests.
 - [ ] Run opt-in real Swarm smoke tests when environment is available.
 - [ ] Run `bun run lint`.
 - [ ] Run `bun turbo run typecheck`.

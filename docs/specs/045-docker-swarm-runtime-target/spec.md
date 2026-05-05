@@ -127,10 +127,15 @@ No new public operation key is accepted in this Spec Round.
   execution backend yet.
 - The runtime adapter package also renders a label-scoped Swarm cleanup plan for services owned by
   the same Appaloft resource, deployment, target, destination, and runtime-target identity. The plan
-  is not wired to an execution backend yet.
+  is wired only through the explicit fake-runner Swarm backend, not through default real execution.
+- An explicit `DockerSwarmExecutionBackend` now exists for fake-runner acceptance coverage. It can
+  execute the adapter-owned image apply plan and label-scoped cleanup plan through an injected
+  command runner, records sanitized Swarm runtime metadata on successful deployment completion, and
+  is not registered in the default runtime backend registry.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
-- Swarm runtime target backend apply/verify/log/health/cleanup is not implemented.
+- Real Swarm command execution, failed-rollout rollback behavior, logs, health, and read-model
+  persistence are not implemented.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and
