@@ -2663,6 +2663,31 @@ export interface ScheduledTaskRunLogReadModel {
   ): Promise<Omit<ScheduledTaskRunLogsResult, "schemaVersion" | "generatedAt">>;
 }
 
+export interface ScheduledTaskRuntimeExecutionRequest {
+  runId: string;
+  taskId: string;
+  resourceId: string;
+  commandIntent: string;
+  timeoutSeconds: number;
+  environment?: Record<string, string>;
+}
+
+export interface ScheduledTaskRuntimeExecutionResult {
+  status: Extract<ScheduledTaskRunStatus, "succeeded" | "failed">;
+  exitCode: number;
+  startedAt: string;
+  finishedAt: string;
+  logs: ScheduledTaskRunLogEntry[];
+  failureSummary?: string;
+}
+
+export interface ScheduledTaskRuntimePort {
+  execute(
+    context: ExecutionContext,
+    request: ScheduledTaskRuntimeExecutionRequest,
+  ): Promise<Result<ScheduledTaskRuntimeExecutionResult, DomainError>>;
+}
+
 export type ResourceHealthOverall =
   | "healthy"
   | "degraded"
