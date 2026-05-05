@@ -1085,6 +1085,10 @@ Current verification notes:
   definitions, run attempts, task-run logs, scheduler admission, and deployment-boundary separation.
   The roadmap row remains open until operation catalog entries, persistence, scheduler/runtime
   execution, entrypoints, and public docs are implemented.
+- 2026-05-05 Phase 7 scheduled task core-domain slice added Resource-owned scheduled task
+  definition value objects and state for schedule, timezone, command intent, timeout, retry, and
+  lifecycle status, plus `forbid` concurrency validation. Run attempts, persistence,
+  scheduler/runtime execution, entrypoints, and public docs remain open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

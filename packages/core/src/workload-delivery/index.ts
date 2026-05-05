@@ -1,6 +1,7 @@
 export * from "./auto-deploy-policy";
 export * from "./resource";
 export * from "./resource-specifications";
+export * from "./scheduled-task";
 export * from "./source-binding";
 export * from "./specs";
 export * from "./storage-volume";
