@@ -300,7 +300,7 @@ describe("Dependency resource binding use cases", () => {
         maskedConnection: "postgres://app:********@db.example.com:5432/app",
       },
       snapshotReadiness: {
-        status: "deferred",
+        status: "ready",
       },
     });
     const detail = JSON.stringify(show._unsafeUnwrap());

@@ -34,6 +34,7 @@ import {
   type ServerReadModel,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { dependencyBindingSnapshotSummaryFromReferenceSummaries } from "./dependency-binding-snapshot-references";
 import { DeploymentRecoveryReadinessQuery } from "./deployment-recovery-readiness.query";
 import { type DeploymentRecoveryReadinessQueryService } from "./deployment-recovery-readiness.query-service";
 import { type ShowDeploymentQuery } from "./show-deployment.query";
@@ -267,6 +268,9 @@ export class ShowDeploymentQueryService {
               snapshot: {
                 runtimePlan: detailSummary.runtimePlan,
                 environmentSnapshot: detailSummary.environmentSnapshot,
+                dependencyBindings: dependencyBindingSnapshotSummaryFromReferenceSummaries(
+                  detailSummary.dependencyBindingReferences ?? [],
+                ),
               },
             }
           : {}),

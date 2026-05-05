@@ -1,8 +1,168 @@
 import { describe, expect, test } from "bun:test";
 
-import { deploymentPlanResponseSchema } from "../src/index";
+import { deploymentPlanResponseSchema, showDeploymentResponseSchema } from "../src/index";
 
 describe("deployment plan preview contract", () => {
+  test("[DEP-BIND-SNAP-REF-002] accepts safe dependency binding snapshot references on plan and show", () => {
+    const dependencyBindings = {
+      status: "ready",
+      references: [
+        {
+          bindingId: "rbd_pg",
+          dependencyResourceId: "rsi_pg",
+          kind: "postgres",
+          targetName: "DATABASE_URL",
+          scope: "runtime-only",
+          injectionMode: "env",
+          snapshotReadiness: {
+            status: "ready",
+          },
+        },
+      ],
+      runtimeInjection: {
+        status: "deferred",
+        reason: "runtime dependency environment injection is deferred for this slice",
+      },
+    };
+
+    const plan = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_web",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+      },
+      readiness: {
+        status: "ready",
+        ready: true,
+        reasonCodes: [],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "web",
+        locator: "/workspace/web",
+        detectedFiles: [],
+        detectedScripts: [],
+        reasoning: [],
+      },
+      planner: {
+        plannerKey: "custom",
+        supportTier: "explicit-custom",
+        buildStrategy: "workspace-commands",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      artifact: {
+        kind: "workspace-image",
+      },
+      commands: [],
+      network: {
+        internalPort: 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: false,
+        kind: "none",
+      },
+      dependencyBindings,
+      warnings: [],
+      unsupportedReasons: [],
+      nextActions: [],
+      generatedAt: "2026-05-05T00:00:00.000Z",
+    });
+
+    const show = showDeploymentResponseSchema.parse({
+      schemaVersion: "deployments.show/v1",
+      deployment: {
+        id: "dep_demo",
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_web",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+        status: "succeeded",
+        runtimePlan: {
+          id: "rplan_demo",
+          source: {
+            kind: "local-folder",
+            locator: "/workspace/web",
+            displayName: "web",
+          },
+          buildStrategy: "workspace-commands",
+          packagingMode: "all-in-one-docker",
+          execution: {
+            kind: "docker-container",
+          },
+          target: {
+            kind: "single-server",
+            providerKey: "local-shell",
+            serverIds: ["srv_local"],
+          },
+          detectSummary: "custom",
+          steps: ["deploy"],
+          generatedAt: "2026-05-05T00:00:00.000Z",
+        },
+        environmentSnapshot: {
+          id: "snap_demo",
+          environmentId: "env_demo",
+          createdAt: "2026-05-05T00:00:00.000Z",
+          precedence: [],
+          variables: [],
+        },
+        dependencyBindingReferences: dependencyBindings.references,
+        logCount: 0,
+        createdAt: "2026-05-05T00:00:00.000Z",
+      },
+      status: {
+        current: "succeeded",
+        createdAt: "2026-05-05T00:00:00.000Z",
+      },
+      snapshot: {
+        runtimePlan: {
+          id: "rplan_demo",
+          source: {
+            kind: "local-folder",
+            locator: "/workspace/web",
+            displayName: "web",
+          },
+          buildStrategy: "workspace-commands",
+          packagingMode: "all-in-one-docker",
+          execution: {
+            kind: "docker-container",
+          },
+          target: {
+            kind: "single-server",
+            providerKey: "local-shell",
+            serverIds: ["srv_local"],
+          },
+          detectSummary: "custom",
+          steps: ["deploy"],
+          generatedAt: "2026-05-05T00:00:00.000Z",
+        },
+        environmentSnapshot: {
+          id: "snap_demo",
+          environmentId: "env_demo",
+          createdAt: "2026-05-05T00:00:00.000Z",
+          precedence: [],
+          variables: [],
+        },
+        dependencyBindings,
+      },
+      nextActions: ["logs"],
+      sectionErrors: [],
+      generatedAt: "2026-05-05T00:00:01.000Z",
+    });
+
+    expect(plan.dependencyBindings?.references[0]?.targetName).toBe("DATABASE_URL");
+    expect(show.snapshot?.dependencyBindings?.runtimeInjection.status).toBe("deferred");
+    expect(JSON.stringify({ plan, show })).not.toContain("postgres://");
+    expect(JSON.stringify({ plan, show })).not.toContain("super-secret");
+  });
+
   test("[DPP-CATALOG-001][WF-PLAN-JS-001] exposes ready JavaScript planner catalog output", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",

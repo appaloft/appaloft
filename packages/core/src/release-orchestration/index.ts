@@ -1,3 +1,4 @@
+export * from "./dependency-binding-snapshot-reference";
 export * from "./deployment";
 export * from "./deployment-specifications";
 export * from "./release";

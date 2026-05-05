@@ -73,6 +73,8 @@ Then:
 | DEP-SHOW-QRY-007 | integration | Failure summary unavailable | Deployment failed, but failure summary projection missing | `ok` | `deployment_failure_summary_unavailable` | Terminal status remains `failed`; failure details are not fabricated. |
 | DEP-SHOW-QRY-008 | integration | Resource drift after deployment | Resource current profile now differs from the attempt snapshot | `ok` | None | Snapshot still reflects the immutable attempt; current resource config is not substituted. |
 | DEP-SHOW-QRY-009 | integration | Access snapshot is historical | Deployment snapshot route differs from current resource access precedence | `ok` | None | Detail labels attempt route as historical/snapshot context and does not claim it is current resource access. |
+| DEP-BIND-SNAP-REF-006 | integration | Dependency binding snapshot references are immutable | Deployment was accepted with dependency binding references and the Resource binding state changes later | `ok` | None | Snapshot reports the dependency binding references captured at admission, not the current Resource binding state. |
+| DEP-BIND-SNAP-REF-002 | integration | Dependency binding snapshot references are secret-safe | Deployment was accepted for a Resource bound to a secret-bearing imported Postgres dependency | `ok` | None | Detail output omits raw connection URL, password, token, secret value, provider credential, sensitive query parameter, and materialized env value. |
 | DEP-SHOW-QRY-010 | integration | Aggregation failure | Base deployment sources load but service cannot produce a safe response | `err(deployment_detail_aggregation_failed)` | None | No partial unsafe detail is returned. |
 
 ## Ownership And Boundary Matrix

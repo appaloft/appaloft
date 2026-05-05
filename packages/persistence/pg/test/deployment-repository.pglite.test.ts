@@ -14,6 +14,7 @@ import {
   CreatedAt,
   Deployment,
   DeploymentByIdSpec,
+  DeploymentDependencyBindingSnapshotReadinessValue,
   DeploymentId,
   DeploymentTarget,
   DeploymentTargetDescriptor,
@@ -46,8 +47,14 @@ import {
   ProjectName,
   ProviderKey,
   Resource,
+  ResourceBindingId,
+  ResourceBindingScopeValue,
+  ResourceBindingTargetName,
   ResourceExposureModeValue,
   ResourceId,
+  ResourceInjectionModeValue,
+  ResourceInstanceId,
+  ResourceInstanceKindValue,
   ResourceKindValue,
   ResourceName,
   ResourceNetworkProtocolValue,
@@ -93,6 +100,7 @@ function createDeploymentRecord(input: {
   id: string;
   createdAt: string;
   status: "planned" | "succeeded";
+  includeDependencyBindingReference?: boolean;
   supersedesDeploymentId?: string;
 }): Deployment {
   const environment = Environment.create({
@@ -141,6 +149,21 @@ function createDeploymentRecord(input: {
       snapshotId: EnvironmentSnapshotId.rehydrate(`snap_${input.id}`),
       createdAt: GeneratedAt.rehydrate(input.createdAt),
     }),
+    ...(input.includeDependencyBindingReference
+      ? {
+          dependencyBindingReferences: [
+            {
+              bindingId: ResourceBindingId.rehydrate("rbd_pg"),
+              dependencyResourceId: ResourceInstanceId.rehydrate("rsi_pg"),
+              kind: ResourceInstanceKindValue.rehydrate("postgres"),
+              targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
+              scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+              injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+              snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
+            },
+          ],
+        }
+      : {}),
     createdAt: CreatedAt.rehydrate(input.createdAt),
     ...(input.supersedesDeploymentId
       ? { supersedesDeploymentId: DeploymentId.rehydrate(input.supersedesDeploymentId) }
@@ -175,6 +198,7 @@ describe("pglite deployment repository", () => {
       createDatabase,
       createMigrator,
       PgDeploymentRepository,
+      PgDeploymentReadModel,
       PgDestinationRepository,
       PgEnvironmentRepository,
       PgProjectRepository,
@@ -195,6 +219,7 @@ describe("pglite deployment repository", () => {
     const environmentRepository = new PgEnvironmentRepository(database.db);
     const resourceRepository = new PgResourceRepository(database.db);
     const deploymentRepository = new PgDeploymentRepository(database.db);
+    const deploymentReadModel = new PgDeploymentReadModel(database.db);
 
     const project = Project.create({
       id: ProjectId.rehydrate("prj_repo"),
@@ -272,6 +297,7 @@ describe("pglite deployment repository", () => {
       id: "dep_active",
       createdAt: "2026-01-01T00:00:02.000Z",
       status: "planned",
+      includeDependencyBindingReference: true,
       supersedesDeploymentId: "dep_prev",
     });
     const firstAdmit = await deploymentRepository.insertOne(
@@ -309,6 +335,32 @@ describe("pglite deployment repository", () => {
       DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_active")),
     );
     expect(storedDeployment?.toState().supersedesDeploymentId?.value).toBe("dep_prev");
+    expect(storedDeployment?.toState().dependencyBindingReferences[0]).toMatchObject({
+      bindingId: ResourceBindingId.rehydrate("rbd_pg"),
+      dependencyResourceId: ResourceInstanceId.rehydrate("rsi_pg"),
+      kind: ResourceInstanceKindValue.rehydrate("postgres"),
+      targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
+      scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+      injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+      snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
+    });
+    const storedSummary = await deploymentReadModel.findOne(
+      context,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_active")),
+    );
+    expect(storedSummary?.dependencyBindingReferences).toEqual([
+      {
+        bindingId: "rbd_pg",
+        dependencyResourceId: "rsi_pg",
+        kind: "postgres",
+        targetName: "DATABASE_URL",
+        scope: "runtime-only",
+        injectionMode: "env",
+        snapshotReadiness: {
+          status: "ready",
+        },
+      },
+    ]);
 
     await database.close();
   });

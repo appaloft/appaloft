@@ -484,6 +484,52 @@ describe("ShowDeploymentQueryService", () => {
     expect(detail.generatedAt).toBe("2026-01-01T00:00:10.000Z");
   });
 
+  test("[DEP-BIND-SNAP-REF-006] returns immutable dependency binding snapshot references", async () => {
+    const result = await createService({
+      deployments: [
+        deploymentSummary({
+          dependencyBindingReferences: [
+            {
+              bindingId: "rbd_pg",
+              dependencyResourceId: "rsi_pg",
+              kind: "postgres",
+              targetName: "DATABASE_URL",
+              scope: "runtime-only",
+              injectionMode: "env",
+              snapshotReadiness: {
+                status: "ready",
+              },
+            },
+          ],
+        }),
+      ],
+    }).service.execute(createTestContext(), createQuery());
+
+    const detail = unwrap(result);
+    expect(detail.snapshot?.dependencyBindings).toEqual({
+      status: "ready",
+      references: [
+        {
+          bindingId: "rbd_pg",
+          dependencyResourceId: "rsi_pg",
+          kind: "postgres",
+          targetName: "DATABASE_URL",
+          scope: "runtime-only",
+          injectionMode: "env",
+          snapshotReadiness: {
+            status: "ready",
+          },
+        },
+      ],
+      runtimeInjection: {
+        status: "deferred",
+        reason: "runtime dependency environment injection is deferred for this slice",
+      },
+    });
+    expect(JSON.stringify(detail.snapshot?.dependencyBindings)).not.toContain("postgres://");
+    expect(JSON.stringify(detail.snapshot?.dependencyBindings)).not.toContain("super-secret");
+  });
+
   test("[DEP-SHOW-QRY-002] returns not_found without querying related readers when deployment is missing", async () => {
     const harness = createService({
       deployments: [],

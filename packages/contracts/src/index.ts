@@ -2518,6 +2518,22 @@ export const deploymentSummarySchema = z.object({
     precedence: z.array(z.string()),
     variables: z.array(environmentVariableSchema),
   }),
+  dependencyBindingReferences: z
+    .array(
+      z.object({
+        bindingId: z.string(),
+        dependencyResourceId: z.string(),
+        kind: z.literal("postgres"),
+        targetName: z.string(),
+        scope: z.enum(["environment", "release", "build-only", "runtime-only"]),
+        injectionMode: z.enum(["env", "file", "reference"]),
+        snapshotReadiness: z.object({
+          status: z.enum(["ready", "blocked"]),
+          reason: z.string().optional(),
+        }),
+      }),
+    )
+    .optional(),
   logs: z.array(deploymentLogEntrySchema),
   logCount: z.number(),
   createdAt: z.string(),
@@ -2693,6 +2709,16 @@ export const deploymentAttemptTimelineSchema = z.object({
 export const deploymentAttemptSnapshotSchema = z.object({
   runtimePlan: runtimePlanSchema,
   environmentSnapshot: deploymentSummarySchema.shape.environmentSnapshot,
+  dependencyBindings: z
+    .object({
+      status: z.enum(["ready", "blocked", "not-applicable"]),
+      references: deploymentSummarySchema.shape.dependencyBindingReferences.unwrap(),
+      runtimeInjection: z.object({
+        status: z.literal("deferred"),
+        reason: z.string(),
+      }),
+    })
+    .optional(),
 });
 
 export const deploymentAttemptFailureSummarySchema = z.object({
@@ -2930,6 +2956,16 @@ export const deploymentPlanResponseSchema = z.object({
       scheme: z.enum(["http", "https"]).optional(),
       routeCount: z.number().int().nonnegative().optional(),
       routeGroupCount: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
+  dependencyBindings: z
+    .object({
+      status: z.enum(["ready", "blocked", "not-applicable"]),
+      references: deploymentSummarySchema.shape.dependencyBindingReferences.unwrap(),
+      runtimeInjection: z.object({
+        status: z.literal("deferred"),
+        reason: z.string(),
+      }),
     })
     .optional(),
   warnings: z.array(deploymentPlanReasonSchema),

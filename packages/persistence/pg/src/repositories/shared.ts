@@ -37,6 +37,8 @@ import {
   DeactivatedAt,
   DeactivationReason,
   DeletedAt,
+  type DeploymentDependencyBindingReferenceState,
+  DeploymentDependencyBindingSnapshotReadinessValue,
   DeploymentId,
   DeploymentLogEntry,
   type DeploymentLogEntry as DeploymentLogEntryType,
@@ -117,9 +119,15 @@ import {
   ProjectSlug,
   ProviderKey,
   PublicDomainName,
+  ResourceBindingId,
+  ResourceBindingScopeValue,
+  ResourceBindingTargetName,
   ResourceExposureModeValue,
   ResourceGeneratedAccessModeValue,
   ResourceId,
+  ResourceInjectionModeValue,
+  ResourceInstanceId,
+  ResourceInstanceKindValue,
   ResourceKindValue,
   ResourceLifecycleStatusValue,
   ResourceName,
@@ -197,6 +205,12 @@ type DeploymentStatusInput = Parameters<typeof DeploymentStatusValue.rehydrate>[
 type DestinationKindInput = Parameters<typeof DestinationKindValue.rehydrate>[0];
 type DeploymentPhaseInput = Parameters<typeof DeploymentPhaseValue.rehydrate>[0];
 type LogLevelInput = Parameters<typeof LogLevelValue.rehydrate>[0];
+type ResourceBindingScopeInput = Parameters<typeof ResourceBindingScopeValue.rehydrate>[0];
+type ResourceInjectionModeInput = Parameters<typeof ResourceInjectionModeValue.rehydrate>[0];
+type ResourceInstanceKindInput = Parameters<typeof ResourceInstanceKindValue.rehydrate>[0];
+type DeploymentDependencyBindingSnapshotReadinessInput = Parameters<
+  typeof DeploymentDependencyBindingSnapshotReadinessValue.rehydrate
+>[0];
 type ResourceKindInput = Parameters<typeof ResourceKindValue.rehydrate>[0];
 type ResourceLifecycleStatusInput = Parameters<typeof ResourceLifecycleStatusValue.rehydrate>[0];
 type ProjectLifecycleStatusInput = Parameters<typeof ProjectLifecycleStatusValue.rehydrate>[0];
@@ -350,6 +364,17 @@ export interface SerializedDeploymentLog extends Record<string, unknown> {
   phase: DeploymentPhaseInput;
   level: LogLevelInput;
   message: string;
+}
+
+export interface SerializedDeploymentDependencyBindingReference extends Record<string, unknown> {
+  bindingId: string;
+  dependencyResourceId: string;
+  kind: ResourceInstanceKindInput;
+  targetName: string;
+  scope: ResourceBindingScopeInput;
+  injectionMode: ResourceInjectionModeInput;
+  snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessInput;
+  snapshotReadinessReason?: string;
 }
 
 export interface SerializedResourceService extends Record<string, unknown> {
@@ -871,6 +896,49 @@ export function serializeDeploymentLogs(logs: DeploymentLogEntryType[]): Seriali
       phase: state.phase.value,
       level: state.level.value,
       message: state.message.value,
+    };
+  });
+}
+
+export function serializeDeploymentDependencyBindingReferences(
+  references: DeploymentDependencyBindingReferenceState[],
+): SerializedDeploymentDependencyBindingReference[] {
+  return references.map((reference) => ({
+    bindingId: reference.bindingId.value,
+    dependencyResourceId: reference.dependencyResourceId.value,
+    kind: reference.kind.value,
+    targetName: reference.targetName.value,
+    scope: reference.scope.value,
+    injectionMode: reference.injectionMode.value,
+    snapshotReadiness: reference.snapshotReadiness.value,
+    ...(reference.snapshotReadinessReason
+      ? { snapshotReadinessReason: reference.snapshotReadinessReason.value }
+      : {}),
+  }));
+}
+
+export function rehydrateDeploymentDependencyBindingReferences(
+  raw: unknown,
+): DeploymentDependencyBindingReferenceState[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.map((item) => {
+    const record = item as SerializedDeploymentDependencyBindingReference;
+    return {
+      bindingId: ResourceBindingId.rehydrate(record.bindingId),
+      dependencyResourceId: ResourceInstanceId.rehydrate(record.dependencyResourceId),
+      kind: ResourceInstanceKindValue.rehydrate(record.kind),
+      targetName: ResourceBindingTargetName.rehydrate(record.targetName),
+      scope: ResourceBindingScopeValue.rehydrate(record.scope),
+      injectionMode: ResourceInjectionModeValue.rehydrate(record.injectionMode),
+      snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.rehydrate(
+        record.snapshotReadiness,
+      ),
+      ...(record.snapshotReadinessReason
+        ? { snapshotReadinessReason: DescriptionText.rehydrate(record.snapshotReadinessReason) }
+        : {}),
     };
   });
 }
@@ -1610,6 +1678,9 @@ export function rehydrateDeploymentRow(row: Selectable<Database["deployments"]>)
     status: DeploymentStatusValue.rehydrate(row.status as DeploymentStatusInput),
     runtimePlan: rehydrateRuntimePlan(row.runtime_plan),
     environmentSnapshot: rehydrateEnvironmentSnapshot(row.environment_snapshot),
+    dependencyBindingReferences: rehydrateDeploymentDependencyBindingReferences(
+      row.dependency_binding_references,
+    ),
     logs: rehydrateDeploymentLogs(row.logs),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
     ...(startedAt ? { startedAt: StartedAt.rehydrate(startedAt) } : {}),

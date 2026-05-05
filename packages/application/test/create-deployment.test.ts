@@ -10,6 +10,8 @@ import {
   ConfigValueText,
   CreatedAt,
   DeactivatedAt,
+  DependencyResourceSecretRef,
+  DependencyResourceSourceModeValue,
   Deployment,
   DeploymentByIdSpec,
   DeploymentId,
@@ -57,10 +59,19 @@ import {
   ProjectName,
   ProviderKey,
   Resource,
+  ResourceBinding,
+  ResourceBindingId,
+  ResourceBindingScopeValue,
+  ResourceBindingTargetName,
   ResourceByIdSpec,
   ResourceExposureModeValue,
   ResourceGeneratedAccessModeValue,
   ResourceId,
+  ResourceInjectionModeValue,
+  ResourceInstance,
+  ResourceInstanceId,
+  ResourceInstanceKindValue,
+  ResourceInstanceName,
   ResourceKindValue,
   ResourceName,
   ResourceNetworkProtocolValue,
@@ -86,6 +97,8 @@ import {
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
+  UpsertResourceBindingSpec,
+  UpsertResourceInstanceSpec,
   UpsertResourceSpec,
   VariableExposureValue,
   VariableKindValue,
@@ -93,10 +106,13 @@ import {
 import {
   CapturedEventBus,
   FixedClock,
+  MemoryDependencyResourceRepository,
   MemoryDeploymentRepository,
   MemoryDestinationRepository,
   MemoryEnvironmentRepository,
   MemoryProjectRepository,
+  MemoryResourceDependencyBindingReadModel,
+  MemoryResourceDependencyBindingRepository,
   MemoryResourceRepository,
   MemoryServerRepository,
   NoopLogger,
@@ -488,6 +504,23 @@ class LocalEmbeddedDefaultsPolicy implements DeploymentContextDefaultsPolicy {
   }
 }
 
+function unwrapDeploymentCreateResult(result: Result<{ id: string }> | { id: string }): {
+  id: string;
+} {
+  let current: unknown = result;
+  while (current && typeof current === "object") {
+    const candidate = current as { isOk?: unknown; _unsafeUnwrap?: unknown };
+    if (typeof candidate._unsafeUnwrap !== "function") {
+      break;
+    }
+    if (typeof candidate.isOk === "function") {
+      expect(candidate.isOk()).toBe(true);
+    }
+    current = (candidate._unsafeUnwrap as () => unknown)();
+  }
+  return current as { id: string };
+}
+
 function createTestContext(): ExecutionContext {
   return createExecutionContext({
     entrypoint: "cli",
@@ -525,6 +558,12 @@ async function createDeploymentFixture(
   const environments = new MemoryEnvironmentRepository();
   const resources = new MemoryResourceRepository();
   const deployments = new MemoryDeploymentRepository();
+  const dependencyResources = new MemoryDependencyResourceRepository();
+  const dependencyBindings = new MemoryResourceDependencyBindingRepository();
+  const dependencyBindingReadModel = new MemoryResourceDependencyBindingReadModel(
+    dependencyBindings,
+    dependencyResources,
+  );
   const clock = new FixedClock("2026-01-01T00:00:00.000Z");
   const idGenerator = new SequenceIdGenerator();
   const eventBus = new CapturedEventBus();
@@ -641,11 +680,15 @@ async function createDeploymentFixture(
     options.runtimeTargetBackendRegistry ?? new StaticRuntimeTargetBackendRegistry(),
     options.domainRouteBindingReader,
     options.serverAppliedRouteDesiredStateReader,
+    dependencyBindingReadModel,
   );
   return {
     clock,
     context,
     createDeploymentUseCase,
+    dependencyBindings,
+    dependencyBindingReadModel,
+    dependencyResources,
     deployments,
     eventBus,
     logger,
@@ -660,6 +703,60 @@ async function createDeploymentFixture(
       resourceId: "res_demo",
     },
   };
+}
+
+async function createActivePostgresBinding(input: {
+  dependencyResources: MemoryDependencyResourceRepository;
+  dependencyBindings: MemoryResourceDependencyBindingRepository;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  bindingId?: string;
+  dependencyResourceId?: string;
+  status?: "active" | "removed";
+}) {
+  const dependencyResource = ResourceInstance.createPostgresDependencyResource({
+    id: ResourceInstanceId.rehydrate(input.dependencyResourceId ?? "rsi_pg"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    name: ResourceInstanceName.rehydrate("External Postgres"),
+    kind: ResourceInstanceKindValue.rehydrate("postgres"),
+    sourceMode: DependencyResourceSourceModeValue.rehydrate("imported-external"),
+    providerKey: ProviderKey.rehydrate("external-postgres"),
+    endpoint: {
+      host: "db.example.com",
+      port: 5432,
+      databaseName: "app",
+      maskedConnection: "postgres://app:********@db.example.com:5432/app",
+    },
+    connectionSecretRef: DependencyResourceSecretRef.rehydrate("secret://postgres/super-secret"),
+    providerManaged: false,
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
+  await input.dependencyResources.upsert(
+    input.repositoryContext,
+    dependencyResource,
+    UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
+  );
+
+  const binding = ResourceBinding.create({
+    id: ResourceBindingId.rehydrate(input.bindingId ?? "rbd_pg"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    resourceId: ResourceId.rehydrate("res_demo"),
+    resourceInstanceId: ResourceInstanceId.rehydrate(input.dependencyResourceId ?? "rsi_pg"),
+    targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
+    scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+    injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
+  if (input.status === "removed") {
+    binding.unbind({ removedAt: UpdatedAt.rehydrate("2026-01-01T00:01:00.000Z") });
+  }
+
+  await input.dependencyBindings.upsert(
+    input.repositoryContext,
+    binding,
+    UpsertResourceBindingSpec.fromResourceBinding(binding),
+  );
 }
 
 function createStaticSiteResource(input: { publishDirectory?: string } = {}): Resource {
@@ -945,6 +1042,69 @@ describe("CreateDeploymentUseCase", () => {
     expect(runtimePlanResolver.input?.requestedDeployment.runtimeMetadata?.["preview.id"]).toBe(
       undefined,
     );
+  });
+
+  test("[DEP-BIND-SNAP-REF-001] [DEP-BIND-SNAP-REF-002] captures active Postgres binding safe references without secrets", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResources,
+      repositoryContext,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const created = unwrapDeploymentCreateResult(result);
+
+    const deployment = deployments.items.get(created.id);
+    expect(deployment?.toState().dependencyBindingReferences).toHaveLength(1);
+    expect(deployment?.toState().dependencyBindingReferences[0]).toMatchObject({
+      bindingId: ResourceBindingId.rehydrate("rbd_pg"),
+      dependencyResourceId: ResourceInstanceId.rehydrate("rsi_pg"),
+      kind: ResourceInstanceKindValue.rehydrate("postgres"),
+      targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
+      scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+      injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+    });
+    const serializedReferences = JSON.stringify(
+      deployment?.toState().dependencyBindingReferences ?? [],
+    );
+    expect(serializedReferences).not.toContain("super-secret");
+    expect(serializedReferences).not.toContain("db.example.com");
+    expect(serializedReferences).not.toContain("postgres://");
+    expect(serializedReferences).not.toContain("secret://");
+  });
+
+  test("[DEP-BIND-SNAP-REF-003] omits removed bindings from new deployment snapshots", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResources,
+      repositoryContext,
+      status: "removed",
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(
+      deployments.items.get(result._unsafeUnwrap().id)?.toState().dependencyBindingReferences,
+    ).toEqual([]);
   });
 
   test("[RES-PROFILE-ACCESS-003] resource access path prefix reaches generated route planning input", async () => {
