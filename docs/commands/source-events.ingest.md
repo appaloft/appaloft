@@ -4,9 +4,10 @@
 
 Accepted candidate integration boundary. Inactive application command handling, generic signed
 source-event verification, durable source-event dedupe persistence, and policy matching for ignored
-or blocked outcomes exist. Do not expose ingestion routes until provider adapters, deployment
-dispatch, read models, error contracts, public docs/help, `CORE_OPERATIONS.md`,
-`operation-catalog.ts`, and tests are aligned in Code Round.
+or blocked outcomes exist. A matching source-event dispatcher can invoke existing
+`deployments.create` admission and durably update source-event outcomes. Do not expose ingestion
+routes until provider adapters, read models, error contracts, public docs/help,
+`CORE_OPERATIONS.md`, `operation-catalog.ts`, and tests are aligned in Code Round.
 
 ## Governing Sources
 

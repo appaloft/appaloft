@@ -45,10 +45,10 @@ Round authorization.
 ### 4. Deployment Dispatch
 
 - Evaluate enabled policies in application logic. `Status: policy candidate lookup and ignored
-  ref/disabled/blocked/no-match outcome evaluation implemented; matching deployment dispatch
-  remains future.`
+  ref/disabled/blocked/no-match outcome evaluation implemented.`
 - Dispatch matching policies through existing deployment admission and `resource-runtime`
-  coordination.
+  coordination. `Status: application dispatcher invokes existing deployments.create admission and
+  records dispatched or dispatch-failed source event outcomes; entrypoints remain inactive.`
 - Preserve async acceptance, deployment snapshots, logs, recovery, and rollback semantics.
 
 ### 5. Entrypoints And Docs

@@ -4119,6 +4119,7 @@ export interface SourceEventPolicyCandidate {
   projectId: string;
   environmentId: string;
   resourceId: string;
+  serverId?: string;
   destinationId?: string;
   status: "enabled" | "disabled" | "blocked";
   refs: string[];
@@ -4135,6 +4136,26 @@ export interface SourceEventPolicyReader {
       sourceIdentity: SourceEventIdentity;
     },
   ): Promise<SourceEventPolicyCandidate[]>;
+}
+
+export interface SourceEventDeploymentDispatchInput {
+  sourceEventId: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId?: string;
+}
+
+export interface SourceEventDeploymentDispatchResult {
+  deploymentId: string;
+}
+
+export interface SourceEventDeploymentDispatcher {
+  dispatch(
+    context: ExecutionContext,
+    input: SourceEventDeploymentDispatchInput,
+  ): Promise<Result<SourceEventDeploymentDispatchResult>>;
 }
 
 export interface SourceEventRecorder {
