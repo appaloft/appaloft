@@ -342,4 +342,35 @@ describe("public docs operation coverage", () => {
       publicDocsHelpTopics["source.auto-deploy-ignored-events"].webSurfaces?.join("\n"),
     ).toContain("Resource detail source event diagnostics");
   });
+
+  test("[SCHED-TASK-DOCS-001] scheduled task operations record docs coverage", () => {
+    for (const operationKey of [
+      "scheduled-tasks.create",
+      "scheduled-tasks.list",
+      "scheduled-tasks.show",
+      "scheduled-tasks.configure",
+      "scheduled-tasks.delete",
+      "scheduled-tasks.run-now",
+      "scheduled-task-runs.list",
+      "scheduled-task-runs.show",
+      "scheduled-task-runs.logs",
+    ] as const) {
+      expect(getPublicDocsOperationCoverage(operationKey)).toMatchObject({
+        operationKey,
+        status: "documented",
+        topicId: "scheduled-task.resource-lifecycle",
+      });
+    }
+
+    const topic = publicDocsHelpTopics["scheduled-task.resource-lifecycle"];
+
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/decisions/ADR-039-scheduled-task-resource-ownership.md",
+        "docs/specs/044-scheduled-task-resource-shape/spec.md",
+        "docs/testing/scheduled-task-resource-test-matrix.md",
+      ]),
+    );
+    expect(topic.webSurfaces?.join("\n")).toContain("Web controls deferred");
+  });
 });

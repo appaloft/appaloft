@@ -155,6 +155,26 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[SCHED-TASK-DOCS-001] scheduled task help resolves to resource docs", () => {
+    const topic = publicDocsHelpTopics["scheduled-task.resource-lifecycle"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+    );
+    expect(topic.surfaces).toEqual(expect.arrayContaining(["cli", "http-api", "mcp"]));
+    expect(topic.aliases).toEqual(expect.arrayContaining(["scheduled task", "cron"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/decisions/ADR-039-scheduled-task-resource-ownership.md",
+        "docs/specs/044-scheduled-task-resource-shape/spec.md",
+        "docs/testing/scheduled-task-resource-test-matrix.md",
+      ]),
+    );
+  });
+
   test("[ERROR-KNOWLEDGE-002] public error guides resolve docs, agent guide, and remedies", () => {
     const guide = findPublicDocsErrorGuide({
       code: "infra_error",

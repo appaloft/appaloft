@@ -83,6 +83,8 @@ Current status:
   diagnostics, and deployment plan preview blocked/fix/override guidance.
 - `PUB-DOCS-011` now also covers Docker Swarm target registration guidance through CLI
   `server register` help.
+- `PUB-DOCS-011` now also covers scheduled task lifecycle, run-now, run history, and run-log
+  guidance through CLI `scheduled-task` help.
 - `PUB-DOCS-012` has expanded HTTP/API route-description coverage for high-confusion operations
   including deployment source, SSH credentials, server connectivity, resource profiles, environment
   variables, project lifecycle, domains, certificates, logs, health, diagnostics, and terminal
@@ -91,6 +93,8 @@ Current status:
   reference path `/docs/reference/openapi/`.
 - `PUB-DOCS-012` now also covers Docker Swarm target registration guidance through the HTTP
   `POST /servers` route description.
+- `PUB-DOCS-012` now also covers scheduled task lifecycle, run-now, run history, and run-log
+  guidance through the scheduled-task HTTP route descriptions.
 - `PUB-DOCS-013` is covered by HTTP adapter tests for embedded docs routing and binary bundle smoke
   verification that `/docs/*` is served separately from Web console assets.
 - `PUB-DOCS-014` is covered by HTTP adapter tests for `docsStaticDir` override behavior and binary
@@ -102,7 +106,9 @@ Current status:
   dependency resource, backup/restore, and recovery-command traceability is recorded for active
   CLI/HTTP/API operations. Resource runtime control traceability is recorded as future
   Web/CLI/API/MCP surface coverage until those commands are active. Docker Swarm runtime target
-  traceability is recorded as a target-help anchor with deferred execution UI.
+  traceability is recorded as a target-help anchor with deferred execution UI. Scheduled task
+  traceability is recorded for active CLI/HTTP/API/future MCP help links with Web controls
+  deferred.
 - `PUB-DOCS-017` is covered for registered public error guides by
   `packages/docs-registry/test/help-topics.test.ts`.
 

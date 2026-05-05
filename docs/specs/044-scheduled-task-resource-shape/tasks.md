@@ -73,12 +73,13 @@
   - [x] Add CLI commands.
   - [x] Verify generated MCP descriptors.
   - [ ] Add Web controls.
-  - [ ] Add public docs/help.
+  - [x] Add public docs/help.
 
 ## Docs Round
 
-- [ ] Add public docs page/help anchor.
-- [ ] Add CLI/API descriptions and Web help links.
+- [x] Add public docs page/help anchor.
+- [x] Add CLI/API descriptions.
+- [ ] Add Web help links.
 
 ## Verification
 
