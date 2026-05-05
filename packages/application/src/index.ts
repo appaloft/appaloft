@@ -27,6 +27,7 @@ export * from "./resource-access-failure-diagnostics";
 export * from "./resource-handlers";
 export * from "./resource-messages";
 export * from "./runtime-topology";
+export * from "./scheduled-task-messages";
 export * from "./server-handlers";
 export * from "./server-messages";
 export * from "./source-event-handlers";

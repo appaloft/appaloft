@@ -60,6 +60,9 @@ DDD or internal process-manager terminology.
 - Core scheduled task run attempts exist with Resource/task ownership, manual or scheduled trigger
   kind, accepted/running/succeeded/failed/skipped lifecycle state, timestamps, safe exit/failure
   summary fields, and no Deployment id.
+- Inactive application command/query schemas, messages, result DTOs, and read-model ports exist
+  for the target scheduled-task and scheduled-task-run operations. They are not active operation
+  catalog entries and have no handlers/use cases yet.
 - No operation catalog entries are active.
 - No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
 - No persisted scheduled-task/run state exists.
