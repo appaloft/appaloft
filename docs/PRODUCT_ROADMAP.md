@@ -1235,7 +1235,12 @@ Current verification notes:
 - 2026-05-06 Phase 7 Docker Swarm logs slice bound initial `SWARM-TARGET-OBS-001` coverage to
   `resources.runtime-logs`: Swarm-backed OCI image deployments read `docker service logs` through
   sanitized `swarm.serviceName` metadata and return normalized redacted Appaloft runtime log lines.
-  Swarm health observation remains open.
+  Swarm health observation remained open until the following health slice.
+- 2026-05-06 Phase 7 Docker Swarm health slice bound initial `SWARM-TARGET-OBS-002` coverage to
+  `resources.health`: Swarm-backed OCI image deployments can request opt-in live runtime inspection
+  from sanitized `swarm.serviceName` metadata, and the runtime adapter normalizes `docker service
+  ps` task state into Appaloft runtime health/check fields without exposing raw Docker payloads.
+  Remote-manager probing and real Swarm smoke coverage remain open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1300,8 +1305,8 @@ Required:
   Target-kind registration metadata, unsupported-backend admission, backend descriptor selection,
   Swarm manager readiness, adapter-owned OCI/Compose render intent, OCI image apply-plan rendering,
   label-scoped cleanup plan rendering, opt-in fake backend acceptance coverage, Swarm runtime-log
-  observation, the public docs anchor, and CLI/API/Web help links are implemented; real Swarm
-  execution remains open.
+  observation, Swarm health observation, the public docs anchor, and CLI/API/Web help links are
+  implemented; real Swarm execution remains open.
 
 Exit criteria:
 

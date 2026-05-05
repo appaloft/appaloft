@@ -2943,11 +2943,34 @@ export interface ResourceHealthProbeResult {
   metadata?: Record<string, string>;
 }
 
+export interface ResourceRuntimeHealthProbeRequest {
+  resourceId: string;
+  deploymentId: string;
+  runtimeKind: ExecutionStrategyKind;
+  targetKind: TargetKind;
+  providerKey: string;
+  runtimeMetadata?: Record<string, string>;
+  timeoutSeconds: number;
+}
+
+export interface ResourceRuntimeHealthProbeResult {
+  lifecycle: ResourceRuntimeLifecycle;
+  health: ResourceRuntimeHealth;
+  observedAt: string;
+  reasonCode?: string;
+  message?: string;
+  check: ResourceHealthCheck;
+}
+
 export interface ResourceHealthProbeRunner {
   probe(
     context: ExecutionContext,
     request: ResourceHealthProbeRequest,
   ): Promise<Result<ResourceHealthProbeResult, DomainError>>;
+  probeRuntime?(
+    context: ExecutionContext,
+    request: ResourceRuntimeHealthProbeRequest,
+  ): Promise<Result<ResourceRuntimeHealthProbeResult, DomainError>>;
 }
 
 export interface ResourceHealthSummary {

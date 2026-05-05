@@ -32,6 +32,7 @@ import {
   type ResourcePublicAccessHealthSection,
   type ResourceRepository,
   type ResourceRuntimeHealth,
+  type ResourceRuntimeHealthProbeRequest,
   type ResourceRuntimeHealthSection,
   type ResourceSummary,
 } from "../../ports";
@@ -675,7 +676,15 @@ function checkRecords(input: {
     },
   ];
 
-  return checks.map((check) => input.liveChecks?.find((live) => live.name === check.name) ?? check);
+  const liveChecks = input.liveChecks ?? [];
+  const replacedChecks = checks.map(
+    (check) => liveChecks.find((live) => live.name === check.name) ?? check,
+  );
+  const extraChecks = liveChecks.filter(
+    (live) => !checks.some((check) => check.name === live.name),
+  );
+
+  return [...replacedChecks, ...extraChecks];
 }
 
 function overallStatus(input: {
@@ -826,6 +835,14 @@ function publicAccessProbeUrl(
   return withPolicyPath(publicAccess.url, policy.path);
 }
 
+function isDockerSwarmDeployment(deployment: DeploymentSummary): boolean {
+  return (
+    deployment.runtimePlan.target.providerKey === "docker-swarm" &&
+    deployment.runtimePlan.target.kind === "orchestrator-cluster" &&
+    deployment.runtimePlan.execution.kind === "docker-container"
+  );
+}
+
 @injectable()
 export class ResourceHealthQueryService {
   constructor(
@@ -876,8 +893,6 @@ export class ResourceHealthQueryService {
     const latestDeploymentHealthContext = latestDeploymentContext(latestDeployment);
     const latestRuntimeControl = resource.latestRuntimeControl;
 
-    this.recordUnsupportedLiveInspectionRequests(query, resource, sourceErrors);
-
     if (!latestDeployment) {
       sourceErrors.push(
         sourceError({
@@ -921,6 +936,76 @@ export class ResourceHealthQueryService {
       resourceState,
       deployment: latestDeployment,
     });
+
+    if (query.mode === "live" && query.includeRuntimeProbe) {
+      if (!latestDeployment) {
+        sourceErrors.push(
+          sourceError({
+            source: "runtime",
+            code: "resource_runtime_live_probe_unavailable",
+            category: "infra",
+            phase: "runtime-live-probe",
+            retriable: true,
+            relatedEntityId: resource.id,
+            message: "Live runtime probes require latest deployment context.",
+          }),
+        );
+      } else {
+        const request = this.runtimeInspectionRequest(resource, latestDeployment);
+        if (!request || !this.probeRunner.probeRuntime) {
+          this.recordUnsupportedLiveInspectionRequest(resource, sourceErrors);
+        } else {
+          const probeResult = await this.probeRunner.probeRuntime(context, request);
+          if (probeResult.isOk()) {
+            const result = probeResult.value;
+            const message = result.message
+              ? sanitizeFailureMessage(result.message).value
+              : undefined;
+            liveChecks.push({
+              ...result.check,
+              ...(result.check.message
+                ? { message: sanitizeFailureMessage(result.check.message).value }
+                : {}),
+            });
+            runtime = {
+              ...runtime,
+              lifecycle: result.lifecycle,
+              health: result.health,
+              observedAt: result.observedAt,
+              ...(result.reasonCode ? { reasonCode: result.reasonCode } : {}),
+              ...(message ? { message } : {}),
+            };
+
+            if (result.check.status === "failed" || result.health === "unhealthy") {
+              sourceErrors.push(
+                sourceError({
+                  source: "runtime",
+                  code:
+                    result.reasonCode ?? result.check.reasonCode ?? "resource_runtime_probe_failed",
+                  category: "infra",
+                  phase: result.check.phase ?? "runtime-live-probe",
+                  retriable: result.check.retriable ?? true,
+                  relatedEntityId: resource.id,
+                  ...(message ? { message } : {}),
+                }),
+              );
+            }
+          } else {
+            sourceErrors.push(
+              sourceError({
+                source: "runtime",
+                code: probeResult.error.code,
+                category: probeResult.error.category,
+                phase: "runtime-live-probe",
+                retriable: probeResult.error.retryable,
+                relatedEntityId: resource.id,
+                message: probeResult.error.message,
+              }),
+            );
+          }
+        }
+      }
+    }
 
     if (
       query.mode === "live" &&
@@ -1232,24 +1317,47 @@ export class ResourceHealthQueryService {
       : undefined;
   }
 
-  private recordUnsupportedLiveInspectionRequests(
-    query: ResourceHealthQuery,
+  private runtimeInspectionRequest(
+    resource: ResourceSummary,
+    deployment: DeploymentSummary,
+  ): ResourceRuntimeHealthProbeRequest | undefined {
+    if (!isDockerSwarmDeployment(deployment)) {
+      return undefined;
+    }
+
+    const serviceName = deployment.runtimePlan.execution.metadata?.["swarm.serviceName"];
+    if (!serviceName || serviceName.trim().length === 0) {
+      return undefined;
+    }
+
+    return {
+      resourceId: resource.id,
+      deploymentId: deployment.id,
+      runtimeKind: deployment.runtimePlan.execution.kind,
+      targetKind: deployment.runtimePlan.target.kind,
+      providerKey: deployment.runtimePlan.target.providerKey,
+      ...(deployment.runtimePlan.execution.metadata
+        ? { runtimeMetadata: deployment.runtimePlan.execution.metadata }
+        : {}),
+      timeoutSeconds: 5,
+    };
+  }
+
+  private recordUnsupportedLiveInspectionRequest(
     resource: ResourceSummary,
     sourceErrors: ResourceHealthSourceError[],
   ): void {
-    if (query.mode === "live" && query.includeRuntimeProbe) {
-      sourceErrors.push(
-        sourceError({
-          source: "runtime",
-          code: "resource_runtime_live_probe_unavailable",
-          category: "infra",
-          phase: "runtime-live-probe",
-          retriable: true,
-          relatedEntityId: resource.id,
-          message: "Live runtime probes are not available in this implementation slice.",
-        }),
-      );
-    }
+    sourceErrors.push(
+      sourceError({
+        source: "runtime",
+        code: "resource_runtime_live_probe_unavailable",
+        category: "infra",
+        phase: "runtime-live-probe",
+        retriable: true,
+        relatedEntityId: resource.id,
+        message: "Live runtime probes are not available for this runtime target.",
+      }),
+    );
   }
 
   private latestDeployment(
