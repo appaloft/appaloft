@@ -218,6 +218,7 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-022 | integration | Deploy action PR preview overlay boundary | Future preview config overlays apply only after trusted PR entrypoint context selects the preview environment; a committed overlay cannot select environment/project/resource/server/destination identity or credentials and cannot retarget an existing preview source link. |
 | CONFIG-FILE-ENTRY-023 | integration | Deploy action PR preview profile flag parity | Trusted CLI/Action flags provide or override runtime commands, network profile, health path, non-secret env values, `ci-env:` secret references, preview domain template, and preview TLS mode; the workflow persists env and route state through the same commands as config bootstrap and dispatches ids-only `deployments.create`. |
 | CONFIG-FILE-ENTRY-024 | integration | Deploy action PR preview URL required | With `require-preview-url=true`, the CLI/action fails the workflow when the created deployment read model cannot expose a public route or the deployment finished failed during preview route verification; without the flag, the deployment may be accepted with diagnostics and no `preview-url`. |
+| CONFIG-FILE-ENTRY-026 | integration | Deploy action PR preview output file | When preview mode is selected, the CLI can write an action-safe preview output file with schema version, deployment id, resource id, preview id, deployment status, and resolved public preview URL; the wrapper passes a temp file and publishes `preview-url` from that file to GitHub outputs. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -352,18 +353,17 @@ tests because it runs the source checkout directly instead of installing a relea
 The main repository now includes a reference composite wrapper at
 `.github/actions/deploy-action` with `action.yml`, install/checksum script, deploy script, and
 `scripts/test/deploy-action-wrapper.test.ts` coverage for `CONFIG-FILE-ENTRY-009`,
-`CONFIG-FILE-ENTRY-010`, `CONFIG-FILE-ENTRY-012`, `CONFIG-FILE-ENTRY-015`, and the current
-fail-before-mutation baseline for `CONTROL-PLANE-ENTRY-002`. This proves wrapper metadata,
-version/target install contract shape, SSH secret temp-key command mapping, PR preview flag
-mapping, no-config default behavior, and unsupported control-plane input rejection in this
-repository.
+`CONFIG-FILE-ENTRY-010`, `CONFIG-FILE-ENTRY-012`, `CONFIG-FILE-ENTRY-015`,
+`CONFIG-FILE-ENTRY-026`, and the current fail-before-mutation baseline for
+`CONTROL-PLANE-ENTRY-002`. This proves wrapper metadata, version/target install contract shape,
+SSH secret temp-key command mapping, PR preview flag mapping, CLI preview-output-file handling,
+no-config default behavior, and unsupported control-plane input rejection in this repository.
 
 Public `appaloft/deploy-action` release coverage is not complete yet. The main repository release
 workflow already produces CLI archives, the static Docker self-host installer, `checksums.txt`,
 `release-manifest.json`, and release notes, but the separate public wrapper repository still needs
-Marketplace README/examples, fixture or real-release install CI, generated access output handling,
-wrapper-level cleanup input/examples, future overlay behavior, and tests for the public repository
-layout.
+Marketplace README/examples, fixture or real-release install CI, wrapper-level cleanup
+input/examples, future overlay behavior, and tests for the public repository layout.
 
 Profile drift visibility and default fail-before-deploy behavior for existing-resource drift are
 covered in `packages/adapters/cli/test/deployment-config.test.ts`. Existing-resource profile

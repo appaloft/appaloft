@@ -32,6 +32,9 @@ cleanup_key_file() {
   if [ -n "${generated_key_file:-}" ]; then
     rm -f "$generated_key_file"
   fi
+  if [ -n "${generated_preview_output_file:-}" ]; then
+    rm -f "$generated_preview_output_file"
+  fi
 }
 
 trap cleanup_key_file EXIT
@@ -51,6 +54,7 @@ preview_id="${INPUT_PREVIEW_ID:-}"
 preview_domain_template="${INPUT_PREVIEW_DOMAIN_TEMPLATE:-}"
 preview_tls_mode="${INPUT_PREVIEW_TLS_MODE:-}"
 require_preview_url="${INPUT_REQUIRE_PREVIEW_URL:-false}"
+preview_output_file=""
 
 case "$control_plane_mode" in
   ""|none)
@@ -92,6 +96,11 @@ if [ -n "$ssh_private_key" ]; then
   ssh_private_key_file="$generated_key_file"
 fi
 
+if [ -n "$preview" ]; then
+  generated_preview_output_file="$(mktemp "${RUNNER_TEMP:-/tmp}/appaloft-preview-output.XXXXXX")"
+  preview_output_file="$generated_preview_output_file"
+fi
+
 argv=("$appaloft_bin" "deploy" "$source_locator")
 
 if [ -n "$config_path" ]; then
@@ -112,6 +121,7 @@ append_option "--preview" "$preview"
 append_option "--preview-id" "$preview_id"
 append_option "--preview-domain-template" "$preview_domain_template"
 append_option "--preview-tls-mode" "$preview_tls_mode"
+append_option "--preview-output-file" "$preview_output_file"
 
 if truthy "$require_preview_url"; then
   append_arg "--require-preview-url"
@@ -128,15 +138,34 @@ else
   "${argv[@]}"
 fi
 
+preview_url=""
+if [ -n "$preview_output_file" ] && [ -f "$preview_output_file" ]; then
+  while IFS='=' read -r key value; do
+    case "$key" in
+      preview-id)
+        if [ -z "$preview_id" ]; then
+          preview_id="$value"
+        fi
+        ;;
+      preview-url)
+        preview_url="$value"
+        ;;
+    esac
+  done < "$preview_output_file"
+fi
+
 if [ -n "$preview_id" ]; then
   echo "preview-id=$preview_id" >> "${GITHUB_OUTPUT:-/dev/null}"
 fi
 
-if [ -n "$preview_domain_template" ]; then
+if [ -z "$preview_url" ] && [ -n "$preview_domain_template" ]; then
   if [ "$preview_tls_mode" = "disabled" ]; then
     preview_url="http://${preview_domain_template}"
   else
     preview_url="https://${preview_domain_template}"
   fi
+fi
+
+if [ -n "$preview_url" ]; then
   echo "preview-url=$preview_url" >> "${GITHUB_OUTPUT:-/dev/null}"
 fi

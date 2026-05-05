@@ -98,7 +98,7 @@ outputs:
     description: Preview id when preview mode is selected.
     value: ${{ steps.deploy.outputs.preview-id }}
   preview-url:
-    description: Preview URL when a custom preview domain template is supplied and accepted.
+    description: Preview URL resolved by the CLI from generated/default access or custom preview route intent.
     value: ${{ steps.deploy.outputs.preview-url }}
 
 runs:

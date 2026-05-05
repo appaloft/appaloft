@@ -1066,8 +1066,11 @@ Current verification notes:
   verification script, deploy invocation script, SSH private-key temp-file handling, PR preview flag
   mapping, and `scripts/test/deploy-action-wrapper.test.ts` coverage. The roadmap row remains open
   until this reference is promoted to the public `appaloft/deploy-action` repository with
-  Marketplace docs/examples, public wrapper CI, cleanup examples, and stable action-safe
-  `preview-url` output handling.
+  Marketplace docs/examples, public wrapper CI, and cleanup examples.
+- 2026-05-05 Phase 7 deploy-action preview-output slice added CLI `--preview-output-file`
+  handling and wrapper temp-file parsing so Action PR previews can publish generated/default or
+  custom `preview-url` values from deployment read models instead of deriving only from templates.
+  Public `appaloft/deploy-action` promotion remains open.
 - 2026-05-05 Phase 7 existing-resource profile-drift help slice closed the stable public
   `resource.profile-drift` help topic, Web Resource diagnostics help link, CLI `resource show`
   help target, HTTP route description, docs traceability, and matrix/task sync. Default
