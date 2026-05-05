@@ -74,5 +74,11 @@ describe("MCP tool descriptors", () => {
       httpRoute: "POST /api/resources/{resourceId}/source-events/generic-signed",
       alternateHttpRoutes: ["POST /api/integrations/github/source-events"],
     });
+    expect(toolContractsByOperationKey.get("servers.register")).toMatchObject({
+      name: "servers_register",
+      cliCommand: "appaloft server register",
+      httpRoute: "POST /api/servers",
+    });
+    expect(toolContractsByOperationKey.has("server.docker-swarm-target")).toBe(false);
   });
 });

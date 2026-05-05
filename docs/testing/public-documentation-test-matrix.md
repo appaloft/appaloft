@@ -75,17 +75,22 @@ Current status:
   identity, runtime, health, network profile, custom domain, generated access route, TLS
   certificate readiness, proxy readiness, safe diagnostic payloads, runtime logs, terminal
   sessions, and resource detail/profile editing closure for source/runtime/network/access/health/
-  configuration sections.
+  configuration sections. Server registration provider help now points at the Docker Swarm runtime
+  target anchor for cluster-target readiness and unsupported-field recovery.
 - `PUB-DOCS-011` has expanded CLI coverage for high-confusion operations including deployment
   source, preview cleanup, source relink, SSH credentials, server connectivity, terminal sessions,
   project lifecycle, resource profiles, environment variables, domains, certificates, logs, health,
   diagnostics, and deployment plan preview blocked/fix/override guidance.
+- `PUB-DOCS-011` now also covers Docker Swarm target registration guidance through CLI
+  `server register` help.
 - `PUB-DOCS-012` has expanded HTTP/API route-description coverage for high-confusion operations
   including deployment source, SSH credentials, server connectivity, resource profiles, environment
   variables, project lifecycle, domains, certificates, logs, health, diagnostics, and terminal
   sessions. The HTTP API reference page also names the runtime OpenAPI document path
   `/api/openapi.json`, Scalar reference path `/api/reference`, and docs-generated OpenAPI
   reference path `/docs/reference/openapi/`.
+- `PUB-DOCS-012` now also covers Docker Swarm target registration guidance through the HTTP
+  `POST /servers` route description.
 - `PUB-DOCS-013` is covered by HTTP adapter tests for embedded docs routing and binary bundle smoke
   verification that `/docs/*` is served separately from Web console assets.
 - `PUB-DOCS-014` is covered by HTTP adapter tests for `docsStaticDir` override behavior and binary
