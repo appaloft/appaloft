@@ -2640,6 +2640,10 @@ export interface ResourceRuntimeControlTargetRequest {
   runtimeKind: ExecutionStrategyKind;
   targetKind: TargetKind;
   providerKey: string;
+  runtimeMetadata?: Record<string, string>;
+  composeFile?: string;
+  workingDirectory?: string;
+  targetServiceName?: string;
   reason?: string;
 }
 

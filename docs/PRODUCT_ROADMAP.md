@@ -964,6 +964,11 @@ Current verification notes:
   into `ResourceSummary.latestRuntimeControl`, with `RUNTIME-CTRL-READ-001` PGlite coverage. The
   operations remain inactive until real runtime adapters, CLI/HTTP/Web entrypoints,
   `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
+- 2026-05-05 Phase 7 resource runtime controls adapter Code Round slice added provider-neutral
+  Docker container and Docker Compose stop/start/restart command mapping with retained runtime
+  metadata, target service scoping, sanitized blocked results, and injected executor boundaries.
+  The operations remain inactive until local/generic-SSH executor wiring, CLI/HTTP/Web
+  entrypoints, `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
 
 Required:
 

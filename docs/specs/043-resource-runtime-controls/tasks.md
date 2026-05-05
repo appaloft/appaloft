@@ -25,11 +25,11 @@
 ## Test-First Round
 
 - [x] Bind `RUNTIME-CTRL-STOP-001` to command/use-case tests.
-- [ ] Bind `RUNTIME-CTRL-STOP-001` to real adapter tests.
+- [x] Bind `RUNTIME-CTRL-STOP-001` to adapter command-mapping tests.
 - [x] Bind `RUNTIME-CTRL-START-001` to retained runtime metadata command/use-case tests.
-- [ ] Bind `RUNTIME-CTRL-START-001` to real adapter tests.
+- [x] Bind `RUNTIME-CTRL-START-001` to adapter command-mapping tests.
 - [x] Bind `RUNTIME-CTRL-RESTART-001` to stop/start phase command/use-case tests.
-- [ ] Bind `RUNTIME-CTRL-RESTART-001` to real adapter tests.
+- [x] Bind `RUNTIME-CTRL-RESTART-001` to adapter command-mapping tests.
 - [x] Bind `RUNTIME-CTRL-BLOCK-001` to missing/stale runtime metadata tests.
 - [x] Bind `RUNTIME-CTRL-COORD-001` to `resource-runtime` coordination tests.
 - [x] Bind `RUNTIME-CTRL-READ-001` to `resources.health.latestRuntimeControl` readback tests.
@@ -42,7 +42,9 @@
 - [x] Add provider-neutral runtime target control port.
 - [x] Add runtime-control attempt recorder port.
 - [x] Add durable runtime-control attempt/read model persistence.
-- [ ] Implement local/generic-SSH Docker and Compose runtime-control adapters.
+- [x] Add Docker and Compose runtime-control adapter command mapping.
+- [ ] Wire local/generic-SSH runtime-control command execution.
+- [ ] Complete local/generic-SSH Docker and Compose runtime-control adapter activation.
 - [ ] Add CLI, HTTP/oRPC, and Web entrypoints only after tests pass.
 - [ ] Update `CORE_OPERATIONS.md` and `operation-catalog.ts` in the activation commit.
 

@@ -38,7 +38,9 @@ authorization.
 ### 3. Runtime Target Port
 
 - A provider-neutral runtime control port contract now exists for stop/start/restart.
-- Implement local/generic-SSH Docker and Compose adapters behind that port.
+- Provider-neutral Docker container and Docker Compose command mapping now exists behind that port
+  with an injected executor boundary.
+- Wire local/generic-SSH command execution behind the runtime-control target.
 - Return sanitized status, phase, and support details only.
 
 ### 4. Persistence And Read Models
