@@ -906,6 +906,14 @@ Current verification notes:
   CLI, HTTP/oRPC, public docs, and Web recovery actions gated by readiness output. Rollback remains
   inactive, so the full `0.9.0` release rule remains blocked by rollback, auto-deploy, preview, and
   cluster runtime items.
+- 2026-05-05 Phase 7 deployment rollback Spec Round created
+  [Deployment Rollback](./specs/041-deployment-rollback/spec.md) to activate
+  `deployments.rollback` under ADR-016/ADR-034. It narrows the next Code Round to a new deployment
+  attempt from a selected retained successful candidate, explicit rollback trigger/source/candidate
+  metadata, runtime artifact identity checks, resource-runtime coordination, CLI/oRPC/HTTP/Web
+  surfaces, and no stateful data rollback. It does not implement the command yet, so the full
+  `0.9.0` release rule remains blocked by rollback Code Round, auto-deploy, preview, and cluster
+  runtime items.
 
 Required:
 

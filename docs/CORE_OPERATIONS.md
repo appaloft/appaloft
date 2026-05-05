@@ -771,7 +771,9 @@ Current boundary:
   [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md).
 - Future `deployments.rollback` creates a new rollback deployment attempt from a retained successful
   candidate's immutable snapshot and Docker/OCI artifact identity. It does not re-plan from the
-  current Resource profile and does not roll back databases, volumes, or external dependencies.
+  current Resource profile and does not roll back databases, volumes, or external dependencies. Its
+  command implementation is scoped by
+  [Deployment Rollback](./specs/041-deployment-rollback/spec.md).
 - Quick Deploy is an entry workflow over explicit operations, not a separate domain command or
   operation-catalog entry. Web QuickDeploy and CLI interactive `appaloft deploy` must create/select
   context through existing commands and queries, then dispatch `deployments.create`. See
