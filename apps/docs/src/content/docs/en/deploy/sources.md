@@ -92,9 +92,13 @@ If the resource already points at an old source, use [Deployment recovery](/docs
 
 <h2 id="source-auto-deploy-setup">Auto-deploy setup</h2>
 
-Source auto-deploy is a planned Phase 7 capability. It turns a verified Git or generic signed source
-event into an ordinary deployment request, without adding branch, webhook, or delivery fields to
-`deployments.create`.
+Source auto-deploy turns a verified source event into an ordinary deployment request, without adding
+branch, webhook, or delivery fields to `deployments.create`. The first active ingestion route is the
+Resource-scoped generic signed webhook:
+
+```text
+POST /api/resources/{resourceId}/source-events/generic-signed
+```
 
 When enabled, the policy belongs to one Resource and is bound to that Resource's current source
 profile. If the Resource source changes later, the old policy becomes blocked until a user
@@ -103,8 +107,10 @@ explicitly acknowledges that the new source should still trigger auto-deploy.
 <h2 id="source-auto-deploy-signatures">Signatures and secrets</h2>
 
 Git provider webhooks and generic signed webhooks must be verified before policy matching. Generic
-signed webhooks use a Resource-scoped secret reference. Appaloft stores only safe reference and
-version metadata, not secret values, signature headers, or raw payloads.
+signed webhooks use `X-Appaloft-Signature` with `sha256=<hex>` or bare HMAC SHA-256 hex. The policy
+secret reference must use `resource-secret:<KEY>`, where `<KEY>` is a runtime secret variable on the
+same Resource. Appaloft stores only safe reference metadata, not secret values, signature headers, or
+raw payloads.
 
 To rotate a secret, replace the underlying secret reference first, then acknowledge the auto-deploy
 policy when needed.
@@ -113,7 +119,7 @@ policy when needed.
 
 The source event is written to a durable record before deployment dispatch. Duplicate delivery uses
 the provider delivery id, generic idempotency key, or a bounded-window key over source, ref,
-revision, and event kind.
+revision, and event kind. Generic signed route dedupe is scoped to the route Resource.
 
 A duplicate event must not create a second deployment. Users should be able to see `deduped` status
 and the original source event id in the source event read model.
@@ -129,8 +135,8 @@ payloads.
 
 <h2 id="source-auto-deploy-recovery">Auto-deploy recovery</h2>
 
-The first Phase 7 slice only promises visible source event records and synchronous dispatch results;
-it does not promise automatic background retry. If dispatch fails, inspect source event detail first,
+The first Phase 7 ingestion path records source event state and synchronous dispatch results; it
+does not promise automatic background retry. If dispatch fails, inspect source event detail first,
 then fix the source profile, secret reference, policy state, or runtime blocker.
 
 If a deployment was created, use ordinary deployment recovery/readiness, retry, redeploy, or

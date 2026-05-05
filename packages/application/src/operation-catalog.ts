@@ -109,6 +109,7 @@ import { rotateSshCredentialCommandInputSchema } from "./operations/servers/rota
 import { showServerQueryInputSchema } from "./operations/servers/show-server.query";
 import { showSshCredentialQueryInputSchema } from "./operations/servers/show-ssh-credential.query";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
+import { ingestSourceEventCommandInputSchema } from "./operations/source-events/ingest-source-event.command";
 import { listSourceEventsQueryInputSchema } from "./operations/source-events/list-source-events.query";
 import { showSourceEventQueryInputSchema } from "./operations/source-events/show-source-event.query";
 import { relinkSourceLinkCommandInputSchema } from "./operations/source-links/relink-source-link.command";
@@ -1547,6 +1548,22 @@ export const operationCatalog = [
     serviceToken: tokens.relinkSourceLinkUseCase,
     transports: {
       cli: "appaloft source-links relink",
+    },
+  },
+  {
+    key: "source-events.ingest",
+    kind: "command",
+    domain: "source-events",
+    messageName: "IngestSourceEventCommand",
+    handlerName: "IngestSourceEventCommandHandler",
+    serviceName: "IngestSourceEventUseCase",
+    inputSchema: ingestSourceEventCommandInputSchema,
+    serviceToken: tokens.ingestSourceEventUseCase,
+    transports: {
+      orpc: {
+        method: "POST",
+        path: "/api/resources/{resourceId}/source-events/generic-signed",
+      },
     },
   },
   {

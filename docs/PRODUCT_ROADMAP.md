@@ -1021,9 +1021,13 @@ Current verification notes:
   diagnostics, and future MCP/tool descriptors remain deferred.
 - 2026-05-05 Phase 7 generic signed webhook secret-resolution Spec Round fixed the
   `resource-secret:<KEY>` reference format, Resource-scoped generic signed route shape, and
-  `scopeResourceId` matching requirement for `source-events.ingest`. It does not implement the
-  route yet, so auto-deploy remains blocked by generic signed route Code Round, Web diagnostics,
-  provider Git ingestion, and future MCP/tool descriptors.
+  `scopeResourceId` matching requirement for `source-events.ingest`; the following route slice
+  implements that contract.
+- 2026-05-05 Phase 7 generic signed webhook route slice activated
+  `POST /api/resources/{resourceId}/source-events/generic-signed` with Resource-scoped
+  `resource-secret:<KEY>` resolution, `X-Appaloft-Signature` HMAC verification, scoped source-event
+  ingestion, and `SRC-AUTO-ENTRY-002`/`SRC-AUTO-EVENT-006` automation. Web diagnostics, provider
+  Git ingestion, and future MCP/tool descriptors remain deferred.
 
 Required:
 

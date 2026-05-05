@@ -21,6 +21,7 @@ export class IngestSourceEventCommandHandler
     return this.useCase.execute(context, {
       sourceKind: command.sourceKind,
       eventKind: command.eventKind,
+      ...(command.scopeResourceId ? { scopeResourceId: command.scopeResourceId } : {}),
       sourceIdentity: command.sourceIdentity,
       ref: command.ref,
       revision: command.revision,

@@ -80,6 +80,7 @@ export class IngestSourceEventUseCase {
           sourceIdentity,
           input.eventKind,
           input.ref,
+          input.scopeResourceId,
         )
       : emptySourceEventOutcome();
 
@@ -153,11 +154,16 @@ async function evaluateSourceEventPolicyMatch(
   sourceIdentity: SourceEventIdentity,
   eventKind: IngestSourceEventCommandPayload["eventKind"],
   ref: string,
+  scopeResourceId?: string,
 ): Promise<SourceEventOutcome> {
-  const candidates = await sourceEventPolicyReader.listCandidates(context, {
+  const allCandidates = await sourceEventPolicyReader.listCandidates(context, {
     sourceKind,
     sourceIdentity,
   });
+  const candidates = scopeResourceId
+    ? allCandidates.filter((candidate) => candidate.resourceId === scopeResourceId)
+    : allCandidates;
+
   if (candidates.length === 0) {
     return {
       status: "ignored",
@@ -306,6 +312,7 @@ async function dispatchSourceEventDeployments(
 export function sourceEventDedupeKey(input: {
   sourceKind: IngestSourceEventCommandPayload["sourceKind"];
   eventKind: IngestSourceEventCommandPayload["eventKind"];
+  scopeResourceId?: string | undefined;
   sourceIdentity: IngestSourceEventCommandPayload["sourceIdentity"];
   ref: string;
   revision: string;
@@ -318,16 +325,17 @@ export function sourceEventDedupeKey(input: {
     input.sourceIdentity.repositoryFullName ?? "",
     safeSourceLocator(input.sourceIdentity.locator),
   ].join(":");
+  const scope = input.scopeResourceId ? `resource:${input.scopeResourceId.trim()}:` : "";
 
   if (input.deliveryId) {
-    return `delivery:${identity}:${input.deliveryId.trim()}`;
+    return `delivery:${scope}${identity}:${input.deliveryId.trim()}`;
   }
 
   if (input.idempotencyKey) {
-    return `idempotency:${identity}:${input.idempotencyKey.trim()}`;
+    return `idempotency:${scope}${identity}:${input.idempotencyKey.trim()}`;
   }
 
-  return `event:${identity}:${input.eventKind}:${input.ref.trim()}:${input.revision.trim()}`;
+  return `event:${scope}${identity}:${input.eventKind}:${input.ref.trim()}:${input.revision.trim()}`;
 }
 
 function sourceIdentityFromInput(

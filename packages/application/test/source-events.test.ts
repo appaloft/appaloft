@@ -442,6 +442,80 @@ describe("source event application baseline", () => {
     });
   });
 
+  test("[SRC-AUTO-EVENT-006] limits Resource-scoped generic signed events to route Resource", async () => {
+    const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher(["dep_web"]);
+    const { context, ingest, sourceEvents } = createHarness({
+      deploymentDispatcher,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          serverId: "srv_prod",
+          destinationId: "dst_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_worker",
+          serverId: "srv_prod",
+          destinationId: "dst_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ],
+    });
+
+    const result = await ingest.execute(context, {
+      sourceKind: "generic-signed",
+      eventKind: "push",
+      scopeResourceId: "res_web",
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/demo",
+        repositoryFullName: "appaloft/demo",
+      },
+      ref: "main",
+      revision: "abc123",
+      deliveryId: "delivery_scoped_generic",
+      verification: {
+        status: "verified",
+        method: "generic-hmac",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      sourceEventId: "sevt_1",
+      status: "dispatched",
+      matchedResourceIds: ["res_web"],
+      createdDeploymentIds: ["dep_web"],
+    });
+    expect(deploymentDispatcher.inputs.map((input) => input.resourceId)).toEqual(["res_web"]);
+    expect(sourceEvents.records[0]).toMatchObject({
+      dedupeKey:
+        "delivery:resource:res_web:generic-signed::appaloft/demo:https://github.com/appaloft/demo:delivery_scoped_generic",
+      policyResults: [
+        {
+          resourceId: "res_web",
+          status: "dispatched",
+          deploymentId: "dep_web",
+        },
+      ],
+    });
+  });
+
   test("source event deployment dispatcher reuses create deployment admission input", async () => {
     const calls: unknown[] = [];
     const dispatcher = new CreateDeploymentSourceEventDispatcher({

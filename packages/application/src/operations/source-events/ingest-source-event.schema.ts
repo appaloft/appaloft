@@ -11,6 +11,7 @@ import {
 export const ingestSourceEventCommandInputSchema = z.object({
   sourceKind: sourceEventSourceKindSchema,
   eventKind: sourceEventKindSchema,
+  scopeResourceId: nonEmptyTrimmedString("Scope Resource id").optional(),
   sourceIdentity: sourceEventIdentitySchema,
   ref: nonEmptyTrimmedString("Source ref"),
   revision: nonEmptyTrimmedString("Source revision"),

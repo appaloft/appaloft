@@ -568,15 +568,20 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
+| Ingest source event | Command | `source-events.ingest` | `IngestSourceEventCommand` | `IngestSourceEventCommandInput` | Not exposed | `POST /api/resources/{resourceId}/source-events/generic-signed` |
 | List source events | Query | `source-events.list` | `ListSourceEventsQuery` | `ListSourceEventsQueryInput` | `appaloft source-event list --resource <resourceId>` | `GET /api/source-events` |
 | Show source event | Query | `source-events.show` | `ShowSourceEventQuery` | `ShowSourceEventQueryInput` | `appaloft source-event show <sourceEventId> --resource <resourceId>` | `GET /api/source-events/{sourceEventId}` |
 
 Current boundary:
+- `source-events.ingest` is active only for the Resource-scoped generic signed HTTP route. It
+  resolves the Resource policy's `resource-secret:<KEY>` reference, verifies
+  `X-Appaloft-Signature`, dispatches a scoped provider-neutral ingest command, and does not persist
+  raw payloads, signatures, or secret values.
 - `source-events.list` and `source-events.show` are read-only diagnostics over persisted source
   event records. They require project or Resource scope and must not replay events, retry failed
   dispatch, mutate auto-deploy policy, or create deployments.
-- Provider webhook ingestion remains deferred until raw payload parsing, signature extraction,
-  provider-specific routes, and public help are aligned with `source-events.ingest`.
+- Provider-specific Git webhook ingestion remains deferred until provider payload parsing and
+  signature extraction are implemented.
 - Web diagnostics remain deferred; CLI and HTTP/oRPC read surfaces are active for operator
   diagnostics and API consumers.
 
