@@ -348,6 +348,18 @@ export class ResourceRuntimeControlUseCase {
               runtimeKind: deployment.runtimePlan.execution.kind,
               targetKind: deployment.runtimePlan.target.kind,
               providerKey: deployment.runtimePlan.target.providerKey,
+              ...(deployment.runtimePlan.execution.metadata
+                ? { runtimeMetadata: deployment.runtimePlan.execution.metadata }
+                : {}),
+              ...(deployment.runtimePlan.execution.composeFile
+                ? { composeFile: deployment.runtimePlan.execution.composeFile }
+                : {}),
+              ...(deployment.runtimePlan.execution.workingDirectory
+                ? { workingDirectory: deployment.runtimePlan.execution.workingDirectory }
+                : {}),
+              ...(resourceSummary?.networkProfile?.targetServiceName
+                ? { targetServiceName: resourceSummary.networkProfile.targetServiceName }
+                : {}),
               ...(input.reason ? { reason: input.reason } : {}),
             });
 
