@@ -27,6 +27,8 @@ import { deploymentLogsQueryInputSchema } from "./operations/deployments/deploym
 import { deploymentPlanQueryInputSchema } from "./operations/deployments/deployment-plan.query";
 import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deployments/deployment-recovery-readiness.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
+import { redeployDeploymentCommandInputSchema } from "./operations/deployments/redeploy-deployment.command";
+import { retryDeploymentCommandInputSchema } from "./operations/deployments/retry-deployment.command";
 import { showDeploymentQueryInputSchema } from "./operations/deployments/show-deployment.query";
 import { streamDeploymentEventsQueryInputSchema } from "./operations/deployments/stream-deployment-events.query";
 import { checkDomainBindingDeleteSafetyQueryInputSchema } from "./operations/domain-bindings/check-domain-binding-delete-safety.query";
@@ -1311,6 +1313,34 @@ export const operationCatalog = [
       cli: "appaloft deploy [path-or-source] [--config appaloft.yml] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]",
       orpc: { method: "POST", path: "/api/deployments" },
       orpcStream: { method: "POST", path: "/api/deployments/stream" },
+    },
+  },
+  {
+    key: "deployments.retry",
+    kind: "command",
+    domain: "deployments",
+    messageName: "RetryDeploymentCommand",
+    handlerName: "RetryDeploymentCommandHandler",
+    serviceName: "RetryDeploymentUseCase",
+    inputSchema: retryDeploymentCommandInputSchema,
+    serviceToken: tokens.retryDeploymentUseCase,
+    transports: {
+      cli: "appaloft deployments retry <deploymentId>",
+      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/retry" },
+    },
+  },
+  {
+    key: "deployments.redeploy",
+    kind: "command",
+    domain: "deployments",
+    messageName: "RedeployDeploymentCommand",
+    handlerName: "RedeployDeploymentCommandHandler",
+    serviceName: "RedeployDeploymentUseCase",
+    inputSchema: redeployDeploymentCommandInputSchema,
+    serviceToken: tokens.redeployDeploymentUseCase,
+    transports: {
+      cli: "appaloft deployments redeploy <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/redeploy" },
     },
   },
   {

@@ -36,8 +36,8 @@ const activeDeploymentStatuses = new Set<DeploymentStatus>([
 ]);
 const retryableDeploymentStatuses = new Set<DeploymentStatus>(["failed", "canceled"]);
 const recoveryCommandActive = {
-  retry: false,
-  redeploy: false,
+  retry: true,
+  redeploy: true,
   rollback: false,
 } as const;
 
@@ -220,8 +220,8 @@ function recommendedActions(input: {
       targetOperation: "deployments.retry",
       label: "Retry the deployment attempt",
       safeByDefault: false,
-      blockedReasonCode: "recovery-command-not-active",
       commandActive: recoveryCommandActive.retry,
+      ...(recoveryCommandActive.retry ? {} : { blockedReasonCode: "recovery-command-not-active" }),
     });
   }
 
@@ -231,8 +231,10 @@ function recommendedActions(input: {
       targetOperation: "deployments.redeploy",
       label: "Redeploy the current resource profile",
       safeByDefault: false,
-      blockedReasonCode: "recovery-command-not-active",
       commandActive: recoveryCommandActive.redeploy,
+      ...(recoveryCommandActive.redeploy
+        ? {}
+        : { blockedReasonCode: "recovery-command-not-active" }),
     });
   }
 

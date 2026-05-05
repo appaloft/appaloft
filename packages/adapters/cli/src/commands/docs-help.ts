@@ -54,6 +54,14 @@ export const cliCommandDescriptions = {
     "Show retry, redeploy, and rollback readiness for a deployment",
     "deployment.recovery-readiness",
   ),
+  deploymentRetry: withDocs(
+    "Retry a failed or canceled deployment attempt",
+    "deployment.recovery-readiness",
+  ),
+  deploymentRedeploy: withDocs(
+    "Redeploy the current resource profile",
+    "deployment.recovery-readiness",
+  ),
   deploymentEvents: withDocs(
     "Replay or follow deployment lifecycle events",
     "deployment.lifecycle",

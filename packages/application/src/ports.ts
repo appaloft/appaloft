@@ -18,6 +18,7 @@ import {
   type DeploymentSelectionSpec,
   type DeploymentStatus,
   type DeploymentTargetState,
+  type DeploymentTriggerKind,
   type Destination,
   type DestinationKind,
   type DestinationMutationSpec,
@@ -2979,6 +2980,8 @@ export interface DeploymentSummary {
   serverId: string;
   destinationId: string;
   status: DeploymentStatus;
+  triggerKind?: DeploymentTriggerKind;
+  sourceDeploymentId?: string;
   sourceCommitSha?: string;
   runtimePlan: {
     id: string;

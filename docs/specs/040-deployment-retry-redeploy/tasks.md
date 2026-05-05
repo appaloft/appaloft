@@ -39,23 +39,23 @@
 
 ## Entrypoints And Docs
 
-- [ ] Add operation catalog entries for `deployments.retry` and `deployments.redeploy`.
-- [ ] Update `docs/CORE_OPERATIONS.md` active command rows.
-- [ ] Add CLI commands.
-- [ ] Add oRPC/HTTP routes.
+- [x] Add operation catalog entries for `deployments.retry` and `deployments.redeploy`.
+- [x] Update `docs/CORE_OPERATIONS.md` active command rows.
+- [x] Add CLI commands.
+- [x] Add oRPC/HTTP routes.
 - [ ] Enable Web deployment recovery actions with i18n and shared readiness gating.
-- [ ] Update public docs in `apps/docs` and docs registry operation documentation status.
+- [x] Update public docs/docs matrix status for active retry/redeploy command surfaces.
 - [ ] Keep rollback command/action unavailable until rollback Code Round.
 
 ## Verification
 
-- [ ] Run targeted core/application retry/redeploy tests.
+- [x] Run targeted core/application retry/redeploy tests.
 - [ ] Run targeted PG/PGlite persistence tests.
-- [ ] Run targeted CLI/oRPC/HTTP tests.
+- [x] Run targeted CLI/oRPC/HTTP tests.
 - [ ] Run targeted Web semantic/browser tests.
 - [ ] Run operation catalog boundary tests.
 - [ ] Run `bun install --frozen-lockfile`.
-- [ ] Run `bun run typecheck`.
+- [x] Run `bun run typecheck`.
 - [ ] Run `bun run lint`.
 - [ ] Run `git diff --check`.
 

@@ -26,34 +26,34 @@ separate future Code Round.
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `DEP-RECOVERY-READINESS-001` | Failed deployment has retained snapshot intent and runtime inputs. | Query returns `retryable = true`, safe read-only actions, and retry command unavailable with `recovery-command-not-active`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
+| `DEP-RECOVERY-READINESS-001` | Failed deployment has retained snapshot intent and runtime inputs. | Query returns `retryable = true`, safe read-only actions, and active retry command metadata. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
 | `DEP-RECOVERY-READINESS-002` | Active or non-terminal deployment is inspected. | Query returns retry blocked with `attempt-not-terminal` and redeploy blocked with `resource-runtime-busy`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
 | `DEP-RECOVERY-READINESS-003` | Failed deployment has missing deployment snapshot. | Query returns retry blocked with `snapshot-missing` and does not offer retry as active command. | planned application fixture | Deferred gap |
-| `DEP-RECOVERY-READINESS-004` | Current Resource profile is valid for a fresh deployment. | Query returns `redeployable = true` even when write command remains inactive. | `packages/application/test/deployment-recovery-readiness.test.ts` via `DEP-RECOVERY-READINESS-001` fixture | Passing |
+| `DEP-RECOVERY-READINESS-004` | Current Resource profile is valid for a fresh deployment. | Query returns `redeployable = true` and active redeploy command metadata. | `packages/application/test/deployment-recovery-readiness.test.ts` via `DEP-RECOVERY-READINESS-001` fixture | Passing |
 | `DEP-RECOVERY-READINESS-005` | Current Resource profile is invalid or drifted. | Query returns `redeployable = false` with a stable profile/drift blocked reason and a configuration repair suggestion. | planned application fixture | Deferred gap |
 | `DEP-RECOVERY-READINESS-006` | Successful prior deployment retains snapshot, environment snapshot, target/destination identity, and artifact identity. | Query returns rollback candidate and `rollbackReady = true`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
 | `DEP-RECOVERY-READINESS-007` | Prior successful deployment has expired or missing artifact identity. | Query marks the candidate blocked with `runtime-artifact-missing`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
 | `DEP-RECOVERY-READINESS-008` | Prior successful deployment used an incompatible runtime target/destination. | Query blocks rollback with `rollback-candidate-target-mismatch`. | planned after target compatibility metadata | Deferred gap |
 | `DEP-RECOVERY-READINESS-009` | Deployment event stream reports reconnect gap. | Query result is based on durable state and is not made ready/blocked solely by the gap envelope. | covered by spec; no stream dependency in query service | Passing by construction |
-| `DEP-RECOVERY-READINESS-010` | Recovery command is not active in the operation catalog. | Query may show readiness facts but next actions identify unavailable command state with `recovery-command-not-active`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
+| `DEP-RECOVERY-READINESS-010` | Rollback command is not active in the operation catalog. | Query may show rollback readiness facts but rollback next actions identify unavailable command state with `recovery-command-not-active`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
 | `DEP-RECOVERY-READINESS-011` | Missing deployment is requested. | Query returns `not_found` with `queryName = deployments.recovery-readiness`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
 
 ## Recovery Command Coverage
 
-| ID | Scenario | Expected assertion |
-| --- | --- | --- |
-| `DEP-RETRY-001` | Retry admitted for failed attempt with retained snapshot intent. | Command returns accepted async result with a new attempt id and emits normal lifecycle events with `triggerKind = "retry"`. |
-| `DEP-RETRY-002` | Retry requested for active or successful attempt. | Command rejects with `deployment_not_retryable` and does not mutate the source attempt. |
-| `DEP-RETRY-003` | Retry readiness marker is stale. | Command rejects with `deployment_recovery_state_stale`. |
-| `DEP-RETRY-004` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without admitting competing retry work. |
-| `DEP-REDEPLOY-001` | Redeploy admitted for current valid Resource profile. | Command returns accepted async result with a new attempt id and resolves runtime inputs from current profile state. |
-| `DEP-REDEPLOY-002` | Source deployment has usable snapshot but current profile differs. | Command creates a current-profile attempt and does not reuse the old snapshot as runtime truth. |
-| `DEP-REDEPLOY-003` | Source deployment has usable snapshot but current profile is invalid. | Command rejects redeploy; it does not fall back to retry semantics. |
-| `DEP-REDEPLOY-004` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without bypassing create/retry/rollback serialization. |
-| `DEP-ROLLBACK-001` | Rollback admitted with retained successful candidate. | Command returns accepted async result with a new rollback attempt id and emits `triggerKind = "rollback"`. |
-| `DEP-ROLLBACK-002` | Requested rollback candidate is missing or expired. | Command rejects with `deployment_rollback_candidate_not_found`. |
-| `DEP-ROLLBACK-003` | Requested candidate lacks artifact or environment snapshot. | Command rejects with `deployment_not_rollback_ready` and safe missing metadata detail. |
-| `DEP-ROLLBACK-004` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without admitting competing recovery work. |
+| ID | Scenario | Expected assertion | Automation binding | Status |
+| --- | --- | --- | --- | --- |
+| `DEP-RETRY-001` | Retry admitted for failed attempt with retained snapshot intent. | Command returns accepted async result with a new attempt id and emits normal lifecycle events with `triggerKind = "retry"`. | `packages/core/test/deployment.test.ts`; `packages/orpc/test/deployment-create.http.test.ts` | Passing |
+| `DEP-RETRY-002` | Retry requested for active or successful attempt. | Command rejects with `deployment_not_retryable` and does not mutate the source attempt. | planned application fixture | Deferred gap |
+| `DEP-RETRY-003` | Retry readiness marker is stale. | Command rejects with `deployment_recovery_state_stale`. | planned application fixture | Deferred gap |
+| `DEP-RETRY-004` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without admitting competing retry work. | planned coordination fixture | Deferred gap |
+| `DEP-REDEPLOY-001` | Redeploy admitted for current valid Resource profile. | Command returns accepted async result with a new attempt id and resolves runtime inputs from current profile state. | `packages/orpc/test/deployment-create.http.test.ts` | Passing |
+| `DEP-REDEPLOY-002` | Source deployment has usable snapshot but current profile differs. | Command creates a current-profile attempt and does not reuse the old snapshot as runtime truth. | planned application fixture | Deferred gap |
+| `DEP-REDEPLOY-003` | Source deployment has usable snapshot but current profile is invalid. | Command rejects redeploy; it does not fall back to retry semantics. | planned application fixture | Deferred gap |
+| `DEP-REDEPLOY-004` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without bypassing create/retry/rollback serialization. | planned coordination fixture | Deferred gap |
+| `DEP-ROLLBACK-001` | Rollback admitted with retained successful candidate. | Command returns accepted async result with a new rollback attempt id and emits `triggerKind = "rollback"`. | future rollback Code Round | Deferred gap |
+| `DEP-ROLLBACK-002` | Requested rollback candidate is missing or expired. | Command rejects with `deployment_rollback_candidate_not_found`. | future rollback Code Round | Deferred gap |
+| `DEP-ROLLBACK-003` | Requested candidate lacks artifact or environment snapshot. | Command rejects with `deployment_not_rollback_ready` and safe missing metadata detail. | future rollback Code Round | Deferred gap |
+| `DEP-ROLLBACK-004` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without admitting competing recovery work. | future rollback Code Round | Deferred gap |
 
 ## Entrypoint Coverage
 

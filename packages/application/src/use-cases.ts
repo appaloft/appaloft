@@ -39,6 +39,8 @@ export * from "./operations/deployments/deployment-recovery-readiness.query-serv
 export * from "./operations/deployments/deployment-snapshot.factory";
 export * from "./operations/deployments/list-deployments.query-service";
 export * from "./operations/deployments/mark-server-applied-route-status-on-deployment-finished.handler";
+export * from "./operations/deployments/redeploy-deployment.use-case";
+export * from "./operations/deployments/retry-deployment.use-case";
 export * from "./operations/deployments/runtime-plan-resolution-input.builder";
 export * from "./operations/deployments/show-deployment.query-service";
 export * from "./operations/deployments/stream-deployment-events.query-service";

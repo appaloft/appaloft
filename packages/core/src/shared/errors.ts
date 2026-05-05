@@ -186,6 +186,14 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("deployment_not_redeployable", "user", message, details),
+  deploymentNotRetryable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("deployment_not_retryable", "user", message, details),
+  deploymentRecoveryStateStale: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("deployment_recovery_state_stale", "user", message, details),
   domainBindingProxyRequired: (
     details?: Record<string, string | number | boolean | null>,
   ): DomainError =>
