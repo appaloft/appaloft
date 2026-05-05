@@ -446,7 +446,9 @@ preview-scoped source fingerprints, non-interactive preview environment selectio
 `--preview-domain-template` server-applied route intent, explicit preview config paths, and the
 implicit-root-domain skip rule needed for Action-style execution. CLI/action profile flags must
 remain in sync with config profile fields so Action previews can be expressed without generating a
-temporary config file. The public `appaloft/deploy-action` repository is not yet implemented.
+temporary config file. The main repository now includes a reference `.github/actions/deploy-action`
+composite wrapper that maps trusted PR preview inputs to the CLI and handles SSH private-key
+temp-file custody. The public `appaloft/deploy-action` repository is not yet implemented.
 
 The main Appaloft repository now includes `.github/workflows/deploy-docs-preview.yml` as a
 repository-authored docs preview workflow over the same CLI path. It classifies PRs whose changed
@@ -461,12 +463,10 @@ preview feature; it does not replace the public `appaloft/deploy-action` wrapper
 Missing pieces before Action PR preview can be documented as supported:
 
 - `appaloft/deploy-action` wrapper repository and Marketplace README;
-- wrapper inputs that map `preview`, `preview-id`, and optional `preview-domain-template` to the
-  CLI;
 - stable machine-readable CLI output for `preview-url` or an action-safe diagnostic file the
   wrapper can parse;
 - wrapper tests for install, secret mapping, fork-safety docs, generated access output, and cleanup
-  plus GitHub deployment/environment metadata cleanup behavior;
+  plus GitHub deployment/environment metadata cleanup behavior in the public wrapper repository;
 - public docs that distinguish Action-only preview deploy from product-grade GitHub App previews.
 
 Missing pieces for product-grade previews:

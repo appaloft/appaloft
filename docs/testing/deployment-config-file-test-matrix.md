@@ -349,13 +349,21 @@ deployments/environment metadata. This workflow is not a substitute for the publ
 tests because it runs the source checkout directly instead of installing a released
 `appaloft/deploy-action` wrapper.
 
-Public `appaloft/deploy-action` wrapper coverage is not implemented yet. The main repository
-release workflow already produces CLI archives, the static Docker self-host installer,
-`checksums.txt`, `release-manifest.json`, and release notes, but `CONFIG-FILE-ENTRY-009` through
-`CONFIG-FILE-ENTRY-014`, `CONFIG-FILE-ENTRY-016`, `CONFIG-FILE-ENTRY-018`,
-`CONFIG-FILE-ENTRY-019`, and `CONFIG-FILE-ENTRY-022` still need wrapper repository coverage,
-action metadata, SSH secret temp-key handling, generated access output handling, wrapper-level
-cleanup input/examples, future overlay behavior, and tests.
+The main repository now includes a reference composite wrapper at
+`.github/actions/deploy-action` with `action.yml`, install/checksum script, deploy script, and
+`scripts/test/deploy-action-wrapper.test.ts` coverage for `CONFIG-FILE-ENTRY-009`,
+`CONFIG-FILE-ENTRY-010`, `CONFIG-FILE-ENTRY-012`, `CONFIG-FILE-ENTRY-015`, and the current
+fail-before-mutation baseline for `CONTROL-PLANE-ENTRY-002`. This proves wrapper metadata,
+version/target install contract shape, SSH secret temp-key command mapping, PR preview flag
+mapping, no-config default behavior, and unsupported control-plane input rejection in this
+repository.
+
+Public `appaloft/deploy-action` release coverage is not complete yet. The main repository release
+workflow already produces CLI archives, the static Docker self-host installer, `checksums.txt`,
+`release-manifest.json`, and release notes, but the separate public wrapper repository still needs
+Marketplace README/examples, fixture or real-release install CI, generated access output handling,
+wrapper-level cleanup input/examples, future overlay behavior, and tests for the public repository
+layout.
 
 Profile drift visibility and default fail-before-deploy behavior for existing-resource drift,
 existing-resource profile operation sequencing through explicit apply steps using
