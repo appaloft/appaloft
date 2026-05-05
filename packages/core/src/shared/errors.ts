@@ -190,6 +190,15 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("deployment_not_retryable", "user", message, details),
+  deploymentNotRollbackReady: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("deployment_not_rollback_ready", "user", message, details),
+  deploymentRollbackCandidateNotFound: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError =>
+    createError("deployment_rollback_candidate_not_found", "user", message, details),
   deploymentRecoveryStateStale: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

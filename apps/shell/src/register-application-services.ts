@@ -184,6 +184,8 @@ import {
   RetryDomainBindingVerificationUseCase,
   RevokeCertificateCommandHandler,
   RevokeCertificateUseCase,
+  RollbackDeploymentCommandHandler,
+  RollbackDeploymentUseCase,
   RotateResourceDependencyBindingSecretCommandHandler,
   RotateResourceDependencyBindingSecretUseCase,
   RotateSshCredentialCommandHandler,
@@ -361,6 +363,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(DeploymentRecoveryReadinessQueryHandler);
   container.registerSingleton(RetryDeploymentCommandHandler);
   container.registerSingleton(RedeployDeploymentCommandHandler);
+  container.registerSingleton(RollbackDeploymentCommandHandler);
   container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
@@ -607,6 +610,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.createDeploymentUseCase, CreateDeploymentUseCase);
   container.registerSingleton(tokens.retryDeploymentUseCase, RetryDeploymentUseCase);
   container.registerSingleton(tokens.redeployDeploymentUseCase, RedeployDeploymentUseCase);
+  container.registerSingleton(tokens.rollbackDeploymentUseCase, RollbackDeploymentUseCase);
   container.registerSingleton(tokens.cleanupPreviewUseCase, CleanupPreviewUseCase);
   container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);
   container.registerSingleton(
