@@ -959,6 +959,11 @@ Current verification notes:
   `RUNTIME-CTRL-RESTART-001`, `RUNTIME-CTRL-BLOCK-001`, and `RUNTIME-CTRL-COORD-001`. The
   operations remain inactive until durable attempt persistence, real runtime adapters,
   CLI/HTTP/Web entrypoints, `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
+- 2026-05-05 Phase 7 resource runtime controls persistence Code Round slice added PG/PGlite
+  runtime-control attempt storage, recorder upsert behavior, and `PgResourceReadModel` projection
+  into `ResourceSummary.latestRuntimeControl`, with `RUNTIME-CTRL-READ-001` PGlite coverage. The
+  operations remain inactive until real runtime adapters, CLI/HTTP/Web entrypoints,
+  `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
 
 Required:
 

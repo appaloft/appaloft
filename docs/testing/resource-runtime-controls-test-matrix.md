@@ -5,10 +5,10 @@
 Application command/use-case slice for Phase 7 / `0.9.0`.
 
 Runtime stop/start/restart command schemas, handlers, use case orchestration, coordination
-policies, provider-neutral target port contract, and attempt-recorder contract exist in
-`packages/application`. No runtime stop/start/restart operation is active in CLI, HTTP/oRPC, Web,
-`CORE_OPERATIONS.md`, or `operation-catalog.ts` yet, and no real runtime adapter or PG/PGlite
-attempt persistence is implemented yet.
+policies, provider-neutral target port contract, attempt-recorder contract, and PG/PGlite attempt
+persistence/readback exist. No runtime stop/start/restart operation is active in CLI, HTTP/oRPC,
+Web, `CORE_OPERATIONS.md`, or `operation-catalog.ts` yet, and no real runtime adapter is
+implemented yet.
 
 ## Governing Sources
 
@@ -39,7 +39,7 @@ attempt persistence is implemented yet.
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `RUNTIME-CTRL-READ-001` | Latest runtime-control attempt exists for a Resource. | `resources.health` returns `latestRuntimeControl` with operation, status, runtime state, phase details when applicable, safe error code, and blocked reason without raw provider details. | `packages/application/test/resource-health.test.ts`; `packages/contracts/test/route-intent-status-contract.test.ts` | Passing |
+| `RUNTIME-CTRL-READ-001` | Latest runtime-control attempt exists for a Resource. | `resources.health` returns `latestRuntimeControl` with operation, status, runtime state, phase details when applicable, safe error code, and blocked reason without raw provider details. | `packages/application/test/resource-health.test.ts`; `packages/contracts/test/route-intent-status-contract.test.ts`; `packages/persistence/pg/test/resource-runtime-control-attempts.pglite.test.ts` | Passing |
 
 ## Adapter Coverage
 
@@ -65,8 +65,10 @@ coverage.
 
 Runtime stop/start/restart now has application-layer command schemas, command handlers, a shared
 use case, `resource-runtime` coordination policies, a provider-neutral runtime target port
-contract, and a runtime-control attempt recorder port. The command/use-case tests use fake target
-and recorder collaborators to prove admission, normalized request mapping, attempt record ordering,
-phase readback, and coordination scope. Runtime control remains inactive until real durable
-attempt persistence, runtime adapters, CLI/HTTP/Web entrypoints, `CORE_OPERATIONS.md`, and
-operation catalog activation slices are aligned.
+contract, a runtime-control attempt recorder port, PG/PGlite attempt persistence, and
+`PgResourceReadModel.latestRuntimeControl` readback. The command/use-case tests use fake target and
+recorder collaborators to prove admission, normalized request mapping, attempt record ordering,
+phase readback, and coordination scope. The persistence test proves a terminal attempt upserts over
+the running attempt and is projected through the Resource read model. Runtime control remains
+inactive until runtime adapters, CLI/HTTP/Web entrypoints, `CORE_OPERATIONS.md`, and operation
+catalog activation slices are aligned.

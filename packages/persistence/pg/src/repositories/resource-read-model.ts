@@ -5,6 +5,7 @@ import {
   type RepositoryContext,
   type ResourceAccessSummaryDomainBinding,
   type ResourceReadModel,
+  type ResourceRuntimeControlSummary,
   type ResourceSummary,
 } from "@appaloft/application";
 import {
@@ -15,6 +16,7 @@ import {
 import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
+import { rowToRuntimeControlAttempt } from "./resource-runtime-control-attempts";
 import {
   normalizeTimestamp,
   resolveRepositoryExecutor,
@@ -48,6 +50,25 @@ type ResourceDomainBindingRow = {
   tls_mode: string;
   created_at: string;
 };
+type ResourceRuntimeControlAttemptRow = Selectable<Database["resource_runtime_control_attempts"]>;
+
+function toRuntimeControlSummary(
+  row: ResourceRuntimeControlAttemptRow,
+): ResourceRuntimeControlSummary {
+  const attempt = rowToRuntimeControlAttempt(row);
+
+  return {
+    runtimeControlAttemptId: attempt.runtimeControlAttemptId,
+    operation: attempt.operation,
+    status: attempt.status,
+    startedAt: attempt.startedAt,
+    ...(attempt.completedAt ? { completedAt: attempt.completedAt } : {}),
+    runtimeState: attempt.runtimeState,
+    ...(attempt.blockedReason ? { blockedReason: attempt.blockedReason } : {}),
+    ...(attempt.errorCode ? { errorCode: attempt.errorCode } : {}),
+    ...(attempt.phases ? { phases: attempt.phases } : {}),
+  };
+}
 
 class KyselyResourceSelectionVisitor
   implements ResourceSelectionSpecVisitor<ResourceSelectionQuery>
@@ -71,6 +92,7 @@ function toResourceSummary(
   row: ResourceRow,
   deploymentRows: ResourceDeploymentRow[],
   domainBindingRows: ResourceDomainBindingRow[],
+  runtimeControlAttemptRows: ResourceRuntimeControlAttemptRow[],
 ): ResourceSummary {
   const services = (row.services ?? []) as unknown as SerializedResourceService[];
   const networkProfile = row.network_profile
@@ -82,6 +104,9 @@ function toResourceSummary(
   const deployments = deploymentRows.filter((deployment) => deployment.resource_id === row.id);
   const domainBindings = domainBindingRows.filter(
     (domainBinding) => domainBinding.resource_id === row.id,
+  );
+  const latestRuntimeControl = runtimeControlAttemptRows.find(
+    (attempt) => attempt.resource_id === row.id,
   );
   const lastDeployment = deployments[0];
   const accessSummary = projectResourceAccessSummary(
@@ -166,6 +191,9 @@ function toResourceSummary(
         }
       : {}),
     ...(accessSummary ? { accessSummary } : {}),
+    ...(latestRuntimeControl
+      ? { latestRuntimeControl: toRuntimeControlSummary(latestRuntimeControl) }
+      : {}),
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
   };
 }
@@ -239,8 +267,23 @@ export class PgResourceReadModel implements ResourceReadModel {
                 .orderBy("created_at", "desc")
                 .execute()
             : [];
+        const runtimeControlAttemptRows =
+          rows.length > 0
+            ? await executor
+                .selectFrom("resource_runtime_control_attempts")
+                .selectAll()
+                .where(
+                  "resource_id",
+                  "in",
+                  rows.map((row) => row.id),
+                )
+                .orderBy("updated_at", "desc")
+                .execute()
+            : [];
 
-        return rows.map((row) => toResourceSummary(row, deploymentRows, domainBindingRows));
+        return rows.map((row) =>
+          toResourceSummary(row, deploymentRows, domainBindingRows, runtimeControlAttemptRows),
+        );
       },
     );
   }
@@ -267,7 +310,7 @@ export class PgResourceReadModel implements ResourceReadModel {
           return null;
         }
 
-        const [deploymentRows, domainBindingRows] = await Promise.all([
+        const [deploymentRows, domainBindingRows, runtimeControlAttemptRows] = await Promise.all([
           executor
             .selectFrom("deployments")
             .select(["id", "resource_id", "status", "runtime_plan", "created_at"])
@@ -289,9 +332,16 @@ export class PgResourceReadModel implements ResourceReadModel {
             .where("resource_id", "=", row.id)
             .orderBy("created_at", "desc")
             .execute(),
+          executor
+            .selectFrom("resource_runtime_control_attempts")
+            .selectAll()
+            .where("resource_id", "=", row.id)
+            .orderBy("updated_at", "desc")
+            .limit(1)
+            .execute(),
         ]);
 
-        return toResourceSummary(row, deploymentRows, domainBindingRows);
+        return toResourceSummary(row, deploymentRows, domainBindingRows, runtimeControlAttemptRows);
       },
     );
   }

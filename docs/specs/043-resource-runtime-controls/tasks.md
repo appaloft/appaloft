@@ -41,7 +41,7 @@
 - [x] Add runtime-control command schemas, handlers, use cases, and tokens.
 - [x] Add provider-neutral runtime target control port.
 - [x] Add runtime-control attempt recorder port.
-- [ ] Add durable runtime-control attempt/read model persistence.
+- [x] Add durable runtime-control attempt/read model persistence.
 - [ ] Implement local/generic-SSH Docker and Compose runtime-control adapters.
 - [ ] Add CLI, HTTP/oRPC, and Web entrypoints only after tests pass.
 - [ ] Update `CORE_OPERATIONS.md` and `operation-catalog.ts` in the activation commit.

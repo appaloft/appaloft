@@ -23,6 +23,7 @@ export * from "./resource-deletion-blocker-reader";
 export * from "./resource-dependency-binding-repository";
 export * from "./resource-read-model";
 export * from "./resource-repository";
+export * from "./resource-runtime-control-attempts";
 export * from "./server-applied-route-state-repository";
 export * from "./server-deletion-blocker-reader";
 export * from "./server-read-model";

@@ -482,6 +482,25 @@ export interface ResourceAccessFailureEvidenceTable {
   expires_at: UpdatableTimestampColumn;
 }
 
+export interface ResourceRuntimeControlAttemptsTable {
+  id: string;
+  resource_id: string;
+  deployment_id: string | null;
+  server_id: string;
+  destination_id: string;
+  operation: string;
+  status: string;
+  runtime_state: string;
+  blocked_reason: string | null;
+  error_code: string | null;
+  phases: ColumnType<JsonRecord[], JsonRecord[] | undefined, JsonRecord[]>;
+  reason: string | null;
+  idempotency_key: string | null;
+  started_at: string;
+  completed_at: string | null;
+  updated_at: UpdatableTimestampColumn;
+}
+
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
@@ -509,4 +528,5 @@ export interface Database {
   mutation_coordinations: MutationCoordinationsTable;
   process_attempt_journal: ProcessAttemptJournalTable;
   resource_access_failure_evidence: ResourceAccessFailureEvidenceTable;
+  resource_runtime_control_attempts: ResourceRuntimeControlAttemptsTable;
 }
