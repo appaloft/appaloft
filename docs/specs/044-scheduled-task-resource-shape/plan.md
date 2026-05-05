@@ -20,7 +20,8 @@ Spec-first slice for Resource-owned scheduled tasks, run attempts, history, and 
    accepted-run worker wiring is implemented.`
 5. Add scheduler process manager that dispatches the same admission path as run-now.
    `Status: inactive scheduler process manager is implemented around a due-candidate reader port
-   and shared run admission service; due-candidate persistence and shell runner remain open.`
+   and shared run admission service; Postgres/PGlite due-candidate read-model support is
+   implemented; shell runner remains open.`
 6. Add operation catalog, CLI, HTTP/oRPC, Web, public docs/help, and generated MCP descriptor
    surfaces.
 

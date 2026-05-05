@@ -59,7 +59,8 @@ coverage in `packages/application/test/scheduled-task-delete.test.ts`.
 `SCHED-TASK-RUN-001` and `SCHED-TASK-RUN-002` have inactive application run-now admission coverage
 in `packages/application/test/scheduled-task-run-now.test.ts`.
 `SCHED-TASK-SCHED-001` has inactive application scheduler admission coverage in
-`packages/application/test/scheduled-task-scheduler.test.ts`.
+`packages/application/test/scheduled-task-scheduler.test.ts` and Postgres/PGlite due-candidate
+read-model coverage in `packages/persistence/pg/test/scheduled-task-definition.pglite.test.ts`.
 `SCHED-TASK-RUNTIME-001` and one runtime-output masking path for `SCHED-TASK-SECRET-001` have
 adapter coverage in `packages/adapters/runtime/test/scheduled-task-runtime.test.ts`.
 `SCHED-TASK-WORKER-001` has inactive application worker coverage in
@@ -78,5 +79,5 @@ matrix remains open for definitions, runs, errors, diagnostics, and tool descrip
 Inactive application command/query schemas, messages, result DTOs, read-model ports, create,
 update, delete, run-now admission, scheduler admission, accepted-run worker, read-query
 handlers/services, scheduled task persistence/read models, and hermetic runtime adapter support
-exist. No operation catalog entries, due-candidate persistence, shell scheduler/background worker
-runner, entrypoints, or public docs are active yet.
+exist. No operation catalog entries, shell scheduler/background worker runner, entrypoints, or
+public docs are active yet.

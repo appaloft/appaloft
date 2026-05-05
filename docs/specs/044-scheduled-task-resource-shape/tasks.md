@@ -66,6 +66,7 @@
 - [x] Add scheduled-task run-log persistence/read model.
 - [x] Add persistence/read models.
 - [x] Add scheduler process manager.
+- [x] Add scheduled-task due-candidate persistence/read model.
 - [x] Add runtime adapter one-off task execution/log support.
 - [x] Add accepted-run worker wiring.
 - [ ] Add CLI/API/Web/MCP surfaces.

@@ -6,6 +6,8 @@ import {
   type RepositoryContext,
   type ScheduledTaskDefinitionRepository,
   type ScheduledTaskDefinitionSummary,
+  type ScheduledTaskDueCandidate,
+  type ScheduledTaskDueCandidateReader,
   type ScheduledTaskReadModel,
   type ScheduledTaskRunAttemptRepository,
   type ScheduledTaskRunLogEntry,
@@ -276,6 +278,138 @@ function safeLogMessage(message: string): string {
   return logSecretPattern.test(message) ? "********" : message;
 }
 
+interface TimezoneMinuteParts {
+  minute: number;
+  hour: number;
+  dayOfMonth: number;
+  month: number;
+  dayOfWeek: number;
+}
+
+function minuteBucketStart(value: string): string {
+  const date = new Date(value);
+  date.setUTCSeconds(0, 0);
+  return date.toISOString();
+}
+
+function addMinutes(value: string, minutes: number): string {
+  const date = new Date(value);
+  date.setUTCMinutes(date.getUTCMinutes() + minutes);
+  return date.toISOString();
+}
+
+function timezoneMinuteParts(value: string, timezone: string): TimezoneMinuteParts | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    minute: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const parts = new Map(
+    formatter
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  const year = Number(parts.get("year"));
+  const month = Number(parts.get("month"));
+  const dayOfMonth = Number(parts.get("day"));
+  const hour = Number(parts.get("hour"));
+  const minute = Number(parts.get("minute"));
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(dayOfMonth) ||
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute)
+  ) {
+    return null;
+  }
+
+  return {
+    minute,
+    hour,
+    dayOfMonth,
+    month,
+    dayOfWeek: new Date(Date.UTC(year, month - 1, dayOfMonth)).getUTCDay(),
+  };
+}
+
+function matchesCronValue(value: number, expression: string, sundayAlias = false): boolean {
+  return expression.split(",").some((rawPart) => {
+    const part = rawPart.trim();
+    if (part === "*") {
+      return true;
+    }
+
+    if (part.startsWith("*/")) {
+      const step = Number(part.slice(2));
+      return Number.isInteger(step) && step > 0 && value % step === 0;
+    }
+
+    const rangeSeparatorIndex = part.indexOf("-");
+    if (rangeSeparatorIndex > 0) {
+      const start = Number(part.slice(0, rangeSeparatorIndex));
+      const end = Number(part.slice(rangeSeparatorIndex + 1));
+      return Number.isInteger(start) && Number.isInteger(end) && value >= start && value <= end;
+    }
+
+    const parsed = Number(part);
+    if (sundayAlias && parsed === 7) {
+      return value === 0;
+    }
+
+    return Number.isInteger(parsed) && value === parsed;
+  });
+}
+
+function matchesScheduleAt(schedule: string, timezone: string, now: string): boolean {
+  const parts = timezoneMinuteParts(now, timezone);
+  if (!parts) {
+    return false;
+  }
+
+  if (schedule === "@hourly") {
+    return parts.minute === 0;
+  }
+  if (schedule === "@daily") {
+    return parts.hour === 0 && parts.minute === 0;
+  }
+  if (schedule === "@weekly") {
+    return parts.dayOfWeek === 0 && parts.hour === 0 && parts.minute === 0;
+  }
+  if (schedule === "@monthly") {
+    return parts.dayOfMonth === 1 && parts.hour === 0 && parts.minute === 0;
+  }
+
+  const fields = schedule.split(" ");
+  if (fields.length !== 5) {
+    return false;
+  }
+
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = fields;
+  if (!minute || !hour || !dayOfMonth || !month || !dayOfWeek) {
+    return false;
+  }
+
+  return (
+    matchesCronValue(parts.minute, minute) &&
+    matchesCronValue(parts.hour, hour) &&
+    matchesCronValue(parts.dayOfMonth, dayOfMonth) &&
+    matchesCronValue(parts.month, month) &&
+    matchesCronValue(parts.dayOfWeek, dayOfWeek, true)
+  );
+}
+
 function toScheduledTaskRunLogEntry(row: ScheduledTaskRunLogRow): ScheduledTaskRunLogEntry {
   return {
     timestamp: normalizeTimestamp(row.logged_at) ?? row.logged_at,
@@ -534,6 +668,65 @@ export class PgScheduledTaskRunLogRecorder implements ScheduledTaskRunLogRecorde
     );
 
     return ok({ recorded: records.length });
+  }
+}
+
+export class PgScheduledTaskDueCandidateReader implements ScheduledTaskDueCandidateReader {
+  constructor(private readonly db: Kysely<Database>) {}
+
+  async listDue(
+    context: RepositoryContext,
+    input: Parameters<ScheduledTaskDueCandidateReader["listDue"]>[1],
+  ): Promise<ScheduledTaskDueCandidate[]> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("scheduled-task-due-candidate", "list_due"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "scheduled-task-due-candidate",
+        },
+      },
+      async () => {
+        const bucketStart = minuteBucketStart(input.now);
+        const bucketEnd = addMinutes(bucketStart, 1);
+        const admittedRows = await executor
+          .selectFrom("scheduled_task_run_attempts")
+          .select("task_id")
+          .where("trigger_kind", "=", "scheduled")
+          .where("created_at", ">=", bucketStart)
+          .where("created_at", "<", bucketEnd)
+          .execute();
+        const admittedTaskIds = new Set(admittedRows.map((row) => row.task_id));
+        const rows = await executor
+          .selectFrom("scheduled_task_definitions")
+          .select(["id", "resource_id", "schedule", "timezone"])
+          .where("status", "=", "enabled")
+          .orderBy("created_at", "asc")
+          .orderBy("id", "asc")
+          .execute();
+        const candidates: ScheduledTaskDueCandidate[] = [];
+
+        for (const row of rows) {
+          if (candidates.length >= input.limit) {
+            break;
+          }
+          if (admittedTaskIds.has(row.id)) {
+            continue;
+          }
+          if (!matchesScheduleAt(row.schedule, row.timezone, bucketStart)) {
+            continue;
+          }
+
+          candidates.push({
+            taskId: row.id,
+            resourceId: row.resource_id,
+            scheduledFor: bucketStart,
+          });
+        }
+
+        return candidates;
+      },
+    );
   }
 }
 

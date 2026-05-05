@@ -44,17 +44,29 @@ import {
   UpsertScheduledTaskRunAttemptSpec,
 } from "@appaloft/core";
 
-function taskFixture(input?: { id?: string; resourceId?: string; createdAt?: string }) {
+function taskFixture(input?: {
+  id?: string;
+  resourceId?: string;
+  schedule?: string;
+  timezone?: string;
+  status?: "enabled" | "disabled";
+  createdAt?: string;
+}) {
   return ScheduledTaskDefinition.create({
     id: ScheduledTaskId.rehydrate(input?.id ?? "tsk_backup"),
     resourceId: ResourceId.rehydrate(input?.resourceId ?? "res_api"),
-    schedule: ScheduledTaskScheduleExpression.create("0 1 * * *")._unsafeUnwrap(),
-    timezone: ScheduledTaskTimezone.create("UTC")._unsafeUnwrap(),
+    schedule: ScheduledTaskScheduleExpression.create(
+      input?.schedule ?? "0 1 * * *",
+    )._unsafeUnwrap(),
+    timezone: ScheduledTaskTimezone.create(input?.timezone ?? "UTC")._unsafeUnwrap(),
     commandIntent: ScheduledTaskCommandIntent.create("bun run backup")._unsafeUnwrap(),
     timeoutSeconds: ScheduledTaskTimeoutSeconds.create(600)._unsafeUnwrap(),
     retryLimit: ScheduledTaskRetryLimit.create(2)._unsafeUnwrap(),
     concurrencyPolicy: ScheduledTaskConcurrencyPolicyValue.forbid(),
-    status: ScheduledTaskDefinitionStatusValue.enabled(),
+    status:
+      input?.status === "disabled"
+        ? ScheduledTaskDefinitionStatusValue.disabled()
+        : ScheduledTaskDefinitionStatusValue.enabled(),
     createdAt: CreatedAt.rehydrate(input?.createdAt ?? "2026-05-05T00:10:00.000Z"),
   })._unsafeUnwrap();
 }
@@ -425,6 +437,121 @@ describe("scheduled task definition persistence", () => {
       }
       expect(persistedRun?.toState().status.value).toBe("failed");
       expect(recorded.isOk()).toBe(true);
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
+
+  test("[SCHED-TASK-SCHED-001] reads due task candidates and suppresses already admitted fires", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-scheduled-task-due-candidates-"));
+    const {
+      createDatabase,
+      createMigrator,
+      PgEnvironmentRepository,
+      PgProjectRepository,
+      PgResourceRepository,
+      PgScheduledTaskDefinitionRepository,
+      PgScheduledTaskDueCandidateReader,
+      PgScheduledTaskRunAttemptRepository,
+    } = await import("../src");
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const context = toRepositoryContext(
+        createExecutionContext({
+          requestId: "req_scheduled_task_due_candidate_pglite_test",
+          entrypoint: "system",
+        }),
+      );
+      const createdAt = CreatedAt.rehydrate("2026-05-05T00:00:00.000Z");
+      const project = Project.create({
+        id: ProjectId.rehydrate("prj_demo"),
+        name: ProjectName.rehydrate("Demo"),
+        createdAt,
+      })._unsafeUnwrap();
+      const environment = Environment.create({
+        id: EnvironmentId.rehydrate("env_demo"),
+        projectId: ProjectId.rehydrate("prj_demo"),
+        name: EnvironmentName.rehydrate("Production"),
+        kind: EnvironmentKindValue.rehydrate("production"),
+        createdAt,
+      })._unsafeUnwrap();
+      const resource = Resource.create({
+        id: ResourceId.rehydrate("res_api"),
+        projectId: ProjectId.rehydrate("prj_demo"),
+        environmentId: EnvironmentId.rehydrate("env_demo"),
+        name: ResourceName.rehydrate("API"),
+        kind: ResourceKindValue.rehydrate("application"),
+        createdAt,
+      })._unsafeUnwrap();
+      const projects = new PgProjectRepository(database.db);
+      const environments = new PgEnvironmentRepository(database.db);
+      const resources = new PgResourceRepository(database.db);
+      const tasks = new PgScheduledTaskDefinitionRepository(database.db);
+      const runAttempts = new PgScheduledTaskRunAttemptRepository(database.db);
+      const dueCandidates = new PgScheduledTaskDueCandidateReader(database.db);
+      const dailyTask = taskFixture({ id: "tsk_daily", schedule: "0 1 * * *" });
+      const hourlyTask = taskFixture({ id: "tsk_hourly", schedule: "@hourly" });
+      const disabledTask = taskFixture({
+        id: "tsk_disabled",
+        schedule: "@hourly",
+        status: "disabled",
+      });
+
+      await projects.upsert(context, project, UpsertProjectSpec.fromProject(project));
+      await environments.upsert(
+        context,
+        environment,
+        UpsertEnvironmentSpec.fromEnvironment(environment),
+      );
+      await resources.upsert(context, resource, UpsertResourceSpec.fromResource(resource));
+      await tasks.upsert(
+        context,
+        dailyTask,
+        UpsertScheduledTaskDefinitionSpec.fromTaskDefinition(dailyTask),
+      );
+      await tasks.upsert(
+        context,
+        hourlyTask,
+        UpsertScheduledTaskDefinitionSpec.fromTaskDefinition(hourlyTask),
+      );
+      await tasks.upsert(
+        context,
+        disabledTask,
+        UpsertScheduledTaskDefinitionSpec.fromTaskDefinition(disabledTask),
+      );
+      const alreadyAdmittedRun = ScheduledTaskRunAttempt.create({
+        id: ScheduledTaskRunId.rehydrate("str_hourly_0100"),
+        taskId: ScheduledTaskId.rehydrate("tsk_hourly"),
+        resourceId: ResourceId.rehydrate("res_api"),
+        triggerKind: ScheduledTaskRunTriggerKindValue.scheduled(),
+        createdAt: CreatedAt.rehydrate("2026-05-05T01:00:10.000Z"),
+      })._unsafeUnwrap();
+      await runAttempts.upsert(
+        context,
+        alreadyAdmittedRun,
+        UpsertScheduledTaskRunAttemptSpec.fromRunAttempt(alreadyAdmittedRun),
+      );
+
+      const candidates = await dueCandidates.listDue(context, {
+        now: "2026-05-05T01:00:45.000Z",
+        limit: 10,
+      });
+
+      expect(candidates).toEqual([
+        {
+          taskId: "tsk_daily",
+          resourceId: "res_api",
+          scheduledFor: "2026-05-05T01:00:00.000Z",
+        },
+      ]);
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });
