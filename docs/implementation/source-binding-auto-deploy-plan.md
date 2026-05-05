@@ -15,13 +15,15 @@ Round authorization.
 - ADR-037 decides source event ownership and durable retry boundaries.
 - ADR-037 decides generic signed webhook secret custody and rotation baseline.
 - ADR-037 decides source-binding-change behavior for existing auto-deploy policies.
+- Local command/query/error specs and public help anchors are available for the first Test-First
+  Round.
 - Remaining ADR work is required only if Code Round expands beyond ADR-037.
 
 ### 2. Policy Model
 
 - Add Resource-owned auto-deploy policy value objects.
 - Add `resources.configure-auto-deploy` command schema, handler, use case, and operation catalog
-  entry after tests exist.
+  entry from `docs/commands/resources.configure-auto-deploy.md` after tests exist.
 - Persist policy and expose safe Resource detail/read-model summaries.
 
 ### 3. Source Event Ingestion
@@ -32,6 +34,7 @@ Round authorization.
   reasons, and created deployment ids.
 - Store project/resource scoped read-model facts first; global operator source-event rollups remain
   future.
+- Implement `source-events.list` and `source-events.show` from the local query specs.
 
 ### 4. Deployment Dispatch
 
@@ -50,7 +53,6 @@ Round authorization.
 
 Minimum before Code Round completion:
 
-- source auto-deploy local command/query/error specs are synchronized;
 - source auto-deploy test matrix rows have automation bindings;
 - operation map, `CORE_OPERATIONS.md`, operation catalog, public docs/help, and contracts are in
   sync;

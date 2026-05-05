@@ -5,6 +5,12 @@
 - ADRs: ADR-010, ADR-012, ADR-014, ADR-016, ADR-024, ADR-025, ADR-026, ADR-028, ADR-029, ADR-037
 - Operation map: `docs/BUSINESS_OPERATION_MAP.md`
 - Core operations: `docs/CORE_OPERATIONS.md`
+- Candidate local specs:
+  - `docs/commands/resources.configure-auto-deploy.md`
+  - `docs/commands/source-events.ingest.md`
+  - `docs/queries/source-events.list.md`
+  - `docs/queries/source-events.show.md`
+  - `docs/errors/source-events.md`
 - Global contracts:
   - `docs/errors/model.md`
   - `docs/errors/neverthrow-conventions.md`
@@ -102,7 +108,7 @@ Minimum stable test ids for Code Round:
 
 ## Code Round Readiness
 
-Ready for local command/query/error/public-doc Spec Round, not yet Code Round.
+Ready for Test-First Round automation binding, not yet Code Round.
 
-Before Code Round, update or add governing command/query/error/testing docs and public docs/help for
-the first implementation slice.
+Before Code Round, bind governing matrix rows to automated tests and decide the first adapter slice
+for provider Git versus generic signed webhook ingestion.
