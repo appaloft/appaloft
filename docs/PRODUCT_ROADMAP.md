@@ -855,6 +855,12 @@ Current verification notes:
   metadata. It rotates only binding-scoped safe secret references for future deployment snapshots;
   runtime injection, provider-native database realization, Redis, backup/restore, recovery,
   auto-deploy, preview, and cluster runtime items remain open for the full `0.9.0` release rule.
+- 2026-05-05 Phase 7 Redis dependency resource lifecycle Spec Round positioned
+  `dependency-resources.provision-redis` and `dependency-resources.import-redis` as accepted
+  candidates, with matrix rows for safe Redis metadata, secret masking, list/show/rename/delete
+  inclusion, and CLI/oRPC/HTTP dispatch. It does not implement the Redis Code Round yet, so the
+  full `0.9.0` release rule remains blocked by Redis, provider-native database realization,
+  backup/restore, recovery, auto-deploy, preview, and cluster runtime items.
 
 Required:
 
