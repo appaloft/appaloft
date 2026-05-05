@@ -1213,6 +1213,10 @@ Current verification notes:
   intent, including stack/service identity, runtime environment snapshots, health policy, access
   routes, Compose target-service disambiguation, and initial runtime secret masking. Swarm
   apply/verify/log/health/cleanup execution remains open.
+- 2026-05-05 Phase 7 Docker Swarm cleanup-plan slice bound initial `SWARM-TARGET-CLEAN-001`
+  coverage to adapter-owned service cleanup selectors scoped by Appaloft managed, resource,
+  deployment, target, destination, and runtime-target labels. Active Swarm cleanup execution remains
+  open with the backend.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1275,8 +1279,9 @@ Required:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
   semantics, normalized read surfaces, public docs/help, and contract tests are implemented.
   Target-kind registration metadata, unsupported-backend admission, backend descriptor selection,
-  Swarm manager readiness, adapter-owned OCI/Compose render intent, the public docs anchor, and
-  CLI/API/Web help links are implemented; Swarm execution remains open.
+  Swarm manager readiness, adapter-owned OCI/Compose render intent, label-scoped cleanup plan
+  rendering, the public docs anchor, and CLI/API/Web help links are implemented; Swarm execution
+  remains open.
 
 Exit criteria:
 

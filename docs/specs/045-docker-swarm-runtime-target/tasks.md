@@ -41,6 +41,7 @@
 - [x] Add Swarm manager readiness capability checks.
 - [x] Add Swarm runtime target backend descriptor and registry selection coverage.
 - [x] Implement adapter-owned render intent for OCI image and Compose workloads.
+- [x] Add adapter-owned label-scoped cleanup plan rendering for Swarm services.
 - [ ] Implement apply/verify/log/health/cleanup behind runtime adapters.
 - [ ] Add sanitized target identity persistence/read-model support where required.
 - [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.

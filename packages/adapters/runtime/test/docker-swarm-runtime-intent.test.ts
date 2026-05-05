@@ -47,7 +47,10 @@ import {
   VariableExposureValue,
   VariableKindValue,
 } from "@appaloft/core";
-import { renderDockerSwarmRuntimeIntent } from "../src/docker-swarm-runtime-intent";
+import {
+  renderDockerSwarmCleanupPlan,
+  renderDockerSwarmRuntimeIntent,
+} from "../src/docker-swarm-runtime-intent";
 
 const generatedAt = GeneratedAt.rehydrate("2026-04-01T00:00:00.000Z");
 
@@ -193,6 +196,7 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(intent.stackName).toBe("appaloft-res-api-dst-prod");
     expect(intent.serviceName).toBe("appaloft-res-api-dst-prod_web");
     expect(intent.labels).toMatchObject({
+      "appaloft.managed": "true",
       "appaloft.resource-id": "res_api",
       "appaloft.deployment-id": "dep_123",
       "appaloft.target-id": "dtg_swarm_1",
@@ -277,5 +281,37 @@ describe("renderDockerSwarmRuntimeIntent", () => {
         }),
       );
     }
+  });
+
+  test("[SWARM-TARGET-CLEAN-001] renders cleanup selectors scoped to Appaloft Swarm identity labels", () => {
+    const plan = renderDockerSwarmCleanupPlan({
+      resourceId: "res_api",
+      deploymentId: "dep_123",
+      targetId: "dtg_swarm_1",
+      destinationId: "dst_prod",
+    });
+
+    expect(plan.scopeLabels).toEqual({
+      "appaloft.managed": "true",
+      "appaloft.resource-id": "res_api",
+      "appaloft.deployment-id": "dep_123",
+      "appaloft.target-id": "dtg_swarm_1",
+      "appaloft.destination-id": "dst_prod",
+      "appaloft.runtime-target": "docker-swarm",
+    });
+    expect(plan.commands).toHaveLength(1);
+    expect(plan.commands[0]?.command).toContain(
+      "--filter 'label=appaloft.deployment-id=dep_123'",
+    );
+    expect(plan.commands[0]?.command).toContain("--filter 'label=appaloft.resource-id=res_api'");
+    expect(plan.commands[0]?.command).toContain("--filter 'label=appaloft.target-id=dtg_swarm_1'");
+    expect(plan.commands[0]?.command).toContain(
+      "--filter 'label=appaloft.destination-id=dst_prod'",
+    );
+    expect(plan.commands[0]?.command).toContain(
+      "--filter 'label=appaloft.runtime-target=docker-swarm'",
+    );
+    expect(plan.commands[0]?.command).not.toContain("docker system prune");
+    expect(plan.commands[0]?.command).not.toContain("docker volume");
   });
 });

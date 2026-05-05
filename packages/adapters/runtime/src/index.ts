@@ -104,7 +104,10 @@ export {
 } from "./resource-runtime-control-target";
 export { RuntimeResourceRuntimeLogReader } from "./resource-runtime-logs";
 export {
+  renderDockerSwarmCleanupPlan,
   renderDockerSwarmRuntimeIntent,
+  type DockerSwarmCleanupCommand,
+  type DockerSwarmCleanupPlan,
   type DockerSwarmComposeWorkloadIntent,
   type DockerSwarmEnvironmentVariableIntent,
   type DockerSwarmHealthIntent,

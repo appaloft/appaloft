@@ -101,6 +101,19 @@ export interface DockerSwarmRuntimeIntent {
   warnings: string[];
 }
 
+export interface DockerSwarmCleanupCommand {
+  step: "remove-services";
+  command: string;
+  displayCommand: string;
+}
+
+export interface DockerSwarmCleanupPlan {
+  schemaVersion: "docker-swarm.cleanup-plan/v1";
+  scopeLabels: Record<string, string>;
+  commands: DockerSwarmCleanupCommand[];
+  warnings: string[];
+}
+
 const defaultEdgeNetworkName = "appaloft-edge";
 const composeTargetServiceMetadataKeys = [
   "swarmTargetService",
@@ -128,6 +141,28 @@ function renderStackName(identity: DockerSwarmRuntimeIdentityInput): string {
 
 function renderTargetServiceName(value: string | undefined): string {
   return sanitizeDockerName(value ?? "web", "web");
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function runtimeIdentityLabels(identity: DockerSwarmRuntimeIdentityInput): Record<string, string> {
+  return {
+    "appaloft.managed": "true",
+    "appaloft.resource-id": identity.resourceId,
+    "appaloft.deployment-id": identity.deploymentId,
+    "appaloft.target-id": identity.targetId,
+    "appaloft.destination-id": identity.destinationId,
+    "appaloft.runtime-target": "docker-swarm",
+  };
+}
+
+function dockerServiceLabelFilters(labels: Record<string, string>): string {
+  return Object.entries(labels)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `--filter ${shellQuote(`label=${key}=${value}`)}`)
+    .join(" ");
 }
 
 function runtimeTargetUnsupported(input: {
@@ -351,13 +386,31 @@ export function renderDockerSwarmRuntimeIntent(
     environment: renderEnvironmentVariables(input.environmentSnapshot),
     ...(health ? { health } : {}),
     routes: renderRoutes({ execution, networkName }),
-    labels: {
-      "appaloft.resource-id": input.identity.resourceId,
-      "appaloft.deployment-id": input.identity.deploymentId,
-      "appaloft.target-id": input.identity.targetId,
-      "appaloft.destination-id": input.identity.destinationId,
-      "appaloft.runtime-target": "docker-swarm",
-    },
+    labels: runtimeIdentityLabels(input.identity),
     warnings: [],
   });
+}
+
+export function renderDockerSwarmCleanupPlan(
+  identity: DockerSwarmRuntimeIdentityInput,
+): DockerSwarmCleanupPlan {
+  const scopeLabels = runtimeIdentityLabels(identity);
+  const filters = dockerServiceLabelFilters(scopeLabels);
+  const command = [
+    `service_ids=$(docker service ls -q ${filters})`,
+    'if [ -n "$service_ids" ]; then docker service rm $service_ids; fi',
+  ].join("; ");
+
+  return {
+    schemaVersion: "docker-swarm.cleanup-plan/v1",
+    scopeLabels,
+    commands: [
+      {
+        step: "remove-services",
+        command,
+        displayCommand: command,
+      },
+    ],
+    warnings: [],
+  };
 }
