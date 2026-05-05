@@ -10,20 +10,22 @@ Spec-first slice for Resource-owned scheduled tasks, run attempts, history, and 
    `Status: implemented for definition value objects, Resource-owned definition state, and
    run-attempt state transitions.`
 2. Add application command/query schemas, messages, handlers, use cases, and ports.
-   `Status: inactive schemas, messages, result DTOs, and read-model ports are implemented;
-   create, update, delete, and run-now admission handlers/use cases are implemented; task/run
-   read-query handlers and services are implemented.`
+   `Status: schemas, messages, result DTOs, and read-model ports are implemented; create, update,
+   delete, and run-now admission handlers/use cases are implemented; task/run read-query handlers
+   and services are implemented.`
 3. Add persistence repository/read models for task definitions, run attempts, and run logs.
    `Status: task definition, run-attempt, and run-log persistence/read models are implemented.`
 4. Add runtime target execution/log ports for one-off task runs.
-   `Status: inactive scheduled-task runtime port and hermetic runtime adapter are implemented;
-   accepted-run worker wiring is implemented.`
+   `Status: scheduled-task runtime port and hermetic runtime adapter are implemented; accepted-run
+   worker wiring is implemented.`
 5. Add scheduler process manager that dispatches the same admission path as run-now.
-   `Status: inactive scheduler process manager is implemented around a due-candidate reader port
-   and shared run admission service; Postgres/PGlite due-candidate read-model support is
-   implemented; shell composition registrations and opt-in runner are implemented.`
+   `Status: scheduler process manager is implemented around a due-candidate reader port and shared
+   run admission service; Postgres/PGlite due-candidate read-model support is implemented; shell
+   composition registrations and opt-in runner are implemented.`
 6. Add operation catalog, CLI, HTTP/oRPC, Web, public docs/help, and generated MCP descriptor
    surfaces.
+   `Status: operation catalog and HTTP/oRPC routes are active. CLI commands, Web controls, public
+   docs/help, and generated MCP descriptor verification remain open.`
 
 ## Non-Goals
 

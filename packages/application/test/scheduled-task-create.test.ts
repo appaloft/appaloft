@@ -92,7 +92,7 @@ async function createHarness(input?: { resource?: Resource }) {
 }
 
 describe("CreateScheduledTaskUseCase", () => {
-  test("[SCHED-TASK-CREATE-001] creates a Resource-owned task definition without activating catalog entries", async () => {
+  test("[SCHED-TASK-CREATE-001] creates a Resource-owned task definition", async () => {
     const { context, taskRepository, useCase } = await createHarness();
 
     const result = await useCase.execute(context, {

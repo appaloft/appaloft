@@ -124,7 +124,7 @@ async function createHarness(input?: { task?: ScheduledTaskDefinition | null }) 
 }
 
 describe("DeleteScheduledTaskUseCase", () => {
-  test("[SCHED-TASK-DELETE-001] deletes a Resource-owned task definition without activating catalog entries", async () => {
+  test("[SCHED-TASK-DELETE-001] deletes a Resource-owned task definition", async () => {
     const { context, taskRepository, useCase } = await createHarness();
 
     const result = await useCase.execute(context, {

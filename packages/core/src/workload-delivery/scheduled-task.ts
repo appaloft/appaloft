@@ -682,7 +682,7 @@ export interface CreateScheduledTaskDefinitionInput {
   createdAt: CreatedAt;
 }
 
-export interface UpdateScheduledTaskDefinitionInput {
+export interface ConfigureScheduledTaskDefinitionInput {
   schedule?: ScheduledTaskScheduleExpression;
   timezone?: ScheduledTaskTimezone;
   commandIntent?: ScheduledTaskCommandIntent;
@@ -804,7 +804,7 @@ export class ScheduledTaskDefinition extends AggregateRoot<
     return this.state.status.isEnabled();
   }
 
-  update(input: UpdateScheduledTaskDefinitionInput): Result<void> {
+  configure(input: ConfigureScheduledTaskDefinitionInput): Result<void> {
     if (input.schedule) {
       this.state.schedule = input.schedule;
     }

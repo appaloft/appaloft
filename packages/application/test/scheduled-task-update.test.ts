@@ -28,7 +28,7 @@ import { MemoryResourceRepository } from "@appaloft/testkit";
 
 import { createExecutionContext, type RepositoryContext, toRepositoryContext } from "../src";
 import { type ScheduledTaskDefinitionRepository } from "../src/ports";
-import { UpdateScheduledTaskUseCase } from "../src/use-cases";
+import { ConfigureScheduledTaskUseCase } from "../src/use-cases";
 
 class RecordingScheduledTaskDefinitionRepository implements ScheduledTaskDefinitionRepository {
   readonly upserts: ScheduledTaskDefinition[] = [];
@@ -118,12 +118,12 @@ async function createHarness(input?: { resource?: Resource; task?: ScheduledTask
   return {
     context,
     taskRepository,
-    useCase: new UpdateScheduledTaskUseCase(taskRepository, resourceRepository),
+    useCase: new ConfigureScheduledTaskUseCase(taskRepository, resourceRepository),
   };
 }
 
-describe("UpdateScheduledTaskUseCase", () => {
-  test("[SCHED-TASK-UPDATE-001] updates a Resource-owned task definition without activating catalog entries", async () => {
+describe("ConfigureScheduledTaskUseCase", () => {
+  test("[SCHED-TASK-UPDATE-001] configures a Resource-owned task definition", async () => {
     const { context, taskRepository, useCase } = await createHarness();
 
     const result = await useCase.execute(context, {

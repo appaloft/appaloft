@@ -41,6 +41,8 @@ import {
   ConfigureResourceRuntimeUseCase,
   ConfigureResourceSourceCommandHandler,
   ConfigureResourceSourceUseCase,
+  ConfigureScheduledTaskCommandHandler,
+  ConfigureScheduledTaskUseCase,
   ConfigureServerCredentialUseCase,
   ConfigureServerEdgeProxyCommandHandler,
   ConfigureServerEdgeProxyUseCase,
@@ -263,8 +265,6 @@ import {
   UnsetEnvironmentVariableUseCase,
   UnsetResourceVariableCommandHandler,
   UnsetResourceVariableUseCase,
-  UpdateScheduledTaskCommandHandler,
-  UpdateScheduledTaskUseCase,
 } from "@appaloft/application";
 import { type DomainError, ok, type Result } from "@appaloft/core";
 import { type DependencyContainer } from "tsyringe";
@@ -379,7 +379,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
   container.registerSingleton(ConfigureResourceSourceCommandHandler);
   container.registerSingleton(CreateScheduledTaskCommandHandler);
-  container.registerSingleton(UpdateScheduledTaskCommandHandler);
+  container.registerSingleton(ConfigureScheduledTaskCommandHandler);
   container.registerSingleton(DeleteScheduledTaskCommandHandler);
   container.registerSingleton(RunScheduledTaskNowCommandHandler);
   container.registerSingleton(ListScheduledTasksQueryHandler);
@@ -526,7 +526,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.showResourceQueryService, ShowResourceQueryService);
   container.registerSingleton(tokens.createScheduledTaskUseCase, CreateScheduledTaskUseCase);
-  container.registerSingleton(tokens.updateScheduledTaskUseCase, UpdateScheduledTaskUseCase);
+  container.registerSingleton(tokens.configureScheduledTaskUseCase, ConfigureScheduledTaskUseCase);
   container.registerSingleton(tokens.deleteScheduledTaskUseCase, DeleteScheduledTaskUseCase);
   container.registerSingleton(tokens.runScheduledTaskNowUseCase, RunScheduledTaskNowUseCase);
   container.registerSingleton(

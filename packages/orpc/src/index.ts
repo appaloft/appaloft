@@ -25,6 +25,7 @@ import {
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
+  ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   ConfigureServerEdgeProxyCommand,
   ConfirmDomainBindingOwnershipCommand,
@@ -35,6 +36,7 @@ import {
   CreateEnvironmentCommand,
   CreateProjectCommand,
   CreateResourceCommand,
+  CreateScheduledTaskCommand,
   CreateSshCredentialCommand,
   CreateStorageVolumeCommand,
   checkDomainBindingDeleteSafetyQueryInputSchema,
@@ -48,6 +50,7 @@ import {
   configureResourceNetworkCommandInputSchema,
   configureResourceRuntimeCommandInputSchema,
   configureResourceSourceCommandInputSchema,
+  configureScheduledTaskCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   configureServerEdgeProxyCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
@@ -57,6 +60,7 @@ import {
   createEnvironmentCommandInputSchema,
   createProjectCommandInputSchema,
   createResourceCommandInputSchema,
+  createScheduledTaskCommandInputSchema,
   createSshCredentialCommandInputSchema,
   createStorageVolumeCommandInputSchema,
   DeactivateServerCommand,
@@ -64,6 +68,7 @@ import {
   DeleteDependencyResourceCommand,
   DeleteDomainBindingCommand,
   DeleteResourceCommand,
+  DeleteScheduledTaskCommand,
   DeleteServerCommand,
   DeleteSshCredentialCommand,
   DeleteStorageVolumeCommand,
@@ -80,6 +85,7 @@ import {
   deleteDependencyResourceCommandInputSchema,
   deleteDomainBindingCommandInputSchema,
   deleteResourceCommandInputSchema,
+  deleteScheduledTaskCommandInputSchema,
   deleteServerCommandInputSchema,
   deleteSshCredentialCommandInputSchema,
   deleteStorageVolumeCommandInputSchema,
@@ -118,6 +124,8 @@ import {
   ListProvidersQuery,
   ListResourceDependencyBindingsQuery,
   ListResourcesQuery,
+  ListScheduledTaskRunsQuery,
+  ListScheduledTasksQuery,
   ListServersQuery,
   ListSourceEventsQuery,
   ListSshCredentialsQuery,
@@ -134,6 +142,8 @@ import {
   listOperatorWorkQueryInputSchema,
   listResourceDependencyBindingsQueryInputSchema,
   listResourcesQueryInputSchema,
+  listScheduledTaskRunsQueryInputSchema,
+  listScheduledTasksQueryInputSchema,
   listSourceEventsQueryInputSchema,
   listSshCredentialsQueryInputSchema,
   listStorageVolumesQueryInputSchema,
@@ -174,6 +184,7 @@ import {
   RollbackDeploymentCommand,
   RotateResourceDependencyBindingSecretCommand,
   RotateSshCredentialCommand,
+  RunScheduledTaskNowCommand,
   redeployDeploymentCommandInputSchema,
   registerServerCommandInputSchema,
   renameDependencyResourceCommandInputSchema,
@@ -196,6 +207,8 @@ import {
   rollbackDeploymentCommandInputSchema,
   rotateResourceDependencyBindingSecretCommandInputSchema,
   rotateSshCredentialCommandInputSchema,
+  runScheduledTaskNowCommandInputSchema,
+  ScheduledTaskRunLogsQuery,
   SetEnvironmentVariableCommand,
   SetResourceVariableCommand,
   ShowCertificateQuery,
@@ -209,6 +222,8 @@ import {
   ShowProjectQuery,
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
+  ShowScheduledTaskQuery,
+  ShowScheduledTaskRunQuery,
   ShowServerQuery,
   ShowSourceEventQuery,
   ShowSshCredentialQuery,
@@ -219,6 +234,7 @@ import {
   StreamDeploymentEventsQuery,
   type StreamDeploymentEventsQueryInput,
   type StreamDeploymentEventsResult,
+  scheduledTaskRunLogsQueryInputSchema,
   setEnvironmentVariableCommandInputSchema,
   setResourceVariableCommandInputSchema,
   showCertificateQueryInputSchema,
@@ -232,6 +248,8 @@ import {
   showProjectQueryInputSchema,
   showResourceDependencyBindingQueryInputSchema,
   showResourceQueryInputSchema,
+  showScheduledTaskQueryInputSchema,
+  showScheduledTaskRunQueryInputSchema,
   showServerQueryInputSchema,
   showSourceEventQueryInputSchema,
   showSshCredentialQueryInputSchema,
@@ -283,6 +301,7 @@ import {
   deleteCertificateResponseSchema,
   deleteDomainBindingResponseSchema,
   deleteResourceResponseSchema,
+  deleteScheduledTaskResponseSchema,
   deleteServerResponseSchema,
   deleteSshCredentialResponseSchema,
   deleteStorageVolumeResponseSchema,
@@ -315,6 +334,8 @@ import {
   listProvidersResponseSchema,
   listResourceDependencyBindingsResponseSchema,
   listResourcesResponseSchema,
+  listScheduledTaskRunsResponseSchema,
+  listScheduledTasksResponseSchema,
   listServersResponseSchema,
   listSourceEventsResponseSchema,
   listSshCredentialsResponseSchema,
@@ -344,6 +365,9 @@ import {
   rollbackDeploymentResponseSchema,
   rotateResourceDependencyBindingSecretResponseSchema,
   rotateSshCredentialResponseSchema,
+  runScheduledTaskNowResponseSchema,
+  scheduledTaskCommandResponseSchema,
+  scheduledTaskRunLogsResponseSchema,
   setResourceVariableResponseSchema,
   showCertificateResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
@@ -354,6 +378,8 @@ import {
   showOperatorWorkResponseSchema,
   showProjectResponseSchema,
   showResourceDependencyBindingResponseSchema,
+  showScheduledTaskResponseSchema,
+  showScheduledTaskRunResponseSchema,
   showServerResponseSchema,
   showSourceEventResponseSchema,
   showSshCredentialResponseSchema,
@@ -2556,6 +2582,114 @@ export const resourceProxyConfigurationPreviewProcedure = base
     executeQuery(context, ResourceProxyConfigurationPreviewQuery.create(input)),
   );
 
+export const listScheduledTasksProcedure = base
+  .route({
+    method: "GET",
+    path: "/scheduled-tasks",
+    successStatus: 200,
+  })
+  .input(listScheduledTasksQueryInputSchema)
+  .output(listScheduledTasksResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListScheduledTasksQuery.create(input)),
+  );
+
+export const showScheduledTaskProcedure = base
+  .route({
+    method: "GET",
+    path: "/scheduled-tasks/{taskId}",
+    successStatus: 200,
+  })
+  .input(showScheduledTaskQueryInputSchema)
+  .output(showScheduledTaskResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowScheduledTaskQuery.create(input)),
+  );
+
+export const createScheduledTaskProcedure = base
+  .route({
+    method: "POST",
+    path: "/scheduled-tasks",
+    successStatus: 201,
+  })
+  .input(createScheduledTaskCommandInputSchema)
+  .output(scheduledTaskCommandResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateScheduledTaskCommand.create(input)),
+  );
+
+export const configureScheduledTaskProcedure = base
+  .route({
+    method: "POST",
+    path: "/scheduled-tasks/{taskId}",
+    successStatus: 200,
+  })
+  .input(configureScheduledTaskCommandInputSchema)
+  .output(scheduledTaskCommandResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureScheduledTaskCommand.create(input)),
+  );
+
+export const deleteScheduledTaskProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/scheduled-tasks/{taskId}",
+    successStatus: 200,
+  })
+  .input(deleteScheduledTaskCommandInputSchema)
+  .output(deleteScheduledTaskResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteScheduledTaskCommand.create(input)),
+  );
+
+export const runScheduledTaskNowProcedure = base
+  .route({
+    method: "POST",
+    path: "/scheduled-tasks/{taskId}/runs",
+    successStatus: 202,
+  })
+  .input(runScheduledTaskNowCommandInputSchema)
+  .output(runScheduledTaskNowResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RunScheduledTaskNowCommand.create(input)),
+  );
+
+export const listScheduledTaskRunsProcedure = base
+  .route({
+    method: "GET",
+    path: "/scheduled-task-runs",
+    successStatus: 200,
+  })
+  .input(listScheduledTaskRunsQueryInputSchema)
+  .output(listScheduledTaskRunsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListScheduledTaskRunsQuery.create(input)),
+  );
+
+export const showScheduledTaskRunProcedure = base
+  .route({
+    method: "GET",
+    path: "/scheduled-task-runs/{runId}",
+    successStatus: 200,
+  })
+  .input(showScheduledTaskRunQueryInputSchema)
+  .output(showScheduledTaskRunResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowScheduledTaskRunQuery.create(input)),
+  );
+
+export const scheduledTaskRunLogsProcedure = base
+  .route({
+    method: "GET",
+    path: "/scheduled-task-runs/{runId}/logs",
+    successStatus: 200,
+  })
+  .input(scheduledTaskRunLogsQueryInputSchema)
+  .output(scheduledTaskRunLogsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ScheduledTaskRunLogsQuery.create(input)),
+  );
+
 export const createStorageVolumeProcedure = base
   .route({
     method: "POST",
@@ -2979,6 +3113,19 @@ export const appaloftOrpcRouter = {
     show: showStorageVolumeProcedure,
     rename: renameStorageVolumeProcedure,
     delete: deleteStorageVolumeProcedure,
+  },
+  scheduledTasks: {
+    list: listScheduledTasksProcedure,
+    show: showScheduledTaskProcedure,
+    create: createScheduledTaskProcedure,
+    configure: configureScheduledTaskProcedure,
+    delete: deleteScheduledTaskProcedure,
+    runNow: runScheduledTaskNowProcedure,
+    runs: {
+      list: listScheduledTaskRunsProcedure,
+      show: showScheduledTaskRunProcedure,
+      logs: scheduledTaskRunLogsProcedure,
+    },
   },
   dependencyResources: {
     provisionPostgres: provisionPostgresDependencyResourceProcedure,
@@ -3520,6 +3667,12 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/dependency-bindings",
     "/api/resources/:resourceId/dependency-bindings/:bindingId",
     "/api/resources/:resourceId/dependency-bindings/:bindingId/secret-rotations",
+    "/api/scheduled-tasks",
+    "/api/scheduled-tasks/:taskId",
+    "/api/scheduled-tasks/:taskId/runs",
+    "/api/scheduled-task-runs",
+    "/api/scheduled-task-runs/:runId",
+    "/api/scheduled-task-runs/:runId/logs",
     "/api/resource-access-failures/:requestId",
     "/api/terminal-sessions",
     "/api/domain-bindings",

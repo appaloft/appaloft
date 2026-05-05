@@ -4,18 +4,18 @@ import { Command } from "../../cqrs";
 import { type ScheduledTaskCommandResult } from "../../ports";
 import { parseOperationInput, trimToUndefined } from "../shared-schema";
 import {
-  type UpdateScheduledTaskCommandInput,
-  type UpdateScheduledTaskCommandPayload,
-  updateScheduledTaskCommandInputSchema,
+  type ConfigureScheduledTaskCommandInput,
+  type ConfigureScheduledTaskCommandPayload,
+  configureScheduledTaskCommandInputSchema,
 } from "./scheduled-task.schema";
 
 export {
-  type UpdateScheduledTaskCommandInput,
-  type UpdateScheduledTaskCommandPayload,
-  updateScheduledTaskCommandInputSchema,
+  type ConfigureScheduledTaskCommandInput,
+  type ConfigureScheduledTaskCommandPayload,
+  configureScheduledTaskCommandInputSchema,
 } from "./scheduled-task.schema";
 
-export class UpdateScheduledTaskCommand extends Command<ScheduledTaskCommandResult> {
+export class ConfigureScheduledTaskCommand extends Command<ScheduledTaskCommandResult> {
   constructor(
     public readonly taskId: string,
     public readonly resourceId: string,
@@ -24,17 +24,17 @@ export class UpdateScheduledTaskCommand extends Command<ScheduledTaskCommandResu
     public readonly commandIntent?: string,
     public readonly timeoutSeconds?: number,
     public readonly retryLimit?: number,
-    public readonly concurrencyPolicy?: UpdateScheduledTaskCommandPayload["concurrencyPolicy"],
-    public readonly status?: UpdateScheduledTaskCommandPayload["status"],
+    public readonly concurrencyPolicy?: ConfigureScheduledTaskCommandPayload["concurrencyPolicy"],
+    public readonly status?: ConfigureScheduledTaskCommandPayload["status"],
     public readonly idempotencyKey?: string,
   ) {
     super();
   }
 
-  static create(input: UpdateScheduledTaskCommandInput): Result<UpdateScheduledTaskCommand> {
-    return parseOperationInput(updateScheduledTaskCommandInputSchema, input).map(
+  static create(input: ConfigureScheduledTaskCommandInput): Result<ConfigureScheduledTaskCommand> {
+    return parseOperationInput(configureScheduledTaskCommandInputSchema, input).map(
       (parsed) =>
-        new UpdateScheduledTaskCommand(
+        new ConfigureScheduledTaskCommand(
           parsed.taskId,
           parsed.resourceId,
           trimToUndefined(parsed.schedule),

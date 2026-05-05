@@ -14,6 +14,7 @@ import {
   type ConfigureResourceNetworkCommandInput,
   type ConfigureResourceRuntimeCommandInput,
   type ConfigureResourceSourceCommandInput,
+  type ConfigureScheduledTaskCommandInput,
   type ConfigureServerCredentialCommandInput,
   type ConfigureServerEdgeProxyCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
@@ -22,11 +23,13 @@ import {
   type CreateEnvironmentCommandInput,
   type CreateProjectCommandInput,
   type CreateResourceCommandInput,
+  type CreateScheduledTaskCommandInput,
   type CreateSshCredentialCommandInput,
   type DeactivateServerCommandInput,
   type DeleteCertificateCommandInput,
   type DeleteDomainBindingCommandInput,
   type DeleteResourceCommandInput,
+  type DeleteScheduledTaskCommandInput,
   type DeleteServerCommandInput,
   type DeleteSshCredentialCommandInput,
   type DeploymentLogsQueryInput,
@@ -45,6 +48,8 @@ import {
   type ListGitHubRepositoriesQueryInput,
   type ListOperatorWorkQueryInput,
   type ListResourcesQueryInput,
+  type ListScheduledTaskRunsQueryInput,
+  type ListScheduledTasksQueryInput,
   type ListSourceEventsQueryInput,
   type ListSshCredentialsQueryInput,
   type LockEnvironmentCommandInput,
@@ -68,6 +73,8 @@ import {
   type RevokeCertificateCommandInput,
   type RollbackDeploymentCommandInput,
   type RotateSshCredentialCommandInput,
+  type RunScheduledTaskNowCommandInput,
+  type ScheduledTaskRunLogsQueryInput,
   type SetEnvironmentVariableCommandInput,
   type SetResourceVariableCommandInput,
   type ShowCertificateQueryInput,
@@ -78,6 +85,8 @@ import {
   type ShowOperatorWorkQueryInput,
   type ShowProjectQueryInput,
   type ShowResourceQueryInput,
+  type ShowScheduledTaskQueryInput,
+  type ShowScheduledTaskRunQueryInput,
   type ShowServerQueryInput,
   type ShowSourceEventQueryInput,
   type ShowSshCredentialQueryInput,
@@ -118,6 +127,7 @@ import {
   type DeleteCertificateResponse,
   type DeleteDomainBindingResponse,
   type DeleteResourceResponse,
+  type DeleteScheduledTaskResponse,
   type DeleteServerResponse,
   type DeleteSshCredentialResponse,
   type DeploymentEventStreamEnvelope,
@@ -144,6 +154,8 @@ import {
   type ListProjectsResponse,
   type ListProvidersResponse,
   type ListResourcesResponse,
+  type ListScheduledTaskRunsResponse,
+  type ListScheduledTasksResponse,
   type ListServersResponse,
   type ListSourceEventsResponse,
   type ListSshCredentialsResponse,
@@ -170,6 +182,9 @@ import {
   type RevokeCertificateResponse,
   type RollbackDeploymentResponse,
   type RotateSshCredentialResponse,
+  type RunScheduledTaskNowResponse,
+  type ScheduledTaskCommandResponse,
+  type ScheduledTaskRunLogsResponse,
   type SetResourceVariableResponse,
   type ShowCertificateResponse,
   type ShowDefaultAccessDomainPolicyResponse,
@@ -177,6 +192,8 @@ import {
   type ShowDomainBindingResponse,
   type ShowOperatorWorkResponse,
   type ShowProjectResponse,
+  type ShowScheduledTaskResponse,
+  type ShowScheduledTaskRunResponse,
   type ShowServerResponse,
   type ShowSourceEventResponse,
   type ShowSshCredentialResponse,
@@ -567,6 +584,64 @@ export type AppaloftOrpcClientContract = {
         AppaloftClientContext,
         RestartResourceRuntimeCommandInput,
         RestartResourceRuntimeResponse,
+        AppaloftClientError
+      >;
+    };
+  };
+  scheduledTasks: {
+    list: Client<
+      AppaloftClientContext,
+      ListScheduledTasksQueryInput,
+      ListScheduledTasksResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowScheduledTaskQueryInput,
+      ShowScheduledTaskResponse,
+      AppaloftClientError
+    >;
+    create: Client<
+      AppaloftClientContext,
+      CreateScheduledTaskCommandInput,
+      ScheduledTaskCommandResponse,
+      AppaloftClientError
+    >;
+    configure: Client<
+      AppaloftClientContext,
+      ConfigureScheduledTaskCommandInput,
+      ScheduledTaskCommandResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeleteScheduledTaskCommandInput,
+      DeleteScheduledTaskResponse,
+      AppaloftClientError
+    >;
+    runNow: Client<
+      AppaloftClientContext,
+      RunScheduledTaskNowCommandInput,
+      RunScheduledTaskNowResponse,
+      AppaloftClientError
+    >;
+    runs: {
+      list: Client<
+        AppaloftClientContext,
+        ListScheduledTaskRunsQueryInput,
+        ListScheduledTaskRunsResponse,
+        AppaloftClientError
+      >;
+      show: Client<
+        AppaloftClientContext,
+        ShowScheduledTaskRunQueryInput,
+        ShowScheduledTaskRunResponse,
+        AppaloftClientError
+      >;
+      logs: Client<
+        AppaloftClientContext,
+        ScheduledTaskRunLogsQueryInput,
+        ScheduledTaskRunLogsResponse,
         AppaloftClientError
       >;
     };

@@ -92,6 +92,15 @@ import { showResourceQueryInputSchema } from "./operations/resources/show-resour
 import { showResourceDependencyBindingQueryInputSchema } from "./operations/resources/show-resource-dependency-binding.query";
 import { unbindResourceDependencyCommandInputSchema } from "./operations/resources/unbind-resource-dependency.command";
 import { unsetResourceVariableCommandInputSchema } from "./operations/resources/unset-resource-variable.command";
+import { createScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/create-scheduled-task.command";
+import { deleteScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/delete-scheduled-task.command";
+import { listScheduledTaskRunsQueryInputSchema } from "./operations/scheduled-tasks/list-scheduled-task-runs.query";
+import { listScheduledTasksQueryInputSchema } from "./operations/scheduled-tasks/list-scheduled-tasks.query";
+import { runScheduledTaskNowCommandInputSchema } from "./operations/scheduled-tasks/run-scheduled-task-now.command";
+import { scheduledTaskRunLogsQueryInputSchema } from "./operations/scheduled-tasks/scheduled-task-run-logs.query";
+import { showScheduledTaskQueryInputSchema } from "./operations/scheduled-tasks/show-scheduled-task.query";
+import { showScheduledTaskRunQueryInputSchema } from "./operations/scheduled-tasks/show-scheduled-task-run.query";
+import { configureScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/update-scheduled-task.command";
 import { bootstrapServerProxyCommandInputSchema } from "./operations/servers/bootstrap-server-proxy.command";
 import { checkServerDeleteSafetyQueryInputSchema } from "./operations/servers/check-server-delete-safety.query";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
@@ -130,6 +139,8 @@ type OperationDomain =
   | "environments"
   | "resources"
   | "dependency-resources"
+  | "scheduled-tasks"
+  | "scheduled-task-runs"
   | "storage-volumes"
   | "deployments"
   | "operator-work"
@@ -1059,6 +1070,132 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource dependency show <resourceId> <bindingId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/dependency-bindings/{bindingId}" },
+    },
+  },
+  {
+    key: "scheduled-tasks.create",
+    kind: "command",
+    domain: "scheduled-tasks",
+    messageName: "CreateScheduledTaskCommand",
+    handlerName: "CreateScheduledTaskCommandHandler",
+    serviceName: "CreateScheduledTaskUseCase",
+    inputSchema: createScheduledTaskCommandInputSchema,
+    serviceToken: tokens.createScheduledTaskUseCase,
+    transports: {
+      cli: "appaloft scheduled-task create <resourceId>",
+      orpc: { method: "POST", path: "/api/scheduled-tasks" },
+    },
+  },
+  {
+    key: "scheduled-tasks.list",
+    kind: "query",
+    domain: "scheduled-tasks",
+    messageName: "ListScheduledTasksQuery",
+    handlerName: "ListScheduledTasksQueryHandler",
+    serviceName: "ListScheduledTasksQueryService",
+    inputSchema: listScheduledTasksQueryInputSchema,
+    serviceToken: tokens.listScheduledTasksQueryService,
+    transports: {
+      cli: "appaloft scheduled-task list",
+      orpc: { method: "GET", path: "/api/scheduled-tasks" },
+    },
+  },
+  {
+    key: "scheduled-tasks.show",
+    kind: "query",
+    domain: "scheduled-tasks",
+    messageName: "ShowScheduledTaskQuery",
+    handlerName: "ShowScheduledTaskQueryHandler",
+    serviceName: "ShowScheduledTaskQueryService",
+    inputSchema: showScheduledTaskQueryInputSchema,
+    serviceToken: tokens.showScheduledTaskQueryService,
+    transports: {
+      cli: "appaloft scheduled-task show <taskId>",
+      orpc: { method: "GET", path: "/api/scheduled-tasks/{taskId}" },
+    },
+  },
+  {
+    key: "scheduled-tasks.configure",
+    kind: "command",
+    domain: "scheduled-tasks",
+    messageName: "ConfigureScheduledTaskCommand",
+    handlerName: "ConfigureScheduledTaskCommandHandler",
+    serviceName: "ConfigureScheduledTaskUseCase",
+    inputSchema: configureScheduledTaskCommandInputSchema,
+    serviceToken: tokens.configureScheduledTaskUseCase,
+    transports: {
+      cli: "appaloft scheduled-task configure <taskId>",
+      orpc: { method: "POST", path: "/api/scheduled-tasks/{taskId}" },
+    },
+  },
+  {
+    key: "scheduled-tasks.delete",
+    kind: "command",
+    domain: "scheduled-tasks",
+    messageName: "DeleteScheduledTaskCommand",
+    handlerName: "DeleteScheduledTaskCommandHandler",
+    serviceName: "DeleteScheduledTaskUseCase",
+    inputSchema: deleteScheduledTaskCommandInputSchema,
+    serviceToken: tokens.deleteScheduledTaskUseCase,
+    transports: {
+      cli: "appaloft scheduled-task delete <taskId>",
+      orpc: { method: "DELETE", path: "/api/scheduled-tasks/{taskId}" },
+    },
+  },
+  {
+    key: "scheduled-tasks.run-now",
+    kind: "command",
+    domain: "scheduled-tasks",
+    messageName: "RunScheduledTaskNowCommand",
+    handlerName: "RunScheduledTaskNowCommandHandler",
+    serviceName: "RunScheduledTaskNowUseCase",
+    inputSchema: runScheduledTaskNowCommandInputSchema,
+    serviceToken: tokens.runScheduledTaskNowUseCase,
+    transports: {
+      cli: "appaloft scheduled-task run <taskId>",
+      orpc: { method: "POST", path: "/api/scheduled-tasks/{taskId}/runs" },
+    },
+  },
+  {
+    key: "scheduled-task-runs.list",
+    kind: "query",
+    domain: "scheduled-task-runs",
+    messageName: "ListScheduledTaskRunsQuery",
+    handlerName: "ListScheduledTaskRunsQueryHandler",
+    serviceName: "ListScheduledTaskRunsQueryService",
+    inputSchema: listScheduledTaskRunsQueryInputSchema,
+    serviceToken: tokens.listScheduledTaskRunsQueryService,
+    transports: {
+      cli: "appaloft scheduled-task runs list",
+      orpc: { method: "GET", path: "/api/scheduled-task-runs" },
+    },
+  },
+  {
+    key: "scheduled-task-runs.show",
+    kind: "query",
+    domain: "scheduled-task-runs",
+    messageName: "ShowScheduledTaskRunQuery",
+    handlerName: "ShowScheduledTaskRunQueryHandler",
+    serviceName: "ShowScheduledTaskRunQueryService",
+    inputSchema: showScheduledTaskRunQueryInputSchema,
+    serviceToken: tokens.showScheduledTaskRunQueryService,
+    transports: {
+      cli: "appaloft scheduled-task runs show <runId>",
+      orpc: { method: "GET", path: "/api/scheduled-task-runs/{runId}" },
+    },
+  },
+  {
+    key: "scheduled-task-runs.logs",
+    kind: "query",
+    domain: "scheduled-task-runs",
+    messageName: "ScheduledTaskRunLogsQuery",
+    handlerName: "ScheduledTaskRunLogsQueryHandler",
+    serviceName: "ScheduledTaskRunLogsQueryService",
+    inputSchema: scheduledTaskRunLogsQueryInputSchema,
+    serviceToken: tokens.scheduledTaskRunLogsQueryService,
+    transports: {
+      cli: "appaloft scheduled-task runs logs <runId>",
+      orpc: { method: "GET", path: "/api/scheduled-task-runs/{runId}/logs" },
     },
   },
   {
