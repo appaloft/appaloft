@@ -241,6 +241,27 @@ export class ScheduledTaskId extends IdentifierValue {
   }
 }
 
+const scheduledTaskRunIdBrand: unique symbol = Symbol("ScheduledTaskRunId");
+export class ScheduledTaskRunId extends IdentifierValue {
+  private [scheduledTaskRunIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ScheduledTaskRunId> {
+    return createIdentifierValue(
+      value,
+      "Scheduled task run ID",
+      (normalized) => new ScheduledTaskRunId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): ScheduledTaskRunId {
+    return new ScheduledTaskRunId(value.trim());
+  }
+}
+
 const resourceStorageAttachmentIdBrand: unique symbol = Symbol("ResourceStorageAttachmentId");
 export class ResourceStorageAttachmentId extends IdentifierValue {
   private [resourceStorageAttachmentIdBrand]!: void;
