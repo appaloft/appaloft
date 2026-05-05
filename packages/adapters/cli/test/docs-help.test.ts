@@ -73,6 +73,9 @@ describe("CLI docs help links", () => {
     expect(cliDocsHrefs.sourceAutoDeployRecovery).toBe(
       "/docs/deploy/sources/#source-auto-deploy-recovery",
     );
+    expect(cliDocsHrefs.scheduledTaskLifecycle).toBe(
+      "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+    );
 
     expect(cliCommandDescriptions.serverCredential).toContain(cliDocsHrefs.serverSshCredential);
     expect(cliCommandDescriptions.serverRegister).toContain(cliDocsHrefs.serverDockerSwarmTarget);
@@ -116,6 +119,13 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.sourceEventList).toContain(cliDocsHrefs.sourceAutoDeployDedupe);
     expect(cliCommandDescriptions.sourceEventShow).toContain(
       cliDocsHrefs.sourceAutoDeployIgnoredEvents,
+    );
+    expect(cliCommandDescriptions.scheduledTaskCreate).toContain(
+      cliDocsHrefs.scheduledTaskLifecycle,
+    );
+    expect(cliCommandDescriptions.scheduledTaskRun).toContain(cliDocsHrefs.scheduledTaskLifecycle);
+    expect(cliCommandDescriptions.scheduledTaskRunsLogs).toContain(
+      cliDocsHrefs.scheduledTaskLifecycle,
     );
   });
 });

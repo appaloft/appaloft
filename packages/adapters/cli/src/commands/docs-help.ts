@@ -49,6 +49,7 @@ export const cliDocsHrefs = {
   sourceAutoDeployDedupe: resolvePublicDocsHelpHref("source.auto-deploy-dedupe"),
   sourceAutoDeployIgnoredEvents: resolvePublicDocsHelpHref("source.auto-deploy-ignored-events"),
   sourceAutoDeployRecovery: resolvePublicDocsHelpHref("source.auto-deploy-recovery"),
+  scheduledTaskLifecycle: resolvePublicDocsHelpHref("scheduled-task.resource-lifecycle"),
 } as const;
 
 export const cliCommandDescriptions = {
@@ -226,20 +227,32 @@ export const cliCommandDescriptions = {
   ),
   resourceDependencyList: withDocs("List resource dependency bindings", "resource.concept"),
   resourceDependencyShow: withDocs("Show one resource dependency binding", "resource.concept"),
-  scheduledTask: withDocs("Scheduled task operations", "resource.runtime-profile"),
+  scheduledTask: withDocs("Scheduled task operations", "scheduled-task.resource-lifecycle"),
   scheduledTaskCreate: withDocs(
     "Create a Resource-owned scheduled task",
-    "resource.runtime-profile",
+    "scheduled-task.resource-lifecycle",
   ),
-  scheduledTaskList: withDocs("List scheduled tasks", "resource.runtime-profile"),
-  scheduledTaskShow: withDocs("Show scheduled task detail", "resource.runtime-profile"),
-  scheduledTaskConfigure: withDocs("Configure a scheduled task", "resource.runtime-profile"),
-  scheduledTaskDelete: withDocs("Delete a scheduled task", "resource.runtime-profile"),
-  scheduledTaskRun: withDocs("Accept an immediate scheduled task run", "resource.runtime-profile"),
-  scheduledTaskRuns: withDocs("Scheduled task run history", "resource.runtime-profile"),
-  scheduledTaskRunsList: withDocs("List scheduled task runs", "resource.runtime-profile"),
-  scheduledTaskRunsShow: withDocs("Show scheduled task run detail", "resource.runtime-profile"),
-  scheduledTaskRunsLogs: withDocs("Read scheduled task run logs", "resource.runtime-profile"),
+  scheduledTaskList: withDocs("List scheduled tasks", "scheduled-task.resource-lifecycle"),
+  scheduledTaskShow: withDocs("Show scheduled task detail", "scheduled-task.resource-lifecycle"),
+  scheduledTaskConfigure: withDocs(
+    "Configure a scheduled task",
+    "scheduled-task.resource-lifecycle",
+  ),
+  scheduledTaskDelete: withDocs("Delete a scheduled task", "scheduled-task.resource-lifecycle"),
+  scheduledTaskRun: withDocs(
+    "Accept an immediate scheduled task run",
+    "scheduled-task.resource-lifecycle",
+  ),
+  scheduledTaskRuns: withDocs("Scheduled task run history", "scheduled-task.resource-lifecycle"),
+  scheduledTaskRunsList: withDocs("List scheduled task runs", "scheduled-task.resource-lifecycle"),
+  scheduledTaskRunsShow: withDocs(
+    "Show scheduled task run detail",
+    "scheduled-task.resource-lifecycle",
+  ),
+  scheduledTaskRunsLogs: withDocs(
+    "Read scheduled task run logs",
+    "scheduled-task.resource-lifecycle",
+  ),
   storage: withDocs("Storage operations", "storage.volume-lifecycle"),
   storageVolume: withDocs("Storage volume operations", "storage.volume-lifecycle"),
   storageVolumeCreate: withDocs(

@@ -116,7 +116,7 @@ const sidebar = [
       { slug: "resources/overview" },
       {
         label: "Model",
-        items: [{ slug: "resources/projects" }],
+        items: [{ slug: "resources/projects" }, { slug: "resources/scheduled-tasks" }],
       },
       {
         label: "Profiles",

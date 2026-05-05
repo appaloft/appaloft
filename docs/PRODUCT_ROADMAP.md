@@ -1166,6 +1166,10 @@ Current verification notes:
   command group for create/list/show/configure/delete/run and run-history list/show/logs. CLI,
   HTTP/oRPC, operation catalog, and generated MCP descriptor paths are active; Web controls, public
   docs/help, and broader secret masking coverage remain open.
+- 2026-05-05 Phase 7 scheduled task public docs/help slice added
+  `/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle`, registered
+  `scheduled-task.resource-lifecycle`, and wired CLI/HTTP descriptions to the stable scheduled-task
+  anchor. Web controls and broader secret masking coverage remain open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

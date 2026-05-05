@@ -48,9 +48,10 @@ These operations are active catalog entries with CLI commands and HTTP/oRPC rout
 
 ## Public Docs Outcome
 
-Docs Round required before completion. Target page: a future task-oriented public docs page under
-Resources or Observe explaining scheduled tasks, run history, logs, and failure recovery without
-DDD or internal process-manager terminology.
+Docs Round created the task-oriented public page
+`/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle` with the registry topic
+`scheduled-task.resource-lifecycle`. CLI and HTTP/API descriptions target the same stable anchor for
+scheduled task definitions, run-now, run history, and run logs. Web controls remain deferred.
 
 ## Migration Gaps
 
@@ -109,7 +110,8 @@ DDD or internal process-manager terminology.
   reader, run-log recorder, runtime port, handlers, use cases, scheduler, and accepted-run worker.
   An opt-in scheduled task runner config can start a shell timer that scans due tasks and drains
   admitted runs through the worker in long-running shell processes.
-- Operation catalog entries, CLI commands, and HTTP/oRPC routes are active for scheduled tasks and
-  run history. Generated MCP descriptors consume the active operation catalog entries.
-- Web controls and public docs remain open.
+- Operation catalog entries, CLI commands, HTTP/oRPC routes, and public docs/help anchors are active
+  for scheduled tasks and run history. Generated MCP descriptors consume the active operation
+  catalog entries.
+- Web controls remain open.
 - The scheduled task runner is disabled by default until operators explicitly enable it.

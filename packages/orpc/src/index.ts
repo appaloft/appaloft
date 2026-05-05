@@ -503,6 +503,7 @@ export const apiDocsHrefs = {
   sourceAutoDeployDedupe: resolvePublicDocsHelpHref("source.auto-deploy-dedupe"),
   sourceAutoDeployIgnoredEvents: resolvePublicDocsHelpHref("source.auto-deploy-ignored-events"),
   sourceAutoDeployRecovery: resolvePublicDocsHelpHref("source.auto-deploy-recovery"),
+  scheduledTaskLifecycle: resolvePublicDocsHelpHref("scheduled-task.resource-lifecycle"),
 } as const;
 
 export const apiRouteDescriptions = {
@@ -714,6 +715,42 @@ export const apiRouteDescriptions = {
   showResourceDependencyBinding: routeDescription(
     "Reads one safe dependency binding summary for a resource without exposing raw connection secrets.",
     "resource.concept",
+  ),
+  listScheduledTasks: routeDescription(
+    "Lists Resource-owned scheduled task definitions by project, environment, resource, status, cursor, and limit.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  showScheduledTask: routeDescription(
+    "Reads one Resource-owned scheduled task definition with latest run summary.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  createScheduledTask: routeDescription(
+    "Creates a Resource-owned scheduled task definition without creating a deployment attempt.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  configureScheduledTask: routeDescription(
+    "Configures schedule, command, timeout, retry, or enabled state for one scheduled task.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  deleteScheduledTask: routeDescription(
+    "Deletes one scheduled task definition without deleting the Resource or deployment history.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  runScheduledTaskNow: routeDescription(
+    "Accepts one immediate scheduled task run and returns before task execution completes.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  listScheduledTaskRuns: routeDescription(
+    "Lists scheduled task run attempts by task, resource, status, trigger kind, cursor, and limit.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  showScheduledTaskRun: routeDescription(
+    "Reads one scheduled task run attempt with safe status and terminal details.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  scheduledTaskRunLogs: routeDescription(
+    "Reads run-scoped scheduled task logs without mixing them into deployment or resource runtime logs.",
+    "scheduled-task.resource-lifecycle",
   ),
   setResourceVariable: routeDescription(
     "Sets one resource-scoped variable or secret override.",
@@ -2586,6 +2623,7 @@ export const listScheduledTasksProcedure = base
   .route({
     method: "GET",
     path: "/scheduled-tasks",
+    description: apiRouteDescriptions.listScheduledTasks,
     successStatus: 200,
   })
   .input(listScheduledTasksQueryInputSchema)
@@ -2598,6 +2636,7 @@ export const showScheduledTaskProcedure = base
   .route({
     method: "GET",
     path: "/scheduled-tasks/{taskId}",
+    description: apiRouteDescriptions.showScheduledTask,
     successStatus: 200,
   })
   .input(showScheduledTaskQueryInputSchema)
@@ -2610,6 +2649,7 @@ export const createScheduledTaskProcedure = base
   .route({
     method: "POST",
     path: "/scheduled-tasks",
+    description: apiRouteDescriptions.createScheduledTask,
     successStatus: 201,
   })
   .input(createScheduledTaskCommandInputSchema)
@@ -2622,6 +2662,7 @@ export const configureScheduledTaskProcedure = base
   .route({
     method: "POST",
     path: "/scheduled-tasks/{taskId}",
+    description: apiRouteDescriptions.configureScheduledTask,
     successStatus: 200,
   })
   .input(configureScheduledTaskCommandInputSchema)
@@ -2634,6 +2675,7 @@ export const deleteScheduledTaskProcedure = base
   .route({
     method: "DELETE",
     path: "/scheduled-tasks/{taskId}",
+    description: apiRouteDescriptions.deleteScheduledTask,
     successStatus: 200,
   })
   .input(deleteScheduledTaskCommandInputSchema)
@@ -2646,6 +2688,7 @@ export const runScheduledTaskNowProcedure = base
   .route({
     method: "POST",
     path: "/scheduled-tasks/{taskId}/runs",
+    description: apiRouteDescriptions.runScheduledTaskNow,
     successStatus: 202,
   })
   .input(runScheduledTaskNowCommandInputSchema)
@@ -2658,6 +2701,7 @@ export const listScheduledTaskRunsProcedure = base
   .route({
     method: "GET",
     path: "/scheduled-task-runs",
+    description: apiRouteDescriptions.listScheduledTaskRuns,
     successStatus: 200,
   })
   .input(listScheduledTaskRunsQueryInputSchema)
@@ -2670,6 +2714,7 @@ export const showScheduledTaskRunProcedure = base
   .route({
     method: "GET",
     path: "/scheduled-task-runs/{runId}",
+    description: apiRouteDescriptions.showScheduledTaskRun,
     successStatus: 200,
   })
   .input(showScheduledTaskRunQueryInputSchema)
@@ -2682,6 +2727,7 @@ export const scheduledTaskRunLogsProcedure = base
   .route({
     method: "GET",
     path: "/scheduled-task-runs/{runId}/logs",
+    description: apiRouteDescriptions.scheduledTaskRunLogs,
     successStatus: 200,
   })
   .input(scheduledTaskRunLogsQueryInputSchema)

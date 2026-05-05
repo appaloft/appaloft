@@ -879,6 +879,40 @@ export const publicDocsHelpTopics = {
       "Web dependency-resource write UI deferred; Resource detail can read binding summaries.",
     ],
   },
+  "scheduled-task.resource-lifecycle": {
+    id: "scheduled-task.resource-lifecycle",
+    title: "Scheduled task lifecycle",
+    description:
+      "How Resource-owned scheduled tasks, immediate runs, run history, and task logs work.",
+    page: {
+      "zh-CN": "resources/scheduled-tasks",
+      "en-US": "en/resources/scheduled-tasks",
+    },
+    anchor: "scheduled-task-resource-lifecycle",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "scheduled-tasks.create",
+    aliases: [
+      "scheduled task",
+      "cron",
+      "job",
+      "task run",
+      "run history",
+      "task logs",
+      "定时任务",
+      "任务日志",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-039-scheduled-task-resource-ownership.md",
+      "docs/specs/044-scheduled-task-resource-shape/spec.md",
+      "docs/testing/scheduled-task-resource-test-matrix.md",
+      "docs/architecture/async-lifecycle-and-acceptance.md",
+    ],
+    webSurfaces: ["Web controls deferred; CLI, HTTP/API, and future MCP help links are active."],
+  },
   "server.ssh-credential": {
     id: "server.ssh-credential",
     title: "SSH credential",
@@ -1894,6 +1928,51 @@ export const publicDocsOperationCoverage = [
     operationKey: "storage-volumes.delete",
     status: "documented",
     topicId: "storage.volume-lifecycle",
+  },
+  {
+    operationKey: "scheduled-tasks.create",
+    status: "documented",
+    topicId: "scheduled-task.resource-lifecycle",
+  },
+  {
+    operationKey: "scheduled-tasks.list",
+    status: "documented",
+    topicId: "scheduled-task.resource-lifecycle",
+  },
+  {
+    operationKey: "scheduled-tasks.show",
+    status: "documented",
+    topicId: "scheduled-task.resource-lifecycle",
+  },
+  {
+    operationKey: "scheduled-tasks.configure",
+    status: "documented",
+    topicId: "scheduled-task.resource-lifecycle",
+  },
+  {
+    operationKey: "scheduled-tasks.delete",
+    status: "documented",
+    topicId: "scheduled-task.resource-lifecycle",
+  },
+  {
+    operationKey: "scheduled-tasks.run-now",
+    status: "documented",
+    topicId: "scheduled-task.resource-lifecycle",
+  },
+  {
+    operationKey: "scheduled-task-runs.list",
+    status: "documented",
+    topicId: "scheduled-task.resource-lifecycle",
+  },
+  {
+    operationKey: "scheduled-task-runs.show",
+    status: "documented",
+    topicId: "scheduled-task.resource-lifecycle",
+  },
+  {
+    operationKey: "scheduled-task-runs.logs",
+    status: "documented",
+    topicId: "scheduled-task.resource-lifecycle",
   },
   {
     operationKey: "resources.runtime-logs",

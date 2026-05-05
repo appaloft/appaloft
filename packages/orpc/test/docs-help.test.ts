@@ -62,6 +62,9 @@ describe("HTTP API docs help links", () => {
     expect(apiDocsHrefs.sourceAutoDeployRecovery).toBe(
       "/docs/deploy/sources/#source-auto-deploy-recovery",
     );
+    expect(apiDocsHrefs.scheduledTaskLifecycle).toBe(
+      "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+    );
 
     expect(apiRouteDescriptions.configureServerCredential).toContain(apiDocsHrefs.serverCredential);
     expect(apiRouteDescriptions.registerServer).toContain(apiDocsHrefs.serverDockerSwarmTarget);
@@ -92,6 +95,11 @@ describe("HTTP API docs help links", () => {
     expect(apiRouteDescriptions.listSourceEvents).toContain(apiDocsHrefs.sourceAutoDeployDedupe);
     expect(apiRouteDescriptions.showSourceEvent).toContain(
       apiDocsHrefs.sourceAutoDeployIgnoredEvents,
+    );
+    expect(apiRouteDescriptions.createScheduledTask).toContain(apiDocsHrefs.scheduledTaskLifecycle);
+    expect(apiRouteDescriptions.runScheduledTaskNow).toContain(apiDocsHrefs.scheduledTaskLifecycle);
+    expect(apiRouteDescriptions.scheduledTaskRunLogs).toContain(
+      apiDocsHrefs.scheduledTaskLifecycle,
     );
   });
 });

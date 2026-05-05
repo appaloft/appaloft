@@ -25,7 +25,7 @@ Spec-first slice for Resource-owned scheduled tasks, run attempts, history, and 
 6. Add operation catalog, CLI, HTTP/oRPC, Web, public docs/help, and generated MCP descriptor
    surfaces.
    `Status: operation catalog, CLI commands, HTTP/oRPC routes, and generated MCP descriptors are
-   active. Web controls and public docs/help remain open.`
+   active. Public docs/help anchors are active. Web controls remain open.`
 
 ## Non-Goals
 

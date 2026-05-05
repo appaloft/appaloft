@@ -41,7 +41,7 @@ Some entrypoints remain migration gaps until the full CLI/Web/docs surface is ac
 | SCHED-TASK-RUNNER-001 | Shell runner | Scheduled task runner is enabled. | Long-running shell composition can start an opt-in scheduled task runner that scans due tasks, admits scheduled runs, and drains the admitted runs through the worker. |
 | SCHED-TASK-LOGS-001 | Query/log adapter | Run emits output. | `scheduled-task-runs.logs` reads run-scoped logs; deployment and resource runtime logs are unchanged. |
 | SCHED-TASK-SECRET-001 | Redaction | Task input references secrets. | Definitions, runs, logs, errors, diagnostics, and tool descriptors expose only safe references and masked values. |
-| SCHED-TASK-ENTRY-001 | CLI/API/Web/MCP | Entrypoints are active. | CLI and HTTP/oRPC dispatch command/query messages through the catalog schemas; generated MCP descriptors consume the catalog entries; Web controls remain a migration gap until implemented. |
+| SCHED-TASK-ENTRY-001 | CLI/API/Web/MCP | Entrypoints are active. | CLI and HTTP/oRPC dispatch command/query messages through the catalog schemas; generated MCP descriptors consume the catalog entries; public docs/help links target stable scheduled-task anchors; Web controls remain a migration gap until implemented. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -88,4 +88,5 @@ handlers/services, scheduled task persistence/read models, and hermetic runtime 
 exist. Shell composition can resolve the scheduled-task repositories, read models, runtime port,
 handlers, use cases, scheduler, and worker. The scheduled-task runner is configured off by default
 and can be enabled for long-running shell processes. Operation catalog entries, HTTP/oRPC routes,
-CLI commands, and generated MCP descriptors are active; Web controls and public docs remain open.
+CLI commands, generated MCP descriptors, and public docs/help anchors are active; Web controls
+remain open.
