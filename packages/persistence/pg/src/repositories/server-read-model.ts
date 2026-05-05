@@ -53,6 +53,7 @@ function toServerSummary(
     host: row.host,
     port: row.port,
     providerKey: row.provider_key,
+    targetKind: row.target_kind as "single-server" | "orchestrator-cluster",
     lifecycleStatus: row.lifecycle_status as "active" | "inactive",
     ...(row.deactivated_at
       ? { deactivatedAt: normalizeTimestamp(row.deactivated_at) ?? row.deactivated_at }

@@ -1086,6 +1086,7 @@ export interface ServerSummary {
   host: string;
   port: number;
   providerKey: string;
+  targetKind: TargetKind;
   lifecycleStatus: "active" | "inactive";
   deactivatedAt?: string;
   deactivationReason?: string;

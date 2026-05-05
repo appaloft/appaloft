@@ -28,6 +28,69 @@ function ensureReflectMetadata(): void {
 }
 
 describe("CLI server commands", () => {
+  test("[SWARM-TARGET-REG-001] server register dispatches target kind metadata", async () => {
+    ensureReflectMetadata();
+    const { RegisterServerCommand, createExecutionContext } = await import("@appaloft/application");
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "srv_swarm" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_server_register_target_kind_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "register",
+        "--name",
+        "Swarm manager",
+        "--host",
+        "swarm-manager.internal",
+        "--provider",
+        "docker-swarm",
+        "--target-kind",
+        "orchestrator-cluster",
+        "--proxy-kind",
+        "none",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(RegisterServerCommand);
+    expect(commands[0]).toMatchObject({
+      name: "Swarm manager",
+      host: "swarm-manager.internal",
+      providerKey: "docker-swarm",
+      targetKind: "orchestrator-cluster",
+      proxyKind: "none",
+    });
+  });
+
   test("[SRV-LIFE-ENTRY-001] server show dispatches the application query", async () => {
     ensureReflectMetadata();
     const { ShowServerQuery, createExecutionContext } = await import("@appaloft/application");

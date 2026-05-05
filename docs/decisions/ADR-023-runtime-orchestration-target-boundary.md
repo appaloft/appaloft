@@ -106,10 +106,9 @@ target-kind vocabulary for future Code Rounds is:
 | `orchestrator-cluster` | A cluster control plane schedules the deployment across one or more nodes. |
 
 Concrete runtime providers are selected by provider key and registered backend capabilities, such
-as `local-shell`, `generic-ssh`, `docker-swarm`, or `kubernetes`. The current provisional enum
-values `future-multi-server` and `future-k8s` must not be exposed as public stable vocabulary. A
-future Code Round should replace them directly with the canonical target model before those target
-kinds are used by Web/API/CLI/MCP contracts.
+as `local-shell`, `generic-ssh`, `docker-swarm`, or `kubernetes`. Earlier provisional enum values
+such as `future-multi-server` and `future-k8s` are not public stable vocabulary; Code Rounds must
+use the canonical target model above.
 
 Runtime target backends must be selected through a registry or equivalent dependency-injected
 router keyed by target kind, provider key, and capabilities. Hardcoded provider switches may remain
@@ -191,8 +190,9 @@ Current runtime execution is single-server oriented. `DefaultRuntimePlanResolver
 `single-server` target descriptor, and `RoutingExecutionBackend` routes by hardcoded provider keys
 for `local-shell` and `generic-ssh` before falling back to the in-memory backend.
 
-Current core target kinds include provisional future values. They should be replaced in a Code
-Round before cluster targets become public or persisted by new features.
+Current core target kinds use the canonical ADR-023 values `single-server` and
+`orchestrator-cluster`. Docker Swarm target metadata can now be registered as a cluster-shaped
+target, but Swarm readiness and execution backends are still not active.
 
 Current `ExecutionBackend` includes `cancel` and `rollback` methods even though ADR-016 keeps those
 public operations out of the v1 surface. Those backend capabilities may remain internal, but target

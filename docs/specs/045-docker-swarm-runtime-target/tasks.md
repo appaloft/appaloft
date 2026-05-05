@@ -11,8 +11,8 @@
 
 ## Test-First
 
-- [ ] `SWARM-TARGET-REG-001`: Swarm manager target registration/readiness accepts only safe
-  provider-neutral target metadata.
+- [x] `SWARM-TARGET-REG-001`: Swarm manager target registration accepts safe provider-neutral
+  target kind metadata. Readiness capability checks remain a follow-up.
 - [ ] `SWARM-TARGET-ADM-001`: `deployments.create` remains ids-only and rejects Swarm deployment
   fields.
 - [ ] `SWARM-TARGET-SELECT-001`: backend registry selects `docker-swarm` by target kind, provider
@@ -30,7 +30,8 @@
 
 ## Implementation
 
-- [ ] Add Swarm-capable target registration/readiness support.
+- [x] Add Swarm-capable target registration metadata support.
+- [ ] Add Swarm manager readiness capability checks.
 - [ ] Add Swarm runtime target backend descriptor and registry selection.
 - [ ] Implement render/apply/verify/log/health/cleanup behind runtime adapters.
 - [ ] Add sanitized target identity persistence/read-model support where required.

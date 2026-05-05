@@ -123,6 +123,7 @@ export const serverSummarySchema = z.object({
   host: z.string(),
   port: z.number(),
   providerKey: z.string(),
+  targetKind: z.enum(["single-server", "orchestrator-cluster"]),
   lifecycleStatus: z.enum(["active", "inactive"]),
   deactivatedAt: z.string().optional(),
   deactivationReason: z.string().optional(),
@@ -154,6 +155,7 @@ export const registerServerInputSchema = z.object({
   host: z.string().min(1),
   port: z.number().int().positive().optional(),
   providerKey: z.string().min(1),
+  targetKind: z.enum(["single-server", "orchestrator-cluster"]).optional().default("single-server"),
   proxyKind: z.enum(["none", "traefik", "caddy"]).default("traefik"),
 });
 
@@ -2730,7 +2732,7 @@ export const runtimePlanSchema = z.object({
     metadata: z.record(z.string(), z.string()).optional(),
   }),
   target: z.object({
-    kind: z.enum(["single-server", "future-multi-server", "future-k8s"]),
+    kind: z.enum(["single-server", "orchestrator-cluster"]),
     providerKey: z.string(),
     serverIds: z.array(z.string()),
     metadata: z.record(z.string(), z.string()).optional(),
@@ -3173,7 +3175,7 @@ export const deploymentPlanResponseSchema = z.object({
     ]),
     buildStrategy: runtimePlanSchema.shape.buildStrategy,
     packagingMode: runtimePlanSchema.shape.packagingMode,
-    targetKind: z.enum(["single-server", "future-multi-server", "future-k8s"]),
+    targetKind: z.enum(["single-server", "orchestrator-cluster"]),
     targetProviderKey: z.string(),
   }),
   buildpack: z
@@ -3642,7 +3644,7 @@ export const resourceDiagnosticContextSchema = z.object({
       "optional-future-binary",
     ])
     .optional(),
-  targetKind: z.enum(["single-server", "future-multi-server", "future-k8s"]).optional(),
+  targetKind: z.enum(["single-server", "orchestrator-cluster"]).optional(),
   targetProviderKey: z.string().optional(),
   services: z.array(resourceServiceSummarySchema),
   networkProfile: resourceNetworkProfileSchema.optional(),

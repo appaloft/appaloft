@@ -39,7 +39,7 @@ Docker Swarm support is an internal runtime target capability behind existing op
 | Surface | State | Rule |
 | --- | --- | --- |
 | `deployments.create` | Active command, unchanged input | Selects a registered Swarm-capable target backend after admission context resolution; no Swarm-specific command fields. |
-| `servers.register` | Active command, broadened by future Code Round | May register a Swarm manager target using provider-neutral target kind/provider/capability language when schema and readiness checks are implemented. |
+| `servers.register` | Active command, partial Code Round | Can register `orchestrator-cluster` target metadata with provider key `docker-swarm`; readiness capability checks remain pending. |
 | `resources.runtime-logs` | Active query, normalized output | Reads Swarm service logs through target adapters without returning Docker service API objects. |
 | `resources.health` | Active query, normalized output | Reads Swarm rollout/service health as Appaloft resource health sections. |
 | `servers.capacity.inspect` | Active query, backend-dependent | May report Swarm manager/cluster capacity only when safe signals exist; unsupported signals are explicit, not guessed. |
@@ -105,7 +105,9 @@ No new public operation key is accepted in this Spec Round.
 
 ## Current Implementation Notes And Migration Gaps
 
-- Swarm target registration/readiness is not implemented.
+- Swarm target registration can persist provider-neutral `orchestrator-cluster` target kind
+  metadata with provider key `docker-swarm`; Swarm manager readiness capability checks are not
+  implemented.
 - Swarm runtime target backend render/apply/verify/log/health/cleanup is not implemented.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.

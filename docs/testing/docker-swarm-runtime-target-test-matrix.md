@@ -18,7 +18,7 @@ Code Rounds; no Swarm implementation is active yet.
 
 | ID | Layer | Scenario | Expected |
 | --- | --- | --- | --- |
-| SWARM-TARGET-REG-001 | Application/adapter contract | Register and check Swarm manager readiness. | Target registration/readiness uses `orchestrator-cluster`, provider key `docker-swarm`, safe credential references, and capability checks; raw Docker API payloads and secrets stay out of core/application state. |
+| SWARM-TARGET-REG-001 | Application/adapter contract | Register Swarm manager target metadata. | Target registration uses `orchestrator-cluster`, provider key `docker-swarm`, and safe provider-neutral metadata; raw Docker API payloads and secrets stay out of core/application state. Swarm manager readiness capability checks remain follow-up coverage. |
 | SWARM-TARGET-ADM-001 | Command/API/CLI/Web schema | Swarm fields in deployment admission. | `deployments.create` rejects namespace, stack, service, replica, update policy, registry secret, ingress, or manifest fields with `validation_error` before deployment creation. |
 | SWARM-TARGET-ADM-002 | Application admission | Swarm target lacks required backend capability. | Safe pre-acceptance detection returns `runtime_target_unsupported` in phase `runtime-target-resolution`; no deployment is accepted. |
 | SWARM-TARGET-SELECT-001 | Application/runtime adapter | Select Swarm backend. | Runtime target registry chooses the `docker-swarm` backend by target kind, provider key, and required capabilities without hardcoded transport logic in use cases. |
