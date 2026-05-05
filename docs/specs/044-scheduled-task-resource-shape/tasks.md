@@ -70,9 +70,10 @@
 - [x] Add accepted-run worker wiring.
 - [ ] Add CLI/API/Web/MCP surfaces.
   - [x] Activate operation catalog and HTTP/oRPC surfaces.
-  - [ ] Add CLI commands.
+  - [x] Add CLI commands.
+  - [x] Verify generated MCP descriptors.
   - [ ] Add Web controls.
-  - [ ] Add public docs/help and verify generated MCP descriptors.
+  - [ ] Add public docs/help.
 
 ## Docs Round
 

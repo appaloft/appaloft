@@ -13,6 +13,7 @@ import { operatorWorkCommand } from "./operator-work.js";
 import { projectCommand } from "./project.js";
 import { remoteStateCommand } from "./remote-state.js";
 import { resourceCommand } from "./resource.js";
+import { scheduledTaskCommand } from "./scheduled-task.js";
 import { serverCommand } from "./server.js";
 import { sourceEventCommand } from "./source-event.js";
 import { sourceLinksCommand } from "./source-link.js";
@@ -30,6 +31,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     projectCommand,
     resourceCommand,
     dependencyCommand,
+    scheduledTaskCommand,
     storageCommand,
     serverCommand,
     domainBindingCommand,
