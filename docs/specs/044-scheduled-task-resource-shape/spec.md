@@ -19,7 +19,7 @@ safe retry behavior without confusing them with deployments or hiding them as se
 
 ## Target Operations
 
-These operations are active catalog entries with HTTP/oRPC routes:
+These operations are active catalog entries with CLI commands and HTTP/oRPC routes:
 
 | Operation | Kind | Purpose |
 | --- | --- | --- |
@@ -109,7 +109,7 @@ DDD or internal process-manager terminology.
   reader, run-log recorder, runtime port, handlers, use cases, scheduler, and accepted-run worker.
   An opt-in scheduled task runner config can start a shell timer that scans due tasks and drains
   admitted runs through the worker in long-running shell processes.
-- Operation catalog entries and HTTP/oRPC routes are active for scheduled tasks and run history.
-- CLI commands, Web controls, and public docs remain open. Generated MCP descriptors consume the
-  active operation catalog entries.
+- Operation catalog entries, CLI commands, and HTTP/oRPC routes are active for scheduled tasks and
+  run history. Generated MCP descriptors consume the active operation catalog entries.
+- Web controls and public docs remain open.
 - The scheduled task runner is disabled by default until operators explicitly enable it.
