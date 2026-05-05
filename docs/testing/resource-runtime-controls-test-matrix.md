@@ -35,7 +35,7 @@ No runtime stop/start/restart command, route, Web action, or adapter control por
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `RUNTIME-CTRL-READ-001` | Latest runtime-control attempt exists for a Resource. | `resources.health` returns `latestRuntimeControl` with operation, status, runtime state, phase details when applicable, safe error code, and blocked reason without raw provider details. | planned | Deferred gap |
+| `RUNTIME-CTRL-READ-001` | Latest runtime-control attempt exists for a Resource. | `resources.health` returns `latestRuntimeControl` with operation, status, runtime state, phase details when applicable, safe error code, and blocked reason without raw provider details. | `packages/application/test/resource-health.test.ts`; `packages/contracts/test/route-intent-status-contract.test.ts` | Passing |
 
 ## Adapter Coverage
 
@@ -50,11 +50,12 @@ No runtime stop/start/restart command, route, Web action, or adapter control por
 | --- | --- | --- | --- | --- |
 | `RUNTIME-CTRL-SURFACE-001` | CLI, HTTP/oRPC, Web, and future MCP/tool controls. | Entrypoints reuse the same command schemas, blocked reason vocabulary, and docs links. | planned | Deferred gap |
 | `RUNTIME-CTRL-SURFACE-002` | User compares restart and redeploy. | Public docs and UI copy state that restart does not pick up source/config/profile changes. | planned | Deferred gap |
-| `RUNTIME-CTRL-DOCS-001` | Public help registry resolves runtime-control anchors. | Registered docs topics resolve `resource-runtime-controls`, `runtime-restart-vs-redeploy`, and `runtime-control-blocked-start` anchors in both locales. | planned | Deferred gap |
+| `RUNTIME-CTRL-DOCS-001` | Public help registry resolves runtime-control anchors. | Registered docs topics resolve `resource-runtime-controls`, `runtime-restart-vs-redeploy`, and `runtime-control-blocked-start` anchors in both locales. | `packages/docs-registry/test/help-topics.test.ts` | Passing |
 
 ## Current Implementation Notes And Migration Gaps
 
 Runtime logs and resource health observation are active. Deployment retry, redeploy, and rollback
-are active recovery operations. Runtime stop/start/restart remains unimplemented until automation
-bindings, adapter contracts, command schemas/handlers, CLI/HTTP/Web entrypoints, `CORE_OPERATIONS.md`,
-and the operation catalog are aligned.
+are active recovery operations. `resources.health` now has a typed optional
+`latestRuntimeControl` readback and public runtime-control help anchors have explicit registry
+coverage. Runtime stop/start/restart remains unimplemented until command/use-case, coordination,
+adapter, CLI/HTTP/Web, `CORE_OPERATIONS.md`, and operation catalog activation slices are aligned.

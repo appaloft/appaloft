@@ -29,8 +29,8 @@
 - [ ] Bind `RUNTIME-CTRL-RESTART-001` to stop/start phase tests.
 - [ ] Bind `RUNTIME-CTRL-BLOCK-001` to missing/stale runtime metadata tests.
 - [ ] Bind `RUNTIME-CTRL-COORD-001` to `resource-runtime` coordination tests.
-- [ ] Bind `RUNTIME-CTRL-READ-001` to `resources.health.latestRuntimeControl` readback tests.
-- [ ] Bind `RUNTIME-CTRL-DOCS-001` to public docs/help anchor checks.
+- [x] Bind `RUNTIME-CTRL-READ-001` to `resources.health.latestRuntimeControl` readback tests.
+- [x] Bind `RUNTIME-CTRL-DOCS-001` to public docs/help anchor checks.
 - [ ] Bind `RUNTIME-CTRL-SURFACE-001` to CLI/HTTP/Web/docs coverage.
 
 ## Implementation

@@ -947,6 +947,11 @@ Current verification notes:
   and public docs/help anchors. Code Round remains blocked until Test-First automation, command
   schemas/handlers, adapter ports, entrypoints, `CORE_OPERATIONS.md`, and the operation catalog are
   aligned.
+- 2026-05-05 Phase 7 resource runtime controls Test-First slice bound
+  `RUNTIME-CTRL-READ-001` to `resources.health.latestRuntimeControl` contract coverage and
+  `RUNTIME-CTRL-DOCS-001` to docs-registry anchor coverage. Runtime stop/start/restart command
+  activation remains blocked by command/use-case, coordination, adapter, CLI/HTTP/Web, and catalog
+  slices.
 
 Required:
 

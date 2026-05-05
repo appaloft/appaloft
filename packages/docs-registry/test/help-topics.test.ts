@@ -81,6 +81,30 @@ describe("public docs help registry", () => {
     }
   });
 
+  test("[RUNTIME-CTRL-DOCS-001] runtime-control help topics resolve to stable anchors", () => {
+    const runtimeControlsTopic = publicDocsHelpTopics["resource.runtime-controls"];
+    const restartVsRedeployTopic = publicDocsHelpTopics["resource.runtime-restart-vs-redeploy"];
+    const blockedStartTopic = publicDocsHelpTopics["resource.runtime-control-blocked-start"];
+
+    expect(resolvePublicDocsHelpHref(runtimeControlsTopic.id)).toBe(
+      "/docs/observe/logs-health/#resource-runtime-controls",
+    );
+    expect(resolvePublicDocsHelpHref(restartVsRedeployTopic.id, { locale: "en-US" })).toBe(
+      "/docs/en/observe/logs-health/#runtime-restart-vs-redeploy",
+    );
+    expect(resolvePublicDocsHelpHref(blockedStartTopic.id)).toBe(
+      "/docs/observe/logs-health/#runtime-control-blocked-start",
+    );
+    expect(runtimeControlsTopic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/commands/resources.runtime.stop.md",
+        "docs/commands/resources.runtime.start.md",
+        "docs/commands/resources.runtime.restart.md",
+        "docs/errors/resource-runtime-controls.md",
+      ]),
+    );
+  });
+
   test("[ERROR-KNOWLEDGE-002] public error guides resolve docs, agent guide, and remedies", () => {
     const guide = findPublicDocsErrorGuide({
       code: "infra_error",

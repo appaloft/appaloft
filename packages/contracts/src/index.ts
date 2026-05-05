@@ -821,6 +821,7 @@ export const resourceHealthSourceErrorSchema = z.object({
     "proxy",
     "public-access",
     "domain-binding",
+    "runtime-control",
   ]),
   code: z.string(),
   category: z.string(),
@@ -873,6 +874,39 @@ export const resourceHealthDeploymentContextSchema = z.object({
     .optional(),
 });
 
+export const resourceRuntimeControlSummarySchema = z.object({
+  runtimeControlAttemptId: z.string(),
+  operation: z.enum(["stop", "start", "restart"]),
+  status: z.enum(["accepted", "running", "succeeded", "failed", "blocked"]),
+  startedAt: z.string(),
+  completedAt: z.string().optional(),
+  runtimeState: z.enum(["starting", "running", "restarting", "stopping", "stopped", "unknown"]),
+  blockedReason: z
+    .enum([
+      "resource-archived",
+      "resource-deleted",
+      "runtime-not-found",
+      "runtime-metadata-stale",
+      "runtime-already-running",
+      "runtime-already-stopped",
+      "runtime-control-in-progress",
+      "deployment-in-progress",
+      "profile-acknowledgement-required",
+      "adapter-unsupported",
+    ])
+    .optional(),
+  errorCode: z.string().optional(),
+  phases: z
+    .array(
+      z.object({
+        phase: z.enum(["stop", "start"]),
+        status: z.enum(["pending", "running", "succeeded", "failed", "skipped"]),
+        errorCode: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
 export const resourceHealthSummarySchema = z.object({
   schemaVersion: z.literal("resources.health/v1"),
   resourceId: z.string(),
@@ -897,6 +931,7 @@ export const resourceHealthSummarySchema = z.object({
     reasonCode: z.string().optional(),
     message: z.string().optional(),
   }),
+  latestRuntimeControl: resourceRuntimeControlSummarySchema.optional(),
   healthPolicy: z.object({
     status: z.enum(["configured", "not-configured", "unsupported"]),
     enabled: z.boolean(),
@@ -968,6 +1003,7 @@ export const resourceSummarySchema = z.object({
       "rolled-back",
     ])
     .optional(),
+  latestRuntimeControl: resourceRuntimeControlSummarySchema.optional(),
   accessSummary: resourceAccessSummarySchema.optional(),
 });
 
