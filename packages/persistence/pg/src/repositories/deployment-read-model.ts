@@ -101,6 +101,9 @@ function toDeploymentSummary(
       Awaited<ReturnType<DeploymentReadModel["list"]>>[number]["triggerKind"]
     >,
     ...(row.source_deployment_id ? { sourceDeploymentId: row.source_deployment_id } : {}),
+    ...(row.rollback_candidate_deployment_id
+      ? { rollbackCandidateDeploymentId: row.rollback_candidate_deployment_id }
+      : {}),
     ...(sourceCommitSha ? { sourceCommitSha } : {}),
     runtimePlan: {
       id: runtimePlan.id,
@@ -258,6 +261,9 @@ function toDeploymentSummary(
     ...(finishedAt ? { finishedAt } : {}),
     ...(row.rollback_of_deployment_id
       ? { rollbackOfDeploymentId: row.rollback_of_deployment_id }
+      : {}),
+    ...(row.rollback_candidate_deployment_id
+      ? { rollbackCandidateDeploymentId: row.rollback_candidate_deployment_id }
       : {}),
   };
 }

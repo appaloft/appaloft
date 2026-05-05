@@ -1691,6 +1691,13 @@ export function rehydrateDeploymentRow(row: Selectable<Database["deployments"]>)
     ...(row.source_deployment_id
       ? { sourceDeploymentId: DeploymentId.rehydrate(row.source_deployment_id) }
       : {}),
+    ...(row.rollback_candidate_deployment_id
+      ? {
+          rollbackCandidateDeploymentId: DeploymentId.rehydrate(
+            row.rollback_candidate_deployment_id,
+          ),
+        }
+      : {}),
     ...(startedAt ? { startedAt: StartedAt.rehydrate(startedAt) } : {}),
     ...(finishedAt ? { finishedAt: FinishedAt.rehydrate(finishedAt) } : {}),
     ...(row.rollback_of_deployment_id

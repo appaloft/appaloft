@@ -15,7 +15,7 @@
 
 - [x] Add core tests for rollback trigger/source/candidate metadata.
 - [x] Add application tests for `DEP-ROLLBACK-001` through `DEP-ROLLBACK-005`.
-- [ ] Add PG/PGlite persistence tests for rollback trigger/source/candidate metadata.
+- [x] Add PG/PGlite persistence tests for rollback trigger/source/candidate metadata.
 - [ ] Add CLI and oRPC/HTTP dispatch tests for `DEP-ROLLBACK-ENTRY-001`.
 - [ ] Add Web semantic/browser tests for candidate selection and rollback action gating.
 - [ ] Add regression tests proving retry/redeploy remain active after rollback activation.
@@ -28,7 +28,7 @@
   destination ids, dependency binding snapshot references, and retained artifact identity.
 - [x] Add `RollbackDeploymentCommand`, schema, handler, use case, and tokens.
 - [x] Add resource-runtime mutation coordination policy for rollback.
-- [ ] Persist rollback metadata in PG and memory testkit repositories/read models.
+- [x] Persist rollback metadata in PG and memory testkit repositories/read models.
 - [ ] Update recovery readiness command-active state for rollback after all entrypoints and tests are
   active.
 
@@ -45,7 +45,7 @@
 ## Verification
 
 - [x] Run targeted core/application rollback tests.
-- [ ] Run targeted PG/PGlite persistence tests.
+- [x] Run targeted PG/PGlite persistence tests.
 - [ ] Run targeted CLI/oRPC/HTTP tests.
 - [ ] Run targeted Web semantic/browser tests.
 - [ ] Run operation catalog boundary tests.

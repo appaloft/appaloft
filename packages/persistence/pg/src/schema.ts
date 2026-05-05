@@ -286,6 +286,7 @@ export interface DeploymentsTable {
   finished_at: string | null;
   trigger_kind: ColumnType<string, string | undefined, string>;
   source_deployment_id: string | null;
+  rollback_candidate_deployment_id: string | null;
   rollback_of_deployment_id: string | null;
   supersedes_deployment_id: string | null;
   superseded_by_deployment_id: string | null;

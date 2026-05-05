@@ -100,6 +100,7 @@ class KyselyDeploymentMutationVisitor
         finished_at: spec.state.finishedAt?.value ?? null,
         trigger_kind: spec.state.triggerKind.value,
         source_deployment_id: spec.state.sourceDeploymentId?.value ?? null,
+        rollback_candidate_deployment_id: spec.state.rollbackCandidateDeploymentId?.value ?? null,
         rollback_of_deployment_id: spec.state.rollbackOfDeploymentId?.value ?? null,
         supersedes_deployment_id: spec.state.supersedesDeploymentId?.value ?? null,
         superseded_by_deployment_id: spec.state.supersededByDeploymentId?.value ?? null,

@@ -20,6 +20,7 @@ import {
   DeploymentTargetDescriptor,
   DeploymentTargetId,
   DeploymentTargetName,
+  DeploymentTriggerKindValue,
   Destination,
   DestinationId,
   DestinationKindValue,
@@ -102,6 +103,9 @@ function createDeploymentRecord(input: {
   status: "planned" | "succeeded";
   includeDependencyBindingReference?: boolean;
   supersedesDeploymentId?: string;
+  triggerKind?: DeploymentTriggerKindValue;
+  sourceDeploymentId?: string;
+  rollbackCandidateDeploymentId?: string;
 }): Deployment {
   const environment = Environment.create({
     id: EnvironmentId.rehydrate("env_repo"),
@@ -165,6 +169,17 @@ function createDeploymentRecord(input: {
         }
       : {}),
     createdAt: CreatedAt.rehydrate(input.createdAt),
+    ...(input.triggerKind ? { triggerKind: input.triggerKind } : {}),
+    ...(input.sourceDeploymentId
+      ? { sourceDeploymentId: DeploymentId.rehydrate(input.sourceDeploymentId) }
+      : {}),
+    ...(input.rollbackCandidateDeploymentId
+      ? {
+          rollbackCandidateDeploymentId: DeploymentId.rehydrate(
+            input.rollbackCandidateDeploymentId,
+          ),
+        }
+      : {}),
     ...(input.supersedesDeploymentId
       ? { supersedesDeploymentId: DeploymentId.rehydrate(input.supersedesDeploymentId) }
       : {}),
@@ -298,6 +313,9 @@ describe("pglite deployment repository", () => {
       createdAt: "2026-01-01T00:00:02.000Z",
       status: "planned",
       includeDependencyBindingReference: true,
+      triggerKind: DeploymentTriggerKindValue.rollback(),
+      sourceDeploymentId: "dep_failed",
+      rollbackCandidateDeploymentId: "dep_prev",
       supersedesDeploymentId: "dep_prev",
     });
     const firstAdmit = await deploymentRepository.insertOne(
@@ -334,6 +352,9 @@ describe("pglite deployment repository", () => {
       context,
       DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_active")),
     );
+    expect(storedDeployment?.toState().triggerKind).toEqual(DeploymentTriggerKindValue.rollback());
+    expect(storedDeployment?.toState().sourceDeploymentId?.value).toBe("dep_failed");
+    expect(storedDeployment?.toState().rollbackCandidateDeploymentId?.value).toBe("dep_prev");
     expect(storedDeployment?.toState().supersedesDeploymentId?.value).toBe("dep_prev");
     expect(storedDeployment?.toState().dependencyBindingReferences[0]).toMatchObject({
       bindingId: ResourceBindingId.rehydrate("rbd_pg"),
@@ -361,6 +382,11 @@ describe("pglite deployment repository", () => {
         },
       },
     ]);
+    expect(storedSummary).toMatchObject({
+      triggerKind: "rollback",
+      sourceDeploymentId: "dep_failed",
+      rollbackCandidateDeploymentId: "dep_prev",
+    });
 
     await database.close();
   });

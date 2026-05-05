@@ -2580,6 +2580,7 @@ export const deploymentSummarySchema = z.object({
   ]),
   triggerKind: z.enum(["create", "retry", "redeploy", "rollback"]).optional(),
   sourceDeploymentId: z.string().optional(),
+  rollbackCandidateDeploymentId: z.string().optional(),
   sourceCommitSha: z.string().optional(),
   runtimePlan: runtimePlanSchema,
   environmentSnapshot: z.object({
