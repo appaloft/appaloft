@@ -89,6 +89,53 @@ describe("deployment create HTTP route", () => {
     });
   });
 
+  test("[SWARM-TARGET-ADM-001] rejects Swarm deployment fields before HTTP dispatch", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_swarm_fields" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId: "prj_demo",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          namespace: "prod",
+          stack: "web",
+          service: "api",
+          replicas: 3,
+          updatePolicy: "start-first",
+          registrySecret: "resource-secret:REGISTRY_TOKEN",
+          ingress: { host: "www.example.com" },
+          manifest: { services: {} },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(capturedCommand).toBeUndefined();
+  });
+
   test("[DEP-RETRY-001] dispatches RetryDeploymentCommand through HTTP", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
