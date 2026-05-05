@@ -40,7 +40,10 @@ authorization.
 - A provider-neutral runtime control port contract now exists for stop/start/restart.
 - Provider-neutral Docker container and Docker Compose command mapping now exists behind that port
   with an injected executor boundary.
-- Wire local/generic-SSH command execution behind the runtime-control target.
+- Local shell and generic SSH command execution now exists behind the runtime-control target with
+  bounded subprocess execution and sanitized adapter failure details.
+- Shell composition now registers the runtime-control target port, attempt recorder, use case, and
+  command handlers without exposing public entrypoints.
 - Return sanitized status, phase, and support details only.
 
 ### 4. Persistence And Read Models

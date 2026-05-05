@@ -93,10 +93,14 @@ export {
   dockerComposeRuntimeControlCommand,
   dockerContainerRuntimeControlCommand,
   planResourceRuntimeControlCommand,
+  RuntimeControlShellCommandExecutor,
   RuntimeResourceRuntimeControlTarget,
   type RuntimeControlCommandExecution,
   type RuntimeControlCommandExecutor,
   type RuntimeControlCommandPlan,
+  type RuntimeControlSpawn,
+  type RuntimeControlSpawnOptions,
+  type RuntimeControlSpawnResult,
 } from "./resource-runtime-control-target";
 export { RuntimeResourceRuntimeLogReader } from "./resource-runtime-logs";
 export {

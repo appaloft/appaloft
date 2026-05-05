@@ -969,6 +969,11 @@ Current verification notes:
   metadata, target service scoping, sanitized blocked results, and injected executor boundaries.
   The operations remain inactive until local/generic-SSH executor wiring, CLI/HTTP/Web
   entrypoints, `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
+- 2026-05-05 Phase 7 resource runtime controls executor Code Round slice added bounded
+  local-shell and generic-SSH command execution behind the runtime-control target, sanitized
+  command failure details, and shell-internal DI registration for the target port, attempt
+  recorder, use case, and handlers. The operations remain inactive until CLI/HTTP/Web
+  entrypoints, `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
 
 Required:
 

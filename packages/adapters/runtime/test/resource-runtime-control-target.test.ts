@@ -1,12 +1,31 @@
 import { describe, expect, test } from "bun:test";
-import type { ExecutionContext } from "@appaloft/application";
-import { domainError, err, ok, type DomainError, type Result } from "@appaloft/core";
+import type { ExecutionContext, ServerRepository } from "@appaloft/application";
+import {
+  CreatedAt,
+  DeploymentTargetCredentialKindValue,
+  DeploymentTargetId,
+  DeploymentTargetName,
+  DeploymentTargetUsername,
+  domainError,
+  err,
+  HostAddress,
+  ok,
+  PortNumber,
+  ProviderKey,
+  Server,
+  SshPrivateKeyText,
+  TargetKindValue,
+  type DomainError,
+  type Result,
+} from "@appaloft/core";
 import {
   dockerComposeRuntimeControlCommand,
   dockerContainerRuntimeControlCommand,
+  RuntimeControlShellCommandExecutor,
   RuntimeResourceRuntimeControlTarget,
   type RuntimeControlCommandExecution,
   type RuntimeControlCommandExecutor,
+  type RuntimeControlSpawn,
 } from "../src/resource-runtime-control-target";
 
 function quote(input: string): string {
@@ -25,6 +44,38 @@ class RecordingRuntimeControlExecutor implements RuntimeControlCommandExecutor {
     this.executions.push(execution);
     return this.result;
   }
+}
+
+type SpawnCall = {
+  args: readonly string[];
+  cwd?: string;
+  timeout: number;
+};
+
+class StaticServerRepository implements ServerRepository {
+  constructor(private readonly server: Server | null) {}
+
+  async findOne(): Promise<Server | null> {
+    return this.server;
+  }
+
+  async upsert(): Promise<void> {}
+}
+
+function createSpawn(calls: SpawnCall[], status = 0): RuntimeControlSpawn {
+  return (args, options) => {
+    calls.push({
+      args,
+      ...(options.cwd ? { cwd: options.cwd } : {}),
+      timeout: options.timeout,
+    });
+
+    return {
+      status,
+      stdout: "",
+      stderr: "",
+    };
+  };
 }
 
 function context(): ExecutionContext {
@@ -47,6 +98,23 @@ function context(): ExecutionContext {
       },
     },
   };
+}
+
+function sshServer(): Server {
+  return Server.rehydrate({
+    id: DeploymentTargetId.rehydrate("srv_ssh"),
+    name: DeploymentTargetName.rehydrate("SSH server"),
+    host: HostAddress.rehydrate("203.0.113.10"),
+    port: PortNumber.rehydrate(2222),
+    providerKey: ProviderKey.rehydrate("generic-ssh"),
+    targetKind: TargetKindValue.rehydrate("single-server"),
+    credential: {
+      kind: DeploymentTargetCredentialKindValue.rehydrate("ssh-private-key"),
+      username: DeploymentTargetUsername.rehydrate("deployer"),
+      privateKey: SshPrivateKeyText.rehydrate("-----BEGIN TEST KEY-----\nsecret\n-----END TEST KEY-----"),
+    },
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
 }
 
 describe("RuntimeResourceRuntimeControlTarget", () => {
@@ -97,6 +165,8 @@ describe("RuntimeResourceRuntimeControlTarget", () => {
         command: "docker restart 'retained-web'",
         workingDirectory: "/srv/appaloft/runtime/dep_web",
         operation: "restart",
+        providerKey: "local-shell",
+        serverId: "srv_demo",
       },
     ]);
     expect(JSON.stringify(executor.executions)).not.toContain("container-id");
@@ -143,6 +213,8 @@ describe("RuntimeResourceRuntimeControlTarget", () => {
         command: "docker compose -p 'web-dep_web' -f '/srv/web/docker-compose.yml' stop 'api'",
         workingDirectory: "/srv/web",
         operation: "stop",
+        providerKey: "generic-ssh",
+        serverId: "srv_demo",
       },
     ]);
   });
@@ -197,6 +269,85 @@ describe("RuntimeResourceRuntimeControlTarget", () => {
       details: {
         phase: "runtime-control-execution",
         safeAdapterErrorCode: "docker_failed",
+      },
+    });
+  });
+
+  test("[RUNTIME-CTRL-ADAPTER-001] executes local-shell runtime control through bounded shell command", async () => {
+    const calls: SpawnCall[] = [];
+    const executor = new RuntimeControlShellCommandExecutor({
+      spawn: createSpawn(calls),
+      timeoutMs: 12_000,
+    });
+
+    const result = await executor.run(context(), {
+      command: "docker stop 'retained-web'",
+      workingDirectory: "/srv/appaloft/runtime/dep_web",
+      operation: "stop",
+      providerKey: "local-shell",
+      serverId: "srv_local",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(calls).toEqual([
+      {
+        args: ["sh", "-lc", "docker stop 'retained-web'"],
+        cwd: "/srv/appaloft/runtime/dep_web",
+        timeout: 12_000,
+      },
+    ]);
+  });
+
+  test("[RUNTIME-CTRL-ADAPTER-002] executes generic-ssh runtime control with remote working directory", async () => {
+    const calls: SpawnCall[] = [];
+    const executor = new RuntimeControlShellCommandExecutor({
+      serverRepository: new StaticServerRepository(sshServer()),
+      spawn: createSpawn(calls),
+      timeoutMs: 12_000,
+    });
+
+    const result = await executor.run(context(), {
+      command: "docker compose -p 'web-dep_web' -f '/srv/web/docker-compose.yml' restart 'api'",
+      workingDirectory: "/srv/web",
+      operation: "restart",
+      providerKey: "generic-ssh",
+      serverId: "srv_ssh",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(calls).toHaveLength(1);
+    const [call] = calls;
+    expect(call?.args[0]).toBe("ssh");
+    expect(call?.args).toContain("deployer@203.0.113.10");
+    expect(call?.args).toContain("2222");
+    expect(call?.args).toContain("-i");
+    expect(call?.args.at(-1)).toBe(
+      "cd '/srv/web' && docker compose -p 'web-dep_web' -f '/srv/web/docker-compose.yml' restart 'api'",
+    );
+    expect(call?.timeout).toBe(12_000);
+  });
+
+  test("[RUNTIME-CTRL-ADAPTER-001] returns sanitized execution failure from command executor", async () => {
+    const executor = new RuntimeControlShellCommandExecutor({
+      spawn: createSpawn([], 1),
+    });
+
+    const result = await executor.run(context(), {
+      command: "docker stop 'retained-web'",
+      operation: "stop",
+      providerKey: "local-shell",
+      serverId: "srv_local",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "provider_error",
+      details: {
+        phase: "runtime-control-execution",
+        providerKey: "local-shell",
+        operation: "stop",
+        safeAdapterErrorCode: "runtime_control_command_failed",
+        exitCode: 1,
       },
     });
   });
