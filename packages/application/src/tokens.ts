@@ -200,6 +200,7 @@ export const tokens = {
   createDeploymentUseCase: Symbol.for("appaloft.create_deployment_use_case"),
   retryDeploymentUseCase: Symbol.for("appaloft.retry_deployment_use_case"),
   redeployDeploymentUseCase: Symbol.for("appaloft.redeploy_deployment_use_case"),
+  rollbackDeploymentUseCase: Symbol.for("appaloft.rollback_deployment_use_case"),
   cleanupPreviewUseCase: Symbol.for("appaloft.cleanup_preview_use_case"),
   createDomainBindingUseCase: Symbol.for("appaloft.create_domain_binding_use_case"),
   configureDomainBindingRouteUseCase: Symbol.for(

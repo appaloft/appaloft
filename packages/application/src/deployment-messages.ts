@@ -6,5 +6,6 @@ export * from "./operations/deployments/deployment-recovery-readiness.query";
 export * from "./operations/deployments/list-deployments.query";
 export * from "./operations/deployments/redeploy-deployment.command";
 export * from "./operations/deployments/retry-deployment.command";
+export * from "./operations/deployments/rollback-deployment.command";
 export * from "./operations/deployments/show-deployment.query";
 export * from "./operations/deployments/stream-deployment-events.query";

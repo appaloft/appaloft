@@ -43,6 +43,11 @@ export const mutationCoordinationPolicies = {
     scopeKind: "resource-runtime",
     mode: "supersede-active",
   }),
+  rollbackDeployment: policy({
+    operationKey: "deployments.rollback",
+    scopeKind: "resource-runtime",
+    mode: "serialize-with-bounded-wait",
+  }),
   cleanupPreview: policy({
     operationKey: "deployments.cleanup-preview",
     scopeKind: "preview-lifecycle",
