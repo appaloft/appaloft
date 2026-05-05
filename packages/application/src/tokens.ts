@@ -188,6 +188,11 @@ export const tokens = {
   resourceHealthQueryService: Symbol.for("appaloft.resource_health_query_service"),
   resourceHealthProbeRunner: Symbol.for("appaloft.resource_health_probe_runner"),
   resourceRuntimeLogsQueryService: Symbol.for("appaloft.resource_runtime_logs_query_service"),
+  resourceRuntimeControlUseCase: Symbol.for("appaloft.resource_runtime_control_use_case"),
+  resourceRuntimeControlTargetPort: Symbol.for("appaloft.resource_runtime_control_target_port"),
+  resourceRuntimeControlAttemptRecorder: Symbol.for(
+    "appaloft.resource_runtime_control_attempt_recorder",
+  ),
   openTerminalSessionUseCase: Symbol.for("appaloft.open_terminal_session_use_case"),
   relinkSourceLinkUseCase: Symbol.for("appaloft.relink_source_link_use_case"),
   resourceProxyConfigurationPreviewQueryService: Symbol.for(

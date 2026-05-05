@@ -2618,6 +2618,53 @@ export interface ResourceRuntimeControlSummary {
   phases?: ResourceRuntimeControlPhaseSummary[];
 }
 
+export interface ResourceRuntimeControlCommandResult extends ResourceRuntimeControlSummary {
+  resourceId: string;
+  deploymentId?: string;
+}
+
+export interface ResourceRuntimeControlAttemptRecord extends ResourceRuntimeControlCommandResult {
+  serverId: string;
+  destinationId: string;
+  reason?: string;
+  idempotencyKey?: string;
+}
+
+export interface ResourceRuntimeControlTargetRequest {
+  runtimeControlAttemptId: string;
+  operation: ResourceRuntimeControlOperation;
+  resourceId: string;
+  deploymentId: string;
+  serverId: string;
+  destinationId: string;
+  runtimeKind: ExecutionStrategyKind;
+  targetKind: TargetKind;
+  providerKey: string;
+  reason?: string;
+}
+
+export interface ResourceRuntimeControlTargetResult {
+  status: "succeeded" | "failed" | "blocked";
+  runtimeState: ResourceRuntimeControlRuntimeState;
+  blockedReason?: ResourceRuntimeControlBlockedReason;
+  errorCode?: string;
+  phases?: ResourceRuntimeControlPhaseSummary[];
+}
+
+export interface ResourceRuntimeControlTargetPort {
+  control(
+    context: ExecutionContext,
+    request: ResourceRuntimeControlTargetRequest,
+  ): Promise<Result<ResourceRuntimeControlTargetResult, DomainError>>;
+}
+
+export interface ResourceRuntimeControlAttemptRecorder {
+  record(
+    context: RepositoryContext,
+    attempt: ResourceRuntimeControlAttemptRecord,
+  ): Promise<Result<ResourceRuntimeControlAttemptRecord, DomainError>>;
+}
+
 export interface ResourceHealthProbeRequest {
   name: string;
   target: "runtime" | "public-access";

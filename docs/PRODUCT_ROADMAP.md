@@ -952,6 +952,13 @@ Current verification notes:
   `RUNTIME-CTRL-DOCS-001` to docs-registry anchor coverage. Runtime stop/start/restart command
   activation remains blocked by command/use-case, coordination, adapter, CLI/HTTP/Web, and catalog
   slices.
+- 2026-05-05 Phase 7 resource runtime controls application Code Round slice added
+  stop/start/restart command schemas, handlers, shared use case orchestration, `resource-runtime`
+  coordination policies, provider-neutral runtime target and attempt recorder ports, and
+  command/use-case tests for `RUNTIME-CTRL-STOP-001`, `RUNTIME-CTRL-START-001`,
+  `RUNTIME-CTRL-RESTART-001`, `RUNTIME-CTRL-BLOCK-001`, and `RUNTIME-CTRL-COORD-001`. The
+  operations remain inactive until durable attempt persistence, real runtime adapters,
+  CLI/HTTP/Web entrypoints, `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
 
 Required:
 
