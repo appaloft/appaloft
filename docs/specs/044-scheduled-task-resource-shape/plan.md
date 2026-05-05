@@ -14,8 +14,8 @@ Spec-first slice for Resource-owned scheduled tasks, run attempts, history, and 
    create, update, delete, and run-now admission handlers/use cases are implemented; task/run
    read-query handlers and services are implemented.`
 3. Add persistence repository/read models for task definitions and run attempts.
-   `Status: task definition repository/read model is implemented; run-attempt and run-log
-   persistence remain open.`
+   `Status: task definition and run-attempt repositories/read models are implemented; run-log
+   persistence remains open.`
 4. Add runtime target execution/log ports for one-off task runs.
 5. Add scheduler process manager that dispatches the same admission path as run-now.
 6. Add operation catalog, CLI, HTTP/oRPC, Web, public docs/help, and generated MCP descriptor

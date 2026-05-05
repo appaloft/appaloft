@@ -866,15 +866,23 @@ export interface ScheduledTaskRunAttemptMutationSpec {
 }
 
 export class UpsertScheduledTaskRunAttemptSpec implements ScheduledTaskRunAttemptMutationSpec {
-  private constructor(
-    public readonly runId: ScheduledTaskRunId,
-    public readonly taskId: ScheduledTaskId,
-    public readonly resourceId: ResourceId,
-  ) {}
+  private constructor(public readonly state: ScheduledTaskRunAttemptState) {}
 
   static fromRunAttempt(runAttempt: ScheduledTaskRunAttempt): UpsertScheduledTaskRunAttemptSpec {
     const state = runAttempt.toState();
-    return new UpsertScheduledTaskRunAttemptSpec(state.id, state.taskId, state.resourceId);
+    return new UpsertScheduledTaskRunAttemptSpec(state);
+  }
+
+  get runId(): ScheduledTaskRunId {
+    return this.state.id;
+  }
+
+  get taskId(): ScheduledTaskId {
+    return this.state.taskId;
+  }
+
+  get resourceId(): ResourceId {
+    return this.state.resourceId;
   }
 
   accept<TResult>(visitor: ScheduledTaskRunAttemptMutationSpecVisitor<TResult>): TResult {

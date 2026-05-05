@@ -1123,6 +1123,10 @@ Current verification notes:
   read models for Resource-owned task definitions, including find/upsert/delete repository specs and
   project/environment/Resource/status read filters. Run-attempt/log persistence,
   scheduler/runtime execution, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task run-attempt persistence slice added Postgres/PGlite storage
+  and read models for accepted/running/terminal task runs, plus latest-run summaries on task
+  readbacks. Run-log persistence, scheduler/runtime execution, entrypoints, and public docs remain
+  open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm
