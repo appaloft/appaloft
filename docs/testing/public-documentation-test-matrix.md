@@ -107,8 +107,7 @@ Current status:
   CLI/HTTP/API operations. Resource runtime control traceability is recorded as future
   Web/CLI/API/MCP surface coverage until those commands are active. Docker Swarm runtime target
   traceability is recorded as a target-help anchor with deferred execution UI. Scheduled task
-  traceability is recorded for active CLI/HTTP/API/future MCP help links with Web controls
-  deferred.
+  traceability is recorded for active CLI/HTTP/API/Web/future MCP help links.
 - `PUB-DOCS-017` is covered for registered public error guides by
   `packages/docs-registry/test/help-topics.test.ts`.
 

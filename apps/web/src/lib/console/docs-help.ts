@@ -36,6 +36,7 @@ export const webDocsHrefs = {
   sourceAutoDeployDedupe: resolvePublicDocsHelpHref("source.auto-deploy-dedupe"),
   sourceAutoDeployIgnoredEvents: resolvePublicDocsHelpHref("source.auto-deploy-ignored-events"),
   sourceAutoDeployRecovery: resolvePublicDocsHelpHref("source.auto-deploy-recovery"),
+  scheduledTaskLifecycle: resolvePublicDocsHelpHref("scheduled-task.resource-lifecycle"),
 } as const;
 
 export const quickDeploySourceHelpHref = webDocsHrefs.deploymentSource;

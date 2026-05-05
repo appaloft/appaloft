@@ -89,6 +89,9 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.sourceAutoDeployRecovery).toBe(
       "/docs/deploy/sources/#source-auto-deploy-recovery",
     );
+    expect(webDocsHrefs.scheduledTaskLifecycle).toBe(
+      "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+    );
   });
 
   test("[PUB-DOCS-010] owner-scoped Web forms mount help links for complex inputs", async () => {
@@ -144,6 +147,15 @@ describe("console docs help links", () => {
     );
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "certificateReadiness",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "scheduledTaskLifecycle",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "orpcClient.scheduledTasks.runNow",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "scheduledTaskRunLogs",
     );
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "orpcClient.certificates.retry",

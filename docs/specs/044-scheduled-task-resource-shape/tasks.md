@@ -75,17 +75,17 @@
   - [x] Activate operation catalog and HTTP/oRPC surfaces.
   - [x] Add CLI commands.
   - [x] Verify generated MCP descriptors.
-  - [ ] Add Web controls.
+  - [x] Add Web controls.
   - [x] Add public docs/help.
 
 ## Docs Round
 
 - [x] Add public docs page/help anchor.
 - [x] Add CLI/API descriptions.
-- [ ] Add Web help links.
+- [x] Add Web help links.
 
 ## Verification
 
-- [ ] Run targeted domain/application/persistence/adapter/Web tests.
-- [ ] Run `bun run lint`.
-- [ ] Run `bun turbo run typecheck`.
+- [x] Run targeted domain/application/persistence/adapter/Web tests.
+- [x] Run `bun run lint`.
+- [x] Run `bun turbo run typecheck`.

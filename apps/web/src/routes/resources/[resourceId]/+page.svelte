@@ -45,6 +45,11 @@
     ResourceRuntimeLogEvent,
     ResourceRuntimeLogLine,
     ResourceSummary,
+    ScheduledTaskDefinitionSummary,
+    ScheduledTaskRunLogEntry,
+    ScheduledTaskRunStatus,
+    ScheduledTaskRunSummary,
+    ScheduledTaskRunTriggerKind,
     SourceEventListItem,
     RestartResourceRuntimeInput,
     SetResourceVariableInput,
@@ -102,7 +107,13 @@
     typeof globalThis & {
       appaloftDesktop?: AppaloftDesktopBridge;
     };
-  type ResourceDetailTab = "settings" | "deployments" | "source-events" | "logs" | "terminal";
+  type ResourceDetailTab =
+    | "settings"
+    | "deployments"
+    | "scheduled-tasks"
+    | "source-events"
+    | "logs"
+    | "terminal";
   type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
   type ResourceAccessRoute = CurrentResourceAccessRoute["route"];
   type ResourceAccessKind = "domain-binding" | CurrentResourceAccessRouteKind;
@@ -123,6 +134,10 @@
   type AutoDeployPolicyInput = NonNullable<ConfigureResourceAutoDeployInput["policy"]>;
   type AutoDeployTriggerKind = AutoDeployPolicyInput["triggerKind"];
   type AutoDeployEventKind = AutoDeployPolicyInput["eventKinds"][number];
+  type CreateScheduledTaskInput = Parameters<typeof orpcClient.scheduledTasks.create>[0];
+  type ConfigureScheduledTaskInput = Parameters<typeof orpcClient.scheduledTasks.configure>[0];
+  type DeleteScheduledTaskInput = Parameters<typeof orpcClient.scheduledTasks.delete>[0];
+  type RunScheduledTaskNowInput = Parameters<typeof orpcClient.scheduledTasks.runNow>[0];
   type DomainRouteMode = "serve" | "redirect";
   type RedirectStatusText = "301" | "302" | "307" | "308";
   type ResourceSettingsSection =
@@ -135,7 +150,14 @@
     | "diagnostics";
   type ResourceVariableKind = SetResourceVariableInput["kind"];
   type ResourceVariableExposure = SetResourceVariableInput["exposure"];
-  const resourceDetailTabs = ["settings", "deployments", "source-events", "logs", "terminal"] as const;
+  const resourceDetailTabs = [
+    "settings",
+    "deployments",
+    "scheduled-tasks",
+    "source-events",
+    "logs",
+    "terminal",
+  ] as const;
   const resourceSettingsSections = [
     "profile",
     "auto-deploy",
@@ -207,6 +229,30 @@
       staleTime: 5_000,
     }),
   );
+  const scheduledTasksQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["scheduled-tasks", "resource", resourceId],
+      queryFn: () =>
+        orpcClient.scheduledTasks.list({
+          resourceId,
+          limit: 25,
+        }),
+      enabled: browser && resourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+  const scheduledTaskRunsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["scheduled-task-runs", "resource", resourceId],
+      queryFn: () =>
+        orpcClient.scheduledTasks.runs.list({
+          resourceId,
+          limit: 25,
+        }),
+      enabled: browser && resourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
 
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
@@ -252,6 +298,8 @@
     resourceEffectiveConfigQuery.data ?? null,
   );
   const resourceSourceEvents = $derived(resourceSourceEventsQuery.data?.items ?? []);
+  const scheduledTasks = $derived(scheduledTasksQuery.data?.items ?? []);
+  const scheduledTaskRuns = $derived(scheduledTaskRunsQuery.data?.items ?? []);
   const autoDeployPolicy = $derived(resourceDetail?.autoDeployPolicy ?? null);
   const profileDiagnostics = $derived(resourceDetail?.diagnostics ?? []);
   const resourceHealthOverall = $derived.by((): ResourceHealthViewStatus => {
@@ -358,6 +406,22 @@
   let autoDeployEventKind = $state<AutoDeployEventKind>("push");
   let autoDeployGenericWebhookSecretRef = $state("");
   let autoDeployDedupeWindowSeconds = $state("");
+  let scheduledTaskFormResourceId = $state("");
+  let scheduledTaskSchedule = $state("*/5 * * * *");
+  let scheduledTaskTimezone = $state("UTC");
+  let scheduledTaskCommandIntent = $state("");
+  let scheduledTaskTimeoutSeconds = $state("300");
+  let scheduledTaskRetryLimit = $state("0");
+  let scheduledTaskStatus = $state<"enabled" | "disabled">("enabled");
+  let scheduledTaskFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let selectedScheduledTaskRunId = $state("");
+  let scheduledTaskRunLogs = $state<ScheduledTaskRunLogEntry[]>([]);
+  let scheduledTaskRunLogsLoading = $state(false);
+  let scheduledTaskRunLogsError = $state<string | null>(null);
   let runtimeFormResourceId = $state("");
   let runtimeStrategy = $state<RuntimePlanStrategy>("auto");
   let runtimeInstallCommand = $state("");
@@ -531,6 +595,19 @@
         autoDeployPolicy?.status === "blocked" &&
         autoDeployPolicy.blockedReason === "source-binding-changed" &&
         resourceDetail?.source?.sourceBindingFingerprint,
+    ),
+  );
+  const canCreateScheduledTask = $derived(
+    Boolean(
+      resource &&
+        !isResourceArchived &&
+        scheduledTaskSchedule.trim() &&
+        scheduledTaskTimezone.trim() &&
+        scheduledTaskCommandIntent.trim() &&
+        isPositiveIntegerText(scheduledTaskTimeoutSeconds) &&
+        Number(scheduledTaskTimeoutSeconds) <= 86_400 &&
+        isNonNegativeIntegerText(scheduledTaskRetryLimit) &&
+        Number(scheduledTaskRetryLimit) <= 10,
     ),
   );
   const networkTargetServiceRequired = $derived(
@@ -785,6 +862,81 @@
       autoDeployFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.autoDeploySaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const createScheduledTaskMutation = createMutation(() => ({
+    mutationFn: (input: CreateScheduledTaskInput) => orpcClient.scheduledTasks.create(input),
+    onSuccess: (result) => {
+      scheduledTaskFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.scheduledTaskCreateSucceeded),
+        detail: result.task.taskId,
+      };
+      scheduledTaskCommandIntent = "";
+      void invalidateScheduledTaskQueries();
+    },
+    onError: (error) => {
+      scheduledTaskFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.scheduledTaskCreateFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureScheduledTaskMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureScheduledTaskInput) =>
+      orpcClient.scheduledTasks.configure(input),
+    onSuccess: (result) => {
+      scheduledTaskFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.scheduledTaskConfigureSucceeded),
+        detail: result.task.taskId,
+      };
+      void invalidateScheduledTaskQueries();
+    },
+    onError: (error) => {
+      scheduledTaskFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.scheduledTaskConfigureFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const deleteScheduledTaskMutation = createMutation(() => ({
+    mutationFn: (input: DeleteScheduledTaskInput) => orpcClient.scheduledTasks.delete(input),
+    onSuccess: (result) => {
+      scheduledTaskFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.scheduledTaskDeleteSucceeded),
+        detail: result.taskId,
+      };
+      void invalidateScheduledTaskQueries();
+    },
+    onError: (error) => {
+      scheduledTaskFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.scheduledTaskDeleteFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const runScheduledTaskNowMutation = createMutation(() => ({
+    mutationFn: (input: RunScheduledTaskNowInput) => orpcClient.scheduledTasks.runNow(input),
+    onSuccess: (result) => {
+      scheduledTaskFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.scheduledTaskRunAccepted),
+        detail: result.run.runId,
+      };
+      selectedScheduledTaskRunId = result.run.runId;
+      void invalidateScheduledTaskQueries();
+    },
+    onError: (error) => {
+      scheduledTaskFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.scheduledTaskRunFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -1453,6 +1605,23 @@
       return;
     }
 
+    if (scheduledTaskFormResourceId === resource.id) {
+      return;
+    }
+
+    scheduledTaskFormResourceId = resource.id;
+    resetScheduledTaskForm();
+    scheduledTaskFeedback = null;
+    selectedScheduledTaskRunId = "";
+    scheduledTaskRunLogs = [];
+    scheduledTaskRunLogsError = null;
+  });
+
+  $effect(() => {
+    if (!browser || !resource) {
+      return;
+    }
+
     if (runtimeFormResourceId === resource.id) {
       return;
     }
@@ -1714,6 +1883,120 @@
       .split(/[\n,]/)
       .map((ref) => ref.trim())
       .filter((ref) => ref.length > 0);
+  }
+
+  async function invalidateScheduledTaskQueries(): Promise<void> {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["scheduled-tasks", "resource", resourceId] }),
+      queryClient.invalidateQueries({ queryKey: ["scheduled-task-runs", "resource", resourceId] }),
+    ]);
+  }
+
+  function resetScheduledTaskForm(): void {
+    scheduledTaskSchedule = "*/5 * * * *";
+    scheduledTaskTimezone = "UTC";
+    scheduledTaskCommandIntent = "";
+    scheduledTaskTimeoutSeconds = "300";
+    scheduledTaskRetryLimit = "0";
+    scheduledTaskStatus = "enabled";
+  }
+
+  function createScheduledTask(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canCreateScheduledTask || createScheduledTaskMutation.isPending) {
+      return;
+    }
+
+    scheduledTaskFeedback = null;
+    createScheduledTaskMutation.mutate({
+      resourceId: resource.id,
+      schedule: scheduledTaskSchedule.trim(),
+      timezone: scheduledTaskTimezone.trim(),
+      commandIntent: scheduledTaskCommandIntent.trim(),
+      timeoutSeconds: Number(scheduledTaskTimeoutSeconds),
+      retryLimit: Number(scheduledTaskRetryLimit),
+      concurrencyPolicy: "forbid",
+      status: scheduledTaskStatus,
+    });
+  }
+
+  function configureScheduledTaskStatus(task: ScheduledTaskDefinitionSummary): void {
+    if (!resource || isResourceArchived || configureScheduledTaskMutation.isPending) {
+      return;
+    }
+
+    scheduledTaskFeedback = null;
+    configureScheduledTaskMutation.mutate({
+      taskId: task.taskId,
+      resourceId: resource.id,
+      status: task.status === "enabled" ? "disabled" : "enabled",
+    });
+  }
+
+  function runScheduledTaskNow(task: ScheduledTaskDefinitionSummary): void {
+    if (!resource || isResourceArchived || runScheduledTaskNowMutation.isPending) {
+      return;
+    }
+
+    scheduledTaskFeedback = null;
+    runScheduledTaskNowMutation.mutate({
+      taskId: task.taskId,
+      resourceId: resource.id,
+    });
+  }
+
+  function deleteScheduledTask(task: ScheduledTaskDefinitionSummary): void {
+    if (!resource || isResourceArchived || deleteScheduledTaskMutation.isPending) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        $t(i18nKeys.console.resources.scheduledTaskDeleteConfirm, {
+          taskId: task.taskId,
+        }),
+      )
+    ) {
+      return;
+    }
+
+    scheduledTaskFeedback = null;
+    deleteScheduledTaskMutation.mutate({
+      taskId: task.taskId,
+      resourceId: resource.id,
+    });
+  }
+
+  async function loadScheduledTaskRunLogs(run: ScheduledTaskRunSummary): Promise<void> {
+    if (!resource) {
+      return;
+    }
+
+    selectedScheduledTaskRunId = run.runId;
+    scheduledTaskRunLogsLoading = true;
+    scheduledTaskRunLogsError = null;
+
+    try {
+      const result = await orpcClient.scheduledTasks.runs.logs({
+        runId: run.runId,
+        taskId: run.taskId,
+        resourceId: resource.id,
+        limit: 100,
+      });
+
+      if (selectedScheduledTaskRunId === run.runId) {
+        scheduledTaskRunLogs = result.entries;
+      }
+    } catch (error) {
+      if (selectedScheduledTaskRunId === run.runId) {
+        scheduledTaskRunLogsError = readErrorMessage(error);
+      }
+    } finally {
+      if (selectedScheduledTaskRunId === run.runId) {
+        scheduledTaskRunLogsLoading = false;
+      }
+    }
   }
 
   function configureResourceSource(event: SubmitEvent): void {
@@ -2131,6 +2414,8 @@
     switch (tab) {
       case "deployments":
         return $t(i18nKeys.common.domain.deployments);
+      case "scheduled-tasks":
+        return $t(i18nKeys.console.resources.scheduledTasksTab);
       case "source-events":
         return $t(i18nKeys.console.resources.sourceEventsTab);
       case "logs":
@@ -2299,6 +2584,49 @@
       case "ref-not-matched":
         return $t(i18nKeys.console.resources.sourceEventIgnoredRefNotMatched);
     }
+  }
+
+  function scheduledTaskStatusLabel(status: ScheduledTaskDefinitionSummary["status"]): string {
+    return status === "enabled"
+      ? $t(i18nKeys.console.resources.scheduledTaskStatusEnabled)
+      : $t(i18nKeys.console.resources.scheduledTaskStatusDisabled);
+  }
+
+  function scheduledTaskRunStatusLabel(status: ScheduledTaskRunStatus): string {
+    switch (status) {
+      case "accepted":
+        return $t(i18nKeys.console.resources.scheduledTaskRunStatusAccepted);
+      case "running":
+        return $t(i18nKeys.common.status.running);
+      case "succeeded":
+        return $t(i18nKeys.console.resources.scheduledTaskRunStatusSucceeded);
+      case "failed":
+        return $t(i18nKeys.common.status.failed);
+      case "skipped":
+        return $t(i18nKeys.common.status.skipped);
+    }
+  }
+
+  function scheduledTaskRunStatusVariant(
+    status: ScheduledTaskRunStatus,
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "succeeded":
+        return "default";
+      case "accepted":
+      case "running":
+        return "secondary";
+      case "failed":
+        return "destructive";
+      case "skipped":
+        return "outline";
+    }
+  }
+
+  function scheduledTaskRunTriggerLabel(triggerKind: ScheduledTaskRunTriggerKind): string {
+    return triggerKind === "manual"
+      ? $t(i18nKeys.console.resources.scheduledTaskTriggerManual)
+      : $t(i18nKeys.console.resources.scheduledTaskTriggerScheduled);
   }
 
   function configScopeBadgeVariant(scope: ResourceConfigEntry["scope"]): "default" | "outline" {
@@ -2908,6 +3236,384 @@
                   {$t(i18nKeys.console.resources.noDeployments)}
                 </div>
               {/if}
+            </div>
+          </section>
+        </Tabs.Content>
+
+        <Tabs.Content value="scheduled-tasks" class="mt-0">
+          <section id="resource-scheduled-tasks" class="space-y-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.resources.scheduledTasksTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.scheduledTaskLifecycle}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                  />
+                </div>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.scheduledTasksDescription)}
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={scheduledTasksQuery.isFetching || scheduledTaskRunsQuery.isFetching}
+                  onclick={() => {
+                    void scheduledTasksQuery.refetch();
+                    void scheduledTaskRunsQuery.refetch();
+                  }}
+                >
+                  <RefreshCw
+                    class={[
+                      "size-4",
+                      scheduledTasksQuery.isFetching || scheduledTaskRunsQuery.isFetching
+                        ? "animate-spin"
+                        : "",
+                    ]}
+                  />
+                  {$t(i18nKeys.console.resources.scheduledTasksRefresh)}
+                </Button>
+              </div>
+            </div>
+
+            <form
+              id="resource-scheduled-task-create-form"
+              class="rounded-md border bg-background p-4"
+              onsubmit={createScheduledTask}
+            >
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 class="text-base font-semibold">
+                    {$t(i18nKeys.console.resources.scheduledTaskCreateTitle)}
+                  </h3>
+                  <p class="mt-1 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.resources.scheduledTaskCreateDescription)}
+                  </p>
+                </div>
+                <Badge variant="outline">
+                  {$t(i18nKeys.console.resources.scheduledTaskConcurrencyForbid)}
+                </Badge>
+              </div>
+
+              <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+                <label class="space-y-1.5 text-sm font-medium xl:col-span-2" for="scheduled-task-schedule">
+                  <span class="inline-flex items-center gap-1.5">
+                    {$t(i18nKeys.console.resources.scheduledTaskSchedule)}
+                    <DocsHelpLink
+                      href={webDocsHrefs.scheduledTaskLifecycle}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      className="size-5"
+                    />
+                  </span>
+                  <Input
+                    id="scheduled-task-schedule"
+                    bind:value={scheduledTaskSchedule}
+                    autocomplete="off"
+                    placeholder={$t(i18nKeys.console.resources.scheduledTaskSchedulePlaceholder)}
+                  />
+                </label>
+
+                <label class="space-y-1.5 text-sm font-medium" for="scheduled-task-timezone">
+                  <span>{$t(i18nKeys.console.resources.scheduledTaskTimezone)}</span>
+                  <Input
+                    id="scheduled-task-timezone"
+                    bind:value={scheduledTaskTimezone}
+                    autocomplete="off"
+                    placeholder="UTC"
+                  />
+                </label>
+
+                <label class="space-y-1.5 text-sm font-medium" for="scheduled-task-timeout">
+                  <span>{$t(i18nKeys.console.resources.scheduledTaskTimeoutSeconds)}</span>
+                  <Input
+                    id="scheduled-task-timeout"
+                    bind:value={scheduledTaskTimeoutSeconds}
+                    autocomplete="off"
+                    inputmode="numeric"
+                  />
+                </label>
+
+                <label class="space-y-1.5 text-sm font-medium" for="scheduled-task-retry">
+                  <span>{$t(i18nKeys.console.resources.scheduledTaskRetryLimit)}</span>
+                  <Input
+                    id="scheduled-task-retry"
+                    bind:value={scheduledTaskRetryLimit}
+                    autocomplete="off"
+                    inputmode="numeric"
+                  />
+                </label>
+
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.status)}</span>
+                  <Select.Root bind:value={scheduledTaskStatus} type="single">
+                    <Select.Trigger class="w-full">
+                      {scheduledTaskStatusLabel(scheduledTaskStatus)}
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="enabled">
+                        {$t(i18nKeys.console.resources.scheduledTaskStatusEnabled)}
+                      </Select.Item>
+                      <Select.Item value="disabled">
+                        {$t(i18nKeys.console.resources.scheduledTaskStatusDisabled)}
+                      </Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </label>
+
+                <label
+                  class="space-y-1.5 text-sm font-medium sm:col-span-2 xl:col-span-6"
+                  for="scheduled-task-command-intent"
+                >
+                  <span class="inline-flex items-center gap-1.5">
+                    {$t(i18nKeys.console.resources.scheduledTaskCommandIntent)}
+                    <DocsHelpLink
+                      href={webDocsHrefs.scheduledTaskLifecycle}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      className="size-5"
+                    />
+                  </span>
+                  <Textarea
+                    id="scheduled-task-command-intent"
+                    bind:value={scheduledTaskCommandIntent}
+                    rows={3}
+                    spellcheck={false}
+                    autocomplete="off"
+                    placeholder={$t(i18nKeys.console.resources.scheduledTaskCommandIntentPlaceholder)}
+                  />
+                </label>
+              </div>
+
+              {#if scheduledTaskFeedback}
+                <div
+                  class={[
+                    "mt-4 rounded-md border px-3 py-2 text-sm",
+                    scheduledTaskFeedback.kind === "success"
+                      ? "border-primary/25 bg-primary/5"
+                      : "border-destructive/30 bg-destructive/5 text-destructive",
+                  ]}
+                >
+                  <p class="font-medium">{scheduledTaskFeedback.title}</p>
+                  <p class="mt-1 break-all text-xs">{scheduledTaskFeedback.detail}</p>
+                </div>
+              {/if}
+
+              <div class="mt-4 flex justify-end">
+                <Button
+                  type="submit"
+                  disabled={!canCreateScheduledTask || createScheduledTaskMutation.isPending}
+                >
+                  <Plus class="size-4" />
+                  {createScheduledTaskMutation.isPending
+                    ? $t(i18nKeys.common.actions.creating)
+                    : $t(i18nKeys.console.resources.scheduledTaskCreateAction)}
+                </Button>
+              </div>
+            </form>
+
+            <div class="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
+              <section class="space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                  <h3 class="text-base font-semibold">
+                    {$t(i18nKeys.console.resources.scheduledTaskDefinitionsTitle)}
+                  </h3>
+                  <Badge variant="outline">{scheduledTasks.length}</Badge>
+                </div>
+
+                {#if scheduledTasksQuery.isPending}
+                  <div class="space-y-3">
+                    <Skeleton class="h-36 w-full" />
+                    <Skeleton class="h-36 w-full" />
+                  </div>
+                {:else if scheduledTasksQuery.error}
+                  <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    <p class="font-medium">
+                      {$t(i18nKeys.console.resources.scheduledTasksLoadFailed)}
+                    </p>
+                    <p class="mt-1 break-all text-xs">
+                      {readErrorMessage(scheduledTasksQuery.error)}
+                    </p>
+                  </div>
+                {:else if scheduledTasks.length === 0}
+                  <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.resources.scheduledTasksEmpty)}
+                  </div>
+                {:else}
+                  <div class="space-y-3">
+                    {#each scheduledTasks as task (task.taskId)}
+                      <article class="rounded-md border bg-background p-4">
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div class="min-w-0 space-y-2">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <p class="font-mono text-sm font-medium">{task.taskId}</p>
+                              <Badge variant={task.status === "enabled" ? "default" : "outline"}>
+                                {scheduledTaskStatusLabel(task.status)}
+                              </Badge>
+                              <Badge variant="outline">{task.concurrencyPolicy}</Badge>
+                            </div>
+                            <p class="break-all font-mono text-sm">{task.commandIntent}</p>
+                            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                              <span>
+                                {$t(i18nKeys.console.resources.scheduledTaskSchedule)}:
+                                <code class="rounded bg-muted px-1 py-0.5">{task.schedule}</code>
+                              </span>
+                              <span>{task.timezone}</span>
+                              <span>
+                                {$t(i18nKeys.console.resources.scheduledTaskTimeoutSeconds)}:
+                                {task.timeoutSeconds}
+                              </span>
+                              <span>
+                                {$t(i18nKeys.console.resources.scheduledTaskRetryLimit)}:
+                                {task.retryLimit}
+                              </span>
+                            </div>
+                            {#if task.latestRun}
+                              <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                <span>{$t(i18nKeys.console.resources.scheduledTaskLatestRun)}:</span>
+                                <Badge variant={scheduledTaskRunStatusVariant(task.latestRun.status)}>
+                                  {scheduledTaskRunStatusLabel(task.latestRun.status)}
+                                </Badge>
+                                <span>{formatTime(task.latestRun.createdAt)}</span>
+                              </div>
+                            {/if}
+                          </div>
+
+                          <div class="flex flex-wrap gap-2 lg:justify-end">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                isResourceArchived ||
+                                runScheduledTaskNowMutation.isPending ||
+                                task.status === "disabled"
+                              }
+                              onclick={() => runScheduledTaskNow(task)}
+                            >
+                              <Play class="size-4" />
+                              {$t(i18nKeys.console.resources.scheduledTaskRunNow)}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={isResourceArchived || configureScheduledTaskMutation.isPending}
+                              onclick={() => configureScheduledTaskStatus(task)}
+                            >
+                              {task.status === "enabled"
+                                ? $t(i18nKeys.console.resources.scheduledTaskDisable)
+                                : $t(i18nKeys.console.resources.scheduledTaskEnable)}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              disabled={isResourceArchived || deleteScheduledTaskMutation.isPending}
+                              onclick={() => deleteScheduledTask(task)}
+                            >
+                              <Trash2 class="size-4" />
+                              {$t(i18nKeys.console.resources.scheduledTaskDelete)}
+                            </Button>
+                          </div>
+                        </div>
+                      </article>
+                    {/each}
+                  </div>
+                {/if}
+              </section>
+
+              <section class="space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                  <h3 class="text-base font-semibold">
+                    {$t(i18nKeys.console.resources.scheduledTaskRunsTitle)}
+                  </h3>
+                  <Badge variant="outline">{scheduledTaskRuns.length}</Badge>
+                </div>
+
+                {#if scheduledTaskRunsQuery.isPending}
+                  <Skeleton class="h-64 w-full" />
+                {:else if scheduledTaskRunsQuery.error}
+                  <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    <p class="font-medium">
+                      {$t(i18nKeys.console.resources.scheduledTaskRunsLoadFailed)}
+                    </p>
+                    <p class="mt-1 break-all text-xs">
+                      {readErrorMessage(scheduledTaskRunsQuery.error)}
+                    </p>
+                  </div>
+                {:else if scheduledTaskRuns.length === 0}
+                  <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.resources.scheduledTaskRunsEmpty)}
+                  </div>
+                {:else}
+                  <div class="space-y-2">
+                    {#each scheduledTaskRuns as run (run.runId)}
+                      <article class="rounded-md border bg-background p-3">
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="min-w-0 space-y-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <p class="font-mono text-xs font-medium">{run.runId}</p>
+                              <Badge variant={scheduledTaskRunStatusVariant(run.status)}>
+                                {scheduledTaskRunStatusLabel(run.status)}
+                              </Badge>
+                              <Badge variant="outline">
+                                {scheduledTaskRunTriggerLabel(run.triggerKind)}
+                              </Badge>
+                            </div>
+                            <p class="truncate text-xs text-muted-foreground">
+                              {run.taskId} · {formatTime(run.createdAt)}
+                            </p>
+                            {#if run.failureSummary}
+                              <p class="break-words text-xs text-destructive">{run.failureSummary}</p>
+                            {/if}
+                          </div>
+                          <Button
+                            id={`scheduled-task-run-logs-${run.runId}`}
+                            type="button"
+                            size="sm"
+                            variant={selectedScheduledTaskRunId === run.runId ? "selected" : "outline"}
+                            onclick={() => void loadScheduledTaskRunLogs(run)}
+                          >
+                            <Terminal class="size-4" />
+                            {$t(i18nKeys.console.resources.scheduledTaskRunLogs)}
+                          </Button>
+                        </div>
+                      </article>
+                    {/each}
+                  </div>
+                {/if}
+
+                <div class="max-h-96 overflow-auto rounded-md border bg-zinc-950 p-3 font-mono text-xs text-zinc-100">
+                  {#if scheduledTaskRunLogsLoading}
+                    <p class="text-zinc-400">
+                      {$t(i18nKeys.console.resources.scheduledTaskRunLogsLoading)}
+                    </p>
+                  {:else if scheduledTaskRunLogsError}
+                    <p class="text-rose-200">{scheduledTaskRunLogsError}</p>
+                  {:else if !selectedScheduledTaskRunId}
+                    <p class="text-zinc-400">
+                      {$t(i18nKeys.console.resources.scheduledTaskRunLogsSelect)}
+                    </p>
+                  {:else if scheduledTaskRunLogs.length === 0}
+                    <p class="text-zinc-400">
+                      {$t(i18nKeys.console.resources.scheduledTaskRunLogsEmpty)}
+                    </p>
+                  {:else}
+                    <div class="space-y-1">
+                      {#each scheduledTaskRunLogs as entry, index (`${entry.timestamp}-${entry.stream}-${index}`)}
+                        <div class="grid gap-2 sm:grid-cols-[10rem_4rem_1fr]">
+                          <span class="truncate text-zinc-500">{formatTime(entry.timestamp)}</span>
+                          <span class="text-zinc-500">{entry.stream}</span>
+                          <span class="break-words">{entry.message}</span>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              </section>
             </div>
           </section>
         </Tabs.Content>
