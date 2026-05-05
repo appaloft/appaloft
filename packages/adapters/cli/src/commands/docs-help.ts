@@ -204,6 +204,15 @@ export const cliCommandDescriptions = {
     "Import an external Postgres dependency resource",
     "resource.concept",
   ),
+  dependencyRedis: withDocs("Redis dependency resource operations", "resource.concept"),
+  dependencyRedisProvision: withDocs(
+    "Create an Appaloft-managed Redis dependency resource record",
+    "resource.concept",
+  ),
+  dependencyRedisImport: withDocs(
+    "Import an external Redis dependency resource",
+    "resource.concept",
+  ),
   dependencyList: withDocs("List dependency resources", "resource.concept"),
   dependencyShow: withDocs("Show dependency resource detail", "resource.concept"),
   dependencyRename: withDocs("Rename a dependency resource", "resource.concept"),

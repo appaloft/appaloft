@@ -1,8 +1,10 @@
 import {
   DeleteDependencyResourceCommand,
   ImportPostgresDependencyResourceCommand,
+  ImportRedisDependencyResourceCommand,
   ListDependencyResourcesQuery,
   ProvisionPostgresDependencyResourceCommand,
+  ProvisionRedisDependencyResourceCommand,
   RenameDependencyResourceCommand,
   ShowDependencyResourceQuery,
 } from "@appaloft/application";
@@ -111,6 +113,91 @@ const importPostgresCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyPostgresImport));
 
+const provisionRedisCommand = EffectCommand.make(
+  "provision",
+  {
+    project: projectOption,
+    environment: environmentOption,
+    name: nameOption,
+    providerKey: providerKeyOption,
+    description: descriptionOption,
+    backupRetentionRequired: backupRetentionOption,
+    backupReason: backupReasonOption,
+  },
+  ({
+    backupReason,
+    backupRetentionRequired,
+    description,
+    environment,
+    name,
+    project,
+    providerKey,
+  }) => {
+    const backupReasonValue = optionalValue(backupReason);
+    return runCommand(
+      ProvisionRedisDependencyResourceCommand.create({
+        projectId: project,
+        environmentId: environment,
+        name,
+        ...(optionalValue(providerKey) ? { providerKey: optionalValue(providerKey) } : {}),
+        ...(optionalValue(description) ? { description: optionalValue(description) } : {}),
+        ...(backupRetentionRequired || backupReasonValue
+          ? {
+              backupRelationship: {
+                retentionRequired: backupRetentionRequired,
+                ...(backupReasonValue ? { reason: backupReasonValue } : {}),
+              },
+            }
+          : {}),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyRedisProvision));
+
+const importRedisCommand = EffectCommand.make(
+  "import",
+  {
+    project: projectOption,
+    environment: environmentOption,
+    name: nameOption,
+    connectionUrl: connectionUrlOption,
+    secretRef: secretRefOption,
+    description: descriptionOption,
+    backupRetentionRequired: backupRetentionOption,
+    backupReason: backupReasonOption,
+  },
+  ({
+    backupReason,
+    backupRetentionRequired,
+    connectionUrl,
+    description,
+    environment,
+    name,
+    project,
+    secretRef,
+  }) => {
+    const backupReasonValue = optionalValue(backupReason);
+    return runCommand(
+      ImportRedisDependencyResourceCommand.create({
+        projectId: project,
+        environmentId: environment,
+        name,
+        connectionUrl,
+        ...(optionalValue(secretRef) ? { secretRef: optionalValue(secretRef) } : {}),
+        ...(optionalValue(description) ? { description: optionalValue(description) } : {}),
+        ...(backupRetentionRequired || backupReasonValue
+          ? {
+              backupRelationship: {
+                retentionRequired: backupRetentionRequired,
+                ...(backupReasonValue ? { reason: backupReasonValue } : {}),
+              },
+            }
+          : {}),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyRedisImport));
+
 const listCommand = EffectCommand.make(
   "list",
   {
@@ -159,10 +246,16 @@ const postgresCommand = EffectCommand.make("postgres").pipe(
   EffectCommand.withSubcommands([provisionPostgresCommand, importPostgresCommand]),
 );
 
+const redisCommand = EffectCommand.make("redis").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.dependencyRedis),
+  EffectCommand.withSubcommands([provisionRedisCommand, importRedisCommand]),
+);
+
 export const dependencyCommand = EffectCommand.make("dependency").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.dependency),
   EffectCommand.withSubcommands([
     postgresCommand,
+    redisCommand,
     listCommand,
     showCommand,
     renameCommand,

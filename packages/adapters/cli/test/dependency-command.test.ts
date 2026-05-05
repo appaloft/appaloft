@@ -8,9 +8,11 @@ import {
   type CommandBus,
   type ExecutionContextFactory,
   ImportPostgresDependencyResourceCommand,
+  ImportRedisDependencyResourceCommand,
   ListDependencyResourcesQuery,
   ListResourceDependencyBindingsQuery,
   ProvisionPostgresDependencyResourceCommand,
+  ProvisionRedisDependencyResourceCommand,
   type QueryBus,
   RotateResourceDependencyBindingSecretCommand,
   ShowDependencyResourceQuery,
@@ -132,6 +134,42 @@ describe("CLI dependency commands", () => {
       environmentId: "env_demo",
       name: "External DB",
     });
+  });
+
+  test("[DEP-RES-REDIS-ENTRY-001] dependency redis provision/import dispatch commands", async () => {
+    const { commands, program } = await createCommandCaptureHarness("req_cli_dep_redis");
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "redis",
+      "provision",
+      "--project",
+      "prj_demo",
+      "--environment",
+      "env_demo",
+      "--name",
+      "Main Cache",
+    ]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "redis",
+      "import",
+      "--project",
+      "prj_demo",
+      "--environment",
+      "env_demo",
+      "--name",
+      "External Cache",
+      "--connection-url",
+      "redis://default:secret@cache.example.com:6379/0",
+    ]);
+
+    expect(commands[0]).toBeInstanceOf(ProvisionRedisDependencyResourceCommand);
+    expect(commands[1]).toBeInstanceOf(ImportRedisDependencyResourceCommand);
   });
 
   test("[DEP-RES-PG-ENTRY-001] dependency list/show dispatch query bus", async () => {

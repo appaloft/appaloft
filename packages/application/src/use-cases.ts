@@ -13,8 +13,10 @@ export * from "./operations/default-access-domain-policies/list-default-access-d
 export * from "./operations/default-access-domain-policies/show-default-access-domain-policy.query-service";
 export * from "./operations/dependency-resources/delete-dependency-resource.use-case";
 export * from "./operations/dependency-resources/import-postgres-dependency-resource.use-case";
+export * from "./operations/dependency-resources/import-redis-dependency-resource.use-case";
 export * from "./operations/dependency-resources/list-dependency-resources.query-service";
 export * from "./operations/dependency-resources/provision-postgres-dependency-resource.use-case";
+export * from "./operations/dependency-resources/provision-redis-dependency-resource.use-case";
 export * from "./operations/dependency-resources/rename-dependency-resource.use-case";
 export * from "./operations/dependency-resources/show-dependency-resource.query-service";
 export * from "./operations/deployments/cleanup-preview.use-case";

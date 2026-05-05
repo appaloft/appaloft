@@ -309,6 +309,7 @@ export interface ResourceInstanceState {
   connectionId?: ProviderConnectionId;
   endpoint?: EndpointText;
   postgresEndpoint?: DependencyResourceEndpointState;
+  redisEndpoint?: DependencyResourceEndpointState;
   connectionSecretRef?: DependencyResourceSecretRef;
   backupRelationship?: DependencyResourceBackupRelationshipState;
   bindingReadiness?: DependencyResourceBindingReadinessState;
@@ -417,6 +418,79 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     return ok(instance);
   }
 
+  static createRedisDependencyResource(input: {
+    id: ResourceInstanceId;
+    projectId: ProjectId;
+    environmentId: EnvironmentId;
+    name: ResourceInstanceName;
+    kind: ResourceInstanceKindValue;
+    sourceMode: DependencyResourceSourceModeValue;
+    providerKey: ProviderKey;
+    providerManaged: boolean;
+    endpoint?: DependencyResourceEndpointInput;
+    connectionSecretRef?: DependencyResourceSecretRef;
+    description?: DescriptionText;
+    backupRelationship?: DependencyResourceBackupRelationshipState;
+    createdAt: CreatedAt;
+  }): Result<ResourceInstance> {
+    if (input.kind.value !== "redis") {
+      return err(
+        dependencyResourceValidationError("Redis dependency resources must use kind redis", {
+          field: "kind",
+        }),
+      );
+    }
+
+    const slug = ResourceInstanceSlug.fromName(input.name);
+    if (slug.isErr()) {
+      return err(slug.error);
+    }
+
+    const endpoint = input.endpoint
+      ? createEndpointState(input.endpoint)
+      : ok<DependencyResourceEndpointState | undefined>(undefined);
+    if (endpoint.isErr()) {
+      return err(endpoint.error);
+    }
+
+    const instance = new ResourceInstance({
+      id: input.id,
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      kind: input.kind,
+      ownerScope: OwnerScopeValue.rehydrate("project"),
+      ownerId: OwnerId.rehydrate(input.projectId.value),
+      name: input.name,
+      slug: slug.value,
+      ...(input.description ? { description: input.description } : {}),
+      sourceMode: input.sourceMode,
+      providerKey: input.providerKey,
+      providerManaged: input.providerManaged,
+      ...(input.connectionSecretRef ? { connectionSecretRef: input.connectionSecretRef } : {}),
+      ...(endpoint.value ? { redisEndpoint: endpoint.value } : {}),
+      ...(input.backupRelationship
+        ? { backupRelationship: cloneBackupRelationship(input.backupRelationship) }
+        : { backupRelationship: { retentionRequired: false } }),
+      bindingReadiness: {
+        status: "not-implemented",
+      },
+      status: ResourceInstanceStatusValue.rehydrate("ready"),
+      createdAt: input.createdAt,
+    });
+
+    instance.recordDomainEvent("dependency-resource-created", input.createdAt, {
+      dependencyResourceId: input.id.value,
+      projectId: input.projectId.value,
+      environmentId: input.environmentId.value,
+      kind: input.kind.value,
+      sourceMode: input.sourceMode.value,
+      providerKey: input.providerKey.value,
+      slug: slug.value.value,
+      providerManaged: input.providerManaged,
+    });
+    return ok(instance);
+  }
+
   accept<TContext, TResult>(
     visitor: ResourceInstanceVisitor<TContext, TResult>,
     context: TContext,
@@ -500,6 +574,9 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
       ...(this.state.sourceMode ? { sourceMode: this.state.sourceMode } : {}),
       ...(this.state.postgresEndpoint
         ? { postgresEndpoint: cloneEndpoint(this.state.postgresEndpoint) }
+        : {}),
+      ...(this.state.redisEndpoint
+        ? { redisEndpoint: cloneEndpoint(this.state.redisEndpoint) }
         : {}),
       ...(this.state.connectionSecretRef
         ? { connectionSecretRef: this.state.connectionSecretRef }

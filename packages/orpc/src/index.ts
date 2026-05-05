@@ -90,10 +90,12 @@ import {
   environmentEffectivePrecedenceQueryInputSchema,
   ImportCertificateCommand,
   ImportPostgresDependencyResourceCommand,
+  ImportRedisDependencyResourceCommand,
   ImportResourceVariablesCommand,
   IssueOrRenewCertificateCommand,
   importCertificateCommandInputSchema,
   importPostgresDependencyResourceCommandInputSchema,
+  importRedisDependencyResourceCommandInputSchema,
   importResourceVariablesCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
   ListCertificatesQuery,
@@ -130,8 +132,10 @@ import {
   openTerminalSessionCommandInputSchema,
   PromoteEnvironmentCommand,
   ProvisionPostgresDependencyResourceCommand,
+  ProvisionRedisDependencyResourceCommand,
   promoteEnvironmentCommandInputSchema,
   provisionPostgresDependencyResourceCommandInputSchema,
+  provisionRedisDependencyResourceCommandInputSchema,
   type Query,
   type QueryBus,
   RegisterServerCommand,
@@ -528,6 +532,14 @@ export const apiRouteDescriptions = {
   ),
   importPostgresDependencyResource: routeDescription(
     "Imports external Postgres dependency metadata while keeping raw connection secrets outside list and show responses.",
+    "resource.concept",
+  ),
+  provisionRedisDependencyResource: routeDescription(
+    "Records provider-neutral Appaloft-managed Redis dependency resource intent without creating provider-native Redis infrastructure.",
+    "resource.concept",
+  ),
+  importRedisDependencyResource: routeDescription(
+    "Imports external Redis dependency metadata while keeping raw connection secrets outside list and show responses.",
     "resource.concept",
   ),
   listDependencyResources: routeDescription(
@@ -2382,6 +2394,32 @@ export const importPostgresDependencyResourceProcedure = base
     executeCommand(context, ImportPostgresDependencyResourceCommand.create(input)),
   );
 
+export const provisionRedisDependencyResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/redis/provision",
+    description: apiRouteDescriptions.provisionRedisDependencyResource,
+    successStatus: 201,
+  })
+  .input(provisionRedisDependencyResourceCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ProvisionRedisDependencyResourceCommand.create(input)),
+  );
+
+export const importRedisDependencyResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/redis/import",
+    description: apiRouteDescriptions.importRedisDependencyResource,
+    successStatus: 201,
+  })
+  .input(importRedisDependencyResourceCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ImportRedisDependencyResourceCommand.create(input)),
+  );
+
 export const listDependencyResourcesProcedure = base
   .route({
     method: "GET",
@@ -2634,6 +2672,8 @@ export const appaloftOrpcRouter = {
   dependencyResources: {
     provisionPostgres: provisionPostgresDependencyResourceProcedure,
     importPostgres: importPostgresDependencyResourceProcedure,
+    provisionRedis: provisionRedisDependencyResourceProcedure,
+    importRedis: importRedisDependencyResourceProcedure,
     list: listDependencyResourcesProcedure,
     show: showDependencyResourceProcedure,
     rename: renameDependencyResourceProcedure,
@@ -2868,6 +2908,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/dependency-resources",
     "/api/dependency-resources/postgres/provision",
     "/api/dependency-resources/postgres/import",
+    "/api/dependency-resources/redis/provision",
+    "/api/dependency-resources/redis/import",
     "/api/dependency-resources/:dependencyResourceId",
     "/api/dependency-resources/:dependencyResourceId/rename",
     "/api/operator-work",

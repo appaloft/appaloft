@@ -89,6 +89,23 @@ describe("dependency resource persistence", () => {
         providerManaged: false,
         createdAt,
       })._unsafeUnwrap();
+      const redisResource = ResourceInstance.createRedisDependencyResource({
+        id: ResourceInstanceId.rehydrate("rsi_redis"),
+        projectId: ProjectId.rehydrate("prj_demo"),
+        environmentId: EnvironmentId.rehydrate("env_demo"),
+        name: ResourceInstanceName.rehydrate("External Cache"),
+        kind: ResourceInstanceKindValue.rehydrate("redis"),
+        sourceMode: DependencyResourceSourceModeValue.rehydrate("imported-external"),
+        providerKey: ProviderKey.rehydrate("external-redis"),
+        endpoint: {
+          host: "cache.example.com",
+          port: 6379,
+          databaseName: "0",
+          maskedConnection: "redis://default:********@cache.example.com:6379/0",
+        },
+        providerManaged: false,
+        createdAt,
+      })._unsafeUnwrap();
 
       await projects.upsert(context, project, UpsertProjectSpec.fromProject(project));
       await environments.upsert(
@@ -101,6 +118,11 @@ describe("dependency resource persistence", () => {
         dependencyResource,
         UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
       );
+      await dependencyResources.upsert(
+        context,
+        redisResource,
+        UpsertResourceInstanceSpec.fromResourceInstance(redisResource),
+      );
 
       const persisted = await dependencyResources.findOne(
         context,
@@ -109,6 +131,10 @@ describe("dependency resource persistence", () => {
       const summary = await readModel.findOne(
         context,
         ResourceInstanceByIdSpec.create(ResourceInstanceId.rehydrate("rsi_pg")),
+      );
+      const redisSummary = await readModel.findOne(
+        context,
+        ResourceInstanceByIdSpec.create(ResourceInstanceId.rehydrate("rsi_redis")),
       );
 
       expect(persisted?.toState().postgresEndpoint?.maskedConnection.value).toContain("********");
@@ -123,6 +149,15 @@ describe("dependency resource persistence", () => {
         },
       });
       expect(JSON.stringify(summary)).not.toContain("secret");
+      expect(redisSummary).toMatchObject({
+        id: "rsi_redis",
+        kind: "redis",
+        connection: {
+          host: "cache.example.com",
+          maskedConnection: "redis://default:********@cache.example.com:6379/0",
+        },
+      });
+      expect(JSON.stringify(redisSummary)).not.toContain("super-secret");
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });

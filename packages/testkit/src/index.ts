@@ -1066,6 +1066,7 @@ export class MemoryDependencyResourceReadModel implements DependencyResourceRead
 
   private toSummary(dependencyResource: ResourceInstance): DependencyResourceSummary {
     const state = dependencyResource.toState();
+    const endpoint = state.postgresEndpoint ?? state.redisEndpoint;
     const blockers = this.deleteSafetyReader
       ? (this.deleteSafetyReader as MemoryDependencyResourceDeleteSafetyReader).findBlockers
       : undefined;
@@ -1082,15 +1083,13 @@ export class MemoryDependencyResourceReadModel implements DependencyResourceRead
       providerManaged: state.providerManaged ?? false,
       ...(state.description ? { description: state.description.value } : {}),
       lifecycleStatus: state.status.value,
-      ...(state.postgresEndpoint
+      ...(endpoint
         ? {
             connection: {
-              host: state.postgresEndpoint.host.value,
-              ...(state.postgresEndpoint.port ? { port: state.postgresEndpoint.port.value } : {}),
-              ...(state.postgresEndpoint.databaseName
-                ? { databaseName: state.postgresEndpoint.databaseName.value }
-                : {}),
-              maskedConnection: state.postgresEndpoint.maskedConnection.value,
+              host: endpoint.host.value,
+              ...(endpoint.port ? { port: endpoint.port.value } : {}),
+              ...(endpoint.databaseName ? { databaseName: endpoint.databaseName.value } : {}),
+              maskedConnection: endpoint.maskedConnection.value,
               ...(state.connectionSecretRef ? { secretRef: state.connectionSecretRef.value } : {}),
             },
           }
@@ -1119,7 +1118,7 @@ export class MemoryDependencyResourceReadModel implements DependencyResourceRead
 
   async list(
     context: RepositoryContext,
-    input?: { projectId?: string; environmentId?: string; kind?: "postgres" },
+    input?: { projectId?: string; environmentId?: string; kind?: "postgres" | "redis" },
   ): Promise<DependencyResourceSummary[]> {
     void context;
     return [...this.repository.items.values()]

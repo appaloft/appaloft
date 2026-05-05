@@ -11,9 +11,11 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   ImportPostgresDependencyResourceCommand,
+  ImportRedisDependencyResourceCommand,
   ListDependencyResourcesQuery,
   ListResourceDependencyBindingsQuery,
   ProvisionPostgresDependencyResourceCommand,
+  ProvisionRedisDependencyResourceCommand,
   type Query,
   type QueryBus,
   RotateResourceDependencyBindingSecretCommand,
@@ -177,6 +179,39 @@ describe("dependency resource HTTP routes", () => {
     expect(importResponse.status).toBe(201);
     expect(commands[0]).toBeInstanceOf(ProvisionPostgresDependencyResourceCommand);
     expect(commands[1]).toBeInstanceOf(ImportPostgresDependencyResourceCommand);
+  });
+
+  test("[DEP-RES-REDIS-ENTRY-001] dispatches Redis provision and import through HTTP", async () => {
+    const { app, commands } = createHarness();
+
+    const provisionResponse = await app.handle(
+      new Request("http://localhost/api/dependency-resources/redis/provision", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          name: "Main Cache",
+        }),
+      }),
+    );
+    const importResponse = await app.handle(
+      new Request("http://localhost/api/dependency-resources/redis/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          name: "External Cache",
+          connectionUrl: "redis://default:secret@cache.example.com:6379/0",
+        }),
+      }),
+    );
+
+    expect(provisionResponse.status).toBe(201);
+    expect(importResponse.status).toBe(201);
+    expect(commands[0]).toBeInstanceOf(ProvisionRedisDependencyResourceCommand);
+    expect(commands[1]).toBeInstanceOf(ImportRedisDependencyResourceCommand);
   });
 
   test("[DEP-RES-PG-ENTRY-002] dispatches list/show/delete through HTTP", async () => {

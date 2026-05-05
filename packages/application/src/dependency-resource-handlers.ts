@@ -2,10 +2,14 @@ export * from "./operations/dependency-resources/delete-dependency-resource.hand
 export * from "./operations/dependency-resources/delete-dependency-resource.use-case";
 export * from "./operations/dependency-resources/import-postgres-dependency-resource.handler";
 export * from "./operations/dependency-resources/import-postgres-dependency-resource.use-case";
+export * from "./operations/dependency-resources/import-redis-dependency-resource.handler";
+export * from "./operations/dependency-resources/import-redis-dependency-resource.use-case";
 export * from "./operations/dependency-resources/list-dependency-resources.handler";
 export * from "./operations/dependency-resources/list-dependency-resources.query-service";
 export * from "./operations/dependency-resources/provision-postgres-dependency-resource.handler";
 export * from "./operations/dependency-resources/provision-postgres-dependency-resource.use-case";
+export * from "./operations/dependency-resources/provision-redis-dependency-resource.handler";
+export * from "./operations/dependency-resources/provision-redis-dependency-resource.use-case";
 export * from "./operations/dependency-resources/rename-dependency-resource.handler";
 export * from "./operations/dependency-resources/rename-dependency-resource.use-case";
 export * from "./operations/dependency-resources/show-dependency-resource.handler";

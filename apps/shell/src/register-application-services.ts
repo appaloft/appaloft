@@ -91,6 +91,8 @@ import {
   ImportCertificateUseCase,
   ImportPostgresDependencyResourceCommandHandler,
   ImportPostgresDependencyResourceUseCase,
+  ImportRedisDependencyResourceCommandHandler,
+  ImportRedisDependencyResourceUseCase,
   ImportResourceVariablesCommandHandler,
   ImportResourceVariablesUseCase,
   InspectServerCapacityQueryHandler,
@@ -132,6 +134,8 @@ import {
   PromoteEnvironmentUseCase,
   ProvisionPostgresDependencyResourceCommandHandler,
   ProvisionPostgresDependencyResourceUseCase,
+  ProvisionRedisDependencyResourceCommandHandler,
+  ProvisionRedisDependencyResourceUseCase,
   RegisterServerUseCase,
   RelinkSourceLinkCommandHandler,
   RelinkSourceLinkUseCase,
@@ -294,6 +298,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ShowResourceDependencyBindingQueryHandler);
   container.registerSingleton(ProvisionPostgresDependencyResourceCommandHandler);
   container.registerSingleton(ImportPostgresDependencyResourceCommandHandler);
+  container.registerSingleton(ProvisionRedisDependencyResourceCommandHandler);
+  container.registerSingleton(ImportRedisDependencyResourceCommandHandler);
   container.registerSingleton(RenameDependencyResourceCommandHandler);
   container.registerSingleton(DeleteDependencyResourceCommandHandler);
   container.registerSingleton(ListDependencyResourcesQueryHandler);
@@ -364,6 +370,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.importPostgresDependencyResourceUseCase,
     ImportPostgresDependencyResourceUseCase,
+  );
+  container.registerSingleton(
+    tokens.provisionRedisDependencyResourceUseCase,
+    ProvisionRedisDependencyResourceUseCase,
+  );
+  container.registerSingleton(
+    tokens.importRedisDependencyResourceUseCase,
+    ImportRedisDependencyResourceUseCase,
   );
   container.registerSingleton(
     tokens.renameDependencyResourceUseCase,

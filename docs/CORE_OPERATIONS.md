@@ -299,12 +299,14 @@ Phase 7 storage operations:
 | Attach storage to resource | Command | `resources.attach-storage` | `AttachResourceStorageCommand` | `AttachResourceStorageCommandInput` | `appaloft resource storage attach <resourceId> <storageVolumeId> --destination-path <path>` | `POST /api/resources/{resourceId}/storage-attachments` |
 | Detach storage from resource | Command | `resources.detach-storage` | `DetachResourceStorageCommand` | `DetachResourceStorageCommandInput` | `appaloft resource storage detach <resourceId> <attachmentId>` | `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` |
 
-Phase 7 Postgres dependency resource operations:
+Phase 7 dependency resource operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Provision Postgres dependency resource | Command | `dependency-resources.provision-postgres` | `ProvisionPostgresDependencyResourceCommand` | `ProvisionPostgresDependencyResourceCommandInput` | `appaloft dependency postgres provision` | `POST /api/dependency-resources/postgres/provision` |
 | Import Postgres dependency resource | Command | `dependency-resources.import-postgres` | `ImportPostgresDependencyResourceCommand` | `ImportPostgresDependencyResourceCommandInput` | `appaloft dependency postgres import` | `POST /api/dependency-resources/postgres/import` |
+| Provision Redis dependency resource | Command | `dependency-resources.provision-redis` | `ProvisionRedisDependencyResourceCommand` | `ProvisionRedisDependencyResourceCommandInput` | `appaloft dependency redis provision` | `POST /api/dependency-resources/redis/provision` |
+| Import Redis dependency resource | Command | `dependency-resources.import-redis` | `ImportRedisDependencyResourceCommand` | `ImportRedisDependencyResourceCommandInput` | `appaloft dependency redis import` | `POST /api/dependency-resources/redis/import` |
 | List dependency resources | Query | `dependency-resources.list` | `ListDependencyResourcesQuery` | `ListDependencyResourcesQueryInput` | `appaloft dependency list` | `GET /api/dependency-resources` |
 | Show dependency resource | Query | `dependency-resources.show` | `ShowDependencyResourceQuery` | `ShowDependencyResourceQueryInput` | `appaloft dependency show <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}` |
 | Rename dependency resource | Command | `dependency-resources.rename` | `RenameDependencyResourceCommand` | `RenameDependencyResourceCommandInput` | `appaloft dependency rename <dependencyResourceId> --name <name>` | `POST /api/dependency-resources/{dependencyResourceId}/rename` |
@@ -335,11 +337,9 @@ Current boundary:
   that historical snapshots remain unchanged, and it does not rotate provider-native database
   credentials, inject runtime environment variables, schedule redeploy, or rewrite historical
   deployment snapshots.
-- `dependency-resources.provision-redis` and `dependency-resources.import-redis` are accepted
-  candidates under
-  [Redis Dependency Resource Lifecycle](./specs/037-redis-dependency-resource-lifecycle/spec.md).
-  They must be added to this implemented operations table and to
-  `packages/application/src/operation-catalog.ts` in the same Code Round that activates Redis.
+- Redis dependency resources are provider-neutral `ResourceInstance` records in this slice. Managed
+  Redis records do not create provider-native Redis infrastructure, imported external Redis delete
+  removes only Appaloft's record, and list/show output masks Redis connection secrets.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).

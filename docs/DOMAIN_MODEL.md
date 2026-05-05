@@ -434,7 +434,7 @@ Current scope:
   [Dependency Binding Deployment Snapshot Reference Baseline](./specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
 - Phase 7 binding secret rotation baseline under
   [Dependency Binding Secret Rotation](./specs/036-dependency-binding-secret-rotation/spec.md)
-- Phase 7 Redis dependency resource lifecycle is an accepted candidate under
+- Phase 7 Redis dependency resource lifecycle baseline under
   [Redis Dependency Resource Lifecycle](./specs/037-redis-dependency-resource-lifecycle/spec.md)
 - provider-native provisioning/deletion, provider-native credential rotation,
   backup/restore, runtime env injection, and provider-native runtime materialization are future
