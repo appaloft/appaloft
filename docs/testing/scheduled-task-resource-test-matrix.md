@@ -22,8 +22,11 @@ logs. It is not active implementation coverage yet.
 | SCHED-TASK-APP-001 | Application message model | Inactive scheduled task command/query messages. | Target scheduled-task and scheduled-task-run command/query schemas parse explicit operation inputs while operation catalog entries remain inactive. |
 | SCHED-TASK-CREATE-001 | Application command | User creates a scheduled task. | Command validates core scheduled-task fields, stores a Resource-owned task definition through the inactive repository port, and returns a safe task summary without activating operation catalog entries. |
 | SCHED-TASK-CREATE-002 | Application command | Resource is archived. | Create admission rejects before storing a task with a structured Resource lifecycle phase. |
+| SCHED-TASK-QUERY-001 | Application query | User lists or shows scheduled task definitions. | Query handlers wrap the scheduled-task read model with stable schema versions and generated timestamps while operation catalog entries remain inactive. |
+| SCHED-TASK-QUERY-002 | Application query | User shows a missing scheduled task. | Show query returns a structured `not_found` error with scheduled-task read phase details. |
 | SCHED-TASK-RUN-001 | Application command | User runs a task now. | Command returns `ok({ runId })` after admission; run state starts as accepted/pending/running according to workflow. |
 | SCHED-TASK-RUN-002 | Application command | Resource is archived. | Run admission rejects or skips before runtime execution with a structured resource lifecycle phase. |
+| SCHED-TASK-RUN-QUERY-001 | Application query/log adapter | User lists or shows task runs or reads run logs. | Query handlers wrap run-specific read models with stable schema versions and generated timestamps while deployment/resource runtime logs remain unchanged. |
 | SCHED-TASK-SCHED-001 | Scheduler | Enabled task is due. | Scheduler dispatches the same run admission path as run-now and records the same run shape. |
 | SCHED-TASK-SCHED-002 | Scheduler/concurrency | Previous run is non-terminal. | Default `forbid` policy prevents concurrent runtime execution and records safe skip/rejection state. |
 | SCHED-TASK-LOGS-001 | Query/log adapter | Run emits output. | `scheduled-task-runs.logs` reads run-scoped logs; deployment and resource runtime logs are unchanged. |
@@ -37,6 +40,8 @@ message-shape coverage in `packages/application/test/scheduled-tasks-application
 `SCHED-TASK-CREATE-001`, `SCHED-TASK-CREATE-002`, and unsafe command-intent coverage for
 `SCHED-TASK-SECRET-001` have inactive application create-admission coverage in
 `packages/application/test/scheduled-task-create.test.ts`.
+`SCHED-TASK-QUERY-001`, `SCHED-TASK-QUERY-002`, and `SCHED-TASK-RUN-QUERY-001` have inactive
+application read-query coverage in `packages/application/test/scheduled-task-read-queries.test.ts`.
 `SCHED-TASK-RUN-001` and `SCHED-TASK-RUN-002` have inactive application run-now admission coverage
 in `packages/application/test/scheduled-task-run-now.test.ts`.
 `SCHED-TASK-DOMAIN-001` through `SCHED-TASK-DOMAIN-003` have core coverage in
@@ -46,7 +51,7 @@ policy plus a Resource-owned scheduled task definition state with no deployment 
 the core scheduled-task run attempt lifecycle for accepted, running, succeeded, failed, and skipped
 states with safe terminal details and no Deployment id.
 
-Inactive application command/query schemas, messages, result DTOs, read-model ports, and create and
-run-now admission handlers/use cases exist. No operation catalog entries, remaining application
-handlers/use cases, persisted scheduled-task/run state, scheduler process manager, runtime adapter
-execution path, task-run logs, entrypoints, or public docs are active yet.
+Inactive application command/query schemas, messages, result DTOs, read-model ports, create and
+run-now admission handlers/use cases, and read-query handlers/services exist. No operation catalog
+entries, update/delete handlers/use cases, persisted scheduled-task/run state, scheduler process
+manager, runtime adapter execution path, task-run logs, entrypoints, or public docs are active yet.

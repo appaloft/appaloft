@@ -67,6 +67,9 @@ DDD or internal process-manager terminology.
   archived/deleted Resources before storing the task, validates schedule/timezone/command
   intent/timeout/retry/status/concurrency through core value objects, and stores a Resource-owned
   task definition through the scheduled-task definition repository port.
+- Inactive application read-query handlers/services exist for task list/show, run list/show, and
+  run logs. They wrap scheduled-task read-model ports with stable schema versions and generated
+  timestamps but do not activate persistence, operation catalog entries, or entrypoints.
 - Inactive application run-now admission exists. It loads the Resource-owned task, rejects disabled
   tasks or archived/deleted Resources before runtime execution, records an accepted manual run
   attempt, and returns a run id without starting the task command synchronously.

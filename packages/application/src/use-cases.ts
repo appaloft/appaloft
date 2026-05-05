@@ -108,7 +108,12 @@ export * from "./operations/resources/show-resource-dependency-binding.query-ser
 export * from "./operations/resources/unbind-resource-dependency.use-case";
 export * from "./operations/resources/unset-resource-variable.use-case";
 export * from "./operations/scheduled-tasks/create-scheduled-task.use-case";
+export * from "./operations/scheduled-tasks/list-scheduled-task-runs.query-service";
+export * from "./operations/scheduled-tasks/list-scheduled-tasks.query-service";
 export * from "./operations/scheduled-tasks/run-scheduled-task-now.use-case";
+export * from "./operations/scheduled-tasks/scheduled-task-run-logs.query-service";
+export * from "./operations/scheduled-tasks/show-scheduled-task.query-service";
+export * from "./operations/scheduled-tasks/show-scheduled-task-run.query-service";
 export * from "./operations/servers/bootstrap-server-proxy.use-case";
 export * from "./operations/servers/check-server-delete-safety.query-service";
 export * from "./operations/servers/configure-server-credential.use-case";

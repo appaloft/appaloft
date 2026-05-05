@@ -1107,6 +1107,10 @@ Current verification notes:
   task definitions, including archived-Resource and unsafe-command blockers. Update/delete/list/show
   handlers, persistence/read models, scheduler/runtime execution, entrypoints, and public docs
   remain open.
+- 2026-05-05 Phase 7 scheduled task read-query slice added inactive task list/show, run list/show,
+  and run-log query handlers/services over scheduled-task read-model ports with stable envelopes.
+  Update/delete handlers, persistence/read models, scheduler/runtime execution, entrypoints, and
+  public docs remain open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm
