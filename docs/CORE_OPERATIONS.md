@@ -761,10 +761,12 @@ Current boundary:
   surfaces.
 - Future `deployments.retry` creates a new deployment attempt from a failed/interrupted/canceled/
   superseded attempt's immutable snapshot intent. It does not replay old events and does not mutate
-  the old attempt.
+  the old attempt. Its Code Round is scoped by
+  [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md).
 - Future `deployments.redeploy` creates a new deployment attempt from the current Resource profile,
   effective configuration, target, and destination at admission time. It is the "deploy current
-  desired state again" operation, not a retry of an old snapshot.
+  desired state again" operation, not a retry of an old snapshot. Its Code Round is scoped by
+  [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md).
 - Future `deployments.rollback` creates a new rollback deployment attempt from a retained successful
   candidate's immutable snapshot and Docker/OCI artifact identity. It does not re-plan from the
   current Resource profile and does not roll back databases, volumes, or external dependencies.
