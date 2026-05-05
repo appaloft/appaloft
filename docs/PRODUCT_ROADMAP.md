@@ -974,6 +974,11 @@ Current verification notes:
   command failure details, and shell-internal DI registration for the target port, attempt
   recorder, use case, and handlers. The operations remain inactive until CLI/HTTP/Web
   entrypoints, `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
+- 2026-05-05 Phase 7 resource runtime controls activation Code Round slice activated
+  `resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart` in
+  `CORE_OPERATIONS.md`, the operation catalog, HTTP/oRPC, CLI, and Web Resource detail controls
+  with public docs links and `RUNTIME-CTRL-SURFACE-001` HTTP coverage. Future MCP/tool descriptors
+  remain deferred until the tool surface exists.
 
 Required:
 

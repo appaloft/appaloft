@@ -15,6 +15,7 @@ export const webDocsHrefs = {
   resourceConcept: resolvePublicDocsHelpHref("resource.concept"),
   resourceSourceProfile: resolvePublicDocsHelpHref("resource.source-profile"),
   resourceRuntimeProfile: resolvePublicDocsHelpHref("resource.runtime-profile"),
+  resourceRuntimeControls: resolvePublicDocsHelpHref("resource.runtime-controls"),
   resourceHealthProfile: resolvePublicDocsHelpHref("resource.health-profile"),
   resourceNetworkProfile: resolvePublicDocsHelpHref("resource.network-profile"),
   resourceAccessProfile: resolvePublicDocsHelpHref("resource.access-profile"),

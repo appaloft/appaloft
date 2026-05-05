@@ -33,9 +33,9 @@ editing, runtime log observation, or server cleanup.
 
 | Operation | Kind | Owner | Intent |
 | --- | --- | --- | --- |
-| `resources.runtime.stop` | Accepted candidate command | Resource runtime control application service | Stops the current runtime instance for one Resource placement without deleting Resource or deployment state. |
-| `resources.runtime.start` | Accepted candidate command | Resource runtime control application service | Starts the last stopped runtime instance from retained safe runtime metadata. |
-| `resources.runtime.restart` | Accepted candidate command | Resource runtime control application service | Performs stop then start over the current runtime instance without re-planning or rebuilding. |
+| `resources.runtime.stop` | Active command | Resource runtime control application service | Stops the current runtime instance for one Resource placement without deleting Resource or deployment state. |
+| `resources.runtime.start` | Active command | Resource runtime control application service | Starts the last stopped runtime instance from retained safe runtime metadata. |
+| `resources.runtime.restart` | Active command | Resource runtime control application service | Performs stop then start over the current runtime instance without re-planning or rebuilding. |
 
 The first Code Round may implement these operations through one shared application service and one
 runtime target control port, but each public command must keep a distinct operation key and command

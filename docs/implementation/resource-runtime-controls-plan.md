@@ -57,9 +57,11 @@ authorization.
 
 ### 5. Entrypoints And Docs
 
-- Add CLI, HTTP/oRPC, and Web controls only after application and adapter tests pass.
-- Add public docs/help for stop/start/restart, blocked start, and restart versus redeploy.
-- Add operation catalog metadata and future MCP/tool descriptors in the activation commit.
+- CLI, HTTP/oRPC, and Web controls are active after application and adapter tests passed.
+- Public docs/help for stop/start/restart, blocked start, and restart versus redeploy are linked
+  from CLI help, API descriptions, and Web help affordances.
+- Operation catalog metadata is active; future MCP/tool descriptors remain deferred until the tool
+  surface exists.
 
 ## Verification Gate
 

@@ -34,7 +34,7 @@
 - [x] Bind `RUNTIME-CTRL-COORD-001` to `resource-runtime` coordination tests.
 - [x] Bind `RUNTIME-CTRL-READ-001` to `resources.health.latestRuntimeControl` readback tests.
 - [x] Bind `RUNTIME-CTRL-DOCS-001` to public docs/help anchor checks.
-- [ ] Bind `RUNTIME-CTRL-SURFACE-001` to CLI/HTTP/Web/docs coverage.
+- [x] Bind `RUNTIME-CTRL-SURFACE-001` to CLI/HTTP/Web/docs coverage.
 
 ## Implementation
 
@@ -45,20 +45,20 @@
 - [x] Add Docker and Compose runtime-control adapter command mapping.
 - [x] Wire local/generic-SSH runtime-control command execution.
 - [x] Register shell-internal runtime-control target port, recorder, use case, and handlers.
-- [ ] Complete CLI/HTTP/Web runtime-control adapter activation.
-- [ ] Add CLI, HTTP/oRPC, and Web entrypoints only after tests pass.
-- [ ] Update `CORE_OPERATIONS.md` and `operation-catalog.ts` in the activation commit.
+- [x] Complete CLI/HTTP/Web runtime-control adapter activation.
+- [x] Add CLI, HTTP/oRPC, and Web entrypoints only after tests pass.
+- [x] Update `CORE_OPERATIONS.md` and `operation-catalog.ts` in the activation commit.
 
 ## Verification
 
 - [x] Run targeted runtime-control tests.
-- [ ] Run targeted CLI/oRPC/HTTP tests.
-- [ ] Run targeted Web semantic/browser tests.
+- [x] Run targeted CLI/oRPC/HTTP tests.
+- [x] Run targeted Web semantic/typecheck tests.
 - [x] Run `bun run typecheck`.
 - [x] Run `bun run lint`.
 - [x] Run `git diff --check`.
 
 ## Post-Implementation Sync
 
-- [ ] Reconcile ADR, command specs, error specs, test matrix, public docs, operation catalog,
+- [x] Reconcile ADR, command specs, error specs, test matrix, public docs, operation catalog,
   `CORE_OPERATIONS.md`, roadmap notes, and release notes after Code Round.

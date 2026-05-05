@@ -12,10 +12,13 @@
     Copy,
     Globe2,
     Link2,
+    Play,
     Plus,
     RefreshCw,
+    RotateCw,
     Route,
     ShieldCheck,
+    Square,
     Terminal,
     Trash2,
   } from "@lucide/svelte";
@@ -40,7 +43,10 @@
     ResourceRuntimeLogEvent,
     ResourceRuntimeLogLine,
     ResourceSummary,
+    RestartResourceRuntimeInput,
     SetResourceVariableInput,
+    StartResourceRuntimeInput,
+    StopResourceRuntimeInput,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -290,6 +296,11 @@
     detail: string;
   } | null>(null);
   let runtimeFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let runtimeControlFeedback = $state<{
     kind: "success" | "error";
     title: string;
     detail: string;
@@ -715,6 +726,72 @@
       };
     },
   }));
+  const stopResourceRuntimeMutation = createMutation(() => ({
+    mutationFn: (input: StopResourceRuntimeInput) => orpcClient.resources.runtime.stop(input),
+    onSuccess: (result) => {
+      runtimeControlFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.runtimeControlStopSuccess),
+        detail: result.runtimeControlAttemptId,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "health", resourceId, "detail"],
+      });
+    },
+    onError: (error) => {
+      runtimeControlFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.runtimeControlFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const startResourceRuntimeMutation = createMutation(() => ({
+    mutationFn: (input: StartResourceRuntimeInput) => orpcClient.resources.runtime.start(input),
+    onSuccess: (result) => {
+      runtimeControlFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.runtimeControlStartSuccess),
+        detail: result.runtimeControlAttemptId,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "health", resourceId, "detail"],
+      });
+    },
+    onError: (error) => {
+      runtimeControlFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.runtimeControlFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const restartResourceRuntimeMutation = createMutation(() => ({
+    mutationFn: (input: RestartResourceRuntimeInput) => orpcClient.resources.runtime.restart(input),
+    onSuccess: (result) => {
+      runtimeControlFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.runtimeControlRestartSuccess),
+        detail: result.runtimeControlAttemptId,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "health", resourceId, "detail"],
+      });
+    },
+    onError: (error) => {
+      runtimeControlFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.runtimeControlFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
   const configureResourceNetworkMutation = createMutation(() => ({
     mutationFn: (input: ConfigureResourceNetworkInput) =>
       orpcClient.resources.configureNetwork(input),
@@ -809,6 +886,11 @@
       };
     },
   }));
+  const runtimeControlPending = $derived(
+    stopResourceRuntimeMutation.isPending ||
+      startResourceRuntimeMutation.isPending ||
+      restartResourceRuntimeMutation.isPending,
+  );
   let archiveFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -1580,6 +1662,32 @@
       resourceId: resource.id,
       runtimeProfile,
     });
+  }
+
+  function controlResourceRuntime(operation: "stop" | "start" | "restart"): void {
+    if (!resource || isResourceArchived || runtimeControlPending) {
+      return;
+    }
+
+    runtimeControlFeedback = null;
+    const input = {
+      resourceId: resource.id,
+      ...(operation === "start" || operation === "restart"
+        ? { acknowledgeRetainedRuntimeMetadata: true }
+        : {}),
+    };
+
+    if (operation === "stop") {
+      stopResourceRuntimeMutation.mutate(input);
+      return;
+    }
+
+    if (operation === "start") {
+      startResourceRuntimeMutation.mutate(input);
+      return;
+    }
+
+    restartResourceRuntimeMutation.mutate(input);
   }
 
   function configureResourceNetwork(event: SubmitEvent): void {
@@ -4576,6 +4684,72 @@
 
         <Tabs.Content value="logs" class="mt-0">
           <section id="resource-runtime-logs" class="space-y-4">
+            <div class="rounded-md border bg-card p-4">
+              <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h2 class="text-lg font-semibold">
+                      {$t(i18nKeys.console.resources.runtimeControlsTitle)}
+                    </h2>
+                    <DocsHelpLink
+                      href={webDocsHrefs.resourceRuntimeControls}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    />
+                  </div>
+                  <p class="mt-1 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.resources.runtimeControlsDescription)}
+                  </p>
+                  {#if resourceHealth?.latestRuntimeControl}
+                    <p class="mt-2 text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.resources.runtimeControlsLatest)}:
+                      {resourceHealth.latestRuntimeControl.operation} ·
+                      {resourceHealth.latestRuntimeControl.status} ·
+                      {resourceHealth.latestRuntimeControl.runtimeState}
+                    </p>
+                  {/if}
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onclick={() => controlResourceRuntime("stop")}
+                    disabled={isResourceArchived || runtimeControlPending}
+                  >
+                    <Square class="size-4" />
+                    {$t(i18nKeys.console.resources.runtimeControlStop)}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onclick={() => controlResourceRuntime("start")}
+                    disabled={isResourceArchived || runtimeControlPending}
+                  >
+                    <Play class="size-4" />
+                    {$t(i18nKeys.console.resources.runtimeControlStart)}
+                  </Button>
+                  <Button
+                    onclick={() => controlResourceRuntime("restart")}
+                    disabled={isResourceArchived || runtimeControlPending}
+                  >
+                    <RotateCw class={["size-4", runtimeControlPending ? "animate-spin" : ""]} />
+                    {$t(i18nKeys.console.resources.runtimeControlRestart)}
+                  </Button>
+                </div>
+              </div>
+              {#if runtimeControlFeedback}
+                <div
+                  class={[
+                    "mt-4 rounded-md border px-3 py-2 text-sm",
+                    runtimeControlFeedback.kind === "success"
+                      ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
+                      : "border-destructive/30 bg-destructive/5 text-destructive",
+                  ]}
+                >
+                  <span class="font-medium">{runtimeControlFeedback.title}</span>
+                  <span class="ml-2">{runtimeControlFeedback.detail}</span>
+                </div>
+              {/if}
+            </div>
+
+            <div class="rounded-md border bg-card p-4">
               <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div class="flex items-start gap-3">
                   <div class="bg-muted p-2">
@@ -4653,6 +4827,7 @@
                   </div>
                 {/if}
               </div>
+            </div>
           </section>
         </Tabs.Content>
 
