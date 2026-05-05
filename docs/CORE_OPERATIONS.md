@@ -1044,8 +1044,11 @@ Web:
 - it must not hide business rules in components
 
 Future MCP / AI tools:
-- tools such as `create_project`, `create_environment`, `plan_deployment`, and
-  `deploy_release` must map back to these operations or to future operations added here
+- `@appaloft/ai-mcp` generates one serializable tool descriptor per operation catalog key
+- generated tool names are operation-key based, for example `projects_create`,
+  `environments_create`, `deployments_plan`, and `deployments_create`
+- future MCP server handlers must dispatch through the same command/query messages and input schemas,
+  not through a separate tool-only operation list
 
 ## Authoring Checklist For New Business Capabilities
 

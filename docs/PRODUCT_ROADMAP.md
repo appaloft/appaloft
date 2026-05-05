@@ -119,7 +119,7 @@ The 1.0.0 product is ready only when all of these are checked:
 - [ ] Every long-running internal state has list/show plus retry/cancel/prune/recovery where it can
   block or confuse operators.
 - [ ] Web, CLI, and HTTP/oRPC all dispatch the same command/query schemas.
-- [ ] Future MCP/tool contracts can be generated from the same operation catalog without inventing
+- [x] Future MCP/tool contracts can be generated from the same operation catalog without inventing
   parallel behavior.
 - [ ] Framework/runtime detection covers the mainstream self-hosted web catalog with deterministic
   planners or explicit fallback errors.
@@ -1057,7 +1057,7 @@ Current verification notes:
   Passing. Future MCP/tool descriptor generation remains governed by the operation catalog and the
   global future tool-surface milestone, not by a source auto-deploy transport-specific shape. The
   full `0.9.0` release rule remains blocked by the deploy-action wrapper, preview, scheduled tasks,
-  future MCP/tool descriptors, and cluster runtime items.
+  and cluster runtime items.
 - 2026-05-05 Phase 7 deploy-action reference wrapper slice added
   `.github/actions/deploy-action` with composite action metadata, release-archive install/checksum
   verification script, deploy invocation script, SSH private-key temp-file handling, PR preview flag
@@ -1070,6 +1070,13 @@ Current verification notes:
   help target, HTTP route description, docs traceability, and matrix/task sync. Default
   existing-resource drift remains fail-before-deploy; effective configuration drift redaction is
   retained as a focused follow-up under `RES-PROFILE-DRIFT-003`.
+- 2026-05-05 Phase 7 generated MCP/tool descriptor slice replaced the stale hand-maintained
+  `@appaloft/ai-mcp` tool list with descriptors generated from
+  `packages/application/src/operation-catalog.ts`. `MCP-TOOL-DESC-001` through
+  `MCP-TOOL-DESC-003` assert one descriptor per operation key, stable operation-key tool names,
+  serializable CLI/API metadata, and high-value deployment/resource/source-event mappings. The full
+  `0.9.0` release rule remains blocked by the public deploy-action promotion, product-grade preview
+  deployments, scheduled tasks, and cluster runtime items.
 
 Required:
 
@@ -1154,7 +1161,7 @@ Required:
 - [ ] Add terminal session list/show/attach/close/expire if terminal sessions remain public.
 - [ ] Ensure provider/plugin/system operations expose capability details and configuration
   diagnostics without leaking provider SDK types or secrets.
-- [ ] Verify CLI, HTTP/oRPC, Web, and generated MCP/tool contracts against `operation-catalog.ts`.
+- [x] Verify CLI, HTTP/oRPC, Web, and generated MCP/tool contracts against `operation-catalog.ts`.
 - [ ] Harden install/upgrade/release: migrations, backup/recovery, all-in-one packaging, binary
   release, static console asset serving, and smoke tests.
 
