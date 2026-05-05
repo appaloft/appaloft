@@ -31,6 +31,9 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.resourceRuntimeProfile).toBe(
       "/docs/resources/profiles/source-runtime/#resource-runtime-profile",
     );
+    expect(webDocsHrefs.resourceProfileDrift).toBe(
+      "/docs/resources/profiles/source-runtime/#resource-profile-drift",
+    );
     expect(webDocsHrefs.resourceHealthProfile).toBe(
       "/docs/resources/profiles/health-network/#resource-health-profile",
     );
@@ -126,6 +129,12 @@ describe("console docs help links", () => {
     );
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "diagnosticsSafeSupportPayload",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "resourceProfileDrift",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "profileDiagnosticsSuggestedCommand",
     );
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "serverTerminalSession",

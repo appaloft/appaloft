@@ -28,6 +28,9 @@ describe("HTTP API docs help links", () => {
     expect(apiDocsHrefs.resourceHealthProfile).toBe(
       "/docs/resources/profiles/health-network/#resource-health-profile",
     );
+    expect(apiDocsHrefs.resourceProfileDrift).toBe(
+      "/docs/resources/profiles/source-runtime/#resource-profile-drift",
+    );
     expect(apiDocsHrefs.resourceAccessProfile).toBe(
       "/docs/access/generated-routes/#resource-access-profile",
     );
@@ -69,6 +72,7 @@ describe("HTTP API docs help links", () => {
     expect(apiRouteDescriptions.configureResourceHealth).toContain(
       apiDocsHrefs.resourceHealthProfile,
     );
+    expect(apiRouteDescriptions.showResource).toContain(apiDocsHrefs.resourceProfileDrift);
     expect(apiRouteDescriptions.configureResourceAccess).toContain(
       apiDocsHrefs.resourceAccessProfile,
     );

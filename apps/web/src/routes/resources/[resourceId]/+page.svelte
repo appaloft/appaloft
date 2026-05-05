@@ -5273,9 +5273,16 @@
                   </div>
                 {/if}
                 <div class="mt-4 space-y-3 rounded-md border bg-muted/20 p-3">
-                  <h3 class="text-sm font-semibold">
-                    {$t(i18nKeys.console.resources.profileDiagnosticsTitle)}
-                  </h3>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-semibold">
+                      {$t(i18nKeys.console.resources.profileDiagnosticsTitle)}
+                    </h3>
+                    <DocsHelpLink
+                      href={webDocsHrefs.resourceProfileDrift}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      className="size-5"
+                    />
+                  </div>
                   {#if profileDiagnostics.length === 0}
                     <p class="text-sm text-muted-foreground">
                       {$t(i18nKeys.console.resources.profileDiagnosticsEmpty)}

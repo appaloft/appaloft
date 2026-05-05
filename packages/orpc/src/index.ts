@@ -455,6 +455,7 @@ export const apiDocsHrefs = {
   defaultAccessPolicy: resolvePublicDocsHelpHref("default-access.policy"),
   resourceSourceProfile: resolvePublicDocsHelpHref("resource.source-profile"),
   resourceRuntimeProfile: resolvePublicDocsHelpHref("resource.runtime-profile"),
+  resourceProfileDrift: resolvePublicDocsHelpHref("resource.profile-drift"),
   resourceHealthProfile: resolvePublicDocsHelpHref("resource.health-profile"),
   resourceNetworkProfile: resolvePublicDocsHelpHref("resource.network-profile"),
   resourceAccessProfile: resolvePublicDocsHelpHref("resource.access-profile"),
@@ -554,6 +555,10 @@ export const apiRouteDescriptions = {
   showDefaultAccessDomainPolicy: routeDescription(
     "Reads one persisted default access policy scope.",
     "default-access.policy",
+  ),
+  showResource: routeDescription(
+    "Reads one resource profile with optional diagnostics for profile drift.",
+    "resource.profile-drift",
   ),
   configureResourceSource: routeDescription(
     "Configures the source profile used by later deployment detect and plan stages.",
@@ -1670,6 +1675,7 @@ export const showResourceProcedure = base
   .route({
     method: "GET",
     path: "/resources/{resourceId}",
+    description: apiRouteDescriptions.showResource,
     successStatus: 200,
   })
   .input(showResourceQueryInputSchema)

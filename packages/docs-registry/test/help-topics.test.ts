@@ -105,6 +105,29 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[RES-PROFILE-DRIFT-005] profile drift help topic resolves to public troubleshooting docs", () => {
+    const topic = publicDocsHelpTopics["resource.profile-drift"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/resources/profiles/source-runtime/#resource-profile-drift",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/resources/profiles/source-runtime/#resource-profile-drift",
+    );
+    expect(topic.relatedOperation).toBe("resources.show");
+    expect(topic.surfaces).toEqual(
+      expect.arrayContaining(["web", "cli", "http-api", "repository-config", "mcp"]),
+    );
+    expect(topic.aliases).toEqual(expect.arrayContaining(["resource_profile_drift"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/011-resource-profile-drift-visibility/spec.md",
+        "docs/testing/resource-profile-lifecycle-test-matrix.md",
+        "docs/testing/deployment-config-file-test-matrix.md",
+      ]),
+    );
+  });
+
   test("[ERROR-KNOWLEDGE-002] public error guides resolve docs, agent guide, and remedies", () => {
     const guide = findPublicDocsErrorGuide({
       code: "infra_error",
