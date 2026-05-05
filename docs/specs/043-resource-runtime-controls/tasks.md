@@ -14,13 +14,13 @@
 
 ## Local Spec Follow-Up
 
-- [ ] Add `resources.runtime.stop` command spec.
-- [ ] Add `resources.runtime.start` command spec.
-- [ ] Add `resources.runtime.restart` command spec.
-- [ ] Add runtime-control error spec.
-- [ ] Decide whether runtime-control readback belongs in `resources.show`, `resources.health`, or a
-  new query.
-- [ ] Add public docs/help anchors for runtime controls, blocked start, and restart versus redeploy.
+- [x] Add `resources.runtime.stop` command spec.
+- [x] Add `resources.runtime.start` command spec.
+- [x] Add `resources.runtime.restart` command spec.
+- [x] Add runtime-control error spec.
+- [x] Decide whether runtime-control readback belongs in `resources.show`, `resources.health`, or a
+  new query. First slice uses `resources.health.latestRuntimeControl`.
+- [x] Add public docs/help anchors for runtime controls, blocked start, and restart versus redeploy.
 
 ## Test-First Round
 
@@ -29,6 +29,8 @@
 - [ ] Bind `RUNTIME-CTRL-RESTART-001` to stop/start phase tests.
 - [ ] Bind `RUNTIME-CTRL-BLOCK-001` to missing/stale runtime metadata tests.
 - [ ] Bind `RUNTIME-CTRL-COORD-001` to `resource-runtime` coordination tests.
+- [ ] Bind `RUNTIME-CTRL-READ-001` to `resources.health.latestRuntimeControl` readback tests.
+- [ ] Bind `RUNTIME-CTRL-DOCS-001` to public docs/help anchor checks.
 - [ ] Bind `RUNTIME-CTRL-SURFACE-001` to CLI/HTTP/Web/docs coverage.
 
 ## Implementation

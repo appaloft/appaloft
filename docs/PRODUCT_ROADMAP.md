@@ -942,6 +942,11 @@ Current verification notes:
   `resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart` as accepted
   candidates. Code Round remains blocked until local command/error/readback specs, tests, public
   docs/help, `CORE_OPERATIONS.md`, and the operation catalog are aligned.
+- 2026-05-05 Phase 7 resource runtime controls local specs added stop/start/restart command
+  contracts, runtime-control error vocabulary, `resources.health.latestRuntimeControl` readback,
+  and public docs/help anchors. Code Round remains blocked until Test-First automation, command
+  schemas/handlers, adapter ports, entrypoints, `CORE_OPERATIONS.md`, and the operation catalog are
+  aligned.
 
 Required:
 

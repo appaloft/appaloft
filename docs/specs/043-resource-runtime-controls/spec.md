@@ -11,6 +11,11 @@ new commands, HTTP routes, Web actions, or runtime adapter capabilities.
 
 - [ADR-038: Resource Runtime Control Ownership](../../decisions/ADR-038-resource-runtime-control-ownership.md)
 - [Business Operation Map](../../BUSINESS_OPERATION_MAP.md)
+- [resources.runtime.stop Command Spec](../../commands/resources.runtime.stop.md)
+- [resources.runtime.start Command Spec](../../commands/resources.runtime.start.md)
+- [resources.runtime.restart Command Spec](../../commands/resources.runtime.restart.md)
+- [Resource Runtime Controls Error Spec](../../errors/resource-runtime-controls.md)
+- [resources.health Query Spec](../../queries/resources.health.md)
 - [Resource Runtime Controls Test Matrix](../../testing/resource-runtime-controls-test-matrix.md)
 - [Resource Runtime Controls Implementation Plan](../../implementation/resource-runtime-controls-plan.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
@@ -73,13 +78,12 @@ must report whether stop succeeded but start failed.
 
 ## Read And Recovery Surface
 
-The first Code Round may expose control attempt status through one of:
+The first Code Round must expose latest runtime-control attempt status through
+`resources.health.latestRuntimeControl`.
 
-- `resources.show` runtime summary;
-- `resources.health`;
-- a future `resources.runtime-control.show` query if attempt history needs independent pagination.
-
-Before Code Round, decide the read surface in local query specs and update public docs/help anchors.
+A future `resources.runtime-control.show` or `resources.runtime-controls.list` query remains
+deferred until attempt history, pagination, or audit workflows need an independent read model. Do
+not add a separate query only to make stop/start/restart minimally observable.
 
 Failures should guide users to:
 
@@ -112,9 +116,6 @@ Future Code Round must synchronize:
 
 ## Remaining Work Before Code Round
 
-- Add local command specs for `resources.runtime.stop`, `resources.runtime.start`, and
-  `resources.runtime.restart`.
-- Add error spec and stable blocked reason vocabulary.
-- Decide whether attempt readback belongs in `resources.show`, `resources.health`, or a new query.
 - Bind test matrix rows to automated command/use-case, adapter, CLI/HTTP, and Web tests.
+- Add runtime-control command schemas, handlers, use cases, persistence/readback, and adapter ports.
 - Update `CORE_OPERATIONS.md` and `operation-catalog.ts` only when activating the operations.
