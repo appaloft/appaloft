@@ -936,6 +936,12 @@ Current verification notes:
 - 2026-05-05 Phase 7 public documentation sync added stable storage volume and dependency resource
   pages, and closed docs-registry coverage for active storage, dependency, backup/restore,
   dependency-binding, retry, redeploy, and rollback operations.
+- 2026-05-05 Phase 7 resource runtime controls Spec Round added
+  [ADR-038](./decisions/ADR-038-resource-runtime-control-ownership.md) and
+  [Resource Runtime Controls](./specs/043-resource-runtime-controls/spec.md), positioning
+  `resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart` as accepted
+  candidates. Code Round remains blocked until local command/error/readback specs, tests, public
+  docs/help, `CORE_OPERATIONS.md`, and the operation catalog are aligned.
 
 Required:
 

@@ -798,6 +798,11 @@ Rules:
   stop another resource
 - generated default access routes target `ResourceNetworkProfile.internalPort` through the selected
   deployment target's edge proxy and do not require public host publication of the application port
+- runtime stop/start/restart are Resource-scoped operational controls over current or retained
+  runtime placement. They do not mutate Resource profile, create Deployment attempts, apply profile
+  changes, or rewrite deployment snapshots. Runtime control attempt state is governed by
+  [ADR-038: Resource Runtime Control Ownership](./decisions/ADR-038-resource-runtime-control-ownership.md)
+  and remains separate from Resource lifecycle status.
 - resource storage attachments belong to the Resource profile. Attach/detach affects future
   deployment snapshots only and does not apply mounts to current runtime state or rewrite historical
   deployment snapshots
