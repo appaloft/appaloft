@@ -1058,6 +1058,9 @@ Current verification notes:
   global future tool-surface milestone, not by a source auto-deploy transport-specific shape. The
   full `0.9.0` release rule remains blocked by the deploy-action wrapper, preview, scheduled tasks,
   and cluster runtime items.
+- 2026-05-05 Phase 7 source auto-deploy public docs operation-coverage sync mapped
+  `resources.configure-auto-deploy`, `source-events.ingest`, `source-events.list`, and
+  `source-events.show` to their stable public docs topics in `@appaloft/docs-registry`.
 - 2026-05-05 Phase 7 deploy-action reference wrapper slice added
   `.github/actions/deploy-action` with composite action metadata, release-archive install/checksum
   verification script, deploy invocation script, SSH private-key temp-file handling, PR preview flag

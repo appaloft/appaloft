@@ -352,7 +352,7 @@ export const publicDocsHelpTopics = {
       "docs/specs/042-source-binding-auto-deploy/spec.md",
       "docs/testing/source-binding-auto-deploy-test-matrix.md",
     ],
-    webSurfaces: ["future apps/web Resource source/profile auto-deploy settings"],
+    webSurfaces: ["apps/web Resource detail auto-deploy settings"],
   },
   "source.auto-deploy-signatures": {
     id: "source.auto-deploy-signatures",
@@ -446,7 +446,7 @@ export const publicDocsHelpTopics = {
       "docs/queries/source-events.show.md",
       "docs/testing/source-binding-auto-deploy-test-matrix.md",
     ],
-    webSurfaces: ["future apps/web source event diagnostics panel"],
+    webSurfaces: ["apps/web Resource detail source event diagnostics"],
   },
   "source.auto-deploy-recovery": {
     id: "source.auto-deploy-recovery",
@@ -478,7 +478,9 @@ export const publicDocsHelpTopics = {
       "docs/queries/source-events.show.md",
       "docs/queries/deployments.recovery-readiness.md",
     ],
-    webSurfaces: ["future apps/web source event detail and deployment recovery link"],
+    webSurfaces: [
+      "apps/web Resource detail source event diagnostics and deployment recovery links",
+    ],
   },
   "deployment.source-relink": {
     id: "deployment.source-relink",
@@ -1829,6 +1831,11 @@ export const publicDocsOperationCoverage = [
     topicId: "resource.access-profile",
   },
   {
+    operationKey: "resources.configure-auto-deploy",
+    status: "documented",
+    topicId: "source.auto-deploy-setup",
+  },
+  {
     operationKey: "resources.attach-storage",
     status: "documented",
     topicId: "storage.volume-lifecycle",
@@ -1932,6 +1939,21 @@ export const publicDocsOperationCoverage = [
     operationKey: "resources.proxy-configuration.preview",
     status: "documented",
     topicId: "resource.network-profile",
+  },
+  {
+    operationKey: "source-events.ingest",
+    status: "documented",
+    topicId: "source.auto-deploy-signatures",
+  },
+  {
+    operationKey: "source-events.list",
+    status: "documented",
+    topicId: "source.auto-deploy-dedupe",
+  },
+  {
+    operationKey: "source-events.show",
+    status: "documented",
+    topicId: "source.auto-deploy-ignored-events",
   },
   {
     operationKey: "dependency-resources.provision-postgres",

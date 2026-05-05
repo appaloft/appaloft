@@ -51,7 +51,8 @@ Current status:
   `packages/application/src/operation-catalog.ts` key must have exactly one public docs decision:
   documented topic, not-applicable reason, or explicit migration gap. The current operation catalog
   maps to documented public topics, including Phase 7 storage, dependency resource,
-  dependency-binding, backup/restore, retry, redeploy, and rollback operations.
+  dependency-binding, backup/restore, retry, redeploy, rollback, and source auto-deploy
+  operations.
 - `PUB-DOCS-003` is covered for registered help topics by `@appaloft/docs-registry`; full
   enforcement for every Web/CLI/API/MCP help target is still incomplete. Source auto-deploy now has
   registered stub anchors for setup, signatures, dedupe, ignored events, and recovery before Code
