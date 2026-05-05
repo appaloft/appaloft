@@ -56,6 +56,8 @@ application read-query coverage in `packages/application/test/scheduled-task-rea
 coverage in `packages/application/test/scheduled-task-delete.test.ts`.
 `SCHED-TASK-RUN-001` and `SCHED-TASK-RUN-002` have inactive application run-now admission coverage
 in `packages/application/test/scheduled-task-run-now.test.ts`.
+`SCHED-TASK-SCHED-001` has inactive application scheduler admission coverage in
+`packages/application/test/scheduled-task-scheduler.test.ts`.
 `SCHED-TASK-DOMAIN-001` through `SCHED-TASK-DOMAIN-003` have core coverage in
 `packages/core/test/scheduled-task.test.ts`. The implemented slices add dedicated value objects for
 schedule, timezone, command intent, timeout, retry, lifecycle status, and `forbid` concurrency
@@ -68,6 +70,6 @@ coverage also exercises one log masking path for `SCHED-TASK-SECRET-001`, while 
 matrix remains open for definitions, runs, errors, diagnostics, and tool descriptors.
 
 Inactive application command/query schemas, messages, result DTOs, read-model ports, create,
-update, delete, and run-now admission handlers/use cases, and read-query handlers/services exist. No
-operation catalog entries, scheduler process manager, runtime adapter execution path, entrypoints,
-or public docs are active yet.
+update, delete, run-now admission, scheduler admission, read-query handlers/services, and scheduled
+task persistence/read models exist. No operation catalog entries, due-candidate persistence, shell
+scheduler runner, runtime adapter execution path, entrypoints, or public docs are active yet.

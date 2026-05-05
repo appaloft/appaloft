@@ -79,6 +79,10 @@ DDD or internal process-manager terminology.
 - Inactive application run-now admission exists. It loads the Resource-owned task, rejects disabled
   tasks or archived/deleted Resources before runtime execution, records an accepted manual run
   attempt, and returns a run id without starting the task command synchronously.
+- Inactive application scheduler admission exists. It reads due scheduled-task candidates through
+  a scheduler-specific port, dispatches each due candidate through the same shared run admission
+  service as run-now, records accepted `scheduled` trigger runs, and reports per-candidate
+  admission failures without starting runtime execution.
 - Scheduled task definition persistence exists for Postgres/PGlite. It stores Resource-owned task
   definitions, supports repository find/upsert/delete through explicit specs, and supports
   list/show read-model filtering by project, environment, Resource, status, cursor, and limit.
@@ -92,4 +96,5 @@ DDD or internal process-manager terminology.
   entries.
 - No operation catalog entries are active.
 - No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
-- No scheduler process manager or runtime adapter execution path exists.
+- No due-candidate persistence/read model, shell scheduler runner, or runtime adapter execution path
+  exists.
