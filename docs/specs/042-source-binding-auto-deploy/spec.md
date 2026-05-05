@@ -130,6 +130,21 @@ Resource's `resource-secret:<KEY>` policy reference, and passes `scopeResourceId
 `source-events.ingest`. A Resource-scoped generic signed event must never deploy a different
 Resource even when another Resource shares the same source identity and ref.
 
+The first provider-specific Git HTTP route is:
+
+```text
+POST /api/integrations/github/source-events
+```
+
+The route verifies the raw body with GitHub's `X-Hub-Signature-256` header and the configured
+`APPALOFT_GITHUB_WEBHOOK_SECRET`, reads `X-GitHub-Delivery` as the provider delivery id, and
+supports `X-GitHub-Event = push` first. It normalizes GitHub push payloads into provider-neutral
+source facts without `scopeResourceId`, so matching may fan out to every Resource policy with the
+same source identity and ref selector. GitHub `ping` may return a transport no-op for setup
+validation, but it must not create a source event record or deployment attempt. Missing configured
+webhook secret, missing/invalid signature, unsupported event kind, or unsafe payload shape reject
+before `source-events.ingest` dispatch.
+
 The first generic signed HTTP route is:
 
 ```text
@@ -153,6 +168,8 @@ must not be persisted.
 | `SRC-AUTO-SPEC-005` | Generic signed webhook has invalid signature. | Event is rejected before policy matching and no deployment is created. |
 | `SRC-AUTO-SPEC-006` | Resource source binding changes after policy creation. | Policy is blocked pending explicit acknowledgement and cannot create deployments. |
 | `SRC-AUTO-SPEC-007` | Resource-scoped generic signed webhook matches a source shared by another Resource. | Only the Resource named in the webhook route is eligible for deployment dispatch. |
+| `SRC-AUTO-SPEC-008` | GitHub push webhook has a valid provider signature. | Payload normalizes to safe provider-neutral source facts, uses provider delivery id for dedupe, and can fan out to all matching enabled Resource policies. |
+| `SRC-AUTO-SPEC-009` | GitHub push webhook has missing config, invalid signature, unsupported event kind, or unsafe payload shape. | Request rejects before command dispatch; no source event or deployment is created and no raw payload/signature/secret appears in errors. |
 
 ## Public Surfaces
 
@@ -182,7 +199,7 @@ ADR-037 answers the initial Code Round blockers:
 
 Remaining Test-First / Code Round work:
 
-- bind remaining provider Git webhook rows to concrete automated tests;
-- provider-specific Git webhook adapters remain future; the first active ingestion route is generic
-  signed only;
+- implement the governed GitHub provider webhook route and bind it to concrete automated tests;
+- GitLab and GitHub App preview lifecycle adapters remain future; the first active provider route is
+  the GitHub push webhook baseline;
 - transport help text and Web links are implemented against the registered public docs topics.

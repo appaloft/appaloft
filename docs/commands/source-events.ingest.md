@@ -64,6 +64,17 @@ verify the event, it must not construct a verified command.
 is present, policy matching is limited to that Resource. Provider-signed Git transport routes must
 omit it unless a future spec defines a provider-specific scoping rule.
 
+The first provider-specific Git transport is the GitHub push route:
+
+```text
+POST /api/integrations/github/source-events
+```
+
+It verifies `X-Hub-Signature-256` with configured `APPALOFT_GITHUB_WEBHOOK_SECRET`, uses
+`X-GitHub-Delivery` as `deliveryId`, normalizes `X-GitHub-Event = push` payloads, and dispatches
+this command without `scopeResourceId` so matching may fan out to all eligible Resource policies.
+GitHub `ping` is a transport no-op and must not dispatch this command.
+
 The first Resource-scoped generic signed HTTP route is:
 
 ```text
@@ -124,6 +135,7 @@ Deployment completion remains observable through deployment queries and events.
 Use [Source Event Auto Deploy Error Spec](../errors/source-events.md). Minimum codes:
 
 - `source_event_signature_invalid`
+- `source_event_provider_webhook_not_configured`
 - `source_event_unsupported_kind`
 - `source_event_dispatch_failed`
 - `resource_auto_deploy_secret_unavailable`
@@ -134,9 +146,9 @@ Use [Source Event Auto Deploy Error Spec](../errors/source-events.md). Minimum c
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | No raw webhook ingestion; reads source event results. | Future |
+| Web | No raw webhook ingestion; reads source event results. | Active for Resource detail list |
 | CLI | Optional local smoke/diagnostic ingestion over normalized facts. | Future |
-| oRPC / HTTP | `POST /api/resources/{resourceId}/source-events/generic-signed` verifies Resource-scoped generic signed events; future provider-specific verified webhook routes dispatch this command. | Active for generic signed route |
+| oRPC / HTTP | `POST /api/resources/{resourceId}/source-events/generic-signed` verifies Resource-scoped generic signed events. `POST /api/integrations/github/source-events` is the accepted GitHub push route for the next Code Round. | Active for generic signed route; GitHub route planned |
 | Automation / MCP | Future event ingest tool only when verification input is safe. | Future |
 
 ## Tests
@@ -148,5 +160,8 @@ Stable matrix coverage:
 - `SRC-AUTO-EVENT-003`
 - `SRC-AUTO-EVENT-004`
 - `SRC-AUTO-EVENT-005`
+- `SRC-AUTO-EVENT-007`
+- `SRC-AUTO-EVENT-008`
+- `SRC-AUTO-ENTRY-004`
 - `SRC-AUTO-EVENT-006`
 - `SRC-AUTO-ENTRY-002`
