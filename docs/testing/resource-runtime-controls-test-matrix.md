@@ -2,13 +2,13 @@
 
 ## Status
 
-Application, persistence, and adapter command-mapping slices for Phase 7 / `0.9.0`.
+Application, persistence, and runtime adapter slices for Phase 7 / `0.9.0`.
 
 Runtime stop/start/restart command schemas, handlers, use case orchestration, coordination
 policies, provider-neutral target port contract, attempt-recorder contract, PG/PGlite attempt
-persistence/readback, and Docker/Compose adapter command mapping exist. No runtime
-stop/start/restart operation is active in CLI, HTTP/oRPC, Web, `CORE_OPERATIONS.md`, or
-`operation-catalog.ts` yet, and runtime command execution/wiring is not active yet.
+persistence/readback, Docker/Compose adapter command mapping, local/generic-SSH executor wiring,
+and shell-internal DI registrations exist. No runtime stop/start/restart operation is active in
+CLI, HTTP/oRPC, Web, `CORE_OPERATIONS.md`, or `operation-catalog.ts` yet.
 
 ## Governing Sources
 
@@ -45,8 +45,8 @@ stop/start/restart operation is active in CLI, HTTP/oRPC, Web, `CORE_OPERATIONS.
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `RUNTIME-CTRL-ADAPTER-001` | Single-server Docker runtime control. | Adapter maps normalized stop/start/restart to Docker behavior without leaking Docker ids into public input. | `packages/adapters/runtime/test/resource-runtime-control-target.test.ts` | Command mapping passing; executor wiring deferred |
-| `RUNTIME-CTRL-ADAPTER-002` | Compose runtime control. | Adapter scopes service/project control safely and reports sanitized details. | `packages/adapters/runtime/test/resource-runtime-control-target.test.ts` | Command mapping passing; executor wiring deferred |
+| `RUNTIME-CTRL-ADAPTER-001` | Single-server Docker runtime control. | Adapter maps normalized stop/start/restart to Docker behavior without leaking Docker ids into public input. | `packages/adapters/runtime/test/resource-runtime-control-target.test.ts` | Passing |
+| `RUNTIME-CTRL-ADAPTER-002` | Compose runtime control. | Adapter scopes service/project control safely and reports sanitized details. | `packages/adapters/runtime/test/resource-runtime-control-target.test.ts` | Passing |
 
 ## Public Surface Coverage
 
@@ -70,7 +70,8 @@ contract, a runtime-control attempt recorder port, PG/PGlite attempt persistence
 recorder collaborators to prove admission, normalized request mapping, attempt record ordering,
 phase readback, and coordination scope. The persistence test proves a terminal attempt upserts over
 the running attempt and is projected through the Resource read model. The runtime adapter now has
-provider-neutral Docker container and Docker Compose command mapping with an injected executor
-boundary; local shell and generic SSH command execution are still deferred. Runtime control remains
-inactive until executor wiring, CLI/HTTP/Web entrypoints, `CORE_OPERATIONS.md`, and operation
-catalog activation slices are aligned.
+provider-neutral Docker container and Docker Compose command mapping, local shell execution,
+generic SSH execution, and sanitized command failure handling behind an injected executor boundary.
+Shell composition registers the target port, attempt recorder, use case, and command handlers.
+Runtime control remains inactive until CLI/HTTP/Web entrypoints, `CORE_OPERATIONS.md`, and
+operation catalog activation slices are aligned.

@@ -12,7 +12,9 @@ import {
   InMemoryExecutionBackend,
   LocalExecutionBackend,
   RoutingExecutionBackend,
+  RuntimeControlShellCommandExecutor,
   RuntimeResourceHealthProbeRunner,
+  RuntimeResourceRuntimeControlTarget,
   RuntimeResourceRuntimeLogReader,
   RuntimeServerConnectivityChecker,
   RuntimeServerEdgeProxyBootstrapper,
@@ -91,6 +93,7 @@ import {
   PgResourceDependencyBindingRepository,
   PgResourceReadModel,
   PgResourceRepository,
+  PgResourceRuntimeControlAttemptRecorder,
   PgServerDeletionBlockerReader,
   PgServerReadModel,
   PgServerRepository,
@@ -976,6 +979,21 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
         new RuntimeResourceRuntimeLogReader(dependencyContainer.resolve(tokens.serverRepository)),
+    ),
+  });
+  container.register(tokens.resourceRuntimeControlTargetPort, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RuntimeResourceRuntimeControlTarget(
+          new RuntimeControlShellCommandExecutor({
+            serverRepository: dependencyContainer.resolve(tokens.serverRepository),
+          }),
+        ),
+    ),
+  });
+  container.register(tokens.resourceRuntimeControlAttemptRecorder, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceRuntimeControlAttemptRecorder(input.database.db),
     ),
   });
   container.register(tokens.resourceHealthProbeRunner, {

@@ -43,8 +43,9 @@
 - [x] Add runtime-control attempt recorder port.
 - [x] Add durable runtime-control attempt/read model persistence.
 - [x] Add Docker and Compose runtime-control adapter command mapping.
-- [ ] Wire local/generic-SSH runtime-control command execution.
-- [ ] Complete local/generic-SSH Docker and Compose runtime-control adapter activation.
+- [x] Wire local/generic-SSH runtime-control command execution.
+- [x] Register shell-internal runtime-control target port, recorder, use case, and handlers.
+- [ ] Complete CLI/HTTP/Web runtime-control adapter activation.
 - [ ] Add CLI, HTTP/oRPC, and Web entrypoints only after tests pass.
 - [ ] Update `CORE_OPERATIONS.md` and `operation-catalog.ts` in the activation commit.
 

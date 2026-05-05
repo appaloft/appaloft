@@ -173,7 +173,9 @@ import {
   ResourceEffectiveConfigQueryService,
   ResourceHealthQueryService,
   ResourceProxyConfigurationPreviewQueryService,
+  ResourceRuntimeControlUseCase,
   ResourceRuntimeLogsQueryService,
+  RestartResourceRuntimeCommandHandler,
   RestoreDependencyResourceBackupCommandHandler,
   RestoreDependencyResourceBackupUseCase,
   RetryCertificateCommandHandler,
@@ -219,6 +221,8 @@ import {
   ShowSshCredentialQueryService,
   ShowStorageVolumeQueryHandler,
   ShowStorageVolumeQueryService,
+  StartResourceRuntimeCommandHandler,
+  StopResourceRuntimeCommandHandler,
   StreamDeploymentEventsQueryHandler,
   StreamDeploymentEventsQueryService,
   TestServerConnectivityUseCase,
@@ -364,6 +368,9 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(RetryDeploymentCommandHandler);
   container.registerSingleton(RedeployDeploymentCommandHandler);
   container.registerSingleton(RollbackDeploymentCommandHandler);
+  container.registerSingleton(StopResourceRuntimeCommandHandler);
+  container.registerSingleton(StartResourceRuntimeCommandHandler);
+  container.registerSingleton(RestartResourceRuntimeCommandHandler);
   container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
@@ -455,6 +462,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.configureResourceRuntimeUseCase,
     ConfigureResourceRuntimeUseCase,
   );
+  container.registerSingleton(tokens.resourceRuntimeControlUseCase, ResourceRuntimeControlUseCase);
   container.registerSingleton(
     tokens.importResourceVariablesUseCase,
     ImportResourceVariablesUseCase,
