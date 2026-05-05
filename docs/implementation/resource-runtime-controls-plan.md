@@ -43,8 +43,10 @@ authorization.
 
 ### 4. Persistence And Read Models
 
-- Persist runtime-control attempts before adapter execution.
-- Expose latest control status through the chosen read surface.
+- PG/PGlite persistence now stores runtime-control attempts before adapter execution through the
+  attempt recorder port.
+- `PgResourceReadModel` now exposes latest control status through
+  `ResourceSummary.latestRuntimeControl`, which feeds `resources.health.latestRuntimeControl`.
 - Keep runtime-control attempt history separate from Deployment attempts unless a future spec
   explicitly adds relationship fields.
 
