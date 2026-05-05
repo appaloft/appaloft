@@ -1,0 +1,194 @@
+# Product-Grade Preview Deployments
+
+## Status
+
+Spec Round for Phase 7 / `0.9.0`.
+
+This artifact positions product-grade preview deployments before Code Round. It does not activate
+new operation catalog entries, HTTP routes, CLI commands, Web controls, GitHub App routes, workers,
+or scheduler behavior.
+
+## Problem
+
+Action-only PR previews are useful when a repository owner adds a GitHub Actions workflow that runs
+the Appaloft CLI or `appaloft/deploy-action`. That path deliberately keeps state ownership in the
+Action/CLI entry workflow and relies on a user-authored close-event workflow for cleanup.
+
+Product-grade previews are a different product line. They require Appaloft Cloud or a self-hosted
+control plane to own policy, source-event ingestion, preview environment identity, scoped
+configuration, comments/checks, cleanup retries, audit, quotas, and managed route/domain follow-up.
+They must reuse explicit Appaloft operations and must not add pull request, branch, route, source,
+or preview fields to `deployments.create`.
+
+## Source Of Truth
+
+- [ADR-016: Deployment Command Surface Reset](../../decisions/ADR-016-deployment-command-surface-reset.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
+- [ADR-025: Control-Plane Modes And Action Execution](../../decisions/ADR-025-control-plane-modes-and-action-execution.md)
+- [ADR-028: Command Coordination Scope And Mutation Admission](../../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
+- [ADR-037: Source Event Auto Deploy Ownership](../../decisions/ADR-037-source-event-auto-deploy-ownership.md)
+- [Async Lifecycle And Acceptance](../../architecture/async-lifecycle-and-acceptance.md)
+- [Error Model](../../errors/model.md)
+- [Business Operation Map](../../BUSINESS_OPERATION_MAP.md)
+- [Source Binding And Auto Deploy](../042-source-binding-auto-deploy/spec.md)
+- [GitHub Action PR Preview Deploy](../../workflows/github-action-pr-preview-deploy.md)
+- [deployments.cleanup-preview](../../commands/deployments.cleanup-preview.md)
+- [Product-Grade Preview Deployments Test Matrix](../../testing/product-grade-preview-deployments-test-matrix.md)
+
+## Ubiquitous Language
+
+| Term | Meaning | Context | Compatibility aliases |
+| --- | --- | --- | --- |
+| Product-grade preview deployment | A control-plane-owned preview lifecycle for a source change, usually a pull request, with policy, scoped identity, deployment, feedback, cleanup, and audit. | Source integration / release orchestration | GitHub App preview, managed preview |
+| Preview policy | Control-plane policy deciding which repositories, branches, fork states, event kinds, quotas, domains, and secret scopes may create previews. | Integration policy | Preview environment policy |
+| Preview environment | Durable control-plane identity for one preview scope, such as a pull request, linked to project/environment/resource/server context, source fingerprint, route state, deployment attempts, feedback, cleanup, and audit. | Workspace / release orchestration | Preview app, PR environment |
+| Preview source event | Provider-normalized source event that may request preview create, update, or cleanup after verification. | Source event application service | PR event |
+| Preview feedback | Idempotent GitHub App comment, check run, deployment status, or equivalent integration status pointing users to preview state and diagnostics. | Integration adapter | Comment/check/status |
+| Preview cleanup attempt | Durable cleanup work for preview runtime, route state, source link, feedback, and provider metadata, with retry and audit ownership. | Release orchestration / operator work | Cleanup retry |
+
+## Target Operation Position
+
+Product-grade previews are a control-plane workflow over explicit operations and future accepted
+candidate operations:
+
+| Surface | State | Rule |
+| --- | --- | --- |
+| `source-events.ingest` | Active command / integration boundary | May be extended by a future Code Round to normalize GitHub pull request events after GitHub App verification. It must still persist safe source event state and dedupe before preview policy evaluation. |
+| `preview-policies.show` | Future accepted candidate query | Reads effective preview policy, fork/secret/domain/quota rules, and selected execution owner for a project, resource, integration, or repository scope. |
+| `preview-policies.configure` | Future accepted candidate command | Changes preview policy explicitly. It must not mutate Resource source/runtime/network profile or deployment history as a side effect. |
+| `preview-environments.list` | Future accepted candidate query | Lists durable preview environments with source event, deployment, route, feedback, cleanup, expiry, and audit summaries. |
+| `preview-environments.show` | Future accepted candidate query | Reads one preview environment and its safe latest deployment, route, feedback, policy, cleanup, and diagnostic state. |
+| `preview-environments.delete` | Future accepted candidate command | Requests explicit preview cleanup/deletion. It must dispatch preview-lifecycle cleanup and preserve deployment history/audit. |
+| `deployments.create` | Active command, unchanged input | Creates the actual deployment attempt after preview policy selects or creates the preview Resource/environment context. No preview fields are added. |
+| `deployments.cleanup-preview` | Active command | Remains the narrow runtime/route/source-link cleanup primitive. Product-grade cleanup may call it as part of a broader control-plane cleanup process, but must not expand the command into provider metadata, comments/checks, or generic delete behavior. |
+
+The first Code Round must decide whether `source-events.ingest` directly evaluates preview policy or
+emits durable source event state consumed by a preview lifecycle process manager. Either shape must
+preserve acceptance-first semantics, idempotency, and read-model visibility.
+
+## Lifecycle Semantics
+
+The product-grade create/update flow is:
+
+```text
+GitHub App pull_request or push webhook
+  -> transport verifies signature, installation, repository, and event trust
+  -> source-events.ingest normalizes and dedupes safe event facts
+  -> preview policy evaluates event kind, ref, fork trust, secret eligibility, quotas, and expiry
+  -> preview environment is created or updated with scoped source link and selected Resource context
+  -> preview-scoped config and secret references are resolved without leaking production secrets
+  -> deployments.create is dispatched with ids only
+  -> feedback writer publishes or updates comments, checks, deployment statuses, and diagnostics
+```
+
+The product-grade cleanup flow is:
+
+```text
+GitHub App pull_request closed, policy expiry, or preview-environments.delete
+  -> preview environment cleanup is admitted at preview-lifecycle scope
+  -> deployments.cleanup-preview removes runtime, route desired state, and preview source link
+  -> feedback/provider metadata cleanup runs through integration adapters
+  -> cleanup attempt records terminal, retryable, or already-clean state
+  -> scheduler retries retriable cleanup until policy retention ends or an operator intervenes
+```
+
+## Scenarios And Acceptance Criteria
+
+| ID | Scenario | Given | When | Then |
+| --- | --- | --- | --- | --- |
+| PG-PREVIEW-SPEC-001 | Pull request event is policy-eligible | A GitHub App webhook for a same-repository pull request is verified and the effective preview policy allows the event | Preview policy evaluates the normalized source event | A preview environment is created or updated, linked to scoped source identity, and a deployment attempt is dispatched through ids-only `deployments.create`. |
+| PG-PREVIEW-SPEC-002 | Fork event is not trusted for secrets | A pull request comes from a fork and policy does not allow secret-backed fork previews | Preview policy evaluates the event | No deployment is created; the preview event read model records ignored/blocked status with safe fork-policy detail and no secret resolution. |
+| PG-PREVIEW-SPEC-003 | Scoped preview configuration is isolated | A preview policy provides preview-only variables, secret references, or route policy | The preview environment is materialized | Preview config is scoped to the preview Resource/environment identity; production environment secrets and durable production routes are not copied unless policy explicitly references safe preview-scoped material. |
+| PG-PREVIEW-SPEC-004 | Duplicate source event is idempotent | GitHub redelivers the same pull request synchronization event | The event is ingested again | The existing source/preview event result is returned or projected; no duplicate preview environment, deployment, feedback, or cleanup attempt is created. |
+| PG-PREVIEW-SPEC-005 | Feedback is idempotent and retriable | A deployment status, check run, or PR comment already exists for the preview | Feedback writing runs after deployment acceptance or terminal update | Existing provider feedback is updated in place when possible; retriable provider failures are recorded without changing the accepted deployment result to `err`. |
+| PG-PREVIEW-SPEC-006 | Cleanup preserves history | A pull request is closed or a user deletes the preview environment | Cleanup is accepted | Preview runtime, route state, source link, provider metadata, and feedback are cleaned or marked already clean; deployment history and audit remain readable. |
+| PG-PREVIEW-SPEC-007 | Cleanup retry is durable | Runtime cleanup, provider metadata deletion, or feedback update fails with a retriable error | Cleanup processing records the failure | Retry state records owner, attempt id, next retry timing, safe phase, and sanitized provider detail; a later retry creates a new attempt id. |
+| PG-PREVIEW-SPEC-008 | Quota and expiry are enforced | A repository or project exceeds preview count, age, or resource quota | Preview policy evaluates a create/update event or scheduler scans previews | New previews are blocked or old previews are scheduled for cleanup according to policy, with read-model visibility and safe user guidance. |
+| PG-PREVIEW-SPEC-009 | Public surfaces stay normalized | Web, CLI, HTTP/oRPC, or future MCP surfaces inspect product-grade previews | Users list, show, configure, deploy, or delete previews | Output uses Appaloft preview policy/environment language with stable operation keys and help anchors, not provider-native webhook payloads or GitHub API objects. |
+
+## Error And Async Semantics
+
+Canonical product-grade preview phases:
+
+- `preview-webhook-verification`
+- `preview-event-ingestion`
+- `preview-policy-evaluation`
+- `preview-environment-resolution`
+- `preview-config-resolution`
+- `preview-deployment-dispatch`
+- `preview-feedback`
+- `preview-cleanup`
+- `preview-cleanup-retry`
+
+Expected errors must use the shared error model. Secret values, tokens, raw webhook bodies, raw
+provider API payloads, database URLs, SSH keys, and application secret values must not appear in
+errors, logs, read models, comments/checks, or events.
+
+Pre-acceptance failures return structured `err(...)` from the command or transport boundary that
+owns admission. Post-acceptance failures keep the original accepted command result and become
+durable preview/source/cleanup/feedback state with terminal or retryable visibility.
+
+## Domain Ownership
+
+- Bounded contexts: Source integration, workspace/resource configuration, release orchestration,
+  runtime topology, and operator work.
+- Aggregate/resource owner: `Resource` owns reusable source/runtime/network profile; preview
+  lifecycle owns preview environment identity and policy-specific scoped configuration; `Deployment`
+  owns accepted attempts and immutable runtime plan snapshots.
+- Adapter owner: GitHub App transport and feedback adapters verify and map webhook/status details;
+  runtime adapters own runtime cleanup mechanics; persistence adapters own durable preview/source/
+  cleanup read models.
+- Upstream/downstream contexts: Control-plane mode selection must resolve state owner and execution
+  owner before mutation. Route/domain/certificate follow-up remains managed route/domain workflow
+  state when the control plane owns those integrations.
+
+## Public Surfaces
+
+- API/HTTP/oRPC: no active routes in this Spec Round. Future routes must reuse command/query
+  schemas and must not redefine transport-only shapes.
+- CLI: no active commands in this Spec Round. Future CLI preview policy/environment commands must
+  dispatch through `CommandBus`/`QueryBus`.
+- Web/UI: no active controls in this Spec Round. Future controls must consume read models and i18n
+  copy from `packages/i18n`.
+- Config: committed repository config may carry preview-safe profile defaults only after a future
+  config spec accepts them. It must not select project/resource/server/destination/credential,
+  organization, tenant, GitHub installation, or secret identity.
+- Events: Code Round must define any new preview lifecycle events or process-state records before
+  adding workers. Existing deployment events remain the source for deployment attempt progression.
+- Public docs/help: Docs Round is required before product-grade previews are marked supported. The
+  stable public anchor target is expected under `/docs/deploy/previews/`, while Action-only preview
+  docs must keep distinguishing workflow-file previews from GitHub App/control-plane previews.
+- Future MCP/tools: descriptors must come from the same operation catalog entries once operations
+  are activated.
+
+## Non-Goals
+
+- Adding preview fields to `deployments.create`.
+- Replacing Action-only PR preview workflows.
+- Implementing GitHub App installation onboarding in this Spec Round.
+- Provider-native branch protection policy or required-check enforcement beyond Appaloft feedback.
+- Copying production secrets into fork previews by default.
+- Deleting deployment history, audit, volumes, backups, or retained rollback candidates during
+  preview cleanup.
+
+## Current Implementation Notes And Migration Gaps
+
+- Action-only preview deploy/update and explicit close-event cleanup exist in the CLI/config
+  workflow and reference wrapper, but the public `appaloft/deploy-action` wrapper repository and
+  Marketplace documentation are still open roadmap work.
+- `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
+  pull request preview lifecycle events.
+- No preview policy aggregate/read model, preview environment read model, GitHub App preview worker,
+  feedback writer, cleanup scheduler, or cleanup retry state is implemented.
+- No active operation catalog entries exist for `preview-policies.*` or `preview-environments.*`.
+- Product-grade preview public docs/help are not yet implemented.
+
+## Open Questions
+
+- Should preview policy be project-scoped first, resource-scoped first, or integration/repository
+  scoped with project/resource overrides?
+- Should the first product-grade execution owner be GitHub Actions reporting to the control plane,
+  or a control-plane runner/agent?
+- Which provider feedback surfaces are required for the first supported slice: comments, checks,
+  GitHub deployments, commit statuses, or a smaller subset?
+- What retention policy should apply to preview environments after successful cleanup?

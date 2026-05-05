@@ -81,7 +81,8 @@ In scope:
 
 Out of scope for the first Code Round:
 
-- Product-grade PR preview lifecycle.
+- Product-grade PR preview lifecycle, governed by
+  [Product-Grade Preview Deployments](../046-product-grade-preview-deployments/spec.md).
 - GitHub App installation management UI.
 - Always-on cloud runner execution.
 - Deployment queueing beyond the accepted async lifecycle and operation coordination contracts.
@@ -199,6 +200,8 @@ ADR-037 answers the initial Code Round blockers:
 
 Remaining Test-First / Code Round work:
 
-- GitLab and GitHub App preview lifecycle adapters remain future; the first active provider route is
-  the GitHub push webhook baseline;
+- GitLab and GitHub App preview lifecycle adapters remain future; product-grade preview lifecycle
+  is now positioned in
+  [Product-Grade Preview Deployments](../046-product-grade-preview-deployments/spec.md), and the
+  first active provider route is the GitHub push webhook baseline;
 - transport help text and Web links are implemented against the registered public docs topics.

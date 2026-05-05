@@ -789,7 +789,9 @@ Current boundary:
   Product-grade preview environments with GitHub App webhooks, comments/checks, policy, cleanup
   retries, audit, and managed domain lifecycle still require Appaloft Cloud or a self-hosted
   control plane. That future product line must still reuse repository config and explicit
-  operations rather than adding preview fields to `deployments.create`.
+  operations rather than adding preview fields to `deployments.create`. The governing Spec Round is
+  [Product-Grade Preview Deployments](./specs/046-product-grade-preview-deployments/spec.md); no
+  `preview-policies.*` or `preview-environments.*` operation catalog entries are active yet.
 - `APPALOFT_PROJECT_ID`, `APPALOFT_RESOURCE_ID`, `APPALOFT_SERVER_ID`, and similar ids are optional
   trusted selection overrides for CLI/Action mode. They are required only when the operator wants to
   select existing control-plane identity explicitly; pure SSH CLI mode may reuse or create identity
