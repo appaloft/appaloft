@@ -993,6 +993,10 @@ Current verification notes:
   handlers, use/query services, source event recorder/read-model ports, and PGlite-backed durable
   dedupe/read-model persistence. The operations remain inactive until provider verification,
   deployment dispatch, operation catalog/Core Operations, and CLI/HTTP/Web surfaces are aligned.
+- 2026-05-05 Phase 7 source event verification slice added a provider-neutral verification port
+  shape and generic signed HMAC verifier with `SRC-AUTO-EVENT-004` invalid-signature coverage. Git
+  provider adapters, source event deployment dispatch, operation catalog/Core Operations, and
+  CLI/HTTP/Web surfaces remain inactive.
 
 Required:
 

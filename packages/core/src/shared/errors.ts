@@ -178,6 +178,14 @@ export const domainError = {
     retryable = true,
   ): DomainError =>
     createError("source_event_read_unavailable", "infra", message, details, retryable),
+  sourceEventSignatureInvalid: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("source_event_signature_invalid", "user", message, details),
+  sourceEventUnsupportedKind: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("source_event_unsupported_kind", "user", message, details),
   serverInactive: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

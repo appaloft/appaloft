@@ -13,6 +13,7 @@ import {
 import { FixedClock } from "@appaloft/testkit";
 
 import { createExecutionContext } from "../src";
+import { GenericSignedSourceEventVerifier } from "../src/operations/source-events/generic-signed-source-event-verifier";
 import { IngestSourceEventUseCase } from "../src/operations/source-events/ingest-source-event.use-case";
 import { ListSourceEventsQuery } from "../src/operations/source-events/list-source-events.query";
 import { ListSourceEventsQueryService } from "../src/operations/source-events/list-source-events.query-service";
@@ -158,7 +159,90 @@ function createHarness() {
   };
 }
 
+async function hmacSha256Hex(secretValue: string, body: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secretValue),
+    {
+      name: "HMAC",
+      hash: "SHA-256",
+    },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
+  return [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 describe("source event application baseline", () => {
+  test("[SRC-AUTO-EVENT-004] rejects invalid generic signed source event signatures", async () => {
+    const { context } = createHarness();
+    const verifier = new GenericSignedSourceEventVerifier();
+
+    const result = await verifier.verify(context, {
+      sourceKind: "generic-signed",
+      eventKind: "push",
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/demo",
+      },
+      ref: "main",
+      revision: "abc123",
+      rawBody: '{"ref":"main","revision":"abc123"}',
+      signature: "sha256=0000000000000000000000000000000000000000000000000000000000000000",
+      secretValue: "correct-secret",
+      method: "generic-hmac",
+      idempotencyKey: "generic_delivery_1",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "source_event_signature_invalid",
+      details: {
+        phase: "source-event-verification",
+        sourceKind: "generic-signed",
+        eventKind: "push",
+        idempotencyKey: "generic_delivery_1",
+      },
+    });
+  });
+
+  test("verifies generic signed source event facts for ingest", async () => {
+    const { context } = createHarness();
+    const verifier = new GenericSignedSourceEventVerifier();
+    const rawBody = '{"ref":"main","revision":"abc123"}';
+    const signature = await hmacSha256Hex("correct-secret", rawBody);
+
+    const result = await verifier.verify(context, {
+      sourceKind: "generic-signed",
+      eventKind: "push",
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/demo",
+      },
+      ref: "main",
+      revision: "abc123",
+      rawBody,
+      signature: `sha256=${signature}`,
+      secretValue: "correct-secret",
+      method: "generic-hmac",
+      idempotencyKey: "generic_delivery_1",
+      keyVersion: "v1",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      sourceKind: "generic-signed",
+      eventKind: "push",
+      ref: "main",
+      revision: "abc123",
+      verification: {
+        status: "verified",
+        method: "generic-hmac",
+        keyVersion: "v1",
+      },
+    });
+  });
+
   test("[SRC-AUTO-EVENT-002] dedupes repeated source event deliveries", async () => {
     const { context, ingest, sourceEvents } = createHarness();
 
