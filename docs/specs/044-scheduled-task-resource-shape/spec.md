@@ -82,7 +82,11 @@ DDD or internal process-manager terminology.
 - Scheduled task definition persistence exists for Postgres/PGlite. It stores Resource-owned task
   definitions, supports repository find/upsert/delete through explicit specs, and supports
   list/show read-model filtering by project, environment, Resource, status, cursor, and limit.
+- Scheduled task run-attempt persistence exists for Postgres/PGlite. It stores accepted, running,
+  succeeded, failed, and skipped run attempts, supports repository upsert through explicit specs,
+  supports run list/show filtering by task, Resource, status, trigger kind, cursor, and limit, and
+  exposes latest run summaries on task list/show read models.
 - No operation catalog entries are active.
 - No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
-- No persisted scheduled-task run-attempt or run-log state exists.
+- No persisted scheduled-task run-log state exists.
 - No scheduler process manager or runtime adapter execution path exists.

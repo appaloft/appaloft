@@ -542,6 +542,20 @@ export interface ScheduledTaskDefinitionsTable {
   created_at: TimestampColumn;
 }
 
+export interface ScheduledTaskRunAttemptsTable {
+  id: string;
+  task_id: string;
+  resource_id: string;
+  trigger_kind: string;
+  status: string;
+  created_at: TimestampColumn;
+  started_at: NullableUpdatableTimestampColumn;
+  finished_at: NullableUpdatableTimestampColumn;
+  exit_code: ColumnType<number | null, number | null | undefined, number | null>;
+  failure_summary: ColumnType<string | null, string | null | undefined, string | null>;
+  skipped_reason: ColumnType<string | null, string | null | undefined, string | null>;
+}
+
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
@@ -572,4 +586,5 @@ export interface Database {
   resource_access_failure_evidence: ResourceAccessFailureEvidenceTable;
   resource_runtime_control_attempts: ResourceRuntimeControlAttemptsTable;
   scheduled_task_definitions: ScheduledTaskDefinitionsTable;
+  scheduled_task_run_attempts: ScheduledTaskRunAttemptsTable;
 }

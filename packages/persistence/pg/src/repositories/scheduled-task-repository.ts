@@ -7,6 +7,9 @@ import {
   type ScheduledTaskDefinitionRepository,
   type ScheduledTaskDefinitionSummary,
   type ScheduledTaskReadModel,
+  type ScheduledTaskRunAttemptRepository,
+  type ScheduledTaskRunReadModel,
+  type ScheduledTaskRunSummary,
 } from "@appaloft/application";
 import {
   CreatedAt,
@@ -23,10 +26,14 @@ import {
   ScheduledTaskDefinitionStatusValue,
   ScheduledTaskId,
   ScheduledTaskRetryLimit,
+  type ScheduledTaskRunAttempt,
+  type ScheduledTaskRunAttemptMutationSpec,
+  type ScheduledTaskRunAttemptMutationSpecVisitor,
   ScheduledTaskScheduleExpression,
   ScheduledTaskTimeoutSeconds,
   ScheduledTaskTimezone,
   type UpsertScheduledTaskDefinitionSpec,
+  type UpsertScheduledTaskRunAttemptSpec,
 } from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
@@ -34,6 +41,7 @@ import { type Database } from "../schema";
 import { normalizeTimestamp, resolveRepositoryExecutor, withRepositoryTransaction } from "./shared";
 
 type ScheduledTaskDefinitionRow = Selectable<Database["scheduled_task_definitions"]>;
+type ScheduledTaskRunAttemptRow = Selectable<Database["scheduled_task_run_attempts"]>;
 type ScheduledTaskDefinitionSelectionQuery = SelectQueryBuilder<
   Database,
   "scheduled_task_definitions",
@@ -52,6 +60,9 @@ type ScheduledTaskDefinitionMutation =
       taskId: string;
       resourceId: string;
     };
+type ScheduledTaskRunAttemptMutation = {
+  scheduledTaskRunAttempt: Insertable<Database["scheduled_task_run_attempts"]>;
+};
 
 class KyselyScheduledTaskDefinitionSelectionVisitor
   implements ScheduledTaskDefinitionSelectionSpecVisitor<ScheduledTaskDefinitionSelectionApplier>
@@ -104,6 +115,31 @@ class KyselyScheduledTaskDefinitionMutationVisitor
   }
 }
 
+class KyselyScheduledTaskRunAttemptMutationVisitor
+  implements ScheduledTaskRunAttemptMutationSpecVisitor<ScheduledTaskRunAttemptMutation>
+{
+  visitUpsertScheduledTaskRunAttempt(
+    spec: UpsertScheduledTaskRunAttemptSpec,
+  ): ScheduledTaskRunAttemptMutation {
+    const state = spec.state;
+    return {
+      scheduledTaskRunAttempt: {
+        id: state.id.value,
+        task_id: state.taskId.value,
+        resource_id: state.resourceId.value,
+        trigger_kind: state.triggerKind.value,
+        status: state.status.value,
+        created_at: state.createdAt.value,
+        started_at: state.startedAt?.value ?? null,
+        finished_at: state.finishedAt?.value ?? null,
+        exit_code: state.exitCode?.value ?? null,
+        failure_summary: state.failureSummary?.value ?? null,
+        skipped_reason: state.skippedReason?.value ?? null,
+      },
+    };
+  }
+}
+
 function rehydrateScheduledTaskDefinition(
   row: ScheduledTaskDefinitionRow,
 ): ScheduledTaskDefinition {
@@ -125,8 +161,33 @@ function rehydrateScheduledTaskDefinition(
   });
 }
 
+function toScheduledTaskRunSummary(row: ScheduledTaskRunAttemptRow): ScheduledTaskRunSummary {
+  return {
+    runId: row.id,
+    taskId: row.task_id,
+    resourceId: row.resource_id,
+    triggerKind: row.trigger_kind as ScheduledTaskRunSummary["triggerKind"],
+    status: row.status as ScheduledTaskRunSummary["status"],
+    createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
+    ...(row.started_at ? { startedAt: normalizeTimestamp(row.started_at) ?? row.started_at } : {}),
+    ...(row.finished_at
+      ? { finishedAt: normalizeTimestamp(row.finished_at) ?? row.finished_at }
+      : {}),
+    ...(row.exit_code !== null ? { exitCode: row.exit_code } : {}),
+    ...(row.failure_summary ? { failureSummary: row.failure_summary } : {}),
+    ...(row.skipped_reason
+      ? {
+          skippedReason: row.skipped_reason as NonNullable<
+            ScheduledTaskRunSummary["skippedReason"]
+          >,
+        }
+      : {}),
+  };
+}
+
 function toScheduledTaskDefinitionSummary(
   row: ScheduledTaskDefinitionRow,
+  latestRun?: ScheduledTaskRunSummary,
 ): ScheduledTaskDefinitionSummary {
   return {
     taskId: row.id,
@@ -140,7 +201,35 @@ function toScheduledTaskDefinitionSummary(
       row.concurrency_policy as ScheduledTaskDefinitionSummary["concurrencyPolicy"],
     status: row.status as ScheduledTaskDefinitionSummary["status"],
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
+    ...(latestRun ? { latestRun } : {}),
   };
+}
+
+async function loadLatestRuns(
+  executor: ReturnType<typeof resolveRepositoryExecutor>,
+  taskIds: string[],
+): Promise<Map<string, ScheduledTaskRunSummary>> {
+  const latestRuns = new Map<string, ScheduledTaskRunSummary>();
+  if (taskIds.length === 0) {
+    return latestRuns;
+  }
+
+  const rows = await executor
+    .selectFrom("scheduled_task_run_attempts")
+    .selectAll()
+    .where("task_id", "in", taskIds)
+    .orderBy("task_id", "asc")
+    .orderBy("created_at", "desc")
+    .orderBy("id", "desc")
+    .execute();
+
+  for (const row of rows) {
+    if (!latestRuns.has(row.task_id)) {
+      latestRuns.set(row.task_id, toScheduledTaskRunSummary(row));
+    }
+  }
+
+  return latestRuns;
 }
 
 export class PgScheduledTaskDefinitionRepository implements ScheduledTaskDefinitionRepository {
@@ -241,6 +330,48 @@ export class PgScheduledTaskDefinitionRepository implements ScheduledTaskDefinit
   }
 }
 
+export class PgScheduledTaskRunAttemptRepository implements ScheduledTaskRunAttemptRepository {
+  constructor(private readonly db: Kysely<Database>) {}
+
+  async upsert(
+    context: RepositoryContext,
+    runAttempt: ScheduledTaskRunAttempt,
+    spec: ScheduledTaskRunAttemptMutationSpec,
+  ): Promise<void> {
+    void runAttempt;
+    const mutation = spec.accept(new KyselyScheduledTaskRunAttemptMutationVisitor());
+
+    await context.tracer.startActiveSpan(
+      createRepositorySpanName("scheduled-task-run-attempt", "upsert"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.repositoryName]: "scheduled-task-run-attempt",
+          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
+        },
+      },
+      async () => {
+        await withRepositoryTransaction(this.db, context, async (transaction) => {
+          await transaction
+            .insertInto("scheduled_task_run_attempts")
+            .values(mutation.scheduledTaskRunAttempt)
+            .onConflict((conflict) =>
+              conflict.column("id").doUpdateSet({
+                trigger_kind: mutation.scheduledTaskRunAttempt.trigger_kind,
+                status: mutation.scheduledTaskRunAttempt.status,
+                started_at: mutation.scheduledTaskRunAttempt.started_at,
+                finished_at: mutation.scheduledTaskRunAttempt.finished_at,
+                exit_code: mutation.scheduledTaskRunAttempt.exit_code,
+                failure_summary: mutation.scheduledTaskRunAttempt.failure_summary,
+                skipped_reason: mutation.scheduledTaskRunAttempt.skipped_reason,
+              }),
+            )
+            .execute();
+        });
+      },
+    );
+  }
+}
+
 export class PgScheduledTaskReadModel implements ScheduledTaskReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
@@ -286,9 +417,15 @@ export class PgScheduledTaskReadModel implements ScheduledTaskReadModel {
           .execute();
         const pageRows = rows.slice(0, limit);
         const nextCursor = rows.length > limit ? pageRows.at(-1)?.created_at : undefined;
+        const latestRuns = await loadLatestRuns(
+          executor,
+          pageRows.map((row) => row.id),
+        );
 
         return {
-          items: pageRows.map(toScheduledTaskDefinitionSummary),
+          items: pageRows.map((row) =>
+            toScheduledTaskDefinitionSummary(row, latestRuns.get(row.id)),
+          ),
           ...(nextCursor ? { nextCursor: normalizeTimestamp(nextCursor) ?? nextCursor } : {}),
         };
       },
@@ -318,7 +455,94 @@ export class PgScheduledTaskReadModel implements ScheduledTaskReadModel {
         }
 
         const row = await query.executeTakeFirst();
-        return row ? toScheduledTaskDefinitionSummary(row) : null;
+        if (!row) {
+          return null;
+        }
+
+        const latestRuns = await loadLatestRuns(executor, [row.id]);
+        return toScheduledTaskDefinitionSummary(row, latestRuns.get(row.id));
+      },
+    );
+  }
+}
+
+export class PgScheduledTaskRunReadModel implements ScheduledTaskRunReadModel {
+  constructor(private readonly db: Kysely<Database>) {}
+
+  async list(
+    context: RepositoryContext,
+    input: Parameters<ScheduledTaskRunReadModel["list"]>[1],
+  ): Promise<Awaited<ReturnType<ScheduledTaskRunReadModel["list"]>>> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("scheduled-task-run", "list"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "scheduled-task-run",
+        },
+      },
+      async () => {
+        const limit = input.limit ?? 50;
+        let query = executor
+          .selectFrom("scheduled_task_run_attempts")
+          .selectAll()
+          .limit(limit + 1);
+
+        if (input.taskId) {
+          query = query.where("task_id", "=", input.taskId);
+        }
+        if (input.resourceId) {
+          query = query.where("resource_id", "=", input.resourceId);
+        }
+        if (input.status) {
+          query = query.where("status", "=", input.status);
+        }
+        if (input.triggerKind) {
+          query = query.where("trigger_kind", "=", input.triggerKind);
+        }
+        if (input.cursor) {
+          query = query.where("created_at", "<", input.cursor);
+        }
+
+        const rows = await query.orderBy("created_at", "desc").orderBy("id", "desc").execute();
+        const pageRows = rows.slice(0, limit);
+        const nextCursor = rows.length > limit ? pageRows.at(-1)?.created_at : undefined;
+
+        return {
+          items: pageRows.map(toScheduledTaskRunSummary),
+          ...(nextCursor ? { nextCursor: normalizeTimestamp(nextCursor) ?? nextCursor } : {}),
+        };
+      },
+    );
+  }
+
+  async show(
+    context: RepositoryContext,
+    input: Parameters<ScheduledTaskRunReadModel["show"]>[1],
+  ): Promise<ScheduledTaskRunSummary | null> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("scheduled-task-run", "show"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "scheduled-task-run",
+        },
+      },
+      async () => {
+        let query = executor
+          .selectFrom("scheduled_task_run_attempts")
+          .selectAll()
+          .where("id", "=", input.runId);
+
+        if (input.taskId) {
+          query = query.where("task_id", "=", input.taskId);
+        }
+        if (input.resourceId) {
+          query = query.where("resource_id", "=", input.resourceId);
+        }
+
+        const row = await query.executeTakeFirst();
+        return row ? toScheduledTaskRunSummary(row) : null;
       },
     );
   }

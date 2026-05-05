@@ -12,6 +12,7 @@ import {
   EnvironmentId,
   EnvironmentKindValue,
   EnvironmentName,
+  FinishedAt,
   Project,
   ProjectId,
   ProjectName,
@@ -26,13 +27,20 @@ import {
   ScheduledTaskDefinitionStatusValue,
   ScheduledTaskId,
   ScheduledTaskRetryLimit,
+  ScheduledTaskRunAttempt,
+  ScheduledTaskRunExitCode,
+  ScheduledTaskRunFailureSummary,
+  ScheduledTaskRunId,
+  ScheduledTaskRunTriggerKindValue,
   ScheduledTaskScheduleExpression,
   ScheduledTaskTimeoutSeconds,
   ScheduledTaskTimezone,
+  StartedAt,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
   UpsertResourceSpec,
   UpsertScheduledTaskDefinitionSpec,
+  UpsertScheduledTaskRunAttemptSpec,
 } from "@appaloft/core";
 
 function taskFixture(input?: { id?: string; resourceId?: string; createdAt?: string }) {
@@ -251,6 +259,148 @@ describe("scheduled task definition persistence", () => {
 
       expect(shown).toBeNull();
       expect(list.items).toEqual([]);
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
+
+  test("[SCHED-TASK-PERSIST-003] persists run attempts and exposes run read models", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-scheduled-task-run-attempt-"));
+    const {
+      createDatabase,
+      createMigrator,
+      PgEnvironmentRepository,
+      PgProjectRepository,
+      PgResourceRepository,
+      PgScheduledTaskDefinitionRepository,
+      PgScheduledTaskReadModel,
+      PgScheduledTaskRunAttemptRepository,
+      PgScheduledTaskRunReadModel,
+    } = await import("../src");
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const context = toRepositoryContext(
+        createExecutionContext({
+          requestId: "req_scheduled_task_run_attempt_pglite_test",
+          entrypoint: "system",
+        }),
+      );
+      const createdAt = CreatedAt.rehydrate("2026-05-05T00:00:00.000Z");
+      const project = Project.create({
+        id: ProjectId.rehydrate("prj_demo"),
+        name: ProjectName.rehydrate("Demo"),
+        createdAt,
+      })._unsafeUnwrap();
+      const environment = Environment.create({
+        id: EnvironmentId.rehydrate("env_demo"),
+        projectId: ProjectId.rehydrate("prj_demo"),
+        name: EnvironmentName.rehydrate("Production"),
+        kind: EnvironmentKindValue.rehydrate("production"),
+        createdAt,
+      })._unsafeUnwrap();
+      const resource = Resource.create({
+        id: ResourceId.rehydrate("res_api"),
+        projectId: ProjectId.rehydrate("prj_demo"),
+        environmentId: EnvironmentId.rehydrate("env_demo"),
+        name: ResourceName.rehydrate("API"),
+        kind: ResourceKindValue.rehydrate("application"),
+        createdAt,
+      })._unsafeUnwrap();
+      const projects = new PgProjectRepository(database.db);
+      const environments = new PgEnvironmentRepository(database.db);
+      const resources = new PgResourceRepository(database.db);
+      const tasks = new PgScheduledTaskDefinitionRepository(database.db);
+      const taskReadModel = new PgScheduledTaskReadModel(database.db);
+      const runAttempts = new PgScheduledTaskRunAttemptRepository(database.db);
+      const runReadModel = new PgScheduledTaskRunReadModel(database.db);
+      const task = taskFixture();
+
+      await projects.upsert(context, project, UpsertProjectSpec.fromProject(project));
+      await environments.upsert(
+        context,
+        environment,
+        UpsertEnvironmentSpec.fromEnvironment(environment),
+      );
+      await resources.upsert(context, resource, UpsertResourceSpec.fromResource(resource));
+      await tasks.upsert(context, task, UpsertScheduledTaskDefinitionSpec.fromTaskDefinition(task));
+
+      const runAttempt = ScheduledTaskRunAttempt.create({
+        id: ScheduledTaskRunId.rehydrate("str_manual"),
+        taskId: ScheduledTaskId.rehydrate("tsk_backup"),
+        resourceId: ResourceId.rehydrate("res_api"),
+        triggerKind: ScheduledTaskRunTriggerKindValue.manual(),
+        createdAt: CreatedAt.rehydrate("2026-05-05T00:20:00.000Z"),
+      })._unsafeUnwrap();
+      await runAttempts.upsert(
+        context,
+        runAttempt,
+        UpsertScheduledTaskRunAttemptSpec.fromRunAttempt(runAttempt),
+      );
+
+      runAttempt
+        .start({
+          startedAt: StartedAt.rehydrate("2026-05-05T00:20:05.000Z"),
+        })
+        ._unsafeUnwrap();
+      runAttempt
+        .markFailed({
+          finishedAt: FinishedAt.rehydrate("2026-05-05T00:20:30.000Z"),
+          exitCode: ScheduledTaskRunExitCode.rehydrate(1),
+          failureSummary: ScheduledTaskRunFailureSummary.create(
+            "Command exited with code 1",
+          )._unsafeUnwrap(),
+        })
+        ._unsafeUnwrap();
+      await runAttempts.upsert(
+        context,
+        runAttempt,
+        UpsertScheduledTaskRunAttemptSpec.fromRunAttempt(runAttempt),
+      );
+
+      const runs = await runReadModel.list(context, {
+        taskId: "tsk_backup",
+        resourceId: "res_api",
+        status: "failed",
+        triggerKind: "manual",
+      });
+      const shown = await runReadModel.show(context, {
+        runId: "str_manual",
+        taskId: "tsk_backup",
+        resourceId: "res_api",
+      });
+      const taskSummary = await taskReadModel.show(context, {
+        taskId: "tsk_backup",
+        resourceId: "res_api",
+      });
+
+      expect(runs.items).toEqual([
+        {
+          runId: "str_manual",
+          taskId: "tsk_backup",
+          resourceId: "res_api",
+          triggerKind: "manual",
+          status: "failed",
+          createdAt: "2026-05-05T00:20:00.000Z",
+          startedAt: "2026-05-05T00:20:05.000Z",
+          finishedAt: "2026-05-05T00:20:30.000Z",
+          exitCode: 1,
+          failureSummary: "Command exited with code 1",
+        },
+      ]);
+      const expectedRun = runs.items[0];
+      expect(expectedRun).toBeDefined();
+      if (expectedRun) {
+        expect(shown).toEqual(expectedRun);
+        expect(taskSummary?.latestRun).toEqual(expectedRun);
+      }
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });
