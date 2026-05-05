@@ -1094,6 +1094,10 @@ Current verification notes:
   `SWARM-TARGET-ADM-002` to application coverage proving `deployments.create` returns
   `runtime_target_unsupported` before accepting a deployment when a Swarm target lacks required
   runtime backend capabilities.
+- 2026-05-05 Phase 7 Docker Swarm public help slice added the
+  `server.docker-swarm-target` help topic and bilingual
+  `/docs/servers/register-connect/#docker-swarm-runtime-target` anchor. CLI/API descriptions and
+  Web help links remain open with Swarm readiness and execution.
 
 Required:
 
@@ -1134,8 +1138,9 @@ Required:
 - [ ] Complete the Docker Swarm Code Round as the first cluster runtime target:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
   semantics, normalized read surfaces, public docs/help, and contract tests are implemented.
-  Target-kind registration metadata is implemented; Swarm manager readiness and execution remain
-  open.
+  Target-kind registration metadata, unsupported-backend admission, backend descriptor selection,
+  and the public docs anchor are implemented; Swarm manager readiness, CLI/API/Web help links, and
+  execution remain open.
 
 Exit criteria:
 

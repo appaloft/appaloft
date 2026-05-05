@@ -9,6 +9,8 @@ searchAliases:
   - "server"
   - "connectivity"
   - "ssh test"
+  - "docker swarm"
+  - "orchestrator cluster"
 relatedOperations:
   - servers.register
   - servers.show
@@ -103,6 +105,35 @@ appaloft server register \
 `--target-kind orchestrator-cluster` records a cluster-shaped deployment target for future
 cluster backends such as Docker Swarm. It does not by itself make the target ready for deployments;
 readiness still depends on the registered runtime backend capabilities and connectivity checks.
+
+<h2 id="docker-swarm-runtime-target">Docker Swarm runtime target</h2>
+
+Docker Swarm targets are registered as cluster-shaped deployment targets. Use
+`--target-kind orchestrator-cluster --provider docker-swarm` only for a Swarm manager endpoint that
+Appaloft can reach through the selected transport.
+
+Current status: Appaloft can record Swarm target metadata and reject unsupported Swarm-specific
+deployment fields before a deployment is created. The default runtime backend does not execute
+Swarm deployments yet. Until a Swarm execution backend is enabled, deploying to a Swarm target should
+fail before acceptance with `runtime_target_unsupported`.
+
+Keep deployment requests ids-only. Do not add Swarm fields such as namespace, stack name, service
+name, replicas, update policy, ingress, registry secret, or manifest directly to `deployments.create`
+or `appaloft.config.*`. If a validation error names one of those fields, remove it and use the
+supported resource, environment, and server inputs for the current runtime target.
+
+Before Swarm execution is supported for a target, operators should verify:
+
+- the manager address is reachable and points to an active Swarm manager;
+- the selected credential can run the required Docker and Swarm diagnostics;
+- image registry access is configured without exposing secret values;
+- the reverse proxy and overlay network placement are understood;
+- health checks and service logs can be read in a form Appaloft can normalize.
+
+When Swarm execution is active, rollout should preserve the previous service until verification
+passes, logs and health should be returned as Appaloft status shapes, and cleanup should stay scoped
+to the resource, deployment, destination, and target labels. Until then, use a supported
+single-server target for deployment execution.
 
 ```bash title="Run connectivity test"
 appaloft server test srv_primary
