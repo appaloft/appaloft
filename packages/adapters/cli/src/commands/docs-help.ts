@@ -78,6 +78,12 @@ export const cliCommandDescriptions = {
     "Relink a source fingerprint to an explicit resource",
     "deployment.source-relink",
   ),
+  sourceEvent: withDocs("Source event diagnostics", "source.auto-deploy-setup"),
+  sourceEventList: withDocs(
+    "List source event deliveries for a project or resource",
+    "source.auto-deploy-setup",
+  ),
+  sourceEventShow: withDocs("Show one source event delivery", "source.auto-deploy-setup"),
   remoteState: withDocs("Remote state diagnostics", "errors.remote-state-lock"),
   remoteStateLock: withDocs("SSH remote-state lock diagnostics", "errors.remote-state-lock"),
   remoteStateLockInspect: withDocs(

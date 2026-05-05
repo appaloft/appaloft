@@ -117,6 +117,7 @@ import {
   ListResourceDependencyBindingsQuery,
   ListResourcesQuery,
   ListServersQuery,
+  ListSourceEventsQuery,
   ListSshCredentialsQuery,
   ListStorageVolumesQuery,
   LockEnvironmentCommand,
@@ -131,6 +132,7 @@ import {
   listOperatorWorkQueryInputSchema,
   listResourceDependencyBindingsQueryInputSchema,
   listResourcesQueryInputSchema,
+  listSourceEventsQueryInputSchema,
   listSshCredentialsQueryInputSchema,
   listStorageVolumesQueryInputSchema,
   lockEnvironmentCommandInputSchema,
@@ -205,6 +207,7 @@ import {
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
   ShowServerQuery,
+  ShowSourceEventQuery,
   ShowSshCredentialQuery,
   ShowStorageVolumeQuery,
   StartResourceRuntimeCommand,
@@ -226,6 +229,7 @@ import {
   showResourceDependencyBindingQueryInputSchema,
   showResourceQueryInputSchema,
   showServerQueryInputSchema,
+  showSourceEventQueryInputSchema,
   showSshCredentialQueryInputSchema,
   showStorageVolumeQueryInputSchema,
   startResourceRuntimeCommandInputSchema,
@@ -307,6 +311,7 @@ import {
   listResourceDependencyBindingsResponseSchema,
   listResourcesResponseSchema,
   listServersResponseSchema,
+  listSourceEventsResponseSchema,
   listSshCredentialsResponseSchema,
   listStorageVolumesResponseSchema,
   lockEnvironmentResponseSchema,
@@ -345,6 +350,7 @@ import {
   showProjectResponseSchema,
   showResourceDependencyBindingResponseSchema,
   showServerResponseSchema,
+  showSourceEventResponseSchema,
   showSshCredentialResponseSchema,
   showStorageVolumeResponseSchema,
   startResourceRuntimeResponseSchema,
@@ -429,6 +435,7 @@ export const apiDocsHrefs = {
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
   storageVolumeLifecycle: resolvePublicDocsHelpHref("storage.volume-lifecycle"),
   dependencyResourceLifecycle: resolvePublicDocsHelpHref("resource.concept"),
+  sourceAutoDeploySetup: resolvePublicDocsHelpHref("source.auto-deploy-setup"),
 } as const;
 
 export const apiRouteDescriptions = {
@@ -770,6 +777,14 @@ export const apiRouteDescriptions = {
     "Opens a controlled terminal session for server or resource troubleshooting.",
     "server.terminal-session",
   ),
+  listSourceEvents: routeDescription(
+    "Lists safe source event deliveries for a project or resource.",
+    "source.auto-deploy-setup",
+  ),
+  showSourceEvent: routeDescription(
+    "Reads one safe source event delivery with dedupe, policy, and dispatch details.",
+    "source.auto-deploy-setup",
+  ),
 } as const;
 export const createDeploymentRouteDescription = apiRouteDescriptions.createDeployment;
 
@@ -922,6 +937,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
 
   switch (error.code) {
     case "not_found":
+    case "source_event_not_found":
       return new ORPCError("NOT_FOUND", {
         message,
         status: 404,
@@ -960,6 +976,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "terminal_session_workspace_unavailable":
     case "terminal_session_policy_denied":
     case "terminal_session_not_found":
+    case "source_event_scope_required":
       return new ORPCError("BAD_REQUEST", {
         message,
         status: 400,
@@ -2167,6 +2184,30 @@ export const showOperatorWorkProcedure = base
     executeQuery(context, ShowOperatorWorkQuery.create(input)),
   );
 
+export const listSourceEventsProcedure = base
+  .route({
+    method: "GET",
+    path: "/source-events",
+    description: apiRouteDescriptions.listSourceEvents,
+    successStatus: 200,
+  })
+  .input(listSourceEventsQueryInputSchema)
+  .output(listSourceEventsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSourceEventsQuery.create(input)),
+  );
+
+export const showSourceEventProcedure = base
+  .route({
+    method: "GET",
+    path: "/source-events/{sourceEventId}",
+    description: apiRouteDescriptions.showSourceEvent,
+    successStatus: 200,
+  })
+  .input(showSourceEventQueryInputSchema)
+  .output(showSourceEventResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowSourceEventQuery.create(input)));
+
 export const createDeploymentProcedure = base
   .route({
     method: "POST",
@@ -2929,6 +2970,10 @@ export const appaloftOrpcRouter = {
   operatorWork: {
     list: listOperatorWorkProcedure,
     show: showOperatorWorkProcedure,
+  },
+  sourceEvents: {
+    list: listSourceEventsProcedure,
+    show: showSourceEventProcedure,
   },
   providers: {
     list: listProvidersProcedure,

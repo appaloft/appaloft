@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted candidate read model. Inactive application query handling and durable source-event
-read-model persistence exist. Do not expose this query until permission checks, public docs/help,
-`CORE_OPERATIONS.md`, `operation-catalog.ts`, and tests are aligned in Code Round.
+Active read model. Application query handling, durable source-event read-model persistence,
+`CORE_OPERATIONS.md`, the operation catalog, CLI, and HTTP/oRPC read surfaces are aligned. Web
+diagnostics and future MCP/tool descriptors remain deferred.
 
 ## Governing Sources
 
@@ -90,6 +90,6 @@ Use [Source Event Auto Deploy Error Spec](../errors/source-events.md). Minimum c
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
 | Web | Source event detail drawer or diagnostics page. | Future Code Round |
-| CLI | `appaloft source-event show <sourceEventId> --resource <resourceId>`. | Future Code Round |
-| oRPC / HTTP | `GET /api/source-events/{sourceEventId}` with project/resource scope. | Future Code Round |
+| CLI | `appaloft source-event show <sourceEventId> --resource <resourceId>`. | Active |
+| oRPC / HTTP | `GET /api/source-events/{sourceEventId}` with project/resource scope. | Active |
 | Automation / MCP | Future read-only query/tool. | Future |

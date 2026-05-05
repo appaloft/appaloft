@@ -109,6 +109,8 @@ import { rotateSshCredentialCommandInputSchema } from "./operations/servers/rota
 import { showServerQueryInputSchema } from "./operations/servers/show-server.query";
 import { showSshCredentialQueryInputSchema } from "./operations/servers/show-ssh-credential.query";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
+import { listSourceEventsQueryInputSchema } from "./operations/source-events/list-source-events.query";
+import { showSourceEventQueryInputSchema } from "./operations/source-events/show-source-event.query";
 import { relinkSourceLinkCommandInputSchema } from "./operations/source-links/relink-source-link.command";
 import { createStorageVolumeCommandInputSchema } from "./operations/storage-volumes/create-storage-volume.command";
 import { deleteStorageVolumeCommandInputSchema } from "./operations/storage-volumes/delete-storage-volume.command";
@@ -133,6 +135,7 @@ type OperationDomain =
   | "default-access-domain-policies"
   | "domain-bindings"
   | "certificates"
+  | "source-events"
   | "source-links"
   | "system"
   | "terminal-sessions";
@@ -1544,6 +1547,34 @@ export const operationCatalog = [
     serviceToken: tokens.relinkSourceLinkUseCase,
     transports: {
       cli: "appaloft source-links relink",
+    },
+  },
+  {
+    key: "source-events.list",
+    kind: "query",
+    domain: "source-events",
+    messageName: "ListSourceEventsQuery",
+    handlerName: "ListSourceEventsQueryHandler",
+    serviceName: "ListSourceEventsQueryService",
+    inputSchema: listSourceEventsQueryInputSchema,
+    serviceToken: tokens.listSourceEventsQueryService,
+    transports: {
+      cli: "appaloft source-event list --resource <resourceId> | --project <projectId>",
+      orpc: { method: "GET", path: "/api/source-events" },
+    },
+  },
+  {
+    key: "source-events.show",
+    kind: "query",
+    domain: "source-events",
+    messageName: "ShowSourceEventQuery",
+    handlerName: "ShowSourceEventQueryHandler",
+    serviceName: "ShowSourceEventQueryService",
+    inputSchema: showSourceEventQueryInputSchema,
+    serviceToken: tokens.showSourceEventQueryService,
+    transports: {
+      cli: "appaloft source-event show <sourceEventId> --resource <resourceId> | --project <projectId>",
+      orpc: { method: "GET", path: "/api/source-events/{sourceEventId}" },
     },
   },
   {

@@ -89,5 +89,7 @@ export * from "./operations/servers/rotate-ssh-credential.schema";
 export * from "./operations/servers/show-server.schema";
 export * from "./operations/servers/show-ssh-credential.schema";
 export * from "./operations/servers/test-server-connectivity.schema";
+export * from "./operations/source-events/list-source-events.schema";
+export * from "./operations/source-events/show-source-event.schema";
 export * from "./operations/system/list-github-repositories.schema";
 export * from "./operations/terminal-sessions/open-terminal-session.schema";

@@ -130,6 +130,8 @@ import {
   ListResourceDependencyBindingsQueryService,
   ListResourcesQueryService,
   ListServersQueryService,
+  ListSourceEventsQueryHandler,
+  ListSourceEventsQueryService,
   ListSshCredentialsQueryService,
   ListStorageVolumesQueryHandler,
   ListStorageVolumesQueryService,
@@ -219,6 +221,8 @@ import {
   ShowResourceQueryHandler,
   ShowResourceQueryService,
   ShowServerQueryService,
+  ShowSourceEventQueryHandler,
+  ShowSourceEventQueryService,
   ShowSshCredentialQueryHandler,
   ShowSshCredentialQueryService,
   ShowStorageVolumeQueryHandler,
@@ -397,6 +401,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(RotateResourceDependencyBindingSecretCommandHandler);
   container.registerSingleton(ListResourceDependencyBindingsQueryHandler);
   container.registerSingleton(ShowResourceDependencyBindingQueryHandler);
+  container.registerSingleton(ListSourceEventsQueryHandler);
+  container.registerSingleton(ShowSourceEventQueryHandler);
   container.registerSingleton(ProvisionPostgresDependencyResourceCommandHandler);
   container.registerSingleton(ImportPostgresDependencyResourceCommandHandler);
   container.registerSingleton(ProvisionRedisDependencyResourceCommandHandler);
@@ -543,6 +549,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.showResourceDependencyBindingQueryService,
     ShowResourceDependencyBindingQueryService,
   );
+  container.registerSingleton(tokens.listSourceEventsQueryService, ListSourceEventsQueryService);
+  container.registerSingleton(tokens.showSourceEventQueryService, ShowSourceEventQueryService);
   container.registerSingleton(tokens.createStorageVolumeUseCase, CreateStorageVolumeUseCase);
   container.registerSingleton(tokens.renameStorageVolumeUseCase, RenameStorageVolumeUseCase);
   container.registerSingleton(tokens.deleteStorageVolumeUseCase, DeleteStorageVolumeUseCase);

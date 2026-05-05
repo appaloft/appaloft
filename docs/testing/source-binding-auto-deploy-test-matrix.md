@@ -50,8 +50,8 @@ automation. Ingestion routes, entrypoints, and background workers are not active
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `SRC-AUTO-QUERY-001` | Operator lists source events by Resource. | Query returns only safe scoped records with status, dedupe, ignored reasons, and created deployment ids. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
-| `SRC-AUTO-QUERY-002` | Operator shows one source event. | Query returns safe verification, policy result, ignored/blocked/failed reason, and created deployment details without raw payload or secrets. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
+| `SRC-AUTO-QUERY-001` | Operator lists source events by Resource. | Query returns only safe scoped records with status, dedupe, ignored reasons, and created deployment ids. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts`; `packages/application/test/operation-catalog-boundary.test.ts`; package typechecks | Passing |
+| `SRC-AUTO-QUERY-002` | Operator shows one source event. | Query returns safe verification, policy result, ignored/blocked/failed reason, and created deployment details without raw payload or secrets. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts`; `packages/application/test/operation-catalog-boundary.test.ts`; package typechecks | Passing |
 
 ## Entrypoint Coverage
 
@@ -65,10 +65,11 @@ automation. Ingestion routes, entrypoints, and background workers are not active
 ## Current Implementation Notes And Migration Gaps
 
 Resource source binding, source fingerprint link state, manual deployment admission,
-Resource-owned auto-deploy policy state behavior, inactive application command handling, and
-Resource repository persistence exist. Inactive source-event command/query handling, generic signed
-source-event verification, durable source-event dedupe/read-model persistence, and policy matching
-for ignored ref outcomes also exist. Matching source events can dispatch through the existing
-deployment admission use case at the application boundary. This matrix still tracks the missing
-ingestion routes and entrypoint surfaces. Code Round must not mark auto-deploy complete until these
-rows have stable automation or explicit deferred exceptions.
+Resource-owned auto-deploy policy state behavior, active configure command entrypoints, and
+Resource repository persistence exist. Source-event command/query handling, generic signed
+source-event verification, durable source-event dedupe/read-model persistence, policy matching for
+ignored ref outcomes, and active CLI/HTTP/oRPC source event read surfaces also exist. Matching
+source events can dispatch through the existing deployment admission use case at the application
+boundary. This matrix still tracks the missing ingestion routes and Web diagnostics. Code Round
+must not mark auto-deploy complete until these rows have stable automation or explicit deferred
+exceptions.
