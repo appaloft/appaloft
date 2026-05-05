@@ -113,8 +113,7 @@ function createHarness() {
             },
             bindingReadiness: { status: "ready" },
             snapshotReadiness: {
-              status: "deferred",
-              reason: "Runtime injection is outside this baseline.",
+              status: "ready",
             },
             status: "active",
             createdAt: "2026-01-01T00:00:00.000Z",

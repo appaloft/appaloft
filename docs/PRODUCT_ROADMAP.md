@@ -836,6 +836,13 @@ Current verification notes:
   does not satisfy the full `0.9.0` release rule while secret rotation, runtime injection,
   deployment snapshot materialization, provider-native database realization, Redis, backup/restore,
   recovery, auto-deploy, preview, and cluster runtime items remain open.
+- 2026-05-05 Phase 7 dependency binding deployment snapshot reference baseline implemented
+  provider-neutral safe Postgres binding references on new deployment attempt snapshots, plus safe
+  readiness summaries on `deployments.plan` and immutable snapshot output on `deployments.show`.
+  This does not materialize raw connection secrets or runtime environment values, and runtime env
+  injection remains deferred. This still does not satisfy the full `0.9.0` release rule while
+  secret rotation, runtime injection, provider-native database realization, Redis, backup/restore,
+  recovery, auto-deploy, preview, and cluster runtime items remain open.
 
 Required:
 

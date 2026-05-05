@@ -16,6 +16,7 @@ import { type Database } from "../schema";
 import {
   normalizeTimestamp,
   resolveRepositoryExecutor,
+  type SerializedDeploymentDependencyBindingReference,
   type SerializedDeploymentLog,
   type SerializedEnvironmentSnapshot,
   type SerializedRuntimePlan,
@@ -83,6 +84,8 @@ function toDeploymentSummary(
   const finishedAt = normalizeTimestamp(row.finished_at);
   const runtimePlan = row.runtime_plan as unknown as SerializedRuntimePlan;
   const environmentSnapshot = row.environment_snapshot as unknown as SerializedEnvironmentSnapshot;
+  const dependencyBindingReferences = (row.dependency_binding_references ??
+    []) as unknown as SerializedDeploymentDependencyBindingReference[];
   const logs = (row.logs ?? []) as unknown as SerializedDeploymentLog[];
   const sourceCommitSha = sourceCommitShaFromRuntimePlan(runtimePlan);
 
@@ -226,6 +229,18 @@ function toDeploymentSummary(
       precedence: [...environmentSnapshot.precedence],
       variables: [...environmentSnapshot.variables],
     },
+    dependencyBindingReferences: dependencyBindingReferences.map((reference) => ({
+      bindingId: reference.bindingId,
+      dependencyResourceId: reference.dependencyResourceId,
+      kind: "postgres",
+      targetName: reference.targetName,
+      scope: reference.scope,
+      injectionMode: reference.injectionMode,
+      snapshotReadiness: {
+        status: reference.snapshotReadiness,
+        ...(reference.snapshotReadinessReason ? { reason: reference.snapshotReadinessReason } : {}),
+      },
+    })),
     logs: logs.map((entry) => ({
       timestamp: entry.timestamp,
       source: entry.source ?? "appaloft",

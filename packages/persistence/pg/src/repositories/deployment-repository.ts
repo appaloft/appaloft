@@ -25,6 +25,7 @@ import { type Database } from "../schema";
 import {
   rehydrateDeploymentRow,
   resolveRepositoryExecutor,
+  serializeDeploymentDependencyBindingReferences,
   serializeDeploymentLogs,
   serializeEnvironmentSnapshot,
   serializeRuntimePlan,
@@ -90,6 +91,9 @@ class KyselyDeploymentMutationVisitor
         status: spec.state.status.value,
         runtime_plan: serializeRuntimePlan(spec.state.runtimePlan),
         environment_snapshot: serializeEnvironmentSnapshot(spec.state.environmentSnapshot),
+        dependency_binding_references: serializeDeploymentDependencyBindingReferences(
+          spec.state.dependencyBindingReferences,
+        ),
         logs: serializeDeploymentLogs(spec.state.logs),
         created_at: spec.state.createdAt.value,
         started_at: spec.state.startedAt?.value ?? null,
@@ -203,6 +207,8 @@ export class PgDeploymentRepository implements DeploymentRepository {
               string,
               unknown
             >,
+            dependency_binding_references: mutation.values
+              .dependency_binding_references as unknown as Record<string, unknown>[],
             logs: mutation.values.logs as unknown as Record<string, unknown>[],
             started_at: mutation.values.started_at ?? null,
             finished_at: mutation.values.finished_at ?? null,

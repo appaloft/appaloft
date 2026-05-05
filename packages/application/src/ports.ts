@@ -2293,6 +2293,28 @@ export interface ResourceDependencyBindingSummary {
   removedAt?: string;
 }
 
+export interface DeploymentDependencyBindingSnapshotReferenceSummary {
+  bindingId: string;
+  dependencyResourceId: string;
+  kind: DependencyResourceKind;
+  targetName: string;
+  scope: ResourceDependencyBindingTargetSummary["scope"];
+  injectionMode: ResourceDependencyBindingTargetSummary["injectionMode"];
+  snapshotReadiness: {
+    status: "ready" | "blocked";
+    reason?: string;
+  };
+}
+
+export interface DeploymentDependencyBindingSnapshotSummary {
+  status: "ready" | "blocked" | "not-applicable";
+  references: DeploymentDependencyBindingSnapshotReferenceSummary[];
+  runtimeInjection: {
+    status: "deferred";
+    reason: string;
+  };
+}
+
 export interface ListResourceDependencyBindingsResult {
   schemaVersion: "resources.dependency-bindings.list/v1";
   items: ResourceDependencyBindingSummary[];
@@ -3043,6 +3065,7 @@ export interface DeploymentSummary {
       isSecret: boolean;
     }>;
   };
+  dependencyBindingReferences?: DeploymentDependencyBindingSnapshotReferenceSummary[];
   logs: DeploymentLogSummary[];
   createdAt: string;
   startedAt?: string;
@@ -3248,6 +3271,7 @@ export interface DeploymentPlanPreview {
     routeCount?: number;
     routeGroupCount?: number;
   };
+  dependencyBindings?: DeploymentDependencyBindingSnapshotSummary;
   warnings: DeploymentPlanReason[];
   unsupportedReasons: DeploymentPlanReason[];
   nextActions: Array<{
@@ -3294,6 +3318,7 @@ export interface DeploymentAttemptTimeline {
 export interface DeploymentAttemptSnapshot {
   runtimePlan: DeploymentDetailSummary["runtimePlan"];
   environmentSnapshot: DeploymentDetailSummary["environmentSnapshot"];
+  dependencyBindings?: DeploymentDependencyBindingSnapshotSummary;
 }
 
 export interface DeploymentAttemptFailureSummary {

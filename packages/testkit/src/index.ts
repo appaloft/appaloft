@@ -1224,8 +1224,13 @@ export class MemoryResourceDependencyBindingReadModel
         status: "ready",
       },
       snapshotReadiness: {
-        status: "deferred",
-        reason: "deployment snapshot dependency binding materialization is deferred",
+        status:
+          dependencyState.status.value === "ready" && bindingState.status.value === "active"
+            ? "ready"
+            : "blocked",
+        ...(dependencyState.status.value === "ready" && bindingState.status.value === "active"
+          ? {}
+          : { reason: "dependency binding is not ready for deployment snapshot reference" }),
       },
       status: bindingState.status.value,
       createdAt: bindingState.createdAt.value,
@@ -2026,6 +2031,20 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
               isSecret: variable.isSecret,
             })),
           },
+          dependencyBindingReferences: deployment.dependencyBindingReferences.map((reference) => ({
+            bindingId: reference.bindingId.value,
+            dependencyResourceId: reference.dependencyResourceId.value,
+            kind: "postgres",
+            targetName: reference.targetName.value,
+            scope: reference.scope.value,
+            injectionMode: reference.injectionMode.value,
+            snapshotReadiness: {
+              status: reference.snapshotReadiness.value,
+              ...(reference.snapshotReadinessReason
+                ? { reason: reference.snapshotReadinessReason.value }
+                : {}),
+            },
+          })),
           createdAt: deployment.createdAt.value,
           ...(deployment.startedAt ? { startedAt: deployment.startedAt.value } : {}),
           ...(deployment.finishedAt ? { finishedAt: deployment.finishedAt.value } : {}),

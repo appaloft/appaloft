@@ -429,8 +429,10 @@ Current scope:
   [Postgres Dependency Resource Lifecycle](./specs/033-postgres-dependency-resource-lifecycle/spec.md)
 - Phase 7 binding baseline under
   [Dependency Resource Binding Baseline](./specs/034-dependency-resource-binding-baseline/spec.md)
+- Phase 7 deployment snapshot safe reference baseline under
+  [Dependency Binding Deployment Snapshot Reference Baseline](./specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
 - Redis, secret rotation, provider-native provisioning/deletion, backup/restore, runtime env
-  injection, and deployment snapshot binding are future Phase 7 work
+  injection, and provider-native runtime materialization are future Phase 7 work
 
 ### Release Orchestration
 
@@ -461,6 +463,9 @@ Boundary rule:
 - `Deployment` does not own durable source binding, runtime profile, network profile, generated
   access policy, domain binding, or certificate policy
 - deployment snapshots may record resolved generated or durable access routes used by that attempt
+- deployment snapshots may record provider-neutral safe dependency binding references copied from
+  active Resource bindings at admission time; these references are immutable attempt context and do
+  not imply runtime environment injection
 - deployment success is not current resource health. Attempt-time verification can feed resource
   health observation, but the long-lived current health view belongs to Workload Delivery read
   models such as `ResourceHealthSummary`.
@@ -819,6 +824,8 @@ Rules:
 - rollback references prior successful execution
 - generated and durable access routes are copied into the runtime plan snapshot for the attempt;
   they are not command input
+- active Resource dependency bindings are copied into safe dependency binding snapshot references;
+  they are not command input and do not contain secret or materialized environment values
 
 Current scope:
 - state machine for plan -> run -> verify -> rollback
@@ -854,7 +861,9 @@ Current scope:
 - wired into Phase 7 Postgres Dependency Resource Binding Baseline through
   `resources.bind-dependency`, `resources.unbind-dependency`,
   `resources.list-dependency-bindings`, and `resources.show-dependency-binding`
-- deployment snapshot materialization and runtime env injection remain deferred
+- new deployment attempts copy active binding metadata into safe dependency binding snapshot
+  references
+- runtime env injection remains deferred
 
 ### ResourceInstance
 

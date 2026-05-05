@@ -325,9 +325,10 @@ Current boundary:
   Postgres delete removes only Appaloft's record, and list/show output masks connection secrets.
 - Resource dependency bindings are provider-neutral `ResourceBinding` records in this slice. Bind
   requires matching project/environment ownership, stores only safe target metadata and secret
-  reference pointers, and reports deployment snapshot materialization as deferred. Unbind removes
-  only the binding association; it does not delete the dependency resource, external/provider
-  database, runtime state, backup data, or historical snapshots.
+  reference pointers, and reports safe deployment snapshot-reference readiness while runtime env
+  injection remains deferred. Unbind removes only the binding association; it does not delete the
+  dependency resource, external/provider database, runtime state, backup data, or historical
+  snapshots.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).
@@ -556,8 +557,8 @@ Current boundary:
   deployment context references as `deployments.create`, resolves current Resource source/runtime/
   network/health/access profile into safe source inspection evidence, selected planner/support
   tier, Docker/OCI artifact intent, sanitized command specs, network, health, access summary,
-  warnings, and unsupported reasons, and stops before deployment attempt creation or runtime
-  execution.
+  dependency binding snapshot-reference readiness, warnings, and unsupported reasons, and stops
+  before deployment attempt creation or runtime execution.
 - `deployments.plan` exposes the same runtime plan resolution contract that `deployments.create`
   uses before execution. Unsupported frameworks, unsupported runtime families, ambiguous framework
   or build-tool evidence, missing build/start/internal-port/source-root/artifact output,
@@ -577,8 +578,9 @@ Current boundary:
   build/run/verify/proxy work, mutate runtime/server state, or accept source/runtime/network fields
   that belong to resource profile commands.
 - `deployments.show` is the active immutable-attempt deployment detail surface. It returns
-  deployment context, historical snapshot, timeline, and safe related context while keeping
-  deployment logs on `deployments.logs` and current health on `resources.health`.
+  deployment context, historical snapshot, safe dependency binding references copied at admission
+  time, timeline, and safe related context while keeping deployment logs on `deployments.logs` and
+  current health on `resources.health`.
 - `deployments.stream-events` is the read-only replay/follow observation surface for one accepted
   deployment attempt. It does not replace immutable detail on `deployments.show`, full attempt
   logs on `deployments.logs`, or reintroduce `deployments.reattach` as a write command.

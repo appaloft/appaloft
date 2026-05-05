@@ -38,6 +38,7 @@ user intent
   -> explicit deployments.create command input with ids only
   -> command admission
   -> resolve resource network/access snapshots from resource, server, domain, and default access policy state
+  -> copy active Resource dependency binding safe references into the deployment attempt snapshot
   -> deployment-requested
   -> runtime target backend is selected from deployment target, destination, provider key, and capabilities
   -> Git-backed source is materialized and the resolved commit object id is persisted when source cloning is used
@@ -222,7 +223,33 @@ provider-neutral.
 | project/environment/server/destination/resource context | Entry workflow may collect/create required context; destination may use the compatibility default seam; command admission rejects if still unresolved or inconsistent. |
 | Generated default access | Entry workflow does not collect provider-specific generated-domain settings. Deployment route resolution uses configured policy and the provider-neutral default access domain port. |
 | Domain/TLS intent | Entry workflow must use `domain-bindings.create` and certificate commands. It must not pass domain/TLS fields to `deployments.create`. |
+| Dependency binding metadata | Entry workflow must use `resources.bind-dependency` before deployment. `deployments.create` reads active Resource dependency bindings and copies only safe reference metadata into the attempt snapshot. It must not accept dependency resource ids, database URLs, usernames, passwords, provider credentials, secret rotation options, or materialized environment values as command input. |
 | Quick Deploy context | Collected by the Quick Deploy workflow through explicit operations; it is not a separate deployment command. |
+
+## Dependency Binding Snapshot References
+
+When a Resource has active Postgres dependency bindings, `deployments.create` records
+provider-neutral safe binding references in the immutable deployment attempt snapshot.
+
+The copied reference may include:
+
+- binding id;
+- dependency resource id;
+- dependency kind;
+- target name;
+- scope;
+- injection mode;
+- snapshot readiness.
+
+The copied reference must not include raw connection URLs, usernames, passwords, tokens, provider
+credentials, private keys, sensitive connection query parameters, materialized environment
+variables, or runtime-rendered secret values.
+
+This first slice does not inject dependency bindings into the runtime environment. Missing,
+removed, or not-ready binding state is represented as a safe readiness diagnostic; it does not
+change deployment admission unless a later runtime-env-injection ADR/spec explicitly makes that
+state a blocker. Removed bindings are omitted from new deployment snapshots. Historical deployment
+snapshots are not rewritten when a binding is later removed or changed.
 
 ## Runtime Port Behavior
 
