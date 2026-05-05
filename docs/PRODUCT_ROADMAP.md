@@ -879,6 +879,13 @@ Current verification notes:
   cleanup before delete tombstone. Backup/restore remains a separate required slice, so the full
   `0.9.0` release rule remains blocked by backup/restore, recovery, auto-deploy, preview, and
   cluster runtime items.
+- 2026-05-05 Phase 7 dependency resource backup/restore Spec Round positioned
+  `dependency-resources.create-backup`, `dependency-resources.restore-backup`,
+  `dependency-resources.list-backups`, and `dependency-resources.show-backup` under ADR-036 with
+  safe restore point metadata, in-place restore acknowledgements, provider capability boundaries,
+  delete-safety retention blockers, and lifecycle event specs. It does not implement the Code
+  Round yet, so the full `0.9.0` release rule remains blocked by backup/restore Code Round,
+  recovery, auto-deploy, preview, and cluster runtime items.
 
 Required:
 

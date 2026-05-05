@@ -438,8 +438,33 @@ Current scope:
   [Redis Dependency Resource Lifecycle](./specs/037-redis-dependency-resource-lifecycle/spec.md)
 - Phase 7 provider-native Postgres realization baseline under
   [Postgres Provider-Native Realization](./specs/038-postgres-provider-native-realization/spec.md)
-- provider-native credential rotation, backup/restore, runtime env injection, and provider-native
-  runtime materialization are future Phase 7 work
+- Phase 7 dependency resource backup/restore planned baseline under
+  [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md)
+- provider-native credential rotation, runtime env injection, and provider-native runtime
+  materialization are future Phase 7 work
+
+### Dependency Resource Backup
+
+Meaning:
+- a dependency-resource-owned backup attempt and restore point represented by
+  `DependencyResourceBackup`
+
+Rules:
+- one backup belongs to one `ResourceInstance`
+- ready backups expose only safe restore point metadata and provider artifact handles
+- restore is in-place to the same dependency resource in the first Phase 7 slice
+- restore requires explicit overwrite and runtime-not-restarted acknowledgements
+- retained ready backups and in-flight backup/restore attempts block dependency resource deletion
+- backup/restore must not mutate ResourceBindings, historical deployment snapshots, runtime env, or
+  workload runtime state
+- raw dump contents, passwords, provider credentials, raw connection URLs, provider SDK payloads,
+  and command output must not appear in core state, read models, events, errors, logs, or public
+  contracts
+
+Current scope:
+- governed by
+  [ADR-036: Dependency Resource Backup And Restore Lifecycle](./decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md)
+  and [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md)
 
 ### Release Orchestration
 

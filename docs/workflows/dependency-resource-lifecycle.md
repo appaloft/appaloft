@@ -14,6 +14,8 @@ dispatch one explicit operation:
 - `dependency-resources.import-redis`
 - `dependency-resources.rename`
 - `dependency-resources.delete`
+- `dependency-resources.create-backup`
+- `dependency-resources.restore-backup`
 - `resources.bind-dependency`
 - `resources.unbind-dependency`
 - `resources.rotate-dependency-binding-secret`
@@ -22,12 +24,16 @@ Every read must dispatch one explicit query:
 
 - `dependency-resources.list`
 - `dependency-resources.show`
+- `dependency-resources.list-backups`
+- `dependency-resources.show-backup`
 - `resources.list-dependency-bindings`
 - `resources.show-dependency-binding`
 
-The current implemented workflow is not backup/restore, not provider-native credential rotation,
-not runtime env injection, and not a deployment command. Provider-native Postgres realization is
-implemented through a hermetic provider capability under
+Backup/restore is planned by ADR-036 and
+[Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md)
+and becomes active during Code Round. The current implemented workflow is not provider-native
+credential rotation, not runtime env injection, and not a deployment command. Provider-native
+Postgres realization is implemented through a hermetic provider capability under
 [Postgres Provider-Native Realization](../specs/038-postgres-provider-native-realization/spec.md).
 
 ## Global References
@@ -38,17 +44,25 @@ implemented through a hermetic provider capability under
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
+- [ADR-036: Dependency Resource Backup And Restore Lifecycle](../decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md)
 - [Postgres Dependency Resource Lifecycle](../specs/033-postgres-dependency-resource-lifecycle/spec.md)
 - [Dependency Resource Binding Baseline](../specs/034-dependency-resource-binding-baseline/spec.md)
 - [Dependency Binding Deployment Snapshot Reference Baseline](../specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
 - [Dependency Binding Secret Rotation](../specs/036-dependency-binding-secret-rotation/spec.md)
 - [Redis Dependency Resource Lifecycle](../specs/037-redis-dependency-resource-lifecycle/spec.md)
 - [Postgres Provider-Native Realization](../specs/038-postgres-provider-native-realization/spec.md)
+- [Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md)
 - [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
 - [dependency-resource-realization-requested](../events/dependency-resource-realization-requested.md)
 - [dependency-resource-realized](../events/dependency-resource-realized.md)
 - [dependency-resource-realization-failed](../events/dependency-resource-realization-failed.md)
 - [dependency-resource-provider-delete-requested](../events/dependency-resource-provider-delete-requested.md)
+- [dependency-resource-backup-requested](../events/dependency-resource-backup-requested.md)
+- [dependency-resource-backup-completed](../events/dependency-resource-backup-completed.md)
+- [dependency-resource-backup-failed](../events/dependency-resource-backup-failed.md)
+- [dependency-resource-restore-requested](../events/dependency-resource-restore-requested.md)
+- [dependency-resource-restore-completed](../events/dependency-resource-restore-completed.md)
+- [dependency-resource-restore-failed](../events/dependency-resource-restore-failed.md)
 - [Dependency Resource Test Matrix](../testing/dependency-resource-test-matrix.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -71,7 +85,8 @@ The workflow lets operators:
 9. Rotate a binding-scoped secret reference for future deployment snapshots without changing
    historical deployments.
 10. Register Redis dependency resources as safe provider-neutral records.
-11. Delete only dependency resources that pass safety checks.
+11. Create safe backup restore points and restore them in place after explicit acknowledgement.
+12. Delete only dependency resources that pass safety checks.
 
 ## Operation Boundaries
 
@@ -85,6 +100,10 @@ The workflow lets operators:
 | Show dependency resource | `dependency-resources.show` | Nothing | Any aggregate or runtime state |
 | Rename dependency resource | `dependency-resources.rename` | Dependency resource name/slug | Bindings, backup metadata, provider state, runtime, snapshots |
 | Delete dependency resource | `dependency-resources.delete` | Dependency resource lifecycle/tombstone | External/provider database, bindings, backup data, runtime cleanup |
+| Create dependency resource backup | `dependency-resources.create-backup` | `DependencyResourceBackup` attempt/restore point | Resource bindings, dependency resource lifecycle, runtime, deployment snapshots |
+| Restore dependency resource backup | `dependency-resources.restore-backup` | Restore attempt and provider data behind dependency resource | Resource bindings, deployment rollback/redeploy, runtime restart, snapshots |
+| List dependency resource backups | `dependency-resources.list-backups` | Nothing | Any aggregate, provider, runtime, or deployment state |
+| Show dependency resource backup | `dependency-resources.show-backup` | Nothing | Any aggregate, provider, runtime, or deployment state |
 | Bind dependency to Resource | `resources.bind-dependency` | ResourceBinding | Provider database, ResourceInstance lifecycle, runtime, historical deployment snapshots |
 | Unbind dependency from Resource | `resources.unbind-dependency` | ResourceBinding lifecycle/tombstone | Dependency resource, external/provider database, runtime cleanup, snapshots |
 | Rotate binding secret reference | `resources.rotate-dependency-binding-secret` | ResourceBinding safe secret reference/version | Provider database credentials, Dependency Resource lifecycle, runtime env injection, historical deployment snapshots |
@@ -188,6 +207,26 @@ Failure uses stable structured errors and safe blocker details. Imported externa
 deletes the external database. Realized Appaloft-managed Postgres delete calls the managed provider
 cleanup only after explicit provider delete safety and cleanup succeeds.
 
+## Backup And Restore
+
+Backup/restore is an accepted Phase 7 candidate governed by ADR-036 and
+[Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md).
+The first slice:
+
+- creates one `DependencyResourceBackup` attempt for one ready dependency resource;
+- records a ready restore point only as safe provider artifact metadata;
+- restores in place to the same dependency resource after explicit data-overwrite and
+  runtime-not-restarted acknowledgements;
+- reports backup and restore progress through safe read models and lifecycle events;
+- blocks dependency resource delete while retained restore points or in-flight backup/restore
+  attempts exist.
+
+Backup/restore must not expose raw dump contents, raw connection URLs, passwords, tokens, auth
+headers, cookies, SSH credentials, provider tokens, private keys, sensitive query parameters,
+provider SDK payloads, or command output. It also must not mutate ResourceBindings, historical
+deployment snapshots, runtime environment values, workload process state, deployment retry,
+redeploy, or rollback state.
+
 ## Deployment Relationship
 
 Dependency resources do not add input fields to deployment admission in this slice.
@@ -222,8 +261,8 @@ metadata, safe read models, real active-binding delete blockers, and safe depend
 snapshot references. Binding secret rotation updates binding-scoped safe secret references for
 future deployment snapshots only. Redis dependency resource lifecycle records are implemented as
 provider-neutral safe metadata. Provider-native Postgres realization is implemented with a
-hermetic provider capability. Backup/restore, runtime env injection, Web affordances, and runtime
-cleanup remain future work.
+hermetic provider capability. Backup/restore is specified by ADR-036/039 but not implemented yet.
+Runtime env injection, Web affordances, and runtime cleanup remain future work.
 
 ## Open Questions
 
