@@ -197,8 +197,8 @@ Still blocking 1.0.0:
 - [ ] Dependency resources and bindings exist in core but lack provisioning, binding, backup, and
   deletion commands.
 - [ ] Framework coverage is narrower than the target product catalog.
-- [ ] Docker Swarm support is not yet specified and implemented as a supported `1.0.0` runtime target
-  backend.
+- [ ] Docker Swarm support is specified but not yet implemented as a supported `1.0.0` runtime
+  target backend.
 - [ ] Durable outbox/inbox, job state, process attempts, dead-letter/retry state, remote-state
   recovery, and audit visibility are not a complete operator surface.
 
@@ -1116,9 +1116,12 @@ Required:
   retries.
 - [ ] Add scheduled task/cron resource shape with run history and logs after workload service
   semantics are specified. ADR-039/spec matrix now position ownership and target operations.
-- [ ] Complete the Docker Swarm Spec Round and Code Round as the first cluster runtime target:
+- [x] Complete the Docker Swarm Spec Round as the first cluster runtime target:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
-  semantics, normalized read surfaces, and contract tests.
+  semantics, normalized read surfaces, and contract test matrix are specified.
+- [ ] Complete the Docker Swarm Code Round as the first cluster runtime target:
+  target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
+  semantics, normalized read surfaces, public docs/help, and contract tests are implemented.
 
 Exit criteria:
 

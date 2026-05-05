@@ -159,13 +159,23 @@ normalized.
 
 ### Docker Swarm Backend
 
-Before Code Round:
+The Spec Round is positioned in
+[Docker Swarm Runtime Target](../specs/045-docker-swarm-runtime-target/spec.md) and
+[Docker Swarm Runtime Target Test Matrix](../testing/docker-swarm-runtime-target-test-matrix.md).
 
-- define target registration/readiness for a Swarm manager;
-- define destination placement and stack identity;
-- define registry push/pull and secret handling;
+Before Code Round, the implementation must use those artifacts to:
+
+- add failing tests for target registration/readiness, ids-only deployment admission, registry
+  selection, render/apply/verify/log/health/cleanup, route realization, redaction, and capacity
+  diagnostics;
+- implement Swarm manager target readiness through provider-neutral `DeploymentTarget`/
+  `Destination` language and `docker-swarm` backend capabilities;
+- define destination placement and adapter-owned stack/network identity without storing raw Swarm
+  manifests or Docker API payloads as aggregate state;
+- define registry push/pull and secret handling with masked secret references only;
 - define service update, health, logs, diagnostics, cleanup, and rollback-candidate identity;
-- update deployment and resource health/log/proxy specs.
+- update deployment and resource health/log/proxy/public-doc surfaces only through normalized
+  Appaloft read models.
 
 This backend is required before `1.0.0`; the abstraction is not roadmap-complete until these Swarm
 contracts and the corresponding implementation/tests exist.

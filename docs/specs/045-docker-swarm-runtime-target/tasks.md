@@ -1,0 +1,51 @@
+# Tasks: Docker Swarm Runtime Target
+
+## Spec Round
+
+- [x] Confirm ADR-021 and ADR-023 govern the Swarm boundary without a new ADR.
+- [x] Position Docker Swarm as an internal runtime target capability in the business operation map.
+- [x] Create local spec, plan, and task artifacts.
+- [x] Create the Docker Swarm runtime target test matrix.
+- [x] Update runtime target workflow, implementation plan, and roadmap notes without marking Code
+  Round complete.
+
+## Test-First
+
+- [ ] `SWARM-TARGET-REG-001`: Swarm manager target registration/readiness accepts only safe
+  provider-neutral target metadata.
+- [ ] `SWARM-TARGET-ADM-001`: `deployments.create` remains ids-only and rejects Swarm deployment
+  fields.
+- [ ] `SWARM-TARGET-SELECT-001`: backend registry selects `docker-swarm` by target kind, provider
+  key, and capabilities.
+- [ ] `SWARM-TARGET-RENDER-001`: OCI image and Compose artifact intent render to adapter-owned
+  Swarm stack/service intent.
+- [ ] `SWARM-TARGET-APPLY-001`: rollout preserves or restores previous same-resource service until
+  verification succeeds.
+- [ ] `SWARM-TARGET-OBS-001`: logs and health return normalized Appaloft read-model shapes.
+- [ ] `SWARM-TARGET-CLEAN-001`: cleanup stays resource/deployment/destination scoped.
+- [ ] `SWARM-TARGET-ROUTE-001`: reverse-proxy access routes attach through Swarm service/network
+  identity without public workload host ports.
+- [ ] `SWARM-TARGET-SECRET-001`: registry credentials, pull secrets, env values, and rendered
+  command/provider payloads are redacted.
+
+## Implementation
+
+- [ ] Add Swarm-capable target registration/readiness support.
+- [ ] Add Swarm runtime target backend descriptor and registry selection.
+- [ ] Implement render/apply/verify/log/health/cleanup behind runtime adapters.
+- [ ] Add sanitized target identity persistence/read-model support where required.
+- [ ] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.
+
+## Docs Round
+
+- [ ] Add public docs/help anchor for Docker Swarm runtime targets.
+- [ ] Add CLI/API descriptions and Web help links for Swarm target readiness and unsupported-field
+  recovery.
+
+## Verification
+
+- [ ] Run targeted domain/application/adapter tests.
+- [ ] Run fake Swarm backend acceptance tests.
+- [ ] Run opt-in real Swarm smoke tests when environment is available.
+- [ ] Run `bun run lint`.
+- [ ] Run `bun turbo run typecheck`.

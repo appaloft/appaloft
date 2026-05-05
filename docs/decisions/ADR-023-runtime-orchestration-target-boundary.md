@@ -176,6 +176,8 @@ Implementation work should move toward:
 - [deployments.create Test Matrix](../testing/deployments.create-test-matrix.md)
 - [Deployment Runtime Target Abstraction Workflow](../workflows/deployment-runtime-target-abstraction.md)
 - [Runtime Target Abstraction Implementation Plan](../implementation/runtime-target-abstraction-plan.md)
+- [Docker Swarm Runtime Target Spec](../specs/045-docker-swarm-runtime-target/spec.md)
+- [Docker Swarm Runtime Target Test Matrix](../testing/docker-swarm-runtime-target-test-matrix.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](./ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-018: Resource Runtime Log Observation](./ADR-018-resource-runtime-log-observation.md)
@@ -196,9 +198,10 @@ Current `ExecutionBackend` includes `cancel` and `rollback` methods even though 
 public operations out of the v1 surface. Those backend capabilities may remain internal, but target
 backend contracts must not imply public cancel or rollback until their own specs are accepted.
 
-Kubernetes and Docker Swarm backends are not active implementation targets yet. This ADR fixes the
-direction and boundary so future specs can add them without changing deployment admission; the
-current roadmap priority is to land Docker Swarm before `1.0.0`.
+Docker Swarm is specified as the first cluster runtime target, but the backend is not active yet.
+Kubernetes is not an active implementation target. This ADR fixes the direction and boundary so
+runtime target backends can be added without changing deployment admission; the current roadmap
+priority is to land Docker Swarm before `1.0.0`.
 
 ## Open Questions
 
