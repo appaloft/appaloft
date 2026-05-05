@@ -2189,6 +2189,9 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
           ...(deployment.sourceDeploymentId
             ? { sourceDeploymentId: deployment.sourceDeploymentId.value }
             : {}),
+          ...(deployment.rollbackCandidateDeploymentId
+            ? { rollbackCandidateDeploymentId: deployment.rollbackCandidateDeploymentId.value }
+            : {}),
           ...(sourceCommitSha ? { sourceCommitSha } : {}),
           runtimePlan: {
             id: deployment.runtimePlan.id,
@@ -2376,6 +2379,9 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
           ...(deployment.finishedAt ? { finishedAt: deployment.finishedAt.value } : {}),
           ...(deployment.rollbackOfDeploymentId
             ? { rollbackOfDeploymentId: deployment.rollbackOfDeploymentId.value }
+            : {}),
+          ...(deployment.rollbackCandidateDeploymentId
+            ? { rollbackCandidateDeploymentId: deployment.rollbackCandidateDeploymentId.value }
             : {}),
           ...(deployment.supersedesDeploymentId
             ? { supersedesDeploymentId: deployment.supersedesDeploymentId.value }

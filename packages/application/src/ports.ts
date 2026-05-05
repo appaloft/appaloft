@@ -2982,6 +2982,7 @@ export interface DeploymentSummary {
   status: DeploymentStatus;
   triggerKind?: DeploymentTriggerKind;
   sourceDeploymentId?: string;
+  rollbackCandidateDeploymentId?: string;
   sourceCommitSha?: string;
   runtimePlan: {
     id: string;
