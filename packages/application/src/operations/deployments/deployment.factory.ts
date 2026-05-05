@@ -71,11 +71,12 @@ export class DeploymentFactory {
   }
 
   createRollback(input: {
-    deployment: DeploymentAggregate;
-    rollbackOfDeploymentId: DeploymentId;
+    candidateDeployment: DeploymentAggregate;
+    sourceDeploymentId: DeploymentId;
+    supersedesDeploymentId?: DeploymentId;
   }): Result<DeploymentAggregate> {
     const { clock, idGenerator } = this;
-    const state = input.deployment.toState();
+    const state = input.candidateDeployment.toState();
 
     return safeTry(function* () {
       const deploymentId = yield* DeploymentId.create(idGenerator.next("dep"));
@@ -92,9 +93,12 @@ export class DeploymentFactory {
         environmentSnapshot: state.environmentSnapshot,
         dependencyBindingReferences: state.dependencyBindingReferences,
         createdAt,
-        triggerKind: state.triggerKind,
-        sourceDeploymentId: state.id,
-        rollbackOfDeploymentId: input.rollbackOfDeploymentId,
+        triggerKind: DeploymentTriggerKindValue.rollback(),
+        sourceDeploymentId: input.sourceDeploymentId,
+        rollbackCandidateDeploymentId: state.id,
+        ...(input.supersedesDeploymentId
+          ? { supersedesDeploymentId: input.supersedesDeploymentId }
+          : {}),
       });
     });
   }

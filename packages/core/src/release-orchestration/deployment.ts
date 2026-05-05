@@ -95,6 +95,7 @@ export interface DeploymentState {
   finishedAt?: FinishedAt;
   triggerKind: DeploymentTriggerKindValue;
   sourceDeploymentId?: DeploymentId;
+  rollbackCandidateDeploymentId?: DeploymentId;
   rollbackOfDeploymentId?: DeploymentId;
   supersedesDeploymentId?: DeploymentId;
   supersededByDeploymentId?: DeploymentId;
@@ -127,6 +128,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     createdAt: CreatedAt;
     triggerKind?: DeploymentTriggerKindValue;
     sourceDeploymentId?: DeploymentId;
+    rollbackCandidateDeploymentId?: DeploymentId;
     rollbackOfDeploymentId?: DeploymentId;
     supersedesDeploymentId?: DeploymentId;
     supersededByDeploymentId?: DeploymentId;
@@ -151,6 +153,9 @@ export class Deployment extends AggregateRoot<DeploymentState> {
         createdAt: input.createdAt,
         triggerKind: input.triggerKind ?? DeploymentTriggerKindValue.createDefault(),
         ...(input.sourceDeploymentId ? { sourceDeploymentId: input.sourceDeploymentId } : {}),
+        ...(input.rollbackCandidateDeploymentId
+          ? { rollbackCandidateDeploymentId: input.rollbackCandidateDeploymentId }
+          : {}),
         ...(input.rollbackOfDeploymentId
           ? { rollbackOfDeploymentId: input.rollbackOfDeploymentId }
           : {}),
@@ -341,11 +346,15 @@ export class Deployment extends AggregateRoot<DeploymentState> {
   private recoveryEventPayload(): {
     triggerKind: DeploymentTriggerKind;
     sourceDeploymentId?: string;
+    rollbackCandidateDeploymentId?: string;
   } {
     return {
       triggerKind: this.state.triggerKind.value,
       ...(this.state.sourceDeploymentId
         ? { sourceDeploymentId: this.state.sourceDeploymentId.value }
+        : {}),
+      ...(this.state.rollbackCandidateDeploymentId
+        ? { rollbackCandidateDeploymentId: this.state.rollbackCandidateDeploymentId.value }
         : {}),
     };
   }

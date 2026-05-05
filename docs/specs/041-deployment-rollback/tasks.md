@@ -13,7 +13,7 @@
 
 ## Test-First Round
 
-- [ ] Add core tests for rollback trigger/source/candidate metadata.
+- [x] Add core tests for rollback trigger/source/candidate metadata.
 - [ ] Add application tests for `DEP-ROLLBACK-001` through `DEP-ROLLBACK-005`.
 - [ ] Add PG/PGlite persistence tests for rollback trigger/source/candidate metadata.
 - [ ] Add CLI and oRPC/HTTP dispatch tests for `DEP-ROLLBACK-ENTRY-001`.
@@ -22,8 +22,8 @@
 
 ## Implementation
 
-- [ ] Add `rollbackCandidateDeploymentId` value-object-backed state to `Deployment`.
-- [ ] Add deployment factory helper for rollback attempt creation.
+- [x] Add `rollbackCandidateDeploymentId` value-object-backed state to `Deployment`.
+- [x] Add deployment factory helper for rollback attempt creation.
 - [ ] Add rollback orchestration from selected candidate runtime plan, environment snapshot, target/
   destination ids, dependency binding snapshot references, and retained artifact identity.
 - [ ] Add `RollbackDeploymentCommand`, schema, handler, use case, and tokens.
@@ -44,7 +44,7 @@
 
 ## Verification
 
-- [ ] Run targeted core/application rollback tests.
+- [x] Run targeted core/application rollback tests.
 - [ ] Run targeted PG/PGlite persistence tests.
 - [ ] Run targeted CLI/oRPC/HTTP tests.
 - [ ] Run targeted Web semantic/browser tests.

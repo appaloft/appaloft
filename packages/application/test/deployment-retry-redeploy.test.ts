@@ -200,3 +200,26 @@ describe("RetryDeploymentUseCase", () => {
     });
   });
 });
+
+describe("DeploymentFactory recovery helpers", () => {
+  test("[DEP-ROLLBACK-001] creates rollback attempts from selected candidate state", () => {
+    const factory = new DeploymentFactory(
+      new FixedClock("2026-01-01T00:00:15.000Z"),
+      new SequenceIdGenerator(),
+    );
+
+    const result = factory.createRollback({
+      candidateDeployment: sourceDeployment("succeeded"),
+      sourceDeploymentId: DeploymentId.rehydrate("dep_failed"),
+    });
+
+    expect(result.isOk()).toBe(true);
+    const rollbackState = result._unsafeUnwrap().toState();
+    expect(rollbackState.id.value).toBe("dep_0001");
+    expect(rollbackState.triggerKind.value).toBe("rollback");
+    expect(rollbackState.sourceDeploymentId).toEqual(DeploymentId.rehydrate("dep_failed"));
+    expect(rollbackState.rollbackCandidateDeploymentId).toEqual(
+      DeploymentId.rehydrate("dep_source"),
+    );
+  });
+});
