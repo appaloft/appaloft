@@ -1679,6 +1679,7 @@ export interface ResourceSummary {
   deploymentCount: number;
   lastDeploymentId?: string;
   lastDeploymentStatus?: DeploymentStatus;
+  latestRuntimeControl?: ResourceRuntimeControlSummary;
   accessSummary?: ResourceAccessSummary;
 }
 
@@ -2486,7 +2487,8 @@ export type ResourceHealthSource =
   | "health-check"
   | "proxy"
   | "public-access"
-  | "domain-binding";
+  | "domain-binding"
+  | "runtime-control";
 
 export interface ResourceHealthSourceError {
   source: ResourceHealthSource;
@@ -2569,6 +2571,53 @@ export interface ResourceHealthCheck {
   metadata?: Record<string, string>;
 }
 
+export type ResourceRuntimeControlOperation = "stop" | "start" | "restart";
+
+export type ResourceRuntimeControlStatus =
+  | "accepted"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "blocked";
+
+export type ResourceRuntimeControlRuntimeState =
+  | "starting"
+  | "running"
+  | "restarting"
+  | "stopping"
+  | "stopped"
+  | "unknown";
+
+export type ResourceRuntimeControlBlockedReason =
+  | "resource-archived"
+  | "resource-deleted"
+  | "runtime-not-found"
+  | "runtime-metadata-stale"
+  | "runtime-already-running"
+  | "runtime-already-stopped"
+  | "runtime-control-in-progress"
+  | "deployment-in-progress"
+  | "profile-acknowledgement-required"
+  | "adapter-unsupported";
+
+export interface ResourceRuntimeControlPhaseSummary {
+  phase: "stop" | "start";
+  status: "pending" | "running" | "succeeded" | "failed" | "skipped";
+  errorCode?: string;
+}
+
+export interface ResourceRuntimeControlSummary {
+  runtimeControlAttemptId: string;
+  operation: ResourceRuntimeControlOperation;
+  status: ResourceRuntimeControlStatus;
+  startedAt: string;
+  completedAt?: string;
+  runtimeState: ResourceRuntimeControlRuntimeState;
+  blockedReason?: ResourceRuntimeControlBlockedReason;
+  errorCode?: string;
+  phases?: ResourceRuntimeControlPhaseSummary[];
+}
+
 export interface ResourceHealthProbeRequest {
   name: string;
   target: "runtime" | "public-access";
@@ -2607,6 +2656,7 @@ export interface ResourceHealthSummary {
   overall: ResourceHealthOverall;
   latestDeployment?: ResourceHealthDeploymentContext;
   runtime: ResourceRuntimeHealthSection;
+  latestRuntimeControl?: ResourceRuntimeControlSummary;
   healthPolicy: ResourceHealthPolicySection;
   publicAccess: ResourcePublicAccessHealthSection;
   proxy: ResourceProxyHealthSection;

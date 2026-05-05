@@ -874,6 +874,7 @@ export class ResourceHealthQueryService {
     const observedAt = generatedAt;
     const sourceErrors: ResourceHealthSourceError[] = [];
     const latestDeploymentHealthContext = latestDeploymentContext(latestDeployment);
+    const latestRuntimeControl = resource.latestRuntimeControl;
 
     this.recordUnsupportedLiveInspectionRequests(query, resource, sourceErrors);
 
@@ -1072,6 +1073,7 @@ export class ResourceHealthQueryService {
       overall,
       ...(latestDeploymentHealthContext ? { latestDeployment: latestDeploymentHealthContext } : {}),
       runtime,
+      ...(latestRuntimeControl ? { latestRuntimeControl } : {}),
       healthPolicy,
       publicAccess,
       proxy,

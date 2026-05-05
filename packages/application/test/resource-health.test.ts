@@ -407,6 +407,59 @@ describe("ResourceHealthQueryService", () => {
     );
   });
 
+  test("[RUNTIME-CTRL-READ-001] includes latest runtime-control readback when projected", async () => {
+    const service = createService({
+      resources: [
+        resourceSummary({
+          latestRuntimeControl: {
+            runtimeControlAttemptId: "rtc_0001",
+            operation: "restart",
+            status: "failed",
+            startedAt: "2026-01-01T00:00:06.000Z",
+            completedAt: "2026-01-01T00:00:08.000Z",
+            runtimeState: "stopped",
+            errorCode: "resource_runtime_control_failed",
+            phases: [
+              {
+                phase: "stop",
+                status: "succeeded",
+              },
+              {
+                phase: "start",
+                status: "failed",
+                errorCode: "resource_runtime_control_failed",
+              },
+            ],
+          },
+        }),
+      ],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().latestRuntimeControl).toEqual({
+      runtimeControlAttemptId: "rtc_0001",
+      operation: "restart",
+      status: "failed",
+      startedAt: "2026-01-01T00:00:06.000Z",
+      completedAt: "2026-01-01T00:00:08.000Z",
+      runtimeState: "stopped",
+      errorCode: "resource_runtime_control_failed",
+      phases: [
+        {
+          phase: "stop",
+          status: "succeeded",
+        },
+        {
+          phase: "start",
+          status: "failed",
+          errorCode: "resource_runtime_control_failed",
+        },
+      ],
+    });
+  });
+
   test("[RES-HEALTH-QRY-020][EDGE-PROXY-ROUTE-005][HEALTH-ACCESS-001] reports server-applied domain before generated route", async () => {
     const service = createService({
       resources: [
