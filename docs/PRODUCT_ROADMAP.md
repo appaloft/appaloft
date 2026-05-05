@@ -1149,6 +1149,10 @@ Current verification notes:
   scheduler candidate scanning for enabled tasks, timezone-aware current-minute schedule matching,
   and same-minute duplicate scheduled-run suppression. Automatic shell/background runner wiring,
   entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task shell composition slice registered the inactive scheduled-task
+  repositories, read models, due-candidate reader, run-log recorder, runtime port, command/query
+  handlers, use cases, scheduler, and accepted-run worker in the shell DI root. Automatic
+  shell/background runner wiring, entrypoints, and public docs remain open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm

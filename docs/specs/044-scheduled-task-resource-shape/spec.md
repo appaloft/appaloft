@@ -105,6 +105,9 @@ DDD or internal process-manager terminology.
 - Scheduled task due-candidate read-model support exists for Postgres/PGlite. It scans enabled
   task definitions, evaluates the accepted schedule subset for the current timezone-aware minute,
   and suppresses candidates already admitted as scheduled runs in that same minute.
+- Shell composition registrations exist for scheduled-task repositories, read models, due-candidate
+  reader, run-log recorder, runtime port, handlers, use cases, scheduler, and accepted-run worker.
+  No public transport or automatic timer starts those components yet.
 - No operation catalog entries are active.
 - No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
 - No shell scheduler runner or background worker runner that automatically drains accepted

@@ -9,6 +9,7 @@ import {
 import {
   createDefaultRuntimeTargetBackendRegistry,
   DefaultRuntimePlanResolver,
+  HermeticScheduledTaskRuntimePort,
   InMemoryExecutionBackend,
   LocalExecutionBackend,
   RoutingExecutionBackend,
@@ -98,6 +99,13 @@ import {
   PgResourceReadModel,
   PgResourceRepository,
   PgResourceRuntimeControlAttemptRecorder,
+  PgScheduledTaskDefinitionRepository,
+  PgScheduledTaskDueCandidateReader,
+  PgScheduledTaskReadModel,
+  PgScheduledTaskRunAttemptRepository,
+  PgScheduledTaskRunLogReadModel,
+  PgScheduledTaskRunLogRecorder,
+  PgScheduledTaskRunReadModel,
   PgServerDeletionBlockerReader,
   PgServerReadModel,
   PgServerRepository,
@@ -749,6 +757,24 @@ export function registerRuntimeDependencies(
   container.register(tokens.resourceRepository, {
     useFactory: instanceCachingFactory(() => new PgResourceRepository(input.database.db)),
   });
+  container.register(tokens.scheduledTaskDefinitionRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgScheduledTaskDefinitionRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.scheduledTaskRunAttemptRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgScheduledTaskRunAttemptRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.scheduledTaskRunLogRecorder, {
+    useFactory: instanceCachingFactory(() => new PgScheduledTaskRunLogRecorder(input.database.db)),
+  });
+  container.register(tokens.scheduledTaskDueCandidateReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgScheduledTaskDueCandidateReader(input.database.db),
+    ),
+  });
   container.register(tokens.dependencyResourceRepository, {
     useFactory: instanceCachingFactory(() => new PgDependencyResourceRepository(input.database.db)),
   });
@@ -875,6 +901,15 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.resourceReadModel, {
     useFactory: instanceCachingFactory(() => new PgResourceReadModel(input.database.db)),
+  });
+  container.register(tokens.scheduledTaskReadModel, {
+    useFactory: instanceCachingFactory(() => new PgScheduledTaskReadModel(input.database.db)),
+  });
+  container.register(tokens.scheduledTaskRunReadModel, {
+    useFactory: instanceCachingFactory(() => new PgScheduledTaskRunReadModel(input.database.db)),
+  });
+  container.register(tokens.scheduledTaskRunLogReadModel, {
+    useFactory: instanceCachingFactory(() => new PgScheduledTaskRunLogReadModel(input.database.db)),
   });
   container.register(tokens.dependencyResourceReadModel, {
     useFactory: instanceCachingFactory(
@@ -1004,6 +1039,9 @@ export function registerRuntimeDependencies(
           }),
         ),
     ),
+  });
+  container.register(tokens.scheduledTaskRuntimePort, {
+    useFactory: instanceCachingFactory(() => new HermeticScheduledTaskRuntimePort()),
   });
   container.register(tokens.resourceRuntimeControlAttemptRecorder, {
     useFactory: instanceCachingFactory(
