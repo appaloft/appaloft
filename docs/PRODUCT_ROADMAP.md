@@ -1241,6 +1241,11 @@ Current verification notes:
   from sanitized `swarm.serviceName` metadata, and the runtime adapter normalizes `docker service
   ps` task state into Appaloft runtime health/check fields without exposing raw Docker payloads.
   Remote-manager probing and real Swarm smoke coverage remain open.
+- 2026-05-06 Phase 7 Docker Swarm route-label slice bound initial `SWARM-TARGET-ROUTE-001`
+  coverage to image apply planning: Traefik route labels are absent from candidate service
+  creation, promoted only after candidate verification, and target the Swarm edge network without
+  public workload host-port publication. End-to-end route realization against a real Swarm edge
+  proxy remains open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1305,8 +1310,8 @@ Required:
   Target-kind registration metadata, unsupported-backend admission, backend descriptor selection,
   Swarm manager readiness, adapter-owned OCI/Compose render intent, OCI image apply-plan rendering,
   label-scoped cleanup plan rendering, opt-in fake backend acceptance coverage, Swarm runtime-log
-  observation, Swarm health observation, the public docs anchor, and CLI/API/Web help links are
-  implemented; real Swarm execution remains open.
+  observation, Swarm health observation, initial Traefik route label promotion, the public docs
+  anchor, and CLI/API/Web help links are implemented; real Swarm execution remains open.
 
 Exit criteria:
 

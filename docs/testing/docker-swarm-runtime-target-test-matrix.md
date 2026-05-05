@@ -84,6 +84,10 @@ implemented, but no Docker Swarm execution backend is active yet.
   request an opt-in Swarm runtime probe from sanitized `swarm.serviceName` metadata and normalize
   `docker service ps` task state into Appaloft runtime health/check fields without exposing raw
   Docker task payloads. Remote-manager probing and real Swarm smoke coverage remain open.
+- `SWARM-TARGET-ROUTE-001` has initial apply-plan coverage proving Traefik route labels are absent
+  from candidate service creation and added only in the post-verification `promote-route-target`
+  step against the Swarm edge network. End-to-end route realization against a real Swarm edge proxy
+  remains open.
 - `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
   explaining Swarm target registration, manager readiness expectations, image registry access,
   rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI `server register`,

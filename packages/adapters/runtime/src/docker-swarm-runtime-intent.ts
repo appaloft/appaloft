@@ -130,6 +130,7 @@ export interface DockerSwarmApplyPlan {
   schemaVersion: "docker-swarm.apply-plan/v1";
   serviceName: string;
   preservesPreviousService: true;
+  routeLabels: string[];
   steps: DockerSwarmApplyPlanStep[];
   warnings: string[];
 }
@@ -225,6 +226,10 @@ function dockerHealthFlags(health: DockerSwarmHealthIntent | undefined): string 
     `--health-retries ${shellQuote(`${health.retries}`)}`,
     `--health-start-period ${shellQuote(`${health.startPeriodSeconds}s`)}`,
   ].join(" ");
+}
+
+function routeLabelFlags(labels: readonly string[]): string {
+  return labels.map((label) => `--label-add ${shellQuote(label)}`).join(" ");
 }
 
 function commandParts(parts: readonly string[]): string {
@@ -423,6 +428,59 @@ function renderRoutes(input: {
   );
 }
 
+function proxyRouteName(input: { serviceName: string; index: number }): string {
+  const normalized = `${input.serviceName}${input.index === 0 ? "" : `-${input.index}`}`
+    .replace(/[^a-zA-Z0-9-]/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized.length > 0 ? normalized : "appaloft-swarm-route";
+}
+
+function traefikRule(route: DockerSwarmRouteIntent): string {
+  const hostRule = route.domains.map((domain) => `Host(\`${domain}\`)`).join(" || ");
+  return route.pathPrefix === "/"
+    ? hostRule
+    : `(${hostRule}) && PathPrefix(\`${route.pathPrefix}\`)`;
+}
+
+function routeLabels(input: {
+  serviceName: string;
+  targetPort?: number;
+  routes: readonly DockerSwarmRouteIntent[];
+}): string[] {
+  const labels = input.routes.flatMap((route, index) => {
+    if (
+      route.proxyKind !== "traefik" ||
+      route.routeBehavior !== "serve" ||
+      route.domains.length === 0
+    ) {
+      return [];
+    }
+
+    const targetPort = route.targetPort ?? input.targetPort;
+    if (!targetPort) {
+      return [];
+    }
+
+    const router = proxyRouteName({ serviceName: input.serviceName, index });
+    const service = `${router}-svc`;
+    const entrypoint = route.tlsMode === "auto" ? "websecure" : "web";
+
+    return [
+      "traefik.enable=true",
+      `traefik.docker.network=${route.networkName}`,
+      `traefik.http.routers.${router}.rule=${traefikRule(route)}`,
+      `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
+      ...(route.tlsMode === "auto" ? [`traefik.http.routers.${router}.tls=true`] : []),
+      `traefik.http.routers.${router}.service=${service}`,
+      `traefik.http.services.${service}.loadbalancer.server.port=${targetPort}`,
+      "appaloft.route-target=active",
+    ];
+  });
+
+  return [...new Set(labels)];
+}
+
 export function renderDockerSwarmRuntimeIntent(
   input: DockerSwarmRuntimeIntentInput,
 ): Result<DockerSwarmRuntimeIntent> {
@@ -495,6 +553,11 @@ export function renderDockerSwarmApplyPlan(
 
   const networkNames = [...new Set(intent.routes.map((route) => route.networkName))];
   const primaryNetwork = networkNames[0] ?? defaultEdgeNetworkName;
+  const labels = routeLabels({
+    serviceName: intent.serviceName,
+    ...(intent.workload.port ? { targetPort: intent.workload.port } : {}),
+    routes: intent.routes,
+  });
   const createCommand = commandParts([
     "docker service create",
     `--name ${shellQuote(intent.serviceName)}`,
@@ -513,6 +576,7 @@ export function renderDockerSwarmApplyPlan(
   const promoteCommand = commandParts([
     "docker service update",
     `--label-add ${shellQuote("appaloft.route-candidate=ready")}`,
+    routeLabelFlags(labels),
     shellQuote(intent.serviceName),
   ]);
   const cleanupCommand = commandParts([
@@ -533,6 +597,7 @@ export function renderDockerSwarmApplyPlan(
     schemaVersion: "docker-swarm.apply-plan/v1",
     serviceName: intent.serviceName,
     preservesPreviousService: true,
+    routeLabels: labels,
     steps: [
       {
         step: "create-candidate-service",
