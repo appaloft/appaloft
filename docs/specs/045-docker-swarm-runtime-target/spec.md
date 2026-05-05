@@ -135,6 +135,10 @@ No new public operation key is accepted in this Spec Round.
 - Fake-runner failed verification now records deployment failure metadata and runs the
   deployment-scoped cleanup plan for the failed candidate service without broad prune or volume
   commands.
+- `resources.runtime-logs` can read Swarm-backed OCI image deployment logs through `docker service
+  logs` using the sanitized `swarm.serviceName` runtime metadata. Output remains the existing
+  Appaloft `ResourceRuntimeLogLine` shape with resource/deployment/runtime context and configured
+  redactions applied.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
 - Real Swarm command execution, failed-rollout rollback behavior, logs, health, and read-model

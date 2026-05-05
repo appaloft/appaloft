@@ -225,6 +225,7 @@ function deploymentSummary(input?: {
   providerKey?: string;
   targetMetadata?: Record<string, string>;
   executionKind?: "docker-container" | "docker-compose-stack";
+  executionMetadata?: Record<string, string>;
 }): DeploymentSummary {
   const executionKind = input?.executionKind ?? "docker-container";
   return {
@@ -257,14 +258,15 @@ function deploymentSummary(input?: {
                 workdir: "/srv/app",
               },
             }
-          : {
-              metadata: {
-                containerName: "appaloft-dep_web",
-              },
-            }),
+            : {
+                metadata: {
+                  containerName: "appaloft-dep_web",
+                  ...(input?.executionMetadata ?? {}),
+                },
+              }),
       },
       target: {
-        kind: "single-server",
+        kind: input?.providerKey === "docker-swarm" ? "orchestrator-cluster" : "single-server",
         providerKey: input?.providerKey ?? "local-shell",
         serverIds: ["srv_ssh"],
         metadata: input?.targetMetadata ?? {},
@@ -290,11 +292,13 @@ function logContext(input?: {
   providerKey?: string;
   targetMetadata?: Record<string, string>;
   executionKind?: "docker-container" | "docker-compose-stack";
+  executionMetadata?: Record<string, string>;
+  redactions?: string[];
 }): ResourceRuntimeLogContext {
   return {
     resource: resourceSummary(),
     deployment: deploymentSummary(input),
-    redactions: [],
+    redactions: input?.redactions ?? [],
   };
 }
 
@@ -395,6 +399,53 @@ describe("RuntimeResourceRuntimeLogReader", () => {
     expect(calls[0]?.args).toContain("ControlMaster=auto");
     expect(calls[0]?.args.at(-1)).toBe(
       "docker logs --tail '25' --follow 'appaloft-dep_web'",
+    );
+  });
+
+  test("[SWARM-TARGET-OBS-001][SWARM-TARGET-SECRET-001] opens Docker Swarm service logs as normalized redacted runtime log lines", async () => {
+    const calls: SpawnCall[] = [];
+    const reader = await createReader(
+      undefined,
+      createSpawn(calls, ["ready secret-token\n"]),
+    );
+    const result = await reader.open(
+      createTestExecutionContext(),
+      logContext({
+        providerKey: "docker-swarm",
+        executionMetadata: {
+          "swarm.serviceName": "appaloft-res-web-dst-demo-dep-web_web",
+        },
+        redactions: ["secret-token"],
+      }),
+      request({ follow: true }),
+      new AbortController().signal,
+    );
+
+    expect(result.isOk()).toBe(true);
+    const events = await collectEvents(result._unsafeUnwrap());
+
+    expect(calls[0]?.args).toEqual([
+      "docker",
+      "service",
+      "logs",
+      "--raw",
+      "--tail",
+      "25",
+      "--follow",
+      "appaloft-res-web-dst-demo-dep-web_web",
+    ]);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        kind: "line",
+        line: expect.objectContaining({
+          resourceId: "res_web",
+          deploymentId: "dep_web",
+          runtimeKind: "docker-container",
+          runtimeInstanceId: "appaloft-res-web-dst-demo-dep-web_web",
+          message: "ready ********",
+          masked: true,
+        }),
+      }),
     );
   });
 
