@@ -27,6 +27,7 @@ import {
 } from "@appaloft/core";
 import {
   CapturedEventBus,
+  FakeDependencyBindingSecretStore,
   FixedClock,
   MemoryDependencyResourceDeleteSafetyReader,
   MemoryDependencyResourceReadModel,
@@ -43,12 +44,14 @@ import {
 import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
 import {
   ListResourceDependencyBindingsQuery,
+  RotateResourceDependencyBindingSecretCommand,
   ShowResourceDependencyBindingQuery,
 } from "../src/messages";
 import {
   BindResourceDependencyUseCase,
   DeleteDependencyResourceUseCase,
   ListResourceDependencyBindingsQueryService,
+  RotateResourceDependencyBindingSecretUseCase,
   ShowResourceDependencyBindingQueryService,
   UnbindResourceDependencyUseCase,
 } from "../src/use-cases";
@@ -81,6 +84,7 @@ async function createHarness() {
   const eventBus = new CapturedEventBus();
   const logger = new NoopLogger();
   const idGenerator = new SequenceIdGenerator();
+  const bindingSecretStore = new FakeDependencyBindingSecretStore("secret");
   const createdAt = CreatedAt.rehydrate(clock.now());
 
   const project = Project.create({
@@ -160,6 +164,15 @@ async function createHarness() {
     listBindings: new ListResourceDependencyBindingsQueryService(bindingReadModel, clock),
     repositoryContext,
     resources,
+    rotateBindingSecret: new RotateResourceDependencyBindingSecretUseCase(
+      bindings,
+      bindingSecretStore,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+    ),
+    bindingSecretStore,
     showBinding: new ShowResourceDependencyBindingQueryService(bindingReadModel, clock),
     unbindDependency: new UnbindResourceDependencyUseCase(bindings, clock, eventBus, logger),
   };
@@ -364,5 +377,146 @@ describe("Dependency resource binding use cases", () => {
         deletionBlockers: "resource-binding",
       },
     });
+  });
+
+  test("[DEP-BIND-ROTATE-001] rotates active binding secret reference", async () => {
+    const { bindDependency, context, eventBus, rotateBindingSecret, showBinding } =
+      await createHarness();
+    const created = (
+      await bindDependency.execute(context, {
+        resourceId: "res_web",
+        dependencyResourceId: "rsi_pg",
+        targetName: "DATABASE_URL",
+      })
+    )._unsafeUnwrap();
+
+    const rotated = await rotateBindingSecret.execute(context, {
+      resourceId: "res_web",
+      bindingId: created.id,
+      secretRef: "secret://dependency-binding/rbd_pg/current",
+      confirmHistoricalSnapshotsRemainUnchanged: true,
+    });
+    const show = await showBinding.execute(
+      context,
+      ShowResourceDependencyBindingQuery.create({
+        resourceId: "res_web",
+        bindingId: created.id,
+      })._unsafeUnwrap(),
+    );
+
+    expect(rotated.isOk()).toBe(true);
+    expect(rotated._unsafeUnwrap()).toMatchObject({
+      id: created.id,
+      rotatedAt: "2026-01-01T00:00:00.000Z",
+      secretVersion: "rbsv_0002",
+    });
+    expect(eventBus.events).toContainEqual(
+      expect.objectContaining({
+        type: "resource-dependency-binding-secret-rotated",
+        aggregateId: created.id,
+      }),
+    );
+    expect(show._unsafeUnwrap().binding).toMatchObject({
+      id: created.id,
+      target: {
+        secretRef: "secret://dependency-binding/rbd_pg/current",
+      },
+      secretRotation: {
+        secretRef: "secret://dependency-binding/rbd_pg/current",
+        secretVersion: "rbsv_0002",
+        rotatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    });
+  });
+
+  test("[DEP-BIND-ROTATE-002] rejects removed binding secret rotation", async () => {
+    const { bindDependency, context, rotateBindingSecret, unbindDependency } =
+      await createHarness();
+    const created = (
+      await bindDependency.execute(context, {
+        resourceId: "res_web",
+        dependencyResourceId: "rsi_pg",
+        targetName: "DATABASE_URL",
+      })
+    )._unsafeUnwrap();
+    await unbindDependency.execute(context, {
+      resourceId: "res_web",
+      bindingId: created.id,
+    });
+
+    const rejected = await rotateBindingSecret.execute(context, {
+      resourceId: "res_web",
+      bindingId: created.id,
+      secretRef: "secret://dependency-binding/rbd_pg/new",
+      confirmHistoricalSnapshotsRemainUnchanged: true,
+    });
+
+    expect(rejected.isErr()).toBe(true);
+    expect(rejected._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_dependency_binding_rotation_blocked",
+      details: {
+        phase: "resource-dependency-binding-secret-rotation",
+        blockerReasonCode: "binding_not_active",
+      },
+    });
+  });
+
+  test("[DEP-BIND-ROTATE-003] stores secret value through secret store without leaking raw value", async () => {
+    const { bindDependency, bindingSecretStore, context, rotateBindingSecret, showBinding } =
+      await createHarness();
+    const created = (
+      await bindDependency.execute(context, {
+        resourceId: "res_web",
+        dependencyResourceId: "rsi_pg",
+        targetName: "DATABASE_URL",
+      })
+    )._unsafeUnwrap();
+
+    const rotated = await rotateBindingSecret.execute(context, {
+      resourceId: "res_web",
+      bindingId: created.id,
+      secretValue: "postgres://app:super-secret@db.example.com/app",
+      confirmHistoricalSnapshotsRemainUnchanged: true,
+    });
+    const show = await showBinding.execute(
+      context,
+      ShowResourceDependencyBindingQuery.create({
+        resourceId: "res_web",
+        bindingId: created.id,
+      })._unsafeUnwrap(),
+    );
+
+    expect(rotated.isOk()).toBe(true);
+    expect(bindingSecretStore.stored).toHaveLength(1);
+    const detail = JSON.stringify(show._unsafeUnwrap());
+    expect(detail).toContain("secret://");
+    expect(detail).not.toContain("super-secret");
+    expect(detail).not.toContain("postgres://app:super-secret");
+  });
+
+  test("[DEP-BIND-ROTATE-006] command validates one secret input and historical snapshot acknowledgement", () => {
+    const accepted = RotateResourceDependencyBindingSecretCommand.create({
+      resourceId: "res_web",
+      bindingId: "rbd_pg",
+      secretRef: "secret://dependency-binding/rbd_pg/current",
+      confirmHistoricalSnapshotsRemainUnchanged: true,
+    });
+    const missingAcknowledgement = RotateResourceDependencyBindingSecretCommand.create({
+      resourceId: "res_web",
+      bindingId: "rbd_pg",
+      secretRef: "secret://dependency-binding/rbd_pg/current",
+      confirmHistoricalSnapshotsRemainUnchanged: false as true,
+    });
+    const ambiguousSecretInput = RotateResourceDependencyBindingSecretCommand.create({
+      resourceId: "res_web",
+      bindingId: "rbd_pg",
+      secretRef: "secret://dependency-binding/rbd_pg/current",
+      secretValue: "raw-secret",
+      confirmHistoricalSnapshotsRemainUnchanged: true,
+    });
+
+    expect(accepted.isOk()).toBe(true);
+    expect(missingAcknowledgement.isErr()).toBe(true);
+    expect(ambiguousSecretInput.isErr()).toBe(true);
   });
 });

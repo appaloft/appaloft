@@ -19,6 +19,8 @@ import {
   ResourceBinding,
   ResourceBindingId,
   ResourceBindingScopeValue,
+  ResourceBindingSecretRef,
+  ResourceBindingSecretVersion,
   ResourceBindingTargetName,
   ResourceId,
   ResourceInjectionModeValue,
@@ -26,6 +28,7 @@ import {
   ResourceInstanceId,
   ResourceInstanceKindValue,
   ResourceInstanceName,
+  UpdatedAt,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
   UpsertResourceBindingSpec,
@@ -40,6 +43,7 @@ describe("dependency resource binding persistence", () => {
       createMigrator,
       PgDependencyResourceDeleteSafetyReader,
       PgDependencyResourceRepository,
+      PgDependencyBindingSecretStore,
       PgEnvironmentRepository,
       PgProjectRepository,
       PgResourceDependencyBindingReadModel,
@@ -54,16 +58,16 @@ describe("dependency resource binding persistence", () => {
       const migrationResult = await createMigrator(database.db).migrateToLatest();
       expect(migrationResult.error).toBeUndefined();
 
-      const context = toRepositoryContext(
-        createExecutionContext({
-          requestId: "req_dependency_binding_pglite_test",
-          entrypoint: "system",
-        }),
-      );
+      const executionContext = createExecutionContext({
+        requestId: "req_dependency_binding_pglite_test",
+        entrypoint: "system",
+      });
+      const context = toRepositoryContext(executionContext);
       const dependencyResources = new PgDependencyResourceRepository(database.db);
       const bindings = new PgResourceDependencyBindingRepository(database.db);
       const readModel = new PgResourceDependencyBindingReadModel(database.db);
       const deleteSafetyReader = new PgDependencyResourceDeleteSafetyReader(database.db);
+      const secretStore = new PgDependencyBindingSecretStore(database.db);
       const projects = new PgProjectRepository(database.db);
       const environments = new PgEnvironmentRepository(database.db);
       const createdAt = CreatedAt.rehydrate("2026-01-01T00:00:00.000Z");
@@ -124,6 +128,27 @@ describe("dependency resource binding persistence", () => {
         binding,
         UpsertResourceBindingSpec.fromResourceBinding(binding),
       );
+      const storedSecret = (
+        await secretStore.store(executionContext, {
+          bindingId: "rbd_pg",
+          resourceId: "res_web",
+          secretValue: "postgres://app:super-secret@db.example.com:5432/app",
+          secretVersion: "rbsv_0001",
+          rotatedAt: "2026-01-01T00:02:00.000Z",
+        })
+      )._unsafeUnwrap();
+      binding
+        .rotateSecret({
+          secretRef: ResourceBindingSecretRef.rehydrate(storedSecret.secretRef),
+          secretVersion: ResourceBindingSecretVersion.rehydrate(storedSecret.secretVersion),
+          rotatedAt: UpdatedAt.rehydrate("2026-01-01T00:02:00.000Z"),
+        })
+        ._unsafeUnwrap();
+      await bindings.upsert(
+        context,
+        binding,
+        UpsertResourceBindingSpec.fromResourceBinding(binding),
+      );
 
       const list = await readModel.list(context, { resourceId: "res_web" });
       const blockers = await deleteSafetyReader.findBlockers(context, {
@@ -135,9 +160,15 @@ describe("dependency resource binding persistence", () => {
         dependencyResourceId: "rsi_pg",
         target: {
           targetName: "DATABASE_URL",
+          secretRef: "appaloft+pg://resource-binding/rbd_pg/rbsv_0001",
         },
         connection: {
           maskedConnection: "postgres://app:********@db.example.com:5432/app",
+        },
+        secretRotation: {
+          secretRef: "appaloft+pg://resource-binding/rbd_pg/rbsv_0001",
+          secretVersion: "rbsv_0001",
+          rotatedAt: "2026-01-01T00:02:00.000Z",
         },
       });
       expect(blockers._unsafeUnwrap()).toEqual([{ kind: "resource-binding", count: 1 }]);

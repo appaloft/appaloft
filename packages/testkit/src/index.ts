@@ -11,6 +11,8 @@ import {
   type CertificateSecretStore,
   type CertificateSummary,
   type Clock,
+  type DependencyBindingSecretStore,
+  type DependencyBindingSecretStoreInput,
   type DependencyResourceDeleteBlocker,
   type DependencyResourceDeleteSafetyReader,
   type DependencyResourceReadModel,
@@ -243,6 +245,24 @@ export class FakeCertificateSecretStore implements CertificateSecretStore {
     void context;
     this.deactivated.push(input);
     return ok(undefined);
+  }
+}
+
+export class FakeDependencyBindingSecretStore implements DependencyBindingSecretStore {
+  readonly stored: DependencyBindingSecretStoreInput[] = [];
+
+  constructor(private secretRefPrefix = "secret") {}
+
+  async store(
+    context: ExecutionContext,
+    input: DependencyBindingSecretStoreInput,
+  ): Promise<Result<{ secretRef: string; secretVersion: string }, DomainError>> {
+    void context;
+    this.stored.push(input);
+    return ok({
+      secretRef: `${this.secretRefPrefix}://${input.bindingId}/${input.secretVersion}`,
+      secretVersion: input.secretVersion,
+    });
   }
 }
 
@@ -1199,10 +1219,21 @@ export class MemoryResourceDependencyBindingReadModel
         targetName: bindingState.targetName.value,
         scope: bindingState.scope.value,
         injectionMode: bindingState.injectionMode.value,
-        ...(dependencyState.connectionSecretRef
-          ? { secretRef: dependencyState.connectionSecretRef.value }
-          : {}),
+        ...(bindingState.secretRef
+          ? { secretRef: bindingState.secretRef.value }
+          : dependencyState.connectionSecretRef
+            ? { secretRef: dependencyState.connectionSecretRef.value }
+            : {}),
       },
+      ...(bindingState.secretVersion && bindingState.secretRotatedAt
+        ? {
+            secretRotation: {
+              ...(bindingState.secretRef ? { secretRef: bindingState.secretRef.value } : {}),
+              secretVersion: bindingState.secretVersion.value,
+              rotatedAt: bindingState.secretRotatedAt.value,
+            },
+          }
+        : {}),
       ...(dependencyState.postgresEndpoint
         ? {
             connection: {
@@ -1214,9 +1245,11 @@ export class MemoryResourceDependencyBindingReadModel
                 ? { databaseName: dependencyState.postgresEndpoint.databaseName.value }
                 : {}),
               maskedConnection: dependencyState.postgresEndpoint.maskedConnection.value,
-              ...(dependencyState.connectionSecretRef
-                ? { secretRef: dependencyState.connectionSecretRef.value }
-                : {}),
+              ...(bindingState.secretRef
+                ? { secretRef: bindingState.secretRef.value }
+                : dependencyState.connectionSecretRef
+                  ? { secretRef: dependencyState.connectionSecretRef.value }
+                  : {}),
             },
           }
         : {}),

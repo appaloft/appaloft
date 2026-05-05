@@ -210,9 +210,22 @@ export interface ResourceDependencyBindingsTable {
   target_name: string;
   scope: string;
   injection_mode: string;
+  secret_ref: string | null;
+  secret_version: string | null;
+  secret_rotated_at: NullableUpdatableTimestampColumn;
   lifecycle_status: string;
   created_at: TimestampColumn;
   removed_at: NullableUpdatableTimestampColumn;
+}
+
+export interface DependencyBindingSecretsTable {
+  ref: string;
+  binding_id: string;
+  resource_id: string;
+  secret_version: string;
+  payload: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  metadata: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  created_at: TimestampColumn;
 }
 
 export interface DeploymentsTable {
@@ -448,6 +461,7 @@ export interface Database {
   resource_variables: ResourceVariablesTable;
   dependency_resources: DependencyResourcesTable;
   resource_dependency_bindings: ResourceDependencyBindingsTable;
+  dependency_binding_secrets: DependencyBindingSecretsTable;
   storage_volumes: StorageVolumesTable;
   resource_storage_attachments: ResourceStorageAttachmentsTable;
   deployments: DeploymentsTable;

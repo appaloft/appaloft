@@ -152,6 +152,7 @@ import {
   RetryCertificateCommand,
   RetryDomainBindingVerificationCommand,
   RevokeCertificateCommand,
+  RotateResourceDependencyBindingSecretCommand,
   RotateSshCredentialCommand,
   registerServerCommandInputSchema,
   renameDependencyResourceCommandInputSchema,
@@ -168,6 +169,7 @@ import {
   retryCertificateCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
   revokeCertificateCommandInputSchema,
+  rotateResourceDependencyBindingSecretCommandInputSchema,
   rotateSshCredentialCommandInputSchema,
   SetEnvironmentVariableCommand,
   SetResourceVariableCommand,
@@ -298,6 +300,7 @@ import {
   retryCertificateResponseSchema,
   retryDomainBindingVerificationResponseSchema,
   revokeCertificateResponseSchema,
+  rotateResourceDependencyBindingSecretResponseSchema,
   rotateSshCredentialResponseSchema,
   setResourceVariableResponseSchema,
   showCertificateResponseSchema,
@@ -549,6 +552,10 @@ export const apiRouteDescriptions = {
   ),
   unbindResourceDependency: routeDescription(
     "Removes a resource dependency binding without deleting the dependency resource or external database.",
+    "resource.concept",
+  ),
+  rotateResourceDependencyBindingSecret: routeDescription(
+    "Rotates the safe secret reference used by a resource dependency binding for future deployments.",
     "resource.concept",
   ),
   listResourceDependencyBindings: routeDescription(
@@ -2453,6 +2460,19 @@ export const unbindResourceDependencyProcedure = base
     executeCommand(context, UnbindResourceDependencyCommand.create(input)),
   );
 
+export const rotateResourceDependencyBindingSecretProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations",
+    description: apiRouteDescriptions.rotateResourceDependencyBindingSecret,
+    successStatus: 200,
+  })
+  .input(rotateResourceDependencyBindingSecretCommandInputSchema)
+  .output(rotateResourceDependencyBindingSecretResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RotateResourceDependencyBindingSecretCommand.create(input)),
+  );
+
 export const listResourceDependencyBindingsProcedure = base
   .route({
     method: "GET",
@@ -2599,6 +2619,7 @@ export const appaloftOrpcRouter = {
     dependencyBindings: {
       bind: bindResourceDependencyProcedure,
       unbind: unbindResourceDependencyProcedure,
+      rotateSecret: rotateResourceDependencyBindingSecretProcedure,
       list: listResourceDependencyBindingsProcedure,
       show: showResourceDependencyBindingProcedure,
     },
@@ -2821,6 +2842,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/runtime-logs/stream",
     "/api/resources/:resourceId/dependency-bindings",
     "/api/resources/:resourceId/dependency-bindings/:bindingId",
+    "/api/resources/:resourceId/dependency-bindings/:bindingId/secret-rotations",
     "/api/resource-access-failures/:requestId",
     "/api/terminal-sessions",
     "/api/domain-bindings",

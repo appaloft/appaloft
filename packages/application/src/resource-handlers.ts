@@ -21,6 +21,8 @@ export * from "./operations/resources/resource-effective-config.handler";
 export * from "./operations/resources/resource-health.handler";
 export * from "./operations/resources/resource-proxy-configuration-preview.handler";
 export * from "./operations/resources/resource-runtime-logs.handler";
+export * from "./operations/resources/rotate-resource-dependency-binding-secret.handler";
+export * from "./operations/resources/rotate-resource-dependency-binding-secret.use-case";
 export * from "./operations/resources/set-resource-variable.handler";
 export * from "./operations/resources/show-resource.handler";
 export * from "./operations/resources/show-resource-dependency-binding.handler";

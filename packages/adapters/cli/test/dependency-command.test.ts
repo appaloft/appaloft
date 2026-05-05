@@ -12,6 +12,7 @@ import {
   ListResourceDependencyBindingsQuery,
   ProvisionPostgresDependencyResourceCommand,
   type QueryBus,
+  RotateResourceDependencyBindingSecretCommand,
   ShowDependencyResourceQuery,
   ShowResourceDependencyBindingQuery,
   UnbindResourceDependencyCommand,
@@ -166,6 +167,18 @@ describe("CLI dependency commands", () => {
       "res_web",
       "rbd_pg",
     ]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "dependency",
+      "rotate-secret",
+      "res_web",
+      "rbd_pg",
+      "--secret-ref",
+      "secret://dependency-binding/rbd_pg/current",
+      "--confirm-historical-snapshots-remain-unchanged",
+    ]);
     await parseCli(program, ["node", "appaloft", "resource", "dependency", "list", "res_web"]);
     await parseCli(program, [
       "node",
@@ -179,6 +192,7 @@ describe("CLI dependency commands", () => {
 
     expect(commands[0]).toBeInstanceOf(BindResourceDependencyCommand);
     expect(commands[1]).toBeInstanceOf(UnbindResourceDependencyCommand);
+    expect(commands[2]).toBeInstanceOf(RotateResourceDependencyBindingSecretCommand);
     expect(queries[0]).toBeInstanceOf(ListResourceDependencyBindingsQuery);
     expect(queries[1]).toBeInstanceOf(ShowResourceDependencyBindingQuery);
   });

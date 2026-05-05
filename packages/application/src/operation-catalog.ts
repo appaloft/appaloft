@@ -71,6 +71,7 @@ import { resourceEffectiveConfigQueryInputSchema } from "./operations/resources/
 import { resourceHealthQueryInputSchema } from "./operations/resources/resource-health.query";
 import { resourceProxyConfigurationPreviewQueryInputSchema } from "./operations/resources/resource-proxy-configuration-preview.query";
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
+import { rotateResourceDependencyBindingSecretCommandInputSchema } from "./operations/resources/rotate-resource-dependency-binding-secret.command";
 import { setResourceVariableCommandInputSchema } from "./operations/resources/set-resource-variable.command";
 import { showResourceQueryInputSchema } from "./operations/resources/show-resource.query";
 import { showResourceDependencyBindingQueryInputSchema } from "./operations/resources/show-resource-dependency-binding.query";
@@ -891,6 +892,23 @@ export const operationCatalog = [
       orpc: {
         method: "DELETE",
         path: "/api/resources/{resourceId}/dependency-bindings/{bindingId}",
+      },
+    },
+  },
+  {
+    key: "resources.rotate-dependency-binding-secret",
+    kind: "command",
+    domain: "resources",
+    messageName: "RotateResourceDependencyBindingSecretCommand",
+    handlerName: "RotateResourceDependencyBindingSecretCommandHandler",
+    serviceName: "RotateResourceDependencyBindingSecretUseCase",
+    inputSchema: rotateResourceDependencyBindingSecretCommandInputSchema,
+    serviceToken: tokens.rotateResourceDependencyBindingSecretUseCase,
+    transports: {
+      cli: "appaloft resource dependency rotate-secret <resourceId> <bindingId>",
+      orpc: {
+        method: "POST",
+        path: "/api/resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations",
       },
     },
   },

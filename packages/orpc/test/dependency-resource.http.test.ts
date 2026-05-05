@@ -16,6 +16,7 @@ import {
   ProvisionPostgresDependencyResourceCommand,
   type Query,
   type QueryBus,
+  RotateResourceDependencyBindingSecretCommand,
   ShowDependencyResourceQuery,
   ShowResourceDependencyBindingQuery,
   UnbindResourceDependencyCommand,
@@ -49,6 +50,13 @@ function createHarness() {
   const commandBus = {
     execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
       commands.push(command as Command<unknown>);
+      if (command instanceof RotateResourceDependencyBindingSecretCommand) {
+        return ok({
+          id: "rbd_pg",
+          rotatedAt: "2026-01-01T00:00:00.000Z",
+          secretVersion: "rbsv_0001",
+        } as T);
+      }
       return ok({ id: "rsi_pg" } as T);
     },
   } as CommandBus;
@@ -223,13 +231,30 @@ describe("dependency resource HTTP routes", () => {
         body: JSON.stringify({ resourceId: "res_api", bindingId: "rbd_pg" }),
       }),
     );
+    const rotateResponse = await app.handle(
+      new Request(
+        "http://localhost/api/resources/res_api/dependency-bindings/rbd_pg/secret-rotations",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            resourceId: "res_api",
+            bindingId: "rbd_pg",
+            secretRef: "secret://dependency-binding/rbd_pg/current",
+            confirmHistoricalSnapshotsRemainUnchanged: true,
+          }),
+        },
+      ),
+    );
 
     expect(bindResponse.status).toBe(201);
     expect(listResponse.status).toBe(200);
     expect(showResponse.status).toBe(200);
     expect(unbindResponse.status).toBe(200);
+    expect(rotateResponse.status).toBe(200);
     expect(commands[0]).toBeInstanceOf(BindResourceDependencyCommand);
     expect(commands[1]).toBeInstanceOf(UnbindResourceDependencyCommand);
+    expect(commands[2]).toBeInstanceOf(RotateResourceDependencyBindingSecretCommand);
     expect(queries[0]).toBeInstanceOf(ListResourceDependencyBindingsQuery);
     expect(queries[1]).toBeInstanceOf(ShowResourceDependencyBindingQuery);
   });

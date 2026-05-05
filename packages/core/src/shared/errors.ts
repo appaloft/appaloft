@@ -50,6 +50,11 @@ export const domainError = {
     details?: DomainErrorDetails,
   ): DomainError =>
     createError("resource_dependency_binding_context_mismatch", "user", message, details),
+  resourceDependencyBindingRotationBlocked: (
+    message: string,
+    details?: DomainErrorDetails,
+  ): DomainError =>
+    createError("resource_dependency_binding_rotation_blocked", "user", message, details),
   resourceRuntimeLogsContextMismatch: (
     message: string,
     details?: DomainErrorDetails,

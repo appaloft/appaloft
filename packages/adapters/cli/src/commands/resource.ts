@@ -20,6 +20,7 @@ import {
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   ResourceRuntimeLogsQuery,
+  RotateResourceDependencyBindingSecretCommand,
   SetResourceVariableCommand,
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
@@ -173,6 +174,11 @@ const dependencyInjectionModeOption = Options.choice("injection-mode", [
   "file",
   "reference",
 ]).pipe(Options.withDefault("env"));
+const dependencySecretRefOption = Options.text("secret-ref").pipe(Options.optional);
+const dependencySecretValueOption = Options.text("secret-value").pipe(Options.optional);
+const confirmHistoricalSnapshotsOption = Options.boolean(
+  "confirm-historical-snapshots-remain-unchanged",
+).pipe(Options.withDefault(false));
 
 const listCommand = EffectCommand.make(
   "list",
@@ -247,6 +253,28 @@ const dependencyUnbindCommand = EffectCommand.make(
     runCommand(UnbindResourceDependencyCommand.create({ resourceId, bindingId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDependencyUnbind));
 
+const dependencyRotateSecretCommand = EffectCommand.make(
+  "rotate-secret",
+  {
+    resourceId: resourceIdArg,
+    bindingId: dependencyBindingIdArg,
+    secretRef: dependencySecretRefOption,
+    secretValue: dependencySecretValueOption,
+    confirmHistoricalSnapshotsRemainUnchanged: confirmHistoricalSnapshotsOption,
+  },
+  ({ bindingId, confirmHistoricalSnapshotsRemainUnchanged, resourceId, secretRef, secretValue }) =>
+    runCommand(
+      RotateResourceDependencyBindingSecretCommand.create({
+        resourceId,
+        bindingId,
+        ...(optionalValue(secretRef) ? { secretRef: optionalValue(secretRef) } : {}),
+        ...(optionalValue(secretValue) ? { secretValue: optionalValue(secretValue) } : {}),
+        confirmHistoricalSnapshotsRemainUnchanged:
+          confirmHistoricalSnapshotsRemainUnchanged as true,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDependencyRotateSecret));
+
 const dependencyListCommand = EffectCommand.make(
   "list",
   {
@@ -270,6 +298,7 @@ const dependencyCommand = EffectCommand.make("dependency").pipe(
   EffectCommand.withSubcommands([
     dependencyBindCommand,
     dependencyUnbindCommand,
+    dependencyRotateSecretCommand,
     dependencyListCommand,
     dependencyShowCommand,
   ]),

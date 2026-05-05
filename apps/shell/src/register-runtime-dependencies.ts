@@ -65,6 +65,7 @@ import {
   PgCertificateRetryCandidateReader,
   PgCertificateSecretStore,
   PgDefaultAccessDomainPolicyRepository,
+  PgDependencyBindingSecretStore,
   PgDependencyResourceDeleteSafetyReader,
   PgDependencyResourceReadModel,
   PgDependencyResourceRepository,
@@ -792,6 +793,9 @@ export function registerRuntimeDependencies(
           dependencyContainer.resolve<Clock>(tokens.clock),
         ),
     ),
+  });
+  container.register(tokens.dependencyBindingSecretStore, {
+    useFactory: instanceCachingFactory(() => new PgDependencyBindingSecretStore(input.database.db)),
   });
   container.register(tokens.certificateHttpChallengeTokenStore, {
     useFactory: instanceCachingFactory(() => new InMemoryCertificateHttpChallengeTokenStore()),

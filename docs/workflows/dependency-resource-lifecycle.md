@@ -13,6 +13,7 @@ This first slice is Postgres-only. Every mutation must dispatch one explicit ope
 - `dependency-resources.delete`
 - `resources.bind-dependency`
 - `resources.unbind-dependency`
+- `resources.rotate-dependency-binding-secret`
 
 Every read must dispatch one explicit query:
 
@@ -20,9 +21,6 @@ Every read must dispatch one explicit query:
 - `dependency-resources.show`
 - `resources.list-dependency-bindings`
 - `resources.show-dependency-binding`
-
-`resources.rotate-dependency-binding-secret` is an accepted candidate for the next binding
-lifecycle slice. It is not active until Code Round adds catalog, transport, persistence, and tests.
 
 The workflow is not backup/restore, not provider-native database provisioning, not provider-native
 credential rotation, not runtime env injection, and not a deployment command.
@@ -183,10 +181,10 @@ secret-rotation fields.
 
 The current implementation adds Postgres dependency resource lifecycle records, Resource binding
 metadata, safe read models, real active-binding delete blockers, and safe dependency binding
-snapshot references.
-Binding secret rotation is specified as an accepted candidate but not implemented. Redis,
-provider-native provisioning/deletion, backup/restore, runtime env injection, Web affordances, and
-runtime cleanup are future work.
+snapshot references. Binding secret rotation updates binding-scoped safe secret references for
+future deployment snapshots only.
+Redis, provider-native provisioning/deletion, backup/restore, runtime env injection, Web
+affordances, and runtime cleanup are future work.
 
 ## Open Questions
 

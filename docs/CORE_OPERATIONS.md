@@ -311,6 +311,7 @@ Phase 7 Postgres dependency resource operations:
 | Delete dependency resource | Command | `dependency-resources.delete` | `DeleteDependencyResourceCommand` | `DeleteDependencyResourceCommandInput` | `appaloft dependency delete <dependencyResourceId>` | `DELETE /api/dependency-resources/{dependencyResourceId}` |
 | Bind dependency to resource | Command | `resources.bind-dependency` | `BindResourceDependencyCommand` | `BindResourceDependencyCommandInput` | `appaloft resource dependency bind <resourceId>` | `POST /api/resources/{resourceId}/dependency-bindings` |
 | Unbind dependency from resource | Command | `resources.unbind-dependency` | `UnbindResourceDependencyCommand` | `UnbindResourceDependencyCommandInput` | `appaloft resource dependency unbind <resourceId> <bindingId>` | `DELETE /api/resources/{resourceId}/dependency-bindings/{bindingId}` |
+| Rotate resource dependency binding secret | Command | `resources.rotate-dependency-binding-secret` | `RotateResourceDependencyBindingSecretCommand` | `RotateResourceDependencyBindingSecretCommandInput` | `appaloft resource dependency rotate-secret <resourceId> <bindingId>` | `POST /api/resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations` |
 | List resource dependency bindings | Query | `resources.list-dependency-bindings` | `ListResourceDependencyBindingsQuery` | `ListResourceDependencyBindingsQueryInput` | `appaloft resource dependency list <resourceId>` | `GET /api/resources/{resourceId}/dependency-bindings` |
 | Show resource dependency binding | Query | `resources.show-dependency-binding` | `ShowResourceDependencyBindingQuery` | `ShowResourceDependencyBindingQueryInput` | `appaloft resource dependency show <resourceId> <bindingId>` | `GET /api/resources/{resourceId}/dependency-bindings/{bindingId}` |
 
@@ -329,11 +330,11 @@ Current boundary:
   injection remains deferred. Unbind removes only the binding association; it does not delete the
   dependency resource, external/provider database, runtime state, backup data, or historical
   snapshots.
-- `resources.rotate-dependency-binding-secret` is specified as an accepted candidate under
-  [Dependency Binding Secret Rotation](./specs/036-dependency-binding-secret-rotation/spec.md), but
-  is not an implemented operation yet. It must be added to this implemented operations table and to
-  `packages/application/src/operation-catalog.ts` in the same Code Round that activates the
-  command.
+- `resources.rotate-dependency-binding-secret` rotates only the binding-scoped safe secret
+  reference/version for future deployment snapshot references. It requires explicit acknowledgement
+  that historical snapshots remain unchanged, and it does not rotate provider-native database
+  credentials, inject runtime environment variables, schedule redeploy, or rewrite historical
+  deployment snapshots.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).

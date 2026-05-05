@@ -178,6 +178,10 @@ export const cliCommandDescriptions = {
     "Unbind a dependency resource without deleting it",
     "resource.concept",
   ),
+  resourceDependencyRotateSecret: withDocs(
+    "Rotate a resource dependency binding secret reference",
+    "resource.concept",
+  ),
   resourceDependencyList: withDocs("List resource dependency bindings", "resource.concept"),
   resourceDependencyShow: withDocs("Show one resource dependency binding", "resource.concept"),
   storage: withDocs("Storage operations", "storage.volume-lifecycle"),

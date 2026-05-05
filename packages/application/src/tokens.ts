@@ -43,6 +43,7 @@ export const tokens = {
   certificateProvider: Symbol.for("appaloft.certificate_provider"),
   certificateMaterialValidator: Symbol.for("appaloft.certificate_material_validator"),
   certificateSecretStore: Symbol.for("appaloft.certificate_secret_store"),
+  dependencyBindingSecretStore: Symbol.for("appaloft.dependency_binding_secret_store"),
   certificateHttpChallengeTokenStore: Symbol.for("appaloft.certificate_http_challenge_token_store"),
   deploymentContextDefaultsPolicy: Symbol.for("appaloft.deployment_context_defaults_policy"),
   projectReadModel: Symbol.for("appaloft.project_read_model"),
@@ -124,6 +125,9 @@ export const tokens = {
   detachResourceStorageUseCase: Symbol.for("appaloft.detach_resource_storage_use_case"),
   bindResourceDependencyUseCase: Symbol.for("appaloft.bind_resource_dependency_use_case"),
   unbindResourceDependencyUseCase: Symbol.for("appaloft.unbind_resource_dependency_use_case"),
+  rotateResourceDependencyBindingSecretUseCase: Symbol.for(
+    "appaloft.rotate_resource_dependency_binding_secret_use_case",
+  ),
   listResourcesQueryService: Symbol.for("appaloft.list_resources_query_service"),
   showResourceQueryService: Symbol.for("appaloft.show_resource_query_service"),
   listResourceDependencyBindingsQueryService: Symbol.for(

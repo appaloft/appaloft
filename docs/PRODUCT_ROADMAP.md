@@ -849,6 +849,12 @@ Current verification notes:
   dispatch. It does not implement the command yet, so the full `0.9.0` release rule remains
   blocked by binding secret rotation Code Round, runtime injection, provider-native database
   realization, Redis, backup/restore, recovery, auto-deploy, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 dependency binding secret rotation Code Round implemented
+  `resources.rotate-dependency-binding-secret` across core `ResourceBinding`, application command
+  handling, PG/PGlite persistence, CLI/oRPC/HTTP dispatch, contract schemas, and safe read-model
+  metadata. It rotates only binding-scoped safe secret references for future deployment snapshots;
+  runtime injection, provider-native database realization, Redis, backup/restore, recovery,
+  auto-deploy, preview, and cluster runtime items remain open for the full `0.9.0` release rule.
 
 Required:
 
@@ -864,7 +870,7 @@ Required:
   baseline.
 - [ ] Add provider-native Postgres database realization and closed bind/backup/delete lifecycle.
 - [ ] Add Redis provisioning/import/list/show/update/delete.
-- [ ] Add dependency bind/unbind and binding secret rotation.
+- [x] Add dependency bind/unbind and binding secret rotation.
 - [ ] Add backup/restore for the minimum useful dependency-resource loop.
 - [x] Rebuild deployment show as a first-class query.
 - [x] Rebuild deployment stream-events as a first-class query.
