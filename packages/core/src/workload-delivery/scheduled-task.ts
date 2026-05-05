@@ -702,6 +702,7 @@ export interface ScheduledTaskDefinitionSelectionSpec {
 
 export interface ScheduledTaskDefinitionMutationSpecVisitor<TResult> {
   visitUpsertScheduledTaskDefinition(spec: UpsertScheduledTaskDefinitionSpec): TResult;
+  visitDeleteScheduledTaskDefinition(spec: DeleteScheduledTaskDefinitionSpec): TResult;
 }
 
 export interface ScheduledTaskDefinitionMutationSpec {
@@ -736,6 +737,24 @@ export class UpsertScheduledTaskDefinitionSpec implements ScheduledTaskDefinitio
 
   accept<TResult>(visitor: ScheduledTaskDefinitionMutationSpecVisitor<TResult>): TResult {
     return visitor.visitUpsertScheduledTaskDefinition(this);
+  }
+}
+
+export class DeleteScheduledTaskDefinitionSpec implements ScheduledTaskDefinitionMutationSpec {
+  private constructor(
+    public readonly taskId: ScheduledTaskId,
+    public readonly resourceId: ResourceId,
+  ) {}
+
+  static create(
+    taskId: ScheduledTaskId,
+    resourceId: ResourceId,
+  ): DeleteScheduledTaskDefinitionSpec {
+    return new DeleteScheduledTaskDefinitionSpec(taskId, resourceId);
+  }
+
+  accept<TResult>(visitor: ScheduledTaskDefinitionMutationSpecVisitor<TResult>): TResult {
+    return visitor.visitDeleteScheduledTaskDefinition(this);
   }
 }
 

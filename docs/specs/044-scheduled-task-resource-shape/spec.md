@@ -70,6 +70,9 @@ DDD or internal process-manager terminology.
 - Inactive application update admission exists. It loads the Resource-owned task and Resource,
   rejects archived/deleted Resources before storing changes, validates every patched field through
   core value objects, and persists through the same scheduled-task definition repository port.
+- Inactive application delete admission exists. It loads the Resource-owned task, verifies Resource
+  ownership and Resource existence, deletes through an explicit scheduled-task definition repository
+  mutation spec, and returns a timestamped delete result.
 - Inactive application read-query handlers/services exist for task list/show, run list/show, and
   run logs. They wrap scheduled-task read-model ports with stable schema versions and generated
   timestamps but do not activate persistence, operation catalog entries, or entrypoints.

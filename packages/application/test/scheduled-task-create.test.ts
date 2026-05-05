@@ -44,6 +44,11 @@ class RecordingScheduledTaskDefinitionRepository implements ScheduledTaskDefinit
     this.records.push(task);
     this.specs.push(spec);
   }
+
+  async delete(
+    _context: RepositoryContext,
+    _spec: ScheduledTaskDefinitionMutationSpec,
+  ): Promise<void> {}
 }
 
 function resourceFixture(input?: { lifecycleStatus?: "active" | "archived" | "deleted" }) {

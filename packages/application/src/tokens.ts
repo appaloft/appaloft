@@ -207,6 +207,7 @@ export const tokens = {
   ),
   createScheduledTaskUseCase: Symbol.for("appaloft.create_scheduled_task_use_case"),
   updateScheduledTaskUseCase: Symbol.for("appaloft.update_scheduled_task_use_case"),
+  deleteScheduledTaskUseCase: Symbol.for("appaloft.delete_scheduled_task_use_case"),
   listScheduledTasksQueryService: Symbol.for("appaloft.list_scheduled_tasks_query_service"),
   showScheduledTaskQueryService: Symbol.for("appaloft.show_scheduled_task_query_service"),
   listScheduledTaskRunsQueryService: Symbol.for("appaloft.list_scheduled_task_runs_query_service"),
