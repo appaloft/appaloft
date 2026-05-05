@@ -62,6 +62,8 @@ import {
   ResourceBinding,
   ResourceBindingId,
   ResourceBindingScopeValue,
+  ResourceBindingSecretRef,
+  ResourceBindingSecretVersion,
   ResourceBindingTargetName,
   ResourceByIdSpec,
   ResourceExposureModeValue,
@@ -1105,6 +1107,49 @@ describe("CreateDeploymentUseCase", () => {
     expect(
       deployments.items.get(result._unsafeUnwrap().id)?.toState().dependencyBindingReferences,
     ).toEqual([]);
+  });
+
+  test("[DEP-BIND-ROTATE-004] preserves historical deployment snapshot references after binding secret rotation", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResources,
+      repositoryContext,
+    });
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const created = unwrapDeploymentCreateResult(result);
+    const deployment = deployments.items.get(created.id);
+    const capturedReferences = deployment?.toState().dependencyBindingReferences ?? [];
+    const binding = dependencyBindings.items.get("rbd_pg");
+
+    expect(binding).toBeDefined();
+    binding
+      ?.rotateSecret({
+        secretRef: ResourceBindingSecretRef.rehydrate("secret://dependency-binding/rbd_pg/current"),
+        secretVersion: ResourceBindingSecretVersion.rehydrate("rbsv_0001"),
+        rotatedAt: UpdatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
+      })
+      ._unsafeUnwrap();
+    if (binding) {
+      await dependencyBindings.upsert(
+        repositoryContext,
+        binding,
+        UpsertResourceBindingSpec.fromResourceBinding(binding),
+      );
+    }
+
+    expect(deployment?.toState().dependencyBindingReferences).toEqual(capturedReferences);
+    expect(JSON.stringify(deployment?.toState().dependencyBindingReferences ?? [])).not.toContain(
+      "secret://dependency-binding/rbd_pg/current",
+    );
   });
 
   test("[RES-PROFILE-ACCESS-003] resource access path prefix reaches generated route planning input", async () => {

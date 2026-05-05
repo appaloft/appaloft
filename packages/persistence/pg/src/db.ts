@@ -46,6 +46,7 @@ import { storageVolumesMigration } from "./migrations/038_storage_volumes";
 import { dependencyResourcesMigration } from "./migrations/039_dependency_resources";
 import { resourceDependencyBindingsMigration } from "./migrations/040_resource_dependency_bindings";
 import { deploymentDependencyBindingReferencesMigration } from "./migrations/041_deployment_dependency_binding_references";
+import { dependencyBindingSecretRotationMigration } from "./migrations/042_dependency_binding_secret_rotation";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -182,6 +183,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "040_resource_dependency_bindings": resourceDependencyBindingsMigration,
       "041_deployment_dependency_binding_references":
         deploymentDependencyBindingReferencesMigration,
+      "042_dependency_binding_secret_rotation": dependencyBindingSecretRotationMigration,
     };
   }
 }

@@ -3,6 +3,7 @@ export * from "./certificate-repository";
 export * from "./certificate-retry-candidate-reader";
 export * from "./certificate-secret-store";
 export * from "./default-access-domain-policy-repository";
+export * from "./dependency-binding-secret-store";
 export * from "./dependency-resource-repository";
 export * from "./deployment-read-model";
 export * from "./deployment-repository";

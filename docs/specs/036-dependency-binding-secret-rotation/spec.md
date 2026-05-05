@@ -2,8 +2,8 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: ready for Test-First / Code Round
+- Round: Code Round / Post-Implementation Sync
+- Artifact state: implemented and aligned
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, additive public CLI/API/oRPC capability
 - Decision state: no-ADR-needed
@@ -72,15 +72,16 @@ runtime environment injection, Redis, and backup/restore out of scope.
 
 ## Public Surfaces
 
-- API/oRPC: accepted candidate
+- API/oRPC:
   `POST /api/resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations` using the
   application command schema.
-- CLI: accepted candidate
+- CLI:
   `appaloft resource dependency rotate-secret <resourceId> <bindingId>`.
-- Web/UI: deferred until Code/Docs Round with i18n and tests.
+- Web/UI: deferred to a later Web/Docs Round with i18n and tests.
 - Config: no repository config fields.
 - Events: `resource-dependency-binding-secret-rotated` domain event after durable persistence.
-- Public docs/help: migration gap until the operation is implemented.
+- Public docs/help: migration gap; CLI/API help exposes the operation, while task-oriented public
+  docs are deferred to a later Docs Round.
 - Future MCP/tools: one operation for the explicit command, not a compound dependency update tool.
 
 ## Output Contracts

@@ -159,6 +159,8 @@ import {
   RetryDomainBindingVerificationUseCase,
   RevokeCertificateCommandHandler,
   RevokeCertificateUseCase,
+  RotateResourceDependencyBindingSecretCommandHandler,
+  RotateResourceDependencyBindingSecretUseCase,
   RotateSshCredentialCommandHandler,
   RotateSshCredentialUseCase,
   RuntimePlanResolutionInputBuilder,
@@ -287,6 +289,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(CreateStorageVolumeCommandHandler);
   container.registerSingleton(BindResourceDependencyCommandHandler);
   container.registerSingleton(UnbindResourceDependencyCommandHandler);
+  container.registerSingleton(RotateResourceDependencyBindingSecretCommandHandler);
   container.registerSingleton(ListResourceDependencyBindingsQueryHandler);
   container.registerSingleton(ShowResourceDependencyBindingQueryHandler);
   container.registerSingleton(ProvisionPostgresDependencyResourceCommandHandler);
@@ -382,6 +385,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.unbindResourceDependencyUseCase,
     UnbindResourceDependencyUseCase,
+  );
+  container.registerSingleton(
+    tokens.rotateResourceDependencyBindingSecretUseCase,
+    RotateResourceDependencyBindingSecretUseCase,
   );
   container.registerSingleton(
     tokens.listResourceDependencyBindingsQueryService,

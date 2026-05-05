@@ -18,6 +18,7 @@ export * from "./operations/resources/resource-effective-config.query";
 export * from "./operations/resources/resource-health.query";
 export * from "./operations/resources/resource-proxy-configuration-preview.query";
 export * from "./operations/resources/resource-runtime-logs.query";
+export * from "./operations/resources/rotate-resource-dependency-binding-secret.command";
 export * from "./operations/resources/set-resource-variable.command";
 export * from "./operations/resources/show-resource.query";
 export * from "./operations/resources/show-resource-dependency-binding.query";

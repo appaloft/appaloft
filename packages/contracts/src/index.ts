@@ -1088,6 +1088,14 @@ export const resourceDependencyBindingSummarySchema = z.object({
     injectionMode: z.enum(["env", "file", "reference"]),
     secretRef: z.string().optional(),
   }),
+  secretRotation: z
+    .object({
+      secretRef: z.string().optional(),
+      secretVersion: z.string(),
+      rotatedAt: z.string(),
+      previousSecretVersion: z.string().optional(),
+    })
+    .optional(),
   connection: dependencyResourceConnectionSummarySchema.optional(),
   bindingReadiness: dependencyResourceBindingReadinessSummarySchema,
   snapshotReadiness: z.object({
@@ -1687,6 +1695,12 @@ export const bindResourceDependencyResponseSchema = z.object({
 
 export const unbindResourceDependencyResponseSchema = z.object({
   id: z.string(),
+});
+
+export const rotateResourceDependencyBindingSecretResponseSchema = z.object({
+  id: z.string(),
+  rotatedAt: z.string(),
+  secretVersion: z.string(),
 });
 
 export const listResourceDependencyBindingsResponseSchema = z.object({
@@ -3747,6 +3761,9 @@ export type ShowDependencyResourceResponse = z.infer<typeof showDependencyResour
 export type BindResourceDependencyResponse = z.infer<typeof bindResourceDependencyResponseSchema>;
 export type UnbindResourceDependencyResponse = z.infer<
   typeof unbindResourceDependencyResponseSchema
+>;
+export type RotateResourceDependencyBindingSecretResponse = z.infer<
+  typeof rotateResourceDependencyBindingSecretResponseSchema
 >;
 export type ListResourceDependencyBindingsResponse = z.infer<
   typeof listResourceDependencyBindingsResponseSchema

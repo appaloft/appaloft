@@ -1002,6 +1002,26 @@ export interface CertificateSecretStore {
   ): Promise<Result<void, DomainError>>;
 }
 
+export interface DependencyBindingSecretStoreInput {
+  bindingId: string;
+  resourceId: string;
+  secretValue: string;
+  secretVersion: string;
+  rotatedAt: string;
+}
+
+export interface DependencyBindingSecretStoreResult {
+  secretRef: string;
+  secretVersion: string;
+}
+
+export interface DependencyBindingSecretStore {
+  store(
+    context: ExecutionContext,
+    input: DependencyBindingSecretStoreInput,
+  ): Promise<Result<DependencyBindingSecretStoreResult, DomainError>>;
+}
+
 export interface CertificateHttpChallengeToken {
   domainName: string;
   token: string;
@@ -2261,6 +2281,13 @@ export interface ResourceDependencyBindingTargetSummary {
   secretRef?: string;
 }
 
+export interface ResourceDependencyBindingSecretRotationSummary {
+  secretRef?: string;
+  secretVersion: string;
+  rotatedAt: string;
+  previousSecretVersion?: string;
+}
+
 export interface ResourceDependencyBindingReadinessSummary {
   status: "ready" | "blocked" | "not-implemented";
   reason?: string;
@@ -2285,6 +2312,7 @@ export interface ResourceDependencyBindingSummary {
   providerManaged: boolean;
   lifecycleStatus: DependencyResourceLifecycleStatus;
   target: ResourceDependencyBindingTargetSummary;
+  secretRotation?: ResourceDependencyBindingSecretRotationSummary;
   connection?: DependencyResourceConnectionSummary;
   bindingReadiness: ResourceDependencyBindingReadinessSummary;
   snapshotReadiness: ResourceDependencyBindingSnapshotReadinessSummary;

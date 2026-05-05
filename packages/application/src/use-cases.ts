@@ -90,6 +90,7 @@ export * from "./operations/resources/resource-health.query-service";
 export * from "./operations/resources/resource-profile-drift";
 export * from "./operations/resources/resource-proxy-configuration-preview.query-service";
 export * from "./operations/resources/resource-runtime-logs.query-service";
+export * from "./operations/resources/rotate-resource-dependency-binding-secret.use-case";
 export * from "./operations/resources/set-resource-variable.use-case";
 export * from "./operations/resources/show-resource.query-service";
 export * from "./operations/resources/show-resource-dependency-binding.query-service";

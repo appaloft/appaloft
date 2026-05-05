@@ -7,6 +7,8 @@ import {
   ResourceBinding,
   ResourceBindingId,
   ResourceBindingScopeValue,
+  ResourceBindingSecretRef,
+  ResourceBindingSecretVersion,
   ResourceBindingTargetName,
   ResourceId,
   ResourceInjectionModeValue,
@@ -85,5 +87,52 @@ describe("ResourceBinding", () => {
         targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
       }),
     ).toBe(true);
+  });
+
+  test("[DEP-BIND-ROTATE-001] rotates active binding secret metadata", () => {
+    const created = binding({ injectionMode: "env" })._unsafeUnwrap();
+
+    const rotated = created.rotateSecret({
+      secretRef: ResourceBindingSecretRef.rehydrate("secret://dependency-binding/rbd_demo/current"),
+      secretVersion: ResourceBindingSecretVersion.rehydrate("rbsv_0001"),
+      rotatedAt: UpdatedAt.rehydrate("2026-01-01T00:02:00.000Z"),
+    });
+
+    expect(rotated.isOk()).toBe(true);
+    expect(created.toState()).toMatchObject({
+      secretRef: expect.objectContaining({ value: "secret://dependency-binding/rbd_demo/current" }),
+      secretVersion: expect.objectContaining({ value: "rbsv_0001" }),
+      secretRotatedAt: expect.objectContaining({ value: "2026-01-01T00:02:00.000Z" }),
+    });
+    expect(created.pullDomainEvents()).toContainEqual(
+      expect.objectContaining({
+        type: "resource-dependency-binding-secret-rotated",
+        aggregateId: "rbd_demo",
+      }),
+    );
+  });
+
+  test("[DEP-BIND-ROTATE-002] rejects secret rotation after unbind", () => {
+    const created = binding({ injectionMode: "env" })._unsafeUnwrap();
+    created
+      .unbind({
+        removedAt: UpdatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const rejected = created.rotateSecret({
+      secretRef: ResourceBindingSecretRef.rehydrate("secret://dependency-binding/rbd_demo/current"),
+      secretVersion: ResourceBindingSecretVersion.rehydrate("rbsv_0001"),
+      rotatedAt: UpdatedAt.rehydrate("2026-01-01T00:02:00.000Z"),
+    });
+
+    expect(rejected.isErr()).toBe(true);
+    expect(rejected._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_dependency_binding_rotation_blocked",
+      details: {
+        blockerReasonCode: "binding_not_active",
+        currentBindingState: "removed",
+      },
+    });
   });
 });
