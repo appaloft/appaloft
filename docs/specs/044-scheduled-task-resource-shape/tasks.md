@@ -15,6 +15,9 @@
   intent, timeout, retry, status, and concurrency policy.
 - [x] `SCHED-TASK-DOMAIN-002`: invalid schedule or unsafe command intent returns structured
   validation errors without primitive domain state.
+- [x] `SCHED-TASK-DOMAIN-003`: run attempt state starts accepted, transitions to running and
+  terminal succeeded/failed/skipped states, and rejects invalid transitions or unsafe failure
+  summaries.
 - [ ] `SCHED-TASK-RUN-001`: run-now accepts a run attempt without completing it synchronously.
 - [ ] `SCHED-TASK-SCHED-001`: scheduler dispatches through the same run admission use case.
 - [ ] `SCHED-TASK-LOGS-001`: task-run logs are separate from deployment/resource runtime logs.
@@ -23,6 +26,7 @@
 ## Implementation
 
 - [x] Add core scheduled-task definition value objects and Resource-owned state shape.
+- [x] Add core scheduled-task run attempt state machine.
 - [ ] Add application scheduled-task command/query model.
 - [ ] Add persistence/read models.
 - [ ] Add scheduler process manager.

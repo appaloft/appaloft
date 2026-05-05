@@ -56,7 +56,10 @@ DDD or internal process-manager terminology.
 
 - Core scheduled task definition value objects and Resource-owned definition state exist for
   schedule, timezone, command intent, timeout, retry, lifecycle status, and `forbid` concurrency
-  validation. No run attempt state machine exists yet.
+  validation.
+- Core scheduled task run attempts exist with Resource/task ownership, manual or scheduled trigger
+  kind, accepted/running/succeeded/failed/skipped lifecycle state, timestamps, safe exit/failure
+  summary fields, and no Deployment id.
 - No operation catalog entries are active.
 - No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
 - No persisted scheduled-task/run state exists.

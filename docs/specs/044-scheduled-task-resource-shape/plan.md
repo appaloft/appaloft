@@ -7,8 +7,8 @@ Spec-first slice for Resource-owned scheduled tasks, run attempts, history, and 
 ## Code Round Sequence
 
 1. Add core value objects and state machine for scheduled task definitions and run attempts.
-   `Status: definition value objects and Resource-owned definition state are implemented; run
-   attempt state machine remains open.`
+   `Status: implemented for definition value objects, Resource-owned definition state, and
+   run-attempt state transitions.`
 2. Add application command/query schemas, messages, handlers, use cases, and ports.
 3. Add persistence repository/read models for task definitions and run attempts.
 4. Add runtime target execution/log ports for one-off task runs.

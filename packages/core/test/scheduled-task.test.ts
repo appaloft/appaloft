@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   CreatedAt,
+  FinishedAt,
   ResourceId,
   ScheduledTaskCommandIntent,
   ScheduledTaskConcurrencyPolicyValue,
@@ -8,9 +9,17 @@ import {
   ScheduledTaskDefinitionStatusValue,
   ScheduledTaskId,
   ScheduledTaskRetryLimit,
+  ScheduledTaskRunAttempt,
+  ScheduledTaskRunExitCode,
+  ScheduledTaskRunFailureSummary,
+  ScheduledTaskRunId,
+  ScheduledTaskRunSkippedReasonValue,
+  ScheduledTaskRunStatusValue,
+  ScheduledTaskRunTriggerKindValue,
   ScheduledTaskScheduleExpression,
   ScheduledTaskTimeoutSeconds,
   ScheduledTaskTimezone,
+  StartedAt,
 } from "../src";
 
 describe("ScheduledTaskDefinition", () => {
@@ -89,6 +98,165 @@ describe("ScheduledTaskDefinition", () => {
       expect(unsafeCommand.error.details).toMatchObject({
         phase: "scheduled-task-definition-admission",
         field: "commandIntent",
+      });
+    }
+  });
+});
+
+describe("ScheduledTaskRunAttempt", () => {
+  test("[SCHED-TASK-DOMAIN-003] records accepted, running, and terminal run attempt transitions", () => {
+    const run = ScheduledTaskRunAttempt.create({
+      id: ScheduledTaskRunId.rehydrate("str_daily_migration_1"),
+      taskId: ScheduledTaskId.rehydrate("tsk_daily_migration"),
+      resourceId: ResourceId.rehydrate("res_api"),
+      triggerKind: ScheduledTaskRunTriggerKindValue.manual(),
+      createdAt: CreatedAt.rehydrate("2026-05-05T00:01:00.000Z"),
+    })._unsafeUnwrap();
+
+    expect(run.toState().status.value).toBe("accepted");
+    expect(run.isNonTerminal()).toBe(true);
+    expect(run.toState()).not.toHaveProperty("deploymentId");
+    expect(run.belongsToTask(ScheduledTaskId.rehydrate("tsk_daily_migration"))).toBe(true);
+    expect(run.belongsToResource(ResourceId.rehydrate("res_api"))).toBe(true);
+
+    const started = run.start({
+      startedAt: StartedAt.rehydrate("2026-05-05T00:01:05.000Z"),
+    });
+
+    expect(started.isOk()).toBe(true);
+    expect(run.isRunning()).toBe(true);
+    expect(run.toState().startedAt?.value).toBe("2026-05-05T00:01:05.000Z");
+
+    const succeeded = run.markSucceeded({
+      finishedAt: FinishedAt.rehydrate("2026-05-05T00:01:30.000Z"),
+      exitCode: ScheduledTaskRunExitCode.rehydrate(0),
+    });
+
+    expect(succeeded.isOk()).toBe(true);
+    expect(run.isTerminal()).toBe(true);
+    expect(run.toState().status.value).toBe("succeeded");
+    expect(run.toState().exitCode?.isSuccessful()).toBe(true);
+
+    const failedStart = run.start({
+      startedAt: StartedAt.rehydrate("2026-05-05T00:02:00.000Z"),
+    });
+
+    expect(failedStart.isErr()).toBe(true);
+    if (failedStart.isErr()) {
+      expect(failedStart.error.code).toBe("conflict");
+      expect(failedStart.error.details).toMatchObject({
+        phase: "scheduled-task-run-state-transition",
+        status: "succeeded",
+      });
+    }
+
+    const invalidSuccess = ScheduledTaskRunAttempt.create({
+      id: ScheduledTaskRunId.rehydrate("str_daily_migration_invalid_success"),
+      taskId: ScheduledTaskId.rehydrate("tsk_daily_migration"),
+      resourceId: ResourceId.rehydrate("res_api"),
+      triggerKind: ScheduledTaskRunTriggerKindValue.manual(),
+      createdAt: CreatedAt.rehydrate("2026-05-05T00:03:00.000Z"),
+    })._unsafeUnwrap();
+    invalidSuccess
+      .start({
+        startedAt: StartedAt.rehydrate("2026-05-05T00:03:01.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const invalidSuccessResult = invalidSuccess.markSucceeded({
+      finishedAt: FinishedAt.rehydrate("2026-05-05T00:03:02.000Z"),
+      exitCode: ScheduledTaskRunExitCode.rehydrate(1),
+    });
+
+    expect(invalidSuccessResult.isErr()).toBe(true);
+  });
+
+  test("[SCHED-TASK-DOMAIN-003] records skipped and failed run terminal details without secrets", () => {
+    const scheduledTrigger = ScheduledTaskRunTriggerKindValue.create("scheduled");
+    const unsupportedTrigger = ScheduledTaskRunTriggerKindValue.create("webhook");
+    const unsupportedStatus = ScheduledTaskRunStatusValue.create("queued");
+    const invalidExitCode = ScheduledTaskRunExitCode.create(300);
+    const unsafeFailureSummary = ScheduledTaskRunFailureSummary.create("token=secret");
+
+    expect(scheduledTrigger.isOk()).toBe(true);
+    expect(unsupportedTrigger.isErr()).toBe(true);
+    expect(unsupportedStatus.isErr()).toBe(true);
+    expect(invalidExitCode.isErr()).toBe(true);
+    expect(unsafeFailureSummary.isErr()).toBe(true);
+
+    const skipped = ScheduledTaskRunAttempt.create({
+      id: ScheduledTaskRunId.rehydrate("str_daily_migration_skipped"),
+      taskId: ScheduledTaskId.rehydrate("tsk_daily_migration"),
+      resourceId: ResourceId.rehydrate("res_api"),
+      triggerKind: scheduledTrigger._unsafeUnwrap(),
+      createdAt: CreatedAt.rehydrate("2026-05-05T01:00:00.000Z"),
+    })._unsafeUnwrap();
+
+    const skippedResult = skipped.markSkipped({
+      finishedAt: FinishedAt.rehydrate("2026-05-05T01:00:01.000Z"),
+      skippedReason: ScheduledTaskRunSkippedReasonValue.concurrencyForbidden(),
+      failureSummary: ScheduledTaskRunFailureSummary.create(
+        "Previous run is still active",
+      )._unsafeUnwrap(),
+    });
+
+    expect(skippedResult.isOk()).toBe(true);
+    expect(skipped.isTerminal()).toBe(true);
+    expect(skipped.toState().status.value).toBe("skipped");
+    expect(skipped.toState().skippedReason?.value).toBe("concurrency-forbidden");
+
+    const failed = ScheduledTaskRunAttempt.create({
+      id: ScheduledTaskRunId.rehydrate("str_daily_migration_failed"),
+      taskId: ScheduledTaskId.rehydrate("tsk_daily_migration"),
+      resourceId: ResourceId.rehydrate("res_api"),
+      triggerKind: ScheduledTaskRunTriggerKindValue.manual(),
+      createdAt: CreatedAt.rehydrate("2026-05-05T02:00:00.000Z"),
+    })._unsafeUnwrap();
+
+    failed
+      .start({
+        startedAt: StartedAt.rehydrate("2026-05-05T02:00:01.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const failedResult = failed.markFailed({
+      finishedAt: FinishedAt.rehydrate("2026-05-05T02:00:03.000Z"),
+      exitCode: ScheduledTaskRunExitCode.rehydrate(1),
+      failureSummary: ScheduledTaskRunFailureSummary.create(
+        "Command exited with code 1",
+      )._unsafeUnwrap(),
+    });
+
+    expect(failedResult.isOk()).toBe(true);
+    expect(failed.toState().status.value).toBe("failed");
+    expect(failed.toState().exitCode?.value).toBe(1);
+    expect(failed.toState().failureSummary?.value).toBe("Command exited with code 1");
+
+    const invalidFailure = ScheduledTaskRunAttempt.create({
+      id: ScheduledTaskRunId.rehydrate("str_daily_migration_invalid_failure"),
+      taskId: ScheduledTaskId.rehydrate("tsk_daily_migration"),
+      resourceId: ResourceId.rehydrate("res_api"),
+      triggerKind: ScheduledTaskRunTriggerKindValue.manual(),
+      createdAt: CreatedAt.rehydrate("2026-05-05T02:01:00.000Z"),
+    })._unsafeUnwrap();
+    invalidFailure
+      .start({
+        startedAt: StartedAt.rehydrate("2026-05-05T02:01:01.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const invalidFailureResult = invalidFailure.markFailed({
+      finishedAt: FinishedAt.rehydrate("2026-05-05T02:01:02.000Z"),
+      exitCode: ScheduledTaskRunExitCode.rehydrate(0),
+      failureSummary: ScheduledTaskRunFailureSummary.create("Command failed")._unsafeUnwrap(),
+    });
+
+    expect(invalidFailureResult.isErr()).toBe(true);
+
+    if (unsafeFailureSummary.isErr()) {
+      expect(unsafeFailureSummary.error.details).toMatchObject({
+        phase: "scheduled-task-run-admission",
+        field: "failureSummary",
       });
     }
   });

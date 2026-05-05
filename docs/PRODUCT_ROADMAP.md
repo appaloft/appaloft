@@ -1089,6 +1089,10 @@ Current verification notes:
   definition value objects and state for schedule, timezone, command intent, timeout, retry, and
   lifecycle status, plus `forbid` concurrency validation. Run attempts, persistence,
   scheduler/runtime execution, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task run-attempt core slice added Resource/task-owned run attempt
+  state with manual/scheduled trigger kind, accepted/running/succeeded/failed/skipped transitions,
+  safe exit/failure details, and no Deployment id. Application run admission, persistence,
+  scheduler/runtime execution, entrypoints, and public docs remain open.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm
