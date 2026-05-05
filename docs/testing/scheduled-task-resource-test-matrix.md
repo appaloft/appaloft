@@ -32,6 +32,8 @@ logs. It is not active implementation coverage yet.
 
 `SCHED-TASK-CATALOG-001` has inactive-catalog coverage and `SCHED-TASK-APP-001` has command/query
 message-shape coverage in `packages/application/test/scheduled-tasks-application-model.test.ts`.
+`SCHED-TASK-RUN-001` and `SCHED-TASK-RUN-002` have inactive application run-now admission coverage
+in `packages/application/test/scheduled-task-run-now.test.ts`.
 `SCHED-TASK-DOMAIN-001` through `SCHED-TASK-DOMAIN-003` have core coverage in
 `packages/core/test/scheduled-task.test.ts`. The implemented slices add dedicated value objects for
 schedule, timezone, command intent, timeout, retry, lifecycle status, and `forbid` concurrency
@@ -39,7 +41,7 @@ policy plus a Resource-owned scheduled task definition state with no deployment 
 the core scheduled-task run attempt lifecycle for accepted, running, succeeded, failed, and skipped
 states with safe terminal details and no Deployment id.
 
-Inactive application command/query schemas, messages, result DTOs, and read-model ports exist. No
-operation catalog entries, application handlers/use cases, persisted scheduled-task/run state,
-scheduler process manager, runtime adapter execution path, task-run logs, entrypoints, or public
-docs are active yet.
+Inactive application command/query schemas, messages, result DTOs, read-model ports, and run-now
+admission handler/use case exist. No operation catalog entries, remaining application handlers/use
+cases, persisted scheduled-task/run state, scheduler process manager, runtime adapter execution
+path, task-run logs, entrypoints, or public docs are active yet.

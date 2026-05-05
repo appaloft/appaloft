@@ -21,6 +21,8 @@ export const tokens = {
   destinationRepository: Symbol.for("appaloft.destination_repository"),
   environmentRepository: Symbol.for("appaloft.environment_repository"),
   resourceRepository: Symbol.for("appaloft.resource_repository"),
+  scheduledTaskDefinitionRepository: Symbol.for("appaloft.scheduled_task_definition_repository"),
+  scheduledTaskRunAttemptRepository: Symbol.for("appaloft.scheduled_task_run_attempt_repository"),
   dependencyResourceRepository: Symbol.for("appaloft.dependency_resource_repository"),
   dependencyResourceBackupRepository: Symbol.for("appaloft.dependency_resource_backup_repository"),
   resourceDependencyBindingRepository: Symbol.for(
@@ -200,6 +202,7 @@ export const tokens = {
   resourceRuntimeControlAttemptRecorder: Symbol.for(
     "appaloft.resource_runtime_control_attempt_recorder",
   ),
+  runScheduledTaskNowUseCase: Symbol.for("appaloft.run_scheduled_task_now_use_case"),
   ingestSourceEventUseCase: Symbol.for("appaloft.ingest_source_event_use_case"),
   sourceEventVerificationPort: Symbol.for("appaloft.source_event_verification_port"),
   githubSourceEventWebhookVerifier: Symbol.for("appaloft.github_source_event_webhook_verifier"),

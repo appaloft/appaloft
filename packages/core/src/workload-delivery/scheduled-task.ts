@@ -682,6 +682,29 @@ export interface CreateScheduledTaskDefinitionInput {
   createdAt: CreatedAt;
 }
 
+export interface ScheduledTaskDefinitionSelectionSpecVisitor<TResult> {
+  visitScheduledTaskDefinitionById(spec: ScheduledTaskDefinitionByIdSpec): TResult;
+}
+
+export interface ScheduledTaskDefinitionSelectionSpec {
+  accept<TResult>(visitor: ScheduledTaskDefinitionSelectionSpecVisitor<TResult>): TResult;
+}
+
+export class ScheduledTaskDefinitionByIdSpec implements ScheduledTaskDefinitionSelectionSpec {
+  private constructor(
+    public readonly taskId: ScheduledTaskId,
+    public readonly resourceId?: ResourceId,
+  ) {}
+
+  static create(taskId: ScheduledTaskId, resourceId?: ResourceId): ScheduledTaskDefinitionByIdSpec {
+    return new ScheduledTaskDefinitionByIdSpec(taskId, resourceId);
+  }
+
+  accept<TResult>(visitor: ScheduledTaskDefinitionSelectionSpecVisitor<TResult>): TResult {
+    return visitor.visitScheduledTaskDefinitionById(this);
+  }
+}
+
 export class ScheduledTaskDefinition extends AggregateRoot<
   ScheduledTaskDefinitionState,
   ScheduledTaskId
@@ -748,6 +771,31 @@ export interface CreateScheduledTaskRunAttemptInput {
   resourceId: ResourceId;
   triggerKind: ScheduledTaskRunTriggerKindValue;
   createdAt: CreatedAt;
+}
+
+export interface ScheduledTaskRunAttemptMutationSpecVisitor<TResult> {
+  visitUpsertScheduledTaskRunAttempt(spec: UpsertScheduledTaskRunAttemptSpec): TResult;
+}
+
+export interface ScheduledTaskRunAttemptMutationSpec {
+  accept<TResult>(visitor: ScheduledTaskRunAttemptMutationSpecVisitor<TResult>): TResult;
+}
+
+export class UpsertScheduledTaskRunAttemptSpec implements ScheduledTaskRunAttemptMutationSpec {
+  private constructor(
+    public readonly runId: ScheduledTaskRunId,
+    public readonly taskId: ScheduledTaskId,
+    public readonly resourceId: ResourceId,
+  ) {}
+
+  static fromRunAttempt(runAttempt: ScheduledTaskRunAttempt): UpsertScheduledTaskRunAttemptSpec {
+    const state = runAttempt.toState();
+    return new UpsertScheduledTaskRunAttemptSpec(state.id, state.taskId, state.resourceId);
+  }
+
+  accept<TResult>(visitor: ScheduledTaskRunAttemptMutationSpecVisitor<TResult>): TResult {
+    return visitor.visitUpsertScheduledTaskRunAttempt(this);
+  }
 }
 
 export class ScheduledTaskRunAttempt extends AggregateRoot<
