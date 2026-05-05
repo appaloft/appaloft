@@ -104,6 +104,18 @@ export {
 } from "./resource-runtime-control-target";
 export { RuntimeResourceRuntimeLogReader } from "./resource-runtime-logs";
 export {
+  renderDockerSwarmRuntimeIntent,
+  type DockerSwarmComposeWorkloadIntent,
+  type DockerSwarmEnvironmentVariableIntent,
+  type DockerSwarmHealthIntent,
+  type DockerSwarmImageWorkloadIntent,
+  type DockerSwarmRouteIntent,
+  type DockerSwarmRuntimeIdentityInput,
+  type DockerSwarmRuntimeIntent,
+  type DockerSwarmRuntimeIntentInput,
+  type DockerSwarmWorkloadIntent,
+} from "./docker-swarm-runtime-intent";
+export {
   HermeticScheduledTaskRuntimePort,
   type HermeticScheduledTaskRuntimeOptions,
   type ScheduledTaskCommandRunner,

@@ -1208,6 +1208,11 @@ Current verification notes:
   `servers.test-connectivity` adapter coverage for SSH reachability, Docker daemon availability,
   active manager state, overlay network support, and edge proxy compatibility without mutating
   Swarm stacks, services, or networks. Swarm execution remains open.
+- 2026-05-05 Phase 7 Docker Swarm render-intent slice bound `SWARM-TARGET-RENDER-001` and
+  `SWARM-TARGET-RENDER-002` to adapter contract coverage for OCI image and Compose artifact render
+  intent, including stack/service identity, runtime environment snapshots, health policy, access
+  routes, Compose target-service disambiguation, and initial runtime secret masking. Swarm
+  apply/verify/log/health/cleanup execution remains open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1270,8 +1275,8 @@ Required:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
   semantics, normalized read surfaces, public docs/help, and contract tests are implemented.
   Target-kind registration metadata, unsupported-backend admission, backend descriptor selection,
-  Swarm manager readiness, the public docs anchor, and CLI/API/Web help links are implemented;
-  Swarm execution remains open.
+  Swarm manager readiness, adapter-owned OCI/Compose render intent, the public docs anchor, and
+  CLI/API/Web help links are implemented; Swarm execution remains open.
 
 Exit criteria:
 
