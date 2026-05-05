@@ -408,6 +408,7 @@ export interface ScheduledTaskDefinitionRepository {
     task: ScheduledTaskDefinition,
     spec: ScheduledTaskDefinitionMutationSpec,
   ): Promise<void>;
+  delete(context: RepositoryContext, spec: ScheduledTaskDefinitionMutationSpec): Promise<void>;
 }
 
 export interface ScheduledTaskRunAttemptRepository {

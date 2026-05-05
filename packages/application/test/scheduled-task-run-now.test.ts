@@ -66,6 +66,11 @@ class StaticScheduledTaskDefinitionRepository implements ScheduledTaskDefinition
     _task: ScheduledTaskDefinition,
     _spec: ScheduledTaskDefinitionMutationSpec,
   ): Promise<void> {}
+
+  async delete(
+    _context: RepositoryContext,
+    _spec: ScheduledTaskDefinitionMutationSpec,
+  ): Promise<void> {}
 }
 
 class RecordingScheduledTaskRunAttemptRepository implements ScheduledTaskRunAttemptRepository {

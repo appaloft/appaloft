@@ -26,6 +26,8 @@ logs. It is not active implementation coverage yet.
 | SCHED-TASK-QUERY-002 | Application query | User shows a missing scheduled task. | Show query returns a structured `not_found` error with scheduled-task read phase details. |
 | SCHED-TASK-UPDATE-001 | Application command | User updates a scheduled task. | Command validates patched core scheduled-task fields, stores the Resource-owned task definition through the inactive repository port, and returns a safe task summary without activating operation catalog entries. |
 | SCHED-TASK-UPDATE-002 | Application command | Resource is archived. | Update admission rejects before storing changes with a structured Resource lifecycle phase. |
+| SCHED-TASK-DELETE-001 | Application command | User deletes a scheduled task. | Command verifies Resource ownership and deletes through an explicit inactive repository mutation spec with a timestamped result while operation catalog entries remain inactive. |
+| SCHED-TASK-DELETE-002 | Application command | Resource context does not match task ownership. | Delete admission rejects before persistence with a structured Resource context mismatch phase. |
 | SCHED-TASK-RUN-001 | Application command | User runs a task now. | Command returns `ok({ runId })` after admission; run state starts as accepted/pending/running according to workflow. |
 | SCHED-TASK-RUN-002 | Application command | Resource is archived. | Run admission rejects or skips before runtime execution with a structured resource lifecycle phase. |
 | SCHED-TASK-RUN-QUERY-001 | Application query/log adapter | User lists or shows task runs or reads run logs. | Query handlers wrap run-specific read models with stable schema versions and generated timestamps while deployment/resource runtime logs remain unchanged. |
@@ -47,6 +49,8 @@ application read-query coverage in `packages/application/test/scheduled-task-rea
 `SCHED-TASK-UPDATE-001`, `SCHED-TASK-UPDATE-002`, and unsafe command-intent coverage for
 `SCHED-TASK-SECRET-001` have inactive application update-admission coverage in
 `packages/application/test/scheduled-task-update.test.ts`.
+`SCHED-TASK-DELETE-001` and `SCHED-TASK-DELETE-002` have inactive application delete-admission
+coverage in `packages/application/test/scheduled-task-delete.test.ts`.
 `SCHED-TASK-RUN-001` and `SCHED-TASK-RUN-002` have inactive application run-now admission coverage
 in `packages/application/test/scheduled-task-run-now.test.ts`.
 `SCHED-TASK-DOMAIN-001` through `SCHED-TASK-DOMAIN-003` have core coverage in
@@ -57,7 +61,6 @@ the core scheduled-task run attempt lifecycle for accepted, running, succeeded, 
 states with safe terminal details and no Deployment id.
 
 Inactive application command/query schemas, messages, result DTOs, read-model ports, create,
-update, and run-now admission handlers/use cases, and read-query handlers/services exist. No
-operation catalog entries, delete handler/use case, persisted scheduled-task/run state, scheduler
-process manager, runtime adapter execution path, task-run logs, entrypoints, or public docs are
-active yet.
+update, delete, and run-now admission handlers/use cases, and read-query handlers/services exist. No
+operation catalog entries, persisted scheduled-task/run state, scheduler process manager, runtime
+adapter execution path, task-run logs, entrypoints, or public docs are active yet.

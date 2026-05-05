@@ -29,6 +29,9 @@
 - [x] `SCHED-TASK-UPDATE-001`: update patches a Resource-owned task definition without activating
   operation catalog entries.
 - [x] `SCHED-TASK-UPDATE-002`: Resource archive blocks task updates before persistence.
+- [x] `SCHED-TASK-DELETE-001`: delete removes a Resource-owned task definition without activating
+  operation catalog entries.
+- [x] `SCHED-TASK-DELETE-002`: Resource context mismatch blocks delete before persistence.
 - [x] `SCHED-TASK-RUN-001`: run-now accepts a run attempt without completing it synchronously.
 - [x] `SCHED-TASK-RUN-002`: Resource archive blocks run-now before runtime execution.
 - [x] `SCHED-TASK-RUN-QUERY-001`: run list/show/log queries wrap run-specific read models.
@@ -44,9 +47,10 @@
   ports.
 - [x] Add inactive application create task admission handler/use case.
 - [x] Add inactive application update task admission handler/use case.
+- [x] Add inactive application delete task admission handler/use case.
 - [x] Add inactive application run-now admission handler/use case.
 - [x] Add inactive application read-query handlers/services for task and run history surfaces.
-- [ ] Add remaining application scheduled-task handlers/use cases.
+- [x] Add remaining application scheduled-task handlers/use cases.
 - [ ] Add persistence/read models.
 - [ ] Add scheduler process manager.
 - [ ] Add runtime adapter one-off task execution/log support.

@@ -24,15 +24,14 @@ import {
   ScheduledTaskTimezone,
   UpsertResourceSpec,
 } from "@appaloft/core";
-import { MemoryResourceRepository } from "@appaloft/testkit";
+import { FixedClock, MemoryResourceRepository } from "@appaloft/testkit";
 
 import { createExecutionContext, type RepositoryContext, toRepositoryContext } from "../src";
 import { type ScheduledTaskDefinitionRepository } from "../src/ports";
-import { UpdateScheduledTaskUseCase } from "../src/use-cases";
+import { DeleteScheduledTaskUseCase } from "../src/use-cases";
 
 class RecordingScheduledTaskDefinitionRepository implements ScheduledTaskDefinitionRepository {
-  readonly upserts: ScheduledTaskDefinition[] = [];
-  readonly specs: ScheduledTaskDefinitionMutationSpec[] = [];
+  readonly deletes: ScheduledTaskDefinitionMutationSpec[] = [];
 
   constructor(private task: ScheduledTaskDefinition | null) {}
 
@@ -54,11 +53,9 @@ class RecordingScheduledTaskDefinitionRepository implements ScheduledTaskDefinit
   async upsert(
     _context: RepositoryContext,
     task: ScheduledTaskDefinition,
-    spec: ScheduledTaskDefinitionMutationSpec,
+    _spec: ScheduledTaskDefinitionMutationSpec,
   ): Promise<void> {
     this.task = task;
-    this.upserts.push(task);
-    this.specs.push(spec);
   }
 
   async delete(
@@ -66,11 +63,11 @@ class RecordingScheduledTaskDefinitionRepository implements ScheduledTaskDefinit
     spec: ScheduledTaskDefinitionMutationSpec,
   ): Promise<void> {
     this.task = null;
-    this.specs.push(spec);
+    this.deletes.push(spec);
   }
 }
 
-function resourceFixture(input?: { lifecycleStatus?: "active" | "archived" | "deleted" }) {
+function resourceFixture() {
   return Resource.rehydrate({
     id: ResourceId.rehydrate("res_api"),
     projectId: ProjectId.rehydrate("prj_demo"),
@@ -79,7 +76,7 @@ function resourceFixture(input?: { lifecycleStatus?: "active" | "archived" | "de
     slug: ResourceSlug.rehydrate("api"),
     kind: ResourceKindValue.rehydrate("application"),
     services: [],
-    lifecycleStatus: ResourceLifecycleStatusValue.rehydrate(input?.lifecycleStatus ?? "active"),
+    lifecycleStatus: ResourceLifecycleStatusValue.rehydrate("active"),
     createdAt: CreatedAt.rehydrate("2026-05-05T00:00:00.000Z"),
   });
 }
@@ -99,106 +96,76 @@ function taskFixture() {
   })._unsafeUnwrap();
 }
 
-async function createHarness(input?: { resource?: Resource; task?: ScheduledTaskDefinition }) {
+async function createHarness(input?: { task?: ScheduledTaskDefinition | null }) {
   const context = createExecutionContext({
-    requestId: "req_scheduled_task_update_test",
+    requestId: "req_scheduled_task_delete_test",
     entrypoint: "system",
   });
   const resourceRepository = new MemoryResourceRepository();
-  const resource = input?.resource ?? resourceFixture();
+  const resource = resourceFixture();
   await resourceRepository.upsert(
     toRepositoryContext(context),
     resource,
     UpsertResourceSpec.fromResource(resource),
   );
   const taskRepository = new RecordingScheduledTaskDefinitionRepository(
-    input?.task ?? taskFixture(),
+    input?.task === undefined ? taskFixture() : input.task,
   );
 
   return {
     context,
     taskRepository,
-    useCase: new UpdateScheduledTaskUseCase(taskRepository, resourceRepository),
+    useCase: new DeleteScheduledTaskUseCase(
+      taskRepository,
+      resourceRepository,
+      new FixedClock("2026-05-05T00:45:00.000Z"),
+    ),
   };
 }
 
-describe("UpdateScheduledTaskUseCase", () => {
-  test("[SCHED-TASK-UPDATE-001] updates a Resource-owned task definition without activating catalog entries", async () => {
+describe("DeleteScheduledTaskUseCase", () => {
+  test("[SCHED-TASK-DELETE-001] deletes a Resource-owned task definition without activating catalog entries", async () => {
     const { context, taskRepository, useCase } = await createHarness();
 
     const result = await useCase.execute(context, {
       taskId: "tsk_backup",
       resourceId: "res_api",
-      schedule: "0 2 * * *",
-      timezone: "Asia/Shanghai",
-      commandIntent: "bun run migrate",
-      timeoutSeconds: 900,
-      retryLimit: 0,
-      status: "disabled",
     });
 
     expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toMatchObject({
-      schemaVersion: "scheduled-tasks.command/v1",
-      task: {
-        taskId: "tsk_backup",
-        resourceId: "res_api",
-        schedule: "0 2 * * *",
-        timezone: "Asia/Shanghai",
-        commandIntent: "bun run migrate",
-        timeoutSeconds: 900,
-        retryLimit: 0,
-        concurrencyPolicy: "forbid",
-        status: "disabled",
-        createdAt: "2026-05-05T00:10:00.000Z",
-      },
-    });
-    expect(taskRepository.upserts).toHaveLength(1);
-    expect(taskRepository.upserts[0]?.toState().retryLimit.value).toBe(0);
-  });
-
-  test("[SCHED-TASK-UPDATE-002] rejects archived Resources before storing updates", async () => {
-    const { context, taskRepository, useCase } = await createHarness({
-      resource: resourceFixture({ lifecycleStatus: "archived" }),
-    });
-
-    const result = await useCase.execute(context, {
+    expect(result._unsafeUnwrap()).toEqual({
+      schemaVersion: "scheduled-tasks.delete/v1",
       taskId: "tsk_backup",
       resourceId: "res_api",
-      schedule: "0 2 * * *",
+      status: "deleted",
+      deletedAt: "2026-05-05T00:45:00.000Z",
     });
-
-    expect(result.isErr()).toBe(true);
-    expect(taskRepository.upserts).toHaveLength(0);
-
-    if (result.isErr()) {
-      expect(result.error.code).toBe("resource_archived");
-      expect(result.error.details).toMatchObject({
-        phase: "scheduled-task-update-admission",
-        taskId: "tsk_backup",
-        resourceId: "res_api",
-        lifecycleStatus: "archived",
-      });
-    }
+    expect(taskRepository.deletes).toHaveLength(1);
+    expect(
+      taskRepository.deletes[0]?.accept({
+        visitUpsertScheduledTaskDefinition: () => "unexpected",
+        visitDeleteScheduledTaskDefinition: (spec) => spec.taskId.value,
+      }),
+    ).toBe("tsk_backup");
   });
 
-  test("[SCHED-TASK-SECRET-001] rejects unsafe update command intent before storing updates", async () => {
+  test("[SCHED-TASK-DELETE-002] rejects Resource context mismatch before deleting", async () => {
     const { context, taskRepository, useCase } = await createHarness();
 
     const result = await useCase.execute(context, {
       taskId: "tsk_backup",
-      resourceId: "res_api",
-      commandIntent: "PASSWORD=secret bun run backup",
+      resourceId: "res_other",
     });
 
     expect(result.isErr()).toBe(true);
-    expect(taskRepository.upserts).toHaveLength(0);
+    expect(taskRepository.deletes).toHaveLength(0);
 
     if (result.isErr()) {
-      expect(result.error.code).toBe("validation_error");
+      expect(result.error.code).toBe("resource_context_mismatch");
       expect(result.error.details).toMatchObject({
-        phase: "scheduled-task-definition-admission",
-        field: "commandIntent",
+        phase: "scheduled-task-delete-admission",
+        taskId: "tsk_backup",
+        resourceId: "res_other",
       });
     }
   });
