@@ -4,9 +4,9 @@
 
 Test-First / Code Round preparation for Phase 7 / `0.9.0`.
 
-Resource-owned auto-deploy policy domain behavior has core automation. Source auto-deploy command,
-source event ingestion route, durable source event read models, entrypoints, and background workers
-are not active yet.
+Resource-owned auto-deploy policy domain behavior, application command handling, and Resource
+repository persistence have automation. Source event ingestion routes, durable source event read
+models, entrypoints, and background workers are not active yet.
 
 ## Governing Sources
 
@@ -30,9 +30,9 @@ are not active yet.
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `SRC-AUTO-POLICY-001` | Resource has compatible Git source binding and user enables push auto-deploy for one branch. | Policy is persisted without mutating source binding or deployment history. | `packages/core/test/resource.test.ts` | Passing |
-| `SRC-AUTO-POLICY-002` | Resource has no compatible source binding. | Configure command rejects with stable source binding blocker. | `packages/core/test/resource.test.ts` | Passing |
-| `SRC-AUTO-POLICY-003` | Source binding changes after policy creation. | Policy becomes blocked pending explicit acknowledgement and cannot create deployments. | `packages/core/test/resource.test.ts` | Passing |
+| `SRC-AUTO-POLICY-001` | Resource has compatible Git source binding and user enables push auto-deploy for one branch. | Policy is persisted without mutating source binding or deployment history. | `packages/core/test/resource.test.ts`; `packages/application/test/configure-resource-auto-deploy.test.ts`; `packages/persistence/pg/test/resource-auto-deploy-policy.pglite.test.ts` | Passing |
+| `SRC-AUTO-POLICY-002` | Resource has no compatible source binding. | Configure command rejects with stable source binding blocker. | `packages/core/test/resource.test.ts`; `packages/application/test/configure-resource-auto-deploy.test.ts` | Passing |
+| `SRC-AUTO-POLICY-003` | Source binding changes after policy creation. | Policy becomes blocked pending explicit acknowledgement and cannot create deployments. | `packages/core/test/resource.test.ts`; `packages/persistence/pg/test/resource-auto-deploy-policy.pglite.test.ts` | Passing |
 
 ## Event Coverage
 
@@ -62,8 +62,8 @@ are not active yet.
 
 ## Current Implementation Notes And Migration Gaps
 
-Resource source binding, source fingerprint link state, manual deployment admission, and
-Resource-owned auto-deploy policy state behavior exist. This matrix still tracks the missing
-application command, source event ingestion, dedupe, read models, and entrypoint surfaces. Code Round
-must not mark auto-deploy complete until these rows have stable automation or explicit deferred
-exceptions.
+Resource source binding, source fingerprint link state, manual deployment admission,
+Resource-owned auto-deploy policy state behavior, inactive application command handling, and
+Resource repository persistence exist. This matrix still tracks the missing source event ingestion,
+dedupe, read models, and entrypoint surfaces. Code Round must not mark auto-deploy complete until
+these rows have stable automation or explicit deferred exceptions.

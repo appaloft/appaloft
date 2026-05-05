@@ -81,6 +81,7 @@ import {
   type GitRefText,
   ResourceSourceBinding,
   type ResourceSourceBindingState,
+  type SourceBindingFingerprint,
 } from "./source-binding";
 import { type ResourceStorageMountModeValue, type StorageDestinationPath } from "./storage-volume";
 
@@ -507,6 +508,21 @@ function resourceAutoDeploySourceMissingError(input: {
       ...(input.sourceKind ? { sourceKind: input.sourceKind } : {}),
     },
   );
+}
+
+function resourceAutoDeployPolicyBlockedError(input: {
+  resourceId: ResourceId;
+  blockedReason: string;
+  sourceBindingFingerprint?: string;
+}) {
+  return domainError.resourceAutoDeployPolicyBlocked("Auto-deploy policy is blocked", {
+    phase: "auto-deploy-policy-admission",
+    resourceId: input.resourceId.value,
+    blockedReason: input.blockedReason,
+    ...(input.sourceBindingFingerprint
+      ? { sourceBindingFingerprint: input.sourceBindingFingerprint }
+      : {}),
+  });
 }
 
 export type ResourceVariableState = ReturnType<EnvironmentConfigSet["toState"]>[number];
@@ -1673,6 +1689,91 @@ export class Resource extends AggregateRoot<ResourceState> {
       sourceBindingFingerprint: this.state.autoDeployPolicy.sourceBindingFingerprint.value,
       configuredAt: input.configuredAt.value,
     });
+
+    return ok(cloneResourceAutoDeployPolicyState(this.state.autoDeployPolicy));
+  }
+
+  disableAutoDeployPolicy(input: { disabledAt: UpdatedAt }): Result<{ status: "disabled" }> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-auto-deploy");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    delete this.state.autoDeployPolicy;
+    this.recordDomainEvent("resource-auto-deploy-policy-disabled", input.disabledAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      status: "disabled",
+      disabledAt: input.disabledAt.value,
+    });
+
+    return ok({ status: "disabled" });
+  }
+
+  acknowledgeAutoDeploySourceBinding(input: {
+    sourceBindingFingerprint: SourceBindingFingerprint;
+    acknowledgedAt: UpdatedAt;
+  }): Result<ResourceAutoDeployPolicyState> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-auto-deploy");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    if (!this.state.autoDeployPolicy) {
+      return err(
+        resourceAutoDeployPolicyBlockedError({
+          resourceId: this.state.id,
+          blockedReason: "policy-missing",
+        }),
+      );
+    }
+
+    if (!this.state.sourceBinding) {
+      return err(resourceAutoDeploySourceMissingError({ resourceId: this.state.id }));
+    }
+
+    const sourceBinding = ResourceSourceBinding.rehydrate(this.state.sourceBinding);
+    if (!sourceBinding.supportsAutoDeployPolicy()) {
+      return err(
+        resourceAutoDeploySourceMissingError({
+          resourceId: this.state.id,
+          sourceKind: this.state.sourceBinding.kind.value,
+        }),
+      );
+    }
+
+    const currentFingerprint = sourceBinding.fingerprint();
+    if (!currentFingerprint.equals(input.sourceBindingFingerprint)) {
+      return err(
+        resourceAutoDeployPolicyBlockedError({
+          resourceId: this.state.id,
+          blockedReason: "source-binding-fingerprint-mismatch",
+          sourceBindingFingerprint: input.sourceBindingFingerprint.value,
+        }),
+      );
+    }
+
+    const policy = ResourceAutoDeployPolicy.rehydrate(
+      this.state.autoDeployPolicy,
+    ).acknowledgeSourceBinding({
+      currentSourceBindingFingerprint: currentFingerprint,
+      acknowledgedAt: input.acknowledgedAt,
+    });
+    this.state.autoDeployPolicy = policy.toState();
+
+    this.recordDomainEvent(
+      "resource-auto-deploy-policy-source-binding-acknowledged",
+      input.acknowledgedAt,
+      {
+        resourceId: this.state.id.value,
+        projectId: this.state.projectId.value,
+        environmentId: this.state.environmentId.value,
+        status: this.state.autoDeployPolicy.status.value,
+        sourceBindingFingerprint: this.state.autoDeployPolicy.sourceBindingFingerprint.value,
+        acknowledgedAt: input.acknowledgedAt.value,
+      },
+    );
 
     return ok(cloneResourceAutoDeployPolicyState(this.state.autoDeployPolicy));
   }

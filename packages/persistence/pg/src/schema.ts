@@ -110,6 +110,11 @@ export interface ResourcesTable {
     Record<string, unknown> | null,
     Record<string, unknown> | null
   >;
+  auto_deploy_policy: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null | undefined,
+    Record<string, unknown> | null
+  >;
   lifecycle_status: string;
   archived_at: string | null;
   archive_reason: string | null;

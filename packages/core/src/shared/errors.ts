@@ -156,6 +156,10 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("resource_auto_deploy_source_missing", "user", message, details),
+  resourceAutoDeployPolicyBlocked: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_auto_deploy_policy_blocked", "user", message, details),
   resourceAutoDeploySecretRequired: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

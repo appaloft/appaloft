@@ -313,8 +313,27 @@ export class ResourceAutoDeployPolicy extends ValueObject<ResourceAutoDeployPoli
     });
   }
 
+  acknowledgeSourceBinding(input: {
+    currentSourceBindingFingerprint: SourceBindingFingerprint;
+    acknowledgedAt: UpdatedAt;
+  }): ResourceAutoDeployPolicy {
+    return new ResourceAutoDeployPolicy({
+      ...this.toState(),
+      status: ResourceAutoDeployPolicyStatusValue.enabled(),
+      sourceBindingFingerprint: input.currentSourceBindingFingerprint,
+      updatedAt: input.acknowledgedAt,
+    });
+  }
+
   toState(): ResourceAutoDeployPolicyState {
-    return cloneResourceAutoDeployPolicyState(this.state);
+    const state = cloneResourceAutoDeployPolicyState(this.state);
+    if (state.status.value === "blocked") {
+      return state;
+    }
+
+    const { blockedReason, ...unblockedState } = state;
+    void blockedReason;
+    return unblockedState;
   }
 }
 
@@ -328,7 +347,9 @@ export function cloneResourceAutoDeployPolicyState(
     eventKinds: [...state.eventKinds],
     sourceBindingFingerprint: state.sourceBindingFingerprint,
     updatedAt: state.updatedAt,
-    ...(state.blockedReason ? { blockedReason: state.blockedReason } : {}),
+    ...(state.status.value === "blocked" && state.blockedReason
+      ? { blockedReason: state.blockedReason }
+      : {}),
     ...(state.genericWebhookSecretRef
       ? { genericWebhookSecretRef: state.genericWebhookSecretRef }
       : {}),

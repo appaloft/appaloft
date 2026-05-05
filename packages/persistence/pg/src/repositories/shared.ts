@@ -120,6 +120,10 @@ import {
   ProjectSlug,
   ProviderKey,
   PublicDomainName,
+  ResourceAutoDeployPolicyBlockedReasonValue,
+  ResourceAutoDeployPolicyStatusValue,
+  ResourceAutoDeploySecretRef,
+  ResourceAutoDeployTriggerKindValue,
   ResourceBindingId,
   ResourceBindingScopeValue,
   ResourceBindingTargetName,
@@ -153,9 +157,12 @@ import {
   RuntimeVerificationStepKindValue,
   SourceApplicationShapeValue,
   SourceBaseDirectory,
+  SourceBindingFingerprint,
   SourceDescriptor,
   SourceDetectedFileValue,
   SourceDetectedScriptValue,
+  SourceEventDedupeWindowSeconds,
+  SourceEventKindValue,
   SourceFrameworkValue,
   SourceInspectionSnapshot,
   SourceKindValue,
@@ -426,6 +433,18 @@ export interface SerializedResourceNetworkProfile extends Record<string, unknown
 export interface SerializedResourceAccessProfile extends Record<string, unknown> {
   generatedAccessMode: "inherit" | "disabled";
   pathPrefix: string;
+}
+
+export interface SerializedResourceAutoDeployPolicy extends Record<string, unknown> {
+  status: "enabled" | "disabled" | "blocked";
+  triggerKind: "git-push" | "generic-signed-webhook";
+  refs: string[];
+  eventKinds: ("push" | "tag")[];
+  sourceBindingFingerprint: string;
+  updatedAt: string;
+  blockedReason?: "source-binding-changed";
+  genericWebhookSecretRef?: string;
+  dedupeWindowSeconds?: number;
 }
 
 export interface SerializedDomainVerificationAttempt extends Record<string, unknown> {
@@ -1468,6 +1487,9 @@ export function rehydrateResourceRow(
   const accessProfile = row.access_profile
     ? (row.access_profile as unknown as SerializedResourceAccessProfile)
     : undefined;
+  const autoDeployPolicy = row.auto_deploy_policy
+    ? (row.auto_deploy_policy as unknown as SerializedResourceAutoDeployPolicy)
+    : undefined;
 
   return {
     id: ResourceId.rehydrate(row.id),
@@ -1636,6 +1658,43 @@ export function rehydrateResourceRow(
               accessProfile.generatedAccessMode,
             ),
             pathPrefix: RoutePathPrefix.rehydrate(accessProfile.pathPrefix),
+          },
+        }
+      : {}),
+    ...(autoDeployPolicy
+      ? {
+          autoDeployPolicy: {
+            status: ResourceAutoDeployPolicyStatusValue.rehydrate(autoDeployPolicy.status),
+            triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate(autoDeployPolicy.triggerKind),
+            refs: autoDeployPolicy.refs.map((ref) => GitRefText.rehydrate(ref)),
+            eventKinds: autoDeployPolicy.eventKinds.map((eventKind) =>
+              SourceEventKindValue.rehydrate(eventKind),
+            ),
+            sourceBindingFingerprint: SourceBindingFingerprint.rehydrate(
+              autoDeployPolicy.sourceBindingFingerprint,
+            ),
+            updatedAt: UpdatedAt.rehydrate(autoDeployPolicy.updatedAt),
+            ...(autoDeployPolicy.blockedReason
+              ? {
+                  blockedReason: ResourceAutoDeployPolicyBlockedReasonValue.rehydrate(
+                    autoDeployPolicy.blockedReason,
+                  ),
+                }
+              : {}),
+            ...(autoDeployPolicy.genericWebhookSecretRef
+              ? {
+                  genericWebhookSecretRef: ResourceAutoDeploySecretRef.rehydrate(
+                    autoDeployPolicy.genericWebhookSecretRef,
+                  ),
+                }
+              : {}),
+            ...(autoDeployPolicy.dedupeWindowSeconds
+              ? {
+                  dedupeWindowSeconds: SourceEventDedupeWindowSeconds.rehydrate(
+                    autoDeployPolicy.dedupeWindowSeconds,
+                  ),
+                }
+              : {}),
           },
         }
       : {}),
