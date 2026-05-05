@@ -8,6 +8,9 @@ import {
   type CertificateSource,
   type CertificateStatus,
   type ConfigScope,
+  type DependencyResourceBackup,
+  type DependencyResourceBackupMutationSpec,
+  type DependencyResourceBackupSelectionSpec,
   type Deployment,
   type DeploymentLogEntry,
   type DeploymentLogSource,
@@ -413,6 +416,22 @@ export interface DependencyResourceRepository {
   ): Promise<void>;
 }
 
+export interface DependencyResourceBackupRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: DependencyResourceBackupSelectionSpec,
+  ): Promise<DependencyResourceBackup | null>;
+  findMany(
+    context: RepositoryContext,
+    spec: DependencyResourceBackupSelectionSpec,
+  ): Promise<DependencyResourceBackup[]>;
+  upsert(
+    context: RepositoryContext,
+    backup: DependencyResourceBackup,
+    spec: DependencyResourceBackupMutationSpec,
+  ): Promise<void>;
+}
+
 export interface ResourceDependencyBindingRepository {
   findOne(
     context: RepositoryContext,
@@ -428,6 +447,7 @@ export interface ResourceDependencyBindingRepository {
 export type DependencyResourceDeleteBlockerKind =
   | "resource-binding"
   | "backup-relationship"
+  | "dependency-resource-backup"
   | "provider-managed-unsafe"
   | "deployment-snapshot-reference";
 
@@ -2286,6 +2306,48 @@ export interface ShowDependencyResourceResult {
   generatedAt: string;
 }
 
+export interface DependencyResourceRestoreAttemptSummary {
+  attemptId: string;
+  status: "pending" | "completed" | "failed";
+  requestedAt: string;
+  completedAt?: string;
+  failedAt?: string;
+  failureCode?: string;
+  failureMessage?: string;
+}
+
+export interface DependencyResourceBackupSummary {
+  id: string;
+  dependencyResourceId: string;
+  projectId: string;
+  environmentId: string;
+  dependencyKind: DependencyResourceKind;
+  providerKey: string;
+  status: "pending" | "ready" | "failed";
+  attemptId: string;
+  requestedAt: string;
+  retentionStatus: "retained" | "none";
+  providerArtifactHandle?: string;
+  completedAt?: string;
+  failedAt?: string;
+  failureCode?: string;
+  failureMessage?: string;
+  latestRestoreAttempt?: DependencyResourceRestoreAttemptSummary;
+  createdAt: string;
+}
+
+export interface ListDependencyResourceBackupsResult {
+  schemaVersion: "dependency-resources.backups.list/v1";
+  items: DependencyResourceBackupSummary[];
+  generatedAt: string;
+}
+
+export interface ShowDependencyResourceBackupResult {
+  schemaVersion: "dependency-resources.backups.show/v1";
+  backup: DependencyResourceBackupSummary;
+  generatedAt: string;
+}
+
 export interface ResourceDependencyBindingTargetSummary {
   targetName: string;
   scope: "environment" | "release" | "build-only" | "runtime-only";
@@ -3836,6 +3898,20 @@ export interface DependencyResourceReadModel {
   ): Promise<DependencyResourceSummary | null>;
 }
 
+export interface DependencyResourceBackupReadModel {
+  list(
+    context: RepositoryContext,
+    input: {
+      dependencyResourceId: string;
+      status?: DependencyResourceBackupSummary["status"];
+    },
+  ): Promise<DependencyResourceBackupSummary[]>;
+  findOne(
+    context: RepositoryContext,
+    spec: DependencyResourceBackupSelectionSpec,
+  ): Promise<DependencyResourceBackupSummary | null>;
+}
+
 export interface ResourceDependencyBindingReadModel {
   list(
     context: RepositoryContext,
@@ -3897,6 +3973,47 @@ export interface ManagedPostgresProviderPort {
     context: ExecutionContext,
     input: ManagedPostgresDeleteInput,
   ): Promise<Result<ManagedPostgresDeleteResult, DomainError>>;
+}
+
+export interface DependencyResourceBackupProviderInput {
+  backupId: string;
+  dependencyResourceId: string;
+  dependencyKind: DependencyResourceKind;
+  providerKey: string;
+  attemptId: string;
+  requestedAt: string;
+}
+
+export interface DependencyResourceBackupProviderResult {
+  providerArtifactHandle: string;
+  completedAt: string;
+  retentionStatus?: "retained" | "none";
+}
+
+export interface DependencyResourceRestoreProviderInput {
+  backupId: string;
+  dependencyResourceId: string;
+  dependencyKind: DependencyResourceKind;
+  providerKey: string;
+  providerArtifactHandle: string;
+  restoreAttemptId: string;
+  requestedAt: string;
+}
+
+export interface DependencyResourceRestoreProviderResult {
+  completedAt: string;
+}
+
+export interface DependencyResourceBackupProviderPort {
+  supports(providerKey: string, dependencyKind: DependencyResourceKind): boolean;
+  createBackup(
+    context: ExecutionContext,
+    input: DependencyResourceBackupProviderInput,
+  ): Promise<Result<DependencyResourceBackupProviderResult, DomainError>>;
+  restoreBackup(
+    context: ExecutionContext,
+    input: DependencyResourceRestoreProviderInput,
+  ): Promise<Result<DependencyResourceRestoreProviderResult, DomainError>>;
 }
 
 export interface DeploymentReadModel {

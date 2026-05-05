@@ -417,6 +417,7 @@ export interface DependencyResourceDeleteBlockerState {
   kind:
     | "resource-binding"
     | "backup-relationship"
+    | "dependency-resource-backup"
     | "provider-managed-unsafe"
     | "deployment-snapshot-reference";
   relatedEntityId?: string;
@@ -785,6 +786,75 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
       providerKey: this.state.providerKey.value,
       attemptId: input.attemptId.value,
     });
+    return ok(undefined);
+  }
+
+  ensureCanCreateBackup(): Result<void> {
+    if (this.state.status.value !== "ready") {
+      return err(
+        domainError.dependencyResourceBackupBlocked("Dependency resource is not ready", {
+          phase: "dependency-resource-backup-admission",
+          dependencyResourceId: this.state.id.value,
+          currentStatus: this.state.status.value,
+        }),
+      );
+    }
+    if (
+      this.state.providerManaged &&
+      this.state.kind.value === "postgres" &&
+      this.state.sourceMode?.value === "appaloft-managed" &&
+      this.state.providerRealization?.status.value !== "ready"
+    ) {
+      return err(
+        domainError.dependencyResourceBackupBlocked("Managed Postgres is not realized", {
+          phase: "dependency-resource-backup-admission",
+          dependencyResourceId: this.state.id.value,
+          currentStatus: this.state.providerRealization?.status.value ?? "missing",
+        }),
+      );
+    }
+    if (
+      !this.state.connectionSecretRef &&
+      !this.state.postgresEndpoint &&
+      !this.state.redisEndpoint
+    ) {
+      return err(
+        domainError.dependencyResourceBackupBlocked(
+          "Dependency resource has no backup connection",
+          {
+            phase: "dependency-resource-backup-admission",
+            dependencyResourceId: this.state.id.value,
+          },
+        ),
+      );
+    }
+    return ok(undefined);
+  }
+
+  ensureCanRestoreBackup(): Result<void> {
+    if (this.state.status.value !== "ready") {
+      return err(
+        domainError.dependencyResourceRestoreBlocked("Dependency resource is not ready", {
+          phase: "dependency-resource-restore-admission",
+          dependencyResourceId: this.state.id.value,
+          currentStatus: this.state.status.value,
+        }),
+      );
+    }
+    if (
+      this.state.providerManaged &&
+      this.state.kind.value === "postgres" &&
+      this.state.sourceMode?.value === "appaloft-managed" &&
+      this.state.providerRealization?.status.value !== "ready"
+    ) {
+      return err(
+        domainError.dependencyResourceRestoreBlocked("Managed Postgres is not realized", {
+          phase: "dependency-resource-restore-admission",
+          dependencyResourceId: this.state.id.value,
+          currentStatus: this.state.providerRealization?.status.value ?? "missing",
+        }),
+      );
+    }
     return ok(undefined);
   }
 

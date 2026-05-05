@@ -197,6 +197,30 @@ export interface DependencyResourcesTable {
   deleted_at: NullableUpdatableTimestampColumn;
 }
 
+export interface DependencyResourceBackupsTable {
+  id: string;
+  dependency_resource_id: string;
+  project_id: string;
+  environment_id: string;
+  dependency_kind: string;
+  provider_key: string;
+  status: string;
+  attempt_id: string;
+  requested_at: TimestampColumn;
+  retention_status: string;
+  provider_artifact_handle: string | null;
+  completed_at: NullableUpdatableTimestampColumn;
+  failed_at: NullableUpdatableTimestampColumn;
+  failure_code: string | null;
+  failure_message: string | null;
+  latest_restore_attempt: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
+  created_at: TimestampColumn;
+}
+
 export interface ResourceStorageAttachmentsTable {
   id: string;
   resource_id: string;
@@ -465,6 +489,7 @@ export interface Database {
   environment_variables: EnvironmentVariablesTable;
   resource_variables: ResourceVariablesTable;
   dependency_resources: DependencyResourcesTable;
+  dependency_resource_backups: DependencyResourceBackupsTable;
   resource_dependency_bindings: ResourceDependencyBindingsTable;
   dependency_binding_secrets: DependencyBindingSecretsTable;
   storage_volumes: StorageVolumesTable;

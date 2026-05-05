@@ -29,11 +29,12 @@ Every read must dispatch one explicit query:
 - `resources.list-dependency-bindings`
 - `resources.show-dependency-binding`
 
-Backup/restore is planned by ADR-036 and
+Backup/restore is governed by ADR-036 and
 [Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md)
-and becomes active during Code Round. The current implemented workflow is not provider-native
-credential rotation, not runtime env injection, and not a deployment command. Provider-native
-Postgres realization is implemented through a hermetic provider capability under
+and is active for ready dependency resources with provider backup capability. The current
+implemented workflow is not provider-native credential rotation, not runtime env injection, and not
+a deployment command. Provider-native Postgres realization is implemented through a hermetic provider
+capability under
 [Postgres Provider-Native Realization](../specs/038-postgres-provider-native-realization/spec.md).
 
 ## Global References
@@ -209,7 +210,7 @@ cleanup only after explicit provider delete safety and cleanup succeeds.
 
 ## Backup And Restore
 
-Backup/restore is an accepted Phase 7 candidate governed by ADR-036 and
+Backup/restore is an active Phase 7 workflow governed by ADR-036 and
 [Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md).
 The first slice:
 
@@ -261,8 +262,10 @@ metadata, safe read models, real active-binding delete blockers, and safe depend
 snapshot references. Binding secret rotation updates binding-scoped safe secret references for
 future deployment snapshots only. Redis dependency resource lifecycle records are implemented as
 provider-neutral safe metadata. Provider-native Postgres realization is implemented with a
-hermetic provider capability. Backup/restore is specified by ADR-036/039 but not implemented yet.
-Runtime env injection, Web affordances, and runtime cleanup remain future work.
+hermetic provider capability. Dependency resource backup/restore is implemented with a hermetic
+provider capability, safe backup read models, restore attempt metadata, lifecycle events, and
+delete-safety blockers. Runtime env injection, Web affordances, provider-native Redis realization,
+and runtime cleanup remain future work.
 
 ## Open Questions
 

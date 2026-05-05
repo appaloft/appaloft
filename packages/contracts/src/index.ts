@@ -1048,6 +1048,7 @@ export const dependencyResourceDeleteBlockerSchema = z.object({
   kind: z.enum([
     "resource-binding",
     "backup-relationship",
+    "dependency-resource-backup",
     "provider-managed-unsafe",
     "deployment-snapshot-reference",
   ]),
@@ -1698,6 +1699,48 @@ export const listDependencyResourcesResponseSchema = z.object({
 export const showDependencyResourceResponseSchema = z.object({
   schemaVersion: z.literal("dependency-resources.show/v1"),
   dependencyResource: dependencyResourceSummarySchema,
+  generatedAt: z.string(),
+});
+
+export const dependencyResourceRestoreAttemptSummarySchema = z.object({
+  attemptId: z.string(),
+  status: z.enum(["pending", "completed", "failed"]),
+  requestedAt: z.string(),
+  completedAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  failureCode: z.string().optional(),
+  failureMessage: z.string().optional(),
+});
+
+export const dependencyResourceBackupSummarySchema = z.object({
+  id: z.string(),
+  dependencyResourceId: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  dependencyKind: z.enum(["postgres", "redis"]),
+  providerKey: z.string(),
+  status: z.enum(["pending", "ready", "failed"]),
+  attemptId: z.string(),
+  requestedAt: z.string(),
+  retentionStatus: z.enum(["retained", "none"]),
+  providerArtifactHandle: z.string().optional(),
+  completedAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  failureCode: z.string().optional(),
+  failureMessage: z.string().optional(),
+  latestRestoreAttempt: dependencyResourceRestoreAttemptSummarySchema.optional(),
+  createdAt: z.string(),
+});
+
+export const listDependencyResourceBackupsResponseSchema = z.object({
+  schemaVersion: z.literal("dependency-resources.backups.list/v1"),
+  items: z.array(dependencyResourceBackupSummarySchema),
+  generatedAt: z.string(),
+});
+
+export const showDependencyResourceBackupResponseSchema = z.object({
+  schemaVersion: z.literal("dependency-resources.backups.show/v1"),
+  backup: dependencyResourceBackupSummarySchema,
   generatedAt: z.string(),
 });
 
@@ -3683,6 +3726,10 @@ export type DependencyResourceBackupRelationship = z.infer<
 >;
 export type DependencyResourceDeleteBlocker = z.infer<typeof dependencyResourceDeleteBlockerSchema>;
 export type DependencyResourceSummary = z.infer<typeof dependencyResourceSummarySchema>;
+export type DependencyResourceRestoreAttemptSummary = z.infer<
+  typeof dependencyResourceRestoreAttemptSummarySchema
+>;
+export type DependencyResourceBackupSummary = z.infer<typeof dependencyResourceBackupSummarySchema>;
 export type ResourceDependencyBindingSummary = z.infer<
   typeof resourceDependencyBindingSummarySchema
 >;
@@ -3770,6 +3817,12 @@ export type DeleteStorageVolumeResponse = z.infer<typeof deleteStorageVolumeResp
 export type DependencyResourceResponse = z.infer<typeof dependencyResourceResponseSchema>;
 export type ListDependencyResourcesResponse = z.infer<typeof listDependencyResourcesResponseSchema>;
 export type ShowDependencyResourceResponse = z.infer<typeof showDependencyResourceResponseSchema>;
+export type ListDependencyResourceBackupsResponse = z.infer<
+  typeof listDependencyResourceBackupsResponseSchema
+>;
+export type ShowDependencyResourceBackupResponse = z.infer<
+  typeof showDependencyResourceBackupResponseSchema
+>;
 export type BindResourceDependencyResponse = z.infer<typeof bindResourceDependencyResponseSchema>;
 export type UnbindResourceDependencyResponse = z.infer<
   typeof unbindResourceDependencyResponseSchema

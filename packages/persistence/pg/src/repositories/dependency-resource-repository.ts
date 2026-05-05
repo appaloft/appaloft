@@ -458,6 +458,7 @@ export class PgDependencyResourceRepository implements DependencyResourceReposit
                 description: mutation.dependencyResource.description,
                 endpoint: mutation.dependencyResource.endpoint,
                 connection_secret_ref: mutation.dependencyResource.connection_secret_ref,
+                provider_realization: mutation.dependencyResource.provider_realization,
                 backup_relationship: mutation.dependencyResource.backup_relationship,
                 binding_readiness: mutation.dependencyResource.binding_readiness,
                 lifecycle_status: mutation.dependencyResource.lifecycle_status,
@@ -488,7 +489,30 @@ export class PgDependencyResourceDeleteSafetyReader
       .where("lifecycle_status", "=", "active")
       .executeTakeFirst();
     const count = Number(row?.count ?? 0);
-    return ok(count > 0 ? [{ kind: "resource-binding", count }] : []);
+    const backupRow = await executor
+      .selectFrom("dependency_resource_backups")
+      .select((expressionBuilder) => [expressionBuilder.fn.count<number>("id").as("count")])
+      .where("dependency_resource_id", "=", input.dependencyResourceId)
+      .where((expressionBuilder) =>
+        expressionBuilder.or([
+          expressionBuilder("status", "=", "pending"),
+          expressionBuilder("retention_status", "=", "retained"),
+        ]),
+      )
+      .executeTakeFirst();
+    const backupCount = Number(backupRow?.count ?? 0);
+    return ok([
+      ...(count > 0 ? [{ kind: "resource-binding" as const, count }] : []),
+      ...(backupCount > 0
+        ? [
+            {
+              kind: "dependency-resource-backup" as const,
+              relatedEntityType: "dependency_resource_backup",
+              count: backupCount,
+            },
+          ]
+        : []),
+    ]);
   }
 }
 

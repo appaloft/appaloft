@@ -27,6 +27,7 @@ import {
   ConfigureServerCredentialCommand,
   ConfigureServerEdgeProxyCommand,
   ConfirmDomainBindingOwnershipCommand,
+  CreateDependencyResourceBackupCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
   CreateDomainBindingCommand,
@@ -48,6 +49,7 @@ import {
   configureServerCredentialCommandInputSchema,
   configureServerEdgeProxyCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
+  createDependencyResourceBackupCommandInputSchema,
   createDeploymentCommandInputSchema,
   createDomainBindingCommandInputSchema,
   createEnvironmentCommandInputSchema,
@@ -100,6 +102,7 @@ import {
   issueOrRenewCertificateCommandInputSchema,
   ListCertificatesQuery,
   ListDefaultAccessDomainPoliciesQuery,
+  ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
   ListDeploymentsQuery,
   ListDomainBindingsQuery,
@@ -117,6 +120,7 @@ import {
   LockEnvironmentCommand,
   listCertificatesQueryInputSchema,
   listDefaultAccessDomainPoliciesQueryInputSchema,
+  listDependencyResourceBackupsQueryInputSchema,
   listDependencyResourcesQueryInputSchema,
   listDeploymentsQueryInputSchema,
   listDomainBindingsQueryInputSchema,
@@ -153,6 +157,7 @@ import {
   ResourceRuntimeLogsQuery,
   type ResourceRuntimeLogsQueryInput,
   type ResourceRuntimeLogsResult,
+  RestoreDependencyResourceBackupCommand,
   RetryCertificateCommand,
   RetryDomainBindingVerificationCommand,
   RevokeCertificateCommand,
@@ -170,6 +175,7 @@ import {
   resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
+  restoreDependencyResourceBackupCommandInputSchema,
   retryCertificateCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
   revokeCertificateCommandInputSchema,
@@ -179,6 +185,7 @@ import {
   SetResourceVariableCommand,
   ShowCertificateQuery,
   ShowDefaultAccessDomainPolicyQuery,
+  ShowDependencyResourceBackupQuery,
   ShowDependencyResourceQuery,
   ShowDeploymentQuery,
   ShowDomainBindingQuery,
@@ -197,6 +204,7 @@ import {
   setResourceVariableCommandInputSchema,
   showCertificateQueryInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
+  showDependencyResourceBackupQueryInputSchema,
   showDependencyResourceQueryInputSchema,
   showDeploymentQueryInputSchema,
   showDomainBindingQueryInputSchema,
@@ -271,6 +279,7 @@ import {
   issueOrRenewCertificateResponseSchema,
   listCertificatesResponseSchema,
   listDefaultAccessDomainPoliciesResponseSchema,
+  listDependencyResourceBackupsResponseSchema,
   listDependencyResourcesResponseSchema,
   listDeploymentsResponseSchema,
   listDomainBindingsResponseSchema,
@@ -309,6 +318,7 @@ import {
   setResourceVariableResponseSchema,
   showCertificateResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
+  showDependencyResourceBackupResponseSchema,
   showDependencyResourceResponseSchema,
   showDeploymentResponseSchema,
   showDomainBindingResponseSchema,
@@ -556,6 +566,22 @@ export const apiRouteDescriptions = {
   ),
   deleteDependencyResource: routeDescription(
     "Deletes only dependency resources that are not blocked by bindings, backup relationships, provider-managed unsafe state, or snapshot references.",
+    "resource.concept",
+  ),
+  createDependencyResourceBackup: routeDescription(
+    "Creates a dependency resource backup through the selected provider while recording safe artifact metadata.",
+    "resource.concept",
+  ),
+  listDependencyResourceBackups: routeDescription(
+    "Lists dependency resource backups without exposing provider-native artifact secrets.",
+    "resource.concept",
+  ),
+  showDependencyResourceBackup: routeDescription(
+    "Reads one dependency resource backup with latest restore attempt metadata.",
+    "resource.concept",
+  ),
+  restoreDependencyResourceBackup: routeDescription(
+    "Restores a ready dependency resource backup after explicit data-overwrite acknowledgements.",
     "resource.concept",
   ),
   bindResourceDependency: routeDescription(
@@ -2472,6 +2498,58 @@ export const deleteDependencyResourceProcedure = base
     executeCommand(context, DeleteDependencyResourceCommand.create(input)),
   );
 
+export const createDependencyResourceBackupProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/{dependencyResourceId}/backups",
+    description: apiRouteDescriptions.createDependencyResourceBackup,
+    successStatus: 201,
+  })
+  .input(createDependencyResourceBackupCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateDependencyResourceBackupCommand.create(input)),
+  );
+
+export const listDependencyResourceBackupsProcedure = base
+  .route({
+    method: "GET",
+    path: "/dependency-resources/{dependencyResourceId}/backups",
+    description: apiRouteDescriptions.listDependencyResourceBackups,
+    successStatus: 200,
+  })
+  .input(listDependencyResourceBackupsQueryInputSchema)
+  .output(listDependencyResourceBackupsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListDependencyResourceBackupsQuery.create(input)),
+  );
+
+export const showDependencyResourceBackupProcedure = base
+  .route({
+    method: "GET",
+    path: "/dependency-resources/backups/{backupId}",
+    description: apiRouteDescriptions.showDependencyResourceBackup,
+    successStatus: 200,
+  })
+  .input(showDependencyResourceBackupQueryInputSchema)
+  .output(showDependencyResourceBackupResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowDependencyResourceBackupQuery.create(input)),
+  );
+
+export const restoreDependencyResourceBackupProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/backups/{backupId}/restore",
+    description: apiRouteDescriptions.restoreDependencyResourceBackup,
+    successStatus: 202,
+  })
+  .input(restoreDependencyResourceBackupCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RestoreDependencyResourceBackupCommand.create(input)),
+  );
+
 export const bindResourceDependencyProcedure = base
   .route({
     method: "POST",
@@ -2678,6 +2756,10 @@ export const appaloftOrpcRouter = {
     show: showDependencyResourceProcedure,
     rename: renameDependencyResourceProcedure,
     delete: deleteDependencyResourceProcedure,
+    createBackup: createDependencyResourceBackupProcedure,
+    listBackups: listDependencyResourceBackupsProcedure,
+    showBackup: showDependencyResourceBackupProcedure,
+    restoreBackup: restoreDependencyResourceBackupProcedure,
   },
   terminalSessions: {
     open: openTerminalSessionProcedure,
@@ -2910,7 +2992,10 @@ export function mountAppaloftOrpcRoutes(
     "/api/dependency-resources/postgres/import",
     "/api/dependency-resources/redis/provision",
     "/api/dependency-resources/redis/import",
+    "/api/dependency-resources/backups/:backupId",
+    "/api/dependency-resources/backups/:backupId/restore",
     "/api/dependency-resources/:dependencyResourceId",
+    "/api/dependency-resources/:dependencyResourceId/backups",
     "/api/dependency-resources/:dependencyResourceId/rename",
     "/api/operator-work",
     "/api/operator-work/:workId",

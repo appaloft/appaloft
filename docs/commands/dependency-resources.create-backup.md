@@ -9,7 +9,6 @@ may produce a safe restore point.
 
 - `dependencyResourceId`
 - optional `description`
-- optional `retentionPolicy`
 - optional `providerKey` override when the dependency resource supports more than one backup
   capability
 
@@ -34,3 +33,6 @@ backup state, safe read models, and lifecycle events.
 No restore, backup deletion/prune, scheduled backup policy, runtime restart, deployment snapshot
 mutation, or raw dump export.
 
+## Current Implementation Notes
+
+Retention policy selection is deferred; this slice records provider-supplied retained/none metadata.

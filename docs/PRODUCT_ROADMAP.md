@@ -886,6 +886,12 @@ Current verification notes:
   delete-safety retention blockers, and lifecycle event specs. It does not implement the Code
   Round yet, so the full `0.9.0` release rule remains blocked by backup/restore Code Round,
   recovery, auto-deploy, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 dependency resource backup/restore Code Round implemented
+  `DependencyResourceBackup` state, hermetic backup/restore provider capability, safe backup
+  list/show read models, CLI and oRPC/HTTP entrypoints, lifecycle events, restore acknowledgements,
+  and delete-safety blockers for retained backups. Web affordances and provider-native Redis remain
+  separate gaps, so the full `0.9.0` release rule remains blocked by recovery, auto-deploy, preview,
+  and cluster runtime items.
 
 Required:
 
@@ -899,10 +905,10 @@ Required:
   baseline.
 - [x] Add provider-neutral Postgres dependency resource bind/unbind/list/show binding metadata
   baseline.
-- [ ] Add provider-native Postgres database realization and closed bind/backup/delete lifecycle.
+- [x] Add provider-native Postgres database realization and closed bind/backup/delete lifecycle.
 - [x] Add Redis provisioning/import/list/show/update/delete.
 - [x] Add dependency bind/unbind and binding secret rotation.
-- [ ] Add backup/restore for the minimum useful dependency-resource loop.
+- [x] Add backup/restore for the minimum useful dependency-resource loop.
 - [x] Rebuild deployment show as a first-class query.
 - [x] Rebuild deployment stream-events as a first-class query.
 - [ ] Rebuild deployment retry/redeploy under ADR-016.

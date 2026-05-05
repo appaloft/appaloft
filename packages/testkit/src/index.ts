@@ -13,10 +13,18 @@ import {
   type Clock,
   type DependencyBindingSecretStore,
   type DependencyBindingSecretStoreInput,
+  type DependencyResourceBackupProviderInput,
+  type DependencyResourceBackupProviderPort,
+  type DependencyResourceBackupProviderResult,
+  type DependencyResourceBackupReadModel,
+  type DependencyResourceBackupRepository,
+  type DependencyResourceBackupSummary,
   type DependencyResourceDeleteBlocker,
   type DependencyResourceDeleteSafetyReader,
   type DependencyResourceReadModel,
   type DependencyResourceRepository,
+  type DependencyResourceRestoreProviderInput,
+  type DependencyResourceRestoreProviderResult,
   type DependencyResourceSummary,
   type DeploymentLogSummary,
   type DeploymentReadModel,
@@ -72,6 +80,10 @@ import {
   CertificateByIdSpec,
   type CertificateMutationSpec,
   type CertificateSelectionSpec,
+  DependencyResourceBackup,
+  DependencyResourceBackupByIdSpec,
+  type DependencyResourceBackupMutationSpec,
+  type DependencyResourceBackupSelectionSpec,
   Deployment,
   type DeploymentByIdSpec,
   type DeploymentMutationSpec,
@@ -329,6 +341,62 @@ export class FakeManagedPostgresProvider implements ManagedPostgresProviderPort 
     void context;
     this.deleted.push(input);
     return this.deleteResult ?? ok({ deletedAt: input.requestedAt });
+  }
+}
+
+export class FakeDependencyResourceBackupProvider implements DependencyResourceBackupProviderPort {
+  readonly backups: DependencyResourceBackupProviderInput[] = [];
+  readonly restores: DependencyResourceRestoreProviderInput[] = [];
+  private supported = new Set([
+    "appaloft-managed-postgres:postgres",
+    "external-postgres:postgres",
+    "external-redis:redis",
+  ]);
+
+  constructor(
+    private backupResult?: Result<DependencyResourceBackupProviderResult, DomainError>,
+    private restoreResult?: Result<DependencyResourceRestoreProviderResult, DomainError>,
+  ) {}
+
+  setSupported(providerKeysByKind: string[]): void {
+    this.supported = new Set(providerKeysByKind);
+  }
+
+  setBackupResult(result: Result<DependencyResourceBackupProviderResult, DomainError>): void {
+    this.backupResult = result;
+  }
+
+  setRestoreResult(result: Result<DependencyResourceRestoreProviderResult, DomainError>): void {
+    this.restoreResult = result;
+  }
+
+  supports(providerKey: string, dependencyKind: "postgres" | "redis"): boolean {
+    return this.supported.has(`${providerKey}:${dependencyKind}`);
+  }
+
+  async createBackup(
+    context: ExecutionContext,
+    input: DependencyResourceBackupProviderInput,
+  ): Promise<Result<DependencyResourceBackupProviderResult, DomainError>> {
+    void context;
+    this.backups.push(input);
+    return (
+      this.backupResult ??
+      ok({
+        providerArtifactHandle: `backup/${input.dependencyResourceId}/${input.backupId}`,
+        completedAt: input.requestedAt,
+        retentionStatus: "retained",
+      })
+    );
+  }
+
+  async restoreBackup(
+    context: ExecutionContext,
+    input: DependencyResourceRestoreProviderInput,
+  ): Promise<Result<DependencyResourceRestoreProviderResult, DomainError>> {
+    void context;
+    this.restores.push(input);
+    return this.restoreResult ?? ok({ completedAt: input.requestedAt });
   }
 }
 
@@ -1092,12 +1160,56 @@ export class MemoryDependencyResourceRepository implements DependencyResourceRep
   }
 }
 
+export class MemoryDependencyResourceBackupRepository
+  implements DependencyResourceBackupRepository
+{
+  readonly items = new Map<string, DependencyResourceBackup>();
+
+  async upsert(
+    context: RepositoryContext,
+    backup: DependencyResourceBackup,
+    spec: DependencyResourceBackupMutationSpec,
+  ): Promise<void> {
+    void context;
+    void spec;
+    const state = backup.toState();
+    this.items.set(state.id.value, DependencyResourceBackup.rehydrate(state));
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: DependencyResourceBackupSelectionSpec,
+  ): Promise<DependencyResourceBackup | null> {
+    void context;
+    if (spec instanceof DependencyResourceBackupByIdSpec) {
+      return this.items.get(spec.id.value) ?? null;
+    }
+    for (const backup of this.items.values()) {
+      if (spec.isSatisfiedBy(backup)) {
+        return backup;
+      }
+    }
+    return null;
+  }
+
+  async findMany(
+    context: RepositoryContext,
+    spec: DependencyResourceBackupSelectionSpec,
+  ): Promise<DependencyResourceBackup[]> {
+    void context;
+    return [...this.items.values()].filter((backup) => spec.isSatisfiedBy(backup));
+  }
+}
+
 export class MemoryDependencyResourceDeleteSafetyReader
   implements DependencyResourceDeleteSafetyReader
 {
   private readonly blockers = new Map<string, DependencyResourceDeleteBlocker[]>();
 
-  constructor(private readonly bindings?: MemoryResourceDependencyBindingRepository) {}
+  constructor(
+    private readonly bindings?: MemoryResourceDependencyBindingRepository,
+    private readonly backups?: MemoryDependencyResourceBackupRepository,
+  ) {}
 
   setBlockers(dependencyResourceId: string, blockers: DependencyResourceDeleteBlocker[]): void {
     this.blockers.set(dependencyResourceId, blockers);
@@ -1120,7 +1232,93 @@ export class MemoryDependencyResourceDeleteSafetyReader
         blockers.push({ kind: "resource-binding", count: activeBindings.length });
       }
     }
+    if (this.backups) {
+      const blockingBackups = [...this.backups.items.values()].filter((backup) => {
+        const state = backup.toState();
+        return (
+          state.dependencyResourceId.value === input.dependencyResourceId &&
+          backup.blocksDependencyResourceDelete()
+        );
+      });
+      if (blockingBackups.length > 0) {
+        blockers.push({
+          kind: "dependency-resource-backup",
+          relatedEntityType: "dependency_resource_backup",
+          count: blockingBackups.length,
+        });
+      }
+    }
     return ok(blockers);
+  }
+}
+
+function memoryBackupSummary(backup: DependencyResourceBackup): DependencyResourceBackupSummary {
+  const state = backup.toState();
+  return {
+    id: state.id.value,
+    dependencyResourceId: state.dependencyResourceId.value,
+    projectId: state.projectId.value,
+    environmentId: state.environmentId.value,
+    dependencyKind: state.dependencyKind.value as DependencyResourceBackupSummary["dependencyKind"],
+    providerKey: state.providerKey.value,
+    status: state.status.value,
+    attemptId: state.attemptId.value,
+    requestedAt: state.requestedAt.value,
+    retentionStatus: state.retentionStatus.value,
+    ...(state.providerArtifactHandle
+      ? { providerArtifactHandle: state.providerArtifactHandle.value }
+      : {}),
+    ...(state.completedAt ? { completedAt: state.completedAt.value } : {}),
+    ...(state.failedAt ? { failedAt: state.failedAt.value } : {}),
+    ...(state.failureCode ? { failureCode: state.failureCode.value } : {}),
+    ...(state.failureMessage ? { failureMessage: state.failureMessage.value } : {}),
+    ...(state.latestRestoreAttempt
+      ? {
+          latestRestoreAttempt: {
+            attemptId: state.latestRestoreAttempt.attemptId.value,
+            status: state.latestRestoreAttempt.status.value,
+            requestedAt: state.latestRestoreAttempt.requestedAt.value,
+            ...(state.latestRestoreAttempt.completedAt
+              ? { completedAt: state.latestRestoreAttempt.completedAt.value }
+              : {}),
+            ...(state.latestRestoreAttempt.failedAt
+              ? { failedAt: state.latestRestoreAttempt.failedAt.value }
+              : {}),
+            ...(state.latestRestoreAttempt.failureCode
+              ? { failureCode: state.latestRestoreAttempt.failureCode.value }
+              : {}),
+            ...(state.latestRestoreAttempt.failureMessage
+              ? { failureMessage: state.latestRestoreAttempt.failureMessage.value }
+              : {}),
+          },
+        }
+      : {}),
+    createdAt: state.createdAt.value,
+  };
+}
+
+export class MemoryDependencyResourceBackupReadModel implements DependencyResourceBackupReadModel {
+  constructor(private readonly repository: MemoryDependencyResourceBackupRepository) {}
+
+  async list(
+    context: RepositoryContext,
+    input: { dependencyResourceId: string; status?: "pending" | "ready" | "failed" },
+  ): Promise<DependencyResourceBackupSummary[]> {
+    void context;
+    return [...this.repository.items.values()]
+      .filter(
+        (backup) => backup.toState().dependencyResourceId.value === input.dependencyResourceId,
+      )
+      .filter((backup) => (input.status ? backup.toState().status.value === input.status : true))
+      .map(memoryBackupSummary);
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: DependencyResourceBackupSelectionSpec,
+  ): Promise<DependencyResourceBackupSummary | null> {
+    const backup = await this.repository.findOne(context, spec);
+    return backup ? memoryBackupSummary(backup) : null;
   }
 }
 
