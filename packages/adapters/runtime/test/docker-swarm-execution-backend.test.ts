@@ -77,6 +77,24 @@ class RecordingSwarmCommandRunner implements DockerSwarmCommandRunner {
   }
 }
 
+class FailingVerifySwarmCommandRunner implements DockerSwarmCommandRunner {
+  readonly calls: DockerSwarmCommandRunnerInput[] = [];
+
+  async run(
+    input: DockerSwarmCommandRunnerInput,
+  ): Promise<Result<DockerSwarmCommandRunnerResult>> {
+    this.calls.push(input);
+    if (input.step === "verify-candidate-service") {
+      return ok({
+        exitCode: 22,
+        stderr: "candidate service failed health verification",
+      });
+    }
+
+    return ok({ exitCode: 0 });
+  }
+}
+
 function createContext(): ExecutionContext {
   return {
     entrypoint: "system",
@@ -247,5 +265,33 @@ describe("DockerSwarmExecutionBackend", () => {
     expect(runner.calls[0]?.command).toContain("--filter 'label=appaloft.resource-id=res_api'");
     expect(runner.calls[0]?.command).not.toContain("docker system prune");
     expect(runner.calls[0]?.command).not.toContain("docker volume");
+  });
+
+  test("[SWARM-TARGET-APPLY-002][SWARM-TARGET-CLEAN-001] cleans only the failed candidate when fake verification fails", async () => {
+    const runner = new FailingVerifySwarmCommandRunner();
+    const backend = new DockerSwarmExecutionBackend(runner);
+
+    const result = await backend.execute(createContext(), runningDeployment());
+
+    expect(result.isOk()).toBe(true);
+    const deployment = result._unsafeUnwrap().deployment.toState();
+
+    expect(deployment.status.value).toBe("failed");
+    expect(deployment.runtimePlan.execution.metadata).toMatchObject({
+      phase: "verify-candidate-service",
+      errorCode: "docker_swarm_command_failed",
+      message: "candidate service failed health verification",
+    });
+    expect(runner.calls.map((call) => call.step)).toEqual([
+      "create-candidate-service",
+      "verify-candidate-service",
+      "remove-services",
+    ]);
+    expect(runner.calls[2]?.command).toContain(
+      "--filter 'label=appaloft.deployment-id=dep_swarm_backend'",
+    );
+    expect(runner.calls[2]?.command).toContain("--filter 'label=appaloft.resource-id=res_api'");
+    expect(runner.calls[2]?.command).not.toContain("docker system prune");
+    expect(runner.calls[2]?.command).not.toContain("docker volume");
   });
 });

@@ -132,6 +132,9 @@ No new public operation key is accepted in this Spec Round.
   execute the adapter-owned image apply plan and label-scoped cleanup plan through an injected
   command runner, records sanitized Swarm runtime metadata on successful deployment completion, and
   is not registered in the default runtime backend registry.
+- Fake-runner failed verification now records deployment failure metadata and runs the
+  deployment-scoped cleanup plan for the failed candidate service without broad prune or volume
+  commands.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
 - Real Swarm command execution, failed-rollout rollback behavior, logs, health, and read-model

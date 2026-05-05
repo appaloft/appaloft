@@ -1228,6 +1228,10 @@ Current verification notes:
   and scoped cleanup. The backend is not registered in the default runtime registry; real Swarm
   command execution, failed-rollout rollback behavior, logs, health, and read-model persistence
   remain open.
+- 2026-05-06 Phase 7 Docker Swarm failed-candidate slice bound initial `SWARM-TARGET-APPLY-002`
+  coverage to fake-runner verification failure: the backend records deployment failure metadata and
+  runs only the deployment-scoped cleanup command for the failed candidate. Real Swarm rollback
+  command behavior remains open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
