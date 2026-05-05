@@ -29,6 +29,8 @@ export * from "./resource-messages";
 export * from "./runtime-topology";
 export * from "./server-handlers";
 export * from "./server-messages";
+export * from "./source-event-handlers";
+export * from "./source-event-messages";
 export * from "./source-link-handlers";
 export * from "./source-link-messages";
 export * from "./storage-volume-handlers";

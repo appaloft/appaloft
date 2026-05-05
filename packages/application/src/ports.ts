@@ -3929,6 +3929,156 @@ export interface CertificateSummary {
   createdAt: string;
 }
 
+export type SourceEventSourceKind = "github" | "gitlab" | "generic-signed";
+export type SourceEventKind = "push" | "tag";
+export type SourceEventStatus =
+  | "accepted"
+  | "deduped"
+  | "ignored"
+  | "blocked"
+  | "dispatched"
+  | "failed";
+export type SourceEventDedupeStatus = "new" | "duplicate";
+export type SourceEventVerificationMethod = "provider-signature" | "generic-hmac";
+export type SourceEventIgnoredReason =
+  | "no-matching-policy"
+  | "ref-not-matched"
+  | "policy-disabled"
+  | "policy-blocked";
+export type SourceEventPolicyResultStatus =
+  | "matched"
+  | "ignored"
+  | "blocked"
+  | "dispatch-failed"
+  | "dispatched";
+export type SourceEventPolicyResultReason =
+  | "ref-not-matched"
+  | "policy-disabled"
+  | "policy-blocked"
+  | "dispatch-failed";
+
+export interface SourceEventIdentity {
+  locator: string;
+  providerRepositoryId?: string;
+  repositoryFullName?: string;
+}
+
+export interface SourceEventVerificationSummary {
+  status: "verified" | "rejected";
+  method?: SourceEventVerificationMethod;
+  keyVersion?: string;
+}
+
+export interface SourceEventPolicyResult {
+  resourceId: string;
+  status: SourceEventPolicyResultStatus;
+  reason?: SourceEventPolicyResultReason;
+  deploymentId?: string;
+  errorCode?: string;
+}
+
+export interface SourceEventRecord {
+  sourceEventId: string;
+  projectId?: string;
+  matchedResourceIds: string[];
+  sourceKind: SourceEventSourceKind;
+  eventKind: SourceEventKind;
+  sourceIdentity: SourceEventIdentity;
+  ref: string;
+  revision: string;
+  deliveryId?: string;
+  idempotencyKey?: string;
+  dedupeKey: string;
+  dedupeStatus: SourceEventDedupeStatus;
+  dedupeOfSourceEventId?: string;
+  verification: SourceEventVerificationSummary;
+  status: SourceEventStatus;
+  ignoredReasons: SourceEventIgnoredReason[];
+  policyResults: SourceEventPolicyResult[];
+  createdDeploymentIds: string[];
+  receivedAt: string;
+}
+
+export interface SourceEventListInput {
+  projectId?: string;
+  resourceId?: string;
+  status?: SourceEventStatus;
+  sourceKind?: SourceEventSourceKind;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface SourceEventShowInput {
+  sourceEventId: string;
+  projectId?: string;
+  resourceId?: string;
+}
+
+export interface SourceEventListItem {
+  sourceEventId: string;
+  projectId?: string;
+  resourceIds: string[];
+  sourceKind: SourceEventSourceKind;
+  eventKind: SourceEventKind;
+  ref: string;
+  revision: string;
+  status: SourceEventStatus;
+  dedupeStatus: SourceEventDedupeStatus;
+  ignoredReasons: SourceEventIgnoredReason[];
+  createdDeploymentIds: string[];
+  receivedAt: string;
+}
+
+export interface SourceEventListResult {
+  items: SourceEventListItem[];
+  nextCursor?: string;
+  generatedAt: string;
+}
+
+export interface SourceEventListPage {
+  items: SourceEventListItem[];
+  nextCursor?: string;
+}
+
+export interface SourceEventDetail {
+  sourceEventId: string;
+  projectId?: string;
+  matchedResourceIds: string[];
+  sourceKind: SourceEventSourceKind;
+  eventKind: SourceEventKind;
+  sourceIdentity: SourceEventIdentity;
+  ref: string;
+  revision: string;
+  verification: SourceEventVerificationSummary;
+  status: SourceEventStatus;
+  dedupeOfSourceEventId?: string;
+  policyResults: SourceEventPolicyResult[];
+  createdDeploymentIds: string[];
+  receivedAt: string;
+}
+
+export interface IngestSourceEventResult {
+  sourceEventId: string;
+  status: SourceEventStatus;
+  matchedResourceIds: string[];
+  createdDeploymentIds: string[];
+  ignoredReasons: SourceEventIgnoredReason[];
+  dedupeOfSourceEventId?: string;
+}
+
+export interface SourceEventRecorder {
+  findByDedupeKey(context: RepositoryContext, dedupeKey: string): Promise<SourceEventRecord | null>;
+  record(context: RepositoryContext, record: SourceEventRecord): Promise<SourceEventRecord>;
+}
+
+export interface SourceEventReadModel {
+  list(context: RepositoryContext, input: SourceEventListInput): Promise<SourceEventListPage>;
+  findOne(
+    context: RepositoryContext,
+    input: SourceEventShowInput,
+  ): Promise<SourceEventDetail | null>;
+}
+
 export interface ProjectReadModel {
   list(context: RepositoryContext): Promise<ProjectSummary[]>;
   findOne(context: RepositoryContext, spec: ProjectSelectionSpec): Promise<ProjectSummary | null>;

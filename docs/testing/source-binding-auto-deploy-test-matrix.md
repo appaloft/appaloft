@@ -4,9 +4,10 @@
 
 Test-First / Code Round preparation for Phase 7 / `0.9.0`.
 
-Resource-owned auto-deploy policy domain behavior, application command handling, and Resource
-repository persistence have automation. Source event ingestion routes, durable source event read
-models, entrypoints, and background workers are not active yet.
+Resource-owned auto-deploy policy domain behavior, application command handling, Resource
+repository persistence, source-event command/query handling, and durable source-event dedupe/read
+models have automation. Source event deployment dispatch, ingestion routes, entrypoints, and
+background workers are not active yet.
 
 ## Governing Sources
 
@@ -39,7 +40,7 @@ models, entrypoints, and background workers are not active yet.
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
 | `SRC-AUTO-EVENT-001` | Verified push event matches one enabled policy. | One deployment is accepted through existing deployment admission. | planned | Deferred gap |
-| `SRC-AUTO-EVENT-002` | Provider redelivers same event. | Durable source-event dedupe prevents duplicate deployment and read model reports deduped. | planned | Deferred gap |
+| `SRC-AUTO-EVENT-002` | Provider redelivers same event. | Durable source-event dedupe prevents duplicate source-event records and read model reports deduped; duplicate deployment prevention remains bound to the dispatch slice. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Partial |
 | `SRC-AUTO-EVENT-003` | Event ref does not match policy. | No deployment is created and read model reports ignored ref. | planned | Deferred gap |
 | `SRC-AUTO-EVENT-004` | Generic signed webhook has invalid signature. | Event rejects before policy matching; no deployment is created. | planned | Deferred gap |
 | `SRC-AUTO-EVENT-005` | Multiple Resources match one event. | Each matching Resource creates at most one coordinated deployment attempt. | planned | Deferred gap |
@@ -48,8 +49,8 @@ models, entrypoints, and background workers are not active yet.
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `SRC-AUTO-QUERY-001` | Operator lists source events by Resource. | Query returns only safe scoped records with status, dedupe, ignored reasons, and created deployment ids. | planned | Deferred gap |
-| `SRC-AUTO-QUERY-002` | Operator shows one source event. | Query returns safe verification, policy result, ignored/blocked/failed reason, and created deployment details without raw payload or secrets. | planned | Deferred gap |
+| `SRC-AUTO-QUERY-001` | Operator lists source events by Resource. | Query returns only safe scoped records with status, dedupe, ignored reasons, and created deployment ids. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
+| `SRC-AUTO-QUERY-002` | Operator shows one source event. | Query returns safe verification, policy result, ignored/blocked/failed reason, and created deployment details without raw payload or secrets. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
 
 ## Entrypoint Coverage
 
@@ -64,6 +65,7 @@ models, entrypoints, and background workers are not active yet.
 
 Resource source binding, source fingerprint link state, manual deployment admission,
 Resource-owned auto-deploy policy state behavior, inactive application command handling, and
-Resource repository persistence exist. This matrix still tracks the missing source event ingestion,
-dedupe, read models, and entrypoint surfaces. Code Round must not mark auto-deploy complete until
-these rows have stable automation or explicit deferred exceptions.
+Resource repository persistence exist. Inactive source-event command/query handling and durable
+source-event dedupe/read-model persistence also exist. This matrix still tracks the missing source
+event deployment dispatch and entrypoint surfaces. Code Round must not mark auto-deploy complete
+until these rows have stable automation or explicit deferred exceptions.

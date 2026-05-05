@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted candidate read model. Do not expose this query until durable source event persistence,
-permission checks, public docs/help, `CORE_OPERATIONS.md`, `operation-catalog.ts`, and tests are
-aligned in Code Round.
+Accepted candidate read model. Inactive application query handling and durable source-event
+read-model persistence exist. Do not expose this query until permission checks, public docs/help,
+`CORE_OPERATIONS.md`, `operation-catalog.ts`, and tests are aligned in Code Round.
 
 ## Governing Sources
 

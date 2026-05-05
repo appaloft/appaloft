@@ -61,6 +61,8 @@ export const tokens = {
   resourceAccessFailureEvidenceReadModel: Symbol.for(
     "appaloft.resource_access_failure_evidence_read_model",
   ),
+  sourceEventRecorder: Symbol.for("appaloft.source_event_recorder"),
+  sourceEventReadModel: Symbol.for("appaloft.source_event_read_model"),
   deploymentReadModel: Symbol.for("appaloft.deployment_read_model"),
   domainBindingReadModel: Symbol.for("appaloft.domain_binding_read_model"),
   certificateReadModel: Symbol.for("appaloft.certificate_read_model"),
@@ -196,6 +198,9 @@ export const tokens = {
   resourceRuntimeControlAttemptRecorder: Symbol.for(
     "appaloft.resource_runtime_control_attempt_recorder",
   ),
+  ingestSourceEventUseCase: Symbol.for("appaloft.ingest_source_event_use_case"),
+  listSourceEventsQueryService: Symbol.for("appaloft.list_source_events_query_service"),
+  showSourceEventQueryService: Symbol.for("appaloft.show_source_event_query_service"),
   openTerminalSessionUseCase: Symbol.for("appaloft.open_terminal_session_use_case"),
   relinkSourceLinkUseCase: Symbol.for("appaloft.relink_source_link_use_case"),
   resourceProxyConfigurationPreviewQueryService: Symbol.for(
