@@ -1,5 +1,6 @@
 export * from "./operations/resources/archive-resource.command";
 export * from "./operations/resources/attach-resource-storage.command";
+export * from "./operations/resources/bind-resource-dependency.command";
 export * from "./operations/resources/configure-resource-access.command";
 export * from "./operations/resources/configure-resource-health.command";
 export * from "./operations/resources/configure-resource-network.command";
@@ -9,6 +10,7 @@ export * from "./operations/resources/create-resource.command";
 export * from "./operations/resources/delete-resource.command";
 export * from "./operations/resources/detach-resource-storage.command";
 export * from "./operations/resources/import-resource-variables.command";
+export * from "./operations/resources/list-resource-dependency-bindings.query";
 export * from "./operations/resources/list-resources.query";
 export * from "./operations/resources/resource-access-failure-evidence-lookup.query";
 export * from "./operations/resources/resource-diagnostic-summary.query";
@@ -18,4 +20,6 @@ export * from "./operations/resources/resource-proxy-configuration-preview.query
 export * from "./operations/resources/resource-runtime-logs.query";
 export * from "./operations/resources/set-resource-variable.command";
 export * from "./operations/resources/show-resource.query";
+export * from "./operations/resources/show-resource-dependency-binding.query";
+export * from "./operations/resources/unbind-resource-dependency.command";
 export * from "./operations/resources/unset-resource-variable.command";

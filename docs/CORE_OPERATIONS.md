@@ -309,6 +309,10 @@ Phase 7 Postgres dependency resource operations:
 | Show dependency resource | Query | `dependency-resources.show` | `ShowDependencyResourceQuery` | `ShowDependencyResourceQueryInput` | `appaloft dependency show <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}` |
 | Rename dependency resource | Command | `dependency-resources.rename` | `RenameDependencyResourceCommand` | `RenameDependencyResourceCommandInput` | `appaloft dependency rename <dependencyResourceId> --name <name>` | `POST /api/dependency-resources/{dependencyResourceId}/rename` |
 | Delete dependency resource | Command | `dependency-resources.delete` | `DeleteDependencyResourceCommand` | `DeleteDependencyResourceCommandInput` | `appaloft dependency delete <dependencyResourceId>` | `DELETE /api/dependency-resources/{dependencyResourceId}` |
+| Bind dependency to resource | Command | `resources.bind-dependency` | `BindResourceDependencyCommand` | `BindResourceDependencyCommandInput` | `appaloft resource dependency bind <resourceId>` | `POST /api/resources/{resourceId}/dependency-bindings` |
+| Unbind dependency from resource | Command | `resources.unbind-dependency` | `UnbindResourceDependencyCommand` | `UnbindResourceDependencyCommandInput` | `appaloft resource dependency unbind <resourceId> <bindingId>` | `DELETE /api/resources/{resourceId}/dependency-bindings/{bindingId}` |
+| List resource dependency bindings | Query | `resources.list-dependency-bindings` | `ListResourceDependencyBindingsQuery` | `ListResourceDependencyBindingsQueryInput` | `appaloft resource dependency list <resourceId>` | `GET /api/resources/{resourceId}/dependency-bindings` |
+| Show resource dependency binding | Query | `resources.show-dependency-binding` | `ShowResourceDependencyBindingQuery` | `ShowResourceDependencyBindingQueryInput` | `appaloft resource dependency show <resourceId> <bindingId>` | `GET /api/resources/{resourceId}/dependency-bindings/{bindingId}` |
 
 Current boundary:
 - resources are persisted and can be listed by project or environment
@@ -319,6 +323,11 @@ Current boundary:
 - Postgres dependency resources are provider-neutral `ResourceInstance` records in this slice.
   Appaloft-managed Postgres records do not create provider-native databases yet, imported external
   Postgres delete removes only Appaloft's record, and list/show output masks connection secrets.
+- Resource dependency bindings are provider-neutral `ResourceBinding` records in this slice. Bind
+  requires matching project/environment ownership, stores only safe target metadata and secret
+  reference pointers, and reports deployment snapshot materialization as deferred. Unbind removes
+  only the binding association; it does not delete the dependency resource, external/provider
+  database, runtime state, backup data, or historical snapshots.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).
