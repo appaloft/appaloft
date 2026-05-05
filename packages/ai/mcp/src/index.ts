@@ -1,72 +1,84 @@
+import { type OperationCatalogEntry, operationCatalog } from "@appaloft/application";
 import { z } from "zod";
 
-export const toolNameSchema = z.enum([
-  "detect_project",
-  "package_workspace",
-  "create_project",
-  "register_server",
-  "create_environment",
-  "plan_deployment",
-  "deploy_release",
-  "stream_logs",
-]);
+type OperationTransportRoute = NonNullable<OperationCatalogEntry["transports"]["orpc"]>;
+
+const toolNamePattern = /^[a-z][a-z0-9_]*$/;
+const operationKeyPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
+
+export const toolNameSchema = z.string().regex(toolNamePattern);
 
 export const toolContractSchema = z.object({
   name: toolNameSchema,
+  operationKey: z.string().regex(operationKeyPattern),
+  kind: z.enum(["command", "query"]),
+  domain: z.string(),
   description: z.string(),
-  cliCommand: z.string(),
-  httpRoute: z.string(),
+  cliCommand: z.string().optional(),
+  httpRoute: z.string().optional(),
+  alternateHttpRoutes: z.array(z.string()).optional(),
+  inputSchemaAvailable: z.boolean(),
 });
 
-export const toolContracts = [
-  {
-    name: "detect_project",
-    description: "Detect the current workspace source and build strategy.",
-    cliCommand: "appaloft deploy <path-or-source>",
-    httpRoute: "POST /api/deployments",
-  },
-  {
-    name: "package_workspace",
-    description: "Package a workspace for one of the supported deployment modes.",
-    cliCommand: "appaloft deploy <path-or-source>",
-    httpRoute: "POST /api/deployments",
-  },
-  {
-    name: "create_project",
-    description: "Create a project record.",
-    cliCommand: "appaloft project create",
-    httpRoute: "POST /api/projects",
-  },
-  {
-    name: "register_server",
-    description: "Register a server target.",
-    cliCommand: "appaloft server register",
-    httpRoute: "POST /api/servers",
-  },
-  {
-    name: "create_environment",
-    description: "Create an environment profile.",
-    cliCommand: "appaloft env create",
-    httpRoute: "POST /api/environments",
-  },
-  {
-    name: "plan_deployment",
-    description: "Resolve source detection and deployment plan.",
-    cliCommand: "appaloft deploy <path-or-source>",
-    httpRoute: "POST /api/deployments",
-  },
-  {
-    name: "deploy_release",
-    description: "Execute a deployment release.",
-    cliCommand: "appaloft deploy <path-or-source>",
-    httpRoute: "POST /api/deployments",
-  },
-  {
-    name: "stream_logs",
-    description: "Read deployment logs.",
-    cliCommand: "appaloft logs <deployment-id>",
-    httpRoute: "GET /api/deployments/:deploymentId/logs",
-  },
-] as const;
-
 export type ToolContract = z.infer<typeof toolContractSchema>;
+
+export interface ToolDescriptor extends ToolContract {
+  readonly inputSchema?: OperationCatalogEntry["inputSchema"];
+}
+
+function operationKeyToToolName(operationKey: string): string {
+  return operationKey.replaceAll(".", "_").replaceAll("-", "_");
+}
+
+function routeLabel(route: OperationTransportRoute): string {
+  return `${route.method} ${route.path}`;
+}
+
+function firstHttpRoute(entry: OperationCatalogEntry): string | undefined {
+  if (entry.transports.orpc) {
+    return routeLabel(entry.transports.orpc);
+  }
+
+  if (entry.transports.orpcStream) {
+    return routeLabel(entry.transports.orpcStream);
+  }
+
+  return undefined;
+}
+
+function alternateHttpRoutes(entry: OperationCatalogEntry): string[] {
+  return [
+    ...(entry.transports.orpcAdditional ?? []).map(routeLabel),
+    ...(entry.transports.orpc && entry.transports.orpcStream
+      ? [routeLabel(entry.transports.orpcStream)]
+      : []),
+  ];
+}
+
+function descriptionFor(entry: OperationCatalogEntry): string {
+  const action = entry.kind === "command" ? "Run" : "Read";
+  return `${action} ${entry.key} through the Appaloft application operation catalog.`;
+}
+
+export function toolDescriptorFromOperation(entry: OperationCatalogEntry): ToolDescriptor {
+  const alternateRoutes = alternateHttpRoutes(entry);
+
+  return {
+    name: operationKeyToToolName(entry.key),
+    operationKey: entry.key,
+    kind: entry.kind,
+    domain: entry.domain,
+    description: descriptionFor(entry),
+    ...(entry.transports.cli ? { cliCommand: entry.transports.cli } : {}),
+    ...(firstHttpRoute(entry) ? { httpRoute: firstHttpRoute(entry) } : {}),
+    ...(alternateRoutes.length > 0 ? { alternateHttpRoutes: alternateRoutes } : {}),
+    inputSchemaAvailable: Boolean(entry.inputSchema),
+    ...(entry.inputSchema ? { inputSchema: entry.inputSchema } : {}),
+  };
+}
+
+export const toolContracts = operationCatalog.map(toolDescriptorFromOperation);
+
+export const toolContractsByOperationKey = new Map(
+  toolContracts.map((contract) => [contract.operationKey, contract]),
+);
