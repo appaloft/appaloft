@@ -556,6 +556,16 @@ export interface ScheduledTaskRunAttemptsTable {
   skipped_reason: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
+export interface ScheduledTaskRunLogsTable {
+  id: string;
+  run_id: string;
+  task_id: string;
+  resource_id: string;
+  logged_at: TimestampColumn;
+  stream: string;
+  message: string;
+}
+
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
@@ -587,4 +597,5 @@ export interface Database {
   resource_runtime_control_attempts: ResourceRuntimeControlAttemptsTable;
   scheduled_task_definitions: ScheduledTaskDefinitionsTable;
   scheduled_task_run_attempts: ScheduledTaskRunAttemptsTable;
+  scheduled_task_run_logs: ScheduledTaskRunLogsTable;
 }

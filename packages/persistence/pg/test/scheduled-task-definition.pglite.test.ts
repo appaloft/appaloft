@@ -406,4 +406,134 @@ describe("scheduled task definition persistence", () => {
       rmSync(dataDir, { force: true, recursive: true });
     }
   });
+
+  test("[SCHED-TASK-LOGS-001] reads run-scoped logs without exposing raw secret values", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-scheduled-task-run-logs-"));
+    const {
+      createDatabase,
+      createMigrator,
+      PgEnvironmentRepository,
+      PgProjectRepository,
+      PgResourceRepository,
+      PgScheduledTaskDefinitionRepository,
+      PgScheduledTaskRunAttemptRepository,
+      PgScheduledTaskRunLogReadModel,
+    } = await import("../src");
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const context = toRepositoryContext(
+        createExecutionContext({
+          requestId: "req_scheduled_task_run_logs_pglite_test",
+          entrypoint: "system",
+        }),
+      );
+      const createdAt = CreatedAt.rehydrate("2026-05-05T00:00:00.000Z");
+      const project = Project.create({
+        id: ProjectId.rehydrate("prj_demo"),
+        name: ProjectName.rehydrate("Demo"),
+        createdAt,
+      })._unsafeUnwrap();
+      const environment = Environment.create({
+        id: EnvironmentId.rehydrate("env_demo"),
+        projectId: ProjectId.rehydrate("prj_demo"),
+        name: EnvironmentName.rehydrate("Production"),
+        kind: EnvironmentKindValue.rehydrate("production"),
+        createdAt,
+      })._unsafeUnwrap();
+      const resource = Resource.create({
+        id: ResourceId.rehydrate("res_api"),
+        projectId: ProjectId.rehydrate("prj_demo"),
+        environmentId: EnvironmentId.rehydrate("env_demo"),
+        name: ResourceName.rehydrate("API"),
+        kind: ResourceKindValue.rehydrate("application"),
+        createdAt,
+      })._unsafeUnwrap();
+      const projects = new PgProjectRepository(database.db);
+      const environments = new PgEnvironmentRepository(database.db);
+      const resources = new PgResourceRepository(database.db);
+      const tasks = new PgScheduledTaskDefinitionRepository(database.db);
+      const runAttempts = new PgScheduledTaskRunAttemptRepository(database.db);
+      const logReadModel = new PgScheduledTaskRunLogReadModel(database.db);
+      const task = taskFixture();
+      const runAttempt = ScheduledTaskRunAttempt.create({
+        id: ScheduledTaskRunId.rehydrate("str_manual"),
+        taskId: ScheduledTaskId.rehydrate("tsk_backup"),
+        resourceId: ResourceId.rehydrate("res_api"),
+        triggerKind: ScheduledTaskRunTriggerKindValue.manual(),
+        createdAt: CreatedAt.rehydrate("2026-05-05T00:20:00.000Z"),
+      })._unsafeUnwrap();
+
+      await projects.upsert(context, project, UpsertProjectSpec.fromProject(project));
+      await environments.upsert(
+        context,
+        environment,
+        UpsertEnvironmentSpec.fromEnvironment(environment),
+      );
+      await resources.upsert(context, resource, UpsertResourceSpec.fromResource(resource));
+      await tasks.upsert(context, task, UpsertScheduledTaskDefinitionSpec.fromTaskDefinition(task));
+      await runAttempts.upsert(
+        context,
+        runAttempt,
+        UpsertScheduledTaskRunAttemptSpec.fromRunAttempt(runAttempt),
+      );
+      await database.db
+        .insertInto("scheduled_task_run_logs")
+        .values([
+          {
+            id: "stlog_1",
+            run_id: "str_manual",
+            task_id: "tsk_backup",
+            resource_id: "res_api",
+            logged_at: "2026-05-05T00:20:01.000Z",
+            stream: "stdout",
+            message: "backup started",
+          },
+          {
+            id: "stlog_2",
+            run_id: "str_manual",
+            task_id: "tsk_backup",
+            resource_id: "res_api",
+            logged_at: "2026-05-05T00:20:02.000Z",
+            stream: "stderr",
+            message: "TOKEN=secret leaked by child process",
+          },
+        ])
+        .execute();
+
+      const logs = await logReadModel.read(context, {
+        runId: "str_manual",
+        taskId: "tsk_backup",
+        resourceId: "res_api",
+        limit: 10,
+      });
+
+      expect(logs).toEqual({
+        runId: "str_manual",
+        taskId: "tsk_backup",
+        resourceId: "res_api",
+        entries: [
+          {
+            timestamp: "2026-05-05T00:20:01.000Z",
+            stream: "stdout",
+            message: "backup started",
+          },
+          {
+            timestamp: "2026-05-05T00:20:02.000Z",
+            stream: "stderr",
+            message: "********",
+          },
+        ],
+      });
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
 });
