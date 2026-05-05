@@ -87,6 +87,10 @@ DDD or internal process-manager terminology.
   runtime port contract, and the runtime adapter package provides a hermetic implementation that
   returns scheduled-task-run-scoped stdout/stderr log entries, terminal status, exit code,
   timestamps, and masked secret-looking output without using deployment/resource runtime logs.
+- Inactive accepted-run worker support exists. It loads an accepted run attempt, loads the owning
+  task definition, persists the running transition, invokes the scheduled-task runtime port,
+  records runtime logs through the scheduled-task run-log recorder, and persists the terminal
+  succeeded or failed run state.
 - Scheduled task definition persistence exists for Postgres/PGlite. It stores Resource-owned task
   definitions, supports repository find/upsert/delete through explicit specs, and supports
   list/show read-model filtering by project, environment, Resource, status, cursor, and limit.
@@ -100,5 +104,5 @@ DDD or internal process-manager terminology.
   entries.
 - No operation catalog entries are active.
 - No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
-- No due-candidate persistence/read model, shell scheduler runner, or accepted-run worker that
-  invokes the runtime adapter and persists terminal run/log state exists.
+- No due-candidate persistence/read model, shell scheduler runner, or background worker runner that
+  automatically drains accepted scheduled-task runs exists.

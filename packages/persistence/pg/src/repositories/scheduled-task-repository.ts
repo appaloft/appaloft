@@ -10,6 +10,8 @@ import {
   type ScheduledTaskRunAttemptRepository,
   type ScheduledTaskRunLogEntry,
   type ScheduledTaskRunLogReadModel,
+  type ScheduledTaskRunLogRecord,
+  type ScheduledTaskRunLogRecorder,
   type ScheduledTaskRunLogsResult,
   type ScheduledTaskRunReadModel,
   type ScheduledTaskRunSummary,
@@ -17,6 +19,8 @@ import {
 import {
   CreatedAt,
   type DeleteScheduledTaskDefinitionSpec,
+  FinishedAt,
+  ok,
   ResourceId,
   ScheduledTaskCommandIntent,
   ScheduledTaskConcurrencyPolicyValue,
@@ -29,12 +33,22 @@ import {
   ScheduledTaskDefinitionStatusValue,
   ScheduledTaskId,
   ScheduledTaskRetryLimit,
-  type ScheduledTaskRunAttempt,
+  ScheduledTaskRunAttempt,
+  type ScheduledTaskRunAttemptByIdSpec,
   type ScheduledTaskRunAttemptMutationSpec,
   type ScheduledTaskRunAttemptMutationSpecVisitor,
+  type ScheduledTaskRunAttemptSelectionSpec,
+  type ScheduledTaskRunAttemptSelectionSpecVisitor,
+  ScheduledTaskRunExitCode,
+  ScheduledTaskRunFailureSummary,
+  ScheduledTaskRunId,
+  ScheduledTaskRunSkippedReasonValue,
+  ScheduledTaskRunStatusValue,
+  ScheduledTaskRunTriggerKindValue,
   ScheduledTaskScheduleExpression,
   ScheduledTaskTimeoutSeconds,
   ScheduledTaskTimezone,
+  StartedAt,
   type UpsertScheduledTaskDefinitionSpec,
   type UpsertScheduledTaskRunAttemptSpec,
 } from "@appaloft/core";
@@ -54,6 +68,14 @@ type ScheduledTaskDefinitionSelectionQuery = SelectQueryBuilder<
 type ScheduledTaskDefinitionSelectionApplier = (
   query: ScheduledTaskDefinitionSelectionQuery,
 ) => ScheduledTaskDefinitionSelectionQuery;
+type ScheduledTaskRunAttemptSelectionQuery = SelectQueryBuilder<
+  Database,
+  "scheduled_task_run_attempts",
+  ScheduledTaskRunAttemptRow
+>;
+type ScheduledTaskRunAttemptSelectionApplier = (
+  query: ScheduledTaskRunAttemptSelectionQuery,
+) => ScheduledTaskRunAttemptSelectionQuery;
 type ScheduledTaskDefinitionMutation =
   | {
       kind: "upsert";
@@ -115,6 +137,25 @@ class KyselyScheduledTaskDefinitionMutationVisitor
       kind: "delete",
       taskId: spec.taskId.value,
       resourceId: spec.resourceId.value,
+    };
+  }
+}
+
+class KyselyScheduledTaskRunAttemptSelectionVisitor
+  implements ScheduledTaskRunAttemptSelectionSpecVisitor<ScheduledTaskRunAttemptSelectionApplier>
+{
+  visitScheduledTaskRunAttemptById(
+    spec: ScheduledTaskRunAttemptByIdSpec,
+  ): ScheduledTaskRunAttemptSelectionApplier {
+    return (query) => {
+      let next = query.where("id", "=", spec.runId.value);
+      if (spec.taskId) {
+        next = next.where("task_id", "=", spec.taskId.value);
+      }
+      if (spec.resourceId) {
+        next = next.where("resource_id", "=", spec.resourceId.value);
+      }
+      return next;
     };
   }
 }
@@ -187,6 +228,46 @@ function toScheduledTaskRunSummary(row: ScheduledTaskRunAttemptRow): ScheduledTa
         }
       : {}),
   };
+}
+
+function rehydrateScheduledTaskRunAttempt(
+  row: ScheduledTaskRunAttemptRow,
+): ScheduledTaskRunAttempt {
+  return ScheduledTaskRunAttempt.rehydrate({
+    id: ScheduledTaskRunId.rehydrate(row.id),
+    taskId: ScheduledTaskId.rehydrate(row.task_id),
+    resourceId: ResourceId.rehydrate(row.resource_id),
+    triggerKind: ScheduledTaskRunTriggerKindValue.rehydrate(
+      row.trigger_kind as Parameters<typeof ScheduledTaskRunTriggerKindValue.rehydrate>[0],
+    ),
+    status: ScheduledTaskRunStatusValue.rehydrate(
+      row.status as Parameters<typeof ScheduledTaskRunStatusValue.rehydrate>[0],
+    ),
+    createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
+    ...(row.started_at
+      ? { startedAt: StartedAt.rehydrate(normalizeTimestamp(row.started_at) ?? row.started_at) }
+      : {}),
+    ...(row.finished_at
+      ? {
+          finishedAt: FinishedAt.rehydrate(normalizeTimestamp(row.finished_at) ?? row.finished_at),
+        }
+      : {}),
+    ...(row.exit_code !== null
+      ? { exitCode: ScheduledTaskRunExitCode.rehydrate(row.exit_code) }
+      : {}),
+    ...(row.failure_summary
+      ? { failureSummary: ScheduledTaskRunFailureSummary.rehydrate(row.failure_summary) }
+      : {}),
+    ...(row.skipped_reason
+      ? {
+          skippedReason: ScheduledTaskRunSkippedReasonValue.rehydrate(
+            row.skipped_reason as Parameters<
+              typeof ScheduledTaskRunSkippedReasonValue.rehydrate
+            >[0],
+          ),
+        }
+      : {}),
+  });
 }
 
 const logSecretPattern = /(BEGIN .*PRIVATE KEY|PRIVATE_KEY|SECRET_|PASSWORD=|TOKEN=|PASS=)/i;
@@ -351,6 +432,30 @@ export class PgScheduledTaskDefinitionRepository implements ScheduledTaskDefinit
 export class PgScheduledTaskRunAttemptRepository implements ScheduledTaskRunAttemptRepository {
   constructor(private readonly db: Kysely<Database>) {}
 
+  async findOne(
+    context: RepositoryContext,
+    spec: ScheduledTaskRunAttemptSelectionSpec,
+  ): Promise<ScheduledTaskRunAttempt | null> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createRepositorySpanName("scheduled-task-run-attempt", "find_one"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.repositoryName]: "scheduled-task-run-attempt",
+          [appaloftTraceAttributes.selectionSpecName]: spec.constructor.name,
+        },
+      },
+      async () => {
+        const applySelection = spec.accept(new KyselyScheduledTaskRunAttemptSelectionVisitor());
+        const row = await applySelection(
+          executor.selectFrom("scheduled_task_run_attempts").selectAll(),
+        ).executeTakeFirst();
+
+        return row ? rehydrateScheduledTaskRunAttempt(row) : null;
+      },
+    );
+  }
+
   async upsert(
     context: RepositoryContext,
     runAttempt: ScheduledTaskRunAttempt,
@@ -387,6 +492,48 @@ export class PgScheduledTaskRunAttemptRepository implements ScheduledTaskRunAtte
         });
       },
     );
+  }
+}
+
+export class PgScheduledTaskRunLogRecorder implements ScheduledTaskRunLogRecorder {
+  constructor(private readonly db: Kysely<Database>) {}
+
+  async recordMany(
+    context: RepositoryContext,
+    records: ScheduledTaskRunLogRecord[],
+  ): Promise<Awaited<ReturnType<ScheduledTaskRunLogRecorder["recordMany"]>>> {
+    if (records.length === 0) {
+      return ok({ recorded: 0 });
+    }
+
+    const executor = resolveRepositoryExecutor(this.db, context);
+    await context.tracer.startActiveSpan(
+      createRepositorySpanName("scheduled-task-run-log", "record_many"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.repositoryName]: "scheduled-task-run-log",
+        },
+      },
+      async () => {
+        await executor
+          .insertInto("scheduled_task_run_logs")
+          .values(
+            records.map((record) => ({
+              id: record.id,
+              run_id: record.runId,
+              task_id: record.taskId,
+              resource_id: record.resourceId,
+              logged_at: record.timestamp,
+              stream: record.stream,
+              message: safeLogMessage(record.message),
+            })),
+          )
+          .onConflict((conflict) => conflict.column("id").doNothing())
+          .execute();
+      },
+    );
+
+    return ok({ recorded: records.length });
   }
 }
 

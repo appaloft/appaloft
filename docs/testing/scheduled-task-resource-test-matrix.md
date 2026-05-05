@@ -37,6 +37,7 @@ logs. It is not active implementation coverage yet.
 | SCHED-TASK-SCHED-001 | Scheduler | Enabled task is due. | Scheduler dispatches the same run admission path as run-now and records the same run shape. |
 | SCHED-TASK-SCHED-002 | Scheduler/concurrency | Previous run is non-terminal. | Default `forbid` policy prevents concurrent runtime execution and records safe skip/rejection state. |
 | SCHED-TASK-RUNTIME-001 | Runtime adapter | Accepted task run is executed. | Runtime adapter executes one-off task command intent and returns run-scoped stdout/stderr logs, terminal status, timestamps, and exit code without writing deployment/resource runtime logs. |
+| SCHED-TASK-WORKER-001 | Application worker | Accepted run is drained. | Worker transitions accepted run to running, invokes the scheduled-task runtime port, records run-scoped logs, and persists terminal run state. |
 | SCHED-TASK-LOGS-001 | Query/log adapter | Run emits output. | `scheduled-task-runs.logs` reads run-scoped logs; deployment and resource runtime logs are unchanged. |
 | SCHED-TASK-SECRET-001 | Redaction | Task input references secrets. | Definitions, runs, logs, errors, diagnostics, and tool descriptors expose only safe references and masked values. |
 | SCHED-TASK-ENTRY-001 | CLI/API/Web/MCP | Entrypoints are active. | Each surface dispatches command/query messages through the catalog schemas; no generic task update or provider SDK shape appears. |
@@ -61,6 +62,8 @@ in `packages/application/test/scheduled-task-run-now.test.ts`.
 `packages/application/test/scheduled-task-scheduler.test.ts`.
 `SCHED-TASK-RUNTIME-001` and one runtime-output masking path for `SCHED-TASK-SECRET-001` have
 adapter coverage in `packages/adapters/runtime/test/scheduled-task-runtime.test.ts`.
+`SCHED-TASK-WORKER-001` has inactive application worker coverage in
+`packages/application/test/scheduled-task-run-worker.test.ts`.
 `SCHED-TASK-DOMAIN-001` through `SCHED-TASK-DOMAIN-003` have core coverage in
 `packages/core/test/scheduled-task.test.ts`. The implemented slices add dedicated value objects for
 schedule, timezone, command intent, timeout, retry, lifecycle status, and `forbid` concurrency
@@ -73,7 +76,7 @@ coverage also exercises one log masking path for `SCHED-TASK-SECRET-001`, while 
 matrix remains open for definitions, runs, errors, diagnostics, and tool descriptors.
 
 Inactive application command/query schemas, messages, result DTOs, read-model ports, create,
-update, delete, run-now admission, scheduler admission, read-query handlers/services, scheduled
-task persistence/read models, and hermetic runtime adapter support exist. No operation catalog
-entries, due-candidate persistence, shell scheduler runner, accepted-run worker, entrypoints, or
-public docs are active yet.
+update, delete, run-now admission, scheduler admission, accepted-run worker, read-query
+handlers/services, scheduled task persistence/read models, and hermetic runtime adapter support
+exist. No operation catalog entries, due-candidate persistence, shell scheduler/background worker
+runner, entrypoints, or public docs are active yet.

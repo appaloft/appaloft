@@ -17,7 +17,7 @@ Spec-first slice for Resource-owned scheduled tasks, run attempts, history, and 
    `Status: task definition, run-attempt, and run-log persistence/read models are implemented.`
 4. Add runtime target execution/log ports for one-off task runs.
    `Status: inactive scheduled-task runtime port and hermetic runtime adapter are implemented;
-   accepted-run worker wiring remains open.`
+   accepted-run worker wiring is implemented.`
 5. Add scheduler process manager that dispatches the same admission path as run-now.
    `Status: inactive scheduler process manager is implemented around a due-candidate reader port
    and shared run admission service; due-candidate persistence and shell runner remain open.`
