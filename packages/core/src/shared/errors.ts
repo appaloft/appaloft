@@ -188,6 +188,18 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("source_event_signature_invalid", "user", message, details),
+  sourceEventProviderWebhookNotConfigured: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError(
+      "source_event_provider_webhook_not_configured",
+      "infra",
+      message,
+      details,
+      retryable,
+    ),
   sourceEventUnsupportedKind: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

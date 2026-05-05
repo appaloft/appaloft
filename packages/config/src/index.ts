@@ -42,6 +42,7 @@ export interface AppConfig {
   betterAuthSecret: string;
   githubClientId?: string;
   githubClientSecret?: string;
+  githubWebhookSecret?: string;
   httpHost: string;
   httpPort: number;
   webOrigin: string;
@@ -369,6 +370,16 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
             source.flags?.githubClientSecret ??
             env.APPALOFT_GITHUB_CLIENT_SECRET ??
             fileConfig.githubClientSecret,
+        }
+      : {}),
+    ...(source.flags?.githubWebhookSecret ||
+    env.APPALOFT_GITHUB_WEBHOOK_SECRET ||
+    fileConfig.githubWebhookSecret
+      ? {
+          githubWebhookSecret:
+            source.flags?.githubWebhookSecret ??
+            env.APPALOFT_GITHUB_WEBHOOK_SECRET ??
+            fileConfig.githubWebhookSecret,
         }
       : {}),
     httpHost:

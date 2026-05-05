@@ -4115,6 +4115,31 @@ export interface SourceEventVerificationPort {
   ): Promise<Result<VerifiedSourceEventInput>>;
 }
 
+export interface GitHubSourceEventWebhookVerificationInput {
+  eventName: string;
+  rawBody: string;
+  signature: string;
+  secretValue: string;
+  deliveryId?: string;
+  receivedAt?: string;
+}
+
+export type GitHubSourceEventWebhookVerificationResult =
+  | {
+      outcome: "source-event";
+      sourceEvent: VerifiedSourceEventInput;
+    }
+  | {
+      outcome: "noop";
+    };
+
+export interface GitHubSourceEventWebhookVerifier {
+  verify(
+    context: ExecutionContext,
+    input: GitHubSourceEventWebhookVerificationInput,
+  ): Promise<Result<GitHubSourceEventWebhookVerificationResult>>;
+}
+
 export interface SourceEventPolicyCandidate {
   projectId: string;
   environmentId: string;

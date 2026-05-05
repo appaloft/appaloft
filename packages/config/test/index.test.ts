@@ -117,6 +117,16 @@ describe("resolveConfig", () => {
     expect(config.docsStaticDir).toBe("/srv/appaloft/docs");
   });
 
+  test("reads the GitHub webhook secret from runtime configuration", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_GITHUB_WEBHOOK_SECRET: "github-webhook-secret",
+      },
+    });
+
+    expect(config.githubWebhookSecret).toBe("github-webhook-secret");
+  });
+
   test("uses an explicit resource access failure renderer URL only when it is HTTP based", () => {
     const configured = resolveConfig({
       env: {

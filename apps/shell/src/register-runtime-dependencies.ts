@@ -58,7 +58,11 @@ import { type AuthRuntime } from "@appaloft/auth-better";
 import { type AppConfig } from "@appaloft/config";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { InMemoryIntegrationRegistry } from "@appaloft/integration-core";
-import { createGitHubRepositoryBrowser, githubIntegration } from "@appaloft/integration-github";
+import {
+  createGitHubRepositoryBrowser,
+  createGitHubSourceEventWebhookVerifier,
+  githubIntegration,
+} from "@appaloft/integration-github";
 import { gitlabIntegration } from "@appaloft/integration-gitlab";
 import {
   type DatabaseConnection,
@@ -1066,6 +1070,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.githubRepositoryBrowser, {
     useFactory: instanceCachingFactory(() => createGitHubRepositoryBrowser()),
+  });
+  container.register(tokens.githubSourceEventWebhookVerifier, {
+    useFactory: instanceCachingFactory(() => createGitHubSourceEventWebhookVerifier()),
   });
   container.register(tokens.diagnostics, {
     useFactory: instanceCachingFactory(

@@ -241,6 +241,7 @@
       "name": "@appaloft/integration-github",
       "dependencies": {
         "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
         "@appaloft/integration-core": "workspace:*",
       },
       "devDependencies": {

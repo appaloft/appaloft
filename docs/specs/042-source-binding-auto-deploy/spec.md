@@ -199,7 +199,6 @@ ADR-037 answers the initial Code Round blockers:
 
 Remaining Test-First / Code Round work:
 
-- implement the governed GitHub provider webhook route and bind it to concrete automated tests;
 - GitLab and GitHub App preview lifecycle adapters remain future; the first active provider route is
   the GitHub push webhook baseline;
 - transport help text and Web links are implemented against the registered public docs topics.

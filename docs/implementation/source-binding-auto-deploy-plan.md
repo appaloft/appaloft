@@ -29,12 +29,13 @@ Round authorization.
 ### 3. Source Event Ingestion
 
 - Add provider-neutral `source-events.ingest` command schema. `Status: generic signed route
-  activation implemented with Resource-scoped `scopeResourceId` admission.`
+  activation implemented with Resource-scoped `scopeResourceId` admission; GitHub push route
+  activation implemented without `scopeResourceId` so matching can fan out.`
 - Add signature verification/normalization ports for Git provider and generic signed events.
-  `Status: generic signed source-event verification port implemented; provider-specific Git
-  verification adapters remain future; generic signed `resource-secret:<KEY>` resolution is active.
-  Next provider slice is the GitHub push route using `APPALOFT_GITHUB_WEBHOOK_SECRET` and
-  `X-Hub-Signature-256`.`
+  `Status: generic signed source-event verification port implemented; generic signed
+  `resource-secret:<KEY>` resolution is active; GitHub push verification and normalization use
+  `APPALOFT_GITHUB_WEBHOOK_SECRET`, `X-Hub-Signature-256`, `X-GitHub-Delivery`, and no-op `ping`
+  handling.`
 - Add durable source event records with dedupe keys, normalized facts, policy match results, ignored
   reasons, and created deployment ids. `Status: durable dedupe/read-model persistence baseline
   implemented; ignored policy-match outcomes are populated for non-matching refs; deployment ids are
@@ -52,17 +53,16 @@ Round authorization.
   matching restricts candidates to `scopeResourceId`.`
 - Dispatch matching policies through existing deployment admission and `resource-runtime`
   coordination. `Status: application dispatcher invokes existing deployments.create admission and
-  records dispatched or dispatch-failed source event outcomes; shell DI wiring is present;
-  generic signed HTTP route is active; GitHub push route is specified but inactive.`
+  records dispatched or dispatch-failed source event outcomes; shell DI wiring is present; generic
+  signed and GitHub push HTTP routes are active.`
 - Preserve async acceptance, deployment snapshots, logs, recovery, and rollback semantics.
 
 ### 5. Entrypoints And Docs
 
 - Add CLI, HTTP/oRPC, and Web surfaces only after application behavior and persistence pass.
   `Status: resources.configure-auto-deploy and source-events.list/show have CLI and HTTP/oRPC
-  surfaces; source-events.ingest has the Resource-scoped generic signed HTTP route; provider Git
-  routes remain future with GitHub push route specified for the next Code Round; Web Resource detail
-  source-event diagnostics are active.`
+  surfaces; source-events.ingest has the Resource-scoped generic signed HTTP route and the GitHub
+  push HTTP route; Web Resource detail source-event diagnostics are active.`
 - Add public docs for setup, signatures, dedupe, ignored events, and manual recovery.
 - Add future MCP/tool descriptor mapping from operation catalog metadata.
 
