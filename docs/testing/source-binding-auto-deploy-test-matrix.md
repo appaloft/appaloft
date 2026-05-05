@@ -41,11 +41,11 @@ automation. Ingestion routes, entrypoints, and background workers are not active
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `SRC-AUTO-EVENT-001` | Verified push event matches one enabled policy. | One deployment is accepted through existing deployment admission. | `packages/application/test/source-events.test.ts` | Partial |
-| `SRC-AUTO-EVENT-002` | Provider redelivers same event. | Durable source-event dedupe prevents duplicate source-event records and read model reports deduped; duplicate deployment prevention remains bound to the dispatch slice. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Partial |
+| `SRC-AUTO-EVENT-001` | Verified push event matches one enabled policy. | One deployment is accepted through existing deployment admission. | `packages/application/test/source-events.test.ts` | Passing |
+| `SRC-AUTO-EVENT-002` | Provider redelivers same event. | Durable source-event dedupe prevents duplicate source-event records and duplicate deployment dispatch while read models report deduped status. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
 | `SRC-AUTO-EVENT-003` | Event ref does not match policy. | No deployment is created and read model reports ignored ref. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
-| `SRC-AUTO-EVENT-004` | Generic signed webhook has invalid signature. | Event rejects before policy matching; no deployment is created. | `packages/application/test/source-events.test.ts` | Partial |
-| `SRC-AUTO-EVENT-005` | Multiple Resources match one event. | Each matching Resource creates at most one coordinated deployment attempt. | planned | Deferred gap |
+| `SRC-AUTO-EVENT-004` | Generic signed webhook has invalid signature. | Event rejects before policy matching; no deployment is created. | `packages/application/test/source-events.test.ts`; `packages/orpc/test/source-event-generic-signed.http.test.ts` | Passing |
+| `SRC-AUTO-EVENT-005` | Multiple Resources match one event. | Each matching Resource creates at most one coordinated deployment attempt. | `packages/application/test/source-events.test.ts` | Passing |
 | `SRC-AUTO-EVENT-006` | Resource-scoped generic signed webhook targets a source also used by another Resource. | Secret resolution and matching are limited to the route Resource; no other Resource deployment is dispatched. | `packages/application/test/source-events.test.ts` | Passing |
 
 ## Query Coverage
@@ -74,6 +74,7 @@ ignored ref outcomes, and active CLI/HTTP/oRPC source event read surfaces also e
 source events can dispatch through the existing deployment admission use case at the application
 boundary. The Resource-scoped generic signed HTTP route now resolves `resource-secret:<KEY>`,
 verifies `X-Appaloft-Signature`, dispatches `source-events.ingest` with `scopeResourceId`, and keeps
-dedupe scoped to the route Resource. This matrix still tracks missing provider-specific Git webhook
-ingestion and Web diagnostics. Code Round must not mark auto-deploy complete until these rows have
-stable automation or explicit deferred exceptions.
+dedupe scoped to the route Resource. Event dispatch and dedupe coverage is now bound to application
+automation; provider-specific Git webhook ingestion and Web diagnostics remain deferred. Code Round
+must not mark auto-deploy complete until these rows have stable automation or explicit deferred
+exceptions.

@@ -201,4 +201,57 @@ describe("generic signed source event HTTP route", () => {
     expect(serializedCommand).not.toContain("correct-secret");
     expect(serializedCommand).not.toContain("sha256=");
   });
+
+  test("[SRC-AUTO-EVENT-004] rejects invalid generic signed webhook signatures before ingest", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({} as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+      resourceRepository: new SingleResourceRepository(resourceWithGenericSignedPolicy()),
+      sourceEventVerificationPort: new GenericSignedSourceEventVerifier(),
+    });
+    const rawBody = JSON.stringify({
+      eventKind: "push",
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/demo",
+        repositoryFullName: "appaloft/demo",
+      },
+      ref: "main",
+      revision: "abc123",
+      deliveryId: "delivery_invalid_signature",
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/resources/res_web/source-events/generic-signed", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-appaloft-signature":
+            "sha256=0000000000000000000000000000000000000000000000000000000000000000",
+        },
+        body: rawBody,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "source_event_signature_invalid",
+        retryable: false,
+      },
+    });
+    expect(capturedCommand).toBeUndefined();
+  });
 });
