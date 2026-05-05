@@ -1028,6 +1028,10 @@ Current verification notes:
   `resource-secret:<KEY>` resolution, `X-Appaloft-Signature` HMAC verification, scoped source-event
   ingestion, and `SRC-AUTO-ENTRY-002`/`SRC-AUTO-EVENT-006` automation. Web diagnostics, provider
   Git ingestion, and future MCP/tool descriptors remain deferred.
+- 2026-05-05 Phase 7 source-event coverage slice closed the remaining event matrix rows for
+  dispatch dedupe, multi-Resource provider-signed fanout, and invalid generic signed HTTP
+  signatures. Web diagnostics, provider Git route adapters, and future MCP/tool descriptors remain
+  deferred.
 
 Required:
 

@@ -442,6 +442,142 @@ describe("source event application baseline", () => {
     });
   });
 
+  test("[SRC-AUTO-EVENT-002] dedupes redelivery after source event dispatch", async () => {
+    const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher(["dep_1"]);
+    const { context, ingest } = createHarness({
+      deploymentDispatcher,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          serverId: "srv_prod",
+          destinationId: "dst_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            providerRepositoryId: "repo_1",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ],
+    });
+    const input = {
+      sourceKind: "github" as const,
+      eventKind: "push" as const,
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/demo",
+        providerRepositoryId: "repo_1",
+        repositoryFullName: "appaloft/demo",
+      },
+      ref: "main",
+      revision: "abc123",
+      deliveryId: "delivery_redelivered_after_dispatch",
+      verification: {
+        status: "verified" as const,
+        method: "provider-signature" as const,
+      },
+    };
+
+    const first = await ingest.execute(context, input);
+    const second = await ingest.execute(context, input);
+
+    expect(first.isOk()).toBe(true);
+    expect(first._unsafeUnwrap()).toMatchObject({
+      status: "dispatched",
+      createdDeploymentIds: ["dep_1"],
+    });
+    expect(second.isOk()).toBe(true);
+    expect(second._unsafeUnwrap()).toMatchObject({
+      status: "deduped",
+      sourceEventId: "sevt_1",
+      createdDeploymentIds: ["dep_1"],
+      dedupeOfSourceEventId: "sevt_1",
+    });
+    expect(deploymentDispatcher.inputs).toHaveLength(1);
+  });
+
+  test("[SRC-AUTO-EVENT-005] dispatches one deployment attempt for each matching Resource", async () => {
+    const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher(["dep_web", "dep_api"]);
+    const { context, ingest, sourceEvents } = createHarness({
+      deploymentDispatcher,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          serverId: "srv_prod",
+          destinationId: "dst_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            providerRepositoryId: "repo_1",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_api",
+          serverId: "srv_prod",
+          destinationId: "dst_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            providerRepositoryId: "repo_1",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ],
+    });
+
+    const result = await ingest.execute(context, {
+      sourceKind: "github",
+      eventKind: "push",
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/demo",
+        providerRepositoryId: "repo_1",
+        repositoryFullName: "appaloft/demo",
+      },
+      ref: "main",
+      revision: "abc123",
+      deliveryId: "delivery_multi_match",
+      verification: {
+        status: "verified",
+        method: "provider-signature",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "dispatched",
+      matchedResourceIds: ["res_web", "res_api"],
+      createdDeploymentIds: ["dep_web", "dep_api"],
+    });
+    expect(deploymentDispatcher.inputs.map((input) => input.resourceId)).toEqual([
+      "res_web",
+      "res_api",
+    ]);
+    expect(sourceEvents.records[0]?.policyResults).toEqual([
+      {
+        resourceId: "res_web",
+        status: "dispatched",
+        deploymentId: "dep_web",
+      },
+      {
+        resourceId: "res_api",
+        status: "dispatched",
+        deploymentId: "dep_api",
+      },
+    ]);
+  });
+
   test("[SRC-AUTO-EVENT-006] limits Resource-scoped generic signed events to route Resource", async () => {
     const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher(["dep_web"]);
     const { context, ingest, sourceEvents } = createHarness({

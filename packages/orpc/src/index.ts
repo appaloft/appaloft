@@ -1010,6 +1010,8 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "terminal_session_not_found":
     case "source_event_scope_required":
     case "resource_auto_deploy_secret_unavailable":
+    case "source_event_signature_invalid":
+    case "source_event_unsupported_kind":
       return new ORPCError("BAD_REQUEST", {
         message,
         status: 400,
