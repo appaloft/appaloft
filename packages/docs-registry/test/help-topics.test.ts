@@ -175,6 +175,28 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[PREVIEW-DOCS-001] preview deployment help resolves to preview docs", () => {
+    const actionTopic = publicDocsHelpTopics["deployment.pr-preview-action"];
+    const productGradeTopic = publicDocsHelpTopics["deployment.product-grade-previews"];
+
+    expect(resolvePublicDocsHelpHref(actionTopic.id)).toBe(
+      "/docs/deploy/previews/#deployment-pr-preview-action-workflow",
+    );
+    expect(resolvePublicDocsHelpHref(actionTopic.id, { locale: "en-US" })).toBe(
+      "/docs/en/deploy/previews/#deployment-pr-preview-action-workflow",
+    );
+    expect(resolvePublicDocsHelpHref(productGradeTopic.id)).toBe(
+      "/docs/deploy/previews/#product-grade-preview-deployments",
+    );
+    expect(productGradeTopic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/046-product-grade-preview-deployments/spec.md",
+        "docs/testing/product-grade-preview-deployments-test-matrix.md",
+      ]),
+    );
+    expect(actionTopic.aliases).toEqual(expect.arrayContaining(["deploy-action", "preview-url"]));
+  });
+
   test("[ERROR-KNOWLEDGE-002] public error guides resolve docs, agent guide, and remedies", () => {
     const guide = findPublicDocsErrorGuide({
       code: "infra_error",

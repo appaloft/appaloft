@@ -59,6 +59,8 @@ Current status:
   Round activation. Resource runtime controls now have registered stub anchors for runtime
   controls, restart versus redeploy, and blocked start before Code Round activation. Docker Swarm
   runtime targets now have a registered server docs anchor before Swarm execution is active.
+  Action-only pull request previews and future product-grade previews now have registered
+  `deploy/previews` anchors that distinguish workflow-file previews from control-plane previews.
 - `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
   a dedicated automated link checker does not exist yet.
 - `PUB-DOCS-005` is covered for registered help topics by tests that resolve each locale page and
@@ -107,7 +109,9 @@ Current status:
   CLI/HTTP/API operations. Resource runtime control traceability is recorded as future
   Web/CLI/API/MCP surface coverage until those commands are active. Docker Swarm runtime target
   traceability is recorded as a target-help anchor with deferred execution UI. Scheduled task
-  traceability is recorded for active CLI/HTTP/API/Web/future MCP help links.
+  traceability is recorded for active CLI/HTTP/API/Web/future MCP help links. Preview deployment
+  traceability is recorded for Action-only CLI/repository-config guidance and future
+  Cloud/self-hosted product-grade preview surfaces.
 - `PUB-DOCS-017` is covered for registered public error guides by
   `packages/docs-registry/test/help-topics.test.ts`.
 

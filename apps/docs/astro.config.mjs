@@ -106,7 +106,11 @@ const sidebar = [
       },
       {
         label: "Lifecycle",
-        items: [{ slug: "deploy/lifecycle" }, { slug: "deploy/recovery" }],
+        items: [
+          { slug: "deploy/lifecycle" },
+          { slug: "deploy/previews" },
+          { slug: "deploy/recovery" },
+        ],
       },
     ],
   },

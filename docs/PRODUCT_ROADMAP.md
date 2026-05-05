@@ -1214,6 +1214,10 @@ Current verification notes:
   `docs/testing/product-grade-preview-deployments-test-matrix.md` covering preview policy,
   environment identity, scoped preview config, ids-only deployment dispatch, feedback,
   cleanup retries, quotas, and public-surface requirements. Code Round remains open.
+- 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
+  `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
+  and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
+  Marketplace README, and public wrapper tests remain open.
 
 Required:
 
@@ -1241,7 +1245,9 @@ Required:
 - [x] Add source binding and auto-deploy.
 - [x] Add push webhook and generic signed deploy webhook.
 - [ ] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
-  GitHub Actions workflow.
+  GitHub Actions workflow. Public docs now distinguish Action-only workflow-file previews from
+  future product-grade control-plane previews, but the public `appaloft/deploy-action` wrapper
+  repository, Marketplace README, and wrapper CI/tests remain open.
 - [x] Add existing-resource profile-drift handling.
 - [ ] Add product-grade preview deployments after source binding and webhook ingestion are durable,
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
