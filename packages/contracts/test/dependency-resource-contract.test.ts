@@ -37,4 +37,38 @@ describe("dependency resource contract", () => {
     expect(list.items[0]?.kind).toBe("redis");
     expect(JSON.stringify(list)).not.toContain("super-secret");
   });
+
+  test("[DEP-RES-PG-NATIVE-002] accepts safe managed Postgres realization metadata", () => {
+    const postgres = dependencyResourceSummarySchema.parse({
+      id: "rsi_pg",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Managed DB",
+      slug: "managed-db",
+      kind: "postgres",
+      sourceMode: "appaloft-managed",
+      providerKey: "appaloft-managed-postgres",
+      providerManaged: true,
+      lifecycleStatus: "ready",
+      connection: {
+        host: "managed.postgres.internal",
+        port: 5432,
+        databaseName: "managed_db",
+        maskedConnection: "postgres://app:********@managed.postgres.internal:5432/managed_db",
+        secretRef: "secret://dependency/postgres/rsi_pg",
+      },
+      providerRealization: {
+        status: "ready",
+        attemptId: "dpr_1",
+        attemptedAt: "2026-01-01T00:00:00.000Z",
+        providerResourceHandle: "pg/rsi_pg",
+        realizedAt: "2026-01-01T00:00:00.000Z",
+      },
+      bindingReadiness: { status: "ready" },
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(postgres.providerRealization?.status).toBe("ready");
+    expect(JSON.stringify(postgres)).not.toContain("super-secret");
+  });
 });

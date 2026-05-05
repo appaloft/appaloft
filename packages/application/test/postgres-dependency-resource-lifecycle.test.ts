@@ -3,10 +3,12 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   CreatedAt,
+  domainError,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
   EnvironmentName,
+  err,
   Project,
   ProjectId,
   ProjectName,
@@ -15,6 +17,7 @@ import {
 } from "@appaloft/core";
 import {
   CapturedEventBus,
+  FakeManagedPostgresProvider,
   FixedClock,
   MemoryDependencyResourceDeleteSafetyReader,
   MemoryDependencyResourceReadModel,
@@ -55,6 +58,7 @@ async function createHarness() {
   const deleteSafetyReader = new MemoryDependencyResourceDeleteSafetyReader();
   const readModel = new MemoryDependencyResourceReadModel(dependencyResources, deleteSafetyReader);
   const eventBus = new CapturedEventBus();
+  const managedPostgresProvider = new FakeManagedPostgresProvider();
   const logger = new NoopLogger();
   const idGenerator = new SequenceIdGenerator();
 
@@ -84,12 +88,15 @@ async function createHarness() {
       dependencyResources,
       deleteSafetyReader,
       clock,
+      idGenerator,
       eventBus,
       logger,
+      managedPostgresProvider,
     ),
     deleteSafetyReader,
     dependencyResources,
     eventBus,
+    managedPostgresProvider,
     importPostgres: new ImportPostgresDependencyResourceUseCase(
       projects,
       environments,
@@ -117,6 +124,7 @@ async function createHarness() {
       idGenerator,
       eventBus,
       logger,
+      managedPostgresProvider,
     ),
     provisionRedis: new ProvisionRedisDependencyResourceUseCase(
       projects,
@@ -140,8 +148,14 @@ async function createHarness() {
 }
 
 describe("Postgres dependency resource lifecycle use cases", () => {
-  test("[DEP-RES-PG-PROVISION-001] provisions managed Postgres metadata and emits event", async () => {
-    const { context, eventBus, provisionPostgres } = await createHarness();
+  test("[DEP-RES-PG-PROVISION-001] [DEP-RES-PG-NATIVE-001] [DEP-RES-PG-NATIVE-002] provisions managed Postgres through provider realization", async () => {
+    const {
+      context,
+      eventBus,
+      managedPostgresProvider,
+      provisionPostgres,
+      showDependencyResource,
+    } = await createHarness();
 
     const result = await provisionPostgres.execute(context, {
       projectId: "prj_demo",
@@ -150,12 +164,101 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     });
 
     expect(result.isOk()).toBe(true);
+    expect(managedPostgresProvider.realized).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId: result._unsafeUnwrap().id,
+        providerKey: "appaloft-managed-postgres",
+      }),
+    );
     expect(eventBus.events).toContainEqual(
       expect.objectContaining({
         type: "dependency-resource-created",
         aggregateId: result._unsafeUnwrap().id,
       }),
     );
+    expect(eventBus.events).toContainEqual(
+      expect.objectContaining({
+        type: "dependency-resource-realized",
+        aggregateId: result._unsafeUnwrap().id,
+      }),
+    );
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({
+        dependencyResourceId: result._unsafeUnwrap().id,
+      })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().dependencyResource).toMatchObject({
+      lifecycleStatus: "ready",
+      bindingReadiness: { status: "ready" },
+      providerRealization: {
+        status: "ready",
+        providerResourceHandle: `pg/${result._unsafeUnwrap().id}`,
+      },
+      connection: {
+        maskedConnection: expect.stringContaining("********"),
+      },
+    });
+  });
+
+  test("[DEP-RES-PG-NATIVE-003] provider realization failure keeps provision accepted and blocks binding readiness", async () => {
+    const { context, managedPostgresProvider, provisionPostgres, showDependencyResource } =
+      await createHarness();
+    managedPostgresProvider.setRealizationResult(
+      err(
+        domainError.provider("Managed Postgres unavailable", {
+          phase: "dependency-resource-realization",
+          providerKey: "appaloft-managed-postgres",
+        }),
+      ),
+    );
+
+    const result = await provisionPostgres.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main DB",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({
+        dependencyResourceId: result._unsafeUnwrap().id,
+      })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().dependencyResource).toMatchObject({
+      lifecycleStatus: "degraded",
+      bindingReadiness: { status: "blocked" },
+      providerRealization: {
+        status: "failed",
+        failureCode: "provider_error",
+      },
+    });
+  });
+
+  test("[DEP-RES-PG-NATIVE-007] rejects unsupported managed Postgres provider before persistence", async () => {
+    const { context, managedPostgresProvider, provisionPostgres, listDependencyResources } =
+      await createHarness();
+    managedPostgresProvider.setSupportedProviderKeys([]);
+
+    const result = await provisionPostgres.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main DB",
+    });
+    const list = await listDependencyResources.execute(
+      context,
+      ListDependencyResourcesQuery.create({ projectId: "prj_demo" })._unsafeUnwrap(),
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "provider_capability_unsupported",
+      details: {
+        phase: "dependency-resource-realization-admission",
+      },
+    });
+    expect(list._unsafeUnwrap().items).toEqual([]);
   });
 
   test("[DEP-RES-PG-IMPORT-001] [DEP-RES-PG-READ-002] imports external Postgres with masked read model", async () => {
@@ -290,6 +393,41 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     });
 
     expect(deleted.isOk()).toBe(true);
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({ dependencyResourceId: created.id })._unsafeUnwrap(),
+    );
+    expect(shown.isErr()).toBe(true);
+    expect(shown._unsafeUnwrapErr().code).toBe("not_found");
+  });
+
+  test("[DEP-RES-PG-NATIVE-005] deletes realized managed Postgres through provider cleanup", async () => {
+    const {
+      context,
+      deleteDependencyResource,
+      managedPostgresProvider,
+      provisionPostgres,
+      showDependencyResource,
+    } = await createHarness();
+    const created = (
+      await provisionPostgres.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Main DB",
+      })
+    )._unsafeUnwrap();
+
+    const deleted = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: created.id,
+    });
+
+    expect(deleted.isOk()).toBe(true);
+    expect(managedPostgresProvider.deleted).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId: created.id,
+        providerResourceHandle: `pg/${created.id}`,
+      }),
+    );
     const shown = await showDependencyResource.execute(
       context,
       ShowDependencyResourceQuery.create({ dependencyResourceId: created.id })._unsafeUnwrap(),

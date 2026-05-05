@@ -1,8 +1,10 @@
 import {
   DeletedAt,
   type DependencyResourceDeleteBlockerState,
+  DependencyResourceProviderRealizationAttemptId,
   domainError,
   err,
+  OccurredAt,
   ok,
   ResourceInstanceByIdSpec,
   ResourceInstanceId,
@@ -19,6 +21,8 @@ import {
   type DependencyResourceDeleteSafetyReader,
   type DependencyResourceRepository,
   type EventBus,
+  type IdGenerator,
+  type ManagedPostgresProviderPort,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
@@ -33,10 +37,14 @@ export class DeleteDependencyResourceUseCase {
     private readonly dependencyResourceDeleteSafetyReader: DependencyResourceDeleteSafetyReader,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.idGenerator)
+    private readonly idGenerator: IdGenerator,
     @inject(tokens.eventBus)
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.managedPostgresProvider)
+    private readonly managedPostgresProvider: ManagedPostgresProviderPort,
   ) {}
 
   async execute(
@@ -49,7 +57,9 @@ export class DeleteDependencyResourceUseCase {
       dependencyResourceDeleteSafetyReader,
       dependencyResourceRepository,
       eventBus,
+      idGenerator,
       logger,
+      managedPostgresProvider,
     } = this;
 
     return safeTry(async function* () {
@@ -77,7 +87,53 @@ export class DeleteDependencyResourceUseCase {
           ...(blocker.count ? { count: blocker.count } : {}),
         }),
       );
-      yield* dependencyResource.delete({ deletedAt, blockers });
+      const dependencyState = dependencyResource.toState();
+      const shouldDeleteProviderManagedPostgres =
+        dependencyState.providerManaged === true &&
+        dependencyState.kind.value === "postgres" &&
+        dependencyState.sourceMode?.value === "appaloft-managed" &&
+        blockers.length === 0 &&
+        !dependencyState.backupRelationship?.retentionRequired;
+
+      let allowProviderManaged = false;
+      if (shouldDeleteProviderManagedPostgres) {
+        const providerRealization = dependencyState.providerRealization;
+        if (
+          providerRealization?.status.value === "ready" &&
+          providerRealization.providerResourceHandle
+        ) {
+          const attemptId = DependencyResourceProviderRealizationAttemptId.rehydrate(
+            idGenerator.next("dpd"),
+          );
+          const requestedAt = yield* OccurredAt.create(clock.now());
+          yield* dependencyResource.markProviderDeleteRequested({ attemptId, requestedAt });
+          await dependencyResourceRepository.upsert(
+            repositoryContext,
+            dependencyResource,
+            UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
+          );
+          await publishDomainEventsAndReturn(
+            context,
+            eventBus,
+            logger,
+            dependencyResource,
+            undefined,
+          );
+          const providerDelete = await managedPostgresProvider.delete(context, {
+            dependencyResourceId: dependencyResourceId.value,
+            providerKey: dependencyState.providerKey.value,
+            providerResourceHandle: providerRealization.providerResourceHandle.value,
+            attemptId: attemptId.value,
+            requestedAt: requestedAt.value,
+          });
+          if (providerDelete.isErr()) {
+            return err(providerDelete.error);
+          }
+          allowProviderManaged = true;
+        }
+      }
+
+      yield* dependencyResource.delete({ deletedAt, blockers, allowProviderManaged });
       await dependencyResourceRepository.upsert(
         repositoryContext,
         dependencyResource,

@@ -1,11 +1,17 @@
 import {
   CreatedAt,
+  DependencyResourceProviderFailureCode,
+  DependencyResourceProviderRealizationAttemptId,
+  DependencyResourceProviderRealizationStatusValue,
+  DependencyResourceProviderResourceHandle,
+  DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
   DescriptionText,
   domainError,
   EnvironmentByIdSpec,
   EnvironmentId,
   err,
+  OccurredAt,
   ok,
   ProjectByIdSpec,
   ProjectId,
@@ -30,6 +36,7 @@ import {
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
+  type ManagedPostgresProviderPort,
   type ProjectRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -53,6 +60,8 @@ export class ProvisionPostgresDependencyResourceUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.managedPostgresProvider)
+    private readonly managedPostgresProvider: ManagedPostgresProviderPort,
   ) {}
 
   async execute(
@@ -67,6 +76,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
       eventBus,
       idGenerator,
       logger,
+      managedPostgresProvider,
       projectRepository,
     } = this;
 
@@ -80,7 +90,20 @@ export class ProvisionPostgresDependencyResourceUseCase {
         input.providerKey ?? "appaloft-managed-postgres",
       );
       const createdAt = yield* CreatedAt.create(clock.now());
+      const attemptedAt = yield* OccurredAt.create(clock.now());
       const description = DescriptionText.fromOptional(input.description);
+      if (!managedPostgresProvider.supports(providerKey.value)) {
+        return err(
+          domainError.providerCapabilityUnsupported(
+            "Provider does not support managed Postgres realization",
+            {
+              phase: "dependency-resource-realization-admission",
+              providerKey: providerKey.value,
+              operation: "dependency-resources.provision-postgres",
+            },
+          ),
+        );
+      }
 
       const project = await projectRepository.findOne(
         repositoryContext,
@@ -123,8 +146,12 @@ export class ProvisionPostgresDependencyResourceUseCase {
         );
       }
 
+      const dependencyResourceId = ResourceInstanceId.rehydrate(idGenerator.next("rsi"));
+      const realizationAttemptId = DependencyResourceProviderRealizationAttemptId.rehydrate(
+        idGenerator.next("dpr"),
+      );
       const dependencyResource = yield* ResourceInstance.createPostgresDependencyResource({
-        id: ResourceInstanceId.rehydrate(idGenerator.next("rsi")),
+        id: dependencyResourceId,
         projectId,
         environmentId,
         name,
@@ -132,6 +159,11 @@ export class ProvisionPostgresDependencyResourceUseCase {
         sourceMode: DependencyResourceSourceModeValue.rehydrate("appaloft-managed"),
         providerKey,
         providerManaged: true,
+        providerRealization: {
+          status: DependencyResourceProviderRealizationStatusValue.pending(),
+          attemptId: realizationAttemptId,
+          attemptedAt,
+        },
         ...(description ? { description } : {}),
         ...(input.backupRelationship
           ? {
@@ -145,6 +177,51 @@ export class ProvisionPostgresDependencyResourceUseCase {
           : {}),
         createdAt,
       });
+
+      await dependencyResourceRepository.upsert(
+        repositoryContext,
+        dependencyResource,
+        UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
+      );
+      await publishDomainEventsAndReturn(context, eventBus, logger, dependencyResource, undefined);
+
+      const realization = await managedPostgresProvider.realize(context, {
+        dependencyResourceId: dependencyResourceId.value,
+        projectId: projectId.value,
+        environmentId: environmentId.value,
+        providerKey: providerKey.value,
+        name: name.value,
+        slug: slug.value,
+        attemptId: realizationAttemptId.value,
+        requestedAt: attemptedAt.value,
+      });
+      if (realization.isOk()) {
+        const realizedAt = yield* OccurredAt.create(realization.value.realizedAt);
+        const providerResourceHandle = yield* DependencyResourceProviderResourceHandle.create(
+          realization.value.providerResourceHandle,
+        );
+        const connectionSecretRef = realization.value.secretRef
+          ? yield* DependencyResourceSecretRef.create(realization.value.secretRef)
+          : undefined;
+        yield* dependencyResource.markProviderRealized({
+          attemptId: realizationAttemptId,
+          providerResourceHandle,
+          endpoint: realization.value.endpoint,
+          ...(connectionSecretRef ? { connectionSecretRef } : {}),
+          realizedAt,
+        });
+      } else {
+        const failedAt = yield* OccurredAt.create(clock.now());
+        const failureCode = yield* DependencyResourceProviderFailureCode.create(
+          realization.error.code,
+        );
+        yield* dependencyResource.markProviderRealizationFailed({
+          attemptId: realizationAttemptId,
+          failureCode,
+          failureMessage: DescriptionText.rehydrate(realization.error.message),
+          failedAt,
+        });
+      }
 
       await dependencyResourceRepository.upsert(
         repositoryContext,

@@ -116,6 +116,20 @@ export class BindResourceDependencyUseCase {
         );
       }
       if (
+        dependencyState.providerManaged &&
+        dependencyState.sourceMode?.value === "appaloft-managed" &&
+        dependencyState.providerRealization?.status.value !== "ready"
+      ) {
+        return err(
+          domainError.validation("Managed Postgres dependency resource is not realized", {
+            phase: "resource-dependency-binding",
+            dependencyResourceId: dependencyResourceId.value,
+            providerRealizationStatus:
+              dependencyState.providerRealization?.status.value ?? "not-realized",
+          }),
+        );
+      }
+      if (
         !dependencyState.projectId?.equals(resourceState.projectId) ||
         !dependencyState.environmentId?.equals(resourceState.environmentId)
       ) {

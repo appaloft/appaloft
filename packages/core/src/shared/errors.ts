@@ -325,6 +325,22 @@ export const domainError = {
     details?: Record<string, string | number | boolean | null>,
     retryable = false,
   ): DomainError => createError("provider_error", "provider", message, details, retryable),
+  providerCapabilityUnsupported: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("provider_capability_unsupported", "provider", message, details),
+  dependencyResourceProviderDeleteFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError(
+      "dependency_resource_provider_delete_failed",
+      "provider",
+      message,
+      details,
+      retryable,
+    ),
   retryable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

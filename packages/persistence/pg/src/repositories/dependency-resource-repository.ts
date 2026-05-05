@@ -15,11 +15,16 @@ import {
   DependencyResourceDatabaseName,
   DependencyResourceEndpointHost,
   DependencyResourceEndpointPort,
+  DependencyResourceProviderFailureCode,
+  DependencyResourceProviderRealizationAttemptId,
+  DependencyResourceProviderRealizationStatusValue,
+  DependencyResourceProviderResourceHandle,
   DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
   DescriptionText,
   EnvironmentId,
   MaskedDependencyConnection,
+  OccurredAt,
   OwnerId,
   OwnerScopeValue,
   ok,
@@ -67,6 +72,17 @@ interface SerializedDependencyBackupRelationship extends Record<string, unknown>
 interface SerializedDependencyBindingReadiness extends Record<string, unknown> {
   status: "ready" | "blocked" | "not-implemented";
   reason?: string;
+}
+
+interface SerializedDependencyProviderRealization extends Record<string, unknown> {
+  status: "pending" | "ready" | "failed" | "delete-pending" | "deleted";
+  attemptId: string;
+  attemptedAt: string;
+  providerResourceHandle?: string;
+  realizedAt?: string;
+  failedAt?: string;
+  failureCode?: string;
+  failureMessage?: string;
 }
 
 class KyselyResourceInstanceSelectionVisitor
@@ -124,6 +140,30 @@ class KyselyResourceInstanceMutationVisitor
           ...(state.bindingReadiness.reason ? { reason: state.bindingReadiness.reason.value } : {}),
         } satisfies SerializedDependencyBindingReadiness)
       : null;
+    const providerRealization = state.providerRealization
+      ? ({
+          status: state.providerRealization.status.value,
+          attemptId: state.providerRealization.attemptId.value,
+          attemptedAt: state.providerRealization.attemptedAt.value,
+          ...(state.providerRealization.providerResourceHandle
+            ? {
+                providerResourceHandle: state.providerRealization.providerResourceHandle.value,
+              }
+            : {}),
+          ...(state.providerRealization.realizedAt
+            ? { realizedAt: state.providerRealization.realizedAt.value }
+            : {}),
+          ...(state.providerRealization.failedAt
+            ? { failedAt: state.providerRealization.failedAt.value }
+            : {}),
+          ...(state.providerRealization.failureCode
+            ? { failureCode: state.providerRealization.failureCode.value }
+            : {}),
+          ...(state.providerRealization.failureMessage
+            ? { failureMessage: state.providerRealization.failureMessage.value }
+            : {}),
+        } satisfies SerializedDependencyProviderRealization)
+      : null;
 
     return {
       dependencyResource: {
@@ -139,6 +179,7 @@ class KyselyResourceInstanceMutationVisitor
         description: state.description?.value ?? null,
         endpoint,
         connection_secret_ref: state.connectionSecretRef?.value ?? null,
+        provider_realization: providerRealization,
         backup_relationship: backupRelationship,
         binding_readiness: bindingReadiness,
         lifecycle_status: state.status.value,
@@ -165,6 +206,9 @@ function rehydrateResourceInstance(row: DependencyResourceRow): ResourceInstance
     : undefined;
   const bindingReadiness = row.binding_readiness
     ? (row.binding_readiness as SerializedDependencyBindingReadiness)
+    : undefined;
+  const providerRealization = row.provider_realization
+    ? (row.provider_realization as SerializedDependencyProviderRealization)
     : undefined;
 
   return ResourceInstance.rehydrate({
@@ -214,6 +258,42 @@ function rehydrateResourceInstance(row: DependencyResourceRow): ResourceInstance
     ...(row.connection_secret_ref
       ? { connectionSecretRef: DependencyResourceSecretRef.rehydrate(row.connection_secret_ref) }
       : {}),
+    ...(providerRealization
+      ? {
+          providerRealization: {
+            status: DependencyResourceProviderRealizationStatusValue.rehydrate(
+              providerRealization.status,
+            ),
+            attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate(
+              providerRealization.attemptId,
+            ),
+            attemptedAt: OccurredAt.rehydrate(providerRealization.attemptedAt),
+            ...(providerRealization.providerResourceHandle
+              ? {
+                  providerResourceHandle: DependencyResourceProviderResourceHandle.rehydrate(
+                    providerRealization.providerResourceHandle,
+                  ),
+                }
+              : {}),
+            ...(providerRealization.realizedAt
+              ? { realizedAt: OccurredAt.rehydrate(providerRealization.realizedAt) }
+              : {}),
+            ...(providerRealization.failedAt
+              ? { failedAt: OccurredAt.rehydrate(providerRealization.failedAt) }
+              : {}),
+            ...(providerRealization.failureCode
+              ? {
+                  failureCode: DependencyResourceProviderFailureCode.rehydrate(
+                    providerRealization.failureCode,
+                  ),
+                }
+              : {}),
+            ...(providerRealization.failureMessage
+              ? { failureMessage: DescriptionText.rehydrate(providerRealization.failureMessage) }
+              : {}),
+          },
+        }
+      : {}),
     ...(backupRelationship
       ? {
           backupRelationship: {
@@ -255,6 +335,9 @@ function toDependencyResourceSummary(
   const bindingReadiness = row.binding_readiness
     ? (row.binding_readiness as SerializedDependencyBindingReadiness)
     : undefined;
+  const providerRealization = row.provider_realization
+    ? (row.provider_realization as SerializedDependencyProviderRealization)
+    : undefined;
   return {
     id: row.id,
     projectId: row.project_id,
@@ -275,6 +358,28 @@ function toDependencyResourceSummary(
             ...(endpoint.databaseName ? { databaseName: endpoint.databaseName } : {}),
             maskedConnection: endpoint.maskedConnection,
             ...(row.connection_secret_ref ? { secretRef: row.connection_secret_ref } : {}),
+          },
+        }
+      : {}),
+    ...(providerRealization
+      ? {
+          providerRealization: {
+            status: providerRealization.status,
+            attemptId: providerRealization.attemptId,
+            attemptedAt: providerRealization.attemptedAt,
+            ...(providerRealization.providerResourceHandle
+              ? { providerResourceHandle: providerRealization.providerResourceHandle }
+              : {}),
+            ...(providerRealization.realizedAt
+              ? { realizedAt: providerRealization.realizedAt }
+              : {}),
+            ...(providerRealization.failedAt ? { failedAt: providerRealization.failedAt } : {}),
+            ...(providerRealization.failureCode
+              ? { failureCode: providerRealization.failureCode }
+              : {}),
+            ...(providerRealization.failureMessage
+              ? { failureMessage: providerRealization.failureMessage }
+              : {}),
           },
         }
       : {}),

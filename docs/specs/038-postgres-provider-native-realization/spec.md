@@ -2,8 +2,8 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: ready for Test-First / Code Round
+- Round: Code Round / Post-Implementation Sync
+- Artifact state: implemented with hermetic provider capability and source-of-truth alignment
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, semantic upgrade to managed Postgres lifecycle
 - Decision state: no-ADR-needed
@@ -14,9 +14,9 @@ Operators can provision an Appaloft-managed Postgres dependency resource and hav
 the provider-native database through an injected provider capability, then bind it to a Resource and
 delete it only through explicit safety and provider cleanup rules.
 
-This closes the gap between the provider-neutral Postgres record baseline and the first useful
-managed-database loop. It does not yet run backup/restore, inject runtime environment values into
-running workloads, or add Redis provider-native lifecycle.
+This closes the realization/delete gap between the provider-neutral Postgres record baseline and
+the first useful managed-database loop. It does not yet run backup/restore, inject runtime
+environment values into running workloads, or add Redis provider-native lifecycle.
 
 ## Discover Findings
 
@@ -124,7 +124,6 @@ attempt id, and sanitized provider error code/message.
 
 ## Open Questions
 
-- Whether provider realization should be fully backgrounded behind durable outbox/process state in
-  the first Code Round or implemented as a synchronous fake provider adapter with the same durable
-  status shape is a Code Round implementation choice. The contract still requires acceptance and
-  post-acceptance failure semantics.
+The Code Round uses an injected hermetic provider capability with the same safe durable status shape
+that a later background provider worker must preserve. Durable outbox/process ownership remains a
+platform migration gap.

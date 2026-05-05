@@ -3,11 +3,14 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   CreatedAt,
+  DependencyResourceProviderRealizationAttemptId,
+  DependencyResourceProviderRealizationStatusValue,
   DependencyResourceSourceModeValue,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
   EnvironmentName,
+  OccurredAt,
   Project,
   ProjectId,
   ProjectName,
@@ -28,6 +31,7 @@ import {
 import {
   CapturedEventBus,
   FakeDependencyBindingSecretStore,
+  FakeManagedPostgresProvider,
   FixedClock,
   MemoryDependencyResourceDeleteSafetyReader,
   MemoryDependencyResourceReadModel,
@@ -85,6 +89,7 @@ async function createHarness() {
   const logger = new NoopLogger();
   const idGenerator = new SequenceIdGenerator();
   const bindingSecretStore = new FakeDependencyBindingSecretStore("secret");
+  const managedPostgresProvider = new FakeManagedPostgresProvider();
   const createdAt = CreatedAt.rehydrate(clock.now());
 
   const project = Project.create({
@@ -155,8 +160,10 @@ async function createHarness() {
       dependencyResources,
       deleteSafetyReader,
       clock,
+      idGenerator,
       eventBus,
       logger,
+      managedPostgresProvider,
     ),
     dependencyReadModel,
     dependencyResources,
@@ -278,6 +285,46 @@ describe("Dependency resource binding use cases", () => {
       details: {
         entity: "dependency_resource",
         id: "rsi_missing",
+      },
+    });
+  });
+
+  test("[DEP-RES-PG-NATIVE-004] rejects binding pending managed Postgres realization", async () => {
+    const { bindDependency, context, dependencyResources, repositoryContext } =
+      await createHarness();
+    const pendingManaged = ResourceInstance.createPostgresDependencyResource({
+      id: ResourceInstanceId.rehydrate("rsi_pending_pg"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      name: ResourceInstanceName.rehydrate("Pending DB"),
+      kind: ResourceInstanceKindValue.rehydrate("postgres"),
+      sourceMode: DependencyResourceSourceModeValue.rehydrate("appaloft-managed"),
+      providerKey: ProviderKey.rehydrate("appaloft-managed-postgres"),
+      providerManaged: true,
+      providerRealization: {
+        status: DependencyResourceProviderRealizationStatusValue.pending(),
+        attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_pending"),
+        attemptedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      },
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    await dependencyResources.upsert(
+      repositoryContext,
+      pendingManaged,
+      UpsertResourceInstanceSpec.fromResourceInstance(pendingManaged),
+    );
+
+    const rejected = await bindDependency.execute(context, {
+      resourceId: "res_web",
+      dependencyResourceId: "rsi_pending_pg",
+      targetName: "DATABASE_URL",
+    });
+
+    expect(rejected.isErr()).toBe(true);
+    expect(rejected._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "resource-dependency-binding",
       },
     });
   });

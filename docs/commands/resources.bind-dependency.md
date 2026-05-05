@@ -47,4 +47,4 @@ for future deployment snapshot materialization and runtime injection.
 The command does not write raw connection secrets, mutate historical deployment snapshots, inject
 runtime environment variables, create deployments, trigger redeploy/retry/rollback, create or
 delete provider-native databases, rotate secrets, or run backup/restore. After provider-native
-Postgres realization, binding admission must require a realized ready managed database.
+Postgres realization, binding admission requires a realized ready managed database.
