@@ -59,6 +59,7 @@ import {
   type ResourceHealthQueryInput,
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
+  type RestartResourceRuntimeCommandInput,
   type RetryCertificateCommandInput,
   type RetryDeploymentCommandInput,
   type RetryDomainBindingVerificationCommandInput,
@@ -77,6 +78,8 @@ import {
   type ShowResourceQueryInput,
   type ShowServerQueryInput,
   type ShowSshCredentialQueryInput,
+  type StartResourceRuntimeCommandInput,
+  type StopResourceRuntimeCommandInput,
   type StreamDeploymentEventsQueryInput,
   type TestDraftServerConnectivityCommandInput,
   type TestRegisteredServerConnectivityCommandInput,
@@ -155,6 +158,7 @@ import {
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
+  type RestartResourceRuntimeResponse,
   type RetryCertificateResponse,
   type RetryDeploymentResponse,
   type RetryDomainBindingVerificationResponse,
@@ -170,6 +174,8 @@ import {
   type ShowProjectResponse,
   type ShowServerResponse,
   type ShowSshCredentialResponse,
+  type StartResourceRuntimeResponse,
+  type StopResourceRuntimeResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
   type UnlockEnvironmentResponse,
@@ -532,6 +538,26 @@ export type AppaloftOrpcClientContract = {
       AsyncIteratorClass<ResourceRuntimeLogEvent, ResourceRuntimeLogsStreamResponse, void>,
       AppaloftClientError
     >;
+    runtime: {
+      stop: Client<
+        AppaloftClientContext,
+        StopResourceRuntimeCommandInput,
+        StopResourceRuntimeResponse,
+        AppaloftClientError
+      >;
+      start: Client<
+        AppaloftClientContext,
+        StartResourceRuntimeCommandInput,
+        StartResourceRuntimeResponse,
+        AppaloftClientError
+      >;
+      restart: Client<
+        AppaloftClientContext,
+        RestartResourceRuntimeCommandInput,
+        RestartResourceRuntimeResponse,
+        AppaloftClientError
+      >;
+    };
   };
   terminalSessions: {
     open: Client<

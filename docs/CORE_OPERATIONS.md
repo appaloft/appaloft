@@ -281,6 +281,9 @@ Implemented operations:
 | Show resource profile | Query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
 | Read resource effective configuration | Query | `resources.effective-config` | `ResourceEffectiveConfigQuery` | `ResourceEffectiveConfigQueryInput` | `appaloft resource effective-config <resourceId>` | `GET /api/resources/{resourceId}/effective-config` |
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
+| Stop resource runtime | Command | `resources.runtime.stop` | `StopResourceRuntimeCommand` | `StopResourceRuntimeCommandInput` | `appaloft resource runtime stop <resourceId>` | `POST /api/resources/{resourceId}/runtime/stop` |
+| Start resource runtime | Command | `resources.runtime.start` | `StartResourceRuntimeCommand` | `StartResourceRuntimeCommandInput` | `appaloft resource runtime start <resourceId>` | `POST /api/resources/{resourceId}/runtime/start` |
+| Restart resource runtime | Command | `resources.runtime.restart` | `RestartResourceRuntimeCommand` | `RestartResourceRuntimeCommandInput` | `appaloft resource runtime restart <resourceId>` | `POST /api/resources/{resourceId}/runtime/restart` |
 | Preview resource proxy configuration | Query | `resources.proxy-configuration.preview` | `ResourceProxyConfigurationPreviewQuery` | `ResourceProxyConfigurationPreviewQueryInput` | `appaloft resource proxy-config <resourceId>` | `GET /api/resources/{resourceId}/proxy-configuration` |
 | Read resource diagnostic summary | Query | `resources.diagnostic-summary` | `ResourceDiagnosticSummaryQuery` | `ResourceDiagnosticSummaryQueryInput` | `appaloft resource diagnose <resourceId>` | `GET /api/resources/{resourceId}/diagnostic-summary` |
 | Lookup resource access failure evidence | Query | `resources.access-failure-evidence.lookup` | `ResourceAccessFailureEvidenceLookupQuery` | `ResourceAccessFailureEvidenceLookupQueryInput` | `appaloft resource access-failure <requestId>` | `GET /api/resource-access-failures/{requestId}` |
@@ -402,6 +405,11 @@ Current boundary:
   [ADR-018: Resource Runtime Log Observation](./decisions/ADR-018-resource-runtime-log-observation.md);
   `resources.runtime-logs` is the active bounded and stream-capable query surface for runtime
   stdout/stderr observation through an injected runtime log reader
+- resource runtime controls are resource-owned runtime operations governed by
+  [ADR-038: Resource Runtime Control Ownership](./decisions/ADR-038-resource-runtime-control-ownership.md).
+  `resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart` coordinate
+  through `resource-runtime`, persist runtime-control attempts, and dispatch normalized target
+  requests without creating new Deployment attempts.
 - edge proxy provider behavior is resource-observable through
   `resources.proxy-configuration.preview`, governed by
   [ADR-019: Edge Proxy Provider And Observable Configuration](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md);

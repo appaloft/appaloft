@@ -20,10 +20,13 @@ import {
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   ResourceRuntimeLogsQuery,
+  RestartResourceRuntimeCommand,
   RotateResourceDependencyBindingSecretCommand,
   SetResourceVariableCommand,
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
+  StartResourceRuntimeCommand,
+  StopResourceRuntimeCommand,
   UnbindResourceDependencyCommand,
   UnsetResourceVariableCommand,
 } from "@appaloft/application";
@@ -63,6 +66,11 @@ const kindOption = Options.choice("kind", resourceKinds).pipe(Options.withDefaul
 const destinationOption = Options.text("destination").pipe(Options.optional);
 const descriptionOption = Options.text("description").pipe(Options.optional);
 const archiveReasonOption = Options.text("reason").pipe(Options.optional);
+const runtimeControlReasonOption = Options.text("reason").pipe(Options.optional);
+const runtimeControlDeploymentOption = Options.text("deployment").pipe(Options.optional);
+const acknowledgeRetainedRuntimeMetadataOption = Options.boolean(
+  "acknowledge-retained-runtime-metadata",
+).pipe(Options.withDefault(false));
 const accessFailureResourceOption = Options.text("resource").pipe(Options.optional);
 const accessFailureHostOption = Options.text("host").pipe(Options.optional);
 const accessFailurePathOption = Options.text("path").pipe(Options.optional);
@@ -360,6 +368,66 @@ const logsCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceLogs));
+
+const runtimeStopCommand = EffectCommand.make(
+  "stop",
+  {
+    resourceId: resourceIdArg,
+    deployment: runtimeControlDeploymentOption,
+    reason: runtimeControlReasonOption,
+  },
+  ({ deployment, reason, resourceId }) =>
+    runCommand(
+      StopResourceRuntimeCommand.create({
+        resourceId,
+        deploymentId: optionalValue(deployment),
+        reason: optionalValue(reason),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceRuntimeStop));
+
+const runtimeStartCommand = EffectCommand.make(
+  "start",
+  {
+    resourceId: resourceIdArg,
+    deployment: runtimeControlDeploymentOption,
+    reason: runtimeControlReasonOption,
+    acknowledgeRetainedRuntimeMetadata: acknowledgeRetainedRuntimeMetadataOption,
+  },
+  ({ acknowledgeRetainedRuntimeMetadata, deployment, reason, resourceId }) =>
+    runCommand(
+      StartResourceRuntimeCommand.create({
+        resourceId,
+        deploymentId: optionalValue(deployment),
+        reason: optionalValue(reason),
+        acknowledgeRetainedRuntimeMetadata,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceRuntimeStart));
+
+const runtimeRestartCommand = EffectCommand.make(
+  "restart",
+  {
+    resourceId: resourceIdArg,
+    deployment: runtimeControlDeploymentOption,
+    reason: runtimeControlReasonOption,
+    acknowledgeRetainedRuntimeMetadata: acknowledgeRetainedRuntimeMetadataOption,
+  },
+  ({ acknowledgeRetainedRuntimeMetadata, deployment, reason, resourceId }) =>
+    runCommand(
+      RestartResourceRuntimeCommand.create({
+        resourceId,
+        deploymentId: optionalValue(deployment),
+        reason: optionalValue(reason),
+        acknowledgeRetainedRuntimeMetadata,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceRuntimeRestart));
+
+const runtimeCommand = EffectCommand.make("runtime").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.resourceRuntime),
+  EffectCommand.withSubcommands([runtimeStopCommand, runtimeStartCommand, runtimeRestartCommand]),
+);
 
 const archiveCommand = EffectCommand.make(
   "archive",
@@ -876,6 +944,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     unsetVariableCommand,
     terminalCommand,
     logsCommand,
+    runtimeCommand,
     accessFailureCommand,
     healthCommand,
     configureSourceCommand,

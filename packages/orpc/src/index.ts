@@ -158,6 +158,7 @@ import {
   ResourceRuntimeLogsQuery,
   type ResourceRuntimeLogsQueryInput,
   type ResourceRuntimeLogsResult,
+  RestartResourceRuntimeCommand,
   RestoreDependencyResourceBackupCommand,
   RetryCertificateCommand,
   RetryDeploymentCommand,
@@ -179,6 +180,7 @@ import {
   resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
+  restartResourceRuntimeCommandInputSchema,
   restoreDependencyResourceBackupCommandInputSchema,
   retryCertificateCommandInputSchema,
   retryDeploymentCommandInputSchema,
@@ -203,6 +205,8 @@ import {
   ShowServerQuery,
   ShowSshCredentialQuery,
   ShowStorageVolumeQuery,
+  StartResourceRuntimeCommand,
+  StopResourceRuntimeCommand,
   StreamDeploymentEventsQuery,
   type StreamDeploymentEventsQueryInput,
   type StreamDeploymentEventsResult,
@@ -222,6 +226,8 @@ import {
   showServerQueryInputSchema,
   showSshCredentialQueryInputSchema,
   showStorageVolumeQueryInputSchema,
+  startResourceRuntimeCommandInputSchema,
+  stopResourceRuntimeCommandInputSchema,
   streamDeploymentEventsQueryInputSchema,
   TestServerConnectivityCommand,
   testDraftServerConnectivityCommandInputSchema,
@@ -317,6 +323,7 @@ import {
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
+  restartResourceRuntimeResponseSchema,
   retryCertificateResponseSchema,
   retryDeploymentResponseSchema,
   retryDomainBindingVerificationResponseSchema,
@@ -337,6 +344,8 @@ import {
   showServerResponseSchema,
   showSshCredentialResponseSchema,
   showStorageVolumeResponseSchema,
+  startResourceRuntimeResponseSchema,
+  stopResourceRuntimeResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
   unbindResourceDependencyResponseSchema,
@@ -504,6 +513,10 @@ export const apiRouteDescriptions = {
   configureResourceRuntime: routeDescription(
     "Configures runtime settings such as strategy, commands, and publish directory.",
     "resource.runtime-profile",
+  ),
+  resourceRuntimeControl: routeDescription(
+    "Stops, starts, or restarts the current resource runtime without creating a deployment attempt.",
+    "resource.runtime-controls",
   ),
   configureResourceHealth: routeDescription(
     "Configures readiness and health checks used during verification.",
@@ -2330,6 +2343,45 @@ export const resourceRuntimeLogsStreamProcedure = base
   .output(eventIterator(resourceRuntimeLogEventSchema, resourceRuntimeLogsStreamResponseSchema))
   .handler(({ input, context }) => createResourceRuntimeLogStream(context, input));
 
+export const stopResourceRuntimeProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/runtime/stop",
+    description: apiRouteDescriptions.resourceRuntimeControl,
+    successStatus: 202,
+  })
+  .input(stopResourceRuntimeCommandInputSchema)
+  .output(stopResourceRuntimeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, StopResourceRuntimeCommand.create(input)),
+  );
+
+export const startResourceRuntimeProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/runtime/start",
+    description: apiRouteDescriptions.resourceRuntimeControl,
+    successStatus: 202,
+  })
+  .input(startResourceRuntimeCommandInputSchema)
+  .output(startResourceRuntimeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, StartResourceRuntimeCommand.create(input)),
+  );
+
+export const restartResourceRuntimeProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/runtime/restart",
+    description: apiRouteDescriptions.resourceRuntimeControl,
+    successStatus: 202,
+  })
+  .input(restartResourceRuntimeCommandInputSchema)
+  .output(restartResourceRuntimeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RestartResourceRuntimeCommand.create(input)),
+  );
+
 export const resourceDiagnosticSummaryProcedure = base
   .route({
     method: "GET",
@@ -2783,6 +2835,11 @@ export const appaloftOrpcRouter = {
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
     logs: resourceRuntimeLogsProcedure,
     logsStream: resourceRuntimeLogsStreamProcedure,
+    runtime: {
+      stop: stopResourceRuntimeProcedure,
+      start: startResourceRuntimeProcedure,
+      restart: restartResourceRuntimeProcedure,
+    },
     dependencyBindings: {
       bind: bindResourceDependencyProcedure,
       unbind: unbindResourceDependencyProcedure,
@@ -3017,6 +3074,9 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/proxy-configuration",
     "/api/resources/:resourceId/runtime-logs",
     "/api/resources/:resourceId/runtime-logs/stream",
+    "/api/resources/:resourceId/runtime/stop",
+    "/api/resources/:resourceId/runtime/start",
+    "/api/resources/:resourceId/runtime/restart",
     "/api/resources/:resourceId/dependency-bindings",
     "/api/resources/:resourceId/dependency-bindings/:bindingId",
     "/api/resources/:resourceId/dependency-bindings/:bindingId/secret-rotations",

@@ -12,8 +12,11 @@ import {
   type Query,
   type QueryBus,
   RedeployDeploymentCommand,
+  RestartResourceRuntimeCommand,
   RetryDeploymentCommand,
   RollbackDeploymentCommand,
+  StartResourceRuntimeCommand,
+  StopResourceRuntimeCommand,
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
@@ -211,6 +214,88 @@ describe("deployment create HTTP route", () => {
       rollbackCandidateDeploymentId: "dep_success",
       resourceId: "res_demo",
       readinessGeneratedAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
+  test("[RUNTIME-CTRL-SURFACE-001] dispatches resource runtime control commands through HTTP", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommands.push(command as Command<unknown>);
+        return ok({
+          runtimeControlAttemptId: "rtc_http",
+          operation: "stop",
+          status: "succeeded",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:00:01.000Z",
+          runtimeState: "stopped",
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const stopResponse = await app.handle(
+      new Request("http://localhost/api/resources/res_demo/runtime/stop", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          deploymentId: "dep_current",
+          reason: "operator-request",
+        }),
+      }),
+    );
+    const startResponse = await app.handle(
+      new Request("http://localhost/api/resources/res_demo/runtime/start", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          acknowledgeRetainedRuntimeMetadata: true,
+        }),
+      }),
+    );
+    const restartResponse = await app.handle(
+      new Request("http://localhost/api/resources/res_demo/runtime/restart", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          acknowledgeRetainedRuntimeMetadata: true,
+        }),
+      }),
+    );
+
+    expect(stopResponse.status).toBe(202);
+    expect(startResponse.status).toBe(202);
+    expect(restartResponse.status).toBe(202);
+    expect(capturedCommands[0]).toBeInstanceOf(StopResourceRuntimeCommand);
+    expect(capturedCommands[0]).toMatchObject({
+      resourceId: "res_demo",
+      deploymentId: "dep_current",
+      reason: "operator-request",
+    });
+    expect(capturedCommands[1]).toBeInstanceOf(StartResourceRuntimeCommand);
+    expect(capturedCommands[1]).toMatchObject({
+      resourceId: "res_demo",
+      acknowledgeRetainedRuntimeMetadata: true,
+    });
+    expect(capturedCommands[2]).toBeInstanceOf(RestartResourceRuntimeCommand);
+    expect(capturedCommands[2]).toMatchObject({
+      resourceId: "res_demo",
+      acknowledgeRetainedRuntimeMetadata: true,
     });
   });
 });

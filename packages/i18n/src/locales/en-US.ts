@@ -793,6 +793,17 @@ export const enUS = {
       runtimeInstallCommand: "Install command",
       runtimeName: "Runtime name",
       runtimeNamePlaceholder: "www",
+      runtimeControlsDescription:
+        "Stop, start, or restart the current runtime without creating a new deployment attempt.",
+      runtimeControlsLatest: "Latest control",
+      runtimeControlsTitle: "Runtime controls",
+      runtimeControlFailed: "Runtime control failed",
+      runtimeControlRestart: "Restart",
+      runtimeControlRestartSuccess: "Runtime restart accepted",
+      runtimeControlStart: "Start",
+      runtimeControlStartSuccess: "Runtime start accepted",
+      runtimeControlStop: "Stop",
+      runtimeControlStopSuccess: "Runtime stop accepted",
       runtimeLogsConnecting: "Connecting to runtime logs...",
       runtimeLogsDescription:
         "Read the latest application output through the configured runtime log reader.",

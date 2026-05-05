@@ -2691,6 +2691,26 @@ export const retryDeploymentResponseSchema = createDeploymentResponseSchema;
 export const redeployDeploymentResponseSchema = createDeploymentResponseSchema;
 export const rollbackDeploymentResponseSchema = createDeploymentResponseSchema;
 
+export const stopResourceRuntimeInputSchema = z.object({
+  resourceId: z.string().min(1),
+  deploymentId: z.string().min(1).optional(),
+  reason: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const startResourceRuntimeInputSchema = stopResourceRuntimeInputSchema.extend({
+  acknowledgeRetainedRuntimeMetadata: z.boolean().optional(),
+});
+
+export const restartResourceRuntimeInputSchema = stopResourceRuntimeInputSchema.extend({
+  acknowledgeRetainedRuntimeMetadata: z.boolean().optional(),
+});
+
+export const resourceRuntimeControlResponseSchema = resourceRuntimeControlSummarySchema;
+export const stopResourceRuntimeResponseSchema = resourceRuntimeControlResponseSchema;
+export const startResourceRuntimeResponseSchema = resourceRuntimeControlResponseSchema;
+export const restartResourceRuntimeResponseSchema = resourceRuntimeControlResponseSchema;
+
 export const listDeploymentsResponseSchema = z.object({
   items: z.array(deploymentSummarySchema),
 });
@@ -3965,6 +3985,12 @@ export type RedeployDeploymentInput = z.infer<typeof redeployDeploymentInputSche
 export type RedeployDeploymentResponse = z.infer<typeof redeployDeploymentResponseSchema>;
 export type RollbackDeploymentInput = z.infer<typeof rollbackDeploymentInputSchema>;
 export type RollbackDeploymentResponse = z.infer<typeof rollbackDeploymentResponseSchema>;
+export type StopResourceRuntimeInput = z.infer<typeof stopResourceRuntimeInputSchema>;
+export type StopResourceRuntimeResponse = z.infer<typeof stopResourceRuntimeResponseSchema>;
+export type StartResourceRuntimeInput = z.infer<typeof startResourceRuntimeInputSchema>;
+export type StartResourceRuntimeResponse = z.infer<typeof startResourceRuntimeResponseSchema>;
+export type RestartResourceRuntimeInput = z.infer<typeof restartResourceRuntimeInputSchema>;
+export type RestartResourceRuntimeResponse = z.infer<typeof restartResourceRuntimeResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
 export type OperatorWorkKind = z.infer<typeof operatorWorkKindSchema>;
 export type OperatorWorkStatus = z.infer<typeof operatorWorkStatusSchema>;

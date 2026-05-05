@@ -1197,7 +1197,7 @@ export const publicDocsHelpTopics = {
       "docs/queries/resources.health.md",
       "docs/testing/resource-runtime-controls-test-matrix.md",
     ],
-    webSurfaces: ["Future Resource detail runtime controls"],
+    webSurfaces: ["Resource detail runtime controls"],
   },
   "resource.runtime-restart-vs-redeploy": {
     id: "resource.runtime-restart-vs-redeploy",
@@ -1820,6 +1820,21 @@ export const publicDocsOperationCoverage = [
     operationKey: "resources.runtime-logs",
     status: "documented",
     topicId: "observability.runtime-logs",
+  },
+  {
+    operationKey: "resources.runtime.stop",
+    status: "documented",
+    topicId: "resource.runtime-controls",
+  },
+  {
+    operationKey: "resources.runtime.start",
+    status: "documented",
+    topicId: "resource.runtime-controls",
+  },
+  {
+    operationKey: "resources.runtime.restart",
+    status: "documented",
+    topicId: "resource.runtime-controls",
   },
   {
     operationKey: "terminal-sessions.open",

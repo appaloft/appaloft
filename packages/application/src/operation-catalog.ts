@@ -79,6 +79,11 @@ import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resource
 import { resourceEffectiveConfigQueryInputSchema } from "./operations/resources/resource-effective-config.query";
 import { resourceHealthQueryInputSchema } from "./operations/resources/resource-health.query";
 import { resourceProxyConfigurationPreviewQueryInputSchema } from "./operations/resources/resource-proxy-configuration-preview.query";
+import {
+  restartResourceRuntimeCommandInputSchema,
+  startResourceRuntimeCommandInputSchema,
+  stopResourceRuntimeCommandInputSchema,
+} from "./operations/resources/resource-runtime-control.schema";
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
 import { rotateResourceDependencyBindingSecretCommandInputSchema } from "./operations/resources/rotate-resource-dependency-binding-secret.command";
 import { setResourceVariableCommandInputSchema } from "./operations/resources/set-resource-variable.command";
@@ -1356,6 +1361,48 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>",
       orpc: { method: "POST", path: "/api/deployments/{deploymentId}/rollback" },
+    },
+  },
+  {
+    key: "resources.runtime.stop",
+    kind: "command",
+    domain: "resources",
+    messageName: "StopResourceRuntimeCommand",
+    handlerName: "StopResourceRuntimeCommandHandler",
+    serviceName: "ResourceRuntimeControlUseCase",
+    inputSchema: stopResourceRuntimeCommandInputSchema,
+    serviceToken: tokens.resourceRuntimeControlUseCase,
+    transports: {
+      cli: "appaloft resource runtime stop <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime/stop" },
+    },
+  },
+  {
+    key: "resources.runtime.start",
+    kind: "command",
+    domain: "resources",
+    messageName: "StartResourceRuntimeCommand",
+    handlerName: "StartResourceRuntimeCommandHandler",
+    serviceName: "ResourceRuntimeControlUseCase",
+    inputSchema: startResourceRuntimeCommandInputSchema,
+    serviceToken: tokens.resourceRuntimeControlUseCase,
+    transports: {
+      cli: "appaloft resource runtime start <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime/start" },
+    },
+  },
+  {
+    key: "resources.runtime.restart",
+    kind: "command",
+    domain: "resources",
+    messageName: "RestartResourceRuntimeCommand",
+    handlerName: "RestartResourceRuntimeCommandHandler",
+    serviceName: "ResourceRuntimeControlUseCase",
+    inputSchema: restartResourceRuntimeCommandInputSchema,
+    serviceToken: tokens.resourceRuntimeControlUseCase,
+    transports: {
+      cli: "appaloft resource runtime restart <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime/restart" },
     },
   },
   {

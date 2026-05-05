@@ -52,8 +52,8 @@ CLI, HTTP/oRPC, Web, `CORE_OPERATIONS.md`, or `operation-catalog.ts` yet.
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `RUNTIME-CTRL-SURFACE-001` | CLI, HTTP/oRPC, Web, and future MCP/tool controls. | Entrypoints reuse the same command schemas, blocked reason vocabulary, and docs links. | planned | Deferred gap |
-| `RUNTIME-CTRL-SURFACE-002` | User compares restart and redeploy. | Public docs and UI copy state that restart does not pick up source/config/profile changes. | planned | Deferred gap |
+| `RUNTIME-CTRL-SURFACE-001` | CLI, HTTP/oRPC, Web, and future MCP/tool controls. | Entrypoints reuse the same command schemas, blocked reason vocabulary, and docs links. | `packages/orpc/test/deployment-create.http.test.ts`; `packages/adapters/cli/src/commands/resource.ts`; `apps/web/src/routes/resources/[resourceId]/+page.svelte` | HTTP passing; CLI/Web typecheck coverage |
+| `RUNTIME-CTRL-SURFACE-002` | User compares restart and redeploy. | Public docs and UI copy state that restart does not pick up source/config/profile changes. | `packages/docs-registry/test/help-topics.test.ts`; `apps/web/src/routes/resources/[resourceId]/+page.svelte` | Passing |
 | `RUNTIME-CTRL-DOCS-001` | Public help registry resolves runtime-control anchors. | Registered docs topics resolve `resource-runtime-controls`, `runtime-restart-vs-redeploy`, and `runtime-control-blocked-start` anchors in both locales. | `packages/docs-registry/test/help-topics.test.ts` | Passing |
 
 ## Current Implementation Notes And Migration Gaps
@@ -73,5 +73,5 @@ the running attempt and is projected through the Resource read model. The runtim
 provider-neutral Docker container and Docker Compose command mapping, local shell execution,
 generic SSH execution, and sanitized command failure handling behind an injected executor boundary.
 Shell composition registers the target port, attempt recorder, use case, and command handlers.
-Runtime control remains inactive until CLI/HTTP/Web entrypoints, `CORE_OPERATIONS.md`, and
-operation catalog activation slices are aligned.
+Runtime controls are active in `CORE_OPERATIONS.md`, the operation catalog, CLI, HTTP/oRPC, and Web.
+Future MCP/tool descriptors remain deferred until the tool surface exists.

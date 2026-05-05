@@ -160,6 +160,16 @@ export const cliCommandDescriptions = {
   resourceDelete: withDocs("Delete an archived resource", "resource.concept"),
   resourceTerminal: withDocs("Open a resource terminal session", "server.terminal-session"),
   resourceLogs: withDocs("Show resource runtime logs", "observability.runtime-logs"),
+  resourceRuntime: withDocs("Resource runtime control operations", "resource.runtime-controls"),
+  resourceRuntimeStop: withDocs("Stop the current resource runtime", "resource.runtime-controls"),
+  resourceRuntimeStart: withDocs(
+    "Start the last stopped resource runtime",
+    "resource.runtime-controls",
+  ),
+  resourceRuntimeRestart: withDocs(
+    "Restart the current resource runtime without redeploying",
+    "resource.runtime-controls",
+  ),
   resourceHealth: withDocs("Show current resource health", "observability.health-summary"),
   resourceConfigureSource: withDocs("Configure resource source profile", "resource.source-profile"),
   resourceConfigureRuntime: withDocs(
