@@ -725,14 +725,19 @@ export class ScheduledTaskDefinitionByIdSpec implements ScheduledTaskDefinitionS
 }
 
 export class UpsertScheduledTaskDefinitionSpec implements ScheduledTaskDefinitionMutationSpec {
-  private constructor(
-    public readonly taskId: ScheduledTaskId,
-    public readonly resourceId: ResourceId,
-  ) {}
+  private constructor(public readonly state: ScheduledTaskDefinitionState) {}
 
   static fromTaskDefinition(task: ScheduledTaskDefinition): UpsertScheduledTaskDefinitionSpec {
     const state = task.toState();
-    return new UpsertScheduledTaskDefinitionSpec(state.id, state.resourceId);
+    return new UpsertScheduledTaskDefinitionSpec(state);
+  }
+
+  get taskId(): ScheduledTaskId {
+    return this.state.id;
+  }
+
+  get resourceId(): ResourceId {
+    return this.state.resourceId;
   }
 
   accept<TResult>(visitor: ScheduledTaskDefinitionMutationSpecVisitor<TResult>): TResult {

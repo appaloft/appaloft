@@ -35,6 +35,10 @@
 - [x] `SCHED-TASK-RUN-001`: run-now accepts a run attempt without completing it synchronously.
 - [x] `SCHED-TASK-RUN-002`: Resource archive blocks run-now before runtime execution.
 - [x] `SCHED-TASK-RUN-QUERY-001`: run list/show/log queries wrap run-specific read models.
+- [x] `SCHED-TASK-PERSIST-001`: task definition repository/read model persists Resource-owned
+  definitions and supports list/show filters.
+- [x] `SCHED-TASK-PERSIST-002`: task definition delete mutation removes Resource-owned
+  definitions from read models.
 - [ ] `SCHED-TASK-SCHED-001`: scheduler dispatches through the same run admission use case.
 - [ ] `SCHED-TASK-LOGS-001`: task-run logs are separate from deployment/resource runtime logs.
 - [ ] `SCHED-TASK-SECRET-001`: task definitions, runs, logs, and errors mask secrets.
@@ -51,6 +55,7 @@
 - [x] Add inactive application run-now admission handler/use case.
 - [x] Add inactive application read-query handlers/services for task and run history surfaces.
 - [x] Add remaining application scheduled-task handlers/use cases.
+- [x] Add scheduled-task definition persistence repository/read model.
 - [ ] Add persistence/read models.
 - [ ] Add scheduler process manager.
 - [ ] Add runtime adapter one-off task execution/log support.
