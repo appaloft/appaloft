@@ -62,6 +62,10 @@ import {
   type RuntimeArtifactIntent,
   type RuntimeArtifactKind,
   type RuntimePlan,
+  type ScheduledTaskDefinition,
+  type ScheduledTaskDefinitionSelectionSpec,
+  type ScheduledTaskRunAttempt,
+  type ScheduledTaskRunAttemptMutationSpec,
   type Server,
   type ServerMutationSpec,
   type ServerSelectionSpec,
@@ -391,6 +395,21 @@ export interface EnvironmentRepository {
 export interface ResourceRepository {
   findOne(context: RepositoryContext, spec: ResourceSelectionSpec): Promise<Resource | null>;
   upsert(context: RepositoryContext, resource: Resource, spec: ResourceMutationSpec): Promise<void>;
+}
+
+export interface ScheduledTaskDefinitionRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: ScheduledTaskDefinitionSelectionSpec,
+  ): Promise<ScheduledTaskDefinition | null>;
+}
+
+export interface ScheduledTaskRunAttemptRepository {
+  upsert(
+    context: RepositoryContext,
+    runAttempt: ScheduledTaskRunAttempt,
+    spec: ScheduledTaskRunAttemptMutationSpec,
+  ): Promise<void>;
 }
 
 export interface StorageVolumeRepository {
