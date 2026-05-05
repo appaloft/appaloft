@@ -1208,6 +1208,12 @@ Current verification notes:
   `servers.test-connectivity` adapter coverage for SSH reachability, Docker daemon availability,
   active manager state, overlay network support, and edge proxy compatibility without mutating
   Swarm stacks, services, or networks. Swarm execution remains open.
+- 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
+  App/control-plane previews as a separate workflow from Action-only previews, with
+  `docs/specs/046-product-grade-preview-deployments` and
+  `docs/testing/product-grade-preview-deployments-test-matrix.md` covering preview policy,
+  environment identity, scoped preview config, ids-only deployment dispatch, feedback,
+  cleanup retries, quotas, and public-surface requirements. Code Round remains open.
 
 Required:
 
@@ -1239,7 +1245,10 @@ Required:
 - [x] Add existing-resource profile-drift handling.
 - [ ] Add product-grade preview deployments after source binding and webhook ingestion are durable,
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
-  retries.
+  retries. Spec Round is positioned in
+  [docs/specs/046-product-grade-preview-deployments](./specs/046-product-grade-preview-deployments/spec.md)
+  with a dedicated test matrix; GitHub App/webhook ingestion, preview policy/environment
+  operations, feedback, scheduler retry, entrypoints, and public docs remain open.
 - [x] Add scheduled task/cron resource shape with run history and logs after workload service
   semantics are specified. ADR-039/spec matrix now position ownership and target operations.
 - [x] Complete the Docker Swarm Spec Round as the first cluster runtime target:

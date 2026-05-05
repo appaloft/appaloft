@@ -415,6 +415,11 @@ That product line may support:
 The same repository config and operation contracts still apply. Product-grade preview orchestration
 must not add source/runtime/domain fields to `deployments.create`.
 
+The governing Spec Round for this future product line is
+[Product-Grade Preview Deployments](../specs/046-product-grade-preview-deployments/spec.md), with
+coverage tracked in the
+[Product-Grade Preview Deployments Test Matrix](../testing/product-grade-preview-deployments-test-matrix.md).
+
 ## Error Semantics
 
 Canonical preview-specific phases:
@@ -474,3 +479,5 @@ Missing pieces for product-grade previews:
 - scheduler-owned close-event handling, retries, and audit around preview cleanup;
 - scheduler/agent cleanup retries;
 - Cloud/self-hosted source links, locks, audit, and managed domain mapping.
+
+The product-grade preview Spec Round is positioned, but Code Round implementation remains open.
