@@ -86,7 +86,10 @@ DDD or internal process-manager terminology.
   succeeded, failed, and skipped run attempts, supports repository upsert through explicit specs,
   supports run list/show filtering by task, Resource, status, trigger kind, cursor, and limit, and
   exposes latest run summaries on task list/show read models.
+- Scheduled task run-log persistence exists for Postgres/PGlite. It stores log entries in a
+  scheduled-task-run-specific table, reads them through the run-log read model by run/task/Resource,
+  pages by log timestamp cursor, and masks secret-looking log messages before returning read-model
+  entries.
 - No operation catalog entries are active.
 - No Web, CLI, HTTP/oRPC, or MCP descriptors are active for scheduled tasks.
-- No persisted scheduled-task run-log state exists.
 - No scheduler process manager or runtime adapter execution path exists.

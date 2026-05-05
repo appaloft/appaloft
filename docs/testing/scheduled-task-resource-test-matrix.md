@@ -62,10 +62,12 @@ schedule, timezone, command intent, timeout, retry, lifecycle status, and `forbi
 policy plus a Resource-owned scheduled task definition state with no deployment id. They also add
 the core scheduled-task run attempt lifecycle for accepted, running, succeeded, failed, and skipped
 states with safe terminal details and no Deployment id.
-`SCHED-TASK-PERSIST-001` through `SCHED-TASK-PERSIST-003` have PGlite coverage in
-`packages/persistence/pg/test/scheduled-task-definition.pglite.test.ts`.
+`SCHED-TASK-PERSIST-001` through `SCHED-TASK-PERSIST-003` and `SCHED-TASK-LOGS-001` have PGlite
+coverage in `packages/persistence/pg/test/scheduled-task-definition.pglite.test.ts`. The run-log
+coverage also exercises one log masking path for `SCHED-TASK-SECRET-001`, while the full secret
+matrix remains open for definitions, runs, errors, diagnostics, and tool descriptors.
 
 Inactive application command/query schemas, messages, result DTOs, read-model ports, create,
 update, delete, and run-now admission handlers/use cases, and read-query handlers/services exist. No
-operation catalog entries, persisted run-log state, scheduler process manager, runtime adapter
-execution path, entrypoints, or public docs are active yet.
+operation catalog entries, scheduler process manager, runtime adapter execution path, entrypoints,
+or public docs are active yet.

@@ -8,6 +8,9 @@ import {
   type ScheduledTaskDefinitionSummary,
   type ScheduledTaskReadModel,
   type ScheduledTaskRunAttemptRepository,
+  type ScheduledTaskRunLogEntry,
+  type ScheduledTaskRunLogReadModel,
+  type ScheduledTaskRunLogsResult,
   type ScheduledTaskRunReadModel,
   type ScheduledTaskRunSummary,
 } from "@appaloft/application";
@@ -42,6 +45,7 @@ import { normalizeTimestamp, resolveRepositoryExecutor, withRepositoryTransactio
 
 type ScheduledTaskDefinitionRow = Selectable<Database["scheduled_task_definitions"]>;
 type ScheduledTaskRunAttemptRow = Selectable<Database["scheduled_task_run_attempts"]>;
+type ScheduledTaskRunLogRow = Selectable<Database["scheduled_task_run_logs"]>;
 type ScheduledTaskDefinitionSelectionQuery = SelectQueryBuilder<
   Database,
   "scheduled_task_definitions",
@@ -182,6 +186,20 @@ function toScheduledTaskRunSummary(row: ScheduledTaskRunAttemptRow): ScheduledTa
           >,
         }
       : {}),
+  };
+}
+
+const logSecretPattern = /(BEGIN .*PRIVATE KEY|PRIVATE_KEY|SECRET_|PASSWORD=|TOKEN=|PASS=)/i;
+
+function safeLogMessage(message: string): string {
+  return logSecretPattern.test(message) ? "********" : message;
+}
+
+function toScheduledTaskRunLogEntry(row: ScheduledTaskRunLogRow): ScheduledTaskRunLogEntry {
+  return {
+    timestamp: normalizeTimestamp(row.logged_at) ?? row.logged_at,
+    stream: row.stream as ScheduledTaskRunLogEntry["stream"],
+    message: safeLogMessage(row.message),
   };
 }
 
@@ -543,6 +561,71 @@ export class PgScheduledTaskRunReadModel implements ScheduledTaskRunReadModel {
 
         const row = await query.executeTakeFirst();
         return row ? toScheduledTaskRunSummary(row) : null;
+      },
+    );
+  }
+}
+
+export class PgScheduledTaskRunLogReadModel implements ScheduledTaskRunLogReadModel {
+  constructor(private readonly db: Kysely<Database>) {}
+
+  async read(
+    context: RepositoryContext,
+    input: Parameters<ScheduledTaskRunLogReadModel["read"]>[1],
+  ): Promise<Omit<ScheduledTaskRunLogsResult, "schemaVersion" | "generatedAt">> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("scheduled-task-run-log", "read"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "scheduled-task-run-log",
+        },
+      },
+      async () => {
+        let runQuery = executor
+          .selectFrom("scheduled_task_run_attempts")
+          .select(["id", "task_id", "resource_id"])
+          .where("id", "=", input.runId);
+
+        if (input.taskId) {
+          runQuery = runQuery.where("task_id", "=", input.taskId);
+        }
+        if (input.resourceId) {
+          runQuery = runQuery.where("resource_id", "=", input.resourceId);
+        }
+
+        const run = await runQuery.executeTakeFirst();
+        if (!run) {
+          return {
+            runId: input.runId,
+            taskId: input.taskId ?? "",
+            resourceId: input.resourceId ?? "",
+            entries: [],
+          };
+        }
+
+        const limit = input.limit ?? 100;
+        let query = executor
+          .selectFrom("scheduled_task_run_logs")
+          .selectAll()
+          .where("run_id", "=", run.id)
+          .limit(limit + 1);
+
+        if (input.cursor) {
+          query = query.where("logged_at", ">", input.cursor);
+        }
+
+        const rows = await query.orderBy("logged_at", "asc").orderBy("id", "asc").execute();
+        const pageRows = rows.slice(0, limit);
+        const nextCursor = rows.length > limit ? pageRows.at(-1)?.logged_at : undefined;
+
+        return {
+          runId: run.id,
+          taskId: run.task_id,
+          resourceId: run.resource_id,
+          entries: pageRows.map(toScheduledTaskRunLogEntry),
+          ...(nextCursor ? { nextCursor: normalizeTimestamp(nextCursor) ?? nextCursor } : {}),
+        };
       },
     );
   }
