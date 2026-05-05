@@ -1056,8 +1056,8 @@ Current verification notes:
   acknowledge actions through `resources.configure-auto-deploy`, and moved `SRC-AUTO-ENTRY-001` to
   Passing. Future MCP/tool descriptor generation remains governed by the operation catalog and the
   global future tool-surface milestone, not by a source auto-deploy transport-specific shape. The
-  full `0.9.0` release rule remains blocked by the deploy-action wrapper, preview, scheduled tasks,
-  and cluster runtime items.
+  full `0.9.0` release rule remains blocked by the deploy-action wrapper, preview, and cluster
+  runtime items.
 - 2026-05-05 Phase 7 source auto-deploy public docs operation-coverage sync mapped
   `resources.configure-auto-deploy`, `source-events.ingest`, `source-events.list`, and
   `source-events.show` to their stable public docs topics in `@appaloft/docs-registry`.
@@ -1079,7 +1079,7 @@ Current verification notes:
   `MCP-TOOL-DESC-003` assert one descriptor per operation key, stable operation-key tool names,
   serializable CLI/API metadata, and high-value deployment/resource/source-event mappings. The full
   `0.9.0` release rule remains blocked by the public deploy-action promotion, product-grade preview
-  deployments, scheduled tasks, and cluster runtime items.
+  deployments, and cluster runtime items.
 - 2026-05-05 Phase 7 scheduled task resource Spec Round added ADR-039 and
   `docs/specs/044-scheduled-task-resource-shape` to position Resource-owned scheduled task
   definitions, run attempts, task-run logs, scheduler admission, and deployment-boundary separation.
@@ -1178,6 +1178,10 @@ Current verification notes:
   scheduled-task list/create, run-now, enable/disable, delete, recent run history, run-scoped logs,
   and the stable scheduled-task public help anchor. Phase 7 remains open for Docker Swarm,
   preview/cluster runtime, and any remaining roadmap exit criteria.
+- 2026-05-05 Phase 7 scheduled task roadmap sync marked the scheduled-task Code Round implemented
+  after active operation catalog, HTTP/oRPC, CLI, Web, generated MCP descriptor, public docs/help,
+  persistence, scheduler, worker, runtime, run history, logs, and secret-redaction coverage landed.
+  The scheduled-task runner remains opt-in for long-running shell processes.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm
@@ -1233,7 +1237,7 @@ Required:
 - [ ] Add product-grade preview deployments after source binding and webhook ingestion are durable,
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
   retries.
-- [ ] Add scheduled task/cron resource shape with run history and logs after workload service
+- [x] Add scheduled task/cron resource shape with run history and logs after workload service
   semantics are specified. ADR-039/spec matrix now position ownership and target operations.
 - [x] Complete the Docker Swarm Spec Round as the first cluster runtime target:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup

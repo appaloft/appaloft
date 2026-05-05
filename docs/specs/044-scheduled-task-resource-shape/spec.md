@@ -2,7 +2,7 @@
 
 ## Status
 
-Code Round in progress.
+Code Round implemented. The scheduled task runner remains opt-in for shell processes.
 
 ## Problem
 
@@ -54,7 +54,7 @@ Docs Round created the task-oriented public page
 scheduled task definitions, run-now, run history, and run logs. Resource detail Web controls link
 to the same anchor from the scheduled-task tab.
 
-## Migration Gaps
+## Current Implementation Notes
 
 - Core scheduled task definition value objects and Resource-owned definition state exist for
   schedule, timezone, command intent, timeout, retry, lifecycle status, and `forbid` concurrency
@@ -65,31 +65,31 @@ to the same anchor from the scheduled-task tab.
 - Application command/query schemas, messages, result DTOs, and read-model ports exist for the
   target scheduled-task and scheduled-task-run operations. The operation catalog and HTTP/oRPC
   routes are active.
-- Inactive application create admission exists. It loads the owning Resource, rejects
+- Application create admission exists. It loads the owning Resource, rejects
   archived/deleted Resources before storing the task, validates schedule/timezone/command
   intent/timeout/retry/status/concurrency through core value objects, and stores a Resource-owned
   task definition through the scheduled-task definition repository port.
-- Inactive application configure admission exists. It loads the Resource-owned task and Resource,
+- Application configure admission exists. It loads the Resource-owned task and Resource,
   rejects archived/deleted Resources before storing changes, validates every patched field through
   core value objects, and persists through the same scheduled-task definition repository port.
-- Inactive application delete admission exists. It loads the Resource-owned task, verifies Resource
+- Application delete admission exists. It loads the Resource-owned task, verifies Resource
   ownership and Resource existence, deletes through an explicit scheduled-task definition repository
   mutation spec, and returns a timestamped delete result.
-- Inactive application read-query handlers/services exist for task list/show, run list/show, and
+- Application read-query handlers/services exist for task list/show, run list/show, and
   run logs. They wrap scheduled-task read-model ports with stable schema versions and generated
-  timestamps but do not activate persistence, operation catalog entries, or entrypoints.
-- Inactive application run-now admission exists. It loads the Resource-owned task, rejects disabled
+  timestamps through active operation catalog entries and entrypoints.
+- Application run-now admission exists. It loads the Resource-owned task, rejects disabled
   tasks or archived/deleted Resources before runtime execution, records an accepted manual run
   attempt, and returns a run id without starting the task command synchronously.
-- Inactive application scheduler admission exists. It reads due scheduled-task candidates through
+- Application scheduler admission exists. It reads due scheduled-task candidates through
   a scheduler-specific port, dispatches each due candidate through the same shared run admission
   service as run-now, records accepted `scheduled` trigger runs, and reports per-candidate
   admission failures without starting runtime execution.
-- Inactive scheduled-task runtime adapter support exists. The application owns a one-off task
+- Scheduled-task runtime adapter support exists. The application owns a one-off task
   runtime port contract, and the runtime adapter package provides a hermetic implementation that
   returns scheduled-task-run-scoped stdout/stderr log entries, terminal status, exit code,
   timestamps, and masked secret-looking output without using deployment/resource runtime logs.
-- Inactive accepted-run worker support exists. It loads an accepted run attempt, loads the owning
+- Accepted-run worker support exists. It loads an accepted run attempt, loads the owning
   task definition, persists the running transition, invokes the scheduled-task runtime port,
   records runtime logs through the scheduled-task run-log recorder, and persists the terminal
   succeeded or failed run state.

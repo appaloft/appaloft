@@ -2,8 +2,8 @@
 
 ## Scope
 
-This matrix covers Resource-owned scheduled task definitions, run attempts, run history, and logs.
-Some entrypoints remain migration gaps until the full CLI/Web/docs surface is active.
+This matrix covers Resource-owned scheduled task definitions, run attempts, run history, logs, and
+active CLI/API/Web/MCP entrypoints.
 
 ## Global References
 
@@ -43,7 +43,7 @@ Some entrypoints remain migration gaps until the full CLI/Web/docs surface is ac
 | SCHED-TASK-SECRET-001 | Redaction | Task input references secrets. | Definitions, runs, logs, errors, diagnostics, and tool descriptors expose only safe references and masked values. |
 | SCHED-TASK-ENTRY-001 | CLI/API/Web/MCP | Entrypoints are active. | CLI, HTTP/oRPC, and Web controls dispatch command/query messages through catalog schemas; generated MCP descriptors consume the catalog entries; public docs/help links target stable scheduled-task anchors. |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes
 
 `SCHED-TASK-CATALOG-001` has active-catalog coverage and `SCHED-TASK-APP-001` has command/query
 message-shape coverage in `packages/application/test/scheduled-tasks-application-model.test.ts`.
@@ -86,11 +86,11 @@ coverage also exercises defensive read-model masking for legacy unsafe command i
 summary, and run-log output. Generated tool descriptor coverage for `SCHED-TASK-SECRET-001` lives in
 `packages/ai/mcp/test/tool-descriptors.test.ts`.
 
-Inactive application command/query schemas, messages, result DTOs, read-model ports, create,
-update, delete, run-now admission, scheduler admission, accepted-run worker, read-query
-handlers/services, scheduled task persistence/read models, and hermetic runtime adapter support
-exist. Shell composition can resolve the scheduled-task repositories, read models, runtime port,
-handlers, use cases, scheduler, and worker. The scheduled-task runner is configured off by default
-and can be enabled for long-running shell processes. Operation catalog entries, HTTP/oRPC routes,
-CLI commands, Web Resource-detail controls, generated MCP descriptors, and public docs/help anchors
-are active.
+Application command/query schemas, messages, result DTOs, read-model ports, create, update, delete,
+run-now admission, scheduler admission, accepted-run worker, read-query handlers/services,
+scheduled task persistence/read models, and hermetic runtime adapter support exist. Shell
+composition can resolve the scheduled-task repositories, read models, runtime port, handlers, use
+cases, scheduler, and worker. The scheduled-task runner is configured off by default and can be
+enabled for long-running shell processes. Operation catalog entries, HTTP/oRPC routes, CLI
+commands, Web Resource-detail controls, generated MCP descriptors, and public docs/help anchors are
+active.

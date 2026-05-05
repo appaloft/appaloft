@@ -71,7 +71,7 @@
 - [x] Add accepted-run worker wiring.
 - [x] Add broader scheduled-task secret redaction across definition, run, log, runtime-error, and
   generated tool descriptor boundaries.
-- [ ] Add CLI/API/Web/MCP surfaces.
+- [x] Add CLI/API/Web/MCP surfaces.
   - [x] Activate operation catalog and HTTP/oRPC surfaces.
   - [x] Add CLI commands.
   - [x] Verify generated MCP descriptors.
