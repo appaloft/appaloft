@@ -28,6 +28,7 @@ import {
   type AppLogger,
   type Clock,
   type DependencyResourceRepository,
+  type DependencyResourceSecretStore,
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
@@ -47,6 +48,8 @@ export class ImportRedisDependencyResourceUseCase {
     private readonly environmentRepository: EnvironmentRepository,
     @inject(tokens.dependencyResourceRepository)
     private readonly dependencyResourceRepository: DependencyResourceRepository,
+    @inject(tokens.dependencyResourceSecretStore)
+    private readonly dependencyResourceSecretStore: DependencyResourceSecretStore,
     @inject(tokens.clock)
     private readonly clock: Clock,
     @inject(tokens.idGenerator)
@@ -65,6 +68,7 @@ export class ImportRedisDependencyResourceUseCase {
     const {
       clock,
       dependencyResourceRepository,
+      dependencyResourceSecretStore,
       environmentRepository,
       eventBus,
       idGenerator,
@@ -82,11 +86,6 @@ export class ImportRedisDependencyResourceUseCase {
       const createdAt = yield* CreatedAt.create(clock.now());
       const description = DescriptionText.fromOptional(input.description);
       const dependencyResourceId = ResourceInstanceId.rehydrate(idGenerator.next("rsi"));
-      const secretRef = yield* DependencyResourceSecretRef.create(
-        input.secretRef ??
-          `appaloft://dependency-resources/${dependencyResourceId.value}/connection`,
-      );
-
       const project = await projectRepository.findOne(
         repositoryContext,
         ProjectByIdSpec.create(projectId),
@@ -127,6 +126,21 @@ export class ImportRedisDependencyResourceUseCase {
           }),
         );
       }
+
+      const secretRefValue =
+        input.secretRef ??
+        (yield* await dependencyResourceSecretStore
+          .storeConnection(context, {
+            dependencyResourceId: dependencyResourceId.value,
+            projectId: projectId.value,
+            environmentId: environmentId.value,
+            kind: "redis",
+            purpose: "connection",
+            secretValue: input.connectionUrl,
+            storedAt: createdAt.value,
+          })
+          .then((result) => result.map((stored) => stored.secretRef)));
+      const secretRef = yield* DependencyResourceSecretRef.create(secretRefValue);
 
       const dependencyResource = yield* ResourceInstance.createRedisDependencyResource({
         id: dependencyResourceId,

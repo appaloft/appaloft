@@ -263,6 +263,18 @@ export interface DependencyBindingSecretsTable {
   created_at: TimestampColumn;
 }
 
+export interface DependencyResourceSecretsTable {
+  ref: string;
+  dependency_resource_id: string;
+  project_id: string;
+  environment_id: string;
+  kind: string;
+  purpose: string;
+  payload: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  metadata: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  created_at: TimestampColumn;
+}
+
 export interface DeploymentsTable {
   id: string;
   project_id: string;
@@ -669,6 +681,7 @@ export interface Database {
   dependency_resource_backups: DependencyResourceBackupsTable;
   resource_dependency_bindings: ResourceDependencyBindingsTable;
   dependency_binding_secrets: DependencyBindingSecretsTable;
+  dependency_resource_secrets: DependencyResourceSecretsTable;
   storage_volumes: StorageVolumesTable;
   resource_storage_attachments: ResourceStorageAttachmentsTable;
   deployments: DeploymentsTable;

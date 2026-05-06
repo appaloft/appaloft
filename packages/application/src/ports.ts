@@ -1108,6 +1108,40 @@ export interface DependencyBindingSecretStore {
   ): Promise<Result<DependencyBindingSecretStoreResult, DomainError>>;
 }
 
+export interface DependencyResourceSecretStoreInput {
+  dependencyResourceId: string;
+  projectId: string;
+  environmentId: string;
+  kind: "postgres" | "redis";
+  purpose: "connection";
+  secretValue: string;
+  storedAt: string;
+}
+
+export interface DependencyResourceSecretStoreResult {
+  secretRef: string;
+}
+
+export interface DependencyResourceSecretResolutionInput {
+  secretRef: string;
+}
+
+export interface DependencyResourceSecretResolutionResult {
+  secretRef: string;
+  secretValue: string;
+}
+
+export interface DependencyResourceSecretStore {
+  storeConnection(
+    context: ExecutionContext,
+    input: DependencyResourceSecretStoreInput,
+  ): Promise<Result<DependencyResourceSecretStoreResult, DomainError>>;
+  resolve(
+    context: ExecutionContext,
+    input: DependencyResourceSecretResolutionInput,
+  ): Promise<Result<DependencyResourceSecretResolutionResult, DomainError>>;
+}
+
 export interface CertificateHttpChallengeToken {
   domainName: string;
   token: string;

@@ -56,6 +56,7 @@ export const tokens = {
   certificateProvider: Symbol.for("appaloft.certificate_provider"),
   certificateMaterialValidator: Symbol.for("appaloft.certificate_material_validator"),
   certificateSecretStore: Symbol.for("appaloft.certificate_secret_store"),
+  dependencyResourceSecretStore: Symbol.for("appaloft.dependency_resource_secret_store"),
   dependencyBindingSecretStore: Symbol.for("appaloft.dependency_binding_secret_store"),
   certificateHttpChallengeTokenStore: Symbol.for("appaloft.certificate_http_challenge_token_store"),
   deploymentContextDefaultsPolicy: Symbol.for("appaloft.deployment_context_defaults_policy"),

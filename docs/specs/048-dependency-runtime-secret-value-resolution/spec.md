@@ -97,9 +97,11 @@ OpenAPI descriptions, Web views, CLI table output, lifecycle events, diagnostics
 
 ## Current Implementation Notes And Migration Gaps
 
-Current implementation stores rotated binding secret values in `dependency_binding_secrets`, but
-imported dependency connection URLs are not stored in a resolvable dependency resource secret store.
-Deployment snapshots capture safe runtime secret references and runtime adapters render safe handles,
-but workloads do not yet receive resolved Postgres/Redis connection values from Appaloft-owned refs.
-Code Round must add storage, resolver, runtime materialization, and redaction coverage before the
-Postgres and Redis closed-loop exit criteria can be checked.
+Current implementation stores imported Postgres and Redis connection URLs through the
+`DependencyResourceSecretStore`, persists them in `dependency_resource_secrets`, and returns only
+safe `appaloft://dependency-resources/.../connection` refs plus masked endpoint summaries on
+dependency resource read surfaces. It also stores rotated binding secret values in
+`dependency_binding_secrets`. Deployment snapshots capture safe runtime secret references and
+runtime adapters render safe handles, but deployment plan/create unresolved-ref blocking, managed
+Postgres reference validation, runtime materialization, and redaction coverage remain open before
+the Postgres and Redis closed-loop exit criteria can be checked.

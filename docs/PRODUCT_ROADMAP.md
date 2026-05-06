@@ -889,6 +889,13 @@ Current verification notes:
   validation, deployment blocked readiness for unresolved refs, single-server runtime env
   resolution, and Docker Swarm secret materialization. It does not implement the Code Round yet, so
   Postgres/Redis closed-loop exit criteria remain open.
+- 2026-05-06 Phase 7 dependency secret value storage Code Round slice added a
+  `DependencyResourceSecretStore` application port, PG/PGlite-backed `dependency_resource_secrets`
+  storage/resolution, shell DI wiring, and import use-case integration so imported Postgres and
+  Redis connection URLs are stored behind safe `appaloft://dependency-resources/.../connection`
+  refs. Deployment unresolved-ref blocking, managed Postgres reference validation, and runtime
+  target value materialization remain open, so Postgres/Redis closed-loop exit criteria remain
+  open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider
