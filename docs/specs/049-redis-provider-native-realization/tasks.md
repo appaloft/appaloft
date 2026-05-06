@@ -33,9 +33,8 @@
   covered by existing generic state.
 - [x] Add managed Redis provider capability ports and fake provider adapter.
 - [x] Upgrade `dependency-resources.provision-redis` use case for realization admission.
-- [ ] Store new Appaloft-owned Redis connection values through `DependencyResourceSecretStore`
-  before binding readiness becomes ready; this Code Round validates existing Appaloft-owned refs and
-  provider-owned refs only.
+- [x] Store new Appaloft-owned Redis connection values through `DependencyResourceSecretStore`
+  before binding readiness becomes ready.
 - [x] Upgrade binding admission to allow realized ready managed Redis and block not-ready refs.
 - [x] Upgrade `dependency-resources.delete` for managed Redis provider cleanup after safety checks.
 - [x] Extend persistence and contracts with safe Redis realization metadata. Testkit and in-memory

@@ -950,6 +950,9 @@ Current verification notes:
 - 2026-05-06 Phase 7 managed Redis bind blocker coverage slice verified pending, failed, deleted,
   and unresolved Appaloft-owned connection-ref managed Redis resources cannot create
   `REDIS_URL` bindings. Final Redis observe and closed-loop verification remains open.
+- 2026-05-06 Phase 7 managed Redis secret-value storage slice stores provider-returned raw Redis
+  connection values through `DependencyResourceSecretStore` before marking binding readiness ready.
+  Final Redis observe and closed-loop verification remains open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider

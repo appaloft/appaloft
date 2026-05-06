@@ -5032,6 +5032,7 @@ export interface ManagedRedisRealizationResult {
     maskedConnection: string;
   };
   secretRef?: string;
+  connectionSecretValue?: string;
   realizedAt: string;
 }
 
