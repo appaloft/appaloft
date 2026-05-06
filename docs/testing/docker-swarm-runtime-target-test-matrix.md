@@ -58,15 +58,16 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   renders only when the public target service is explicit, and otherwise returns
   `runtime_target_unsupported` in phase `runtime-target-render`.
 - `SWARM-TARGET-SECRET-001` has initial render-contract coverage proving runtime secret environment
-  values are converted to safe references and omitted from serialized render intent. Registry pull
-  credential and provider response redaction remain open with apply/log/diagnostic adapters.
+  values are converted to safe references and omitted from serialized render intent. Provider
+  response redaction beyond the current apply/log/diagnostic adapter contracts remains open.
   Rendered Swarm apply-plan display commands now redact non-secret runtime environment values while
   retaining the executable command internally for explicit execution.
   Rendered image apply plans also honor internal registry-auth/pull-secret metadata by adding
   `--with-registry-auth` to executable/display commands while exposing only a redacted
   registry-auth marker in the intent and omitting raw registry secret references from intent,
-  command, and display payloads. Local real Swarm smoke has passed; real registry-login/
-  pull-secret provisioning and registry-auth smoke coverage remain open.
+  command, and display payloads. Local real Swarm smoke has passed with a temporary authenticated
+  registry, private image push/pull, `--with-registry-auth`, and secret-safe deployment
+  logs/metadata.
 - `SWARM-TARGET-APPLY-001` has initial adapter contract coverage proving OCI image apply planning
   creates a deployment-specific candidate service before verification, route promotion, and
   superseded-service cleanup. The opt-in fake backend now executes that order, records sanitized
@@ -118,7 +119,10 @@ implemented, but no Docker Swarm execution backend is active in the default runt
 - `SWARM-TARGET-SECRET-001` has initial fake-backend coverage proving Swarm command failure output
   is redacted before deployment logs and execution metadata capture common auth headers, cookies,
   key/value secrets, URL credentials, private-key blocks, or exact deployment snapshot secret
-  values. Full registry/pull-secret handling across real Swarm execution remains open.
+  values. The real Swarm smoke now provisions a temporary authenticated registry, logs in without
+  echoing credentials, pushes a smoke image, deploys that private image through the same
+  `DockerSwarmExecutionBackend` path with `--with-registry-auth`, and asserts registry secret
+  material, secret references, and runtime env secret values stay out of deployment logs/metadata.
 - `packages/adapters/runtime/test/docker-swarm-execution-backend.test.ts` now includes an
   environment-gated real Docker Swarm smoke harness for
   `SWARM-TARGET-ROUTE-001B`/`SWARM-TARGET-SECRET-001B`. It runs only when
@@ -128,7 +132,8 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   afterward. `bun run smoke:swarm` is the first-class opt-in command for that harness. Default CI
   keeps this smoke skipped until a real Swarm environment is explicitly available. On 2026-05-06,
   the harness passed against a temporary local Swarm manager with `appaloft-smoke-edge`, including
-  smoke-specific Docker secret setup, route-label promotion, and scoped cleanup.
+  smoke-specific Docker secret setup, route-label promotion, authenticated-registry image pull,
+  secret-safe deployment metadata, and scoped cleanup.
 - `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
   explaining Swarm target registration, manager readiness expectations, image registry access,
   rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI `server register`,

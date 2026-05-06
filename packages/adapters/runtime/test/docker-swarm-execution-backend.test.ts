@@ -1,3 +1,4 @@
+import { mkdtempSync, rmSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import {
   AccessRoute,
@@ -176,7 +177,9 @@ function runtimeEnvironmentSnapshot(input: { secretKey?: string } = {}): Environ
   });
 }
 
-function runtimePlan(input: { healthPath?: string; image?: string; port?: number } = {}): RuntimePlan {
+function runtimePlan(
+  input: { healthPath?: string; image?: string; metadata?: Record<string, string>; port?: number } = {},
+): RuntimePlan {
   const image = ImageReference.rehydrate(input.image ?? "registry.example.com/team/app:sha");
   const port = PortNumber.rehydrate(input.port ?? 3000);
   const accessRoute = AccessRoute.rehydrate({
@@ -222,6 +225,7 @@ function runtimePlan(input: { healthPath?: string; image?: string; port?: number
       kind: RuntimeArtifactKindValue.rehydrate("image"),
       intent: RuntimeArtifactIntentValue.rehydrate("prebuilt-image"),
       image,
+      ...(input.metadata ? { metadata: input.metadata } : {}),
     }),
     target: DeploymentTargetDescriptor.rehydrate({
       kind: TargetKindValue.rehydrate("orchestrator-cluster"),
@@ -235,10 +239,17 @@ function runtimePlan(input: { healthPath?: string; image?: string; port?: number
 }
 
 function runningDeployment(
-  input: { healthPath?: string; image?: string; port?: number; secretKey?: string } = {},
+  input: {
+    deploymentId?: string;
+    healthPath?: string;
+    image?: string;
+    metadata?: Record<string, string>;
+    port?: number;
+    secretKey?: string;
+  } = {},
 ): Deployment {
   const deployment = Deployment.create({
-    id: DeploymentId.rehydrate("dep_swarm_backend"),
+    id: DeploymentId.rehydrate(input.deploymentId ?? "dep_swarm_backend"),
     projectId: ProjectId.rehydrate("prj_app"),
     environmentId: EnvironmentId.rehydrate("env_prod"),
     resourceId: ResourceId.rehydrate("res_api"),
@@ -279,6 +290,131 @@ function commandStatus(command: string[]): number {
     stdout: "pipe",
     stderr: "pipe",
   }).exitCode;
+}
+
+function commandOutputWithStdinFile(command: string[], stdin: Blob): string {
+  const result = Bun.spawnSync(command, {
+    stdin,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  if (result.exitCode !== 0) {
+    throw new Error(
+      [
+        `Command failed: ${command.join(" ")}`,
+        result.stdout.toString(),
+        result.stderr.toString(),
+      ].join("\n"),
+    );
+  }
+
+  return result.stdout.toString().trim();
+}
+
+async function commandOutputWithStdinFileRetry(input: {
+  attempts: number;
+  command: string[];
+  stdinPath: string;
+}): Promise<string> {
+  let lastOutput = "";
+  for (let attempt = 1; attempt <= input.attempts; attempt += 1) {
+    const result = Bun.spawnSync(input.command, {
+      stdin: Bun.file(input.stdinPath),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (result.exitCode === 0) {
+      return result.stdout.toString().trim();
+    }
+
+    lastOutput = [result.stdout.toString(), result.stderr.toString()].join("\n").trim();
+    await Bun.sleep(500);
+  }
+
+  throw new Error(
+    [`Command failed: ${input.command.join(" ")}`, lastOutput].filter(Boolean).join("\n"),
+  );
+}
+
+async function prepareAuthenticatedRegistryImage(input: {
+  baseImage: string;
+  password: string;
+  username: string;
+}): Promise<{ authDir: string; image: string; registryAddress: string; registryName: string }> {
+  const registryName = "appaloft-swarm-smoke-registry";
+  const registryAddress = `127.0.0.1:${Bun.env.APPALOFT_DOCKER_SWARM_REGISTRY_PORT ?? "5001"}`;
+  const image = `${registryAddress}/appaloft-smoke-nginx:auth`;
+  const authDir = mkdtempSync(`${process.cwd()}/.tmp-appaloft-swarm-registry-auth-`);
+  const passwordPath = `${authDir}/password`;
+  const htpasswdPath = Bun.env.APPALOFT_HTPASSWD_PATH ?? "/usr/sbin/htpasswd";
+
+  try {
+    await Bun.write(passwordPath, `${input.password}\n`);
+    const htpasswd = commandOutputWithStdinFile(
+      [htpasswdPath, "-Bbn", "-i", input.username],
+      Bun.file(passwordPath),
+    );
+    await Bun.write(`${authDir}/htpasswd`, htpasswd);
+
+    commandStatus(["docker", "container", "rm", "-f", registryName]);
+    commandOutput(["docker", "pull", input.baseImage]);
+    commandOutput(["docker", "pull", "registry:2"]);
+    commandOutput([
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      registryName,
+      "-p",
+      `${registryAddress}:5000`,
+      "-v",
+      `${authDir}:/auth`,
+      "-e",
+      "REGISTRY_AUTH=htpasswd",
+      "-e",
+      "REGISTRY_AUTH_HTPASSWD_REALM=Appaloft Swarm Smoke",
+      "-e",
+      "REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd",
+      "registry:2",
+    ]);
+    await commandOutputWithStdinFileRetry({
+      attempts: 20,
+      command: ["docker", "login", registryAddress, "-u", input.username, "--password-stdin"],
+      stdinPath: passwordPath,
+    });
+    commandOutput(["docker", "tag", input.baseImage, image]);
+    commandOutput(["docker", "push", image]);
+    commandStatus(["docker", "image", "rm", image]);
+  } catch (error) {
+    const registryLogsResult = Bun.spawnSync(["docker", "logs", registryName], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const registryLogs = [registryLogsResult.stdout.toString(), registryLogsResult.stderr.toString()]
+      .join("\n")
+      .trim();
+    const sanitizedRegistryLogs = registryLogs
+      .replaceAll(input.password, "********")
+      .replace(/password=[^\s]+/gi, "password=********");
+    commandStatus(["docker", "logout", registryAddress]);
+    commandStatus(["docker", "container", "rm", "-f", registryName]);
+    commandStatus(["docker", "image", "rm", image]);
+    rmSync(authDir, { force: true, recursive: true });
+    const message = error instanceof Error ? error.message : "Authenticated registry setup failed";
+    throw new Error(
+      [message, sanitizedRegistryLogs ? `Registry logs:\n${sanitizedRegistryLogs}` : ""]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  }
+
+  return {
+    authDir,
+    image,
+    registryAddress,
+    registryName,
+  };
 }
 
 const realSwarmSmokeTest = Bun.env.APPALOFT_DOCKER_SWARM_SMOKE === "1" ? test : test.skip;
@@ -469,6 +605,16 @@ describe("DockerSwarmExecutionBackend", () => {
       expect(edgeNetwork).toBe("overlay swarm");
 
       const secretKey = "APPALOFT_SWARM_SMOKE_DATABASE_URL";
+      const registryPassword = "appaloft-swarm-smoke-password";
+      const registryUsername = "appaloft";
+      let registry:
+        | {
+            authDir: string;
+            image: string;
+            registryAddress: string;
+            registryName: string;
+          }
+        | undefined;
       const deployment = runningDeployment({
         healthPath: "/",
         image: Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_IMAGE ?? "nginx:alpine",
@@ -513,9 +659,58 @@ describe("DockerSwarmExecutionBackend", () => {
         expect(JSON.stringify(state.runtimePlan.execution.metadata)).not.toContain(
           "postgres://secret-value",
         );
+
+        registry = await prepareAuthenticatedRegistryImage({
+          baseImage: Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_IMAGE ?? "nginx:alpine",
+          password: registryPassword,
+          username: registryUsername,
+        });
+        const privateDeployment = runningDeployment({
+          deploymentId: "dep_swarm_registry",
+          healthPath: "/",
+          image: registry.image,
+          metadata: {
+            swarmRegistryAuthSecretRef: "secret:APPALOFT_SWARM_SMOKE_REGISTRY_AUTH",
+          },
+          port: 80,
+          secretKey,
+        });
+        try {
+          const privateResult = await backend.execute(createContext(), privateDeployment);
+          expect(privateResult.isOk()).toBe(true);
+          const privateState = privateResult._unsafeUnwrap().deployment.toState();
+          if (privateState.status.value !== "succeeded") {
+            throw new Error(
+              JSON.stringify(
+                {
+                  logs: privateState.logs,
+                  metadata: privateState.runtimePlan.execution.metadata,
+                },
+                null,
+                2,
+              ),
+            );
+          }
+          expect(privateState.status.value).toBe("succeeded");
+          const privateSerialized = JSON.stringify({
+            logs: privateState.logs,
+            metadata: privateState.runtimePlan.execution.metadata,
+          });
+          expect(privateSerialized).not.toContain(registryPassword);
+          expect(privateSerialized).not.toContain("APPALOFT_SWARM_SMOKE_REGISTRY_AUTH");
+          expect(privateSerialized).not.toContain("postgres://secret-value");
+        } finally {
+          await backend.cancel(createContext(), privateDeployment);
+        }
       } finally {
         await backend.cancel(createContext(), deployment);
         commandStatus(["docker", "secret", "rm", secretKey]);
+        if (registry) {
+          commandStatus(["docker", "logout", registry.registryAddress]);
+          commandStatus(["docker", "container", "rm", "-f", registry.registryName]);
+          commandStatus(["docker", "image", "rm", registry.image]);
+          rmSync(registry.authDir, { force: true, recursive: true });
+        }
       }
     },
     Number(Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_TIMEOUT_MS ?? "120000"),
