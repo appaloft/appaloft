@@ -91,6 +91,7 @@ import {
   PgMutationCoordinator,
   PgPreviewEnvironmentReadModel,
   PgPreviewEnvironmentRepository,
+  PgPreviewFeedbackRecorder,
   PgPreviewPolicyDecisionProjection,
   PgPreviewPolicyRepository,
   PgProcessAttemptJournal,
@@ -774,6 +775,9 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       () => new PgPreviewPolicyDecisionProjection(input.database.db),
     ),
+  });
+  container.register(tokens.previewFeedbackRecorder, {
+    useFactory: instanceCachingFactory(() => new PgPreviewFeedbackRecorder(input.database.db)),
   });
   container.register(tokens.scheduledTaskDefinitionRepository, {
     useFactory: instanceCachingFactory(

@@ -1334,6 +1334,12 @@ Current verification notes:
   ids are reused for update-in-place, and retryable provider failures are recorded as safe feedback
   state without turning the accepted deployment path into `err`. Durable feedback persistence,
   GitHub App HTTP routes, cleanup retry, and active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview feedback persistence slice added Postgres/PGlite storage and shell
+  wiring for idempotent provider feedback state keyed by feedback key. The record keeps provider
+  feedback ids, channel/status, safe error codes, retryable state, and update timestamps without
+  persisting feedback body text, provider payloads, tokens, or secret-shaped values. GitHub
+  feedback writer adapters, GitHub App HTTP routes, cleanup retry, and active preview environment
+  entrypoints remain open.
 - 2026-05-06 Phase 7 preview cleanup application slice added a service that marks durable preview
   environment cleanup requested without deleting preview history, then delegates runtime, route,
   source-link, provider metadata, and feedback cleanup to a safe source-scope port. Concrete

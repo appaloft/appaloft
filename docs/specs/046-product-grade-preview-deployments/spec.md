@@ -232,8 +232,11 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   cleanup process state is implemented.
 - Preview feedback now has initial application ports and service coverage for idempotent provider
   feedback updates. Existing provider feedback ids are reused for update-in-place, and retryable
-  provider failures are recorded as safe feedback state while publish returns `ok`; GitHub adapter
-  wiring and durable persistence remain future work.
+  provider failures are recorded as safe feedback state while publish returns `ok`.
+- Preview feedback now has durable Postgres/PGlite persistence for feedback keys, provider feedback
+  ids, channel/status, safe error codes, retryable state, and update timestamps. Feedback body text,
+  provider payloads, tokens, and secret-shaped values are not persisted in the feedback state.
+  GitHub feedback writer adapter wiring remains future work.
 - Preview environment cleanup now has an initial application service that loads the durable preview
   environment, marks cleanup requested without deleting preview history, and delegates runtime,
   route, source-link, provider metadata, and feedback cleanup to a port with safe source-scope
@@ -249,8 +252,8 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   transports yet.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
-- No GitHub App preview worker, durable feedback adapter/persistence, cleanup scheduler, durable
-  cleanup attempt persistence, or concrete product-grade preview cleanup adapter is implemented.
+- No GitHub App preview worker, GitHub feedback writer adapter, cleanup scheduler, durable cleanup
+  attempt persistence, or concrete product-grade preview cleanup adapter is implemented.
 - No active operation catalog transports exist for `preview-policies.*` or
   `preview-environments.*`.
 - Product-grade preview public docs/help now map preview policy and preview environment operations

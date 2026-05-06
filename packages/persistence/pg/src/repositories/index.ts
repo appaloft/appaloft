@@ -16,6 +16,7 @@ export * from "./domain-route-failure-candidate-reader";
 export * from "./environment-read-model";
 export * from "./environment-repository";
 export * from "./preview-environment-repository";
+export * from "./preview-feedback-recorder";
 export * from "./preview-policy-decision-projection";
 export * from "./preview-policy-repository";
 export * from "./process-attempt-journal";

@@ -62,6 +62,7 @@ import { previewEnvironmentsMigration } from "./migrations/054_preview_environme
 import { previewPoliciesMigration } from "./migrations/055_preview_policies";
 import { previewPolicyDecisionsMigration } from "./migrations/056_preview_policy_decisions";
 import { previewPolicyQuotaExpiryMigration } from "./migrations/057_preview_policy_quota_expiry";
+import { previewFeedbackRecordsMigration } from "./migrations/058_preview_feedback_records";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -215,6 +216,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "055_preview_policies": previewPoliciesMigration,
       "056_preview_policy_decisions": previewPolicyDecisionsMigration,
       "057_preview_policy_quota_expiry": previewPolicyQuotaExpiryMigration,
+      "058_preview_feedback_records": previewFeedbackRecordsMigration,
     };
   }
 }
