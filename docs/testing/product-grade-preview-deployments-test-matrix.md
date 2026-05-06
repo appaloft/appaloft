@@ -76,6 +76,11 @@ from policy TTL when no explicit expiry is provided.
 `pull_request` payloads normalize to safe preview facts, invalid signatures reject before
 normalization, unsupported actions reject, unsafe payload shapes reject, and secrets/signature
 material are not returned.
+`PG-PREVIEW-EVENT-002` has initial application coverage in
+`packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves duplicate
+source event ids return the existing preview policy decision and do not update preview environment
+state or dispatch another deployment request. Feedback and cleanup idempotency coverage remains
+blocked on those future process-state implementations.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
