@@ -252,8 +252,9 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   tokens, or secret-shaped values. An application retry scheduler now reads due durable retry
   attempts, skips stale attempts after a newer cleanup attempt exists for the same preview target,
   and dispatches retries through the cleanup service so every retry creates a new attempt id.
-  Concrete cleanup adapters, active scheduler runners/leases, and terminal provider metadata
-  cleanup remain future work.
+  The shell composition has a disabled-by-default `previewCleanupRetryScheduler` runner that can be
+  explicitly enabled after a concrete cleanup adapter is present. Concrete cleanup adapters,
+  scheduler leases, and terminal provider metadata cleanup remain future work.
 - Preview environments now have inactive application operation contracts for
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete`.
   List/show read from the safe preview environment read model, delete dispatches through the

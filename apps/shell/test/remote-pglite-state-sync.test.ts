@@ -59,6 +59,11 @@ function testConfig(
       defaultRetryDelaySeconds: 300,
       batchSize: 25,
     },
+    previewCleanupRetryScheduler: {
+      enabled: false,
+      intervalSeconds: 300,
+      batchSize: 25,
+    },
     scheduledTaskRunner: {
       enabled: false,
       intervalSeconds: 60,

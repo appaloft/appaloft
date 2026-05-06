@@ -39,6 +39,12 @@ export interface ScheduledTaskRunnerConfig {
   batchSize: number;
 }
 
+export interface PreviewCleanupRetrySchedulerConfig {
+  enabled: boolean;
+  intervalSeconds: number;
+  batchSize: number;
+}
+
 export interface AppConfig {
   appName: string;
   appVersion: string;
@@ -74,6 +80,7 @@ export interface AppConfig {
   defaultAccessDomain: DefaultAccessDomainConfig;
   certificateProvider: CertificateProviderConfig;
   certificateRetryScheduler: CertificateRetrySchedulerConfig;
+  previewCleanupRetryScheduler: PreviewCleanupRetrySchedulerConfig;
   scheduledTaskRunner: ScheduledTaskRunnerConfig;
   enabledSystemPlugins: string[];
   configFilePath?: string;
@@ -123,6 +130,11 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
     enabled: true,
     intervalSeconds: 300,
     defaultRetryDelaySeconds: 300,
+    batchSize: 25,
+  },
+  previewCleanupRetryScheduler: {
+    enabled: false,
+    intervalSeconds: 300,
     batchSize: 25,
   },
   scheduledTaskRunner: {
@@ -336,6 +348,21 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     source.flags?.scheduledTaskRunner ??
     fileConfig.scheduledTaskRunner ??
     defaults.scheduledTaskRunner;
+  const previewCleanupRetryScheduler =
+    source.flags?.previewCleanupRetryScheduler ??
+    fileConfig.previewCleanupRetryScheduler ??
+    defaults.previewCleanupRetryScheduler;
+  const previewCleanupRetrySchedulerEnabled =
+    parseBoolean(env.APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_ENABLED) ??
+    previewCleanupRetryScheduler.enabled;
+  const previewCleanupRetrySchedulerIntervalSeconds =
+    parsePositiveInteger(env.APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_INTERVAL_SECONDS) ??
+    parsePositiveInteger(previewCleanupRetryScheduler.intervalSeconds) ??
+    defaults.previewCleanupRetryScheduler.intervalSeconds;
+  const previewCleanupRetrySchedulerBatchSize =
+    parsePositiveInteger(env.APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_BATCH_SIZE) ??
+    parsePositiveInteger(previewCleanupRetryScheduler.batchSize) ??
+    defaults.previewCleanupRetryScheduler.batchSize;
   const scheduledTaskRunnerEnabled =
     parseBoolean(env.APPALOFT_SCHEDULED_TASK_RUNNER_ENABLED) ?? scheduledTaskRunner.enabled;
   const scheduledTaskRunnerIntervalSeconds =
@@ -572,6 +599,11 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       intervalSeconds: certificateRetrySchedulerIntervalSeconds,
       defaultRetryDelaySeconds: certificateRetryDefaultDelaySeconds,
       batchSize: certificateRetrySchedulerBatchSize,
+    },
+    previewCleanupRetryScheduler: {
+      enabled: previewCleanupRetrySchedulerEnabled,
+      intervalSeconds: previewCleanupRetrySchedulerIntervalSeconds,
+      batchSize: previewCleanupRetrySchedulerBatchSize,
     },
     scheduledTaskRunner: {
       enabled: scheduledTaskRunnerEnabled,

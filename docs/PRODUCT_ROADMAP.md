@@ -1373,6 +1373,11 @@ Current verification notes:
   `retry-scheduled` attempts only, and the scheduler dispatches them through the cleanup service so
   retries create fresh `pcln_*` attempt ids. Concrete cleanup adapters, active scheduler
   runners/leases, GitHub App HTTP routes, and active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview cleanup retry runner slice added a disabled-by-default shell runner
+  and config block for `previewCleanupRetryScheduler`. The runner is only resolved when explicitly
+  enabled so normal boot does not require the future concrete cleanup adapter. Concrete cleanup
+  adapters, scheduler leases, GitHub App HTTP routes, and active preview environment entrypoints
+  remain open.
 - 2026-05-06 Phase 7 preview environment surface-contract slice added inactive
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete`
   application contracts plus operation catalog entries. List/show read from the safe preview
