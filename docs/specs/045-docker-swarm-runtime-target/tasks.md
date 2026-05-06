@@ -58,7 +58,7 @@
 - [x] Redact Swarm command failure output before deployment logs/metadata capture.
 - [x] Add bounded shell command runner for the opt-in Swarm execution backend.
 - [ ] Activate and smoke-test real apply/verify/cleanup against a Swarm manager.
-- [ ] Add sanitized target identity persistence/read-model support where required.
+- [x] Add sanitized target identity persistence/read-model support where required.
 - [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.
 
 ## Docs Round

@@ -154,11 +154,15 @@ No new public operation key is accepted in this Spec Round.
   rendered apply, verify, promote, and cleanup commands and preserve stdout/stderr/exit-code
   results for backend handling. The runner is exported for explicit composition and is still not
   registered in the default runtime backend registry.
+- Postgres/PGlite deployment persistence and the deployment read model preserve sanitized Swarm
+  runtime identity metadata, including stack name, service name, and apply-plan schema version,
+  through the existing deployment execution metadata boundary. Raw Docker commands, provider
+  payloads, and registry secret values are not part of that readback contract.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
 - Default Swarm backend activation, failed-rollout rollback behavior, remote-manager health/log
-  execution, end-to-end Swarm route smoke coverage, full registry/pull-secret handling, and
-  read-model persistence remain open.
+  execution, end-to-end Swarm route smoke coverage, and full registry/pull-secret handling remain
+  open.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and

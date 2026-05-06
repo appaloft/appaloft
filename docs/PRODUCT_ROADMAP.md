@@ -1222,12 +1222,13 @@ Current verification notes:
   coverage to an adapter-owned OCI image apply plan. The plan creates a candidate service on the
   Swarm network without public host-port publication, orders verification before route promotion and
   superseded-service cleanup, and keeps runtime secrets as Docker secret references. Active Swarm
-  execution, failed-rollout rollback, persistence/read-model updates, logs, and health remain open.
+  execution, failed-rollout rollback, persistence/read-model updates, logs, and health remained
+  open for later slices.
 - 2026-05-06 Phase 7 Docker Swarm fake backend slice added an opt-in
   `DockerSwarmExecutionBackend` with injected command-runner acceptance coverage for image apply
   and scoped cleanup. The backend is not registered in the default runtime registry; real Swarm
   command execution, failed-rollout rollback behavior, logs, health, and read-model persistence
-  remain open.
+  remained open for later slices.
 - 2026-05-06 Phase 7 Docker Swarm failed-candidate slice bound initial `SWARM-TARGET-APPLY-002`
   coverage to fake-runner verification failure: the backend records deployment failure metadata and
   runs only the deployment-scoped cleanup command for the failed candidate. Real Swarm rollback
@@ -1255,6 +1256,11 @@ Current verification notes:
   opt-in backend, with bounded command execution, stdout/stderr capture, nonzero exit preservation,
   and timeout handling. The default registry still leaves Swarm unsupported until explicitly
   composed; real Swarm smoke/default activation remains open.
+- 2026-05-06 Phase 7 Docker Swarm runtime-identity readback slice bound initial
+  `SWARM-TARGET-APPLY-001` / `SWARM-TARGET-OBS-001` / `SWARM-TARGET-OBS-002` persistence coverage
+  to PGlite deployment repository and read-model tests. Sanitized Swarm stack/service/schema
+  metadata now round-trips through execution metadata; raw commands, provider payloads, and
+  registry-secret fields remain outside the readback contract.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1320,8 +1326,8 @@ Required:
   Swarm manager readiness, adapter-owned OCI/Compose render intent, OCI image apply-plan rendering,
   label-scoped cleanup plan rendering, opt-in fake backend acceptance coverage, Swarm runtime-log
   observation, Swarm health observation, initial Traefik route label promotion, the public docs
-  anchor, command-failure redaction, and CLI/API/Web help links are implemented; real Swarm
-  execution remains open.
+  anchor, command-failure redaction, sanitized runtime identity readback, and CLI/API/Web help
+  links are implemented; real Swarm execution remains open.
 
 Exit criteria:
 
