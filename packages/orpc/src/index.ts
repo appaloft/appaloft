@@ -238,6 +238,7 @@ import {
   ShowSourceEventQuery,
   ShowSshCredentialQuery,
   ShowStorageVolumeQuery,
+  type SourceEventPolicyReader,
   type SourceEventVerificationPort,
   StartResourceRuntimeCommand,
   StopResourceRuntimeCommand,
@@ -436,6 +437,7 @@ export interface AppaloftOrpcContext {
   sourceEventVerificationPort?: SourceEventVerificationPort;
   githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
+  sourceEventPolicyReader?: SourceEventPolicyReader;
   githubWebhookSecret?: string;
 }
 
@@ -3438,6 +3440,188 @@ function previewSourceEventIdFromDelivery(deliveryId: string): string {
   return `sevt_preview_${normalized.slice(0, 96) || "delivery"}`;
 }
 
+interface PreviewPullRequestContextSelection {
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId: string;
+  sourceBindingFingerprint: string;
+}
+
+const previewContextHeaderNames = [
+  "x-appaloft-project-id",
+  "x-appaloft-environment-id",
+  "x-appaloft-resource-id",
+  "x-appaloft-server-id",
+  "x-appaloft-destination-id",
+  "x-appaloft-source-binding-fingerprint",
+] as const;
+
+function hasTrustedPreviewContextHeader(request: Request): boolean {
+  return previewContextHeaderNames.some((headerName) => request.headers.has(headerName));
+}
+
+function trustedPreviewContextFromHeaders(
+  request: Request,
+): Result<PreviewPullRequestContextSelection> {
+  const projectId = requiredPreviewContextHeader(request, "x-appaloft-project-id", "Project id");
+  const environmentId = requiredPreviewContextHeader(
+    request,
+    "x-appaloft-environment-id",
+    "Environment id",
+  );
+  const resourceId = requiredPreviewContextHeader(request, "x-appaloft-resource-id", "Resource id");
+  const serverId = requiredPreviewContextHeader(request, "x-appaloft-server-id", "Server id");
+  const destinationId = requiredPreviewContextHeader(
+    request,
+    "x-appaloft-destination-id",
+    "Destination id",
+  );
+  const sourceBindingFingerprint = requiredPreviewContextHeader(
+    request,
+    "x-appaloft-source-binding-fingerprint",
+    "Source binding fingerprint",
+  );
+  if (projectId.isErr()) return err(projectId.error);
+  if (environmentId.isErr()) return err(environmentId.error);
+  if (resourceId.isErr()) return err(resourceId.error);
+  if (serverId.isErr()) return err(serverId.error);
+  if (destinationId.isErr()) return err(destinationId.error);
+  if (sourceBindingFingerprint.isErr()) return err(sourceBindingFingerprint.error);
+
+  return ok({
+    projectId: projectId.value,
+    environmentId: environmentId.value,
+    resourceId: resourceId.value,
+    serverId: serverId.value,
+    destinationId: destinationId.value,
+    sourceBindingFingerprint: sourceBindingFingerprint.value,
+  });
+}
+
+function githubRepositoryLocator(repositoryFullName: string): string {
+  return `https://github.com/${repositoryFullName}.git`;
+}
+
+function previewRefMatches(candidateRef: string, baseRef: string): boolean {
+  return candidateRef === baseRef || candidateRef === `refs/heads/${baseRef}`;
+}
+
+async function mappedPreviewContextFromSourcePolicy(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  event: {
+    repositoryFullName: string;
+    providerRepositoryId?: string;
+    installationId?: string;
+    baseRef: string;
+  };
+}): Promise<Result<PreviewPullRequestContextSelection>> {
+  const policyReader = input.context.sourceEventPolicyReader;
+  if (!policyReader) {
+    return err(
+      domainError.validation("Preview pull request context headers are required", {
+        phase: "preview-event-ingestion",
+      }),
+    );
+  }
+
+  const candidates = await policyReader.listCandidates(
+    toRepositoryContext(input.executionContext),
+    {
+      sourceKind: "github",
+      sourceIdentity: {
+        locator: githubRepositoryLocator(input.event.repositoryFullName),
+        repositoryFullName: input.event.repositoryFullName,
+        ...(input.event.providerRepositoryId
+          ? { providerRepositoryId: input.event.providerRepositoryId }
+          : {}),
+      },
+    },
+  );
+  const eligibleCandidates = candidates.filter(
+    (candidate) =>
+      candidate.status === "enabled" &&
+      Boolean(candidate.serverId) &&
+      Boolean(candidate.destinationId) &&
+      Boolean(candidate.sourceBindingFingerprint) &&
+      candidate.refs.some((ref) => previewRefMatches(ref, input.event.baseRef)),
+  );
+
+  if (eligibleCandidates.length === 0) {
+    return err(
+      domainError.validation("No preview context matched the GitHub pull request repository", {
+        phase: "preview-event-ingestion",
+        provider: "github",
+        repositoryFullName: input.event.repositoryFullName,
+        baseRef: input.event.baseRef,
+        ...(input.event.installationId ? { installationId: input.event.installationId } : {}),
+      }),
+    );
+  }
+
+  if (eligibleCandidates.length > 1) {
+    return err(
+      domainError.conflict("GitHub pull request preview context is ambiguous", {
+        phase: "preview-event-ingestion",
+        provider: "github",
+        repositoryFullName: input.event.repositoryFullName,
+        baseRef: input.event.baseRef,
+        matchCount: eligibleCandidates.length,
+        ...(input.event.installationId ? { installationId: input.event.installationId } : {}),
+      }),
+    );
+  }
+
+  const candidate = eligibleCandidates[0];
+  if (!candidate?.serverId || !candidate.destinationId || !candidate.sourceBindingFingerprint) {
+    return err(
+      domainError.validation("GitHub pull request preview context is incomplete", {
+        phase: "preview-event-ingestion",
+        provider: "github",
+        repositoryFullName: input.event.repositoryFullName,
+      }),
+    );
+  }
+
+  return ok({
+    projectId: candidate.projectId,
+    environmentId: candidate.environmentId,
+    resourceId: candidate.resourceId,
+    serverId: candidate.serverId,
+    destinationId: candidate.destinationId,
+    sourceBindingFingerprint: candidate.sourceBindingFingerprint,
+  });
+}
+
+async function resolvePreviewPullRequestContext(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  request: Request;
+  event: {
+    repositoryFullName: string;
+    providerRepositoryId?: string;
+    installationId?: string;
+    baseRef: string;
+  };
+}): Promise<Result<PreviewPullRequestContextSelection>> {
+  const trustedHeaders = trustedPreviewContextFromHeaders(input.request);
+  if (trustedHeaders.isOk()) {
+    return trustedHeaders;
+  }
+
+  if (hasTrustedPreviewContextHeader(input.request)) {
+    return err(trustedHeaders.error);
+  }
+
+  if (!input.context.sourceEventPolicyReader) {
+    return err(trustedHeaders.error);
+  }
+
+  return mappedPreviewContextFromSourcePolicy(input);
+}
+
 function parseGenericSignedSourceEventBody(
   rawBody: string,
   executionContext: ExecutionContext,
@@ -3728,52 +3912,25 @@ async function handleGitHubPreviewPullRequestRoute(input: {
     return new Response(null, { status: 204 });
   }
 
-  const projectId = requiredPreviewContextHeader(request, "x-appaloft-project-id", "Project id");
-  const environmentId = requiredPreviewContextHeader(
+  const previewContext = await resolvePreviewPullRequestContext({
+    context,
+    executionContext,
     request,
-    "x-appaloft-environment-id",
-    "Environment id",
-  );
-  const resourceId = requiredPreviewContextHeader(request, "x-appaloft-resource-id", "Resource id");
-  const serverId = requiredPreviewContextHeader(request, "x-appaloft-server-id", "Server id");
-  const destinationId = requiredPreviewContextHeader(
-    request,
-    "x-appaloft-destination-id",
-    "Destination id",
-  );
-  const sourceBindingFingerprint = requiredPreviewContextHeader(
-    request,
-    "x-appaloft-source-binding-fingerprint",
-    "Source binding fingerprint",
-  );
-  if (projectId.isErr()) {
-    return domainErrorHttpResponse(projectId.error, executionContext);
-  }
-  if (environmentId.isErr()) {
-    return domainErrorHttpResponse(environmentId.error, executionContext);
-  }
-  if (resourceId.isErr()) {
-    return domainErrorHttpResponse(resourceId.error, executionContext);
-  }
-  if (serverId.isErr()) {
-    return domainErrorHttpResponse(serverId.error, executionContext);
-  }
-  if (destinationId.isErr()) {
-    return domainErrorHttpResponse(destinationId.error, executionContext);
-  }
-  if (sourceBindingFingerprint.isErr()) {
-    return domainErrorHttpResponse(sourceBindingFingerprint.error, executionContext);
+    event: verified.value.previewEvent,
+  });
+  if (previewContext.isErr()) {
+    return domainErrorHttpResponse(previewContext.error, executionContext);
   }
 
   const command = IngestPreviewPullRequestEventCommand.create({
     sourceEventId: previewSourceEventIdFromDelivery(deliveryId),
     event: verified.value.previewEvent,
-    projectId: projectId.value,
-    environmentId: environmentId.value,
-    resourceId: resourceId.value,
-    serverId: serverId.value,
-    destinationId: destinationId.value,
-    sourceBindingFingerprint: sourceBindingFingerprint.value,
+    projectId: previewContext.value.projectId,
+    environmentId: previewContext.value.environmentId,
+    resourceId: previewContext.value.resourceId,
+    serverId: previewContext.value.serverId,
+    destinationId: previewContext.value.destinationId,
+    sourceBindingFingerprint: previewContext.value.sourceBindingFingerprint,
   });
   if (command.isErr()) {
     return domainErrorHttpResponse(command.error, executionContext);

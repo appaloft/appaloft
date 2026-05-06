@@ -287,17 +287,18 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   `/preview-policies` controls for policy readback/configuration and a `/preview-environments`
   console surface backed by preview environment list/show/delete operations.
 - The GitHub source-event HTTP route now accepts signed `pull_request` deliveries for the first
-  product-grade preview route slice. It verifies the raw GitHub payload, requires the trusted
-  `X-Appaloft-Project-Id`, `X-Appaloft-Environment-Id`, `X-Appaloft-Resource-Id`,
-  `X-Appaloft-Server-Id`, `X-Appaloft-Destination-Id`, and
-  `X-Appaloft-Source-Binding-Fingerprint` headers, then dispatches
-  `IngestPreviewPullRequestEventCommand` through `CommandBus`. Raw signatures, secrets, and
-  provider payloads stay out of the command.
+  product-grade preview route slice. It verifies the raw GitHub payload, resolves preview context
+  from trusted `X-Appaloft-*` headers when supplied, or maps signed GitHub repository facts through
+  the source-event policy reader using repository full name/provider repository id and base ref when
+  no trusted headers are present. The selected project/environment/Resource/server/destination/
+  source-fingerprint context is dispatched in `IngestPreviewPullRequestEventCommand` through
+  `CommandBus`. Raw signatures, secrets, and provider payloads stay out of the command; GitHub
+  installation id is retained only as safe verification/mapping detail.
 - Accepted preview deployment processing now publishes both idempotent PR-comment feedback and
   idempotent `github-deployment-status` feedback after ids-only deployment dispatch. Retryable
   deployment-status feedback failures are recorded as safe feedback state without changing the
   accepted deployment result to `err`.
-- No GitHub App installation/repository context mapper is implemented.
+- Active GitHub App preview worker transports are still not implemented.
 - Preview policy and preview environment operations currently expose CLI, HTTP/oRPC, and generated
   future MCP tool descriptors. Web exposes preview policy readback/configuration and the read-only
   preview environment list/detail/delete surface.

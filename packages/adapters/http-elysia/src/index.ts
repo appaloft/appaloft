@@ -20,6 +20,7 @@ import {
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
   type ResourceRepository,
+  type SourceEventPolicyReader,
   type SourceEventVerificationPort,
   type TerminalSession,
   type TerminalSessionGateway,
@@ -460,6 +461,7 @@ export function createHttpApp(input: {
   resourceAccessFailureEvidenceRecorder?: ResourceAccessFailureEvidenceRecorder;
   resourceAccessRouteContextLookup?: AutomaticRouteContextLookup;
   resourceRepository?: ResourceRepository;
+  sourceEventPolicyReader?: SourceEventPolicyReader;
   sourceEventVerificationPort?: SourceEventVerificationPort;
   githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
@@ -1100,6 +1102,11 @@ export function createHttpApp(input: {
     ...(input.sourceEventVerificationPort
       ? {
           sourceEventVerificationPort: input.sourceEventVerificationPort,
+        }
+      : {}),
+    ...(input.sourceEventPolicyReader
+      ? {
+          sourceEventPolicyReader: input.sourceEventPolicyReader,
         }
       : {}),
     ...(input.githubSourceEventWebhookVerifier

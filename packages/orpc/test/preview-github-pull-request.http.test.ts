@@ -12,6 +12,9 @@ import {
   IngestPreviewPullRequestEventCommand,
   type Query,
   type QueryBus,
+  type RepositoryContext,
+  type SourceEventPolicyCandidate,
+  type SourceEventPolicyReader,
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
 import { createGitHubPreviewPullRequestWebhookVerifier } from "@appaloft/integration-github";
@@ -63,6 +66,9 @@ function githubPullRequestPayload() {
       html_url: "https://github.com/appaloft/demo",
       clone_url: "https://github.com/appaloft/demo.git",
     },
+    installation: {
+      id: 98765,
+    },
     pull_request: {
       head: {
         sha: "f1e2d3c4",
@@ -81,6 +87,7 @@ function createApp(input: {
   commandBus?: CommandBus;
   githubWebhookSecret?: string;
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
+  sourceEventPolicyReader?: SourceEventPolicyReader;
 }) {
   const commandBus =
     input.commandBus ??
@@ -101,7 +108,26 @@ function createApp(input: {
     ...(input.githubWebhookSecret ? { githubWebhookSecret: input.githubWebhookSecret } : {}),
     logger: new NoopLogger(),
     queryBus,
+    ...(input.sourceEventPolicyReader
+      ? { sourceEventPolicyReader: input.sourceEventPolicyReader }
+      : {}),
   });
+}
+
+class MemorySourceEventPolicyReader implements SourceEventPolicyReader {
+  constructor(private readonly candidates: SourceEventPolicyCandidate[]) {}
+
+  async listCandidates(
+    _context: RepositoryContext,
+    _input: Parameters<SourceEventPolicyReader["listCandidates"]>[1],
+  ): Promise<SourceEventPolicyCandidate[]> {
+    return this.candidates.map((candidate) => ({
+      ...candidate,
+      refs: [...candidate.refs],
+      eventKinds: [...candidate.eventKinds],
+      sourceBinding: { ...candidate.sourceBinding },
+    }));
+  }
 }
 
 describe("GitHub preview pull request HTTP route", () => {
@@ -168,6 +194,8 @@ describe("GitHub preview pull request HTTP route", () => {
         eventKind: "pull-request",
         eventAction: "synchronize",
         repositoryFullName: "appaloft/demo",
+        providerRepositoryId: "123456",
+        installationId: "98765",
         headRepositoryFullName: "appaloft/demo",
         pullRequestNumber: 42,
         headSha: "f1e2d3c4",
@@ -179,6 +207,128 @@ describe("GitHub preview pull request HTTP route", () => {
     const serializedCommand = JSON.stringify(command);
     expect(serializedCommand).not.toContain("correct-secret");
     expect(serializedCommand).not.toContain("sha256=");
+  });
+
+  test("[PG-PREVIEW-EVENT-001] maps GitHub repository events to preview context without trusted headers", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          status: "routed",
+          lifecycleResult: {
+            status: "dispatched",
+            sourceEventId: "sevt_preview_delivery_42",
+            previewEnvironmentId: "prenv_preview_42",
+            deploymentId: "dep_preview_42",
+          },
+        } as T);
+      },
+    } as CommandBus;
+    const rawBody = JSON.stringify(githubPullRequestPayload());
+    const signature = await hmacSha256Hex("correct-secret", rawBody);
+    const app = createApp({
+      commandBus,
+      githubWebhookSecret: "correct-secret",
+      sourceEventPolicyReader: new MemorySourceEventPolicyReader([
+        {
+          projectId: "prj_mapped",
+          environmentId: "env_mapped",
+          resourceId: "res_mapped_api",
+          serverId: "srv_mapped",
+          destinationId: "dst_mapped",
+          sourceBindingFingerprint: "srcfp_mapped_repo",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo.git",
+            providerRepositoryId: "123456",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ]),
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/integrations/github/source-events", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-github-delivery": "delivery-42",
+          "x-github-event": "pull_request",
+          "x-hub-signature-256": `sha256=${signature}`,
+        },
+        body: rawBody,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(capturedCommand).toBeInstanceOf(IngestPreviewPullRequestEventCommand);
+    expect(capturedCommand).toMatchObject({
+      projectId: "prj_mapped",
+      environmentId: "env_mapped",
+      resourceId: "res_mapped_api",
+      serverId: "srv_mapped",
+      destinationId: "dst_mapped",
+      sourceBindingFingerprint: "srcfp_mapped_repo",
+      event: {
+        repositoryFullName: "appaloft/demo",
+        providerRepositoryId: "123456",
+        installationId: "98765",
+      },
+    });
+  });
+
+  test("[PG-PREVIEW-EVENT-001] rejects partial trusted context instead of falling back to policy mapping", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ status: "routed" } as T);
+      },
+    } as CommandBus;
+    const rawBody = JSON.stringify(githubPullRequestPayload());
+    const signature = await hmacSha256Hex("correct-secret", rawBody);
+    const app = createApp({
+      commandBus,
+      githubWebhookSecret: "correct-secret",
+      sourceEventPolicyReader: new MemorySourceEventPolicyReader([
+        {
+          projectId: "prj_mapped",
+          environmentId: "env_mapped",
+          resourceId: "res_mapped_api",
+          serverId: "srv_mapped",
+          destinationId: "dst_mapped",
+          sourceBindingFingerprint: "srcfp_mapped_repo",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo.git",
+            providerRepositoryId: "123456",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ]),
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/integrations/github/source-events", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-appaloft-project-id": "prj_partial",
+          "x-github-delivery": "delivery-42",
+          "x-github-event": "pull_request",
+          "x-hub-signature-256": `sha256=${signature}`,
+        },
+        body: rawBody,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(capturedCommand).toBeUndefined();
   });
 
   test("[PG-PREVIEW-EVENT-001] rejects missing preview context before dispatch", async () => {

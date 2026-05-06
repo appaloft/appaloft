@@ -7,6 +7,8 @@ export const previewPullRequestEventSchema = z.object({
   eventKind: z.literal("pull-request"),
   eventAction: z.enum(["opened", "reopened", "synchronize", "closed"]),
   repositoryFullName: nonEmptyTrimmedString("Repository full name"),
+  providerRepositoryId: nonEmptyTrimmedString("Provider repository id").optional(),
+  installationId: nonEmptyTrimmedString("GitHub installation id").optional(),
   headRepositoryFullName: nonEmptyTrimmedString("Head repository full name"),
   pullRequestNumber: z.coerce.number().int().positive(),
   headSha: nonEmptyTrimmedString("Head SHA"),

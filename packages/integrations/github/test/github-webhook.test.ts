@@ -33,6 +33,9 @@ function githubPushPayload() {
       html_url: "https://github.com/appaloft/demo",
       clone_url: "https://github.com/appaloft/demo.git",
     },
+    installation: {
+      id: 98765,
+    },
   };
 }
 
@@ -45,6 +48,9 @@ function githubPullRequestPayload(action = "synchronize") {
       full_name: "appaloft/demo",
       html_url: "https://github.com/appaloft/demo",
       clone_url: "https://github.com/appaloft/demo.git",
+    },
+    installation: {
+      id: 98765,
     },
     pull_request: {
       head: {
@@ -185,6 +191,8 @@ describe("GitHub preview pull request webhook verifier", () => {
         eventKind: "pull-request",
         eventAction: "synchronize",
         repositoryFullName: "appaloft/demo",
+        providerRepositoryId: "123456",
+        installationId: "98765",
         headRepositoryFullName: "appaloft/demo",
         pullRequestNumber: 42,
         headSha: "f1e2d3c4",

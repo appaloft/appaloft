@@ -78,10 +78,12 @@ normalization, unsupported actions reject, unsafe payload shapes reject, and sec
 material are not returned. It also has application coverage in
 `packages/application/test/product-grade-preview-policy.test.ts` proving safe normalized
 pull-request facts route into preview lifecycle without changing deployment admission input.
-`packages/orpc/test/preview-github-pull-request.http.test.ts` covers the first HTTP route slice:
-signed GitHub `pull_request` deliveries on `/api/integrations/github/source-events` require trusted
-Appaloft preview context headers, dispatch `IngestPreviewPullRequestEventCommand` through
-`CommandBus`, and reject missing preview context before command dispatch.
+`packages/orpc/test/preview-github-pull-request.http.test.ts` covers the HTTP route slice: signed
+GitHub `pull_request` deliveries on `/api/integrations/github/source-events` dispatch
+`IngestPreviewPullRequestEventCommand` through `CommandBus` with trusted Appaloft preview context
+headers when supplied, or with context mapped from the source-event policy reader by repository full
+name/provider repository id and base ref when trusted headers are absent. It also proves missing
+context is rejected before command dispatch when no policy reader mapping is available.
 `PG-PREVIEW-EVENT-002` has initial application coverage in
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves duplicate
 source event ids return the existing preview policy decision and do not update preview environment
@@ -205,9 +207,8 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-Repository/installation mapping and active GitHub App preview worker transports remain open.
-Existing non-product-grade coverage belongs to Action-only PR previews and
-`deployments.cleanup-preview`.
+Active GitHub App preview worker transports remain open. Existing non-product-grade coverage
+belongs to Action-only PR previews and `deployments.cleanup-preview`.
 
 Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add
 persistence, adapter, transport, Web, CLI, and public-docs coverage as each surface is activated.

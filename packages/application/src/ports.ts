@@ -4439,6 +4439,8 @@ export interface GitHubPreviewPullRequestWebhookEvent {
   eventKind: "pull-request";
   eventAction: GitHubPreviewPullRequestAction;
   repositoryFullName: string;
+  providerRepositoryId?: string;
+  installationId?: string;
   headRepositoryFullName: string;
   pullRequestNumber: number;
   headSha: string;
@@ -4599,6 +4601,7 @@ export interface SourceEventPolicyCandidate {
   resourceId: string;
   serverId?: string;
   destinationId?: string;
+  sourceBindingFingerprint?: string;
   status: "enabled" | "disabled" | "blocked";
   refs: string[];
   eventKinds: SourceEventKind[];
