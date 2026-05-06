@@ -104,6 +104,10 @@ deployment result.
 requests move the durable preview environment to `cleanup-requested`, preserve source/audit history
 instead of deleting the preview environment, block later source changes, and delegate runtime,
 route, source-link, provider metadata, and feedback cleanup with safe source-scope input.
+`PG-PREVIEW-CLEANUP-002` has initial application coverage in
+`packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves retryable
+cleanup failures record `retry-scheduled` attempt state with owner, new `pcln_*` attempt ids per
+run, safe failure phase, provider error code, next retry time, and no provider error text.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
@@ -123,9 +127,10 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-GitHub App route wiring, durable feedback adapters/persistence, concrete cleanup adapters, cleanup
-retry, and active operation entrypoints remain open. Existing non-product-grade coverage belongs to
-Action-only PR previews and `deployments.cleanup-preview`.
+GitHub App route wiring, durable feedback adapters/persistence, durable cleanup attempt
+persistence, concrete cleanup adapters, scheduler retry dispatch, and active operation entrypoints
+remain open. Existing non-product-grade coverage belongs to Action-only PR previews and
+`deployments.cleanup-preview`.
 
 Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add
 persistence, adapter, transport, Web, CLI, and public-docs coverage as each surface is activated.

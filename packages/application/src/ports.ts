@@ -4545,6 +4545,27 @@ export interface PreviewEnvironmentCleaner {
   ): Promise<Result<PreviewEnvironmentCleanerResult>>;
 }
 
+export type PreviewCleanupAttemptStatus = "succeeded" | "retry-scheduled" | "failed";
+
+export interface PreviewCleanupAttemptRecord {
+  attemptId: string;
+  previewEnvironmentId: string;
+  resourceId: string;
+  sourceBindingFingerprint: string;
+  owner: string;
+  status: PreviewCleanupAttemptStatus;
+  phase: string;
+  attemptedAt: string;
+  updatedAt: string;
+  errorCode?: string;
+  retryable?: boolean;
+  nextRetryAt?: string;
+}
+
+export interface PreviewCleanupAttemptRecorder {
+  record(context: RepositoryContext, record: PreviewCleanupAttemptRecord): Promise<void>;
+}
+
 export interface SourceEventPolicyCandidate {
   projectId: string;
   environmentId: string;

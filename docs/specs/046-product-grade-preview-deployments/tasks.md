@@ -35,7 +35,7 @@
 - [x] `PG-PREVIEW-FEEDBACK-001`: comments/checks/status updates are idempotent and retryable.
 - [x] `PG-PREVIEW-CLEANUP-001`: cleanup preserves deployment history and audit while removing
   preview runtime, route, source-link, and provider metadata.
-- [ ] `PG-PREVIEW-CLEANUP-002`: cleanup retry creates new attempt ids and exposes safe retry state.
+- [x] `PG-PREVIEW-CLEANUP-002`: cleanup retry creates new attempt ids and exposes safe retry state.
 - [ ] `PG-PREVIEW-SURFACE-001`: Web/API/CLI/future MCP surfaces use normalized preview language and
   stable help anchors.
 

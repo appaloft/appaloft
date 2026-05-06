@@ -14,6 +14,8 @@ import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
   type Clock,
+  type IdGenerator,
+  type PreviewCleanupAttemptRecorder,
   type PreviewEnvironmentCleaner,
   type PreviewEnvironmentCleanerResult,
   type PreviewEnvironmentRepository,
@@ -25,14 +27,23 @@ export interface CleanupPreviewEnvironmentInput {
   resourceId: string;
 }
 
-export type CleanupPreviewEnvironmentStatus = "cleaned" | "already-clean";
+export type CleanupPreviewEnvironmentStatus =
+  | "cleaned"
+  | "already-clean"
+  | "retry-scheduled"
+  | "failed";
 
 export interface CleanupPreviewEnvironmentResult extends PreviewEnvironmentCleanerResult {
   status: CleanupPreviewEnvironmentStatus;
+  attemptId: string;
   previewEnvironmentId: string;
   resourceId: string;
   sourceBindingFingerprint: string;
   previewEnvironmentStatus: "cleanup-requested";
+  errorCode?: string;
+  retryable?: boolean;
+  failurePhase?: string;
+  nextRetryAt?: string;
 }
 
 function cleanupStatus(result: PreviewEnvironmentCleanerResult): CleanupPreviewEnvironmentStatus {
@@ -45,6 +56,14 @@ function cleanupStatus(result: PreviewEnvironmentCleanerResult): CleanupPreviewE
     : "already-clean";
 }
 
+function nextRetryAt(at: string): string {
+  return new Date(Date.parse(at) + 5 * 60 * 1000).toISOString();
+}
+
+function failurePhase(errorDetails: Record<string, unknown> | undefined): string {
+  return typeof errorDetails?.phase === "string" ? errorDetails.phase : "preview-cleanup-retry";
+}
+
 @injectable()
 export class PreviewEnvironmentCleanupService {
   constructor(
@@ -52,8 +71,12 @@ export class PreviewEnvironmentCleanupService {
     private readonly previewEnvironmentRepository: PreviewEnvironmentRepository,
     @inject(tokens.previewEnvironmentCleaner)
     private readonly previewEnvironmentCleaner: PreviewEnvironmentCleaner,
+    @inject(tokens.previewCleanupAttemptRecorder)
+    private readonly previewCleanupAttemptRecorder: PreviewCleanupAttemptRecorder,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.idGenerator)
+    private readonly idGenerator: IdGenerator,
   ) {}
 
   async cleanup(
@@ -67,6 +90,8 @@ export class PreviewEnvironmentCleanupService {
     if (resourceId.isErr()) return err(resourceId.error);
 
     const repositoryContext = toRepositoryContext(context);
+    const attemptedAt = this.clock.now();
+    const attemptId = this.idGenerator.next("pcln");
     const previewEnvironment = await this.previewEnvironmentRepository.findOne(
       repositoryContext,
       PreviewEnvironmentByIdSpec.create(previewEnvironmentId.value, resourceId.value),
@@ -77,7 +102,7 @@ export class PreviewEnvironmentCleanupService {
 
     if (previewEnvironment.isActive()) {
       const cleanupRequested = previewEnvironment.requestCleanup({
-        requestedAt: UpdatedAt.rehydrate(this.clock.now()),
+        requestedAt: UpdatedAt.rehydrate(attemptedAt),
       });
       if (cleanupRequested.isErr()) return err(cleanupRequested.error);
 
@@ -97,10 +122,59 @@ export class PreviewEnvironmentCleanupService {
       repositoryFullName: state.source.repositoryFullName.value,
       pullRequestNumber: state.source.pullRequestNumber.value,
     });
-    if (cleanerResult.isErr()) return err(cleanerResult.error);
+    if (cleanerResult.isErr()) {
+      const phase = failurePhase(cleanerResult.error.details);
+      const retryable = cleanerResult.error.retryable;
+      const retryAt = retryable ? nextRetryAt(attemptedAt) : undefined;
+      await this.previewCleanupAttemptRecorder.record(repositoryContext, {
+        attemptId,
+        previewEnvironmentId: state.id.value,
+        resourceId: state.resourceId.value,
+        sourceBindingFingerprint: state.source.sourceBindingFingerprint.value,
+        owner: context.actor?.id ?? context.requestId,
+        status: retryable ? "retry-scheduled" : "failed",
+        phase,
+        attemptedAt,
+        updatedAt: attemptedAt,
+        errorCode: cleanerResult.error.code,
+        retryable,
+        ...(retryAt ? { nextRetryAt: retryAt } : {}),
+      });
+
+      return ok({
+        status: retryable ? "retry-scheduled" : "failed",
+        attemptId,
+        previewEnvironmentId: state.id.value,
+        resourceId: state.resourceId.value,
+        sourceBindingFingerprint: state.source.sourceBindingFingerprint.value,
+        previewEnvironmentStatus: "cleanup-requested",
+        cleanedRuntime: false,
+        removedRoute: false,
+        removedSourceLink: false,
+        removedProviderMetadata: false,
+        updatedFeedback: false,
+        errorCode: cleanerResult.error.code,
+        retryable,
+        failurePhase: phase,
+        ...(retryAt ? { nextRetryAt: retryAt } : {}),
+      });
+    }
+
+    await this.previewCleanupAttemptRecorder.record(repositoryContext, {
+      attemptId,
+      previewEnvironmentId: state.id.value,
+      resourceId: state.resourceId.value,
+      sourceBindingFingerprint: state.source.sourceBindingFingerprint.value,
+      owner: context.actor?.id ?? context.requestId,
+      status: "succeeded",
+      phase: "preview-cleanup",
+      attemptedAt,
+      updatedAt: attemptedAt,
+    });
 
     return ok({
       status: cleanupStatus(cleanerResult.value),
+      attemptId,
       previewEnvironmentId: state.id.value,
       resourceId: state.resourceId.value,
       sourceBindingFingerprint: state.source.sourceBindingFingerprint.value,
