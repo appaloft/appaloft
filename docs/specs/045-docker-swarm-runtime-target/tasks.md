@@ -58,6 +58,7 @@
 - [x] Redact Swarm command failure output before deployment logs/metadata capture.
 - [x] Add bounded shell command runner for the opt-in Swarm execution backend.
 - [x] Add disabled-by-default shell composition for the opt-in Swarm execution backend.
+- [x] Add environment-gated real Swarm smoke harness for apply/route/secret/cleanup validation.
 - [ ] Smoke-test real apply/verify/cleanup against a Swarm manager.
 - [x] Add sanitized target identity persistence/read-model support where required.
 - [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.
@@ -72,6 +73,7 @@
 
 - [x] Run targeted domain/application/adapter tests.
 - [x] Run fake Swarm backend acceptance tests.
+- [x] Run the real Swarm smoke harness in skipped/default CI mode.
 - [ ] Run opt-in real Swarm smoke tests when environment is available.
 - [x] Run `bun run lint`.
 - [x] Run `bun turbo run typecheck`.

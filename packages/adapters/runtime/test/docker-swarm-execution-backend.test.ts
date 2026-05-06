@@ -174,7 +174,8 @@ function runtimeEnvironmentSnapshot(): EnvironmentConfigSnapshot {
   });
 }
 
-function runtimePlan(): RuntimePlan {
+function runtimePlan(input: { image?: string } = {}): RuntimePlan {
+  const image = ImageReference.rehydrate(input.image ?? "registry.example.com/team/app:sha");
   const accessRoute = AccessRoute.rehydrate({
     proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
     domains: [PublicDomainName.rehydrate("api.example.com")],
@@ -195,7 +196,7 @@ function runtimePlan(): RuntimePlan {
     execution: RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       port: PortNumber.rehydrate(3000),
-      image: ImageReference.rehydrate("registry.example.com/team/app:sha"),
+      image,
       accessRoutes: [accessRoute],
       healthCheck: {
         enabled: true,
@@ -217,7 +218,7 @@ function runtimePlan(): RuntimePlan {
     runtimeArtifact: RuntimeArtifactSnapshot.rehydrate({
       kind: RuntimeArtifactKindValue.rehydrate("image"),
       intent: RuntimeArtifactIntentValue.rehydrate("prebuilt-image"),
-      image: ImageReference.rehydrate("registry.example.com/team/app:sha"),
+      image,
     }),
     target: DeploymentTargetDescriptor.rehydrate({
       kind: TargetKindValue.rehydrate("orchestrator-cluster"),
@@ -230,7 +231,7 @@ function runtimePlan(): RuntimePlan {
   });
 }
 
-function runningDeployment(): Deployment {
+function runningDeployment(input: { image?: string } = {}): Deployment {
   const deployment = Deployment.create({
     id: DeploymentId.rehydrate("dep_swarm_backend"),
     projectId: ProjectId.rehydrate("prj_app"),
@@ -238,7 +239,7 @@ function runningDeployment(): Deployment {
     resourceId: ResourceId.rehydrate("res_api"),
     serverId: DeploymentTargetId.rehydrate("dtg_swarm_1"),
     destinationId: DestinationId.rehydrate("dst_prod"),
-    runtimePlan: runtimePlan(),
+    runtimePlan: runtimePlan(input),
     environmentSnapshot: runtimeEnvironmentSnapshot(),
     createdAt: CreatedAt.rehydrate("2026-04-01T00:00:00.000Z"),
   })._unsafeUnwrap();
@@ -248,6 +249,27 @@ function runningDeployment(): Deployment {
   deployment.start(startedAt)._unsafeUnwrap();
   return deployment;
 }
+
+function commandOutput(command: string[]): string {
+  const result = Bun.spawnSync(command, {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  if (result.exitCode !== 0) {
+    throw new Error(
+      [
+        `Command failed: ${command.join(" ")}`,
+        result.stdout.toString(),
+        result.stderr.toString(),
+      ].join("\n"),
+    );
+  }
+
+  return result.stdout.toString().trim();
+}
+
+const realSwarmSmokeTest = Bun.env.APPALOFT_DOCKER_SWARM_SMOKE === "1" ? test : test.skip;
 
 describe("DockerSwarmExecutionBackend", () => {
   test("[SWARM-TARGET-APPLY-001][SWARM-TARGET-CLEAN-001] shell command runner executes bounded Swarm commands", async () => {
@@ -393,4 +415,52 @@ describe("DockerSwarmExecutionBackend", () => {
     expect(serialized).not.toContain("raw-key");
     expect(serialized).not.toContain("BEGIN PRIVATE KEY");
   });
+
+  realSwarmSmokeTest(
+    "[SWARM-TARGET-ROUTE-001B][SWARM-TARGET-SECRET-001B] runs opt-in real Swarm apply and cleanup",
+    async () => {
+      const swarmState = commandOutput([
+        "docker",
+        "info",
+        "--format",
+        "{{.Swarm.LocalNodeState}} {{.Swarm.ControlAvailable}}",
+      ]);
+      expect(swarmState).toBe("active true");
+
+      const edgeNetwork = commandOutput([
+        "docker",
+        "network",
+        "inspect",
+        "appaloft-edge",
+        "--format",
+        "{{.Driver}} {{.Scope}}",
+      ]);
+      expect(edgeNetwork).toBe("overlay swarm");
+
+      const deployment = runningDeployment({
+        image: Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_IMAGE ?? "nginx:alpine",
+      });
+      const backend = new DockerSwarmExecutionBackend(
+        new DockerSwarmShellCommandRunner({
+          timeoutMs: Number(Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_TIMEOUT_MS ?? "120000"),
+        }),
+      );
+
+      try {
+        const result = await backend.execute(createContext(), deployment);
+        expect(result.isOk()).toBe(true);
+        const state = result._unsafeUnwrap().deployment.toState();
+        expect(state.status.value).toBe("succeeded");
+        expect(state.runtimePlan.execution.metadata).toMatchObject({
+          "swarm.serviceName": "appaloft-res-api-dst-prod-dep-swarm-backend_web",
+          "swarm.applyPlanSchemaVersion": "docker-swarm.apply-plan/v1",
+        });
+        expect(JSON.stringify(state.runtimePlan.execution.metadata)).not.toContain(
+          "postgres://secret-value",
+        );
+      } finally {
+        await backend.cancel(createContext(), deployment);
+      }
+    },
+  );
 });
