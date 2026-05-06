@@ -238,10 +238,14 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   environment, marks cleanup requested without deleting preview history, and delegates runtime,
   route, source-link, provider metadata, and feedback cleanup to a port with safe source-scope
   input only. Scheduler retry state and concrete adapters remain future work.
+- Preview cleanup retry now has initial application attempt state. Each cleanup run receives a new
+  `pcln_*` attempt id, retryable cleaner failures are recorded as `retry-scheduled` with safe
+  owner, phase, error code, and next retry time, and retry responses avoid provider error text.
+  Durable persistence and scheduler dispatch remain future work.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
-- No GitHub App preview worker, durable feedback adapter/persistence, cleanup scheduler/retry state,
-  or concrete product-grade preview cleanup adapter is implemented.
+- No GitHub App preview worker, durable feedback adapter/persistence, cleanup scheduler, durable
+  cleanup attempt persistence, or concrete product-grade preview cleanup adapter is implemented.
 - No active operation catalog entries exist for `preview-policies.*` or `preview-environments.*`.
 - Product-grade preview public docs/help are not yet implemented.
 

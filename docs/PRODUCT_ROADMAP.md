@@ -1339,6 +1339,11 @@ Current verification notes:
   source-link, provider metadata, and feedback cleanup to a safe source-scope port. Concrete
   cleanup adapters, cleanup retry state, GitHub App HTTP routes, and active preview environment
   entrypoints remain open.
+- 2026-05-06 Phase 7 preview cleanup retry slice added application attempt state for cleanup
+  retries. Each cleanup run gets a fresh `pcln_*` attempt id, retryable provider/adapter failures
+  record safe owner, phase, error code, and next retry time, and responses omit provider error text.
+  Durable cleanup attempt persistence, scheduler dispatch, concrete cleanup adapters, GitHub App
+  HTTP routes, and active preview environment entrypoints remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,

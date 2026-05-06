@@ -16,6 +16,8 @@ import {
   CreateDeploymentSourceEventDispatcher,
   createExecutionContext,
   type ExecutionContext,
+  type PreviewCleanupAttemptRecord,
+  type PreviewCleanupAttemptRecorder,
   type PreviewEnvironmentCleaner,
   type PreviewEnvironmentCleanerInput,
   type PreviewEnvironmentCleanerResult,
@@ -87,6 +89,7 @@ class InMemoryPreviewEnvironmentRepository implements PreviewEnvironmentReposito
 
 class CapturingPreviewEnvironmentCleaner implements PreviewEnvironmentCleaner {
   inputs: PreviewEnvironmentCleanerInput[] = [];
+  failure: ReturnType<typeof domainError.provider> | null = null;
   result: PreviewEnvironmentCleanerResult = {
     cleanedRuntime: true,
     removedRoute: true,
@@ -100,7 +103,19 @@ class CapturingPreviewEnvironmentCleaner implements PreviewEnvironmentCleaner {
     input: PreviewEnvironmentCleanerInput,
   ): Promise<Result<PreviewEnvironmentCleanerResult>> {
     this.inputs.push(input);
+    if (this.failure) {
+      return err(this.failure);
+    }
+
     return ok(this.result);
+  }
+}
+
+class InMemoryPreviewCleanupAttemptRecorder implements PreviewCleanupAttemptRecorder {
+  readonly records: PreviewCleanupAttemptRecord[] = [];
+
+  async record(_context: RepositoryContext, record: PreviewCleanupAttemptRecord): Promise<void> {
+    this.records.push(record);
   }
 }
 
@@ -1071,10 +1086,13 @@ describe("PreviewEnvironmentCleanupService", () => {
       new SequentialIdGenerator(),
     );
     const cleaner = new CapturingPreviewEnvironmentCleaner();
+    const recorder = new InMemoryPreviewCleanupAttemptRecorder();
     const cleanup = new PreviewEnvironmentCleanupService(
       repository,
       cleaner,
+      recorder,
       new FixedClock("2026-05-06T04:50:00.000Z"),
+      new SequentialIdGenerator(),
     );
     const context = createExecutionContext({
       requestId: "req_preview_environment_cleanup_test",
@@ -1108,6 +1126,7 @@ describe("PreviewEnvironmentCleanupService", () => {
     expect(cleanupResult.isOk()).toBe(true);
     expect(cleanupResult._unsafeUnwrap()).toEqual({
       status: "cleaned",
+      attemptId: "pcln_1",
       previewEnvironmentId: "prenv_1",
       resourceId: "res_preview_api",
       sourceBindingFingerprint: "srcfp_preview_cleanup",
@@ -1118,6 +1137,19 @@ describe("PreviewEnvironmentCleanupService", () => {
       removedProviderMetadata: true,
       updatedFeedback: true,
     });
+    expect(recorder.records).toEqual([
+      {
+        attemptId: "pcln_1",
+        previewEnvironmentId: "prenv_1",
+        resourceId: "res_preview_api",
+        sourceBindingFingerprint: "srcfp_preview_cleanup",
+        owner: "req_preview_environment_cleanup_test",
+        status: "succeeded",
+        phase: "preview-cleanup",
+        attemptedAt: "2026-05-06T04:50:00.000Z",
+        updatedAt: "2026-05-06T04:50:00.000Z",
+      },
+    ]);
     expect(repository.deleteCount).toBe(0);
     expect(repository.previewEnvironment?.toState()).toMatchObject({
       id: { value: "prenv_1" },
@@ -1142,5 +1174,107 @@ describe("PreviewEnvironmentCleanupService", () => {
     ]);
     expect(JSON.stringify(cleaner.inputs)).not.toContain("secret");
     expect(JSON.stringify(cleaner.inputs)).not.toContain("token");
+  });
+
+  test("[PG-PREVIEW-CLEANUP-002] records retryable cleanup state and creates new retry attempt ids", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const lifecycle = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      projection,
+      new FixedClock("2026-05-06T05:00:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const cleaner = new CapturingPreviewEnvironmentCleaner();
+    cleaner.failure = domainError.provider(
+      "Provider metadata cleanup is temporarily unavailable",
+      { phase: "provider-metadata-cleanup" },
+      true,
+    );
+    const recorder = new InMemoryPreviewCleanupAttemptRecorder();
+    const cleanup = new PreviewEnvironmentCleanupService(
+      repository,
+      cleaner,
+      recorder,
+      new FixedClock("2026-05-06T05:05:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const context = createExecutionContext({
+      requestId: "req_preview_environment_cleanup_retry_test",
+      entrypoint: "system",
+    });
+
+    const deployed = await lifecycle.deployFromPolicyEligibleEvent(context, {
+      sourceEventId: "sevt_preview_cleanup_retry_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_cleanup_retry",
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "opened",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "appaloft/demo",
+      pullRequestNumber: 51,
+      headSha: "abc1234",
+      baseRef: "main",
+      verified: true,
+    });
+    const first = await cleanup.cleanup(context, {
+      previewEnvironmentId: "prenv_1",
+      resourceId: "res_preview_api",
+    });
+    const retry = await cleanup.cleanup(context, {
+      previewEnvironmentId: "prenv_1",
+      resourceId: "res_preview_api",
+    });
+
+    expect(deployed.isOk()).toBe(true);
+    expect(first.isOk()).toBe(true);
+    expect(retry.isOk()).toBe(true);
+    expect(first._unsafeUnwrap()).toMatchObject({
+      status: "retry-scheduled",
+      attemptId: "pcln_1",
+      previewEnvironmentId: "prenv_1",
+      errorCode: "provider_error",
+      retryable: true,
+      failurePhase: "provider-metadata-cleanup",
+      nextRetryAt: "2026-05-06T05:10:00.000Z",
+    });
+    expect(retry._unsafeUnwrap()).toMatchObject({
+      status: "retry-scheduled",
+      attemptId: "pcln_2",
+      errorCode: "provider_error",
+      retryable: true,
+      failurePhase: "provider-metadata-cleanup",
+    });
+    expect(recorder.records).toEqual([
+      expect.objectContaining({
+        attemptId: "pcln_1",
+        status: "retry-scheduled",
+        phase: "provider-metadata-cleanup",
+        errorCode: "provider_error",
+        retryable: true,
+        nextRetryAt: "2026-05-06T05:10:00.000Z",
+        owner: "req_preview_environment_cleanup_retry_test",
+      }),
+      expect.objectContaining({
+        attemptId: "pcln_2",
+        status: "retry-scheduled",
+        phase: "provider-metadata-cleanup",
+        errorCode: "provider_error",
+        retryable: true,
+        nextRetryAt: "2026-05-06T05:10:00.000Z",
+        owner: "req_preview_environment_cleanup_retry_test",
+      }),
+    ]);
+    expect(repository.previewEnvironment?.toState().status.value).toBe("cleanup-requested");
+    expect(cleaner.inputs).toHaveLength(2);
+    expect(JSON.stringify(recorder.records)).not.toContain("temporarily unavailable");
   });
 });
