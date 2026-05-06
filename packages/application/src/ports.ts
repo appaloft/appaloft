@@ -4472,6 +4472,54 @@ export interface GitHubPreviewPullRequestWebhookVerifier {
   ): Promise<Result<GitHubPreviewPullRequestWebhookVerificationResult>>;
 }
 
+export type PreviewFeedbackChannel =
+  | "github-pr-comment"
+  | "github-check"
+  | "github-deployment-status";
+export type PreviewFeedbackStatus = "published" | "retryable-failed" | "terminal-failed";
+
+export interface PreviewFeedbackRecord {
+  feedbackKey: string;
+  sourceEventId: string;
+  previewEnvironmentId: string;
+  channel: PreviewFeedbackChannel;
+  status: PreviewFeedbackStatus;
+  providerFeedbackId?: string;
+  errorCode?: string;
+  retryable?: boolean;
+  updatedAt: string;
+}
+
+export interface PreviewFeedbackWriterInput {
+  feedbackKey: string;
+  sourceEventId: string;
+  previewEnvironmentId: string;
+  channel: PreviewFeedbackChannel;
+  repositoryFullName: string;
+  pullRequestNumber: number;
+  body: string;
+  providerFeedbackId?: string;
+}
+
+export interface PreviewFeedbackWriterResult {
+  providerFeedbackId: string;
+}
+
+export interface PreviewFeedbackWriter {
+  publish(
+    context: ExecutionContext,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<PreviewFeedbackWriterResult>>;
+}
+
+export interface PreviewFeedbackRecorder {
+  findOne(
+    context: RepositoryContext,
+    input: { feedbackKey: string },
+  ): Promise<PreviewFeedbackRecord | null>;
+  record(context: RepositoryContext, record: PreviewFeedbackRecord): Promise<void>;
+}
+
 export interface SourceEventPolicyCandidate {
   projectId: string;
   environmentId: string;

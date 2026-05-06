@@ -2,6 +2,8 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  domainError,
+  err,
   ok,
   type PreviewEnvironment,
   type PreviewEnvironmentMutationSpec,
@@ -15,6 +17,12 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type PreviewEnvironmentRepository,
+  type PreviewFeedbackRecord,
+  type PreviewFeedbackRecorder,
+  PreviewFeedbackService,
+  type PreviewFeedbackWriter,
+  type PreviewFeedbackWriterInput,
+  type PreviewFeedbackWriterResult,
   PreviewLifecycleService,
   type PreviewPolicyDecisionProjection,
   type PreviewPolicyDecisionReadModel,
@@ -112,6 +120,46 @@ class InMemoryPreviewPolicyDecisionProjection
     input: { sourceEventId: string },
   ): Promise<PreviewPolicyDecisionProjection | null> {
     return this.projections.get(input.sourceEventId) ?? null;
+  }
+}
+
+class InMemoryPreviewFeedbackRecorder implements PreviewFeedbackRecorder {
+  readonly records = new Map<string, PreviewFeedbackRecord>();
+
+  async findOne(
+    _context: RepositoryContext,
+    input: { feedbackKey: string },
+  ): Promise<PreviewFeedbackRecord | null> {
+    return this.records.get(input.feedbackKey) ?? null;
+  }
+
+  async record(_context: RepositoryContext, record: PreviewFeedbackRecord): Promise<void> {
+    this.records.set(record.feedbackKey, record);
+  }
+}
+
+class CapturingPreviewFeedbackWriter implements PreviewFeedbackWriter {
+  inputs: PreviewFeedbackWriterInput[] = [];
+  failRetryably = false;
+
+  async publish(
+    _context: ExecutionContext,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<PreviewFeedbackWriterResult>> {
+    this.inputs.push(input);
+    if (this.failRetryably) {
+      return err(
+        domainError.provider(
+          "Preview feedback provider is temporarily unavailable",
+          { phase: "preview-feedback" },
+          true,
+        ),
+      );
+    }
+
+    return ok({
+      providerFeedbackId: input.providerFeedbackId ?? `github_feedback_${this.inputs.length}`,
+    });
   }
 }
 
@@ -879,5 +927,107 @@ describe("PreviewPullRequestEventIngestService", () => {
         destinationId: "dst_preview",
       },
     ]);
+  });
+});
+
+describe("PreviewFeedbackService", () => {
+  test("[PG-PREVIEW-FEEDBACK-001] updates existing provider feedback idempotently", async () => {
+    const writer = new CapturingPreviewFeedbackWriter();
+    const recorder = new InMemoryPreviewFeedbackRecorder();
+    const service = new PreviewFeedbackService(
+      writer,
+      recorder,
+      new FixedClock("2026-05-06T04:30:00.000Z"),
+    );
+    const context = createExecutionContext({
+      requestId: "req_preview_feedback_idempotent_test",
+      entrypoint: "system",
+    });
+    const input = {
+      feedbackKey: "feedback:sevt_preview_1:comment",
+      sourceEventId: "sevt_preview_1",
+      previewEnvironmentId: "prenv_1",
+      channel: "github-pr-comment" as const,
+      repositoryFullName: "appaloft/demo",
+      pullRequestNumber: 48,
+      body: "Preview deployment accepted.",
+    };
+
+    const first = await service.publish(context, input);
+    const second = await service.publish(context, {
+      ...input,
+      body: "Preview deployment updated.",
+    });
+
+    expect(first._unsafeUnwrap()).toEqual({
+      status: "created",
+      providerFeedbackId: "github_feedback_1",
+    });
+    expect(second._unsafeUnwrap()).toEqual({
+      status: "updated",
+      providerFeedbackId: "github_feedback_1",
+    });
+    expect(writer.inputs).toEqual([
+      expect.objectContaining({
+        feedbackKey: "feedback:sevt_preview_1:comment",
+        body: "Preview deployment accepted.",
+      }),
+      expect.objectContaining({
+        feedbackKey: "feedback:sevt_preview_1:comment",
+        providerFeedbackId: "github_feedback_1",
+        body: "Preview deployment updated.",
+      }),
+    ]);
+    expect(recorder.records.get("feedback:sevt_preview_1:comment")).toEqual({
+      feedbackKey: "feedback:sevt_preview_1:comment",
+      sourceEventId: "sevt_preview_1",
+      previewEnvironmentId: "prenv_1",
+      channel: "github-pr-comment",
+      status: "published",
+      providerFeedbackId: "github_feedback_1",
+      updatedAt: "2026-05-06T04:30:00.000Z",
+    });
+  });
+
+  test("[PG-PREVIEW-FEEDBACK-001] records retryable provider failures without returning err", async () => {
+    const writer = new CapturingPreviewFeedbackWriter();
+    writer.failRetryably = true;
+    const recorder = new InMemoryPreviewFeedbackRecorder();
+    const service = new PreviewFeedbackService(
+      writer,
+      recorder,
+      new FixedClock("2026-05-06T04:35:00.000Z"),
+    );
+    const context = createExecutionContext({
+      requestId: "req_preview_feedback_retryable_test",
+      entrypoint: "system",
+    });
+
+    const result = await service.publish(context, {
+      feedbackKey: "feedback:sevt_preview_retry:comment",
+      sourceEventId: "sevt_preview_retry",
+      previewEnvironmentId: "prenv_retry",
+      channel: "github-pr-comment",
+      repositoryFullName: "appaloft/demo",
+      pullRequestNumber: 49,
+      body: "Preview deployment accepted.",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({
+      status: "retryable-failed",
+      errorCode: "provider_error",
+      retryable: true,
+    });
+    expect(recorder.records.get("feedback:sevt_preview_retry:comment")).toEqual({
+      feedbackKey: "feedback:sevt_preview_retry:comment",
+      sourceEventId: "sevt_preview_retry",
+      previewEnvironmentId: "prenv_retry",
+      channel: "github-pr-comment",
+      status: "retryable-failed",
+      errorCode: "provider_error",
+      retryable: true,
+      updatedAt: "2026-05-06T04:35:00.000Z",
+    });
   });
 });

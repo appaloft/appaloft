@@ -32,7 +32,7 @@
 - [x] `PG-PREVIEW-CONFIG-001`: scoped preview variables/secrets do not copy production secrets or
   routes by default.
 - [x] `PG-PREVIEW-DEPLOY-001`: preview deployment dispatch uses ids-only `deployments.create`.
-- [ ] `PG-PREVIEW-FEEDBACK-001`: comments/checks/status updates are idempotent and retryable.
+- [x] `PG-PREVIEW-FEEDBACK-001`: comments/checks/status updates are idempotent and retryable.
 - [ ] `PG-PREVIEW-CLEANUP-001`: cleanup preserves deployment history and audit while removing
   preview runtime, route, source-link, and provider metadata.
 - [ ] `PG-PREVIEW-CLEANUP-002`: cleanup retry creates new attempt ids and exposes safe retry state.

@@ -93,6 +93,11 @@ masked secret values, and never copies durable routes into preview output.
 deployment dispatch delegates to the existing `deployments.create` admission use case with only
 project/environment/resource/server/destination ids, excluding source event, pull request, branch,
 source, route, or preview-specific fields.
+`PG-PREVIEW-FEEDBACK-001` has initial application coverage in
+`packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves preview
+feedback publish calls reuse an existing provider feedback id for update-in-place and record
+retryable provider failures as safe feedback state while returning `ok` to preserve the accepted
+deployment result.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
@@ -112,9 +117,8 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-Deployment dispatch, blocked-event read models, GitHub App webhook normalization, feedback, cleanup
-retry, and active operation entrypoints remain open. Existing non-product-grade coverage belongs to
-Action-only PR previews and
+GitHub App route wiring, durable feedback adapters/persistence, cleanup retry, and active operation
+entrypoints remain open. Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 
 Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add
