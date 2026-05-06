@@ -8,6 +8,7 @@ import {
   type CloneEnvironmentCommandInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
   type ConfigureDomainBindingRouteCommandInput,
+  type ConfigurePreviewPolicyCommandInput,
   type ConfigureResourceAccessCommandInput,
   type ConfigureResourceAutoDeployCommandInput,
   type ConfigureResourceHealthCommandInput,
@@ -28,6 +29,7 @@ import {
   type DeactivateServerCommandInput,
   type DeleteCertificateCommandInput,
   type DeleteDomainBindingCommandInput,
+  type DeletePreviewEnvironmentCommandInput,
   type DeleteResourceCommandInput,
   type DeleteScheduledTaskCommandInput,
   type DeleteServerCommandInput,
@@ -47,6 +49,7 @@ import {
   type ListEnvironmentsQueryInput,
   type ListGitHubRepositoriesQueryInput,
   type ListOperatorWorkQueryInput,
+  type ListPreviewEnvironmentsQueryInput,
   type ListResourcesQueryInput,
   type ListScheduledTaskRunsQueryInput,
   type ListScheduledTasksQueryInput,
@@ -83,6 +86,8 @@ import {
   type ShowDomainBindingQueryInput,
   type ShowEnvironmentQueryInput,
   type ShowOperatorWorkQueryInput,
+  type ShowPreviewEnvironmentQueryInput,
+  type ShowPreviewPolicyQueryInput,
   type ShowProjectQueryInput,
   type ShowResourceQueryInput,
   type ShowScheduledTaskQueryInput,
@@ -109,6 +114,7 @@ import {
   type CloneEnvironmentResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
   type ConfigureDomainBindingRouteResponse,
+  type ConfigurePreviewPolicyResponse,
   type ConfigureResourceAccessResponse,
   type ConfigureResourceAutoDeployResponse,
   type ConfigureResourceHealthResponse,
@@ -126,6 +132,7 @@ import {
   type DeactivateServerResponse,
   type DeleteCertificateResponse,
   type DeleteDomainBindingResponse,
+  type DeletePreviewEnvironmentResponse,
   type DeleteResourceResponse,
   type DeleteScheduledTaskResponse,
   type DeleteServerResponse,
@@ -151,6 +158,7 @@ import {
   type ListGitHubRepositoriesResponse,
   type ListOperatorWorkResponse,
   type ListPluginsResponse,
+  type ListPreviewEnvironmentsResponse,
   type ListProjectsResponse,
   type ListProvidersResponse,
   type ListResourcesResponse,
@@ -191,6 +199,8 @@ import {
   type ShowDeploymentResponse,
   type ShowDomainBindingResponse,
   type ShowOperatorWorkResponse,
+  type ShowPreviewEnvironmentResponse,
+  type ShowPreviewPolicyResponse,
   type ShowProjectResponse,
   type ShowScheduledTaskResponse,
   type ShowScheduledTaskRunResponse,
@@ -847,6 +857,40 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ShowSourceEventQueryInput,
       ShowSourceEventResponse,
+      AppaloftClientError
+    >;
+  };
+  previewPolicies: {
+    configure: Client<
+      AppaloftClientContext,
+      ConfigurePreviewPolicyCommandInput,
+      ConfigurePreviewPolicyResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowPreviewPolicyQueryInput,
+      ShowPreviewPolicyResponse,
+      AppaloftClientError
+    >;
+  };
+  previewEnvironments: {
+    list: Client<
+      AppaloftClientContext,
+      ListPreviewEnvironmentsQueryInput,
+      ListPreviewEnvironmentsResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowPreviewEnvironmentQueryInput,
+      ShowPreviewEnvironmentResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeletePreviewEnvironmentCommandInput,
+      DeletePreviewEnvironmentResponse,
       AppaloftClientError
     >;
   };

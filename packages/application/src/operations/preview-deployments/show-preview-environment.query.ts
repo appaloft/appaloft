@@ -1,19 +1,17 @@
 import { type Result } from "@appaloft/core";
-import { z } from "zod";
 
 import { Query } from "../../cqrs";
 import { type ShowPreviewEnvironmentResult } from "../../ports";
-import { nonEmptyTrimmedString, parseOperationInput, trimToUndefined } from "../shared-schema";
+import { parseOperationInput, trimToUndefined } from "../shared-schema";
+import {
+  type ShowPreviewEnvironmentQueryInput,
+  showPreviewEnvironmentQueryInputSchema,
+} from "./show-preview-environment.schema";
 
-export const showPreviewEnvironmentQueryInputSchema = z.object({
-  previewEnvironmentId: nonEmptyTrimmedString("Preview environment id"),
-  projectId: nonEmptyTrimmedString("Project id").optional(),
-  resourceId: nonEmptyTrimmedString("Resource id").optional(),
-});
-
-export type ShowPreviewEnvironmentQueryInput = z.input<
-  typeof showPreviewEnvironmentQueryInputSchema
->;
+export {
+  type ShowPreviewEnvironmentQueryInput,
+  showPreviewEnvironmentQueryInputSchema,
+} from "./show-preview-environment.schema";
 
 export class ShowPreviewEnvironmentQuery extends Query<ShowPreviewEnvironmentResult> {
   constructor(

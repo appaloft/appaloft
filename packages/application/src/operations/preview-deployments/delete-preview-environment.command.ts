@@ -1,18 +1,17 @@
 import { type Result } from "@appaloft/core";
-import { z } from "zod";
 
 import { Command } from "../../cqrs";
-import { nonEmptyTrimmedString, parseOperationInput } from "../shared-schema";
+import { parseOperationInput } from "../shared-schema";
+import {
+  type DeletePreviewEnvironmentCommandInput,
+  deletePreviewEnvironmentCommandInputSchema,
+} from "./delete-preview-environment.schema";
 import { type CleanupPreviewEnvironmentResult } from "./preview-cleanup.service";
 
-export const deletePreviewEnvironmentCommandInputSchema = z.object({
-  previewEnvironmentId: nonEmptyTrimmedString("Preview environment id"),
-  resourceId: nonEmptyTrimmedString("Resource id"),
-});
-
-export type DeletePreviewEnvironmentCommandInput = z.input<
-  typeof deletePreviewEnvironmentCommandInputSchema
->;
+export {
+  type DeletePreviewEnvironmentCommandInput,
+  deletePreviewEnvironmentCommandInputSchema,
+} from "./delete-preview-environment.schema";
 
 export class DeletePreviewEnvironmentCommand extends Command<CleanupPreviewEnvironmentResult> {
   constructor(
