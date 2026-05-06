@@ -1,5 +1,6 @@
 import {
   CreatedAt,
+  type DependencyResourceBindingReadinessState,
   DependencyResourceProviderFailureCode,
   DependencyResourceProviderRealizationAttemptId,
   DependencyResourceProviderRealizationStatusValue,
@@ -33,6 +34,7 @@ import {
   type AppLogger,
   type Clock,
   type DependencyResourceRepository,
+  type DependencyResourceSecretStore,
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
@@ -43,6 +45,49 @@ import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type ProvisionPostgresDependencyResourceCommandInput } from "./provision-postgres-dependency-resource.command";
 
+const appaloftOwnedDependencySecretRefPrefix = "appaloft://dependency-resources/";
+
+function blockedBindingReadiness(reason: string): DependencyResourceBindingReadinessState {
+  return {
+    status: "blocked",
+    reason: DescriptionText.rehydrate(reason),
+  };
+}
+
+function isAppaloftOwnedDependencySecretRef(secretRef: string): boolean {
+  return secretRef.startsWith(appaloftOwnedDependencySecretRefPrefix);
+}
+
+function isProviderOwnedDependencySecretRef(secretRef: string): boolean {
+  return secretRef.startsWith("secret://");
+}
+
+async function resolveManagedPostgresBindingReadiness(input: {
+  context: ExecutionContext;
+  dependencyResourceSecretStore: DependencyResourceSecretStore;
+  secretRef?: string;
+  secretRefValid: boolean;
+}): Promise<DependencyResourceBindingReadinessState> {
+  if (!input.secretRef) {
+    return blockedBindingReadiness("dependency_runtime_secret_ref_missing");
+  }
+  if (!input.secretRefValid) {
+    return blockedBindingReadiness("dependency_runtime_secret_ref_invalid");
+  }
+  if (isAppaloftOwnedDependencySecretRef(input.secretRef)) {
+    const resolved = await input.dependencyResourceSecretStore.resolve(input.context, {
+      secretRef: input.secretRef,
+    });
+    return resolved.isOk()
+      ? { status: "ready" }
+      : blockedBindingReadiness("dependency_runtime_secret_unresolved");
+  }
+  if (isProviderOwnedDependencySecretRef(input.secretRef)) {
+    return { status: "ready" };
+  }
+  return blockedBindingReadiness("dependency_runtime_secret_ref_unsupported");
+}
+
 @injectable()
 export class ProvisionPostgresDependencyResourceUseCase {
   constructor(
@@ -52,6 +97,8 @@ export class ProvisionPostgresDependencyResourceUseCase {
     private readonly environmentRepository: EnvironmentRepository,
     @inject(tokens.dependencyResourceRepository)
     private readonly dependencyResourceRepository: DependencyResourceRepository,
+    @inject(tokens.dependencyResourceSecretStore)
+    private readonly dependencyResourceSecretStore: DependencyResourceSecretStore,
     @inject(tokens.clock)
     private readonly clock: Clock,
     @inject(tokens.idGenerator)
@@ -72,6 +119,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
     const {
       clock,
       dependencyResourceRepository,
+      dependencyResourceSecretStore,
       environmentRepository,
       eventBus,
       idGenerator,
@@ -201,13 +249,22 @@ export class ProvisionPostgresDependencyResourceUseCase {
           realization.value.providerResourceHandle,
         );
         const connectionSecretRef = realization.value.secretRef
-          ? yield* DependencyResourceSecretRef.create(realization.value.secretRef)
+          ? DependencyResourceSecretRef.create(realization.value.secretRef)
           : undefined;
+        const bindingReadiness = await resolveManagedPostgresBindingReadiness({
+          context,
+          dependencyResourceSecretStore,
+          ...(realization.value.secretRef ? { secretRef: realization.value.secretRef } : {}),
+          secretRefValid: connectionSecretRef ? connectionSecretRef.isOk() : false,
+        });
         yield* dependencyResource.markProviderRealized({
           attemptId: realizationAttemptId,
           providerResourceHandle,
           endpoint: realization.value.endpoint,
-          ...(connectionSecretRef ? { connectionSecretRef } : {}),
+          ...(connectionSecretRef?.isOk()
+            ? { connectionSecretRef: connectionSecretRef.value }
+            : {}),
+          bindingReadiness,
           realizedAt,
         });
       } else {

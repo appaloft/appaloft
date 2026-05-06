@@ -18,6 +18,7 @@ import {
 import {
   CapturedEventBus,
   FakeDependencyResourceBackupProvider,
+  FakeDependencyResourceSecretStore,
   FakeManagedPostgresProvider,
   FixedClock,
   MemoryDependencyResourceBackupReadModel,
@@ -61,6 +62,7 @@ async function createHarness() {
   const dependencyResources = new MemoryDependencyResourceRepository();
   const backups = new MemoryDependencyResourceBackupRepository();
   const backupReadModel = new MemoryDependencyResourceBackupReadModel(backups);
+  const dependencyResourceSecretStore = new FakeDependencyResourceSecretStore();
   const deleteSafetyReader = new MemoryDependencyResourceDeleteSafetyReader(undefined, backups);
   const eventBus = new CapturedEventBus();
   const managedPostgresProvider = new FakeManagedPostgresProvider();
@@ -117,6 +119,7 @@ async function createHarness() {
       projects,
       environments,
       dependencyResources,
+      dependencyResourceSecretStore,
       clock,
       idGenerator,
       eventBus,

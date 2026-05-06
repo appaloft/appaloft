@@ -9,6 +9,7 @@ import {
   EnvironmentKindValue,
   EnvironmentName,
   err,
+  ok,
   Project,
   ProjectId,
   ProjectName,
@@ -125,6 +126,7 @@ async function createHarness() {
       projects,
       environments,
       dependencyResources,
+      dependencyResourceSecretStore,
       clock,
       idGenerator,
       eventBus,
@@ -153,7 +155,7 @@ async function createHarness() {
 }
 
 describe("Postgres dependency resource lifecycle use cases", () => {
-  test("[DEP-RES-PG-PROVISION-001] [DEP-RES-PG-NATIVE-001] [DEP-RES-PG-NATIVE-002] provisions managed Postgres through provider realization", async () => {
+  test("[DEP-RES-PG-PROVISION-001] [DEP-RES-PG-NATIVE-001] [DEP-RES-PG-NATIVE-002] [DEP-BIND-SECRET-RESOLVE-003] provisions managed Postgres through provider realization", async () => {
     const {
       context,
       eventBus,
@@ -201,6 +203,107 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         providerResourceHandle: `pg/${result._unsafeUnwrap().id}`,
       },
       connection: {
+        maskedConnection: expect.stringContaining("********"),
+      },
+    });
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-003] keeps managed Postgres binding ready for resolvable Appaloft-owned refs", async () => {
+    const {
+      context,
+      dependencyResourceSecretStore,
+      managedPostgresProvider,
+      provisionPostgres,
+      showDependencyResource,
+    } = await createHarness();
+    const secretRef = "appaloft://dependency-resources/rsi_0001/connection";
+    await dependencyResourceSecretStore.storeConnection(context, {
+      dependencyResourceId: "rsi_0001",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      kind: "postgres",
+      purpose: "connection",
+      secretValue: "postgres://app:super-secret@main-db.postgres.internal:5432/main_db",
+      storedAt: "2026-01-01T00:00:00.000Z",
+    });
+    managedPostgresProvider.setRealizationResult(
+      ok({
+        providerResourceHandle: "pg/rsi_0001",
+        endpoint: {
+          host: "main-db.postgres.internal",
+          port: 5432,
+          databaseName: "main_db",
+          maskedConnection: "postgres://app:********@main-db.postgres.internal:5432/main_db",
+        },
+        secretRef,
+        realizedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    const result = await provisionPostgres.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main DB",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({
+        dependencyResourceId: result._unsafeUnwrap().id,
+      })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().dependencyResource).toMatchObject({
+      lifecycleStatus: "ready",
+      bindingReadiness: { status: "ready" },
+      connection: {
+        secretRef,
+        maskedConnection: expect.stringContaining("********"),
+      },
+    });
+    expect(JSON.stringify(shown._unsafeUnwrap().dependencyResource)).not.toContain("super-secret");
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-003] blocks managed Postgres binding readiness for unresolved Appaloft-owned refs", async () => {
+    const { context, managedPostgresProvider, provisionPostgres, showDependencyResource } =
+      await createHarness();
+    const secretRef = "appaloft://dependency-resources/rsi_0001/connection";
+    managedPostgresProvider.setRealizationResult(
+      ok({
+        providerResourceHandle: "pg/rsi_0001",
+        endpoint: {
+          host: "main-db.postgres.internal",
+          port: 5432,
+          databaseName: "main_db",
+          maskedConnection: "postgres://app:********@main-db.postgres.internal:5432/main_db",
+        },
+        secretRef,
+        realizedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    const result = await provisionPostgres.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main DB",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({
+        dependencyResourceId: result._unsafeUnwrap().id,
+      })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().dependencyResource).toMatchObject({
+      lifecycleStatus: "ready",
+      providerRealization: { status: "ready" },
+      bindingReadiness: {
+        status: "blocked",
+        reason: "dependency_runtime_secret_unresolved",
+      },
+      connection: {
+        secretRef,
         maskedConnection: expect.stringContaining("********"),
       },
     });
