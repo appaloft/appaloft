@@ -178,7 +178,13 @@ function runtimeEnvironmentSnapshot(input: { secretKey?: string } = {}): Environ
 }
 
 function runtimePlan(
-  input: { healthPath?: string; image?: string; metadata?: Record<string, string>; port?: number } = {},
+  input: {
+    healthPath?: string;
+    image?: string;
+    metadata?: Record<string, string>;
+    port?: number;
+    tlsMode?: "auto" | "disabled";
+  } = {},
 ): RuntimePlan {
   const image = ImageReference.rehydrate(input.image ?? "registry.example.com/team/app:sha");
   const port = PortNumber.rehydrate(input.port ?? 3000);
@@ -186,7 +192,7 @@ function runtimePlan(
     proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
     domains: [PublicDomainName.rehydrate("api.example.com")],
     pathPrefix: RoutePathPrefix.rehydrate("/"),
-    tlsMode: TlsModeValue.rehydrate("auto"),
+    tlsMode: TlsModeValue.rehydrate(input.tlsMode ?? "auto"),
     targetPort: port,
   });
 
@@ -246,6 +252,7 @@ function runningDeployment(
     metadata?: Record<string, string>;
     port?: number;
     secretKey?: string;
+    tlsMode?: "auto" | "disabled";
   } = {},
 ): Deployment {
   const deployment = Deployment.create({
@@ -292,6 +299,18 @@ function commandStatus(command: string[]): number {
   }).exitCode;
 }
 
+function commandResult(command: string[]): { exitCode: number; stderr: string; stdout: string } {
+  const result = Bun.spawnSync(command, {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  return {
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  };
+}
+
 function commandOutputWithStdinFile(command: string[], stdin: Blob): string {
   const result = Bun.spawnSync(command, {
     stdin,
@@ -310,6 +329,85 @@ function commandOutputWithStdinFile(command: string[], stdin: Blob): string {
   }
 
   return result.stdout.toString().trim();
+}
+
+function removeSmokeEdgeProxy(): void {
+  commandStatus(["docker", "service", "rm", "appaloft-swarm-smoke-traefik"]);
+}
+
+function prepareSmokeEdgeProxy(input: { edgeNetworkName: string; publishedPort: string }): void {
+  removeSmokeEdgeProxy();
+  commandOutput(["docker", "pull", Bun.env.APPALOFT_DOCKER_SWARM_TRAEFIK_IMAGE ?? "traefik:v2.11"]);
+  commandOutput([
+    "docker",
+    "service",
+    "create",
+    "--name",
+    "appaloft-swarm-smoke-traefik",
+    "--constraint",
+    "node.role==manager",
+    "--network",
+    input.edgeNetworkName,
+    "--publish",
+    `published=${input.publishedPort},target=80,mode=host`,
+    "--mount",
+    "type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock,readonly",
+    Bun.env.APPALOFT_DOCKER_SWARM_TRAEFIK_IMAGE ?? "traefik:v2.11",
+    "--providers.docker=true",
+    "--providers.docker.swarmMode=true",
+    "--providers.docker.exposedByDefault=false",
+    `--providers.docker.network=${input.edgeNetworkName}`,
+    "--entrypoints.web.address=:80",
+  ]);
+}
+
+async function waitForSmokeRoute(input: {
+  expectedText: string;
+  host: string;
+  path: string;
+  port: string;
+}): Promise<string> {
+  const url = `http://127.0.0.1:${input.port}${input.path}`;
+  let lastOutput = "";
+  for (let attempt = 1; attempt <= 40; attempt += 1) {
+    const result = commandResult([
+      "curl",
+      "-fsS",
+      "--max-time",
+      "2",
+      "-H",
+      `Host: ${input.host}`,
+      url,
+    ]);
+    const output = `${result.stdout}\n${result.stderr}`.trim();
+    if (result.exitCode === 0 && result.stdout.includes(input.expectedText)) {
+      return result.stdout;
+    }
+
+    lastOutput = output;
+    await Bun.sleep(500);
+  }
+
+  const proxyLogs = commandResult([
+    "docker",
+    "service",
+    "logs",
+    "--raw",
+    "--tail",
+    "80",
+    "appaloft-swarm-smoke-traefik",
+  ]);
+  throw new Error(
+    [
+      `Smoke edge route did not return ${input.expectedText} from ${input.host}.`,
+      lastOutput ? `Last curl output:\n${lastOutput}` : "",
+      proxyLogs.stdout || proxyLogs.stderr
+        ? `Traefik logs:\n${proxyLogs.stdout}${proxyLogs.stderr}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
 }
 
 async function commandOutputWithStdinFileRetry(input: {
@@ -594,6 +692,7 @@ describe("DockerSwarmExecutionBackend", () => {
 
       const edgeNetworkName =
         Bun.env.APPALOFT_DOCKER_SWARM_EDGE_NETWORK ?? "appaloft-edge";
+      const edgeProxyPort = Bun.env.APPALOFT_DOCKER_SWARM_EDGE_PROXY_PORT ?? "18080";
       const edgeNetwork = commandOutput([
         "docker",
         "network",
@@ -607,6 +706,7 @@ describe("DockerSwarmExecutionBackend", () => {
       const secretKey = "APPALOFT_SWARM_SMOKE_DATABASE_URL";
       const registryPassword = "appaloft-swarm-smoke-password";
       const registryUsername = "appaloft";
+      let deploymentCleaned = false;
       let registry:
         | {
             authDir: string;
@@ -620,6 +720,7 @@ describe("DockerSwarmExecutionBackend", () => {
         image: Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_IMAGE ?? "nginx:alpine",
         port: 80,
         secretKey,
+        tlsMode: "disabled",
       });
       const backend = new DockerSwarmExecutionBackend(
         new DockerSwarmShellCommandRunner({
@@ -630,6 +731,7 @@ describe("DockerSwarmExecutionBackend", () => {
       );
 
       try {
+        prepareSmokeEdgeProxy({ edgeNetworkName, publishedPort: edgeProxyPort });
         commandStatus(["docker", "secret", "rm", secretKey]);
         commandOutput([
           "sh",
@@ -659,6 +761,14 @@ describe("DockerSwarmExecutionBackend", () => {
         expect(JSON.stringify(state.runtimePlan.execution.metadata)).not.toContain(
           "postgres://secret-value",
         );
+        await waitForSmokeRoute({
+          expectedText: "Welcome to nginx",
+          host: "api.example.com",
+          path: "/",
+          port: edgeProxyPort,
+        });
+        await backend.cancel(createContext(), deployment);
+        deploymentCleaned = true;
 
         registry = await prepareAuthenticatedRegistryImage({
           baseImage: Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_IMAGE ?? "nginx:alpine",
@@ -674,6 +784,7 @@ describe("DockerSwarmExecutionBackend", () => {
           },
           port: 80,
           secretKey,
+          tlsMode: "disabled",
         });
         try {
           const privateResult = await backend.execute(createContext(), privateDeployment);
@@ -703,8 +814,11 @@ describe("DockerSwarmExecutionBackend", () => {
           await backend.cancel(createContext(), privateDeployment);
         }
       } finally {
-        await backend.cancel(createContext(), deployment);
+        if (!deploymentCleaned) {
+          await backend.cancel(createContext(), deployment);
+        }
         commandStatus(["docker", "secret", "rm", secretKey]);
+        removeSmokeEdgeProxy();
         if (registry) {
           commandStatus(["docker", "logout", registry.registryAddress]);
           commandStatus(["docker", "container", "rm", "-f", registry.registryName]);

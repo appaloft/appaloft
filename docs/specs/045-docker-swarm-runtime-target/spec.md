@@ -174,18 +174,20 @@ No new public operation key is accepted in this Spec Round.
   through the existing deployment execution metadata boundary. Raw Docker commands, provider
   payloads, and registry secret values are not part of that readback contract.
 - The runtime adapter test suite now includes an environment-gated real Docker Swarm smoke harness
-  for apply, post-verification route-label promotion, secret redaction, registry-authenticated image
-  pull, and scoped cleanup. It is skipped by default and requires
+  for apply, post-verification route-label promotion, real Traefik edge-proxy route realization,
+  secret redaction, registry-authenticated image pull, and scoped cleanup. It is skipped by default
+  and requires
   `APPALOFT_DOCKER_SWARM_SMOKE=1`, an active local Swarm manager, and an overlay network named by
   `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` or `appaloft-edge` before it mutates Docker state.
   `bun run smoke:swarm` is the first-class repository command for that opt-in smoke. The 2026-05-06
   local smoke run initialized a temporary Swarm manager, used `appaloft-smoke-edge`, created a
-  smoke-specific Docker secret reference, verified apply/route-promotion/scoped cleanup, deployed a
-  temporary authenticated-registry image with `--with-registry-auth`, kept registry secret material
-  out of deployment logs/metadata, and then returned Docker to inactive Swarm state.
+  smoke-specific Docker secret reference, verified apply, route promotion, HTTP routing through a
+  temporary Traefik Swarm edge proxy, scoped cleanup, deployed a temporary authenticated-registry
+  image with `--with-registry-auth`, kept registry secret material out of deployment logs/metadata,
+  and then returned Docker to inactive Swarm state.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
-- Default-on Swarm activation and end-to-end Swarm edge-proxy route realization remain open.
+- Default-on Swarm activation remains open.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and

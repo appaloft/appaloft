@@ -75,8 +75,9 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   fails, so previous same-resource services are preserved in default failure handling. Local real
   Swarm smoke has passed for apply, verification, route-label promotion, and scoped cleanup.
 - `SWARM-TARGET-ROUTE-001` has initial apply-plan coverage proving image workloads attach to the
-  Swarm overlay network without public host-port publication. Active edge-proxy route realization
-  remains open.
+  Swarm overlay network without public host-port publication. Local real Swarm smoke has passed
+  with a temporary Traefik Swarm edge proxy, post-verification route-label promotion, and an HTTP
+  `Host: api.example.com` route request to the nginx workload through the published proxy entrypoint.
 - `SWARM-TARGET-CLEAN-001` has initial adapter contract coverage proving Swarm service cleanup
   selectors include Appaloft managed, resource, deployment, target, destination, and runtime-target
   labels, and do not render broad Docker prune or volume commands. It also has fake-runner backend
@@ -114,8 +115,9 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   from candidate service creation and added only in the post-verification `promote-route-target`
   step against the Swarm edge network. Adapter coverage now proves the opt-in execution backend can
   use `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` to target a configured overlay network for both service
-  attachment and route labels. End-to-end route realization against a real Swarm edge proxy remains
-  open.
+  attachment and route labels. End-to-end route realization is covered by the opt-in real Swarm
+  smoke, which starts a temporary Traefik Swarm service on the overlay network and verifies the
+  promoted service route over HTTP without publishing the workload service port.
 - `SWARM-TARGET-SECRET-001` has initial fake-backend coverage proving Swarm command failure output
   is redacted before deployment logs and execution metadata capture common auth headers, cookies,
   key/value secrets, URL credentials, private-key blocks, or exact deployment snapshot secret
@@ -132,8 +134,8 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   afterward. `bun run smoke:swarm` is the first-class opt-in command for that harness. Default CI
   keeps this smoke skipped until a real Swarm environment is explicitly available. On 2026-05-06,
   the harness passed against a temporary local Swarm manager with `appaloft-smoke-edge`, including
-  smoke-specific Docker secret setup, route-label promotion, authenticated-registry image pull,
-  secret-safe deployment metadata, and scoped cleanup.
+  smoke-specific Docker secret setup, real Traefik route realization, authenticated-registry image
+  pull, secret-safe deployment metadata, and scoped cleanup.
 - `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
   explaining Swarm target registration, manager readiness expectations, image registry access,
   rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI `server register`,
