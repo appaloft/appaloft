@@ -12,6 +12,9 @@ import {
   type GitHubSourceEventWebhookVerificationResult,
   type GitHubSourceEventWebhookVerifier,
   type IntegrationDescriptor,
+  type PreviewFeedbackWriter,
+  type PreviewFeedbackWriterInput,
+  type PreviewFeedbackWriterResult,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
 
@@ -245,6 +248,121 @@ export function createGitHubPreviewPullRequestWebhookVerifier(): GitHubPreviewPu
   return new GitHubPreviewPullRequestWebhookVerifierImpl();
 }
 
+export class GitHubPreviewPrCommentFeedbackWriter implements PreviewFeedbackWriter {
+  constructor(
+    private readonly accessToken: string,
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly apiBaseUrl = "https://api.github.com",
+  ) {}
+
+  async publish(
+    context: ExecutionContext,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<PreviewFeedbackWriterResult>> {
+    return context.tracer.startActiveSpan(
+      createAdapterSpanName("github_preview_feedback", "publish_pr_comment"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.integrationKey]: "github",
+          "appaloft.preview_feedback.channel": input.channel,
+        },
+      },
+      async () => {
+        if (input.channel !== "github-pr-comment") {
+          return err(
+            domainError.providerCapabilityUnsupported(
+              "GitHub preview feedback channel is not supported by this writer",
+              {
+                phase: "preview-feedback",
+                provider: "github",
+                channel: input.channel,
+              },
+            ),
+          );
+        }
+
+        const repository = parseRepositoryFullName(input.repositoryFullName);
+        if (!repository) {
+          return err(
+            domainError.validation("GitHub repository full name is invalid", {
+              phase: "preview-feedback",
+              provider: "github",
+            }),
+          );
+        }
+
+        const url = input.providerFeedbackId
+          ? gitHubApiUrl(
+              this.apiBaseUrl,
+              `/repos/${repository.owner}/${repository.name}/issues/comments/${encodeURIComponent(
+                input.providerFeedbackId,
+              )}`,
+            )
+          : gitHubApiUrl(
+              this.apiBaseUrl,
+              `/repos/${repository.owner}/${repository.name}/issues/${input.pullRequestNumber}/comments`,
+            );
+        const response = await this.fetcher(url, {
+          method: input.providerFeedbackId ? "PATCH" : "POST",
+          headers: {
+            accept: "application/vnd.github+json",
+            authorization: `Bearer ${this.accessToken}`,
+            "content-type": "application/json",
+            "user-agent": "appaloft-control-plane",
+            "x-github-api-version": "2022-11-28",
+          },
+          body: JSON.stringify({ body: input.body }),
+        });
+
+        if (!response.ok) {
+          return err(
+            domainError.provider(
+              "GitHub preview feedback request failed",
+              {
+                phase: "preview-feedback",
+                provider: "github",
+                channel: input.channel,
+                statusCode: response.status,
+              },
+              isRetryableGitHubStatus(response.status),
+            ),
+          );
+        }
+
+        const payload = objectRecord(await response.json().catch(() => null));
+        const providerFeedbackId =
+          typeof payload?.id === "number" || typeof payload?.id === "string"
+            ? String(payload.id)
+            : input.providerFeedbackId;
+        if (!providerFeedbackId) {
+          return err(
+            domainError.provider(
+              "GitHub preview feedback response did not include a comment id",
+              {
+                phase: "preview-feedback",
+                provider: "github",
+                channel: input.channel,
+                statusCode: response.status,
+              },
+              true,
+            ),
+          );
+        }
+
+        return ok({ providerFeedbackId });
+      },
+    );
+  }
+}
+
+export function createGitHubPreviewPrCommentFeedbackWriter(
+  accessToken: string,
+  fetcher?: typeof fetch,
+  apiBaseUrl?: string,
+): PreviewFeedbackWriter {
+  return new GitHubPreviewPrCommentFeedbackWriter(accessToken, fetcher, apiBaseUrl);
+}
+
 interface GitHubPushPayloadFacts {
   locator: string;
   providerRepositoryId: string;
@@ -396,6 +514,26 @@ function normalizeGitHubRef(ref: string): string {
   }
 
   return ref;
+}
+
+function parseRepositoryFullName(value: string): { owner: string; name: string } | null {
+  const [owner, name, ...extra] = value.split("/");
+  if (!owner || !name || extra.length > 0) {
+    return null;
+  }
+
+  return {
+    owner: encodeURIComponent(owner),
+    name: encodeURIComponent(name),
+  };
+}
+
+function gitHubApiUrl(apiBaseUrl: string, path: string): URL {
+  return new URL(path, apiBaseUrl);
+}
+
+function isRetryableGitHubStatus(status: number): boolean {
+  return status === 408 || status === 409 || status === 429 || status >= 500;
 }
 
 async function hmacSha256Hex(secretValue: string, body: string): Promise<string> {
