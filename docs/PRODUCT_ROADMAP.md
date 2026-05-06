@@ -1478,6 +1478,11 @@ Current verification notes:
   future public `appaloft/deploy-action` repository, with a layout test proving exported files match
   the reference and shell scripts keep executable bits. Creating the public repository and wiring
   public wrapper CI remain open.
+- 2026-05-06 Phase 7 deploy-action public CI export slice added the wrapper repository CI workflow
+  to the exported layout. The workflow validates shell syntax, dry-run PR preview mapping and
+  outputs, and an opt-in exact-version install smoke controlled by the future public repository's
+  `APPALOFT_INSTALL_SMOKE_VERSION` variable. Creating the public repository and enabling that
+  exported CI remain external release/publishing work.
 
 Required:
 
@@ -1507,8 +1512,8 @@ Required:
 - [ ] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
   GitHub Actions workflow. Public docs now distinguish Action-only workflow-file previews from
   future product-grade control-plane previews, but the public `appaloft/deploy-action` wrapper
-  repository and public wrapper CI remain open; reference action asset export is implemented and
-  layout-tested locally.
+  repository remains open; reference action asset export and the exported public wrapper CI workflow
+  are implemented and layout-tested locally.
 - [x] Add existing-resource profile-drift handling.
 - [x] Add product-grade preview deployments after source binding and webhook ingestion are durable,
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup

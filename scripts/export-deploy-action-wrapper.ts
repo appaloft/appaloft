@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 const repositoryRoot = resolve(import.meta.dir, "..");
 const actionRoot = join(repositoryRoot, ".github/actions/deploy-action");
 const files = [
+  ".github/workflows/ci.yml",
   "action.yml",
   "README.md",
   "scripts/install-appaloft.sh",
