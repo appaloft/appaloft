@@ -113,6 +113,7 @@ import {
   CapturedEventBus,
   FakeDependencyResourceBackupProvider,
   FakeDependencyResourceSecretStore,
+  FakeManagedPostgresProvider,
   FakeManagedRedisProvider,
   FixedClock,
   MemoryDependencyResourceBackupRepository,
@@ -171,6 +172,7 @@ import {
   DeploymentLifecycleService,
   DeploymentLogsQueryService,
   DeploymentSnapshotFactory,
+  ProvisionPostgresDependencyResourceUseCase,
   ProvisionRedisDependencyResourceUseCase,
   RestoreDependencyResourceBackupUseCase,
   RuntimePlanResolutionInputBuilder,
@@ -595,6 +597,7 @@ async function createDeploymentFixture(
   const dependencyBindings = new MemoryResourceDependencyBindingRepository();
   const dependencyResourceBackups = new MemoryDependencyResourceBackupRepository();
   const dependencyResourceBackupProvider = new FakeDependencyResourceBackupProvider();
+  const managedPostgresProvider = new FakeManagedPostgresProvider();
   const managedRedisProvider = new FakeManagedRedisProvider();
   const dependencyBindingReadModel = new MemoryResourceDependencyBindingReadModel(
     dependencyBindings,
@@ -754,7 +757,19 @@ async function createDeploymentFixture(
     environment,
     environments,
     eventBus,
+    managedPostgresProvider,
     managedRedisProvider,
+    provisionPostgres: new ProvisionPostgresDependencyResourceUseCase(
+      projects,
+      environments,
+      dependencyResources,
+      dependencyResourceSecretStore,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+      managedPostgresProvider,
+    ),
     provisionRedis: new ProvisionRedisDependencyResourceUseCase(
       projects,
       environments,
@@ -1431,6 +1446,88 @@ describe("CreateDeploymentUseCase", () => {
     expect(serializedReferences).not.toContain("super-secret");
     expect(serializedReferences).not.toContain("managed-redis.redis.internal");
     expect(serializedReferences).not.toContain("redis://");
+  });
+
+  test("[DEP-RES-PG-CLOSED-LOOP-001] verifies managed Postgres provision bind deploy observe backup restore loop", async () => {
+    const {
+      bindDependency,
+      context,
+      createBackup,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deploymentLogs,
+      deploymentReadModel,
+      dependencyResourceBackupProvider,
+      provisionPostgres,
+      repositoryContext,
+      restoreBackup,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+
+    const provisioned = await provisionPostgres.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main DB",
+    });
+    expect(provisioned.isOk()).toBe(true);
+    const dependencyResourceId = provisioned._unsafeUnwrap().id;
+
+    const bound = await bindDependency.execute(context, {
+      resourceId: "res_demo",
+      dependencyResourceId,
+      targetName: "DATABASE_URL",
+    });
+    expect(bound.isOk()).toBe(true);
+
+    const deployed = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const createdDeployment = unwrapDeploymentCreateResult(deployed);
+    const observed = await deploymentReadModel.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(createdDeployment.id)),
+    );
+    const observedLogs = await deploymentLogs.execute(context, createdDeployment.id);
+
+    expect(observed).toMatchObject({
+      id: createdDeployment.id,
+      status: "succeeded",
+      dependencyBindingReferences: [
+        expect.objectContaining({
+          dependencyResourceId,
+          kind: "postgres",
+          targetName: "DATABASE_URL",
+        }),
+      ],
+    });
+    expect(observedLogs.logs).toContainEqual(
+      expect.objectContaining({
+        level: "info",
+        message: "Hermetic execution backend applied runtime plan",
+      }),
+    );
+    expect(JSON.stringify(observed)).not.toContain("super-secret");
+    expect(JSON.stringify(observed)).not.toContain("postgres://app:");
+
+    const backup = await createBackup.execute(context, { dependencyResourceId });
+    expect(backup.isOk()).toBe(true);
+    const restored = await restoreBackup.execute(context, {
+      backupId: backup._unsafeUnwrap().id,
+      acknowledgeDataOverwrite: true,
+      acknowledgeRuntimeNotRestarted: true,
+    });
+
+    expect(restored.isOk()).toBe(true);
+    expect(dependencyResourceBackupProvider.backups).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId,
+        providerKey: "appaloft-managed-postgres",
+        dependencyKind: "postgres",
+      }),
+    );
+    expect(dependencyResourceBackupProvider.restores).toContainEqual(
+      expect.objectContaining({
+        backupId: backup._unsafeUnwrap().id,
+        dependencyResourceId,
+      }),
+    );
   });
 
   test("[DEP-RES-REDIS-CLOSED-LOOP-001] verifies managed Redis provision bind deploy observe backup restore loop", async () => {

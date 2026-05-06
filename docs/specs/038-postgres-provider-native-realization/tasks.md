@@ -60,3 +60,5 @@
 
 - [x] Reconcile spec, plan, tasks, docs, tests, operation catalog, code, roadmap notes, and public
   docs/help outcome after Code Round.
+- [x] Update `docs/PRODUCT_ROADMAP.md` Postgres closed-loop exit criterion after the full provision
+  -> bind -> deploy -> observe -> backup/restore loop is verified.
