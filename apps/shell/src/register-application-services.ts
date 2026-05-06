@@ -174,6 +174,7 @@ import {
   PreviewEnvironmentCleanupService,
   PreviewFeedbackService,
   PreviewLifecycleService,
+  PreviewPullRequestEventIngestService,
   PromoteEnvironmentUseCase,
   ProvisionPostgresDependencyResourceCommandHandler,
   ProvisionPostgresDependencyResourceUseCase,
@@ -539,6 +540,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.previewDeploymentProcessManager,
     PreviewDeploymentProcessManager,
+  );
+  container.registerSingleton(
+    tokens.previewPullRequestEventIngestService,
+    PreviewPullRequestEventIngestService,
   );
   container.registerSingleton(
     tokens.previewEnvironmentCleanupService,

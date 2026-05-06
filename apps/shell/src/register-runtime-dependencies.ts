@@ -64,6 +64,7 @@ import { type DomainError, domainError, err, ok, type Result } from "@appaloft/c
 import { InMemoryIntegrationRegistry } from "@appaloft/integration-core";
 import {
   createGitHubPreviewFeedbackWriter,
+  createGitHubPreviewPullRequestWebhookVerifier,
   createGitHubRepositoryBrowser,
   createGitHubSourceEventWebhookVerifier,
   githubIntegration,
@@ -1186,6 +1187,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.githubSourceEventWebhookVerifier, {
     useFactory: instanceCachingFactory(() => createGitHubSourceEventWebhookVerifier()),
+  });
+  container.register(tokens.githubPreviewPullRequestWebhookVerifier, {
+    useFactory: instanceCachingFactory(() => createGitHubPreviewPullRequestWebhookVerifier()),
   });
   container.register(tokens.diagnostics, {
     useFactory: instanceCachingFactory(

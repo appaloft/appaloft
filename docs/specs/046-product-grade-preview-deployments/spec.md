@@ -274,10 +274,15 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   future MCP tool contracts are generated from the operation catalog. Web now exposes
   `/preview-policies` controls for policy readback/configuration and a `/preview-environments`
   console surface backed by preview environment list/show/delete operations.
-- `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
-  pull request preview lifecycle events.
-- No GitHub App preview worker, scheduler leases, terminal provider metadata cleanup, or automatic
-  process-manager deployment-status publication is implemented.
+- The GitHub source-event HTTP route now accepts signed `pull_request` deliveries for the first
+  product-grade preview route slice. It verifies the raw GitHub payload, requires the trusted
+  `X-Appaloft-Project-Id`, `X-Appaloft-Environment-Id`, `X-Appaloft-Resource-Id`,
+  `X-Appaloft-Server-Id`, `X-Appaloft-Destination-Id`, and
+  `X-Appaloft-Source-Binding-Fingerprint` headers, then dispatches
+  `IngestPreviewPullRequestEventCommand` through `CommandBus`. Raw signatures, secrets, and
+  provider payloads stay out of the command.
+- No GitHub App installation/repository context mapper, scheduler leases, terminal provider
+  metadata cleanup, or automatic process-manager deployment-status publication is implemented.
 - Preview policy and preview environment operations currently expose CLI, HTTP/oRPC, and generated
   future MCP tool descriptors. Web exposes preview policy readback/configuration and the read-only
   preview environment list/detail/delete surface.

@@ -17,6 +17,7 @@ import {
   type CertificateRetryScheduler,
   type CommandBus,
   type ExecutionContext,
+  type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
   type IdGenerator,
   type IntegrationAuthPort,
@@ -370,6 +371,11 @@ export async function createAppComposition(
     childContainer,
     tokens.githubSourceEventWebhookVerifier,
   );
+  const githubPreviewPullRequestWebhookVerifier =
+    resolveToken<GitHubPreviewPullRequestWebhookVerifier>(
+      childContainer,
+      tokens.githubPreviewPullRequestWebhookVerifier,
+    );
   const executionContextFactory = createExecutionContextFactory({
     idGenerator,
     tracer: telemetry.tracer,
@@ -452,6 +458,7 @@ export async function createAppComposition(
     resourceRepository,
     sourceEventVerificationPort,
     githubSourceEventWebhookVerifier,
+    githubPreviewPullRequestWebhookVerifier,
     pluginRuntime,
     authRuntime,
     requestContextRunner,
