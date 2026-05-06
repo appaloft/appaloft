@@ -361,6 +361,13 @@ Current boundary:
   injection remains deferred. Unbind removes only the binding association; it does not delete the
   dependency resource, external/provider database, runtime state, backup data, or historical
   snapshots.
+- Dependency binding runtime injection is governed by
+  [ADR-040](./decisions/ADR-040-dependency-binding-runtime-injection-boundary.md) and
+  [Dependency Binding Runtime Injection](./specs/047-dependency-binding-runtime-injection/spec.md).
+  The accepted target keeps `deployments.create` ids-only, materializes active ready dependency
+  bindings into immutable safe runtime injection snapshots, and lets runtime target adapters deliver
+  secrets without exposing raw connection values. Code Round remains open; current implementation
+  still reports runtime injection as deferred.
 - `resources.rotate-dependency-binding-secret` rotates only the binding-scoped safe secret
   reference/version for future deployment snapshot references. It requires explicit acknowledgement
   that historical snapshots remain unchanged, and it does not rotate provider-native database

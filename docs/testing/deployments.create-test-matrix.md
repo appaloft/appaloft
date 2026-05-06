@@ -49,6 +49,8 @@ This test matrix inherits:
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
+- [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md)
+- [ADR-040: Dependency Binding Runtime Injection Boundary](../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -146,6 +148,9 @@ Then:
 | DEP-BIND-SNAP-REF-002 | integration | Bound dependency secrets excluded from snapshot | Resource is bound to an imported Postgres dependency that has secret-bearing connection input | `ok({ id })` | None | `deployment-requested`; later async events | Deployment snapshot stores no raw connection URL, password, token, secret value, provider credential, sensitive query parameter, or materialized env value. |
 | DEP-BIND-SNAP-REF-003 | integration | Removed dependency binding excluded | Resource had a Postgres binding removed before deployment admission | `ok({ id })` | None | `deployment-requested`; later async events | Removed binding is absent from the dependency binding snapshot reference list. |
 | DEP-BIND-SNAP-REF-004 | integration | Not-ready binding is diagnostic only | Resource has an active dependency binding whose dependency metadata is not ready for safe snapshot reference | `ok({ id })` for this slice | None | `deployment-requested`; later async events | Deployment admission is not blocked; snapshot readiness is recorded as blocked diagnostic and runtime injection remains deferred. |
+| DEP-BIND-RUNTIME-INJECT-001 | integration/runtime | Active Postgres binding runtime injection | Context ids resolve and Resource has an active ready Postgres binding with supported runtime-only env injection | `ok({ id })` after Code Round | None | `deployment-requested`; later async events | Deployment captures immutable safe runtime injection metadata and runtime receives `DATABASE_URL` through the selected target without raw secret exposure. |
+| DEP-BIND-RUNTIME-INJECT-002 | integration/runtime | Active imported Redis binding runtime injection | Context ids resolve and Resource has an active ready imported Redis binding with supported runtime-only env injection | `ok({ id })` after Code Round | None | `deployment-requested`; later async events | Deployment captures immutable safe runtime injection metadata and runtime receives `REDIS_URL`; managed Redis remains blocked until provider-native realization exists. |
+| DEP-BIND-RUNTIME-INJECT-004 | integration | Non-injectable binding blocks deployment admission | Context ids resolve and Resource has an active binding that cannot be delivered safely to the selected runtime target | `err` after Code Round | `dependency_runtime_injection_blocked`, phase `dependency-runtime-injection` | None | No deployment attempt is created and no raw secret appears in error details. |
 | SRV-LIFE-DEACT-004 | integration | Inactive server selected for deployment | Context ids resolve, but selected server was deactivated | `err` before acceptance | `server_inactive`, phase `server-lifecycle-guard` | None | No accepted deployment; inactive server remains visible for history and delete-safety checks |
 
 ## Async Progression Matrix

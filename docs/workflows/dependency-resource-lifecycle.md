@@ -53,6 +53,8 @@ capability under
 - [Redis Dependency Resource Lifecycle](../specs/037-redis-dependency-resource-lifecycle/spec.md)
 - [Postgres Provider-Native Realization](../specs/038-postgres-provider-native-realization/spec.md)
 - [Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md)
+- [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md)
+- [ADR-040: Dependency Binding Runtime Injection Boundary](../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md)
 - [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
 - [dependency-resource-realization-requested](../events/dependency-resource-realization-requested.md)
 - [dependency-resource-realized](../events/dependency-resource-realized.md)
@@ -88,8 +90,10 @@ The workflow lets operators:
    historical deployments.
 10. Register Redis dependency resources as safe provider-neutral records and copy ready imported
     Redis bindings into safe deployment snapshot references.
-11. Create safe backup restore points and restore them in place after explicit acknowledgement.
-12. Delete only dependency resources that pass safety checks.
+11. Materialize active ready dependency bindings into runtime environment injection snapshots after
+    the runtime injection Code Round.
+12. Create safe backup restore points and restore them in place after explicit acknowledgement.
+13. Delete only dependency resources that pass safety checks.
 
 ## Operation Boundaries
 
@@ -113,6 +117,7 @@ The workflow lets operators:
 | List Resource dependency bindings | `resources.list-dependency-bindings` | Nothing | Any aggregate or runtime state |
 | Show Resource dependency binding | `resources.show-dependency-binding` | Nothing | Any aggregate or runtime state |
 | Create deployment with dependency binding references | `deployments.create` | Deployment attempt snapshot | ResourceBinding lifecycle, Dependency Resource lifecycle, raw secrets, runtime env injection |
+| Materialize dependency binding runtime environment | internal capability during `deployments.plan` / `deployments.create` | Deployment runtime injection snapshot after Code Round | ResourceBinding lifecycle, Dependency Resource lifecycle, raw secrets, historical snapshots |
 
 ## Postgres Source Modes
 
@@ -245,6 +250,12 @@ bindings at admission time only. Removed bindings are excluded from new snapshot
 not-ready dependency metadata is a readiness diagnostic in this first snapshot reference slice, not
 a deployment admission blocker, because runtime env injection remains deferred.
 
+ADR-040 and the dependency binding runtime injection spec define the next target: after Code Round,
+`deployments.plan` reports `ready` or `blocked` runtime injection readiness, and
+`deployments.create` rejects active non-injectable bindings before acceptance. Runtime target
+adapters deliver resolved dependency secrets as close to execution as possible and redact command
+display, logs, events, errors, and diagnostics.
+
 `deployments.create` must not accept dependency resource, database URL, username, password, or
 secret-rotation fields.
 
@@ -267,8 +278,9 @@ provider-neutral safe metadata, and ready imported Redis records can bind to Res
 safe deployment snapshot references. Provider-native Postgres realization is implemented with a
 hermetic provider capability. Dependency resource backup/restore is implemented with a hermetic
 provider capability, safe backup read models, restore attempt metadata, lifecycle events, and
-delete-safety blockers. Runtime env injection, Web affordances, provider-native Redis realization,
-managed Redis binding admission, and runtime cleanup remain future work.
+delete-safety blockers. Dependency binding runtime injection is specified by ADR-040 but not
+implemented yet. Web affordances, provider-native Redis realization, managed Redis binding
+admission, and runtime cleanup remain future work.
 
 ## Open Questions
 

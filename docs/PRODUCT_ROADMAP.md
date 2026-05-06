@@ -871,6 +871,11 @@ Current verification notes:
   references with kind `redis`. Managed Redis binding, provider-native Redis infrastructure, and
   runtime environment injection remain deferred, so the Redis closed loop exit criterion remains
   open.
+- 2026-05-06 Phase 7 dependency binding runtime injection Spec Round added ADR-040 plus
+  `docs/specs/047-dependency-binding-runtime-injection` to govern how active ready Postgres and
+  imported Redis bindings become runtime environment inputs through `deployments.plan`,
+  `deployments.create`, and runtime target adapters. It does not implement the Code Round yet, so
+  Postgres/Redis closed loop exit criteria remain open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider

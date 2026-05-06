@@ -10,17 +10,16 @@
 
 ## Business Outcome
 
-Operators who bind a Postgres dependency resource to a Resource can see that a later deployment
-attempt recognized the binding and recorded safe dependency binding references in the immutable
-deployment snapshot.
+Operators who bind a Postgres or imported Redis dependency resource to a Resource can see that a
+later deployment attempt recognized the binding and recorded safe dependency binding references in
+the immutable deployment snapshot.
 
-The snapshot reference baseline must help users inspect "this deployment knew about this database
+The snapshot reference baseline must help users inspect "this deployment knew about this dependency
 binding" without exposing raw connection secrets, materialized environment values, or implying that
 runtime environment injection is implemented.
 
-This first slice establishes provider-neutral Postgres binding snapshot references that later
-runtime env injection, secret rotation, backup/restore, Redis bindings, and provider-native
-database realization can reuse.
+This first slice established provider-neutral binding snapshot references that later runtime env
+injection, secret rotation, backup/restore, and provider-native database realization can reuse.
 
 ## Discover Findings
 
@@ -38,9 +37,11 @@ database realization can reuse.
 5. Removed bindings are not active and must not be included in a new snapshot reference set.
 6. Missing or not-ready binding dependencies are not deployment admission blockers in this slice
    because runtime injection remains deferred. They are safe readiness diagnostics for plan/show
-   surfaces and future injection work.
-7. No ADR is needed because the slice does not change deployment admission, runtime env injection,
-   provider contracts, rollback semantics, retry semantics, or snapshot immutability.
+   surfaces and future injection work. ADR-040 governs the later runtime injection behavior that
+   will turn non-injectable active bindings into deployment admission blockers.
+7. No ADR was needed for this safe-reference slice because it did not change deployment admission,
+   runtime env injection, provider contracts, rollback semantics, retry semantics, or snapshot
+   immutability.
 
 ## Ubiquitous Language
 
@@ -61,6 +62,7 @@ database realization can reuse.
 | DEP-BIND-SNAP-REF-004 | Not-ready binding is diagnostic only | Resource has an active binding whose dependency metadata is not ready for safe snapshot reference | `deployments.plan` or `deployments.create` evaluates the resource | Deployment admission is not blocked in this slice; plan/show readiness reports blocked snapshot readiness and runtime injection remains deferred. |
 | DEP-BIND-SNAP-REF-005 | Plan preview reports binding readiness without side effects | Resource has an active Postgres dependency binding | `deployments.plan` runs | The preview reports dependency binding snapshot readiness and runtime injection deferred without creating a deployment id, snapshot row, events, or runtime work. |
 | DEP-BIND-SNAP-REF-006 | Deployment show reports immutable binding snapshot | Deployment was accepted with dependency binding references | `deployments.show` reads the attempt snapshot | The snapshot section reports the immutable binding references captured at admission, not the Resource's current binding state. |
+| DEP-BIND-REDIS-SNAPSHOT-001 | Snapshot includes active imported Redis binding references | Resource has an active imported Redis dependency binding with ready dependency metadata | `deployments.create`, `deployments.plan`, or `deployments.show` reports dependency binding references | Safe references carry kind `redis` without raw Redis connection material or materialized env values; runtime injection remains deferred until ADR-040 Code Round. |
 
 ## Domain Ownership
 
@@ -93,7 +95,7 @@ Deployment snapshot and deployment read surfaces may expose:
 
 - binding id;
 - dependency resource id;
-- dependency kind, first slice `postgres`;
+- dependency kind, currently `postgres` or `redis`;
 - target name;
 - scope;
 - injection mode;
@@ -115,7 +117,8 @@ They must not expose:
 - No raw secret materialization.
 - No secret rotation.
 - No backup/restore.
-- No Redis.
+- No runtime delivery of Redis bindings; safe imported Redis references are covered by
+  [Redis Dependency Resource Lifecycle](../037-redis-dependency-resource-lifecycle/spec.md).
 - No provider-native database realization.
 - No deployment retry/redeploy/rollback.
 - No runtime cleanup/prune.
@@ -123,5 +126,6 @@ They must not expose:
 
 ## Open Questions
 
-- Which future runtime injection operation or runtime plan extension consumes these references is
-  deferred to the runtime env injection slice.
+- Runtime injection is now governed by
+  [ADR-040](../../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md) and
+  [Dependency Binding Runtime Injection](../047-dependency-binding-runtime-injection/spec.md).
