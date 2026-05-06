@@ -50,6 +50,9 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.deploymentPlanPreview).toBe(
       "/docs/deploy/lifecycle/#deployment-plan-preview",
     );
+    expect(webDocsHrefs.productGradePreviews).toBe(
+      "/docs/deploy/previews/#product-grade-preview-deployments",
+    );
     expect(webDocsHrefs.serverProxyReadiness).toBe(
       "/docs/servers/operations/proxy-and-terminal/#server-proxy-readiness",
     );
@@ -99,6 +102,7 @@ describe("console docs help links", () => {
       await Promise.all(
         [
           "routes/domain-bindings/+page.svelte",
+          "routes/preview-environments/+page.svelte",
           "routes/projects/[projectId]/+page.svelte",
           "routes/resources/[resourceId]/+page.svelte",
           "routes/projects/[projectId]/environments/[environmentId]/resources/[resourceId]/deployments/new/+page.svelte",
@@ -117,6 +121,9 @@ describe("console docs help links", () => {
     );
     expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain("certificateReadiness");
     expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain("serverProxyReadiness");
+    expect(sourceByPath["routes/preview-environments/+page.svelte"]).toContain(
+      "productGradePreviews",
+    );
     expect(sourceByPath["routes/projects/[projectId]/+page.svelte"]).toContain(
       "environmentLifecycle",
     );

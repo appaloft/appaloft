@@ -87,6 +87,11 @@
     { href: "/servers", labelKey: i18nKeys.console.nav.servers, icon: Server },
     { href: "/domain-bindings", labelKey: i18nKeys.console.nav.domainBindings, icon: Globe2 },
     { href: "/deployments", labelKey: i18nKeys.console.nav.deployments, icon: Rocket },
+    {
+      href: "/preview-environments",
+      labelKey: i18nKeys.console.nav.previewEnvironments,
+      icon: GitBranch,
+    },
   ] as const;
 
   let { title, description, breadcrumbs = [], children }: Props = $props();
@@ -108,6 +113,7 @@
     servers: false,
     environments: false,
     domainBindings: false,
+    previewEnvironments: false,
     certificates: false,
     providers: false,
   });

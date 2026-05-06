@@ -7,6 +7,7 @@ import {
   type EnvironmentSummary,
   type HealthResponse,
   type ListProvidersResponse,
+  type PreviewEnvironmentSummary,
   type ProjectSummary,
   type ReadinessResponse,
   type ResourceSummary,
@@ -40,6 +41,7 @@ type ConsoleQueryKey =
   | "environments"
   | "resources"
   | "deployments"
+  | "previewEnvironments"
   | "domainBindings"
   | "certificates"
   | "providers";
@@ -121,6 +123,13 @@ export function createConsoleQueries(enabled: boolean, overrides: ConsoleQueryOv
       enabled: queryEnabled("deployments"),
     }),
   );
+  const previewEnvironmentsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["preview-environments"],
+      queryFn: () => orpcClient.previewEnvironments.list({}),
+      enabled: queryEnabled("previewEnvironments"),
+    }),
+  );
   const domainBindingsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["domain-bindings"],
@@ -154,6 +163,7 @@ export function createConsoleQueries(enabled: boolean, overrides: ConsoleQueryOv
     environmentsQuery,
     resourcesQuery,
     deploymentsQuery,
+    previewEnvironmentsQuery,
     domainBindingsQuery,
     certificatesQuery,
     providersQuery,
@@ -166,6 +176,7 @@ export type ConsoleQueryData = {
   environments: EnvironmentSummary[];
   resources: ResourceSummary[];
   deployments: DeploymentSummary[];
+  previewEnvironments: PreviewEnvironmentSummary[];
   domainBindings: DomainBindingSummary[];
   certificates: CertificateSummary[];
   providers: ProviderSummary[];

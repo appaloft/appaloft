@@ -49,6 +49,26 @@ export * from "./operations/environments/unlock-environment.schema";
 export * from "./operations/environments/unset-environment-variable.schema";
 export * from "./operations/operator-work/list-operator-work.schema";
 export * from "./operations/operator-work/show-operator-work.schema";
+export {
+  type ConfigurePreviewPolicyCommandInput,
+  configurePreviewPolicyCommandInputSchema,
+} from "./operations/preview-deployments/configure-preview-policy.schema";
+export {
+  type DeletePreviewEnvironmentCommandInput,
+  deletePreviewEnvironmentCommandInputSchema,
+} from "./operations/preview-deployments/delete-preview-environment.schema";
+export {
+  type ListPreviewEnvironmentsQueryInput,
+  listPreviewEnvironmentsQueryInputSchema,
+} from "./operations/preview-deployments/list-preview-environments.schema";
+export {
+  type ShowPreviewEnvironmentQueryInput,
+  showPreviewEnvironmentQueryInputSchema,
+} from "./operations/preview-deployments/show-preview-environment.schema";
+export {
+  type ShowPreviewPolicyQueryInput,
+  showPreviewPolicyQueryInputSchema,
+} from "./operations/preview-deployments/show-preview-policy.schema";
 export * from "./operations/projects/archive-project.schema";
 export * from "./operations/projects/create-project.schema";
 export * from "./operations/projects/rename-project.schema";
