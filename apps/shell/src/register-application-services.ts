@@ -72,6 +72,7 @@ import {
   DeleteDependencyResourceUseCase,
   DeleteDomainBindingCommandHandler,
   DeleteDomainBindingUseCase,
+  DeletePreviewEnvironmentCommandHandler,
   DeleteResourceCommandHandler,
   DeleteResourceUseCase,
   DeleteScheduledTaskCommandHandler,
@@ -136,6 +137,8 @@ import {
   ListGitHubRepositoriesQueryService,
   ListOperatorWorkQueryHandler,
   ListPluginsQueryService,
+  ListPreviewEnvironmentsQueryHandler,
+  ListPreviewEnvironmentsQueryService,
   ListProjectsQueryService,
   ListProvidersQueryService,
   ListResourceDependencyBindingsQueryHandler,
@@ -238,6 +241,8 @@ import {
   ShowDomainBindingQueryService,
   ShowEnvironmentQueryService,
   ShowOperatorWorkQueryHandler,
+  ShowPreviewEnvironmentQueryHandler,
+  ShowPreviewEnvironmentQueryService,
   ShowPreviewPolicyQueryHandler,
   ShowPreviewPolicyQueryService,
   ShowProjectQueryHandler,
@@ -373,6 +378,9 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(CleanupPreviewCommandHandler);
   container.registerSingleton(ConfigureDefaultAccessDomainPolicyCommandHandler);
   container.registerSingleton(ConfigurePreviewPolicyCommandHandler);
+  container.registerSingleton(DeletePreviewEnvironmentCommandHandler);
+  container.registerSingleton(ListPreviewEnvironmentsQueryHandler);
+  container.registerSingleton(ShowPreviewEnvironmentQueryHandler);
   container.registerSingleton(ShowPreviewPolicyQueryHandler);
   container.registerSingleton(ListDefaultAccessDomainPoliciesQueryHandler);
   container.registerSingleton(ShowDefaultAccessDomainPolicyQueryHandler);
@@ -490,6 +498,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
   );
   container.registerSingleton(tokens.configurePreviewPolicyUseCase, ConfigurePreviewPolicyUseCase);
   container.registerSingleton(tokens.showPreviewPolicyQueryService, ShowPreviewPolicyQueryService);
+  container.registerSingleton(
+    tokens.listPreviewEnvironmentsQueryService,
+    ListPreviewEnvironmentsQueryService,
+  );
+  container.registerSingleton(
+    tokens.showPreviewEnvironmentQueryService,
+    ShowPreviewEnvironmentQueryService,
+  );
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
   container.registerSingleton(tokens.archiveResourceUseCase, ArchiveResourceUseCase);
   container.registerSingleton(tokens.deleteResourceUseCase, DeleteResourceUseCase);

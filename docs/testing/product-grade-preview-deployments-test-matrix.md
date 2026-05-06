@@ -111,7 +111,10 @@ run, safe failure phase, provider error code, next retry time, and no provider e
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
-operation catalog entries with no active transports.
+operation catalog entries with no active transports. It also covers inactive
+`preview-environments.list` / `preview-environments.show` / `preview-environments.delete`
+contracts, safe list/show read-model output, cleanup-backed delete command input, and inactive
+catalog entries.
 `PG-PREVIEW-SURFACE-001` now also has Postgres/PGlite persistence coverage in
 `packages/persistence/pg/test/preview-policy.pglite.test.ts` for project/resource-scoped policy
 storage, configured/default safe summaries, idempotency-key retention on the write side, and
@@ -128,8 +131,8 @@ preview environment upsert, lookup by id/source scope, safe list/show read model
 status readback, scoped delete, and owner Resource retention after delete.
 
 GitHub App route wiring, durable feedback adapters/persistence, durable cleanup attempt
-persistence, concrete cleanup adapters, scheduler retry dispatch, and active operation entrypoints
-remain open. Existing non-product-grade coverage belongs to Action-only PR previews and
+persistence, concrete cleanup adapters, scheduler retry dispatch, and active CLI/API/Web/future MCP
+transports remain open. Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 
 Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add

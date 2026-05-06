@@ -242,11 +242,17 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   `pcln_*` attempt id, retryable cleaner failures are recorded as `retry-scheduled` with safe
   owner, phase, error code, and next retry time, and retry responses avoid provider error text.
   Durable persistence and scheduler dispatch remain future work.
+- Preview environments now have inactive application operation contracts for
+  `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete`.
+  List/show read from the safe preview environment read model, delete dispatches through the
+  preview cleanup service, and operation catalog entries intentionally expose no CLI/oRPC/Web
+  transports yet.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No GitHub App preview worker, durable feedback adapter/persistence, cleanup scheduler, durable
   cleanup attempt persistence, or concrete product-grade preview cleanup adapter is implemented.
-- No active operation catalog entries exist for `preview-policies.*` or `preview-environments.*`.
+- No active operation catalog transports exist for `preview-policies.*` or
+  `preview-environments.*`.
 - Product-grade preview public docs/help are not yet implemented.
 
 ## Open Questions
