@@ -65,6 +65,12 @@ describe("HTTP API docs help links", () => {
     expect(apiDocsHrefs.scheduledTaskLifecycle).toBe(
       "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
     );
+    expect(apiDocsHrefs.dependencyResourceLifecycle).toBe(
+      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+    );
+    expect(apiDocsHrefs.dependencyRuntimeInjection).toBe(
+      "/docs/resources/dependencies/#dependency-runtime-injection",
+    );
     expect(apiDocsHrefs.productGradePreviews).toBe(
       "/docs/deploy/previews/#product-grade-preview-deployments",
     );
@@ -116,6 +122,18 @@ describe("HTTP API docs help links", () => {
     expect(apiRouteDescriptions.runScheduledTaskNow).toContain(apiDocsHrefs.scheduledTaskLifecycle);
     expect(apiRouteDescriptions.scheduledTaskRunLogs).toContain(
       apiDocsHrefs.scheduledTaskLifecycle,
+    );
+    expect(apiRouteDescriptions.provisionPostgresDependencyResource).toContain(
+      apiDocsHrefs.dependencyResourceLifecycle,
+    );
+    expect(apiRouteDescriptions.importRedisDependencyResource).toContain(
+      apiDocsHrefs.dependencyResourceLifecycle,
+    );
+    expect(apiRouteDescriptions.bindResourceDependency).toContain(
+      apiDocsHrefs.dependencyResourceLifecycle,
+    );
+    expect(apiRouteDescriptions.rotateResourceDependencyBindingSecret).toContain(
+      apiDocsHrefs.dependencyResourceLifecycle,
     );
   });
 });

@@ -76,6 +76,12 @@ describe("CLI docs help links", () => {
     expect(cliDocsHrefs.scheduledTaskLifecycle).toBe(
       "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
     );
+    expect(cliDocsHrefs.dependencyResourceLifecycle).toBe(
+      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+    );
+    expect(cliDocsHrefs.dependencyRuntimeInjection).toBe(
+      "/docs/resources/dependencies/#dependency-runtime-injection",
+    );
 
     expect(cliCommandDescriptions.serverCredential).toContain(cliDocsHrefs.serverSshCredential);
     expect(cliCommandDescriptions.serverRegister).toContain(cliDocsHrefs.serverDockerSwarmTarget);
@@ -141,6 +147,18 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.scheduledTaskRun).toContain(cliDocsHrefs.scheduledTaskLifecycle);
     expect(cliCommandDescriptions.scheduledTaskRunsLogs).toContain(
       cliDocsHrefs.scheduledTaskLifecycle,
+    );
+    expect(cliCommandDescriptions.dependencyPostgresProvision).toContain(
+      cliDocsHrefs.dependencyResourceLifecycle,
+    );
+    expect(cliCommandDescriptions.dependencyRedisImport).toContain(
+      cliDocsHrefs.dependencyResourceLifecycle,
+    );
+    expect(cliCommandDescriptions.resourceDependencyBind).toContain(
+      cliDocsHrefs.dependencyResourceLifecycle,
+    );
+    expect(cliCommandDescriptions.resourceDependencyRotateSecret).toContain(
+      cliDocsHrefs.dependencyResourceLifecycle,
     );
   });
 });

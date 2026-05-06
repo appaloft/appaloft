@@ -128,6 +128,32 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[DEP-BIND-RUNTIME-INJECT-003] dependency runtime injection help resolves to stable anchors", () => {
+    const lifecycleTopic = publicDocsHelpTopics["dependency.resource-lifecycle"];
+    const runtimeTopic = publicDocsHelpTopics["dependency.runtime-injection"];
+
+    expect(resolvePublicDocsHelpHref(lifecycleTopic.id)).toBe(
+      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+    );
+    expect(resolvePublicDocsHelpHref(runtimeTopic.id)).toBe(
+      "/docs/resources/dependencies/#dependency-runtime-injection",
+    );
+    expect(resolvePublicDocsHelpHref(runtimeTopic.id, { locale: "en-US" })).toBe(
+      "/docs/en/resources/dependencies/#dependency-runtime-injection",
+    );
+    expect(runtimeTopic.surfaces).toEqual(
+      expect.arrayContaining(["web", "cli", "http-api", "mcp"]),
+    );
+    expect(runtimeTopic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/047-dependency-binding-runtime-injection/spec.md",
+        "docs/decisions/ADR-040-dependency-binding-runtime-injection-boundary.md",
+        "docs/queries/deployments.plan.md",
+        "docs/queries/deployments.show.md",
+      ]),
+    );
+  });
+
   test("[SWARM-TARGET-DOCS-001] Swarm runtime target help resolves to server docs", () => {
     const topic = publicDocsHelpTopics["server.docker-swarm-target"];
 

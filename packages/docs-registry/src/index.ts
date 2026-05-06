@@ -891,7 +891,7 @@ export const publicDocsHelpTopics = {
     id: "dependency.resource-lifecycle",
     title: "Dependency resource lifecycle",
     description:
-      "How Postgres and Redis dependency resources, Resource bindings, secret rotation, backup, restore, and delete safety work.",
+      "How Postgres and Redis dependency resources, Resource bindings, runtime injection readiness, secret rotation, backup, restore, and delete safety work.",
     page: {
       "zh-CN": "resources/dependencies",
       "en-US": "en/resources/dependencies",
@@ -923,6 +923,8 @@ export const publicDocsHelpTopics = {
       "docs/specs/037-redis-dependency-resource-lifecycle/spec.md",
       "docs/specs/038-postgres-provider-native-realization/spec.md",
       "docs/specs/039-dependency-resource-backup-restore/spec.md",
+      "docs/specs/047-dependency-binding-runtime-injection/spec.md",
+      "docs/decisions/ADR-040-dependency-binding-runtime-injection-boundary.md",
       "docs/commands/dependency-resources.provision-postgres.md",
       "docs/commands/dependency-resources.import-postgres.md",
       "docs/commands/dependency-resources.provision-redis.md",
@@ -942,7 +944,44 @@ export const publicDocsHelpTopics = {
       "docs/queries/resources.show-dependency-binding.md",
     ],
     webSurfaces: [
-      "Web dependency-resource write UI deferred; Resource detail can read binding summaries.",
+      "Web dependency-resource write UI deferred; Resource detail can read binding summaries and dependency runtime injection readiness.",
+    ],
+  },
+  "dependency.runtime-injection": {
+    id: "dependency.runtime-injection",
+    title: "Dependency runtime injection",
+    description:
+      "How bound Postgres and imported Redis dependencies are delivered to deployments, and how plan/show report blocked runtime injection readiness.",
+    page: {
+      "zh-CN": "resources/dependencies",
+      "en-US": "en/resources/dependencies",
+    },
+    anchor: "dependency-runtime-injection",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "deployments.plan",
+    aliases: [
+      "dependency runtime injection",
+      "dependency_runtime_injection_blocked",
+      "runtimeInjection",
+      "DATABASE_URL",
+      "REDIS_URL",
+      "依赖运行时注入",
+    ],
+    specReferences: [
+      "docs/specs/047-dependency-binding-runtime-injection/spec.md",
+      "docs/decisions/ADR-040-dependency-binding-runtime-injection-boundary.md",
+      "docs/queries/deployments.plan.md",
+      "docs/queries/deployments.show.md",
+      "docs/commands/deployments.create.md",
+      "docs/testing/dependency-resource-test-matrix.md",
+      "docs/testing/deployments.create-test-matrix.md",
+    ],
+    webSurfaces: [
+      "Deployment plan/show read surfaces can link blocked dependency runtime injection readiness to this anchor.",
     ],
   },
   "scheduled-task.resource-lifecycle": {
