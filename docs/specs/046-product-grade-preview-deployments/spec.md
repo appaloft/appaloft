@@ -267,8 +267,12 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   The shell composition has a disabled-by-default `previewCleanupRetryScheduler` runner that can be
   explicitly enabled with the shell cleaner registered. The runner has an in-process non-overlap
   guard so interval ticks do not run concurrently in one shell process. Durable cross-process
-  scheduler leases, terminal provider metadata cleanup, and cleanup-side feedback updates remain
-  future work.
+  scheduler leases and terminal provider metadata cleanup remain future work.
+- Preview cleanup now updates existing PR-comment feedback through the preview feedback service.
+  The feedback recorder can look up the latest feedback record by preview environment and channel,
+  the shell cleaner publishes a cleanup completion body through the existing idempotent GitHub
+  writer path, and retryable cleanup-feedback failures are returned to cleanup retry handling with
+  safe phase/error metadata.
 - Preview policy and preview environment operations now have active CLI and HTTP/oRPC routes for
   `preview-policies.configure`, `preview-policies.show`, `preview-environments.list`,
   `preview-environments.show`, and `preview-environments.delete`. Policy routes reuse the shared
@@ -285,8 +289,7 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   `IngestPreviewPullRequestEventCommand` through `CommandBus`. Raw signatures, secrets, and
   provider payloads stay out of the command.
 - No GitHub App installation/repository context mapper, scheduler leases, terminal provider
-  metadata cleanup, cleanup-side feedback update, or automatic process-manager deployment-status
-  publication is implemented.
+  metadata cleanup, or automatic process-manager deployment-status publication is implemented.
 - Preview policy and preview environment operations currently expose CLI, HTTP/oRPC, and generated
   future MCP tool descriptors. Web exposes preview policy readback/configuration and the read-only
   preview environment list/detail/delete surface.

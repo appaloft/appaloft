@@ -194,6 +194,31 @@ describe("preview feedback persistence", () => {
       expect(JSON.stringify(readback)).not.toContain("Preview feedback body");
       expect(JSON.stringify(readback)).not.toContain("secret");
       expect(JSON.stringify(readback)).not.toContain("token");
+
+      await recorder.record(context, {
+        feedbackKey: "feedback:sevt_preview_feedback_2:github-pr-comment",
+        sourceEventId: "sevt_preview_feedback_2",
+        previewEnvironmentId: "prenv_preview_feedback_1",
+        channel: "github-pr-comment",
+        status: "published",
+        providerFeedbackId: "github_comment_101",
+        updatedAt: "2026-05-06T01:10:00.000Z",
+      });
+
+      expect(
+        await recorder.findLatestForPreviewEnvironment(context, {
+          previewEnvironmentId: "prenv_preview_feedback_1",
+          channel: "github-pr-comment",
+        }),
+      ).toEqual({
+        feedbackKey: "feedback:sevt_preview_feedback_2:github-pr-comment",
+        sourceEventId: "sevt_preview_feedback_2",
+        previewEnvironmentId: "prenv_preview_feedback_1",
+        channel: "github-pr-comment",
+        status: "published",
+        providerFeedbackId: "github_comment_101",
+        updatedAt: "2026-05-06T01:10:00.000Z",
+      });
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });

@@ -6,6 +6,7 @@ import {
   type CleanupPreviewUseCase,
   createExecutionContext,
   type ExecutionContext,
+  type PreviewFeedbackService,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
 
@@ -34,6 +35,27 @@ class CapturingCleanupPreviewUseCase implements Pick<CleanupPreviewUseCase, "exe
   }
 }
 
+class CapturingPreviewFeedbackService
+  implements Pick<PreviewFeedbackService, "publishCleanupUpdate">
+{
+  readonly calls: Array<{
+    context: ExecutionContext;
+    input: Parameters<PreviewFeedbackService["publishCleanupUpdate"]>[1];
+  }> = [];
+
+  result: Awaited<ReturnType<PreviewFeedbackService["publishCleanupUpdate"]>> = ok({
+    status: "skipped",
+  });
+
+  async publishCleanupUpdate(
+    context: ExecutionContext,
+    input: Parameters<PreviewFeedbackService["publishCleanupUpdate"]>[1],
+  ): ReturnType<PreviewFeedbackService["publishCleanupUpdate"]> {
+    this.calls.push({ context, input });
+    return this.result;
+  }
+}
+
 function createContext() {
   return createExecutionContext({
     entrypoint: "system",
@@ -44,7 +66,8 @@ function createContext() {
 describe("ShellPreviewEnvironmentCleaner", () => {
   test("[PG-PREVIEW-CLEANUP-002] delegates cleanup to source-fingerprint cleanup command", async () => {
     const cleanupPreviewUseCase = new CapturingCleanupPreviewUseCase();
-    const cleaner = new ShellPreviewEnvironmentCleaner(cleanupPreviewUseCase);
+    const feedbackService = new CapturingPreviewFeedbackService();
+    const cleaner = new ShellPreviewEnvironmentCleaner(cleanupPreviewUseCase, feedbackService);
     const context = createContext();
 
     const result = await cleaner.cleanup(context, {
@@ -65,12 +88,52 @@ describe("ShellPreviewEnvironmentCleaner", () => {
         },
       },
     ]);
+    expect(feedbackService.calls).toEqual([
+      {
+        context,
+        input: {
+          previewEnvironmentId: "penv_42",
+          repositoryFullName: "acme/api",
+          pullRequestNumber: 42,
+          body: ["Preview cleanup completed for acme/api#42.", "Preview environment: penv_42"].join(
+            "\n",
+          ),
+        },
+      },
+    ]);
     expect(result._unsafeUnwrap()).toEqual({
       cleanedRuntime: true,
       removedRoute: true,
       removedSourceLink: true,
       removedProviderMetadata: false,
       updatedFeedback: false,
+    });
+  });
+
+  test("[PG-PREVIEW-CLEANUP-001] reports cleanup feedback updates", async () => {
+    const cleanupPreviewUseCase = new CapturingCleanupPreviewUseCase();
+    const feedbackService = new CapturingPreviewFeedbackService();
+    feedbackService.result = ok({
+      status: "updated",
+      providerFeedbackId: "github_comment_42",
+    });
+    const cleaner = new ShellPreviewEnvironmentCleaner(cleanupPreviewUseCase, feedbackService);
+
+    const result = await cleaner.cleanup(createContext(), {
+      previewEnvironmentId: "penv_42",
+      resourceId: "res_api",
+      sourceBindingFingerprint: "srcfp_pr_42",
+      provider: "github",
+      repositoryFullName: "acme/api",
+      pullRequestNumber: 42,
+    });
+
+    expect(result._unsafeUnwrap()).toEqual({
+      cleanedRuntime: true,
+      removedRoute: true,
+      removedSourceLink: true,
+      removedProviderMetadata: false,
+      updatedFeedback: true,
     });
   });
 
@@ -86,7 +149,10 @@ describe("ShellPreviewEnvironmentCleaner", () => {
         true,
       ),
     );
-    const cleaner = new ShellPreviewEnvironmentCleaner(cleanupPreviewUseCase);
+    const cleaner = new ShellPreviewEnvironmentCleaner(
+      cleanupPreviewUseCase,
+      new CapturingPreviewFeedbackService(),
+    );
 
     const result = await cleaner.cleanup(createContext(), {
       previewEnvironmentId: "penv_42",
@@ -107,6 +173,38 @@ describe("ShellPreviewEnvironmentCleaner", () => {
       resourceId: "res_api",
       sourceBindingFingerprint: "srcfp_pr_42",
       provider: "github",
+    });
+  });
+
+  test("[PG-PREVIEW-CLEANUP-002] returns retryable cleanup failure when feedback update is retryable", async () => {
+    const cleanupPreviewUseCase = new CapturingCleanupPreviewUseCase();
+    const feedbackService = new CapturingPreviewFeedbackService();
+    feedbackService.result = ok({
+      status: "retryable-failed",
+      errorCode: "github_rate_limited",
+      retryable: true,
+    });
+    const cleaner = new ShellPreviewEnvironmentCleaner(cleanupPreviewUseCase, feedbackService);
+
+    const result = await cleaner.cleanup(createContext(), {
+      previewEnvironmentId: "penv_42",
+      resourceId: "res_api",
+      sourceBindingFingerprint: "srcfp_pr_42",
+      provider: "github",
+      repositoryFullName: "acme/api",
+      pullRequestNumber: 42,
+    });
+
+    expect(result.isErr()).toBe(true);
+    const failure = result._unsafeUnwrapErr();
+    expect(failure.retryable).toBe(true);
+    expect(failure.details).toEqual({
+      phase: "preview-cleanup-feedback",
+      previewEnvironmentId: "penv_42",
+      resourceId: "res_api",
+      sourceBindingFingerprint: "srcfp_pr_42",
+      provider: "github",
+      errorCode: "github_rate_limited",
     });
   });
 });

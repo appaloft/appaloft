@@ -42,6 +42,33 @@ export class PgPreviewFeedbackRecorder implements PreviewFeedbackRecorder {
     );
   }
 
+  async findLatestForPreviewEnvironment(
+    context: RepositoryContext,
+    input: { previewEnvironmentId: string; channel: PreviewFeedbackChannel },
+  ): Promise<PreviewFeedbackRecord | null> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("preview_feedback", "find_latest_for_preview_environment"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "preview_feedback",
+          "appaloft.preview_feedback.channel": input.channel,
+        },
+      },
+      async () => {
+        const row = await executor
+          .selectFrom("preview_feedback_records")
+          .selectAll()
+          .where("preview_environment_id", "=", input.previewEnvironmentId)
+          .where("channel", "=", input.channel)
+          .orderBy("updated_at", "desc")
+          .executeTakeFirst();
+
+        return row ? recordFromRow(row) : null;
+      },
+    );
+  }
+
   async record(context: RepositoryContext, record: PreviewFeedbackRecord): Promise<void> {
     const executor = resolveRepositoryExecutor(this.db, context);
     const values = rowFromRecord(record);

@@ -4519,6 +4519,10 @@ export interface PreviewFeedbackRecorder {
     context: RepositoryContext,
     input: { feedbackKey: string },
   ): Promise<PreviewFeedbackRecord | null>;
+  findLatestForPreviewEnvironment(
+    context: RepositoryContext,
+    input: { previewEnvironmentId: string; channel: PreviewFeedbackChannel },
+  ): Promise<PreviewFeedbackRecord | null>;
   record(context: RepositoryContext, record: PreviewFeedbackRecord): Promise<void>;
 }
 
