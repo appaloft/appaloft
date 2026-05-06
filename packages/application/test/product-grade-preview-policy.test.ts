@@ -18,6 +18,7 @@ import {
   type PreviewPolicyDecisionReadModel,
   type PreviewPolicyDecisionRecorder,
   PreviewPolicyEvaluator,
+  PreviewScopedConfigResolver,
   type RepositoryContext,
   type SourceEventDeploymentDispatcher,
   type SourceEventDeploymentDispatchInput,
@@ -607,5 +608,154 @@ describe("PreviewPolicyEvaluator", () => {
     expect(JSON.stringify(projected)).not.toContain("preview-runtime");
     expect(JSON.stringify(projected)).not.toContain("database");
     expect(JSON.stringify(projected)).not.toContain("secretRef");
+  });
+});
+
+describe("PreviewScopedConfigResolver", () => {
+  test("[PG-PREVIEW-CONFIG-001] does not copy production secrets or durable routes by default", () => {
+    const result = new PreviewScopedConfigResolver().resolve({
+      resourceId: "res_preview_api",
+      previewEnvironmentId: "prenv_1",
+      effectiveConfig: {
+        schemaVersion: "resources.effective-config/v1",
+        resourceId: "res_preview_api",
+        environmentId: "env_production",
+        ownedEntries: [],
+        effectiveEntries: [
+          {
+            key: "DATABASE_URL",
+            value: "****",
+            scope: "environment",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+          },
+          {
+            key: "PUBLIC_BASE_URL",
+            value: "https://production.example.test",
+            scope: "environment",
+            exposure: "build-time",
+            isSecret: false,
+            kind: "plain-config",
+          },
+          {
+            key: "API_TOKEN",
+            value: "****",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+          },
+        ],
+        overrides: [],
+        precedence: [
+          "defaults",
+          "system",
+          "organization",
+          "project",
+          "environment",
+          "resource",
+          "deployment",
+        ],
+        generatedAt: "2026-05-06T04:00:00.000Z",
+      },
+    });
+
+    expect(result).toEqual({
+      schemaVersion: "preview-scoped-config.resolve/v1",
+      resourceId: "res_preview_api",
+      previewEnvironmentId: "prenv_1",
+      variables: [],
+      secretReferences: [],
+      omittedProductionSecretKeys: ["API_TOKEN", "DATABASE_URL"],
+      routePolicy: {
+        mode: "none",
+        copiedDurableRoutes: [],
+      },
+    });
+  });
+
+  test("[PG-PREVIEW-CONFIG-001] resolves only explicit preview variables and safe secret references", () => {
+    const result = new PreviewScopedConfigResolver().resolve({
+      resourceId: "res_preview_api",
+      previewEnvironmentId: "prenv_1",
+      effectiveConfig: {
+        schemaVersion: "resources.effective-config/v1",
+        resourceId: "res_preview_api",
+        environmentId: "env_production",
+        ownedEntries: [],
+        effectiveEntries: [
+          {
+            key: "DATABASE_URL",
+            value: "****",
+            scope: "environment",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+          },
+          {
+            key: "PUBLIC_BASE_URL",
+            value: "https://preview.example.test",
+            scope: "resource",
+            exposure: "build-time",
+            isSecret: false,
+            kind: "plain-config",
+          },
+          {
+            key: "API_TOKEN",
+            value: "****",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+          },
+        ],
+        overrides: [],
+        precedence: [
+          "defaults",
+          "system",
+          "organization",
+          "project",
+          "environment",
+          "resource",
+          "deployment",
+        ],
+        generatedAt: "2026-05-06T04:00:00.000Z",
+      },
+      variableSelections: [{ key: "PUBLIC_BASE_URL", exposure: "build-time" }],
+      secretSelections: [{ key: "DATABASE_URL", exposure: "runtime" }],
+      routePolicy: { mode: "generated-default-access", pathPrefix: "/pr-42" },
+    });
+
+    expect(result).toEqual({
+      schemaVersion: "preview-scoped-config.resolve/v1",
+      resourceId: "res_preview_api",
+      previewEnvironmentId: "prenv_1",
+      variables: [
+        {
+          key: "PUBLIC_BASE_URL",
+          value: "https://preview.example.test",
+          exposure: "build-time",
+          kind: "plain-config",
+          sourceScope: "resource",
+        },
+      ],
+      secretReferences: [
+        {
+          key: "DATABASE_URL",
+          exposure: "runtime",
+          kind: "secret",
+          sourceScope: "environment",
+        },
+      ],
+      omittedProductionSecretKeys: ["API_TOKEN"],
+      routePolicy: {
+        mode: "generated-default-access",
+        copiedDurableRoutes: [],
+        pathPrefix: "/pr-42",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("postgres://");
+    expect(JSON.stringify(result)).not.toContain("****");
   });
 });

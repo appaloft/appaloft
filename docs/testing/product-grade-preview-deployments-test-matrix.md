@@ -81,6 +81,11 @@ material are not returned.
 source event ids return the existing preview policy decision and do not update preview environment
 state or dispatch another deployment request. Feedback and cleanup idempotency coverage remains
 blocked on those future process-state implementations.
+`PG-PREVIEW-CONFIG-001` has initial application coverage in
+`packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves preview
+scoped config resolution materializes no production secrets or durable routes by default, resolves
+only explicit non-secret preview variables, returns safe secret-reference metadata without raw or
+masked secret values, and never copies durable routes into preview output.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
