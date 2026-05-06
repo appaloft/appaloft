@@ -1290,6 +1290,12 @@ Current verification notes:
   target a prepared overlay network without colliding with an existing local bridge named
   `appaloft-edge`. The default remains `appaloft-edge`; running the real smoke still requires an
   active manager and overlay network.
+- 2026-05-06 Phase 7 Docker Swarm real-smoke slice fixed generated superseded-service cleanup shell
+  separators and made the opt-in real smoke provision a smoke-specific Docker secret reference and
+  use an nginx-compatible health check. `bun run smoke:swarm` passed against a temporary local Swarm
+  manager with `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to
+  inactive Swarm state. Default activation, real edge-proxy route realization, remote-manager
+  observation, and registry-auth smoke coverage remain open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1551,7 +1557,9 @@ Required:
   observation, Swarm health observation, initial Traefik route label promotion, the public docs
   anchor, command-failure redaction, sanitized runtime identity readback, and CLI/API/Web help
   links are implemented; opt-in shell composition and `bun run smoke:swarm` real smoke harness
-  exist, but a real Swarm smoke run and default activation remain open.
+  exist, and the local real smoke passed against a temporary Swarm manager; default activation,
+  real edge-proxy route realization, remote-manager observation, and registry-auth smoke coverage
+  remain open.
 
 Exit criteria:
 

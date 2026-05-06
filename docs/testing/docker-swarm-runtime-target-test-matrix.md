@@ -120,7 +120,9 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` or `appaloft-edge`, deploys through
   `DockerSwarmExecutionBackend` with `DockerSwarmShellCommandRunner`, and cleans the scoped service
   afterward. `bun run smoke:swarm` is the first-class opt-in command for that harness. Default CI
-  keeps this smoke skipped until a real Swarm environment is explicitly available.
+  keeps this smoke skipped until a real Swarm environment is explicitly available. On 2026-05-06,
+  the harness passed against a temporary local Swarm manager with `appaloft-smoke-edge`, including
+  smoke-specific Docker secret setup, route-label promotion, and scoped cleanup.
 - `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
   explaining Swarm target registration, manager readiness expectations, image registry access,
   rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI `server register`,

@@ -143,7 +143,9 @@ function createContext(): ExecutionContext {
   };
 }
 
-function runtimeEnvironmentSnapshot(): EnvironmentConfigSnapshot {
+function runtimeEnvironmentSnapshot(input: { secretKey?: string } = {}): EnvironmentConfigSnapshot {
+  const secretKey = input.secretKey ?? "DATABASE_URL";
+
   return EnvironmentConfigSnapshot.rehydrate({
     id: EnvironmentSnapshotId.rehydrate("envsnap_swarm_backend"),
     environmentId: EnvironmentId.rehydrate("env_prod"),
@@ -155,7 +157,7 @@ function runtimeEnvironmentSnapshot(): EnvironmentConfigSnapshot {
     ],
     variables: [
       {
-        key: ConfigKey.rehydrate("DATABASE_URL"),
+        key: ConfigKey.rehydrate(secretKey),
         value: ConfigValueText.rehydrate("postgres://secret-value"),
         kind: VariableKindValue.rehydrate("secret"),
         exposure: VariableExposureValue.rehydrate("runtime"),
@@ -174,14 +176,15 @@ function runtimeEnvironmentSnapshot(): EnvironmentConfigSnapshot {
   });
 }
 
-function runtimePlan(input: { image?: string } = {}): RuntimePlan {
+function runtimePlan(input: { healthPath?: string; image?: string; port?: number } = {}): RuntimePlan {
   const image = ImageReference.rehydrate(input.image ?? "registry.example.com/team/app:sha");
+  const port = PortNumber.rehydrate(input.port ?? 3000);
   const accessRoute = AccessRoute.rehydrate({
     proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
     domains: [PublicDomainName.rehydrate("api.example.com")],
     pathPrefix: RoutePathPrefix.rehydrate("/"),
     tlsMode: TlsModeValue.rehydrate("auto"),
-    targetPort: PortNumber.rehydrate(3000),
+    targetPort: port,
   });
 
   return RuntimePlan.rehydrate({
@@ -195,7 +198,7 @@ function runtimePlan(input: { image?: string } = {}): RuntimePlan {
     packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
     execution: RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
-      port: PortNumber.rehydrate(3000),
+      port,
       image,
       accessRoutes: [accessRoute],
       healthCheck: {
@@ -209,8 +212,8 @@ function runtimePlan(input: { image?: string } = {}): RuntimePlan {
           method: HealthCheckHttpMethodValue.rehydrate("GET"),
           scheme: HealthCheckSchemeValue.rehydrate("http"),
           host: HealthCheckHostText.rehydrate("127.0.0.1"),
-          port: PortNumber.rehydrate(3000),
-          path: HealthCheckPathText.rehydrate("/healthz"),
+          port,
+          path: HealthCheckPathText.rehydrate(input.healthPath ?? "/healthz"),
           expectedStatusCode: HealthCheckExpectedStatusCode.rehydrate(200),
         },
       },
@@ -231,7 +234,9 @@ function runtimePlan(input: { image?: string } = {}): RuntimePlan {
   });
 }
 
-function runningDeployment(input: { image?: string } = {}): Deployment {
+function runningDeployment(
+  input: { healthPath?: string; image?: string; port?: number; secretKey?: string } = {},
+): Deployment {
   const deployment = Deployment.create({
     id: DeploymentId.rehydrate("dep_swarm_backend"),
     projectId: ProjectId.rehydrate("prj_app"),
@@ -240,7 +245,7 @@ function runningDeployment(input: { image?: string } = {}): Deployment {
     serverId: DeploymentTargetId.rehydrate("dtg_swarm_1"),
     destinationId: DestinationId.rehydrate("dst_prod"),
     runtimePlan: runtimePlan(input),
-    environmentSnapshot: runtimeEnvironmentSnapshot(),
+    environmentSnapshot: runtimeEnvironmentSnapshot(input),
     createdAt: CreatedAt.rehydrate("2026-04-01T00:00:00.000Z"),
   })._unsafeUnwrap();
 
@@ -267,6 +272,13 @@ function commandOutput(command: string[]): string {
   }
 
   return result.stdout.toString().trim();
+}
+
+function commandStatus(command: string[]): number {
+  return Bun.spawnSync(command, {
+    stdout: "pipe",
+    stderr: "pipe",
+  }).exitCode;
 }
 
 const realSwarmSmokeTest = Bun.env.APPALOFT_DOCKER_SWARM_SMOKE === "1" ? test : test.skip;
@@ -343,6 +355,10 @@ describe("DockerSwarmExecutionBackend", () => {
     );
     expect(runner.calls[0]?.command).toContain("--secret 'source=DATABASE_URL,target=DATABASE_URL'");
     expect(runner.calls[0]?.command).not.toContain("postgres://secret-value");
+    expect(runner.calls[3]?.command).toContain(
+      '); if [ "$current_deployment" != \'dep_swarm_backend\' ]; then',
+    );
+    expect(runner.calls[3]?.command).toContain('fi; done');
     expect(deployment.runtimePlan.execution.metadata).toMatchObject({
       "swarm.serviceName": "appaloft-res-api-dst-prod-dep-swarm-backend_web",
       "swarm.applyPlanSchemaVersion": "docker-swarm.apply-plan/v1",
@@ -452,8 +468,12 @@ describe("DockerSwarmExecutionBackend", () => {
       ]);
       expect(edgeNetwork).toBe("overlay swarm");
 
+      const secretKey = "APPALOFT_SWARM_SMOKE_DATABASE_URL";
       const deployment = runningDeployment({
+        healthPath: "/",
         image: Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_IMAGE ?? "nginx:alpine",
+        port: 80,
+        secretKey,
       });
       const backend = new DockerSwarmExecutionBackend(
         new DockerSwarmShellCommandRunner({
@@ -464,9 +484,27 @@ describe("DockerSwarmExecutionBackend", () => {
       );
 
       try {
+        commandStatus(["docker", "secret", "rm", secretKey]);
+        commandOutput([
+          "sh",
+          "-c",
+          `printf %s 'postgres://secret-value' | docker secret create ${secretKey} -`,
+        ]);
         const result = await backend.execute(createContext(), deployment);
         expect(result.isOk()).toBe(true);
         const state = result._unsafeUnwrap().deployment.toState();
+        if (state.status.value !== "succeeded") {
+          throw new Error(
+            JSON.stringify(
+              {
+                logs: state.logs,
+                metadata: state.runtimePlan.execution.metadata,
+              },
+              null,
+              2,
+            ),
+          );
+        }
         expect(state.status.value).toBe("succeeded");
         expect(state.runtimePlan.execution.metadata).toMatchObject({
           "swarm.serviceName": "appaloft-res-api-dst-prod-dep-swarm-backend_web",
@@ -477,7 +515,9 @@ describe("DockerSwarmExecutionBackend", () => {
         );
       } finally {
         await backend.cancel(createContext(), deployment);
+        commandStatus(["docker", "secret", "rm", secretKey]);
       }
     },
+    Number(Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_TIMEOUT_MS ?? "120000"),
   );
 });
