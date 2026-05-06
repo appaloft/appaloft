@@ -119,5 +119,6 @@ active non-injectable bindings before deployment acceptance, and routes safe sec
 single-server and Swarm runtime target adapters. Store-backed resolution of Appaloft-owned
 dependency refs and retained rotated binding refs is implemented by
 [Dependency Runtime Secret Value Resolution](../048-dependency-runtime-secret-value-resolution/spec.md).
-Final Postgres closed-loop exit verification remains open. Public docs now describe safe
+Postgres and Redis closed-loop exit verification is covered by
+`DEP-RES-PG-CLOSED-LOOP-001` and `DEP-RES-REDIS-CLOSED-LOOP-001`. Public docs now describe safe
 bind-to-deploy behavior and blocked runtime injection readiness.

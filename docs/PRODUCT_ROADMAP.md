@@ -957,6 +957,9 @@ Current verification notes:
   deploy -> observe logs/status -> backup/restore for a store-backed Appaloft-owned Redis
   connection ref without exposing raw Redis material. The Redis closed-loop exit criterion is now
   closed; the Postgres closed-loop exit criterion remains open.
+- 2026-05-06 Phase 7 managed Postgres closed-loop verification slice proved provision -> bind ->
+  deploy -> observe logs/status -> backup/restore for managed Postgres without exposing raw
+  Postgres material. The Postgres closed-loop exit criterion is now closed.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider
@@ -1692,7 +1695,7 @@ Exit criteria:
 
 - [ ] A user can manage config, secrets, storage, dependencies, auto-deploy, deployment history, and
   rollback candidates without editing files on the server.
-- [ ] Postgres has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
+- [x] Postgres has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
 - [x] Redis has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
 - [x] Operators can deploy through both the single-server Docker/Compose path and the Docker Swarm
   cluster path without changing the public deployment admission surface.
