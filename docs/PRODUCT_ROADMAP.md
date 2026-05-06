@@ -1272,6 +1272,11 @@ Current verification notes:
   default fork blocking, secret-backed fork blocking, and opt-in fork previews without secrets.
   Preview environment state, deployment dispatch, read models, GitHub App ingestion, feedback,
   cleanup retry, and entrypoints remain open.
+- 2026-05-06 Phase 7 product-grade preview environment domain slice added foundational core
+  `PreviewEnvironment` state for scoped project/environment/resource/target placement, safe source
+  fingerprint and pull-request context, expiry checks, and cleanup-request transition. Persistence,
+  read models, deployment dispatch, GitHub App ingestion, feedback, cleanup retry, and entrypoints
+  remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
