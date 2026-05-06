@@ -15,9 +15,11 @@ connection metadata, bind ready imported Redis records to Resources as safe depe
 rename them, and delete only records that pass explicit safety checks.
 
 This slice extends the existing provider-neutral Dependency Resource lifecycle from Postgres to
-Redis. It deliberately keeps provider-native Redis provisioning, managed Redis binding admission,
-runtime environment injection, backup/restore, and Redis-specific materialized workload injection
-semantics out of scope until later Phase 7 slices.
+Redis. This baseline deliberately keeps provider-native Redis provisioning, managed Redis binding
+admission, runtime environment injection, backup/restore, and Redis-specific materialized workload
+injection semantics out of scope; the later provider-native Redis realization behavior is
+positioned in
+[Redis Provider-Native Realization](../049-redis-provider-native-realization/spec.md).
 
 ## Discover Findings
 
@@ -73,7 +75,8 @@ semantics out of scope until later Phase 7 slices.
   - Workspace provides project/environment context.
   - Workload Delivery later binds Resources to Redis dependency resources.
   - Release Orchestration later snapshots safe Redis binding references.
-  - Runtime/provider adapters later provision provider-native Redis and inject runtime env.
+  - Runtime/provider adapters provision provider-native Redis only after the provider-native Redis
+    realization Code Round, and runtime env injection follows ADR-040/ADR-041.
 
 ## Public Surfaces
 
@@ -112,8 +115,10 @@ values.
 
 ## Non-Goals
 
-- No managed Redis binding admission until provider-native Redis realization is specified.
-- No provider-native Redis provisioning/deletion.
+- No managed Redis binding admission until
+  [Redis Provider-Native Realization](../049-redis-provider-native-realization/spec.md) is
+  implemented.
+- No provider-native Redis provisioning/deletion in this baseline.
 - No provider-native credential rotation.
 - No runtime environment injection.
 - No backup/restore.

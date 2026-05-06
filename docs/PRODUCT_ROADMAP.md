@@ -923,6 +923,12 @@ Current verification notes:
   keeps old deployment snapshots on their captured refs, and verifies new deployments can use a
   rotated ref only after it is resolvable. Final Postgres/Redis closed-loop exit verification
   remains open.
+- 2026-05-06 Phase 7 Redis provider-native realization Spec Round added
+  [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md) to
+  position `dependency-resources.provision-redis`, `resources.bind-dependency`, and
+  `dependency-resources.delete` for managed Redis realization, binding readiness, runtime secret
+  resolvability, and provider cleanup. It does not implement the Code Round yet, so the Redis
+  closed-loop exit criterion remains open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider
