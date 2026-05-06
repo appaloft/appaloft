@@ -284,6 +284,7 @@ import { type DomainError, ok, type Result } from "@appaloft/core";
 import { type DependencyContainer } from "tsyringe";
 import { ShellDeploymentEventObserver } from "./deployment-event-observer";
 import { PublicDnsDomainOwnershipVerifier } from "./domain-ownership-verifier";
+import { ShellPreviewEnvironmentCleaner } from "./preview-environment-cleaner";
 
 class ShellCertificateProviderSelectionPolicy implements CertificateProviderSelectionPolicy {
   async select(
@@ -543,6 +544,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.previewEnvironmentCleanupService,
     PreviewEnvironmentCleanupService,
   );
+  container.registerSingleton(tokens.previewEnvironmentCleaner, ShellPreviewEnvironmentCleaner);
   container.registerSingleton(tokens.previewCleanupRetryScheduler, PreviewCleanupRetryScheduler);
   container.registerSingleton(
     tokens.configureResourceHealthUseCase,
