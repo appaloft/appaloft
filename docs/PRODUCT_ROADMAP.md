@@ -1344,6 +1344,11 @@ Current verification notes:
   record safe owner, phase, error code, and next retry time, and responses omit provider error text.
   Durable cleanup attempt persistence, scheduler dispatch, concrete cleanup adapters, GitHub App
   HTTP routes, and active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview environment surface-contract slice added inactive
+  `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete`
+  application contracts plus operation catalog entries. List/show read from the safe preview
+  environment read model, delete uses cleanup-service input, and CLI/API/Web/future MCP transports
+  remain inactive until the product-grade control-plane route is wired.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,

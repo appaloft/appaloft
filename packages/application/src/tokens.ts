@@ -80,6 +80,7 @@ export const tokens = {
   sourceEventDeploymentDispatcher: Symbol.for("appaloft.source_event_deployment_dispatcher"),
   sourceEventReadModel: Symbol.for("appaloft.source_event_read_model"),
   previewLifecycleService: Symbol.for("appaloft.preview_lifecycle_service"),
+  previewEnvironmentReadModel: Symbol.for("appaloft.preview_environment_read_model"),
   previewPolicyReadModel: Symbol.for("appaloft.preview_policy_read_model"),
   previewPolicyDecisionReadModel: Symbol.for("appaloft.preview_policy_decision_read_model"),
   deploymentReadModel: Symbol.for("appaloft.deployment_read_model"),
@@ -237,6 +238,11 @@ export const tokens = {
   showSourceEventQueryService: Symbol.for("appaloft.show_source_event_query_service"),
   configurePreviewPolicyUseCase: Symbol.for("appaloft.configure_preview_policy_use_case"),
   showPreviewPolicyQueryService: Symbol.for("appaloft.show_preview_policy_query_service"),
+  listPreviewEnvironmentsQueryService: Symbol.for(
+    "appaloft.list_preview_environments_query_service",
+  ),
+  showPreviewEnvironmentQueryService: Symbol.for("appaloft.show_preview_environment_query_service"),
+  previewEnvironmentCleanupService: Symbol.for("appaloft.preview_environment_cleanup_service"),
   openTerminalSessionUseCase: Symbol.for("appaloft.open_terminal_session_use_case"),
   relinkSourceLinkUseCase: Symbol.for("appaloft.relink_source_link_use_case"),
   resourceProxyConfigurationPreviewQueryService: Symbol.for(

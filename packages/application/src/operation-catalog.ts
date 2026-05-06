@@ -56,6 +56,9 @@ import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environ
 import { listOperatorWorkQueryInputSchema } from "./operations/operator-work/list-operator-work.query";
 import { showOperatorWorkQueryInputSchema } from "./operations/operator-work/show-operator-work.query";
 import { configurePreviewPolicyCommandInputSchema } from "./operations/preview-deployments/configure-preview-policy.command";
+import { deletePreviewEnvironmentCommandInputSchema } from "./operations/preview-deployments/delete-preview-environment.command";
+import { listPreviewEnvironmentsQueryInputSchema } from "./operations/preview-deployments/list-preview-environments.query";
+import { showPreviewEnvironmentQueryInputSchema } from "./operations/preview-deployments/show-preview-environment.query";
 import { showPreviewPolicyQueryInputSchema } from "./operations/preview-deployments/show-preview-policy.query";
 import { archiveProjectCommandInputSchema } from "./operations/projects/archive-project.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
@@ -147,6 +150,7 @@ type OperationDomain =
   | "deployments"
   | "operator-work"
   | "preview-policies"
+  | "preview-environments"
   | "default-access-domain-policies"
   | "domain-bindings"
   | "certificates"
@@ -204,6 +208,39 @@ export const operationCatalog = [
     serviceName: "ShowPreviewPolicyQueryService",
     inputSchema: showPreviewPolicyQueryInputSchema,
     serviceToken: tokens.showPreviewPolicyQueryService,
+    transports: {},
+  },
+  {
+    key: "preview-environments.list",
+    kind: "query",
+    domain: "preview-environments",
+    messageName: "ListPreviewEnvironmentsQuery",
+    handlerName: "ListPreviewEnvironmentsQueryHandler",
+    serviceName: "ListPreviewEnvironmentsQueryService",
+    inputSchema: listPreviewEnvironmentsQueryInputSchema,
+    serviceToken: tokens.listPreviewEnvironmentsQueryService,
+    transports: {},
+  },
+  {
+    key: "preview-environments.show",
+    kind: "query",
+    domain: "preview-environments",
+    messageName: "ShowPreviewEnvironmentQuery",
+    handlerName: "ShowPreviewEnvironmentQueryHandler",
+    serviceName: "ShowPreviewEnvironmentQueryService",
+    inputSchema: showPreviewEnvironmentQueryInputSchema,
+    serviceToken: tokens.showPreviewEnvironmentQueryService,
+    transports: {},
+  },
+  {
+    key: "preview-environments.delete",
+    kind: "command",
+    domain: "preview-environments",
+    messageName: "DeletePreviewEnvironmentCommand",
+    handlerName: "DeletePreviewEnvironmentCommandHandler",
+    serviceName: "PreviewEnvironmentCleanupService",
+    inputSchema: deletePreviewEnvironmentCommandInputSchema,
+    serviceToken: tokens.previewEnvironmentCleanupService,
     transports: {},
   },
   {

@@ -89,6 +89,7 @@ import {
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
   PgMutationCoordinator,
+  PgPreviewEnvironmentReadModel,
   PgPreviewEnvironmentRepository,
   PgPreviewPolicyDecisionProjection,
   PgPreviewPolicyRepository,
@@ -762,6 +763,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.previewEnvironmentRepository, {
     useFactory: instanceCachingFactory(() => new PgPreviewEnvironmentRepository(input.database.db)),
+  });
+  container.register(tokens.previewEnvironmentReadModel, {
+    useFactory: instanceCachingFactory(() => new PgPreviewEnvironmentReadModel(input.database.db)),
   });
   container.register(tokens.previewPolicyRepository, {
     useFactory: instanceCachingFactory(() => new PgPreviewPolicyRepository(input.database.db)),

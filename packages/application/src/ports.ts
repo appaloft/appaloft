@@ -4674,6 +4674,19 @@ export interface PreviewEnvironmentReadModel {
   ): Promise<PreviewEnvironmentSummary | null>;
 }
 
+export interface ListPreviewEnvironmentsResult {
+  schemaVersion: "preview-environments.list/v1";
+  items: PreviewEnvironmentSummary[];
+  nextCursor?: string;
+  generatedAt: string;
+}
+
+export interface ShowPreviewEnvironmentResult {
+  schemaVersion: "preview-environments.show/v1";
+  previewEnvironment: PreviewEnvironmentSummary;
+  generatedAt: string;
+}
+
 export type PreviewPolicyScope =
   | {
       kind: "project";
