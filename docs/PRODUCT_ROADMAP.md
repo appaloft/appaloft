@@ -1324,6 +1324,11 @@ Current verification notes:
   only ids cross the deployment boundary. Pull-request/source/route/preview details remain
   read-model or process context. GitHub App routes, feedback, cleanup retry, and active preview
   environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview pull-request ingestion slice added an application service that routes
+  safe normalized GitHub pull-request preview facts into preview lifecycle using selected
+  control-plane context, while closed-event cleanup remains an ignored outcome until cleanup
+  process state exists. GitHub App HTTP routes, feedback, cleanup retry, and active preview
+  environment entrypoints remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,

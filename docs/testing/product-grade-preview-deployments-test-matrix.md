@@ -75,7 +75,9 @@ from policy TTL when no explicit expiry is provided.
 `packages/integrations/github/test/github-webhook.test.ts`. The coverage proves signed GitHub
 `pull_request` payloads normalize to safe preview facts, invalid signatures reject before
 normalization, unsupported actions reject, unsafe payload shapes reject, and secrets/signature
-material are not returned.
+material are not returned. It also has application coverage in
+`packages/application/test/product-grade-preview-policy.test.ts` proving safe normalized
+pull-request facts route into preview lifecycle without changing deployment admission input.
 `PG-PREVIEW-EVENT-002` has initial application coverage in
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves duplicate
 source event ids return the existing preview policy decision and do not update preview environment

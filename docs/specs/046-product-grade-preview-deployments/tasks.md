@@ -48,7 +48,7 @@
 - [x] Add preview policy persistence/read model adapter.
 - [x] Add core preview environment aggregate state.
 - [x] Add preview environment read models and persistence.
-- [ ] Extend source event ingestion for GitHub App pull request preview events.
+- [x] Extend source event ingestion for GitHub App pull request preview events.
 - [ ] Add preview lifecycle process manager over policy, environment, deployment, and feedback
   state.
 - [x] Add scoped preview config/secret resolution.
