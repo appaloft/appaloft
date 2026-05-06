@@ -104,6 +104,11 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.certificateRevoke).toContain(cliDocsHrefs.certificateReadiness);
     expect(cliCommandDescriptions.certificateDelete).toContain(cliDocsHrefs.certificateReadiness);
     expect(cliCommandDescriptions.previewCleanup).toContain(cliDocsHrefs.deploymentPreviewCleanup);
+    expect(cliCommandDescriptions.previewPolicy).toContain(cliDocsHrefs.productGradePreviews);
+    expect(cliCommandDescriptions.previewPolicyConfigure).toContain(
+      cliDocsHrefs.productGradePreviews,
+    );
+    expect(cliCommandDescriptions.previewPolicyShow).toContain(cliDocsHrefs.productGradePreviews);
     expect(cliCommandDescriptions.deploymentPlan).toContain(cliDocsHrefs.deploymentPlanPreview);
     expect(cliCommandDescriptions.sourceLinkRelink).toContain(cliDocsHrefs.deploymentSourceRelink);
     expect(cliCommandDescriptions.remoteStateLockInspect).toContain(cliDocsHrefs.remoteStateLock);

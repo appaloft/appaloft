@@ -208,7 +208,7 @@ describe("preview policy operations", () => {
     });
   });
 
-  test("[PG-PREVIEW-SURFACE-001] preview policy catalog entries expose HTTP API transports", () => {
+  test("[PG-PREVIEW-SURFACE-001] preview policy catalog entries expose CLI and HTTP API transports", () => {
     const configure = operationCatalog.find((entry) => entry.key === "preview-policies.configure");
     const show = operationCatalog.find((entry) => entry.key === "preview-policies.show");
 
@@ -219,6 +219,7 @@ describe("preview policy operations", () => {
       handlerName: "ConfigurePreviewPolicyCommandHandler",
       serviceName: "ConfigurePreviewPolicyUseCase",
       transports: {
+        cli: "appaloft preview policy configure",
         orpc: { method: "POST", path: "/api/preview-policies" },
       },
     });
@@ -229,6 +230,7 @@ describe("preview policy operations", () => {
       handlerName: "ShowPreviewPolicyQueryHandler",
       serviceName: "ShowPreviewPolicyQueryService",
       transports: {
+        cli: "appaloft preview policy show",
         orpc: { method: "POST", path: "/api/preview-policies/show" },
       },
     });

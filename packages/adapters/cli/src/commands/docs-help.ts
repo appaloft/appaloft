@@ -8,6 +8,7 @@ export const cliDocsHrefs = {
   deploymentSource: resolvePublicDocsHelpHref("deployment.source"),
   deploymentPlanPreview: resolvePublicDocsHelpHref("deployment.plan-preview"),
   deploymentPreviewCleanup: resolvePublicDocsHelpHref("deployment.preview-cleanup"),
+  productGradePreviews: resolvePublicDocsHelpHref("deployment.product-grade-previews"),
   deploymentSourceRelink: resolvePublicDocsHelpHref("deployment.source-relink"),
   deploymentRecoveryReadiness: resolvePublicDocsHelpHref("deployment.recovery-readiness"),
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
@@ -81,6 +82,18 @@ export const cliCommandDescriptions = {
   deployments: withDocs("Deployment queries", "deployment.lifecycle"),
   preview: withDocs("Preview deployment commands", "deployment.preview-cleanup"),
   previewCleanup: withDocs("Clean up a preview deployment context", "deployment.preview-cleanup"),
+  previewPolicy: withDocs(
+    "Product-grade preview policy commands",
+    "deployment.product-grade-previews",
+  ),
+  previewPolicyConfigure: withDocs(
+    "Configure product-grade preview policy for a project or resource",
+    "deployment.product-grade-previews",
+  ),
+  previewPolicyShow: withDocs(
+    "Show effective product-grade preview policy for a project or resource",
+    "deployment.product-grade-previews",
+  ),
   sourceLinks: withDocs("Source fingerprint link operations", "deployment.source-relink"),
   sourceLinkRelink: withDocs(
     "Relink a source fingerprint to an explicit resource",

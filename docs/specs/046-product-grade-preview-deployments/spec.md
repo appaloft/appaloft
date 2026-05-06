@@ -54,8 +54,8 @@ candidate operations:
 | Surface | State | Rule |
 | --- | --- | --- |
 | `source-events.ingest` | Active command / integration boundary | May be extended by a future Code Round to normalize GitHub pull request events after GitHub App verification. It must still persist safe source event state and dedupe before preview policy evaluation. |
-| `preview-policies.show` | Active HTTP/oRPC query | Reads effective preview policy, fork/secret/domain/quota rules, and selected execution owner for a project or resource scope. CLI and Web surfaces remain future work. |
-| `preview-policies.configure` | Active HTTP/oRPC command | Changes preview policy explicitly. It must not mutate Resource source/runtime/network profile or deployment history as a side effect. CLI and Web surfaces remain future work. |
+| `preview-policies.show` | Active CLI and HTTP/oRPC query | Reads effective preview policy, fork/secret/domain/quota rules, and selected execution owner for a project or resource scope. Web surfaces remain future work. |
+| `preview-policies.configure` | Active CLI and HTTP/oRPC command | Changes preview policy explicitly. It must not mutate Resource source/runtime/network profile or deployment history as a side effect. Web surfaces remain future work. |
 | `preview-environments.list` | Active HTTP/oRPC query | Lists durable preview environments with source event, deployment, route, feedback, cleanup, expiry, and audit summaries. CLI and Web surfaces remain future work. |
 | `preview-environments.show` | Active HTTP/oRPC query | Reads one preview environment and its safe latest deployment, route, feedback, policy, cleanup, and diagnostic state. CLI and Web surfaces remain future work. |
 | `preview-environments.delete` | Active HTTP/oRPC command | Requests explicit preview cleanup/deletion. It dispatches preview-lifecycle cleanup and preserves deployment history/audit. CLI and Web surfaces remain future work. |
@@ -266,18 +266,20 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   The shell composition has a disabled-by-default `previewCleanupRetryScheduler` runner that can be
   explicitly enabled with the shell cleaner registered. Scheduler leases, terminal provider
   metadata cleanup, and cleanup-side feedback updates remain future work.
-- Preview policy and preview environment operations now have active HTTP/oRPC operation routes for
-  `preview-policies.configure`, `preview-policies.show`, `preview-environments.list`,
-  `preview-environments.show`, and `preview-environments.delete`. Policy routes reuse the shared
-  command/query schemas and safe policy contract output. Environment list/show read from the safe
-  preview environment read model, delete dispatches through the preview cleanup service, and CLI/Web
+- Preview policy operations now have active CLI and HTTP/oRPC routes for
+  `preview-policies.configure` and `preview-policies.show`. Preview environment operations have
+  active HTTP/oRPC operation routes for `preview-environments.list`, `preview-environments.show`,
+  and `preview-environments.delete`. Policy routes reuse the shared command/query schemas and safe
+  policy contract output. Environment list/show read from the safe preview environment read model,
+  delete dispatches through the preview cleanup service, and remaining Web/preview-environment CLI
   entrypoints remain future work.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No GitHub App preview worker, scheduler leases, terminal provider metadata cleanup, or automatic
   process-manager deployment-status publication is implemented.
-- Preview policy and preview environment operations currently expose HTTP/oRPC only; CLI/Web/future
-  MCP transports remain future work.
+- Preview policy operations currently expose CLI and HTTP/oRPC only. Preview environment operations
+  currently expose HTTP/oRPC only. Web/future MCP transports and preview-environment CLI transports
+  remain future work.
 - Product-grade preview public docs/help now map preview policy and preview environment operations
   to the stable `/docs/deploy/previews/` product-grade preview anchor.
 
