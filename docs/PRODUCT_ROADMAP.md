@@ -1300,6 +1300,11 @@ Current verification notes:
   safe reason/readback details and requested secret scope counts without dispatching deployments or
   storing secret names/provider tokens. GitHub App ingestion, feedback, cleanup retry, and active
   preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview policy quota/TTL slice added active preview quota settings,
+  `preview_quota_exceeded` blocking, preview TTL-derived environment expiry, and Postgres/PGlite
+  readback for safe quota/expiry policy decision details. Scheduler cleanup for expired previews,
+  GitHub App ingestion, feedback, cleanup retry, and active preview environment entrypoints remain
+  open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,

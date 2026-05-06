@@ -55,11 +55,14 @@ export class PgPreviewPolicyDecisionProjection
               fork: values.fork,
               secret_backed: values.secret_backed,
               requested_secret_scope_count: values.requested_secret_scope_count,
+              active_preview_count: values.active_preview_count,
               status: values.status,
               phase: values.phase,
               deployment_eligible: values.deployment_eligible,
               reason_code: values.reason_code,
+              max_active_previews: values.max_active_previews,
               preview_environment_id: values.preview_environment_id,
+              preview_expires_at: values.preview_expires_at,
               deployment_id: values.deployment_id,
               evaluated_at: values.evaluated_at,
             }),
@@ -113,11 +116,14 @@ function rowFromProjection(
     fork: projection.fork,
     secret_backed: projection.secretBacked,
     requested_secret_scope_count: projection.requestedSecretScopeCount,
+    active_preview_count: projection.activePreviewCount,
     status: projection.status,
     phase: projection.phase,
     deployment_eligible: projection.deploymentEligible,
     reason_code: projection.reasonCode ?? null,
+    max_active_previews: projection.maxActivePreviews ?? null,
     preview_environment_id: projection.previewEnvironmentId ?? null,
+    preview_expires_at: projection.previewExpiresAt ?? null,
     deployment_id: projection.deploymentId ?? null,
     evaluated_at: projection.evaluatedAt,
   };
@@ -140,12 +146,17 @@ function projectionFromRow(row: PreviewPolicyDecisionRow): PreviewPolicyDecision
     fork: row.fork,
     secretBacked: row.secret_backed,
     requestedSecretScopeCount: row.requested_secret_scope_count,
+    activePreviewCount: row.active_preview_count,
     status: row.status === "allowed" ? "allowed" : "blocked",
     phase: "preview-policy-evaluation",
     deploymentEligible: row.deployment_eligible,
     evaluatedAt: normalizedRequiredTimestamp(row.evaluated_at),
     ...(row.reason_code ? { reasonCode: reasonCodeFromRow(row.reason_code) } : {}),
+    ...(row.max_active_previews !== null ? { maxActivePreviews: row.max_active_previews } : {}),
     ...(row.preview_environment_id ? { previewEnvironmentId: row.preview_environment_id } : {}),
+    ...(row.preview_expires_at
+      ? { previewExpiresAt: normalizedRequiredTimestamp(row.preview_expires_at) }
+      : {}),
     ...(row.deployment_id ? { deploymentId: row.deployment_id } : {}),
   };
 }
@@ -160,6 +171,7 @@ function reasonCodeFromRow(value: string): PreviewPolicyDecisionReasonCode {
     case "preview_fork_disabled":
     case "preview_fork_secrets_blocked":
     case "preview_secret_backed_disabled":
+    case "preview_quota_exceeded":
       return value;
     default:
       return "preview_event_unverified";

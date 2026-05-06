@@ -24,6 +24,9 @@ export interface PreviewPolicyDecisionSafeDetails {
   fork: boolean;
   secretBacked: boolean;
   requestedSecretScopeCount: number;
+  activePreviewCount: number;
+  maxActivePreviews?: number;
+  previewTtlHours?: number;
 }
 
 export interface PreviewPolicyDecision {
@@ -49,6 +52,13 @@ function safeDetails(input: PreviewPolicyEvaluationPayload): PreviewPolicyDecisi
     fork,
     secretBacked: input.requestedSecretScopes.length > 0,
     requestedSecretScopeCount: input.requestedSecretScopes.length,
+    activePreviewCount: input.activePreviewCount,
+    ...(input.policy.maxActivePreviews !== undefined
+      ? { maxActivePreviews: input.policy.maxActivePreviews }
+      : {}),
+    ...(input.policy.previewTtlHours !== undefined
+      ? { previewTtlHours: input.policy.previewTtlHours }
+      : {}),
   };
 }
 
@@ -83,6 +93,11 @@ export class PreviewPolicyEvaluator {
 
       const fork = parsed.headRepositoryFullName !== parsed.repositoryFullName;
       const secretBacked = parsed.requestedSecretScopes.length > 0;
+      const maxActivePreviews = parsed.policy.maxActivePreviews;
+
+      if (maxActivePreviews !== undefined && parsed.activePreviewCount >= maxActivePreviews) {
+        return blocked(parsed, "preview_quota_exceeded");
+      }
 
       if (!fork && !parsed.policy.sameRepositoryPreviews) {
         return blocked(parsed, "preview_same_repository_disabled");

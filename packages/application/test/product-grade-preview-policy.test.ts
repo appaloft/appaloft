@@ -131,6 +131,7 @@ describe("PreviewPolicyEvaluator", () => {
         fork: false,
         secretBacked: true,
         requestedSecretScopeCount: 1,
+        activePreviewCount: 0,
       },
     });
   });
@@ -162,6 +163,35 @@ describe("PreviewPolicyEvaluator", () => {
         fork: true,
         secretBacked: true,
         requestedSecretScopeCount: 1,
+      },
+    });
+  });
+
+  test("[PG-PREVIEW-POLICY-003] blocks over-quota preview events with safe quota details", () => {
+    const result = new PreviewPolicyEvaluator().evaluate({
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "opened",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "appaloft/demo",
+      pullRequestNumber: 127,
+      headSha: "quota123",
+      baseRef: "main",
+      verified: true,
+      activePreviewCount: 3,
+      policy: {
+        maxActivePreviews: 3,
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "blocked",
+      deploymentEligible: false,
+      reasonCode: "preview_quota_exceeded",
+      safeDetails: {
+        activePreviewCount: 3,
+        maxActivePreviews: 3,
       },
     });
   });
@@ -284,7 +314,63 @@ describe("PreviewPolicyEvaluator", () => {
       sourceEventId: "sevt_preview_1",
       status: "allowed",
       deploymentEligible: true,
+      activePreviewCount: 0,
       previewEnvironmentId: "prenv_1",
+      deploymentId: "dep_preview_1",
+    });
+  });
+
+  test("[PG-PREVIEW-POLICY-003] applies preview TTL when creating allowed preview environments", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const service = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      new FixedClock("2026-05-06T01:00:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+
+    const context = createExecutionContext({
+      requestId: "req_preview_lifecycle_ttl_test",
+      entrypoint: "system",
+    });
+    const result = await service.deployFromPolicyEligibleEvent(context, {
+      sourceEventId: "sevt_preview_ttl_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_ttl",
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "opened",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "appaloft/demo",
+      pullRequestNumber: 47,
+      headSha: "abc1235",
+      baseRef: "main",
+      verified: true,
+      policy: {
+        previewTtlHours: 24,
+      },
+    });
+    const projected = await projection.findOne(toRepositoryContext(context), {
+      sourceEventId: "sevt_preview_ttl_1",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(repository.previewEnvironment?.toState().expiresAt?.value).toBe(
+      "2026-05-07T01:00:00.000Z",
+    );
+    expect(projected).toMatchObject({
+      sourceEventId: "sevt_preview_ttl_1",
+      status: "allowed",
+      activePreviewCount: 0,
+      previewEnvironmentId: "prenv_1",
+      previewExpiresAt: "2026-05-07T01:00:00.000Z",
       deploymentId: "dep_preview_1",
     });
   });
@@ -445,6 +531,7 @@ describe("PreviewPolicyEvaluator", () => {
       fork: true,
       secretBacked: true,
       requestedSecretScopeCount: 2,
+      activePreviewCount: 0,
       status: "blocked",
       phase: "preview-policy-evaluation",
       deploymentEligible: false,

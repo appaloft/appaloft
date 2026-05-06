@@ -37,6 +37,19 @@ import { tokens } from "../../tokens";
 import { type PreviewPolicyDecision, PreviewPolicyEvaluator } from "./preview-policy.evaluator";
 import { type PreviewPolicyEvaluationInput } from "./preview-policy.schema";
 
+function deriveExpiresAt(now: string, previewTtlHours: number | undefined): string | undefined {
+  if (previewTtlHours === undefined) {
+    return undefined;
+  }
+
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(nowMs)) {
+    return undefined;
+  }
+
+  return new Date(nowMs + previewTtlHours * 60 * 60 * 1000).toISOString();
+}
+
 export interface PreviewLifecycleDeployInput extends PreviewPolicyEvaluationInput {
   sourceEventId: string;
   projectId: string;
@@ -92,7 +105,11 @@ export class PreviewLifecycleService {
       });
     }
 
-    const previewEnvironment = await this.createOrUpdatePreviewEnvironment(context, input);
+    const previewEnvironment = await this.createOrUpdatePreviewEnvironment(
+      context,
+      input,
+      policyDecision.value,
+    );
     if (previewEnvironment.isErr()) {
       return err(previewEnvironment.error);
     }
@@ -110,6 +127,7 @@ export class PreviewLifecycleService {
     if (dispatch.isErr()) {
       await this.recordPolicyDecision(context, input, policyDecision.value, {
         previewEnvironmentId: state.id.value,
+        ...(state.expiresAt ? { previewExpiresAt: state.expiresAt.value } : {}),
       });
       return ok({
         status: "dispatch-failed",
@@ -121,6 +139,7 @@ export class PreviewLifecycleService {
 
     await this.recordPolicyDecision(context, input, policyDecision.value, {
       previewEnvironmentId: state.id.value,
+      ...(state.expiresAt ? { previewExpiresAt: state.expiresAt.value } : {}),
       deploymentId: dispatch.value.deploymentId,
     });
 
@@ -138,6 +157,7 @@ export class PreviewLifecycleService {
     policyDecision: PreviewPolicyDecision,
     lifecycleResult?: {
       previewEnvironmentId?: string;
+      previewExpiresAt?: string;
       deploymentId?: string;
     },
   ): Promise<void> {
@@ -158,13 +178,20 @@ export class PreviewLifecycleService {
       fork: safeDetails.fork,
       secretBacked: safeDetails.secretBacked,
       requestedSecretScopeCount: safeDetails.requestedSecretScopeCount,
+      activePreviewCount: safeDetails.activePreviewCount,
       status: policyDecision.status,
       phase: policyDecision.phase,
       deploymentEligible: policyDecision.deploymentEligible,
       evaluatedAt: this.clock.now(),
       ...(policyDecision.reasonCode ? { reasonCode: policyDecision.reasonCode } : {}),
+      ...(safeDetails.maxActivePreviews !== undefined
+        ? { maxActivePreviews: safeDetails.maxActivePreviews }
+        : {}),
       ...(lifecycleResult?.previewEnvironmentId
         ? { previewEnvironmentId: lifecycleResult.previewEnvironmentId }
+        : {}),
+      ...(lifecycleResult?.previewExpiresAt
+        ? { previewExpiresAt: lifecycleResult.previewExpiresAt }
         : {}),
       ...(lifecycleResult?.deploymentId ? { deploymentId: lifecycleResult.deploymentId } : {}),
     };
@@ -175,6 +202,7 @@ export class PreviewLifecycleService {
   private async createOrUpdatePreviewEnvironment(
     context: ExecutionContext,
     input: PreviewLifecycleDeployInput,
+    policyDecision: PreviewPolicyDecision,
   ): Promise<Result<PreviewEnvironment>> {
     const repositoryFullName = SourceRepositoryFullName.create(input.repositoryFullName);
     if (repositoryFullName.isErr()) return err(repositoryFullName.error);
@@ -212,8 +240,11 @@ export class PreviewLifecycleService {
     if (destinationId.isErr()) return err(destinationId.error);
 
     let expiresAtValue: PreviewEnvironmentExpiresAtValue | undefined;
-    if (input.expiresAt) {
-      const expiresAt = PreviewEnvironmentExpiresAt.create(input.expiresAt);
+    const expiresAtInput =
+      input.expiresAt ??
+      deriveExpiresAt(this.clock.now(), policyDecision.safeDetails.previewTtlHours);
+    if (expiresAtInput) {
+      const expiresAt = PreviewEnvironmentExpiresAt.create(expiresAtInput);
       if (expiresAt.isErr()) return err(expiresAt.error);
       expiresAtValue = expiresAt.value;
     }
