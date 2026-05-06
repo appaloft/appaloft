@@ -226,6 +226,10 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   `CreateDeploymentSourceEventDispatcher`. The dispatcher forwards only project, environment,
   Resource, server, and optional destination ids into `deployments.create`; preview source event,
   pull request, branch, route, and source details stay in preview/source read-model state.
+- Preview pull-request event ingestion now has an application service that accepts safe normalized
+  GitHub preview facts plus selected control-plane context, routes create/update actions into the
+  preview lifecycle service, and leaves closed-event cleanup as an explicit ignored outcome until
+  cleanup process state is implemented.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No GitHub App preview worker, feedback writer, cleanup scheduler, or cleanup retry state is

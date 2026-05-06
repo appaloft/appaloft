@@ -20,6 +20,7 @@ import {
   type PreviewPolicyDecisionReadModel,
   type PreviewPolicyDecisionRecorder,
   PreviewPolicyEvaluator,
+  PreviewPullRequestEventIngestService,
   PreviewScopedConfigResolver,
   type RepositoryContext,
   type SourceEventDeploymentDispatcher,
@@ -807,5 +808,76 @@ describe("PreviewDeploymentDispatch", () => {
     expect(JSON.stringify(createDeploymentUseCase.inputs)).not.toContain("pullRequestNumber");
     expect(JSON.stringify(createDeploymentUseCase.inputs)).not.toContain("headSha");
     expect(JSON.stringify(createDeploymentUseCase.inputs)).not.toContain("baseRef");
+  });
+});
+
+describe("PreviewPullRequestEventIngestService", () => {
+  test("[PG-PREVIEW-EVENT-001] routes normalized pull request events into preview lifecycle", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const lifecycle = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      projection,
+      new FixedClock("2026-05-06T04:20:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const ingest = new PreviewPullRequestEventIngestService(lifecycle);
+    const context = createExecutionContext({
+      requestId: "req_preview_pull_request_ingest_test",
+      entrypoint: "system",
+    });
+
+    const result = await ingest.ingest(context, {
+      sourceEventId: "sevt_preview_pull_request_1",
+      event: {
+        provider: "github",
+        eventKind: "pull-request",
+        eventAction: "synchronize",
+        repositoryFullName: "appaloft/demo",
+        headRepositoryFullName: "appaloft/demo",
+        pullRequestNumber: 48,
+        headSha: "abc1234",
+        baseRef: "main",
+        verified: true,
+        deliveryId: "delivery_preview_48",
+      },
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_48",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "routed",
+      lifecycleResult: {
+        status: "dispatched",
+        previewEnvironmentId: "prenv_1",
+        deploymentId: "dep_preview_1",
+      },
+    });
+    expect(repository.previewEnvironment?.toState()).toMatchObject({
+      id: { value: "prenv_1" },
+      source: {
+        pullRequestNumber: { value: 48 },
+        headSha: { value: "abc1234" },
+        baseRef: { value: "main" },
+      },
+    });
+    expect(dispatcher.inputs).toEqual([
+      {
+        sourceEventId: "sevt_preview_pull_request_1",
+        projectId: "prj_preview",
+        environmentId: "env_preview",
+        resourceId: "res_preview_api",
+        serverId: "srv_preview",
+        destinationId: "dst_preview",
+      },
+    ]);
   });
 });
