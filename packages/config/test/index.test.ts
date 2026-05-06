@@ -127,6 +127,16 @@ describe("resolveConfig", () => {
     expect(config.githubWebhookSecret).toBe("github-webhook-secret");
   });
 
+  test("reads the GitHub preview feedback worker token from runtime configuration", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN: "github-preview-worker-token",
+      },
+    });
+
+    expect(config.githubPreviewFeedbackToken).toBe("github-preview-worker-token");
+  });
+
   test("keeps Docker Swarm execution disabled by default and accepts explicit shell activation", () => {
     const defaults = resolveConfig();
     const configured = resolveConfig({

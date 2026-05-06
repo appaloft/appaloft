@@ -78,9 +78,11 @@ Secrets should come from GitHub Secrets or another trusted workflow secret store
 
 <h2 id="product-grade-preview-deployments">Product-grade control-plane previews</h2>
 
-Product-grade previews are a future Appaloft Cloud or self-hosted control-plane workflow. They are not the same as Action-only previews.
+Product-grade previews are an Appaloft Cloud or self-hosted control-plane workflow. They are not the same as Action-only previews.
 
-That product line will use GitHub App webhooks, preview policy, fork and secret policy, preview environment list/show/delete, comments/checks/status feedback, cleanup retries, quotas, audit, and managed domain follow-up. It still must deploy through ids-only `deployments.create` after the control plane selects or creates the preview context.
+That product line uses signed GitHub webhooks, preview policy, fork and secret policy, preview environment list/show/delete, comments/checks/status feedback, cleanup retries, quotas, audit, and managed domain follow-up. It still must deploy through ids-only `deployments.create` after the control plane selects or creates the preview context.
+
+For self-hosted control planes, webhook verification uses `APPALOFT_GITHUB_WEBHOOK_SECRET`. Worker-side feedback publishing for webhook and cleanup scheduler contexts uses `APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN` when no request-scoped GitHub connection is present.
 
 Use product-grade previews when you need Appaloft to own preview orchestration, policy, feedback, cleanup retries, and team-visible audit instead of relying on every repository to maintain its own workflow file.
 

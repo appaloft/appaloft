@@ -2,11 +2,11 @@
 
 ## Status
 
-Spec Round complete; Code Round started for Phase 7 / `0.9.0`.
+Spec Round complete; Phase 7 / `0.9.0` Code Round implemented.
 
 This artifact positions product-grade preview deployments and records incremental Code Round
-progress. It does not activate new operation catalog entries, HTTP routes, CLI commands, Web
-controls, GitHub App routes, workers, or scheduler behavior.
+progress. GitHub App installation onboarding, provider smoke tests, and managed-domain follow-up
+remain separate public enablement work.
 
 ## Problem
 
@@ -252,8 +252,9 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   deployment id is present, the GitHub writer resolves the pull-request head SHA, creates a
   transient GitHub preview deployment, records that deployment id as the provider feedback id, and
   appends deployment statuses to that deployment timeline. Shell wiring resolves the GitHub access
-  token per request through the existing integration auth port before delegating to the composite
-  GitHub feedback writer.
+  token per request through the existing integration auth port when a user request is in scope, or
+  through the explicit preview feedback worker token for webhook/scheduler execution contexts,
+  before delegating to the composite GitHub feedback writer.
 - Preview environment cleanup now has an initial application service that loads the durable preview
   environment, marks cleanup requested without deleting preview history, and delegates runtime,
   route, source-link, provider metadata, and feedback cleanup to a port with safe source-scope
@@ -299,7 +300,9 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   idempotent `github-deployment-status` feedback after ids-only deployment dispatch. Retryable
   deployment-status feedback failures are recorded as safe feedback state without changing the
   accepted deployment result to `err`.
-- Active GitHub App preview worker transports are still not implemented.
+- GitHub preview feedback worker transport is available for self-hosted/control-plane webhook and
+  scheduler contexts through an explicit runtime token. Full GitHub App installation-token
+  onboarding remains a separate public enablement decision and is not implemented in this slice.
 - Preview policy and preview environment operations currently expose CLI, HTTP/oRPC, and generated
   future MCP tool descriptors. Web exposes preview policy readback/configuration and the read-only
   preview environment list/detail/delete surface.

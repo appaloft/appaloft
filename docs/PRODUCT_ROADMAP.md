@@ -1457,6 +1457,13 @@ Current verification notes:
   `IngestPreviewPullRequestEventCommandHandler` preserves safe provider repository id and
   installation id facts when handing signed GitHub preview events to the application ingest service.
   Active GitHub App preview worker transports remain open.
+- 2026-05-06 Phase 7 preview worker feedback transport slice added an explicit
+  `APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN` runtime configuration path for webhook and cleanup
+  scheduler contexts where no request-scoped GitHub OAuth token exists. The shell feedback writer
+  still prefers request-scoped GitHub auth when present, falls back to the worker token for system
+  contexts, and returns safe `preview-feedback` validation errors when neither token source exists.
+  Full GitHub App installation-token onboarding and provider smoke tests remain future public
+  enablement work rather than a Phase 7 Code Round blocker.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
@@ -1503,15 +1510,16 @@ Required:
   repository and public wrapper CI remain open; reference action asset export is implemented and
   layout-tested locally.
 - [x] Add existing-resource profile-drift handling.
-- [ ] Add product-grade preview deployments after source binding and webhook ingestion are durable,
+- [x] Add product-grade preview deployments after source binding and webhook ingestion are durable,
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
   retries. Spec Round is positioned in
   [docs/specs/046-product-grade-preview-deployments](./specs/046-product-grade-preview-deployments/spec.md)
   with a dedicated test matrix; preview policy/environment operations, feedback, cleanup retry,
   Web/API/CLI/future MCP surfaces, public docs, an initial signed GitHub pull-request HTTP route,
   close-event cleanup routing, cleanup-side feedback update, and automatic deployment-status
-  feedback publication, plus repository-context mapping from signed GitHub events, are implemented.
-  Active GitHub App preview worker transports remain open.
+  feedback publication, plus repository-context mapping from signed GitHub events and
+  request-or-worker-token GitHub feedback transport, are implemented. Full GitHub App installation
+  onboarding and provider smoke tests remain outside this Phase 7 Code Round.
 - [x] Add scheduled task/cron resource shape with run history and logs after workload service
   semantics are specified. ADR-039/spec matrix now position ownership and target operations.
 - [x] Complete the Docker Swarm Spec Round as the first cluster runtime target:
