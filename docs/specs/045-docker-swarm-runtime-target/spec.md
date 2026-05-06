@@ -123,8 +123,9 @@ No new public operation key is accepted in this Spec Round.
 - OCI image runtime intent now also renders an adapter-owned apply plan that creates a
   deployment-specific candidate service, keeps workload traffic on Swarm networks without public
   host-port publication, orders verification before route promotion and superseded-service cleanup,
-  and keeps secret environment values as safe Docker secret references. The plan is not wired to an
-  execution backend yet.
+  and keeps secret environment values as safe Docker secret references. The opt-in fake backend
+  executes that plan in candidate-create, verify, route-promotion, cleanup order and records
+  sanitized runtime identity on success.
 - The runtime adapter package also renders a label-scoped Swarm cleanup plan for services owned by
   the same Appaloft resource, deployment, target, destination, and runtime-target identity. The plan
   is wired only through the explicit fake-runner Swarm backend, not through default real execution.
@@ -132,9 +133,9 @@ No new public operation key is accepted in this Spec Round.
   execute the adapter-owned image apply plan and label-scoped cleanup plan through an injected
   command runner, records sanitized Swarm runtime metadata on successful deployment completion, and
   is not registered in the default runtime backend registry.
-- Fake-runner failed verification now records deployment failure metadata and runs the
-  deployment-scoped cleanup plan for the failed candidate service without broad prune or volume
-  commands.
+- Fake-runner failed verification now records deployment failure metadata, skips superseded-service
+  cleanup, and runs the deployment-scoped cleanup plan for the failed candidate service without
+  broad prune or volume commands.
 - `resources.runtime-logs` can read Swarm-backed OCI image deployment logs through `docker service
   logs` using the sanitized `swarm.serviceName` runtime metadata. Output remains the existing
   Appaloft `ResourceRuntimeLogLine` shape with resource/deployment/runtime context and configured
@@ -160,9 +161,8 @@ No new public operation key is accepted in this Spec Round.
   payloads, and registry secret values are not part of that readback contract.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
-- Default Swarm backend activation, failed-rollout rollback behavior, remote-manager health/log
-  execution, end-to-end Swarm route smoke coverage, and full registry/pull-secret handling remain
-  open.
+- Default Swarm backend activation, remote-manager health/log execution, end-to-end Swarm route
+  smoke coverage, and full registry/pull-secret handling remain open.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and

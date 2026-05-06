@@ -1261,6 +1261,11 @@ Current verification notes:
   to PGlite deployment repository and read-model tests. Sanitized Swarm stack/service/schema
   metadata now round-trips through execution metadata; raw commands, provider payloads, and
   registry-secret fields remain outside the readback contract.
+- 2026-05-06 Phase 7 Docker Swarm rollout-preservation sync marked `SWARM-TARGET-APPLY-001`
+  covered by existing adapter and fake-backend tests: candidate services are created before
+  verification, route promotion, and superseded-service cleanup; failed candidate verification
+  records failure, skips superseded-service cleanup, and cleans only the deployment-scoped
+  candidate. Real Swarm smoke/default activation remains open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and

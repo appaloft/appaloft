@@ -62,8 +62,10 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   credential and provider response redaction remain open with apply/log/diagnostic adapters.
 - `SWARM-TARGET-APPLY-001` has initial adapter contract coverage proving OCI image apply planning
   creates a deployment-specific candidate service before verification, route promotion, and
-  superseded-service cleanup. Active command execution and failure rollback remain open with the
-  Swarm backend.
+  superseded-service cleanup. The opt-in fake backend now executes that order, records sanitized
+  runtime identity after success, and skips superseded-service cleanup when candidate verification
+  fails, so previous same-resource services are preserved in default failure handling. Real Swarm
+  smoke coverage remains open.
 - `SWARM-TARGET-ROUTE-001` has initial apply-plan coverage proving image workloads attach to the
   Swarm overlay network without public host-port publication. Active edge-proxy route realization
   remains open.
