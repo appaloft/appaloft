@@ -15,7 +15,7 @@
 
 - [x] `PG-PREVIEW-POLICY-001A`: policy evaluator allows a verified same-repository pull request
   event.
-- [ ] `PG-PREVIEW-POLICY-001B`: eligible policy result creates or updates a preview environment
+- [x] `PG-PREVIEW-POLICY-001B`: eligible policy result creates or updates a preview environment
   and dispatches one ids-only deployment attempt.
 - [x] `PG-PREVIEW-POLICY-002A`: policy evaluator blocks secret-backed fork preview deployment by
   default.

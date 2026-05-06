@@ -188,6 +188,10 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   read models and scoped delete by preview environment id plus Resource id. The read model exposes
   provider-neutral project/environment/resource/server/destination placement, pull-request source
   context, status, expiry, and timestamps without provider payloads or secret material.
+- The application layer now has an initial `PreviewLifecycleService` for a verified,
+  policy-eligible pull-request event. It creates or updates the scoped `PreviewEnvironment`, then
+  dispatches exactly one ids-only deployment request through the existing deployment dispatcher.
+  Pull-request source facts stay in preview lifecycle state rather than `deployments.create`.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No preview policy aggregate/read model, GitHub App preview worker, feedback writer, cleanup
