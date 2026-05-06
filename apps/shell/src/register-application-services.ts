@@ -169,6 +169,8 @@ import {
   MarkServerAppliedRouteStatusOnDeploymentFinishedHandler,
   OpenTerminalSessionUseCase,
   OperatorWorkQueryService,
+  PreviewCleanupRetryScheduler,
+  PreviewEnvironmentCleanupService,
   PreviewLifecycleService,
   PromoteEnvironmentUseCase,
   ProvisionPostgresDependencyResourceCommandHandler,
@@ -530,6 +532,11 @@ export function registerApplicationServices(container: DependencyContainer): voi
     CreateDeploymentSourceEventDispatcher,
   );
   container.registerSingleton(tokens.previewLifecycleService, PreviewLifecycleService);
+  container.registerSingleton(
+    tokens.previewEnvironmentCleanupService,
+    PreviewEnvironmentCleanupService,
+  );
+  container.registerSingleton(tokens.previewCleanupRetryScheduler, PreviewCleanupRetryScheduler);
   container.registerSingleton(
     tokens.configureResourceHealthUseCase,
     ConfigureResourceHealthUseCase,

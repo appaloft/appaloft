@@ -124,7 +124,10 @@ run, safe failure phase, provider error code, next retry time, and no provider e
 `packages/persistence/pg/test/preview-cleanup-attempt.pglite.test.ts`. The coverage proves durable
 cleanup attempt rows retain attempt id, preview environment id, Resource id, source fingerprint,
 owner, status, safe phase, retry timing, and safe error code without provider error text, tokens, or
-secret-shaped values.
+secret-shaped values. The same test proves the due retry reader returns only the latest due
+retry-scheduled attempt for a preview target. Application coverage also proves the retry scheduler
+reads due candidates and dispatches them through the cleanup service, creating a fresh cleanup
+attempt id for the retry.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and

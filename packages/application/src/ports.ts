@@ -4566,6 +4566,26 @@ export interface PreviewCleanupAttemptRecorder {
   record(context: RepositoryContext, record: PreviewCleanupAttemptRecord): Promise<void>;
 }
 
+export interface PreviewCleanupRetryCandidate {
+  attemptId: string;
+  previewEnvironmentId: string;
+  resourceId: string;
+  sourceBindingFingerprint: string;
+  owner: string;
+  phase: string;
+  nextRetryAt: string;
+}
+
+export interface PreviewCleanupRetryCandidateReader {
+  listDueRetries(
+    context: RepositoryContext,
+    input: {
+      now: string;
+      limit: number;
+    },
+  ): Promise<PreviewCleanupRetryCandidate[]>;
+}
+
 export interface SourceEventPolicyCandidate {
   projectId: string;
   environmentId: string;

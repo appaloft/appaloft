@@ -145,9 +145,12 @@ function contextFixture() {
 describe("preview cleanup attempt persistence", () => {
   test("[PG-PREVIEW-CLEANUP-002] records durable retry attempts with safe details", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-preview-cleanup-attempt-"));
-    const { createDatabase, createMigrator, PgPreviewCleanupAttemptRecorder } = await import(
-      "../src"
-    );
+    const {
+      createDatabase,
+      createMigrator,
+      PgPreviewCleanupAttemptRecorder,
+      PgPreviewCleanupRetryCandidateReader,
+    } = await import("../src");
     const database = await createDatabase({
       driver: "pglite",
       pgliteDataDir: dataDir,
@@ -185,9 +188,24 @@ describe("preview cleanup attempt persistence", () => {
         attemptedAt: "2026-05-06T01:05:00.000Z",
         updatedAt: "2026-05-06T01:05:00.000Z",
       };
+      const dueAttempt: PreviewCleanupAttemptRecord = {
+        attemptId: "pcln_preview_cleanup_retry_3",
+        previewEnvironmentId: "prenv_preview_cleanup_1",
+        resourceId: "res_preview_cleanup_api",
+        sourceBindingFingerprint: "srcfp_preview_cleanup",
+        owner: "req_preview_cleanup_attempt_pglite_test",
+        status: "retry-scheduled",
+        phase: "provider-metadata-cleanup",
+        attemptedAt: "2026-05-06T01:10:00.000Z",
+        updatedAt: "2026-05-06T01:10:00.000Z",
+        errorCode: "github_rate_limited",
+        retryable: true,
+        nextRetryAt: "2026-05-06T01:15:00.000Z",
+      };
 
       await recorder.record(context, retryAttempt);
       await recorder.record(context, succeededAttempt);
+      await recorder.record(context, dueAttempt);
 
       const rows = await database.db
         .selectFrom("preview_cleanup_attempts")
@@ -230,6 +248,38 @@ describe("preview cleanup attempt persistence", () => {
           error_code: null,
           retryable: null,
           next_retry_at: null,
+        },
+        {
+          attempt_id: "pcln_preview_cleanup_retry_3",
+          preview_environment_id: "prenv_preview_cleanup_1",
+          resource_id: "res_preview_cleanup_api",
+          source_binding_fingerprint: "srcfp_preview_cleanup",
+          owner: "req_preview_cleanup_attempt_pglite_test",
+          status: "retry-scheduled",
+          phase: "provider-metadata-cleanup",
+          attempted_at: "2026-05-06T01:10:00.000Z",
+          updated_at: "2026-05-06T01:10:00.000Z",
+          error_code: "github_rate_limited",
+          retryable: true,
+          next_retry_at: "2026-05-06T01:15:00.000Z",
+        },
+      ]);
+      const dueCandidates = await new PgPreviewCleanupRetryCandidateReader(
+        database.db,
+      ).listDueRetries(context, {
+        now: "2026-05-06T01:16:00.000Z",
+        limit: 10,
+      });
+
+      expect(dueCandidates).toEqual([
+        {
+          attemptId: "pcln_preview_cleanup_retry_3",
+          previewEnvironmentId: "prenv_preview_cleanup_1",
+          resourceId: "res_preview_cleanup_api",
+          sourceBindingFingerprint: "srcfp_preview_cleanup",
+          owner: "req_preview_cleanup_attempt_pglite_test",
+          phase: "provider-metadata-cleanup",
+          nextRetryAt: "2026-05-06T01:15:00.000Z",
         },
       ]);
       expect(JSON.stringify(normalizedRows)).not.toContain(

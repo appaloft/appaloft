@@ -34,6 +34,7 @@ export const tokens = {
   previewFeedbackRecorder: Symbol.for("appaloft.preview_feedback_recorder"),
   previewEnvironmentCleaner: Symbol.for("appaloft.preview_environment_cleaner"),
   previewCleanupAttemptRecorder: Symbol.for("appaloft.preview_cleanup_attempt_recorder"),
+  previewCleanupRetryCandidateReader: Symbol.for("appaloft.preview_cleanup_retry_candidate_reader"),
   resourceDependencyBindingRepository: Symbol.for(
     "appaloft.resource_dependency_binding_repository",
   ),
@@ -243,6 +244,7 @@ export const tokens = {
   ),
   showPreviewEnvironmentQueryService: Symbol.for("appaloft.show_preview_environment_query_service"),
   previewEnvironmentCleanupService: Symbol.for("appaloft.preview_environment_cleanup_service"),
+  previewCleanupRetryScheduler: Symbol.for("appaloft.preview_cleanup_retry_scheduler"),
   openTerminalSessionUseCase: Symbol.for("appaloft.open_terminal_session_use_case"),
   relinkSourceLinkUseCase: Symbol.for("appaloft.relink_source_link_use_case"),
   resourceProxyConfigurationPreviewQueryService: Symbol.for(

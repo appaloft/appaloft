@@ -1368,6 +1368,11 @@ Current verification notes:
   safe error code without provider error text, tokens, or secret-shaped values. Scheduler dispatch,
   concrete cleanup adapters, GitHub App HTTP routes, and active preview environment entrypoints
   remain open.
+- 2026-05-06 Phase 7 preview cleanup retry scheduler slice added an application scheduler and
+  durable due-candidate reader for `preview_cleanup_attempts`. The reader returns latest due
+  `retry-scheduled` attempts only, and the scheduler dispatches them through the cleanup service so
+  retries create fresh `pcln_*` attempt ids. Concrete cleanup adapters, active scheduler
+  runners/leases, GitHub App HTTP routes, and active preview environment entrypoints remain open.
 - 2026-05-06 Phase 7 preview environment surface-contract slice added inactive
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete`
   application contracts plus operation catalog entries. List/show read from the safe preview
