@@ -1283,7 +1283,8 @@ Current verification notes:
   redaction, and scoped cleanup through `DockerSwarmExecutionBackend` and
   `DockerSwarmShellCommandRunner`. The smoke is skipped by default and requires
   `APPALOFT_DOCKER_SWARM_SMOKE=1`, an active local Swarm manager, and an `appaloft-edge` overlay
-  network before mutating Docker state; running it against a real manager remains environment-gated.
+  network before mutating Docker state. `bun run smoke:swarm` is the first-class opt-in command for
+  that harness; running it against a real manager remains environment-gated.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1544,7 +1545,7 @@ Required:
   label-scoped cleanup plan rendering, opt-in fake backend acceptance coverage, Swarm runtime-log
   observation, Swarm health observation, initial Traefik route label promotion, the public docs
   anchor, command-failure redaction, sanitized runtime identity readback, and CLI/API/Web help
-  links are implemented; opt-in shell composition and an environment-gated real smoke harness
+  links are implemented; opt-in shell composition and `bun run smoke:swarm` real smoke harness
   exist, but a real Swarm smoke run and default activation remain open.
 
 Exit criteria:

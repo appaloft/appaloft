@@ -39,6 +39,7 @@
     "smoke:local:compose": "bun run scripts/smoke/local-deploy.ts --method=docker-compose --port=4312",
     "smoke:local:prebuilt": "bun run scripts/smoke/local-deploy.ts --method=prebuilt-image --port=4313",
     "smoke:local:static": "bun run scripts/smoke/local-deploy.ts --method=static",
+    "smoke:swarm": "APPALOFT_DOCKER_SWARM_SMOKE=1 bun test packages/adapters/runtime/test/docker-swarm-execution-backend.test.ts",
     "prepare": "husky"
   },
   "lint-staged": {

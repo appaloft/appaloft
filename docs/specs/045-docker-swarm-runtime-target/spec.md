@@ -171,7 +171,8 @@ No new public operation key is accepted in this Spec Round.
 - The runtime adapter test suite now includes an environment-gated real Docker Swarm smoke harness
   for apply, post-verification route-label promotion, secret redaction, and scoped cleanup. It is
   skipped by default and requires `APPALOFT_DOCKER_SWARM_SMOKE=1`, an active local Swarm manager,
-  and an `appaloft-edge` overlay network before it mutates Docker state.
+  and an `appaloft-edge` overlay network before it mutates Docker state. `bun run smoke:swarm`
+  is the first-class repository command for that opt-in smoke.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
 - Default-on Swarm activation, remote-manager health/log execution, end-to-end Swarm route smoke
