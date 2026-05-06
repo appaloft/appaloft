@@ -127,7 +127,8 @@ owner, status, safe phase, retry timing, and safe error code without provider er
 secret-shaped values. The same test proves the due retry reader returns only the latest due
 retry-scheduled attempt for a preview target. Application coverage also proves the retry scheduler
 reads due candidates and dispatches them through the cleanup service, creating a fresh cleanup
-attempt id for the retry.
+attempt id for the retry. `packages/config/test/index.test.ts` covers the disabled-by-default shell
+runner config and environment overrides for preview cleanup retry scheduling.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and

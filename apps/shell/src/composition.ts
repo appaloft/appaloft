@@ -22,6 +22,7 @@ import {
   type IntegrationAuthPort,
   MarkServerAppliedRouteAppliedSpec,
   MarkServerAppliedRouteFailedSpec,
+  type PreviewCleanupRetryScheduler,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
   type ResourceRepository,
@@ -59,6 +60,10 @@ import { container, type DependencyContainer } from "tsyringe";
 import { createCertificateRetrySchedulerRunner } from "./certificate-retry-scheduler-runner";
 import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
 import { adoptLegacyPgliteState } from "./legacy-pglite-state-adoption";
+import {
+  createDisabledPreviewCleanupRetrySchedulerRunner,
+  createPreviewCleanupRetrySchedulerRunner,
+} from "./preview-cleanup-retry-scheduler-runner";
 import { registerApplicationServices } from "./register-application-services";
 import { registerRuntimeDependencies } from "./register-runtime-dependencies";
 import { createReloadableDatabase } from "./reloadable-database";
@@ -400,6 +405,17 @@ export async function createAppComposition(
     executionContextFactory,
     logger,
   });
+  const previewCleanupRetrySchedulerRunner = config.previewCleanupRetryScheduler.enabled
+    ? createPreviewCleanupRetrySchedulerRunner({
+        config: config.previewCleanupRetryScheduler,
+        scheduler: resolveToken<PreviewCleanupRetryScheduler>(
+          childContainer,
+          tokens.previewCleanupRetryScheduler,
+        ),
+        executionContextFactory,
+        logger,
+      })
+    : createDisabledPreviewCleanupRetrySchedulerRunner();
   const scheduledTaskScheduler = resolveToken<ScheduledTaskScheduler>(
     childContainer,
     tokens.scheduledTaskScheduler,
@@ -468,6 +484,7 @@ export async function createAppComposition(
     });
 
     certificateRetrySchedulerRunner.start();
+    previewCleanupRetrySchedulerRunner.start();
     scheduledTaskRunner.start();
   };
 
@@ -520,6 +537,7 @@ export async function createAppComposition(
     startServer,
     async shutdown(): Promise<void> {
       certificateRetrySchedulerRunner.stop();
+      previewCleanupRetrySchedulerRunner.stop();
       scheduledTaskRunner.stop();
       serverHandle?.stop?.();
       await telemetry.shutdown();

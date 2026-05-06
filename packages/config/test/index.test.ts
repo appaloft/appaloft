@@ -227,6 +227,11 @@ describe("resolveConfig", () => {
       intervalSeconds: 60,
       batchSize: 25,
     });
+    expect(config.previewCleanupRetryScheduler).toEqual({
+      enabled: false,
+      intervalSeconds: 300,
+      batchSize: 25,
+    });
   });
 
   test("allows enabling ACME certificate provider through environment", () => {
@@ -287,6 +292,22 @@ describe("resolveConfig", () => {
       enabled: true,
       intervalSeconds: 15,
       batchSize: 3,
+    });
+  });
+
+  test("allows configuring the preview cleanup retry scheduler through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_ENABLED: "true",
+        APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_INTERVAL_SECONDS: "20",
+        APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_BATCH_SIZE: "4",
+      },
+    });
+
+    expect(config.previewCleanupRetryScheduler).toEqual({
+      enabled: true,
+      intervalSeconds: 20,
+      batchSize: 4,
     });
   });
 });
