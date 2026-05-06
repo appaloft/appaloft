@@ -163,7 +163,9 @@ No new public operation key is accepted in this Spec Round.
   rendered apply, verify, promote, and cleanup commands and preserve stdout/stderr/exit-code
   results for backend handling. Shell composition registers it only when
   `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=true`, with
-  `APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS` controlling per-command timeout.
+  `APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS` controlling per-command timeout and
+  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` selecting the Swarm overlay network used for service
+  attachment and route labels.
 - Postgres/PGlite deployment persistence and the deployment read model preserve sanitized Swarm
   runtime identity metadata, including stack name, service name, and apply-plan schema version,
   through the existing deployment execution metadata boundary. Raw Docker commands, provider
@@ -171,8 +173,9 @@ No new public operation key is accepted in this Spec Round.
 - The runtime adapter test suite now includes an environment-gated real Docker Swarm smoke harness
   for apply, post-verification route-label promotion, secret redaction, and scoped cleanup. It is
   skipped by default and requires `APPALOFT_DOCKER_SWARM_SMOKE=1`, an active local Swarm manager,
-  and an `appaloft-edge` overlay network before it mutates Docker state. `bun run smoke:swarm`
-  is the first-class repository command for that opt-in smoke.
+  and an overlay network named by `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` or `appaloft-edge` before it
+  mutates Docker state. `bun run smoke:swarm` is the first-class repository command for that opt-in
+  smoke.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
 - Default-on Swarm activation, remote-manager health/log execution, end-to-end Swarm route smoke

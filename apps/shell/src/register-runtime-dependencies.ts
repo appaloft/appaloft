@@ -1112,6 +1112,12 @@ export function registerRuntimeDependencies(
                 new DockerSwarmShellCommandRunner({
                   timeoutMs: input.config.dockerSwarmExecution.commandTimeoutMs,
                 }),
+                undefined,
+                {
+                  ...(input.config.dockerSwarmExecution.edgeNetworkName
+                    ? { edgeNetworkName: input.config.dockerSwarmExecution.edgeNetworkName }
+                    : {}),
+                },
               ),
             }
           : {}),

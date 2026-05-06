@@ -1285,6 +1285,11 @@ Current verification notes:
   `APPALOFT_DOCKER_SWARM_SMOKE=1`, an active local Swarm manager, and an `appaloft-edge` overlay
   network before mutating Docker state. `bun run smoke:swarm` is the first-class opt-in command for
   that harness; running it against a real manager remains environment-gated.
+- 2026-05-06 Phase 7 Docker Swarm edge-network config slice added
+  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` so opt-in Swarm execution and `bun run smoke:swarm` can
+  target a prepared overlay network without colliding with an existing local bridge named
+  `appaloft-edge`. The default remains `appaloft-edge`; running the real smoke still requires an
+  active manager and overlay network.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and

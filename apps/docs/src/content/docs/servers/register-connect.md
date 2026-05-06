@@ -112,9 +112,10 @@ Docker Swarm 目标应注册为集群形态的部署目标。只有当目标是 
 Swarm manager endpoint 时，才使用 `--target-kind orchestrator-cluster --provider docker-swarm`。
 
 当前状态：Appaloft 可以记录 Swarm 目标 metadata，通过 `server test` 或 `server doctor` 运行不会
-修改集群的 manager readiness 检查，并在创建部署前拒绝不受支持的 Swarm 专用部署字段。默认 runtime
-backend 还不会执行 Swarm 部署。直到 Swarm 执行 backend 启用前，部署到 Swarm 目标应在 acceptance
-之前返回 `runtime_target_unsupported`。
+修改集群的 manager readiness 检查，并在创建部署前拒绝不受支持的 Swarm 专用部署字段。Swarm
+执行需要显式设置 `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=true`；默认 runtime backend 不会执行
+Swarm 部署。直到 Swarm 执行 backend 启用前，部署到 Swarm 目标应在 acceptance 之前返回
+`runtime_target_unsupported`。
 
 部署请求仍应只传 resource、environment、server 等 id。不要把 namespace、stack name、service name、
 replicas、update policy、ingress、registry secret 或 manifest 直接写入 `deployments.create` 或
@@ -132,6 +133,8 @@ replicas、update policy、ingress、registry secret 或 manifest 直接写入 `
 operator 还应确认：
 
 - image registry access 已配置，并且不会暴露 secret value；
+- Swarm edge network 是 overlay network；如果部署应使用 `appaloft-edge` 以外的网络名，请设置
+  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK`；
 - health check 与 service log 能以 Appaloft 可标准化的形态读取。
 
 当 Swarm 执行启用后，rollout 应在 verification 通过前保留上一版 service，logs 和 health 应返回

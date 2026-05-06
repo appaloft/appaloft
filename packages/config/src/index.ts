@@ -48,6 +48,7 @@ export interface PreviewCleanupRetrySchedulerConfig {
 export interface DockerSwarmExecutionConfig {
   enabled: boolean;
   commandTimeoutMs: number;
+  edgeNetworkName?: string;
 }
 
 export interface AppConfig {
@@ -99,6 +100,8 @@ export interface ConfigSource<TValue> {
   configFilePath?: string;
 }
 
+const defaultDockerSwarmEdgeNetworkName = "appaloft-edge";
+
 const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   appName: "Appaloft",
   appVersion: readSourceCheckoutAppVersion(),
@@ -147,6 +150,7 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   dockerSwarmExecution: {
     enabled: false,
     commandTimeoutMs: 60_000,
+    edgeNetworkName: defaultDockerSwarmEdgeNetworkName,
   },
   scheduledTaskRunner: {
     enabled: false,
@@ -394,6 +398,10 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(env.APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS) ??
     parsePositiveInteger(dockerSwarmExecution.commandTimeoutMs) ??
     defaults.dockerSwarmExecution.commandTimeoutMs;
+  const dockerSwarmExecutionEdgeNetworkName =
+    env.APPALOFT_DOCKER_SWARM_EDGE_NETWORK ??
+    dockerSwarmExecution.edgeNetworkName ??
+    defaultDockerSwarmEdgeNetworkName;
   const resourceAccessFailureRendererUrl = normalizeHttpUrl(
     source.flags?.resourceAccessFailureRendererUrl ??
       env.APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL ??
@@ -639,6 +647,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     dockerSwarmExecution: {
       enabled: dockerSwarmExecutionEnabled,
       commandTimeoutMs: dockerSwarmExecutionCommandTimeoutMs,
+      edgeNetworkName: dockerSwarmExecutionEdgeNetworkName,
     },
     scheduledTaskRunner: {
       enabled: scheduledTaskRunnerEnabled,
