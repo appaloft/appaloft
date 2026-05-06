@@ -1631,6 +1631,10 @@ Current verification notes:
   export plus the repository license. Public wrapper CI `validate` passed before merge, and
   post-merge comparison confirmed the exported `README.md`, `action.yml`, install/deploy scripts,
   and `.github/workflows/ci.yml` match byte-for-byte.
+- 2026-05-06 Phase 7 day-two management exit audit added `PHASE7-DAY2-MGMT-001` catalog coverage
+  proving resource config/secrets, storage, dependency resources/bindings/backups, auto-deploy
+  diagnostics, deployment history, recovery-readiness, and rollback expose explicit CLI and
+  HTTP/oRPC operations with shared schemas. This closes the no-server-file-edit exit criterion.
 
 Required:
 
@@ -1694,7 +1698,7 @@ Required:
 
 Exit criteria:
 
-- [ ] A user can manage config, secrets, storage, dependencies, auto-deploy, deployment history, and
+- [x] A user can manage config, secrets, storage, dependencies, auto-deploy, deployment history, and
   rollback candidates without editing files on the server.
 - [x] Postgres has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
 - [x] Redis has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
