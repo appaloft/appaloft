@@ -12,12 +12,16 @@ import {
 } from "@appaloft/core";
 
 import {
+  type AppLogger,
   type CreateDeploymentCommandInput,
   CreateDeploymentSourceEventDispatcher,
   createExecutionContext,
   type ExecutionContext,
   type PreviewCleanupAttemptRecord,
   type PreviewCleanupAttemptRecorder,
+  type PreviewCleanupRetryCandidate,
+  type PreviewCleanupRetryCandidateReader,
+  PreviewCleanupRetryScheduler,
   type PreviewEnvironmentCleaner,
   type PreviewEnvironmentCleanerInput,
   type PreviewEnvironmentCleanerResult,
@@ -58,6 +62,20 @@ class FixedClock {
   now(): string {
     return this.value;
   }
+}
+
+class CapturingLogger implements AppLogger {
+  readonly warnings: Array<Record<string, unknown> | undefined> = [];
+
+  debug(_message: string, _context?: Record<string, unknown>): void {}
+
+  info(_message: string, _context?: Record<string, unknown>): void {}
+
+  warn(_message: string, context?: Record<string, unknown>): void {
+    this.warnings.push(context);
+  }
+
+  error(_message: string, _context?: Record<string, unknown>): void {}
 }
 
 class InMemoryPreviewEnvironmentRepository implements PreviewEnvironmentRepository {
@@ -116,6 +134,20 @@ class InMemoryPreviewCleanupAttemptRecorder implements PreviewCleanupAttemptReco
 
   async record(_context: RepositoryContext, record: PreviewCleanupAttemptRecord): Promise<void> {
     this.records.push(record);
+  }
+}
+
+class InMemoryPreviewCleanupRetryCandidateReader implements PreviewCleanupRetryCandidateReader {
+  readonly inputs: Array<{ now: string; limit: number }> = [];
+
+  constructor(private readonly candidates: PreviewCleanupRetryCandidate[]) {}
+
+  async listDueRetries(
+    _context: RepositoryContext,
+    input: { now: string; limit: number },
+  ): Promise<PreviewCleanupRetryCandidate[]> {
+    this.inputs.push(input);
+    return this.candidates.slice(0, input.limit);
   }
 }
 
@@ -1276,5 +1308,105 @@ describe("PreviewEnvironmentCleanupService", () => {
     expect(repository.previewEnvironment?.toState().status.value).toBe("cleanup-requested");
     expect(cleaner.inputs).toHaveLength(2);
     expect(JSON.stringify(recorder.records)).not.toContain("temporarily unavailable");
+  });
+
+  test("[PG-PREVIEW-CLEANUP-002] dispatches due cleanup retries through the cleanup service", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const lifecycle = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      projection,
+      new FixedClock("2026-05-06T05:55:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const cleaner = new CapturingPreviewEnvironmentCleaner();
+    const recorder = new InMemoryPreviewCleanupAttemptRecorder();
+    const cleanup = new PreviewEnvironmentCleanupService(
+      repository,
+      cleaner,
+      recorder,
+      new FixedClock("2026-05-06T06:05:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const retryCandidateReader = new InMemoryPreviewCleanupRetryCandidateReader([
+      {
+        attemptId: "pcln_previous_retry",
+        previewEnvironmentId: "prenv_1",
+        resourceId: "res_preview_api",
+        sourceBindingFingerprint: "srcfp_preview_cleanup_scheduler",
+        owner: "req_preview_environment_cleanup_scheduler_test",
+        phase: "provider-metadata-cleanup",
+        nextRetryAt: "2026-05-06T06:00:00.000Z",
+      },
+    ]);
+    const logger = new CapturingLogger();
+    const scheduler = new PreviewCleanupRetryScheduler(
+      retryCandidateReader,
+      cleanup,
+      new FixedClock("2026-05-06T06:06:00.000Z"),
+      logger,
+    );
+    const context = createExecutionContext({
+      requestId: "req_preview_environment_cleanup_scheduler_test",
+      entrypoint: "system",
+    });
+
+    const deployed = await lifecycle.deployFromPolicyEligibleEvent(context, {
+      sourceEventId: "sevt_preview_cleanup_scheduler_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_cleanup_scheduler",
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "opened",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "appaloft/demo",
+      pullRequestNumber: 52,
+      headSha: "abc1234",
+      baseRef: "main",
+      verified: true,
+    });
+    const result = await scheduler.run(context, { limit: 5 });
+
+    expect(deployed.isOk()).toBe(true);
+    expect(result.isOk()).toBe(true);
+    expect(retryCandidateReader.inputs).toEqual([
+      {
+        now: "2026-05-06T06:06:00.000Z",
+        limit: 5,
+      },
+    ]);
+    expect(result._unsafeUnwrap()).toEqual({
+      scanned: 1,
+      dispatched: [
+        {
+          previewEnvironmentId: "prenv_1",
+          resourceId: "res_preview_api",
+          previousAttemptId: "pcln_previous_retry",
+          nextAttemptId: "pcln_1",
+          status: "cleaned",
+        },
+      ],
+      failed: [],
+    });
+    expect(recorder.records).toEqual([
+      expect.objectContaining({
+        attemptId: "pcln_1",
+        previewEnvironmentId: "prenv_1",
+        resourceId: "res_preview_api",
+        status: "succeeded",
+        phase: "preview-cleanup",
+        attemptedAt: "2026-05-06T06:05:00.000Z",
+        owner: "req_preview_environment_cleanup_scheduler_test",
+      }),
+    ]);
+    expect(cleaner.inputs).toHaveLength(1);
+    expect(logger.warnings).toEqual([]);
   });
 });
