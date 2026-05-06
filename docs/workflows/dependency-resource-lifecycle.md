@@ -172,7 +172,9 @@ managed Postgres:
 
 Current implementation covers application-level managed Redis realization, safe read-model
 readiness, realized-ready binding admission, unsupported-provider rejection, and provider cleanup
-on delete. Persistence/contract/runtime materialization coverage remains open.
+on delete. Persistence/contract/runtime materialization coverage is implemented for safe
+realization metadata, deployment snapshots, single-server secret resolution, and Swarm secret handle
+rendering.
 
 ## Connection Safety
 

@@ -144,6 +144,39 @@ describe("dependency resource persistence", () => {
           realizedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
         })
         ._unsafeUnwrap();
+      const managedRedisResource = ResourceInstance.createRedisDependencyResource({
+        id: ResourceInstanceId.rehydrate("rsi_managed_redis"),
+        projectId: ProjectId.rehydrate("prj_demo"),
+        environmentId: EnvironmentId.rehydrate("env_demo"),
+        name: ResourceInstanceName.rehydrate("Managed Redis"),
+        kind: ResourceInstanceKindValue.rehydrate("redis"),
+        sourceMode: DependencyResourceSourceModeValue.rehydrate("appaloft-managed"),
+        providerKey: ProviderKey.rehydrate("appaloft-managed-redis"),
+        providerManaged: true,
+        providerRealization: {
+          status: DependencyResourceProviderRealizationStatusValue.pending(),
+          attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_redis_1"),
+          attemptedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+        },
+        createdAt,
+      })._unsafeUnwrap();
+      managedRedisResource
+        .markProviderRealized({
+          attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_redis_1"),
+          providerResourceHandle:
+            DependencyResourceProviderResourceHandle.rehydrate("redis/rsi_managed_redis"),
+          endpoint: {
+            host: "managed-redis.redis.internal",
+            port: 6379,
+            databaseName: "0",
+            maskedConnection: "redis://:********@managed-redis.redis.internal:6379/0",
+          },
+          connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+            "secret://dependency/redis/rsi_managed_redis",
+          ),
+          realizedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+        })
+        ._unsafeUnwrap();
 
       await projects.upsert(context, project, UpsertProjectSpec.fromProject(project));
       await environments.upsert(
@@ -166,6 +199,11 @@ describe("dependency resource persistence", () => {
         managedResource,
         UpsertResourceInstanceSpec.fromResourceInstance(managedResource),
       );
+      await dependencyResources.upsert(
+        context,
+        managedRedisResource,
+        UpsertResourceInstanceSpec.fromResourceInstance(managedRedisResource),
+      );
 
       const persisted = await dependencyResources.findOne(
         context,
@@ -182,6 +220,10 @@ describe("dependency resource persistence", () => {
       const managedSummary = await readModel.findOne(
         context,
         ResourceInstanceByIdSpec.create(ResourceInstanceId.rehydrate("rsi_managed_pg")),
+      );
+      const managedRedisSummary = await readModel.findOne(
+        context,
+        ResourceInstanceByIdSpec.create(ResourceInstanceId.rehydrate("rsi_managed_redis")),
       );
 
       expect(persisted?.toState().postgresEndpoint?.maskedConnection.value).toContain("********");
@@ -218,6 +260,21 @@ describe("dependency resource persistence", () => {
           maskedConnection: "postgres://app:********@managed.postgres.internal:5432/managed_db",
         },
       });
+      expect(managedRedisSummary).toMatchObject({
+        id: "rsi_managed_redis",
+        kind: "redis",
+        lifecycleStatus: "ready",
+        bindingReadiness: { status: "ready" },
+        providerRealization: {
+          status: "ready",
+          providerResourceHandle: "redis/rsi_managed_redis",
+        },
+        connection: {
+          secretRef: "secret://dependency/redis/rsi_managed_redis",
+          maskedConnection: "redis://:********@managed-redis.redis.internal:6379/0",
+        },
+      });
+      expect(JSON.stringify(managedRedisSummary)).not.toContain("super-secret");
       expect(JSON.stringify(managedSummary)).not.toContain("password");
     } finally {
       await database.close();

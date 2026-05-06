@@ -19,14 +19,14 @@
 - [x] DEP-RES-REDIS-NATIVE-004: add bind admission tests for pending managed Redis; failed,
   deleted, and unresolved-ref variants remain covered by generic readiness behavior and need broader
   matrix coverage.
-- [x] DEP-RES-REDIS-NATIVE-005: add application binding tests for realized ready managed Redis;
-  runtime-injection tests remain open.
+- [x] DEP-RES-REDIS-NATIVE-005: add application binding, deployment snapshot, and runtime-injection
+  tests for realized ready managed Redis.
 - [ ] DEP-RES-REDIS-NATIVE-006 and DEP-RES-REDIS-NATIVE-007: add full managed delete safety and
   provider cleanup coverage.
 - [x] DEP-RES-REDIS-NATIVE-006: add managed Redis provider cleanup tests.
 - [x] DEP-RES-REDIS-NATIVE-008: add unsupported-provider tests.
 - [ ] DEP-RES-REDIS-NATIVE-009: add operation catalog/contract/entrypoint tests if schemas change.
-- [ ] Add PG/PGlite persistence tests for Redis realization state and safe read models.
+- [x] Add PG/PGlite persistence tests for Redis realization state and safe read models.
 
 ## Code Round
 
@@ -39,7 +39,7 @@
   provider-owned refs only.
 - [x] Upgrade binding admission to allow realized ready managed Redis and block not-ready refs.
 - [x] Upgrade `dependency-resources.delete` for managed Redis provider cleanup after safety checks.
-- [ ] Extend persistence and contracts with safe Redis realization metadata. Testkit and in-memory
+- [x] Extend persistence and contracts with safe Redis realization metadata. Testkit and in-memory
   read models are covered by this Code Round.
 
 ## Entrypoints And Docs
@@ -52,8 +52,8 @@
 ## Verification
 
 - [x] Run related application tests.
-- [ ] Run PG/PGlite dependency resource tests.
-- [ ] Run runtime adapter tests for `REDIS_URL` materialization if touched.
+- [x] Run PG/PGlite dependency resource tests.
+- [x] Run runtime adapter tests for `REDIS_URL` materialization if touched.
 - [ ] Run CLI/oRPC/HTTP tests touched by route/schema changes.
 - [ ] Run operation catalog boundary tests.
 - [ ] Run `bun run lint`.

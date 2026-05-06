@@ -10,6 +10,9 @@ import {
   ConfigValueText,
   CreatedAt,
   DeactivatedAt,
+  DependencyResourceProviderRealizationAttemptId,
+  DependencyResourceProviderRealizationStatusValue,
+  DependencyResourceProviderResourceHandle,
   DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
   Deployment,
@@ -862,6 +865,82 @@ async function createActiveRedisBinding(input: {
   );
 }
 
+async function createActiveManagedRedisBinding(input: {
+  dependencyResources: MemoryDependencyResourceRepository;
+  dependencyBindings: MemoryResourceDependencyBindingRepository;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  dependencyResourceSecretStore?: FakeDependencyResourceSecretStore;
+  context?: ExecutionContext;
+}) {
+  const dependencyResource = ResourceInstance.createRedisDependencyResource({
+    id: ResourceInstanceId.rehydrate("rsi_managed_redis"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    name: ResourceInstanceName.rehydrate("Managed Redis"),
+    kind: ResourceInstanceKindValue.rehydrate("redis"),
+    sourceMode: DependencyResourceSourceModeValue.rehydrate("appaloft-managed"),
+    providerKey: ProviderKey.rehydrate("appaloft-managed-redis"),
+    providerManaged: true,
+    providerRealization: {
+      status: DependencyResourceProviderRealizationStatusValue.pending(),
+      attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_managed_redis"),
+      attemptedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    },
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
+  dependencyResource
+    .markProviderRealized({
+      attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_managed_redis"),
+      providerResourceHandle:
+        DependencyResourceProviderResourceHandle.rehydrate("redis/rsi_managed_redis"),
+      endpoint: {
+        host: "managed-redis.redis.internal",
+        port: 6379,
+        databaseName: "0",
+        maskedConnection: "redis://:********@managed-redis.redis.internal:6379/0",
+      },
+      connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+        "appaloft://dependency-resources/rsi_managed_redis/connection",
+      ),
+      realizedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })
+    ._unsafeUnwrap();
+  await input.dependencyResources.upsert(
+    input.repositoryContext,
+    dependencyResource,
+    UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
+  );
+  if (input.dependencyResourceSecretStore && input.context) {
+    await input.dependencyResourceSecretStore.storeConnection(input.context, {
+      dependencyResourceId: "rsi_managed_redis",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      kind: "redis",
+      purpose: "connection",
+      secretValue: "redis://:super-secret@managed-redis.redis.internal:6379/0",
+      storedAt: "2026-01-01T00:00:00.000Z",
+    });
+  }
+
+  const binding = ResourceBinding.create({
+    id: ResourceBindingId.rehydrate("rbd_managed_redis"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    resourceId: ResourceId.rehydrate("res_demo"),
+    resourceInstanceId: ResourceInstanceId.rehydrate("rsi_managed_redis"),
+    targetName: ResourceBindingTargetName.rehydrate("REDIS_URL"),
+    scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+    injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
+
+  await input.dependencyBindings.upsert(
+    input.repositoryContext,
+    binding,
+    UpsertResourceBindingSpec.fromResourceBinding(binding),
+  );
+}
+
 function createStaticSiteResource(input: { publishDirectory?: string } = {}): Resource {
   return Resource.rehydrate({
     id: ResourceId.rehydrate("res_demo"),
@@ -1251,6 +1330,49 @@ describe("CreateDeploymentUseCase", () => {
     );
     expect(serializedReferences).not.toContain("super-secret");
     expect(serializedReferences).not.toContain("redis.example.com");
+    expect(serializedReferences).not.toContain("redis://");
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-005] captures realized managed Redis binding runtime references without secrets", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActiveManagedRedisBinding({
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      context,
+      repositoryContext,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const created = unwrapDeploymentCreateResult(result);
+
+    const deployment = deployments.items.get(created.id);
+    expect(deployment?.toState().dependencyBindingReferences).toHaveLength(1);
+    expect(deployment?.toState().dependencyBindingReferences[0]).toMatchObject({
+      bindingId: ResourceBindingId.rehydrate("rbd_managed_redis"),
+      dependencyResourceId: ResourceInstanceId.rehydrate("rsi_managed_redis"),
+      kind: ResourceInstanceKindValue.rehydrate("redis"),
+      targetName: ResourceBindingTargetName.rehydrate("REDIS_URL"),
+      scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+      injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+      runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+        "appaloft://dependency-resources/rsi_managed_redis/connection",
+      ),
+    });
+    const serializedReferences = JSON.stringify(
+      deployment?.toState().dependencyBindingReferences ?? [],
+    );
+    expect(serializedReferences).not.toContain("super-secret");
+    expect(serializedReferences).not.toContain("managed-redis.redis.internal");
     expect(serializedReferences).not.toContain("redis://");
   });
 
