@@ -796,8 +796,8 @@ Current boundary:
   summaries, including same-repository, fork, secret-backed, active preview quota, and preview TTL
   settings.
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete` now
-  expose HTTP/oRPC routes over safe preview environment read models and cleanup-service input. CLI
-  and Web surfaces remain future work. GitHub App route wiring, managed domain lifecycle, and
+  expose CLI and HTTP/oRPC routes over safe preview environment read models and cleanup-service
+  input. Web surfaces remain future work. GitHub App route wiring, managed domain lifecycle, and
   scheduler leases remain future control-plane work.
 
 Product-grade preview policy operations:
@@ -806,9 +806,9 @@ Product-grade preview policy operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | Configure preview policy | Command | `preview-policies.configure` | `ConfigurePreviewPolicyCommand` | `ConfigurePreviewPolicyCommandInput` | `appaloft preview policy configure` | `POST /api/preview-policies` |
 | Show preview policy | Query | `preview-policies.show` | `ShowPreviewPolicyQuery` | `ShowPreviewPolicyQueryInput` | `appaloft preview policy show` | `POST /api/preview-policies/show` |
-| List preview environments | Query | `preview-environments.list` | `ListPreviewEnvironmentsQuery` | `ListPreviewEnvironmentsQueryInput` | - | `GET /api/preview-environments` |
-| Show preview environment | Query | `preview-environments.show` | `ShowPreviewEnvironmentQuery` | `ShowPreviewEnvironmentQueryInput` | - | `GET /api/preview-environments/{previewEnvironmentId}` |
-| Delete preview environment | Command | `preview-environments.delete` | `DeletePreviewEnvironmentCommand` | `DeletePreviewEnvironmentCommandInput` | - | `DELETE /api/resources/{resourceId}/preview-environments/{previewEnvironmentId}` |
+| List preview environments | Query | `preview-environments.list` | `ListPreviewEnvironmentsQuery` | `ListPreviewEnvironmentsQueryInput` | `appaloft preview environment list` | `GET /api/preview-environments` |
+| Show preview environment | Query | `preview-environments.show` | `ShowPreviewEnvironmentQuery` | `ShowPreviewEnvironmentQueryInput` | `appaloft preview environment show` | `GET /api/preview-environments/{previewEnvironmentId}` |
+| Delete preview environment | Command | `preview-environments.delete` | `DeletePreviewEnvironmentCommand` | `DeletePreviewEnvironmentCommandInput` | `appaloft preview environment delete` | `DELETE /api/resources/{resourceId}/preview-environments/{previewEnvironmentId}` |
 
 - `APPALOFT_PROJECT_ID`, `APPALOFT_RESOURCE_ID`, `APPALOFT_SERVER_ID`, and similar ids are optional
   trusted selection overrides for CLI/Action mode. They are required only when the operator wants to

@@ -226,6 +226,7 @@ export const operationCatalog = [
     inputSchema: listPreviewEnvironmentsQueryInputSchema,
     serviceToken: tokens.listPreviewEnvironmentsQueryService,
     transports: {
+      cli: "appaloft preview environment list",
       orpc: { method: "GET", path: "/api/preview-environments" },
     },
   },
@@ -239,6 +240,7 @@ export const operationCatalog = [
     inputSchema: showPreviewEnvironmentQueryInputSchema,
     serviceToken: tokens.showPreviewEnvironmentQueryService,
     transports: {
+      cli: "appaloft preview environment show",
       orpc: { method: "GET", path: "/api/preview-environments/{previewEnvironmentId}" },
     },
   },
@@ -252,6 +254,7 @@ export const operationCatalog = [
     inputSchema: deletePreviewEnvironmentCommandInputSchema,
     serviceToken: tokens.previewEnvironmentCleanupService,
     transports: {
+      cli: "appaloft preview environment delete",
       orpc: {
         method: "DELETE",
         path: "/api/resources/{resourceId}/preview-environments/{previewEnvironmentId}",

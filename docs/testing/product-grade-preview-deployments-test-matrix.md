@@ -144,8 +144,10 @@ details.
 active CLI/HTTP/oRPC operation catalog entries. It also covers the
 `preview-environments.list` / `preview-environments.show` / `preview-environments.delete`
 contracts, safe list/show read-model output, cleanup-backed delete command input, and active
-HTTP/oRPC catalog entries. `packages/adapters/cli/test/preview-policy-command.test.ts` covers CLI
-dispatch for preview policy configure/show through `CommandBus` and `QueryBus`.
+CLI/HTTP/oRPC catalog entries. `packages/adapters/cli/test/preview-policy-command.test.ts` covers
+CLI dispatch for preview policy configure/show through `CommandBus` and `QueryBus`.
+`packages/adapters/cli/test/preview-environment-command.test.ts` covers CLI dispatch for preview
+environment list/show/delete through `QueryBus` and `CommandBus`.
 `packages/orpc/test/preview-policy.http.test.ts` covers HTTP routes dispatching preview policy
 configure/show through `CommandBus` and `QueryBus`.
 `packages/orpc/test/preview-environment.http.test.ts` covers the HTTP routes dispatching preview
