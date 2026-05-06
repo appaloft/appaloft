@@ -114,7 +114,8 @@ No new public operation key is accepted in this Spec Round.
   deployment creation; target/profile configuration fields for Swarm remain deferred until a
   governing Spec Round accepts them.
 - The runtime target adapter package exposes a `docker-swarm` backend descriptor shape and registry
-  selection coverage; the default runtime registry still does not activate Swarm execution.
+  selection coverage; the default runtime registry can include an explicitly composed Swarm backend
+  while keeping Swarm execution disabled by shell configuration by default.
 - The runtime adapter package now renders adapter-owned Docker Swarm runtime intent for OCI image
   and Compose artifact workloads. Render output derives stack/service identity from Appaloft
   resource, deployment, target, and destination context, maps runtime environment snapshots,
@@ -160,16 +161,17 @@ No new public operation key is accepted in this Spec Round.
   serialized into the intent, executable command, or display command.
 - The opt-in Swarm execution backend now has a bounded shell command runner that can execute the
   rendered apply, verify, promote, and cleanup commands and preserve stdout/stderr/exit-code
-  results for backend handling. The runner is exported for explicit composition and is still not
-  registered in the default runtime backend registry.
+  results for backend handling. Shell composition registers it only when
+  `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=true`, with
+  `APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS` controlling per-command timeout.
 - Postgres/PGlite deployment persistence and the deployment read model preserve sanitized Swarm
   runtime identity metadata, including stack name, service name, and apply-plan schema version,
   through the existing deployment execution metadata boundary. Raw Docker commands, provider
   payloads, and registry secret values are not part of that readback contract.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
-- Default Swarm backend activation, remote-manager health/log execution, end-to-end Swarm route
-  smoke coverage, real registry-login/pull-secret provisioning, and real Swarm registry-auth smoke
+- Default-on Swarm activation, remote-manager health/log execution, end-to-end Swarm route smoke
+  coverage, real registry-login/pull-secret provisioning, and real Swarm registry-auth smoke
   coverage remain open.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.

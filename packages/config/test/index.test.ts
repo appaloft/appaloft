@@ -127,6 +127,25 @@ describe("resolveConfig", () => {
     expect(config.githubWebhookSecret).toBe("github-webhook-secret");
   });
 
+  test("keeps Docker Swarm execution disabled by default and accepts explicit shell activation", () => {
+    const defaults = resolveConfig();
+    const configured = resolveConfig({
+      env: {
+        APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED: "true",
+        APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS: "45000",
+      },
+    });
+
+    expect(defaults.dockerSwarmExecution).toEqual({
+      enabled: false,
+      commandTimeoutMs: 60000,
+    });
+    expect(configured.dockerSwarmExecution).toEqual({
+      enabled: true,
+      commandTimeoutMs: 45000,
+    });
+  });
+
   test("uses an explicit resource access failure renderer URL only when it is HTTP based", () => {
     const configured = resolveConfig({
       env: {

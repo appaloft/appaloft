@@ -1274,6 +1274,10 @@ Current verification notes:
   registry secret references out of rendered intent, executable command, and display command
   payloads. Real registry-login/pull-secret provisioning and real Swarm smoke/default activation
   remain open.
+- 2026-05-06 Phase 7 Docker Swarm opt-in composition slice added disabled-by-default shell
+  configuration for the real Swarm execution backend. `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED`
+  composes the `DockerSwarmExecutionBackend` into the runtime target registry with bounded command
+  timeout configuration, while default-on activation and real Swarm smoke coverage remain open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1512,7 +1516,8 @@ Required:
   label-scoped cleanup plan rendering, opt-in fake backend acceptance coverage, Swarm runtime-log
   observation, Swarm health observation, initial Traefik route label promotion, the public docs
   anchor, command-failure redaction, sanitized runtime identity readback, and CLI/API/Web help
-  links are implemented; real Swarm execution remains open.
+  links are implemented; opt-in shell composition exists, but real Swarm smoke/default activation
+  remains open.
 
 Exit criteria:
 
