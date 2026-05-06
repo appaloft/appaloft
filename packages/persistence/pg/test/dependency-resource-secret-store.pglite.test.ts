@@ -83,4 +83,76 @@ describe("dependency resource secret store persistence", () => {
       rmSync(dataDir, { recursive: true, force: true });
     }
   });
+
+  test("[DEP-BIND-SECRET-RESOLVE-007] resolves retained dependency binding secret refs", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-dependency-binding-secret-resolve-"));
+    const {
+      createDatabase,
+      createMigrator,
+      PgDependencyBindingSecretStore,
+      PgDependencyResourceSecretStore,
+    } = await import("../src");
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const executionContext = createExecutionContext({
+        requestId: "req_dependency_binding_secret_resolve_pglite_test",
+        entrypoint: "system",
+      });
+      const bindingSecretStore = new PgDependencyBindingSecretStore(database.db);
+      const runtimeSecretResolver = new PgDependencyResourceSecretStore(database.db);
+      const firstSecret = "postgres://app:first-secret@db.example.com:5432/app";
+      const secondSecret = "postgres://app:second-secret@db.example.com:5432/app";
+
+      const firstStored = await bindingSecretStore.store(executionContext, {
+        bindingId: "rbd_pg",
+        resourceId: "res_api",
+        secretValue: firstSecret,
+        secretVersion: "rbsv_0001",
+        rotatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      const secondStored = await bindingSecretStore.store(executionContext, {
+        bindingId: "rbd_pg",
+        resourceId: "res_api",
+        secretValue: secondSecret,
+        secretVersion: "rbsv_0002",
+        rotatedAt: "2026-01-01T00:03:00.000Z",
+      });
+
+      expect(firstStored._unsafeUnwrap().secretRef).toBe(
+        "appaloft+pg://resource-binding/rbd_pg/rbsv_0001",
+      );
+      expect(secondStored._unsafeUnwrap().secretRef).toBe(
+        "appaloft+pg://resource-binding/rbd_pg/rbsv_0002",
+      );
+      await expect(
+        database.db.selectFrom("dependency_resources").selectAll().execute(),
+      ).resolves.toEqual([]);
+
+      const firstResolved = await runtimeSecretResolver.resolve(executionContext, {
+        secretRef: firstStored._unsafeUnwrap().secretRef,
+      });
+      const secondResolved = await runtimeSecretResolver.resolve(executionContext, {
+        secretRef: secondStored._unsafeUnwrap().secretRef,
+      });
+
+      expect(firstResolved._unsafeUnwrap()).toEqual({
+        secretRef: firstStored._unsafeUnwrap().secretRef,
+        secretValue: firstSecret,
+      });
+      expect(secondResolved._unsafeUnwrap()).toEqual({
+        secretRef: secondStored._unsafeUnwrap().secretRef,
+        secretValue: secondSecret,
+      });
+    } finally {
+      await database.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
 });

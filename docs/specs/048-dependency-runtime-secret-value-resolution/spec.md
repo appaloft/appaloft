@@ -110,7 +110,8 @@ single-server execution now resolve Appaloft-owned dependency refs into executio
 environment values and mark dependency target variables for redaction in Docker command display and
 runtime output. Docker Swarm execution now resolves Appaloft-owned dependency refs into
 deployment-scoped Docker secrets before service update and renders only Docker secret handles in
-sanitized service intent. It also stores rotated binding secret values in
-`dependency_binding_secrets`. Deployment snapshots capture safe runtime secret references and
-runtime adapters render safe handles, but historical rotated-ref execution coverage remains open
-before the Postgres and Redis closed-loop exit criteria can be checked.
+sanitized service intent. Rotated binding secret refs retained in deployment snapshots now resolve
+through the same runtime resolver, and `dependency_binding_secrets` retains historical binding
+secret values by version. Deployment snapshots capture safe runtime secret references and runtime
+adapters render safe handles; final Postgres and Redis closed-loop exit verification remains as the
+next readiness step.

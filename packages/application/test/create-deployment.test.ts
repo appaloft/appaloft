@@ -1445,6 +1445,82 @@ describe("CreateDeploymentUseCase", () => {
     );
   });
 
+  test("[DEP-BIND-SECRET-RESOLVE-007] keeps historical and rotated dependency refs resolvable for deployment snapshots", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      context,
+      repositoryContext,
+    });
+
+    const firstResult = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const firstCreated = unwrapDeploymentCreateResult(firstResult);
+    const firstDeployment = deployments.items.get(firstCreated.id);
+    const firstReference = firstDeployment?.toState().dependencyBindingReferences[0];
+    const rotatedSecretRef = "appaloft+pg://resource-binding/rbd_pg/rbsv_0001";
+    const rotatedSecretValue = "postgres://app:rotated-secret@db.example.com:5432/app";
+
+    const binding = dependencyBindings.items.get("rbd_pg");
+    expect(binding).toBeDefined();
+    binding
+      ?.rotateSecret({
+        secretRef: ResourceBindingSecretRef.rehydrate(rotatedSecretRef),
+        secretVersion: ResourceBindingSecretVersion.rehydrate("rbsv_0001"),
+        rotatedAt: UpdatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
+      })
+      ._unsafeUnwrap();
+    if (binding) {
+      await dependencyBindings.upsert(
+        repositoryContext,
+        binding,
+        UpsertResourceBindingSpec.fromResourceBinding(binding),
+      );
+    }
+
+    const unresolvedResult = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    expect(unresolvedResult.isErr()).toBe(true);
+    expect(unresolvedResult._unsafeUnwrapErr()).toMatchObject({
+      code: "dependency_runtime_injection_blocked",
+      details: { reason: "dependency_runtime_secret_unresolved" },
+    });
+
+    dependencyResourceSecretStore.setResolvedValue(rotatedSecretRef, rotatedSecretValue);
+    const secondResult = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const secondCreated = unwrapDeploymentCreateResult(secondResult);
+    const secondDeployment = deployments.items.get(secondCreated.id);
+    const secondReference = secondDeployment?.toState().dependencyBindingReferences[0];
+    const firstResolved = await dependencyResourceSecretStore.resolve(context, {
+      secretRef: firstReference?.runtimeSecretRef?.value ?? "",
+    });
+    const secondResolved = await dependencyResourceSecretStore.resolve(context, {
+      secretRef: secondReference?.runtimeSecretRef?.value ?? "",
+    });
+
+    expect(firstReference?.runtimeSecretRef?.value).toBe(
+      "appaloft://dependency-resources/rsi_pg/connection",
+    );
+    expect(secondReference?.runtimeSecretRef?.value).toBe(rotatedSecretRef);
+    expect(firstResolved.isOk()).toBe(true);
+    expect(secondResolved._unsafeUnwrap()).toEqual({
+      secretRef: rotatedSecretRef,
+      secretValue: rotatedSecretValue,
+    });
+    expect(firstDeployment?.toState().dependencyBindingReferences[0]?.runtimeSecretRef?.value).toBe(
+      "appaloft://dependency-resources/rsi_pg/connection",
+    );
+  });
+
   test("[RES-PROFILE-ACCESS-003] resource access path prefix reaches generated route planning input", async () => {
     const innerRuntimePlanResolver = new CapturingRuntimePlanResolver();
     const defaultAccessDomainProvider = new StaticDefaultAccessDomainProvider();

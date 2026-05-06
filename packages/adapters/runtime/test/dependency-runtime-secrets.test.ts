@@ -73,6 +73,10 @@ class MemoryDependencyResourceSecretStore implements DependencyResourceSecretSto
     );
   }
 
+  setResolvedValue(secretRef: string, secretValue: string): void {
+    this.values.set(secretRef, secretValue);
+  }
+
   async storeConnection(): ReturnType<DependencyResourceSecretStore["storeConnection"]> {
     throw new Error("storeConnection is not used by this test");
   }
@@ -246,5 +250,26 @@ describe("dependency runtime secret resolution", () => {
     expect(runtime.env.DATABASE_URL).toBeUndefined();
     expect(runtime.redactions).not.toContain(secretValue);
     expect(runtime.dependencyTargetNames.has("DATABASE_URL")).toBe(false);
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-007] resolves retained rotated binding refs for historical runtime snapshots", async () => {
+    const context = testContext("req_dependency_runtime_secret_rotated_ref_test");
+    const store = new MemoryDependencyResourceSecretStore();
+    const rotatedSecretRef = "appaloft+pg://resource-binding/rbd_pg/rbsv_0001";
+    const rotatedSecretValue = "postgres://app:rotated-secret@db.example.com:5432/app";
+    store.setResolvedValue(rotatedSecretRef, rotatedSecretValue);
+
+    const resolved = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment: createDeploymentWithDependencyRef(rotatedSecretRef),
+      dependencyResourceSecretStore: store,
+      baseEnv: {},
+    });
+
+    expect(resolved.isOk()).toBe(true);
+    const runtime = resolved._unsafeUnwrap();
+    expect(runtime.env.DATABASE_URL).toBe(rotatedSecretValue);
+    expect(runtime.redactions).toContain(rotatedSecretValue);
+    expect(runtime.dependencyTargetNames.has("DATABASE_URL")).toBe(true);
   });
 });

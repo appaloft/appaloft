@@ -918,6 +918,11 @@ Current verification notes:
   service update and keeps sanitized service intent on Docker secret handles. Historical
   rotated-ref execution coverage remains open, so Postgres/Redis closed-loop exit criteria remain
   open.
+- 2026-05-06 Phase 7 historical rotated dependency ref resolution Code Round slice now resolves
+  retained `appaloft+pg://resource-binding/...` binding secret refs through the runtime resolver,
+  keeps old deployment snapshots on their captured refs, and verifies new deployments can use a
+  rotated ref only after it is resolvable. Final Postgres/Redis closed-loop exit verification
+  remains open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider

@@ -26,7 +26,10 @@ import {
 } from "../../ports";
 
 export const dependencyRuntimeSecretDeliveryCapability = "runtime.dependency-secrets" as const;
-const appaloftOwnedDependencySecretRefPrefix = "appaloft://dependency-resources/";
+const appaloftOwnedDependencySecretRefPrefixes = [
+  "appaloft://dependency-resources/",
+  "appaloft+pg://resource-binding/",
+];
 
 function toDependencyBindingReferenceKind(
   kind: ResourceInstanceKindValue,
@@ -239,7 +242,10 @@ export async function dependencyRuntimeSecretResolutionReason(input: {
       continue;
     }
     const secretRef = reference.runtimeSecretRef?.value;
-    if (!secretRef?.startsWith(appaloftOwnedDependencySecretRefPrefix)) {
+    if (
+      !secretRef ||
+      !appaloftOwnedDependencySecretRefPrefixes.some((prefix) => secretRef.startsWith(prefix))
+    ) {
       continue;
     }
     const resolved = await input.dependencyResourceSecretStore.resolve(input.context, {

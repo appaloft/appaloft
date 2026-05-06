@@ -88,12 +88,20 @@ export class PgDependencyResourceSecretStore implements DependencyResourceSecret
         .select(["ref", "payload"])
         .where("ref", "=", input.secretRef)
         .executeTakeFirst();
+      const bindingRow = row
+        ? undefined
+        : await this.db
+            .selectFrom("dependency_binding_secrets")
+            .select(["ref", "payload"])
+            .where("ref", "=", input.secretRef)
+            .executeTakeFirst();
+      const resolvedRow = row ?? bindingRow;
 
-      if (!row) {
+      if (!resolvedRow) {
         return err(domainError.notFound("dependency_resource_secret", input.secretRef));
       }
 
-      const payload = row.payload as DependencySecretPayload;
+      const payload = resolvedRow.payload as DependencySecretPayload;
       if (typeof payload.value !== "string") {
         return err(
           domainError.infra("Dependency resource secret payload is invalid", {
@@ -105,7 +113,7 @@ export class PgDependencyResourceSecretStore implements DependencyResourceSecret
       }
 
       return ok({
-        secretRef: row.ref,
+        secretRef: resolvedRow.ref,
         secretValue: payload.value,
       });
     } catch (error) {
