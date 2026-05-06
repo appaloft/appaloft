@@ -1252,7 +1252,7 @@ Current verification notes:
   `SWARM-TARGET-SECRET-001` coverage to the opt-in Swarm execution backend: command failure output
   is redacted before deployment logs and execution metadata capture common auth headers, cookies,
   key/value secrets, URL credentials, private-key blocks, or exact deployment snapshot secret
-  values. Full registry/pull-secret handling across real Swarm execution remains open.
+  values. Registry/pull-secret smoke coverage was closed by the later registry-auth smoke slice.
 - 2026-05-06 Phase 7 Docker Swarm shell-runner slice added `DockerSwarmShellCommandRunner` for the
   opt-in backend, with bounded command execution, stdout/stderr capture, nonzero exit preservation,
   and timeout handling. The default registry still leaves Swarm unsupported until explicitly
@@ -1269,12 +1269,13 @@ Current verification notes:
   candidate. Default activation remains open.
 - 2026-05-06 Phase 7 Docker Swarm display-command redaction slice added apply-plan display command
   redaction for non-secret runtime environment values while keeping executable runner commands
-  intact. Full registry/pull-secret handling and default activation remain open.
+  intact. Registry/pull-secret smoke coverage was closed by the later registry-auth smoke slice;
+  default activation remains open.
 - 2026-05-06 Phase 7 Docker Swarm registry-auth render slice made image apply plans honor internal
   registry-auth/pull-secret metadata with Docker's `--with-registry-auth` flag while keeping raw
   registry secret references out of rendered intent, executable command, and display command
-  payloads. Real registry-login/pull-secret provisioning, registry-auth smoke coverage, and default
-  activation remain open.
+  payloads. Registry-login/pull-secret smoke coverage was closed by the later registry-auth smoke
+  slice; default activation remains open.
 - 2026-05-06 Phase 7 Docker Swarm opt-in composition slice added disabled-by-default shell
   configuration for the real Swarm execution backend. `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED`
   composes the `DockerSwarmExecutionBackend` into the runtime target registry with bounded command
@@ -1295,8 +1296,15 @@ Current verification notes:
   separators and made the opt-in real smoke provision a smoke-specific Docker secret reference and
   use an nginx-compatible health check. `bun run smoke:swarm` passed against a temporary local Swarm
   manager with `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to
-  inactive Swarm state. Default activation, real edge-proxy route realization, and registry-auth
-  smoke coverage remain open.
+  inactive Swarm state. Default activation and real edge-proxy route realization remain open;
+  registry-auth smoke coverage was closed by the later registry-auth smoke slice.
+- 2026-05-06 Phase 7 Docker Swarm registry-auth smoke slice extended `bun run smoke:swarm` to
+  provision a temporary authenticated registry, push a smoke image, deploy that private image
+  through `DockerSwarmExecutionBackend` with `--with-registry-auth`, and assert registry secret
+  material, secret references, and runtime env secret values stay out of deployment logs/metadata.
+  The smoke passed against a temporary local Swarm manager with
+  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to inactive Swarm
+  state. Default activation and real edge-proxy route realization remain open.
 - 2026-05-06 Phase 7 Docker Swarm remote-log observation slice made `resources.runtime-logs` execute
   Swarm service log reads through the resolved Swarm manager SSH target when available, while
   preserving the local Docker fallback for local smoke runs. Remote-manager health observation
@@ -1567,8 +1575,9 @@ Required:
   anchor, command-failure redaction, sanitized runtime identity readback, and CLI/API/Web help
   links are implemented; opt-in shell composition and `bun run smoke:swarm` real smoke harness
   exist, and the local real smoke passed against a temporary Swarm manager; Swarm service log and
-  health reads can run through the resolved manager over SSH. Default activation, real edge-proxy
-  route realization, and registry-auth smoke coverage remain open.
+  health reads can run through the resolved manager over SSH; registry-authenticated image pull is
+  covered by the opt-in real smoke. Default activation and real edge-proxy route realization remain
+  open.
 
 Exit criteria:
 

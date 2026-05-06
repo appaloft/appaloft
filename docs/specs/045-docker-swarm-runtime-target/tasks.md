@@ -37,7 +37,7 @@
   real Swarm edge proxy.
 - [x] `SWARM-TARGET-SECRET-001A`: Swarm command failure output stored in deployment logs and
   metadata is redacted.
-- [ ] `SWARM-TARGET-SECRET-001B`: registry credentials, pull secrets, env values, and all rendered
+- [x] `SWARM-TARGET-SECRET-001B`: registry credentials, pull secrets, env values, and all rendered
   command/provider payloads are redacted across real Swarm execution.
 
 ## Implementation
