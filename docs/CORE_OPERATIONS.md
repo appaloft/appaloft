@@ -379,8 +379,8 @@ Current boundary:
   [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md);
   its Code Round is implemented for imported Postgres, imported Redis, managed Postgres
   Appaloft-owned refs, managed Redis refs, single-server runtimes, Docker Swarm, and retained
-  rotated binding refs. Final Postgres/Redis closed-loop exit criteria still require end-to-end
-  verification.
+  rotated binding refs. The managed Redis closed loop has end-to-end application/read-model
+  verification; the Postgres closed-loop exit criterion still requires end-to-end verification.
 - `resources.rotate-dependency-binding-secret` rotates only the binding-scoped safe secret
   reference/version for future deployment snapshot references. It requires explicit acknowledgement
   that historical snapshots remain unchanged, and it does not rotate provider-native database

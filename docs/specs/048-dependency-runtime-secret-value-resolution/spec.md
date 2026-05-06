@@ -113,5 +113,6 @@ deployment-scoped Docker secrets before service update and renders only Docker s
 sanitized service intent. Rotated binding secret refs retained in deployment snapshots now resolve
 through the same runtime resolver, and `dependency_binding_secrets` retains historical binding
 secret values by version. Deployment snapshots capture safe runtime secret references and runtime
-adapters render safe handles; final Postgres and Redis closed-loop exit verification remains as the
-next readiness step.
+adapters render safe handles. Managed Redis closed-loop verification is covered by
+`DEP-RES-REDIS-CLOSED-LOOP-001`; final Postgres closed-loop exit verification remains as the next
+readiness step.

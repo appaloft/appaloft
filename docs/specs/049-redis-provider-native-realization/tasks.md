@@ -62,5 +62,5 @@
 
 - [x] Reconcile spec, plan, tasks, docs, tests, operation catalog, code, roadmap notes, and public
   docs/help outcome after Code Round.
-- [ ] Update `docs/PRODUCT_ROADMAP.md` Redis closed-loop exit criterion only after the full
+- [x] Update `docs/PRODUCT_ROADMAP.md` Redis closed-loop exit criterion only after the full
   provision/import -> bind -> deploy -> observe -> backup/restore or delete loop is verified.
