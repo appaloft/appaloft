@@ -103,6 +103,11 @@ deployment result.
 feedback state upserts by feedback key, preserves provider feedback ids for idempotent updates,
 records safe retryable error state, and omits feedback bodies, provider payloads, tokens, and
 secret-shaped values.
+`PG-PREVIEW-FEEDBACK-001` now also has hermetic GitHub integration coverage in
+`packages/integrations/github/test/github-feedback.test.ts`. The coverage proves PR comment
+feedback creates comments, updates existing comments by provider feedback id, returns safe
+retryable provider errors without response bodies/tokens, and explicitly leaves check/deployment
+status channels unsupported by the PR comment writer.
 `PG-PREVIEW-CLEANUP-001` has initial core and application coverage in
 `packages/core/test/preview-environment.test.ts` and
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves cleanup
@@ -140,9 +145,10 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-GitHub App route wiring, GitHub feedback writer adapters, concrete cleanup adapters, scheduler
-retry dispatch, and active CLI/API/Web/future MCP transports remain open. Existing
-non-product-grade coverage belongs to Action-only PR previews and `deployments.cleanup-preview`.
+GitHub App route wiring, GitHub check/deployment-status feedback writers, feedback writer shell
+wiring, concrete cleanup adapters, scheduler retry dispatch, and active CLI/API/Web/future MCP
+transports remain open. Existing non-product-grade coverage belongs to Action-only PR previews and
+`deployments.cleanup-preview`.
 
 Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add
 persistence, adapter, transport, Web, CLI, and public-docs coverage as each surface is activated.

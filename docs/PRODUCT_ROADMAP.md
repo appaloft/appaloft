@@ -1340,6 +1340,12 @@ Current verification notes:
   persisting feedback body text, provider payloads, tokens, or secret-shaped values. GitHub
   feedback writer adapters, GitHub App HTTP routes, cleanup retry, and active preview environment
   entrypoints remain open.
+- 2026-05-06 Phase 7 preview GitHub PR comment feedback slice added a hermetic GitHub integration
+  writer for product-grade preview PR comments. It creates comments, updates existing comments by
+  provider feedback id, classifies retryable provider failures safely, and omits response bodies,
+  tokens, and feedback body text from returned errors. Check/deployment-status writers, shell
+  wiring, GitHub App HTTP routes, cleanup retry, and active preview environment entrypoints remain
+  open.
 - 2026-05-06 Phase 7 preview cleanup application slice added a service that marks durable preview
   environment cleanup requested without deleting preview history, then delegates runtime, route,
   source-link, provider metadata, and feedback cleanup to a safe source-scope port. Concrete
