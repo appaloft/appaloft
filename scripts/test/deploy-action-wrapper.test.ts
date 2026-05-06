@@ -14,6 +14,7 @@ import { join, resolve } from "node:path";
 const actionRoot = resolve(import.meta.dir, "../../.github/actions/deploy-action");
 const actionYaml = readFileSync(join(actionRoot, "action.yml"), "utf8");
 const readme = readFileSync(join(actionRoot, "README.md"), "utf8");
+const publicCiWorkflow = readFileSync(join(actionRoot, ".github/workflows/ci.yml"), "utf8");
 const runDeployScript = join(actionRoot, "scripts/run-deploy.sh");
 const exportScript = resolve(import.meta.dir, "../export-deploy-action-wrapper.ts");
 
@@ -76,6 +77,7 @@ describe("deploy-action wrapper reference", () => {
     try {
       expect(result.exitCode).toBe(0);
       for (const file of [
+        ".github/workflows/ci.yml",
         "action.yml",
         "README.md",
         "scripts/install-appaloft.sh",
@@ -90,6 +92,16 @@ describe("deploy-action wrapper reference", () => {
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }
+  });
+
+  test("[CONFIG-FILE-ENTRY-009] exported public CI validates wrapper layout and dry-run preview mapping", () => {
+    expect(publicCiWorkflow).toContain("bash -n scripts/install-appaloft.sh scripts/run-deploy.sh");
+    expect(publicCiWorkflow).toContain("APPALOFT_DEPLOY_ACTION_DRY_RUN");
+    expect(publicCiWorkflow).toContain("INPUT_PREVIEW: pull-request");
+    expect(publicCiWorkflow).toContain('grep -q -- "--preview-output-file"');
+    expect(publicCiWorkflow).toContain("Opt-in exact-version install smoke");
+    expect(publicCiWorkflow).toContain("APPALOFT_INSTALL_SMOKE_VERSION");
+    expect(publicCiWorkflow).not.toContain("APPALOFT_SSH_PRIVATE_KEY");
   });
 
   test("[CONFIG-FILE-ENTRY-010][CONFIG-FILE-ENTRY-015] maps trusted action inputs to CLI preview flags", () => {

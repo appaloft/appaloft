@@ -425,16 +425,21 @@ The main repository now also contains a reference composite action under
   mapping, Marketplace README examples, no-config default behavior, and unsupported control-plane
   input rejection.
 - `scripts/export-deploy-action-wrapper.ts`, which mirrors the reference action metadata,
-  Marketplace README, and install/deploy scripts into a standalone directory with executable script
-  bits preserved for the future public `appaloft/deploy-action` repository. The wrapper test suite
-  verifies the exported repository layout matches the reference action.
+  Marketplace README, public wrapper CI workflow, and install/deploy scripts into a standalone
+  directory with executable script bits preserved for the future public `appaloft/deploy-action`
+  repository. The wrapper test suite verifies the exported repository layout matches the reference
+  action.
+- `.github/workflows/ci.yml` under the exported wrapper layout validates shell script syntax,
+  dry-run PR preview argument/output mapping, and an opt-in exact-version install smoke controlled
+  by the public repository's `APPALOFT_INSTALL_SMOKE_VERSION` variable.
 
 Missing pieces before public release:
 
 - create the `appaloft/deploy-action` repository;
-- run the export script into the public wrapper repository and wire public wrapper CI to the
-  exported layout;
-- add a wrapper-level CI test that verifies exact-version install from a fixture or real release;
+- run the export script into the public wrapper repository and enable the exported public wrapper
+  CI;
+- configure `APPALOFT_INSTALL_SMOKE_VERSION` in the public wrapper repository when a release asset
+  should be smoke-tested from CI;
 - add control-plane mode inputs only after the CLI resolver/parser and structured unsupported
   errors exist;
 - add structured CLI deploy output if action outputs need deployment/resource ids.
