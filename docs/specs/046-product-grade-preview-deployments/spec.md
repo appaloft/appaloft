@@ -271,12 +271,13 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   guard so interval ticks do not run concurrently in one shell process, and enabled shell
   composition wraps retry ticks in the existing durable mutation coordinator under the
   `preview-lifecycle` coordination scope so multiple shell processes do not run the retry scan at
-  the same time. Terminal provider metadata cleanup remains future work.
-- Preview cleanup now updates existing PR-comment feedback through the preview feedback service.
-  The feedback recorder can look up the latest feedback record by preview environment and channel,
-  the shell cleaner publishes a cleanup completion body through the existing idempotent GitHub
-  writer path, and retryable cleanup-feedback failures are returned to cleanup retry handling with
-  safe phase/error metadata.
+  the same time.
+- Preview cleanup now updates existing PR-comment feedback and terminal provider metadata through
+  the preview feedback service. The feedback recorder can look up the latest feedback record by
+  preview environment and channel, the shell cleaner publishes a cleanup completion body through the
+  existing idempotent GitHub writer path, GitHub deployment-status feedback is marked `inactive`
+  when a provider deployment record exists, and retryable cleanup-feedback failures are returned to
+  cleanup retry handling with safe phase/error metadata.
 - Preview policy and preview environment operations now have active CLI and HTTP/oRPC routes for
   `preview-policies.configure`, `preview-policies.show`, `preview-environments.list`,
   `preview-environments.show`, and `preview-environments.delete`. Policy routes reuse the shared
@@ -296,8 +297,7 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   idempotent `github-deployment-status` feedback after ids-only deployment dispatch. Retryable
   deployment-status feedback failures are recorded as safe feedback state without changing the
   accepted deployment result to `err`.
-- No GitHub App installation/repository context mapper or terminal provider metadata cleanup is
-  implemented.
+- No GitHub App installation/repository context mapper is implemented.
 - Preview policy and preview environment operations currently expose CLI, HTTP/oRPC, and generated
   future MCP tool descriptors. Web exposes preview policy readback/configuration and the read-only
   preview environment list/detail/delete surface.

@@ -157,8 +157,11 @@ environment.
 `packages/persistence/pg/test/preview-feedback.pglite.test.ts`, and
 `apps/shell/test/preview-environment-cleaner.test.ts` now also cover cleanup-side feedback updates:
 the feedback recorder reads the latest feedback record by preview environment/channel, cleanup
-publishes an idempotent PR-comment update when feedback exists, missing feedback is skipped, and
-retryable provider feedback failures are returned as safe cleanup retry failures.
+publishes an idempotent PR-comment update when feedback exists, marks the latest GitHub deployment
+status feedback `inactive` when provider metadata exists, missing feedback is skipped, and retryable
+provider feedback failures are returned as safe cleanup retry failures.
+`packages/integrations/github/test/github-feedback.test.ts` covers the GitHub inactive deployment
+status request shape without returning tokens, provider payloads, or feedback body text.
 `PG-PREVIEW-SURFACE-001` has initial operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
@@ -202,8 +205,7 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-Terminal provider metadata cleanup, repository/installation mapping, and active GitHub App preview
-worker transports remain open.
+Repository/installation mapping and active GitHub App preview worker transports remain open.
 Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 

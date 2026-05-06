@@ -41,6 +41,7 @@ function checkInput(input?: { providerFeedbackId?: string }) {
 function deploymentStatusInput(input?: {
   providerDeploymentId?: string;
   providerFeedbackId?: string;
+  deploymentStatusState?: "success" | "inactive";
 }) {
   return {
     ...feedbackInput(),
@@ -48,6 +49,7 @@ function deploymentStatusInput(input?: {
     channel: "github-deployment-status" as const,
     ...(input?.providerDeploymentId ? { providerDeploymentId: input.providerDeploymentId } : {}),
     ...(input?.providerFeedbackId ? { providerFeedbackId: input.providerFeedbackId } : {}),
+    ...(input?.deploymentStatusState ? { deploymentStatusState: input.deploymentStatusState } : {}),
   };
 }
 
@@ -432,6 +434,53 @@ describe("GitHub preview feedback writer", () => {
     ]);
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("github-token");
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("Preview feedback body");
+  });
+
+  test("[PG-PREVIEW-CLEANUP-001] marks GitHub preview deployments inactive during cleanup", async () => {
+    const requests: CapturedRequest[] = [];
+    const writer = createGitHubPreviewDeploymentStatusFeedbackWriter(
+      "github-token",
+      async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method ?? "GET",
+          authorization: new Headers(init?.headers).get("authorization"),
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return new Response(JSON.stringify({ id: 303 }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      },
+      "https://api.github.test",
+    );
+
+    const result = await writer.publish(
+      createExecutionContext({
+        entrypoint: "system",
+        requestId: "req_github_deployment_status_cleanup",
+      }),
+      deploymentStatusInput({
+        providerFeedbackId: "github_deployment_300",
+        deploymentStatusState: "inactive",
+      }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ providerFeedbackId: "github_deployment_300" });
+    expect(requests).toEqual([
+      {
+        url: "https://api.github.test/repos/appaloft/demo/deployments/github_deployment_300/statuses",
+        method: "POST",
+        authorization: "Bearer github-token",
+        body: {
+          state: "inactive",
+          description: "Appaloft preview cleanup completed",
+          environment: "preview",
+          auto_inactive: false,
+        },
+      },
+    ]);
   });
 
   test("[PG-PREVIEW-FEEDBACK-001] reuses an existing deployment id for status updates", async () => {

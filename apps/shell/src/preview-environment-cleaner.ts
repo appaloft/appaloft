@@ -79,8 +79,8 @@ export class ShellPreviewEnvironmentCleaner implements PreviewEnvironmentCleaner
       cleanedRuntime: result.value.cleanedRuntime,
       removedRoute: result.value.removedServerAppliedRoute,
       removedSourceLink: result.value.removedSourceLink,
-      removedProviderMetadata: false,
-      updatedFeedback: feedback.value.status !== "skipped",
+      removedProviderMetadata: feedback.value.removedProviderMetadata ?? false,
+      updatedFeedback: feedback.value.updatedFeedback ?? feedback.value.status !== "skipped",
     });
   }
 }

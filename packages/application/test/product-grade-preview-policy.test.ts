@@ -1561,6 +1561,15 @@ describe("PreviewFeedbackService", () => {
       providerFeedbackId: "github_comment_latest",
       updatedAt: "2026-05-06T04:10:00.000Z",
     });
+    await recorder.record(toRepositoryContext(createExecutionContext({ entrypoint: "system" })), {
+      feedbackKey: "feedback:sevt_preview_latest:github-deployment-status",
+      sourceEventId: "sevt_preview_latest",
+      previewEnvironmentId: "prenv_cleanup_feedback",
+      channel: "github-deployment-status",
+      status: "published",
+      providerFeedbackId: "github_deployment_latest",
+      updatedAt: "2026-05-06T04:11:00.000Z",
+    });
     const service = new PreviewFeedbackService(
       writer,
       recorder,
@@ -1581,6 +1590,8 @@ describe("PreviewFeedbackService", () => {
     expect(result._unsafeUnwrap()).toEqual({
       status: "updated",
       providerFeedbackId: "github_comment_latest",
+      updatedFeedback: true,
+      removedProviderMetadata: true,
     });
     expect(writer.inputs).toEqual([
       expect.objectContaining({
@@ -1588,6 +1599,14 @@ describe("PreviewFeedbackService", () => {
         sourceEventId: "sevt_preview_latest",
         previewEnvironmentId: "prenv_cleanup_feedback",
         providerFeedbackId: "github_comment_latest",
+        body: "Preview cleanup completed.",
+      }),
+      expect.objectContaining({
+        feedbackKey: "feedback:sevt_preview_latest:github-deployment-status",
+        sourceEventId: "sevt_preview_latest",
+        previewEnvironmentId: "prenv_cleanup_feedback",
+        providerFeedbackId: "github_deployment_latest",
+        deploymentStatusState: "inactive",
         body: "Preview cleanup completed.",
       }),
     ]);
@@ -1598,6 +1617,15 @@ describe("PreviewFeedbackService", () => {
       channel: "github-pr-comment",
       status: "published",
       providerFeedbackId: "github_comment_latest",
+      updatedAt: "2026-05-06T04:40:00.000Z",
+    });
+    expect(recorder.records.get("feedback:sevt_preview_latest:github-deployment-status")).toEqual({
+      feedbackKey: "feedback:sevt_preview_latest:github-deployment-status",
+      sourceEventId: "sevt_preview_latest",
+      previewEnvironmentId: "prenv_cleanup_feedback",
+      channel: "github-deployment-status",
+      status: "published",
+      providerFeedbackId: "github_deployment_latest",
       updatedAt: "2026-05-06T04:40:00.000Z",
     });
   });
@@ -1623,7 +1651,11 @@ describe("PreviewFeedbackService", () => {
       },
     );
 
-    expect(result._unsafeUnwrap()).toEqual({ status: "skipped" });
+    expect(result._unsafeUnwrap()).toEqual({
+      status: "skipped",
+      updatedFeedback: false,
+      removedProviderMetadata: false,
+    });
     expect(writer.inputs).toEqual([]);
   });
 });

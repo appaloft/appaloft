@@ -116,6 +116,8 @@ describe("ShellPreviewEnvironmentCleaner", () => {
     feedbackService.result = ok({
       status: "updated",
       providerFeedbackId: "github_comment_42",
+      updatedFeedback: true,
+      removedProviderMetadata: true,
     });
     const cleaner = new ShellPreviewEnvironmentCleaner(cleanupPreviewUseCase, feedbackService);
 
@@ -132,7 +134,7 @@ describe("ShellPreviewEnvironmentCleaner", () => {
       cleanedRuntime: true,
       removedRoute: true,
       removedSourceLink: true,
-      removedProviderMetadata: false,
+      removedProviderMetadata: true,
       updatedFeedback: true,
     });
   });

@@ -4477,6 +4477,7 @@ export type PreviewFeedbackChannel =
   | "github-pr-comment"
   | "github-check"
   | "github-deployment-status";
+export type PreviewDeploymentStatusState = "success" | "inactive";
 export type PreviewFeedbackStatus = "published" | "retryable-failed" | "terminal-failed";
 
 export interface PreviewFeedbackRecord {
@@ -4501,6 +4502,7 @@ export interface PreviewFeedbackWriterInput {
   body: string;
   providerDeploymentId?: string;
   providerFeedbackId?: string;
+  deploymentStatusState?: PreviewDeploymentStatusState;
 }
 
 export interface PreviewFeedbackWriterResult {
