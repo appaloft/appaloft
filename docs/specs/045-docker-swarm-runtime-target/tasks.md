@@ -24,7 +24,7 @@
   key, and capabilities.
 - [x] `SWARM-TARGET-RENDER-001`: OCI image and Compose artifact intent render to adapter-owned
   Swarm stack/service intent.
-- [ ] `SWARM-TARGET-APPLY-001`: rollout preserves or restores previous same-resource service until
+- [x] `SWARM-TARGET-APPLY-001`: rollout preserves or restores previous same-resource service until
   verification succeeds.
 - [x] `SWARM-TARGET-APPLY-002`: fake-runner failed candidate rollout records deployment failure and
   runs only deployment-scoped cleanup.
