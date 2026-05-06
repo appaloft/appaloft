@@ -24,7 +24,7 @@ adding dependency-specific deployment input fields.
 3. Keep materialization out of core aggregates except for immutable value objects/state already
    needed by `Deployment`.
 4. Extend `DeploymentDependencyBindingSnapshotSummary.runtimeInjection` from only `deferred` to
-   `ready | blocked | deferred` in application ports and public contracts.
+   `ready | blocked | not-applicable` in application ports and public contracts.
 5. Extend `deployments.plan`, `deployments.create`, and `deployments.show` to report consistent
    safe runtime injection readiness.
 6. Extend runtime target backends to advertise and verify dependency secret delivery support before
@@ -38,7 +38,7 @@ adding dependency-specific deployment input fields.
 | --- | --- |
 | `packages/core` | Add value objects/state only if existing dependency binding reference state cannot represent captured runtime injection facts safely. |
 | `packages/application` | Materializer, plan/create/show readiness, ports/contracts mapping, tests. |
-| `packages/contracts` | Runtime injection readiness schema accepts `ready`, `blocked`, and `deferred`; no raw secret fields. |
+| `packages/contracts` | Runtime injection readiness schema accepts `ready`, `blocked`, and `not-applicable`; no raw secret fields. |
 | `packages/persistence/pg` | Persist any new deployment snapshot fields if core state expands. |
 | `packages/adapters/runtime` | Runtime target capability and redacted secret delivery for single-server and Swarm paths. |
 | `packages/adapters/cli`, `packages/orpc`, `apps/web` | Reuse shared schemas/readiness fields; no parallel input shapes. |

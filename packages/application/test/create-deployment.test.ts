@@ -14,6 +14,7 @@ import {
   DependencyResourceSourceModeValue,
   Deployment,
   DeploymentByIdSpec,
+  DeploymentDependencyRuntimeSecretRef,
   DeploymentId,
   DeploymentLogEntry,
   DeploymentPhaseValue,
@@ -342,25 +343,38 @@ class HermeticRuntimeTargetBackend
   extends HermeticExecutionBackend
   implements RuntimeTargetBackend
 {
-  readonly descriptor = {
-    key: "single-server-generic-ssh",
-    providerKey: "generic-ssh",
-    targetKinds: ["single-server" as const],
-    capabilities: [
+  readonly descriptor: RuntimeTargetBackend["descriptor"];
+
+  constructor(
+    capabilities: RuntimeTargetCapability[] = [
       "runtime.apply",
       "runtime.verify",
+      "runtime.dependency-secrets",
       "runtime.logs",
       "runtime.health",
       "runtime.cleanup",
       "proxy.route",
-    ] satisfies RuntimeTargetCapability[],
-  };
+    ],
+  ) {
+    super();
+    this.descriptor = {
+      key: "single-server-generic-ssh",
+      providerKey: "generic-ssh",
+      targetKinds: ["single-server" as const],
+      capabilities,
+    };
+  }
 }
 
 class StaticRuntimeTargetBackendRegistry implements RuntimeTargetBackendRegistry {
-  private readonly backend = new HermeticRuntimeTargetBackend();
+  private readonly backend: HermeticRuntimeTargetBackend;
 
-  constructor(private readonly supported = true) {}
+  constructor(
+    private readonly supported = true,
+    capabilities?: RuntimeTargetCapability[],
+  ) {
+    this.backend = new HermeticRuntimeTargetBackend(capabilities);
+  }
 
   find(input: Parameters<RuntimeTargetBackendRegistry["find"]>[0]): Result<RuntimeTargetBackend> {
     if (this.supported) {
@@ -695,6 +709,8 @@ async function createDeploymentFixture(
     dependencyBindingReadModel,
     dependencyResources,
     deployments,
+    environment,
+    environments,
     eventBus,
     logger,
     repositoryContext,
@@ -732,7 +748,9 @@ async function createActivePostgresBinding(input: {
       databaseName: "app",
       maskedConnection: "postgres://app:********@db.example.com:5432/app",
     },
-    connectionSecretRef: DependencyResourceSecretRef.rehydrate("secret://postgres/super-secret"),
+    connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+      "appaloft://dependency-resources/rsi_pg/connection",
+    ),
     providerManaged: false,
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   })._unsafeUnwrap();
@@ -783,7 +801,9 @@ async function createActiveRedisBinding(input: {
       databaseName: "0",
       maskedConnection: "redis://:********@redis.example.com:6379/0",
     },
-    connectionSecretRef: DependencyResourceSecretRef.rehydrate("secret://redis/super-secret"),
+    connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+      "appaloft://dependency-resources/rsi_redis/connection",
+    ),
     providerManaged: false,
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   })._unsafeUnwrap();
@@ -1146,6 +1166,9 @@ describe("CreateDeploymentUseCase", () => {
       targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
       scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
       injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+      runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+        "appaloft://dependency-resources/rsi_pg/connection",
+      ),
     });
     const serializedReferences = JSON.stringify(
       deployment?.toState().dependencyBindingReferences ?? [],
@@ -1153,7 +1176,6 @@ describe("CreateDeploymentUseCase", () => {
     expect(serializedReferences).not.toContain("super-secret");
     expect(serializedReferences).not.toContain("db.example.com");
     expect(serializedReferences).not.toContain("postgres://");
-    expect(serializedReferences).not.toContain("secret://");
   });
 
   test("[DEP-BIND-REDIS-SNAPSHOT-001] captures active Redis binding safe references without secrets", async () => {
@@ -1184,6 +1206,9 @@ describe("CreateDeploymentUseCase", () => {
       targetName: ResourceBindingTargetName.rehydrate("REDIS_URL"),
       scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
       injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+      runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+        "appaloft://dependency-resources/rsi_redis/connection",
+      ),
     });
     const serializedReferences = JSON.stringify(
       deployment?.toState().dependencyBindingReferences ?? [],
@@ -1191,7 +1216,86 @@ describe("CreateDeploymentUseCase", () => {
     expect(serializedReferences).not.toContain("super-secret");
     expect(serializedReferences).not.toContain("redis.example.com");
     expect(serializedReferences).not.toContain("redis://");
-    expect(serializedReferences).not.toContain("secret://");
+  });
+
+  test("[DEP-BIND-RUNTIME-INJECT-004] rejects active dependency binding when the runtime target name conflicts", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResources,
+      deployments,
+      environment,
+      environments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResources,
+      repositoryContext,
+    });
+    environment
+      .setVariable({
+        key: ConfigKey.rehydrate("DATABASE_URL"),
+        value: ConfigValueText.rehydrate("existing-configured-value"),
+        kind: VariableKindValue.rehydrate("secret"),
+        exposure: VariableExposureValue.rehydrate("runtime"),
+        updatedAt: UpdatedAt.rehydrate("2026-01-01T00:00:01.000Z"),
+      })
+      ._unsafeUnwrap();
+    await environments.upsert(
+      repositoryContext,
+      environment,
+      UpsertEnvironmentSpec.fromEnvironment(environment),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "dependency_runtime_injection_blocked",
+      details: {
+        reason: "dependency_runtime_injection_target_conflict",
+        bindingCount: 1,
+      },
+    });
+    expect(deployments.items.size).toBe(0);
+  });
+
+  test("[DEP-BIND-RUNTIME-INJECT-004] rejects active dependency binding when the runtime target cannot deliver dependency secrets", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      runtimeTargetBackendRegistry: new StaticRuntimeTargetBackendRegistry(true, [
+        "runtime.apply",
+        "runtime.verify",
+        "runtime.logs",
+      ]),
+    });
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResources,
+      repositoryContext,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "dependency_runtime_injection_blocked",
+      details: {
+        reason: "dependency_runtime_injection_target_backend_unsupported",
+        bindingCount: 1,
+      },
+    });
+    expect(deployments.items.size).toBe(0);
   });
 
   test("[DEP-BIND-SNAP-REF-003] omits removed bindings from new deployment snapshots", async () => {

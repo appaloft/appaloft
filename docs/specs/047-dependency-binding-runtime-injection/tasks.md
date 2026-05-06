@@ -9,25 +9,25 @@
 
 ## Test-First Round
 
-- [ ] Add failing application tests for `DEP-BIND-RUNTIME-INJECT-001` and
+- [x] Add failing application tests for `DEP-BIND-RUNTIME-INJECT-001` and
   `DEP-BIND-RUNTIME-INJECT-002`.
-- [ ] Add plan-preview tests for `DEP-BIND-RUNTIME-INJECT-003`.
-- [ ] Add deployment admission rejection tests for `DEP-BIND-RUNTIME-INJECT-004`.
-- [ ] Add historical snapshot/rotation tests for `DEP-BIND-RUNTIME-INJECT-005`.
-- [ ] Add runtime adapter redaction tests for `DEP-BIND-RUNTIME-INJECT-006`.
-- [ ] Add contract tests for runtime injection `ready | blocked | deferred` schema.
+- [x] Add plan-preview tests for `DEP-BIND-RUNTIME-INJECT-003`.
+- [x] Add deployment admission rejection tests for `DEP-BIND-RUNTIME-INJECT-004`.
+- [x] Add historical snapshot/rotation tests for `DEP-BIND-RUNTIME-INJECT-005`.
+- [x] Add runtime adapter redaction tests for `DEP-BIND-RUNTIME-INJECT-006`.
+- [x] Add contract tests for runtime injection `ready | blocked | not-applicable` schema.
 
 ## Code Round
 
-- [ ] Implement dependency runtime-injection materializer in `packages/application`.
-- [ ] Extend application ports and contracts for runtime injection readiness.
-- [ ] Gate `deployments.create` on active non-injectable bindings.
-- [ ] Keep `deployments.plan`, `deployments.create`, and `deployments.show` readiness aligned.
-- [ ] Add runtime target capability checks for dependency secret delivery.
-- [ ] Implement redacted single-server dependency env delivery.
-- [ ] Implement redacted Swarm dependency secret delivery.
-- [ ] Persist new deployment snapshot fields if required.
-- [ ] Update CLI/oRPC/Web read surfaces only through shared schemas.
+- [x] Implement dependency runtime-injection materializer in `packages/application`.
+- [x] Extend application ports and contracts for runtime injection readiness.
+- [x] Gate `deployments.create` on active non-injectable bindings.
+- [x] Keep `deployments.plan`, `deployments.create`, and `deployments.show` readiness aligned.
+- [x] Add runtime target capability checks for dependency secret delivery.
+- [x] Implement redacted single-server dependency env delivery of safe secret handles.
+- [x] Implement redacted Swarm dependency secret delivery of safe secret handles.
+- [x] Persist new deployment snapshot fields if required.
+- [x] Confirm CLI/oRPC/Web read surfaces use shared schemas; no transport-only shapes changed.
 
 ## Docs Round
 
@@ -37,17 +37,17 @@
 
 ## Verification
 
-- [ ] Run targeted application tests.
-- [ ] Run targeted contracts and PGlite tests.
-- [ ] Run targeted runtime adapter tests.
+- [x] Run targeted application tests.
+- [x] Run targeted contracts and PGlite tests.
+- [x] Run targeted runtime adapter tests.
 - [ ] Run public docs checks after Docs Round.
-- [ ] Run `bun run lint`.
-- [ ] Run `bun turbo run typecheck`.
-- [ ] Run `git diff --check`.
+- [x] Run `bun run lint`.
+- [x] Run `bun turbo run typecheck`.
+- [x] Run `git diff --check`.
 
 ## Post-Implementation Sync
 
-- [ ] Update `docs/PRODUCT_ROADMAP.md` without checking Phase 7 exit criteria until Postgres and
+- [x] Update `docs/PRODUCT_ROADMAP.md` without checking Phase 7 exit criteria until Postgres and
   Redis closed loops are actually verified.
-- [ ] Reconcile `docs/specs/035-dependency-binding-snapshot-reference-baseline/spec.md` migration
+- [x] Reconcile `docs/specs/035-dependency-binding-snapshot-reference-baseline/spec.md` migration
   notes after runtime injection Code Round.

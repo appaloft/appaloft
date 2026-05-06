@@ -39,6 +39,7 @@ import {
   DeletedAt,
   type DeploymentDependencyBindingReferenceState,
   DeploymentDependencyBindingSnapshotReadinessValue,
+  DeploymentDependencyRuntimeSecretRef,
   DeploymentId,
   DeploymentLogEntry,
   type DeploymentLogEntry as DeploymentLogEntryType,
@@ -382,6 +383,7 @@ export interface SerializedDeploymentDependencyBindingReference extends Record<s
   targetName: string;
   scope: ResourceBindingScopeInput;
   injectionMode: ResourceInjectionModeInput;
+  runtimeSecretRef?: string;
   snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessInput;
   snapshotReadinessReason?: string;
 }
@@ -931,6 +933,7 @@ export function serializeDeploymentDependencyBindingReferences(
     targetName: reference.targetName.value,
     scope: reference.scope.value,
     injectionMode: reference.injectionMode.value,
+    ...(reference.runtimeSecretRef ? { runtimeSecretRef: reference.runtimeSecretRef.value } : {}),
     snapshotReadiness: reference.snapshotReadiness.value,
     ...(reference.snapshotReadinessReason
       ? { snapshotReadinessReason: reference.snapshotReadinessReason.value }
@@ -954,6 +957,13 @@ export function rehydrateDeploymentDependencyBindingReferences(
       targetName: ResourceBindingTargetName.rehydrate(record.targetName),
       scope: ResourceBindingScopeValue.rehydrate(record.scope),
       injectionMode: ResourceInjectionModeValue.rehydrate(record.injectionMode),
+      ...(record.runtimeSecretRef
+        ? {
+            runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+              record.runtimeSecretRef,
+            ),
+          }
+        : {}),
       snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.rehydrate(
         record.snapshotReadiness,
       ),

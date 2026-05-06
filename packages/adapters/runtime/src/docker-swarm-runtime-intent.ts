@@ -1,5 +1,6 @@
 import {
   domainError,
+  type DeploymentDependencyBindingReferenceState,
   err,
   ok,
   type EnvironmentConfigSnapshotState,
@@ -26,6 +27,7 @@ export interface DockerSwarmRuntimeIdentityInput {
 export interface DockerSwarmRuntimeIntentInput {
   runtimePlan: RuntimePlanLike;
   environmentSnapshot?: EnvironmentSnapshotLike;
+  dependencyBindingReferences?: readonly DeploymentDependencyBindingReferenceState[];
   identity: DockerSwarmRuntimeIdentityInput;
   edgeNetworkName?: string;
 }
@@ -363,8 +365,9 @@ function isComposeWorkload(runtimePlan: RuntimePlanState, execution: RuntimeExec
 
 function renderEnvironmentVariables(
   environmentSnapshot: EnvironmentSnapshotLike | undefined,
+  dependencyBindingReferences: readonly DeploymentDependencyBindingReferenceState[] = [],
 ): DockerSwarmEnvironmentVariableIntent[] {
-  return (
+  const snapshotVariables =
     environmentSnapshot
       ?.toState()
       .variables.filter((variable) => variable.exposure.value === "runtime")
@@ -377,7 +380,25 @@ function renderEnvironmentVariables(
           ? { valueFrom: `secret:${variable.key.value}` }
           : { value: variable.value.value }),
       }))
-      .sort((left, right) => left.name.localeCompare(right.name)) ?? []
+      .sort((left, right) => left.name.localeCompare(right.name)) ?? [];
+  const dependencyVariables = dependencyBindingReferences
+    .filter(
+      (reference) =>
+        reference.runtimeSecretRef &&
+        reference.snapshotReadiness.isReady() &&
+        reference.scope.value === "runtime-only" &&
+        reference.injectionMode.value === "env",
+    )
+    .map((reference) => ({
+      name: reference.targetName.value,
+      exposure: "runtime",
+      scope: "deployment",
+      secret: true,
+      valueFrom: `secret:${reference.targetName.value}`,
+    }));
+
+  return [...snapshotVariables, ...dependencyVariables].sort((left, right) =>
+    left.name.localeCompare(right.name),
   );
 }
 
@@ -535,7 +556,10 @@ export function renderDockerSwarmRuntimeIntent(
     serviceName: `${stackName}_${targetServiceName}`,
     targetServiceName,
     workload,
-    environment: renderEnvironmentVariables(input.environmentSnapshot),
+    environment: renderEnvironmentVariables(
+      input.environmentSnapshot,
+      input.dependencyBindingReferences,
+    ),
     ...(health ? { health } : {}),
     routes: renderRoutes({ execution, networkName }),
     labels: runtimeIdentityLabels(input.identity),

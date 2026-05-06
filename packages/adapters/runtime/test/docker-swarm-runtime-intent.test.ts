@@ -5,6 +5,8 @@ import {
   ConfigKey,
   ConfigScopeValue,
   ConfigValueText,
+  DeploymentDependencyRuntimeSecretRef,
+  DeploymentDependencyBindingSnapshotReadinessValue,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
   DetectSummary,
@@ -31,6 +33,12 @@ import {
   PlanStepText,
   PortNumber,
   ProviderKey,
+  ResourceBindingId,
+  ResourceBindingScopeValue,
+  ResourceBindingTargetName,
+  ResourceInjectionModeValue,
+  ResourceInstanceId,
+  ResourceInstanceKindValue,
   PublicDomainName,
   RoutePathPrefix,
   RuntimeArtifactIntentValue,
@@ -239,6 +247,45 @@ describe("renderDockerSwarmRuntimeIntent", () => {
       },
     ]);
     expect(JSON.stringify(intent)).not.toContain("postgres://secret-value");
+  });
+
+  test("[DEP-BIND-RUNTIME-INJECT-006] renders dependency runtime secret handles without exposing raw values", () => {
+    const result = renderDockerSwarmRuntimeIntent({
+      runtimePlan: imageRuntimePlan(),
+      dependencyBindingReferences: [
+        {
+          bindingId: ResourceBindingId.rehydrate("rbd_pg"),
+          dependencyResourceId: ResourceInstanceId.rehydrate("rsi_pg"),
+          kind: ResourceInstanceKindValue.rehydrate("postgres"),
+          targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
+          scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+          injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+          runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+            "appaloft://dependency-resources/rsi_pg/connection",
+          ),
+          snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
+        },
+      ],
+      identity: {
+        resourceId: "res_api",
+        deploymentId: "dep_123",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_prod",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const intent = result._unsafeUnwrap();
+
+    expect(intent.environment).toContainEqual({
+      name: "DATABASE_URL",
+      exposure: "runtime",
+      scope: "deployment",
+      secret: true,
+      valueFrom: "secret:DATABASE_URL",
+    });
+    expect(JSON.stringify(intent)).not.toContain("appaloft://dependency-resources");
+    expect(JSON.stringify(intent)).not.toContain("postgres://");
   });
 
   test("[SWARM-TARGET-RENDER-002] renders Compose intent when target service metadata is explicit", () => {

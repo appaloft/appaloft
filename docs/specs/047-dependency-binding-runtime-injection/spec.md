@@ -2,8 +2,9 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: ready for Test-First / Code Round
+- Round: Code Round
+- Artifact state: safe runtime injection snapshot and readiness slice implemented; Docs Round and
+  store-backed secret value resolution remain open
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, deployment admission/readiness behavior changes for
   bound dependencies
@@ -109,7 +110,9 @@ credentials, or provider response payloads.
 
 ## Current Implementation Notes And Migration Gaps
 
-Current implementation captures safe Postgres and imported Redis binding references in deployment
-snapshots and reports runtime injection as deferred. Runtime environment materialization, backend
-secret-delivery readiness, duplicate target handling, and public docs remain future Code/Docs Round
-work governed by this spec.
+Current implementation captures safe Postgres and imported Redis runtime secret references in
+deployment snapshots, reports runtime injection as `ready | blocked | not-applicable`, rejects
+active non-injectable bindings before deployment acceptance, and routes safe secret handles through
+single-server and Swarm runtime target adapters. Store-backed resolution of `appaloft://...` secret
+references into raw dependency connection values remains a migration gap, so Postgres and Redis
+closed-loop exit criteria stay open. Public docs remain a Docs Round task.

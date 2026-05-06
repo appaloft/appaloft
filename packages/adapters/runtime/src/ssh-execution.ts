@@ -422,6 +422,16 @@ function deploymentEnv(deployment: Deployment, port?: number): NodeJS.ProcessEnv
   for (const variable of state.environmentSnapshot.variables) {
     env[variable.key] = variable.value;
   }
+  for (const reference of state.dependencyBindingReferences) {
+    if (
+      reference.runtimeSecretRef &&
+      reference.snapshotReadiness.isReady() &&
+      reference.scope.value === "runtime-only" &&
+      reference.injectionMode.value === "env"
+    ) {
+      env[reference.targetName.value] = reference.runtimeSecretRef.value;
+    }
+  }
 
   if (port) {
     env.PORT = String(port);

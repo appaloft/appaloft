@@ -35,10 +35,9 @@ injection, secret rotation, backup/restore, and provider-native database realiza
 4. `deployments.plan` is a read-only preview and should report the same safe binding readiness
    summary without creating a deployment or snapshot row.
 5. Removed bindings are not active and must not be included in a new snapshot reference set.
-6. Missing or not-ready binding dependencies are not deployment admission blockers in this slice
-   because runtime injection remains deferred. They are safe readiness diagnostics for plan/show
-   surfaces and future injection work. ADR-040 governs the later runtime injection behavior that
-   will turn non-injectable active bindings into deployment admission blockers.
+6. Missing or not-ready binding dependencies were not deployment admission blockers in this
+   safe-reference slice. ADR-040 supersedes that migration gap for runtime injection: active
+   non-injectable bindings now block deployment admission before acceptance.
 7. No ADR was needed for this safe-reference slice because it did not change deployment admission,
    runtime env injection, provider contracts, rollback semantics, retry semantics, or snapshot
    immutability.
@@ -59,10 +58,10 @@ injection, secret rotation, backup/restore, and provider-native database realiza
 | DEP-BIND-SNAP-REF-001 | Snapshot includes active Postgres binding references | Resource has an active Postgres dependency binding with ready dependency metadata | `deployments.create` accepts a deployment | The deployment attempt snapshot includes one safe reference with binding id, dependency resource id, kind, target name, scope, injection mode, and ready snapshot readiness. |
 | DEP-BIND-SNAP-REF-002 | Snapshot excludes raw secrets and materialized env | Bound Postgres dependency was imported with secret-bearing connection material | Deployment snapshot, `deployments.show`, and `deployments.plan` are read | No raw connection URL, password, token, auth header, cookie, provider credential, secret value, sensitive query parameter, or materialized env value appears. |
 | DEP-BIND-SNAP-REF-003 | Removed binding is not snapshotted | Resource had a binding that was unbound before deployment | `deployments.create` accepts a deployment | The removed binding is absent from the dependency binding snapshot reference list. |
-| DEP-BIND-SNAP-REF-004 | Not-ready binding is diagnostic only | Resource has an active binding whose dependency metadata is not ready for safe snapshot reference | `deployments.plan` or `deployments.create` evaluates the resource | Deployment admission is not blocked in this slice; plan/show readiness reports blocked snapshot readiness and runtime injection remains deferred. |
-| DEP-BIND-SNAP-REF-005 | Plan preview reports binding readiness without side effects | Resource has an active Postgres dependency binding | `deployments.plan` runs | The preview reports dependency binding snapshot readiness and runtime injection deferred without creating a deployment id, snapshot row, events, or runtime work. |
+| DEP-BIND-SNAP-REF-004 | Not-ready binding is diagnostic only | Resource has an active binding whose dependency metadata is not ready for safe snapshot reference | `deployments.plan` or `deployments.create` evaluates the resource | In the original slice, deployment admission was not blocked; after ADR-040 runtime injection, not-ready active bindings block deployment admission before acceptance. |
+| DEP-BIND-SNAP-REF-005 | Plan preview reports binding readiness without side effects | Resource has an active Postgres dependency binding | `deployments.plan` runs | The preview reports dependency binding snapshot and runtime injection readiness without creating a deployment id, snapshot row, events, or runtime work. |
 | DEP-BIND-SNAP-REF-006 | Deployment show reports immutable binding snapshot | Deployment was accepted with dependency binding references | `deployments.show` reads the attempt snapshot | The snapshot section reports the immutable binding references captured at admission, not the Resource's current binding state. |
-| DEP-BIND-REDIS-SNAPSHOT-001 | Snapshot includes active imported Redis binding references | Resource has an active imported Redis dependency binding with ready dependency metadata | `deployments.create`, `deployments.plan`, or `deployments.show` reports dependency binding references | Safe references carry kind `redis` without raw Redis connection material or materialized env values; runtime injection remains deferred until ADR-040 Code Round. |
+| DEP-BIND-REDIS-SNAPSHOT-001 | Snapshot includes active imported Redis binding references | Resource has an active imported Redis dependency binding with ready dependency metadata | `deployments.create`, `deployments.plan`, or `deployments.show` reports dependency binding references | Safe references carry kind `redis` without raw Redis connection material or materialized env values; ADR-040 governs runtime injection readiness and safe secret-handle delivery. |
 
 ## Domain Ownership
 
@@ -100,7 +99,7 @@ Deployment snapshot and deployment read surfaces may expose:
 - scope;
 - injection mode;
 - snapshot readiness status/reason;
-- runtime injection readiness as `deferred`.
+- runtime injection readiness as `ready`, `blocked`, or `not-applicable`.
 
 They must not expose:
 

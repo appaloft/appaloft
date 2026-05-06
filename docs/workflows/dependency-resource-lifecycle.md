@@ -247,14 +247,14 @@ connection query parameters, materialized environment values, or runtime-rendere
 `resources.bind-dependency` and `resources.unbind-dependency` do not mutate historical deployment
 snapshots and do not inject current runtime environment variables. New deployments see active
 bindings at admission time only. Removed bindings are excluded from new snapshots. Missing or
-not-ready dependency metadata is a readiness diagnostic in this first snapshot reference slice, not
-a deployment admission blocker, because runtime env injection remains deferred.
+not-ready dependency metadata now blocks deployment admission once runtime injection is required.
 
-ADR-040 and the dependency binding runtime injection spec define the next target: after Code Round,
+ADR-040 and the dependency binding runtime injection spec govern the runtime path:
 `deployments.plan` reports `ready` or `blocked` runtime injection readiness, and
 `deployments.create` rejects active non-injectable bindings before acceptance. Runtime target
-adapters deliver resolved dependency secrets as close to execution as possible and redact command
-display, logs, events, errors, and diagnostics.
+adapters deliver safe dependency secret handles as close to execution as possible and redact command
+display, logs, events, errors, and diagnostics. Store-backed resolution of Appaloft secret
+references into raw dependency connection values remains a migration gap.
 
 `deployments.create` must not accept dependency resource, database URL, username, password, or
 secret-rotation fields.
@@ -279,8 +279,9 @@ safe deployment snapshot references. Provider-native Postgres realization is imp
 hermetic provider capability. Dependency resource backup/restore is implemented with a hermetic
 provider capability, safe backup read models, restore attempt metadata, lifecycle events, and
 delete-safety blockers. Dependency binding runtime injection is specified by ADR-040 but not
-implemented yet. Web affordances, provider-native Redis realization, managed Redis binding
-admission, and runtime cleanup remain future work.
+fully closed: safe runtime secret handles and readiness gating are implemented, while store-backed
+secret value resolution is still open. Web affordances, provider-native Redis realization, managed
+Redis binding admission, and runtime cleanup remain future work.
 
 ## Open Questions
 
