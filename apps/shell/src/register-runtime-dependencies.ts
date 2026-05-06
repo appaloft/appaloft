@@ -44,6 +44,9 @@ import {
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
   type MutationCoordinator,
+  type PreviewFeedbackWriter,
+  type PreviewFeedbackWriterInput,
+  type PreviewFeedbackWriterResult,
   QueryBus,
   RepositoryBackedDeploymentExecutionGuard,
   type ResourceAccessFailureRendererTarget,
@@ -60,6 +63,7 @@ import { type AppConfig } from "@appaloft/config";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { InMemoryIntegrationRegistry } from "@appaloft/integration-core";
 import {
+  createGitHubPreviewPrCommentFeedbackWriter,
   createGitHubRepositoryBrowser,
   createGitHubSourceEventWebhookVerifier,
   githubIntegration,
@@ -666,6 +670,27 @@ class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   }
 }
 
+class RequestScopedGitHubPreviewFeedbackWriter implements PreviewFeedbackWriter {
+  constructor(private readonly integrationAuthPort: IntegrationAuthPort) {}
+
+  async publish(
+    context: ExecutionContext,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<PreviewFeedbackWriterResult>> {
+    const accessToken = await this.integrationAuthPort.getProviderAccessToken(context, "github");
+    if (!accessToken) {
+      return err(
+        domainError.validation("GitHub account is not connected for preview feedback publishing", {
+          phase: "preview-feedback",
+          provider: "github",
+        }),
+      );
+    }
+
+    return createGitHubPreviewPrCommentFeedbackWriter(accessToken).publish(context, input);
+  }
+}
+
 export interface RegisterRuntimeDependenciesInput {
   config: AppConfig;
   logger: AppLogger;
@@ -779,6 +804,14 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.previewFeedbackRecorder, {
     useFactory: instanceCachingFactory(() => new PgPreviewFeedbackRecorder(input.database.db)),
+  });
+  container.register(tokens.previewFeedbackWriter, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RequestScopedGitHubPreviewFeedbackWriter(
+          dependencyContainer.resolve(tokens.integrationAuthPort),
+        ),
+    ),
   });
   container.register(tokens.previewCleanupAttemptRecorder, {
     useFactory: instanceCachingFactory(

@@ -238,7 +238,9 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   provider payloads, tokens, and secret-shaped values are not persisted in the feedback state.
   The GitHub integration now has a hermetic PR comment feedback writer that creates or updates
   issue comments by provider feedback id and returns safe retryable provider errors without response
-  bodies or tokens. GitHub check/deployment-status writers and shell wiring remain future work.
+  bodies or tokens. Shell wiring resolves the GitHub access token per request through the existing
+  integration auth port before delegating to the PR comment writer. GitHub check/deployment-status
+  writers remain future work.
 - Preview environment cleanup now has an initial application service that loads the durable preview
   environment, marks cleanup requested without deleting preview history, and delegates runtime,
   route, source-link, provider metadata, and feedback cleanup to a port with safe source-scope
@@ -255,9 +257,8 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   transports yet.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
-- No GitHub App preview worker, GitHub check/deployment-status feedback writers, feedback writer
-  shell wiring, cleanup scheduler, or concrete product-grade preview cleanup adapter is
-  implemented.
+- No GitHub App preview worker, GitHub check/deployment-status feedback writers, cleanup scheduler,
+  or concrete product-grade preview cleanup adapter is implemented.
 - No active operation catalog transports exist for `preview-policies.*` or
   `preview-environments.*`.
 - Product-grade preview public docs/help now map preview policy and preview environment operations

@@ -1346,6 +1346,12 @@ Current verification notes:
   tokens, and feedback body text from returned errors. Check/deployment-status writers, shell
   wiring, GitHub App HTTP routes, cleanup retry, and active preview environment entrypoints remain
   open.
+- 2026-05-06 Phase 7 preview feedback shell-wiring slice registered a request-scoped GitHub
+  preview feedback writer in the shell composition. It obtains the GitHub token through the
+  existing integration auth port per publish call, returns a safe validation error when GitHub is
+  not connected, and delegates supported PR comment feedback to the GitHub integration writer.
+  Check/deployment-status writers, GitHub App HTTP routes, cleanup retry, and active preview
+  environment entrypoints remain open.
 - 2026-05-06 Phase 7 preview cleanup application slice added a service that marks durable preview
   environment cleanup requested without deleting preview history, then delegates runtime, route,
   source-link, provider metadata, and feedback cleanup to a safe source-scope port. Concrete
