@@ -15,6 +15,11 @@ searchAliases:
 relatedOperations:
   - deployments.create
   - deployments.cleanup-preview
+  - preview-policies.configure
+  - preview-policies.show
+  - preview-environments.list
+  - preview-environments.show
+  - preview-environments.delete
 sidebar:
   label: "Previews"
   order: 3

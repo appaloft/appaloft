@@ -257,6 +257,36 @@ describe("public docs operation coverage", () => {
     );
   });
 
+  test("[PG-PREVIEW-SURFACE-001] preview operation contracts record product-grade preview docs coverage", () => {
+    const topic = publicDocsHelpTopics["deployment.product-grade-previews"];
+    const operationKeys = [
+      "preview-policies.configure",
+      "preview-policies.show",
+      "preview-environments.list",
+      "preview-environments.show",
+      "preview-environments.delete",
+    ];
+
+    for (const operationKey of operationKeys) {
+      expect(getPublicDocsOperationCoverage(operationKey)).toMatchObject({
+        operationKey,
+        status: "documented",
+        topicId: "deployment.product-grade-previews",
+      });
+    }
+
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/046-product-grade-preview-deployments/spec.md",
+        "docs/testing/product-grade-preview-deployments-test-matrix.md",
+      ]),
+    );
+    expect(topic.surfaces).toEqual(
+      expect.arrayContaining(["web", "cli", "http-api", "repository-config", "mcp"]),
+    );
+    expect(topic.webSurfaces?.join("\n")).toContain("preview policy");
+  });
+
   test("[RES-PROFILE-ENTRY-012] resource profile topics record resource detail editing closure coverage", () => {
     for (const [operationKey, topicId] of [
       ["resources.configure-source", "resource.source-profile"],
