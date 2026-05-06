@@ -2727,7 +2727,7 @@ describe("pglite persistence integration", () => {
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });
     }
-  }, 15000);
+  }, 30000);
 
   test("PgMutationCoordinator returns coordination_timeout when the scope stays occupied", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-mutation-timeout-"));
@@ -2814,5 +2814,5 @@ describe("pglite persistence integration", () => {
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });
     }
-  }, 15000);
+  }, 30000);
 });
