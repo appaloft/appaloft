@@ -359,8 +359,16 @@ export const zhCN = {
     previewEnvironments: {
       activeCount: "活跃",
       allProjects: "全部项目",
+      baseRef: "Base ref",
       cleanupRequestedCount: "已请求清理",
       cleanupRequestedStatus: "已请求清理",
+      cleanupAction: "请求清理",
+      cleanupConfirm:
+        "确定请求清理预览环境 {{previewEnvironmentId}} 吗？runtime、route、source-link 和 provider metadata 会被清理，部署历史仍可读取。",
+      cleanupFailed: "预览清理请求失败",
+      cleanupSucceeded: "已请求预览清理",
+      detailDescription: "单个持久预览环境的安全 owner、source、生命周期和清理状态。",
+      detailTitle: "预览环境详情",
       emptyBody:
         "当 source 事件创建带有 owner、过期时间和清理状态的 pull request 预览部署后，这里会显示预览环境。",
       emptyTitle: "还没有被跟踪的预览环境。",
@@ -368,6 +376,7 @@ export const zhCN = {
       focusDescription:
         "不用直接打开 provider metadata，也能查看 pull request 预览的归属、清理状态和过期时间。",
       focusTitle: "产品级预览环境",
+      headSha: "Head SHA",
       listDescription: "每一行都会把安全 source 摘要、归属资源、生命周期状态和过期窗口放在一起。",
       listTitle: "预览环境记录",
       noExpiry: "无过期时间",
@@ -375,6 +384,9 @@ export const zhCN = {
       pageTitle: "预览环境",
       pullRequest: "Pull request",
       repository: "Repository",
+      lifecycleTitle: "生命周期",
+      ownerTitle: "归属",
+      sourceTitle: "来源",
       sourceBinding: "Source binding",
       statusActive: "活跃",
       statusCleanupRequested: "已请求清理",

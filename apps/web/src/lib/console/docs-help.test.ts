@@ -103,6 +103,7 @@ describe("console docs help links", () => {
         [
           "routes/domain-bindings/+page.svelte",
           "routes/preview-environments/+page.svelte",
+          "routes/preview-environments/[previewEnvironmentId]/+page.svelte",
           "routes/preview-policies/+page.svelte",
           "routes/projects/[projectId]/+page.svelte",
           "routes/resources/[resourceId]/+page.svelte",
@@ -125,6 +126,9 @@ describe("console docs help links", () => {
     expect(sourceByPath["routes/preview-environments/+page.svelte"]).toContain(
       "productGradePreviews",
     );
+    expect(
+      sourceByPath["routes/preview-environments/[previewEnvironmentId]/+page.svelte"],
+    ).toContain("productGradePreviews");
     expect(sourceByPath["routes/preview-policies/+page.svelte"]).toContain("productGradePreviews");
     expect(sourceByPath["routes/projects/[projectId]/+page.svelte"]).toContain(
       "environmentLifecycle",

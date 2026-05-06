@@ -97,6 +97,10 @@ export function deploymentDetailHref(
   return `/projects/${encodeURIComponent(deployment.projectId)}/environments/${encodeURIComponent(deployment.environmentId)}/resources/${encodeURIComponent(deployment.resourceId)}/deployments/${encodeURIComponent(deployment.id)}`;
 }
 
+export function previewEnvironmentDetailHref(previewEnvironmentId: string): string {
+  return `/preview-environments/${encodeURIComponent(previewEnvironmentId)}`;
+}
+
 export function resourceNewDeploymentHref(
   resource: Pick<ResourceSummary, "id" | "projectId" | "environmentId">,
 ): string {

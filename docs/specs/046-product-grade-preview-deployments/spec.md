@@ -272,17 +272,15 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   command/query schemas and safe policy contract output. Environment list/show read from the safe
   preview environment read model, delete dispatches through the preview cleanup service, and
   future MCP tool contracts are generated from the operation catalog. Web now exposes
-  `/preview-policies` controls for policy readback/configuration and a read-only
-  `/preview-environments` console page backed by `preview-environments.list`; preview detail and
-  delete controls remain future Web work.
+  `/preview-policies` controls for policy readback/configuration and a `/preview-environments`
+  console surface backed by preview environment list/show/delete operations.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No GitHub App preview worker, scheduler leases, terminal provider metadata cleanup, or automatic
   process-manager deployment-status publication is implemented.
 - Preview policy and preview environment operations currently expose CLI, HTTP/oRPC, and generated
   future MCP tool descriptors. Web exposes preview policy readback/configuration and the read-only
-  preview environment list surface, while preview environment detail and delete controls remain
-  future Web work.
+  preview environment list/detail/delete surface.
 - Product-grade preview public docs/help now map preview policy and preview environment operations
   to the stable `/docs/deploy/previews/` product-grade preview anchor.
 
