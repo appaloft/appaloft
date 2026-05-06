@@ -253,7 +253,9 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   cleanup attempt persistence, or concrete product-grade preview cleanup adapter is implemented.
 - No active operation catalog transports exist for `preview-policies.*` or
   `preview-environments.*`.
-- Product-grade preview public docs/help are not yet implemented.
+- Product-grade preview public docs/help now map preview policy and preview environment operations
+  to the stable `/docs/deploy/previews/` product-grade preview anchor. Active transport exposure
+  remains deferred until the operation catalog entries are activated.
 
 ## Open Questions
 
