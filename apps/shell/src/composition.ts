@@ -34,6 +34,7 @@ import {
   ServerAppliedRouteStateBySourceFingerprintSpec,
   ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
+  type SourceEventPolicyReader,
   type SourceEventVerificationPort,
   SourceLinkBySourceFingerprintSpec,
   type SourceLinkRecord,
@@ -368,6 +369,10 @@ export async function createAppComposition(
     childContainer,
     tokens.sourceEventVerificationPort,
   );
+  const sourceEventPolicyReader = resolveToken<SourceEventPolicyReader>(
+    childContainer,
+    tokens.sourceEventPolicyReader,
+  );
   const githubSourceEventWebhookVerifier = resolveToken<GitHubSourceEventWebhookVerifier>(
     childContainer,
     tokens.githubSourceEventWebhookVerifier,
@@ -461,6 +466,7 @@ export async function createAppComposition(
     resourceAccessFailureEvidenceRecorder,
     resourceAccessRouteContextLookup,
     resourceRepository,
+    sourceEventPolicyReader,
     sourceEventVerificationPort,
     githubSourceEventWebhookVerifier,
     githubPreviewPullRequestWebhookVerifier,

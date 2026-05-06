@@ -232,6 +232,10 @@ export class GitHubPreviewPullRequestWebhookVerifierImpl
         eventKind: "pull-request",
         eventAction: payload.value.action,
         repositoryFullName: payload.value.repositoryFullName,
+        ...(payload.value.providerRepositoryId
+          ? { providerRepositoryId: payload.value.providerRepositoryId }
+          : {}),
+        ...(payload.value.installationId ? { installationId: payload.value.installationId } : {}),
         headRepositoryFullName: payload.value.headRepositoryFullName,
         pullRequestNumber: payload.value.pullRequestNumber,
         headSha: payload.value.headSha,
@@ -846,6 +850,8 @@ interface GitHubPushPayloadFacts {
 interface GitHubPullRequestPayloadFacts {
   action: GitHubPreviewPullRequestAction;
   repositoryFullName: string;
+  providerRepositoryId?: string;
+  installationId?: string;
   headRepositoryFullName: string;
   pullRequestNumber: number;
   headSha: string;
@@ -939,6 +945,15 @@ function parseGitHubPullRequestPayload(
   const base = pullRequest ? objectRecord(pullRequest.base) : null;
   const repositoryFullName = repository ? nonEmptyString(repository.full_name) : null;
   const headRepositoryFullName = headRepository ? nonEmptyString(headRepository.full_name) : null;
+  const repositoryId =
+    repository && (typeof repository.id === "number" || typeof repository.id === "string")
+      ? String(repository.id)
+      : null;
+  const installation = payload ? objectRecord(payload.installation) : null;
+  const installationId =
+    installation && (typeof installation.id === "number" || typeof installation.id === "string")
+      ? String(installation.id)
+      : null;
   const pullRequestNumber = payload ? positiveInteger(payload.number) : null;
   const headSha = head ? nonEmptyString(head.sha) : null;
   const baseRef = base ? nonEmptyString(base.ref) : null;
@@ -963,6 +978,8 @@ function parseGitHubPullRequestPayload(
   return ok({
     action,
     repositoryFullName,
+    ...(repositoryId ? { providerRepositoryId: repositoryId } : {}),
+    ...(installationId ? { installationId } : {}),
     headRepositoryFullName,
     pullRequestNumber,
     headSha,

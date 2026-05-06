@@ -137,6 +137,7 @@ export class PgSourceEventRepository
         resourceId: row.id,
         ...(row.server_id ? { serverId: row.server_id } : {}),
         ...(row.destination_id ? { destinationId: row.destination_id } : {}),
+        sourceBindingFingerprint: policy.sourceBindingFingerprint,
         status: policy.status,
         refs: [...policy.refs],
         eventKinds: [...policy.eventKinds],
