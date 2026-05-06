@@ -5,6 +5,7 @@ import {
   CreatedAt,
   DependencyResourceProviderRealizationAttemptId,
   DependencyResourceProviderRealizationStatusValue,
+  DependencyResourceProviderResourceHandle,
   DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
   Environment,
@@ -33,6 +34,7 @@ import {
   CapturedEventBus,
   FakeDependencyBindingSecretStore,
   FakeManagedPostgresProvider,
+  FakeManagedRedisProvider,
   FixedClock,
   MemoryDependencyResourceDeleteSafetyReader,
   MemoryDependencyResourceReadModel,
@@ -91,6 +93,7 @@ async function createHarness() {
   const idGenerator = new SequenceIdGenerator();
   const bindingSecretStore = new FakeDependencyBindingSecretStore("secret");
   const managedPostgresProvider = new FakeManagedPostgresProvider();
+  const managedRedisProvider = new FakeManagedRedisProvider();
   const createdAt = CreatedAt.rehydrate(clock.now());
 
   const project = Project.create({
@@ -165,6 +168,7 @@ async function createHarness() {
       eventBus,
       logger,
       managedPostgresProvider,
+      managedRedisProvider,
     ),
     dependencyReadModel,
     dependencyResources,
@@ -386,6 +390,118 @@ describe("Dependency resource binding use cases", () => {
         phase: "resource-dependency-binding",
       },
     });
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-004] rejects binding pending managed Redis realization", async () => {
+    const { bindDependency, context, dependencyResources, repositoryContext } =
+      await createHarness();
+    const pendingManaged = ResourceInstance.createRedisDependencyResource({
+      id: ResourceInstanceId.rehydrate("rsi_pending_redis"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      name: ResourceInstanceName.rehydrate("Pending Cache"),
+      kind: ResourceInstanceKindValue.rehydrate("redis"),
+      sourceMode: DependencyResourceSourceModeValue.rehydrate("appaloft-managed"),
+      providerKey: ProviderKey.rehydrate("appaloft-managed-redis"),
+      providerManaged: true,
+      providerRealization: {
+        status: DependencyResourceProviderRealizationStatusValue.pending(),
+        attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_pending_redis"),
+        attemptedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      },
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    await dependencyResources.upsert(
+      repositoryContext,
+      pendingManaged,
+      UpsertResourceInstanceSpec.fromResourceInstance(pendingManaged),
+    );
+
+    const rejected = await bindDependency.execute(context, {
+      resourceId: "res_web",
+      dependencyResourceId: "rsi_pending_redis",
+      targetName: "REDIS_URL",
+    });
+
+    expect(rejected.isErr()).toBe(true);
+    expect(rejected._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "resource-dependency-binding",
+      },
+    });
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-005] binds realized managed Redis dependency", async () => {
+    const { bindDependency, context, dependencyResources, listBindings, repositoryContext } =
+      await createHarness();
+    const realizedManaged = ResourceInstance.createRedisDependencyResource({
+      id: ResourceInstanceId.rehydrate("rsi_ready_redis"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      name: ResourceInstanceName.rehydrate("Ready Cache"),
+      kind: ResourceInstanceKindValue.rehydrate("redis"),
+      sourceMode: DependencyResourceSourceModeValue.rehydrate("appaloft-managed"),
+      providerKey: ProviderKey.rehydrate("appaloft-managed-redis"),
+      providerManaged: true,
+      providerRealization: {
+        status: DependencyResourceProviderRealizationStatusValue.pending(),
+        attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_ready_redis"),
+        attemptedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      },
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    realizedManaged
+      .markProviderRealized({
+        attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_ready_redis"),
+        providerResourceHandle:
+          DependencyResourceProviderResourceHandle.rehydrate("redis/rsi_ready_redis"),
+        endpoint: {
+          host: "ready-cache.redis.internal",
+          port: 6379,
+          databaseName: "0",
+          maskedConnection: "redis://:********@ready-cache.redis.internal:6379/0",
+        },
+        connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+          "secret://dependency/redis/rsi_ready_redis",
+        ),
+        bindingReadiness: { status: "ready" },
+        realizedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      })
+      ._unsafeUnwrap();
+    await dependencyResources.upsert(
+      repositoryContext,
+      realizedManaged,
+      UpsertResourceInstanceSpec.fromResourceInstance(realizedManaged),
+    );
+
+    const result = await bindDependency.execute(context, {
+      resourceId: "res_web",
+      dependencyResourceId: "rsi_ready_redis",
+      targetName: "REDIS_URL",
+    });
+    const list = await listBindings.execute(
+      context,
+      ListResourceDependencyBindingsQuery.create({ resourceId: "res_web" })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(list._unsafeUnwrap().items).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId: "rsi_ready_redis",
+        kind: "redis",
+        target: expect.objectContaining({
+          targetName: "REDIS_URL",
+          secretRef: "secret://dependency/redis/rsi_ready_redis",
+        }),
+        connection: expect.objectContaining({
+          maskedConnection: "redis://:********@ready-cache.redis.internal:6379/0",
+        }),
+        snapshotReadiness: {
+          status: "ready",
+        },
+      }),
+    );
   });
 
   test("[DEP-BIND-PG-READ-001] [DEP-BIND-PG-READ-002] list/show return masked safe summaries", async () => {

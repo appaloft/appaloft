@@ -355,11 +355,13 @@ Current boundary:
   [Postgres Provider-Native Realization](./specs/038-postgres-provider-native-realization/spec.md)
   and must keep provider SDK types and raw secrets out of core, contracts, CLI, Web, events, and
   read models.
-- Provider-native Redis realization is positioned by
+- Provider-native Redis realization is implemented at the application boundary by
   [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md) for
   the existing `dependency-resources.provision-redis`, `resources.bind-dependency`, and
-  `dependency-resources.delete` boundaries. Until that Code Round is implemented, managed Redis
-  remains metadata-only and binding admission remains blocked for Appaloft-managed Redis.
+  `dependency-resources.delete` boundaries. It uses a hermetic managed Redis provider capability,
+  safe realization state, ready binding admission, unsupported-provider admission rejection, and
+  managed Redis provider cleanup on delete. Persistence/contract/runtime materialization coverage
+  remains open.
 - Resource dependency bindings are provider-neutral `ResourceBinding` records in this slice. Bind
   requires matching project/environment ownership, stores only safe target metadata and secret
   reference pointers, and reports safe deployment snapshot-reference readiness. Unbind removes only
@@ -382,11 +384,11 @@ Current boundary:
   that historical snapshots remain unchanged, and it does not rotate provider-native database
   credentials, inject runtime environment variables, schedule redeploy, or rewrite historical
   deployment snapshots.
-- Redis dependency resources are provider-neutral `ResourceInstance` records in current code.
-  Managed Redis records do not yet create provider-native Redis infrastructure, imported external
-  Redis delete removes only Appaloft's record, list/show output masks Redis connection secrets, and
-  ready imported Redis records can be bound as safe deployment snapshot references. Managed Redis
-  binding remains blocked until the provider-native Redis realization Code Round is implemented.
+- Redis dependency resources are `ResourceInstance` records. Appaloft-managed Redis now carries
+  provider-native realization state through a hermetic provider capability, imported external Redis
+  delete removes only Appaloft's record, list/show output masks Redis connection secrets, and ready
+  imported or realized managed Redis records can be bound as safe dependency references. Runtime
+  materialization coverage for managed Redis remains open.
 - Dependency resource backup/restore is governed by
   [ADR-036](./decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md) and
   [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md).

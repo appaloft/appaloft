@@ -20,6 +20,7 @@ import {
   CapturedEventBus,
   FakeDependencyResourceSecretStore,
   FakeManagedPostgresProvider,
+  FakeManagedRedisProvider,
   FixedClock,
   MemoryDependencyResourceDeleteSafetyReader,
   MemoryDependencyResourceReadModel,
@@ -62,6 +63,7 @@ async function createHarness() {
   const readModel = new MemoryDependencyResourceReadModel(dependencyResources, deleteSafetyReader);
   const eventBus = new CapturedEventBus();
   const managedPostgresProvider = new FakeManagedPostgresProvider();
+  const managedRedisProvider = new FakeManagedRedisProvider();
   const logger = new NoopLogger();
   const idGenerator = new SequenceIdGenerator();
 
@@ -95,12 +97,14 @@ async function createHarness() {
       eventBus,
       logger,
       managedPostgresProvider,
+      managedRedisProvider,
     ),
     deleteSafetyReader,
     dependencyResources,
     dependencyResourceSecretStore,
     eventBus,
     managedPostgresProvider,
+    managedRedisProvider,
     importPostgres: new ImportPostgresDependencyResourceUseCase(
       projects,
       environments,
@@ -137,10 +141,12 @@ async function createHarness() {
       projects,
       environments,
       dependencyResources,
+      dependencyResourceSecretStore,
       clock,
       idGenerator,
       eventBus,
       logger,
+      managedRedisProvider,
     ),
     readModel,
     renameDependencyResource: new RenameDependencyResourceUseCase(
@@ -613,8 +619,9 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     });
   });
 
-  test("[DEP-RES-REDIS-PROVISION-001] provisions managed Redis metadata and emits event", async () => {
-    const { context, eventBus, provisionRedis } = await createHarness();
+  test("[DEP-RES-REDIS-PROVISION-001] [DEP-RES-REDIS-NATIVE-001] [DEP-RES-REDIS-NATIVE-002] provisions managed Redis through provider realization", async () => {
+    const { context, eventBus, managedRedisProvider, provisionRedis, showDependencyResource } =
+      await createHarness();
 
     const result = await provisionRedis.execute(context, {
       projectId: "prj_demo",
@@ -623,12 +630,191 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     });
 
     expect(result.isOk()).toBe(true);
+    expect(managedRedisProvider.realized).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId: result._unsafeUnwrap().id,
+        providerKey: "appaloft-managed-redis",
+      }),
+    );
     expect(eventBus.events).toContainEqual(
       expect.objectContaining({
         type: "dependency-resource-created",
         aggregateId: result._unsafeUnwrap().id,
       }),
     );
+    expect(eventBus.events).toContainEqual(
+      expect.objectContaining({
+        type: "dependency-resource-realized",
+        aggregateId: result._unsafeUnwrap().id,
+      }),
+    );
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({
+        dependencyResourceId: result._unsafeUnwrap().id,
+      })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().dependencyResource).toMatchObject({
+      lifecycleStatus: "ready",
+      bindingReadiness: { status: "ready" },
+      providerRealization: {
+        status: "ready",
+        providerResourceHandle: `redis/${result._unsafeUnwrap().id}`,
+      },
+      connection: {
+        maskedConnection: expect.stringContaining("********"),
+      },
+    });
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-002] keeps managed Redis binding ready for resolvable Appaloft-owned refs", async () => {
+    const {
+      context,
+      dependencyResourceSecretStore,
+      managedRedisProvider,
+      provisionRedis,
+      showDependencyResource,
+    } = await createHarness();
+    const secretRef = "appaloft://dependency-resources/rsi_0001/connection";
+    await dependencyResourceSecretStore.storeConnection(context, {
+      dependencyResourceId: "rsi_0001",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      kind: "redis",
+      purpose: "connection",
+      secretValue: "redis://:super-secret@main-cache.redis.internal:6379/0",
+      storedAt: "2026-01-01T00:00:00.000Z",
+    });
+    managedRedisProvider.setRealizationResult(
+      ok({
+        providerResourceHandle: "redis/rsi_0001",
+        endpoint: {
+          host: "main-cache.redis.internal",
+          port: 6379,
+          maskedConnection: "redis://:********@main-cache.redis.internal:6379/0",
+        },
+        secretRef,
+        realizedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    const result = await provisionRedis.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main Cache",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({
+        dependencyResourceId: result._unsafeUnwrap().id,
+      })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().dependencyResource).toMatchObject({
+      lifecycleStatus: "ready",
+      bindingReadiness: { status: "ready" },
+      connection: {
+        secretRef,
+        maskedConnection: expect.stringContaining("********"),
+      },
+    });
+    expect(JSON.stringify(shown._unsafeUnwrap().dependencyResource)).not.toContain("super-secret");
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-003] provider realization failure keeps Redis provision accepted and blocks binding readiness", async () => {
+    const { context, managedRedisProvider, provisionRedis, showDependencyResource } =
+      await createHarness();
+    managedRedisProvider.setRealizationResult(
+      err(
+        domainError.provider("Managed Redis unavailable", {
+          phase: "dependency-resource-realization",
+          providerKey: "appaloft-managed-redis",
+        }),
+      ),
+    );
+
+    const result = await provisionRedis.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main Cache",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({
+        dependencyResourceId: result._unsafeUnwrap().id,
+      })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().dependencyResource).toMatchObject({
+      lifecycleStatus: "degraded",
+      bindingReadiness: { status: "blocked" },
+      providerRealization: {
+        status: "failed",
+        failureCode: "provider_error",
+      },
+    });
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-008] rejects unsupported managed Redis provider before persistence", async () => {
+    const { context, listDependencyResources, managedRedisProvider, provisionRedis } =
+      await createHarness();
+    managedRedisProvider.setSupportedProviderKeys([]);
+
+    const result = await provisionRedis.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main Cache",
+    });
+    const list = await listDependencyResources.execute(
+      context,
+      ListDependencyResourcesQuery.create({ projectId: "prj_demo" })._unsafeUnwrap(),
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "provider_capability_unsupported",
+      details: {
+        phase: "dependency-resource-realization-admission",
+      },
+    });
+    expect(list._unsafeUnwrap().items).toEqual([]);
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-006] deletes realized managed Redis through provider cleanup", async () => {
+    const {
+      context,
+      deleteDependencyResource,
+      managedRedisProvider,
+      provisionRedis,
+      showDependencyResource,
+    } = await createHarness();
+    const created = (
+      await provisionRedis.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Main Cache",
+      })
+    )._unsafeUnwrap();
+
+    const deleted = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: created.id,
+    });
+
+    expect(deleted.isOk()).toBe(true);
+    expect(managedRedisProvider.deleted).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId: created.id,
+        providerResourceHandle: `redis/${created.id}`,
+      }),
+    );
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({ dependencyResourceId: created.id })._unsafeUnwrap(),
+    );
+    expect(shown.isErr()).toBe(true);
+    expect(shown._unsafeUnwrapErr().code).toBe("not_found");
   });
 
   test("[DEP-RES-REDIS-IMPORT-001] [DEP-RES-REDIS-READ-002] imports external Redis with masked read model", async () => {

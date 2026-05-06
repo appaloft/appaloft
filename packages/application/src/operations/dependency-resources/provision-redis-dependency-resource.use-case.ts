@@ -1,11 +1,18 @@
 import {
   CreatedAt,
+  type DependencyResourceBindingReadinessState,
+  DependencyResourceProviderFailureCode,
+  DependencyResourceProviderRealizationAttemptId,
+  DependencyResourceProviderRealizationStatusValue,
+  DependencyResourceProviderResourceHandle,
+  DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
   DescriptionText,
   domainError,
   EnvironmentByIdSpec,
   EnvironmentId,
   err,
+  OccurredAt,
   ok,
   ProjectByIdSpec,
   ProjectId,
@@ -27,14 +34,59 @@ import {
   type AppLogger,
   type Clock,
   type DependencyResourceRepository,
+  type DependencyResourceSecretStore,
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
+  type ManagedRedisProviderPort,
   type ProjectRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type ProvisionRedisDependencyResourceCommandInput } from "./provision-redis-dependency-resource.command";
+
+const appaloftOwnedDependencySecretRefPrefix = "appaloft://dependency-resources/";
+
+function blockedBindingReadiness(reason: string): DependencyResourceBindingReadinessState {
+  return {
+    status: "blocked",
+    reason: DescriptionText.rehydrate(reason),
+  };
+}
+
+function isAppaloftOwnedDependencySecretRef(secretRef: string): boolean {
+  return secretRef.startsWith(appaloftOwnedDependencySecretRefPrefix);
+}
+
+function isProviderOwnedDependencySecretRef(secretRef: string): boolean {
+  return secretRef.startsWith("secret://");
+}
+
+async function resolveManagedRedisBindingReadiness(input: {
+  context: ExecutionContext;
+  dependencyResourceSecretStore: DependencyResourceSecretStore;
+  secretRef?: string;
+  secretRefValid: boolean;
+}): Promise<DependencyResourceBindingReadinessState> {
+  if (!input.secretRef) {
+    return blockedBindingReadiness("dependency_runtime_secret_ref_missing");
+  }
+  if (!input.secretRefValid) {
+    return blockedBindingReadiness("dependency_runtime_secret_ref_invalid");
+  }
+  if (isAppaloftOwnedDependencySecretRef(input.secretRef)) {
+    const resolved = await input.dependencyResourceSecretStore.resolve(input.context, {
+      secretRef: input.secretRef,
+    });
+    return resolved.isOk()
+      ? { status: "ready" }
+      : blockedBindingReadiness("dependency_runtime_secret_unresolved");
+  }
+  if (isProviderOwnedDependencySecretRef(input.secretRef)) {
+    return { status: "ready" };
+  }
+  return blockedBindingReadiness("dependency_runtime_secret_ref_unsupported");
+}
 
 @injectable()
 export class ProvisionRedisDependencyResourceUseCase {
@@ -45,6 +97,8 @@ export class ProvisionRedisDependencyResourceUseCase {
     private readonly environmentRepository: EnvironmentRepository,
     @inject(tokens.dependencyResourceRepository)
     private readonly dependencyResourceRepository: DependencyResourceRepository,
+    @inject(tokens.dependencyResourceSecretStore)
+    private readonly dependencyResourceSecretStore: DependencyResourceSecretStore,
     @inject(tokens.clock)
     private readonly clock: Clock,
     @inject(tokens.idGenerator)
@@ -53,6 +107,8 @@ export class ProvisionRedisDependencyResourceUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.managedRedisProvider)
+    private readonly managedRedisProvider: ManagedRedisProviderPort,
   ) {}
 
   async execute(
@@ -63,10 +119,12 @@ export class ProvisionRedisDependencyResourceUseCase {
     const {
       clock,
       dependencyResourceRepository,
+      dependencyResourceSecretStore,
       environmentRepository,
       eventBus,
       idGenerator,
       logger,
+      managedRedisProvider,
       projectRepository,
     } = this;
 
@@ -78,7 +136,20 @@ export class ProvisionRedisDependencyResourceUseCase {
       const kind = ResourceInstanceKindValue.rehydrate("redis");
       const providerKey = yield* ProviderKey.create(input.providerKey ?? "appaloft-managed-redis");
       const createdAt = yield* CreatedAt.create(clock.now());
+      const attemptedAt = yield* OccurredAt.create(clock.now());
       const description = DescriptionText.fromOptional(input.description);
+      if (!managedRedisProvider.supports(providerKey.value)) {
+        return err(
+          domainError.providerCapabilityUnsupported(
+            "Provider does not support managed Redis realization",
+            {
+              phase: "dependency-resource-realization-admission",
+              providerKey: providerKey.value,
+              operation: "dependency-resources.provision-redis",
+            },
+          ),
+        );
+      }
 
       const project = await projectRepository.findOne(
         repositoryContext,
@@ -121,8 +192,12 @@ export class ProvisionRedisDependencyResourceUseCase {
         );
       }
 
+      const dependencyResourceId = ResourceInstanceId.rehydrate(idGenerator.next("rsi"));
+      const realizationAttemptId = DependencyResourceProviderRealizationAttemptId.rehydrate(
+        idGenerator.next("dpr"),
+      );
       const dependencyResource = yield* ResourceInstance.createRedisDependencyResource({
-        id: ResourceInstanceId.rehydrate(idGenerator.next("rsi")),
+        id: dependencyResourceId,
         projectId,
         environmentId,
         name,
@@ -130,6 +205,11 @@ export class ProvisionRedisDependencyResourceUseCase {
         sourceMode: DependencyResourceSourceModeValue.rehydrate("appaloft-managed"),
         providerKey,
         providerManaged: true,
+        providerRealization: {
+          status: DependencyResourceProviderRealizationStatusValue.pending(),
+          attemptId: realizationAttemptId,
+          attemptedAt,
+        },
         ...(description ? { description } : {}),
         ...(input.backupRelationship
           ? {
@@ -151,7 +231,60 @@ export class ProvisionRedisDependencyResourceUseCase {
       );
       await publishDomainEventsAndReturn(context, eventBus, logger, dependencyResource, undefined);
 
-      return ok({ id: dependencyResource.toState().id.value });
+      const realization = await managedRedisProvider.realize(context, {
+        dependencyResourceId: dependencyResourceId.value,
+        projectId: projectId.value,
+        environmentId: environmentId.value,
+        providerKey: providerKey.value,
+        name: name.value,
+        slug: slug.value,
+        attemptId: realizationAttemptId.value,
+        requestedAt: attemptedAt.value,
+      });
+      if (realization.isOk()) {
+        const realizedAt = yield* OccurredAt.create(realization.value.realizedAt);
+        const providerResourceHandle = yield* DependencyResourceProviderResourceHandle.create(
+          realization.value.providerResourceHandle,
+        );
+        const connectionSecretRef = realization.value.secretRef
+          ? DependencyResourceSecretRef.create(realization.value.secretRef)
+          : undefined;
+        const bindingReadiness = await resolveManagedRedisBindingReadiness({
+          context,
+          dependencyResourceSecretStore,
+          ...(realization.value.secretRef ? { secretRef: realization.value.secretRef } : {}),
+          secretRefValid: connectionSecretRef ? connectionSecretRef.isOk() : false,
+        });
+        yield* dependencyResource.markProviderRealized({
+          attemptId: realizationAttemptId,
+          providerResourceHandle,
+          endpoint: realization.value.endpoint,
+          ...(connectionSecretRef?.isOk()
+            ? { connectionSecretRef: connectionSecretRef.value }
+            : {}),
+          bindingReadiness,
+          realizedAt,
+        });
+      } else {
+        const failedAt = yield* OccurredAt.create(clock.now());
+        const failureCode = yield* DependencyResourceProviderFailureCode.create(
+          realization.error.code,
+        );
+        yield* dependencyResource.markProviderRealizationFailed({
+          attemptId: realizationAttemptId,
+          failureCode,
+          failureMessage: DescriptionText.rehydrate(realization.error.message),
+          failedAt,
+        });
+      }
+      await dependencyResourceRepository.upsert(
+        repositoryContext,
+        dependencyResource,
+        UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
+      );
+      await publishDomainEventsAndReturn(context, eventBus, logger, dependencyResource, undefined);
+
+      return ok({ id: dependencyResourceId.value });
     });
   }
 }

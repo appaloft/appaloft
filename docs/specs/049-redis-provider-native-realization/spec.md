@@ -2,8 +2,9 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: ready for Test-First / Code Round
+- Round: Code Round
+- Artifact state: application realization, bind admission, and provider cleanup implemented;
+  persistence/contract/runtime verification follow-ups remain open
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, semantic upgrade to managed Redis lifecycle
 - Decision state: no-ADR-needed; this reuses ADR-025, ADR-026, ADR-036, ADR-040, and ADR-041

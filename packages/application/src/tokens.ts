@@ -185,6 +185,7 @@ export const tokens = {
   renameDependencyResourceUseCase: Symbol.for("appaloft.rename_dependency_resource_use_case"),
   deleteDependencyResourceUseCase: Symbol.for("appaloft.delete_dependency_resource_use_case"),
   managedPostgresProvider: Symbol.for("appaloft.managed_postgres_provider"),
+  managedRedisProvider: Symbol.for("appaloft.managed_redis_provider"),
   dependencyResourceBackupProvider: Symbol.for("appaloft.dependency_resource_backup_provider"),
   createDependencyResourceBackupUseCase: Symbol.for(
     "appaloft.create_dependency_resource_backup_use_case",

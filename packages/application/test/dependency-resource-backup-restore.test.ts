@@ -20,6 +20,7 @@ import {
   FakeDependencyResourceBackupProvider,
   FakeDependencyResourceSecretStore,
   FakeManagedPostgresProvider,
+  FakeManagedRedisProvider,
   FixedClock,
   MemoryDependencyResourceBackupReadModel,
   MemoryDependencyResourceBackupRepository,
@@ -66,6 +67,7 @@ async function createHarness() {
   const deleteSafetyReader = new MemoryDependencyResourceDeleteSafetyReader(undefined, backups);
   const eventBus = new CapturedEventBus();
   const managedPostgresProvider = new FakeManagedPostgresProvider();
+  const managedRedisProvider = new FakeManagedRedisProvider();
   const backupProvider = new FakeDependencyResourceBackupProvider();
   const logger = new NoopLogger();
   const idGenerator = new SequenceIdGenerator();
@@ -111,6 +113,7 @@ async function createHarness() {
       eventBus,
       logger,
       managedPostgresProvider,
+      managedRedisProvider,
     ),
     dependencyResources,
     eventBus,
