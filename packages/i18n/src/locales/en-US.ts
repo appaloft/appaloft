@@ -366,8 +366,17 @@ export const enUS = {
     previewEnvironments: {
       activeCount: "Active",
       allProjects: "All projects",
+      baseRef: "Base ref",
       cleanupRequestedCount: "Cleanup requested",
       cleanupRequestedStatus: "Cleanup requested",
+      cleanupAction: "Request cleanup",
+      cleanupConfirm:
+        "Request cleanup for preview environment {{previewEnvironmentId}}? Runtime, route, source-link, and provider metadata cleanup will run while deployment history remains readable.",
+      cleanupFailed: "Preview cleanup was not requested",
+      cleanupSucceeded: "Preview cleanup requested",
+      detailDescription:
+        "Safe owner, source, lifecycle, and cleanup state for one durable preview environment.",
+      detailTitle: "Preview environment detail",
       emptyBody:
         "Preview environments appear after source events create durable pull request deployments with retained ownership, expiry, and cleanup state.",
       emptyTitle: "No preview environments are tracked yet.",
@@ -375,6 +384,7 @@ export const enUS = {
       focusDescription:
         "Track pull request preview ownership, cleanup state, and expiry without opening provider metadata directly.",
       focusTitle: "Product-grade preview environments",
+      headSha: "Head SHA",
       listDescription:
         "Each row keeps the safe source summary, owning resource, lifecycle status, and expiry window together.",
       listTitle: "Preview environment records",
@@ -383,6 +393,9 @@ export const enUS = {
       pageTitle: "Preview environments",
       pullRequest: "Pull request",
       repository: "Repository",
+      lifecycleTitle: "Lifecycle",
+      ownerTitle: "Owner",
+      sourceTitle: "Source",
       sourceBinding: "Source binding",
       statusActive: "Active",
       statusCleanupRequested: "Cleanup requested",

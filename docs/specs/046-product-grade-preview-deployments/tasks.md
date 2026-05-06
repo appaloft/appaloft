@@ -55,7 +55,7 @@
 - [x] Dispatch preview deployments through existing ids-only deployment admission.
 - [x] Add feedback writer ports/adapters and idempotent provider update state.
 - [x] Add cleanup process manager and scheduler retry behavior.
-- [ ] Add Web/API/CLI/future MCP entrypoints.
+- [x] Add Web/API/CLI/future MCP entrypoints.
 
 ## Docs Round
 

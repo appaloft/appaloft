@@ -16,7 +16,7 @@
     findProject,
     findResource,
     formatTime,
-    resourceDetailHref,
+    previewEnvironmentDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
 
@@ -238,15 +238,13 @@
                     {formatTime(previewEnvironment.updatedAt)}
                   </Table.Cell>
                   <Table.Cell class="text-right">
-                    {#if resource}
-                      <a
-                        href={resourceDetailHref(resource)}
-                        aria-label={$t(i18nKeys.common.actions.openResource)}
-                        class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      >
-                        <ArrowRight class="size-4" />
-                      </a>
-                    {/if}
+                    <a
+                      href={previewEnvironmentDetailHref(previewEnvironment.previewEnvironmentId)}
+                      aria-label={$t(i18nKeys.common.actions.viewDetails)}
+                      class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      <ArrowRight class="size-4" />
+                    </a>
                   </Table.Cell>
                 </Table.Row>
               {/each}
