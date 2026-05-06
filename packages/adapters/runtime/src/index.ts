@@ -1268,6 +1268,7 @@ export class DefaultRuntimeTargetBackendRegistry implements RuntimeTargetBackend
 const singleServerDockerCapabilities: RuntimeTargetCapability[] = [
   "runtime.apply",
   "runtime.verify",
+  "runtime.dependency-secrets",
   "runtime.logs",
   "runtime.health",
   "runtime.cleanup",

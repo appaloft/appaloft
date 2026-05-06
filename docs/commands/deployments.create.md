@@ -515,8 +515,10 @@ Migration gaps:
   or Kubernetes backends are added.
 - dependency binding runtime injection is governed by ADR-040 and
   [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md).
-  The current implementation captures safe binding references but still reports runtime injection as
-  deferred.
+  The current implementation captures safe runtime secret references, reports
+  `ready | blocked | not-applicable` injection readiness, and rejects active non-injectable bindings
+  before acceptance. Store-backed resolution of dependency secret references into raw connection
+  values remains a migration gap.
 - generated default access routing is governed by ADR-017, but the current runtime adapter path still contains adapter-facing requested deployment route fields that must be replaced by provider-neutral route resolution.
 
 ## Open Questions

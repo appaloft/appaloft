@@ -234,6 +234,8 @@ export const domainError = {
     createError("dependency_resource_backup_blocked", "user", message, details),
   dependencyResourceRestoreBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
     createError("dependency_resource_restore_blocked", "user", message, details),
+  dependencyRuntimeInjectionBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("dependency_runtime_injection_blocked", "user", message, details),
   deploymentNotRedeployable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

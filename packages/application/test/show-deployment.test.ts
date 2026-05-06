@@ -523,8 +523,7 @@ describe("ShowDeploymentQueryService", () => {
         },
       ],
       runtimeInjection: {
-        status: "deferred",
-        reason: "runtime dependency environment injection is deferred for this slice",
+        status: "ready",
       },
     });
     expect(JSON.stringify(detail.snapshot?.dependencyBindings)).not.toContain("postgres://");

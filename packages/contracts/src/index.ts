@@ -3110,8 +3110,8 @@ export const deploymentAttemptSnapshotSchema = z.object({
       status: z.enum(["ready", "blocked", "not-applicable"]),
       references: deploymentSummarySchema.shape.dependencyBindingReferences.unwrap(),
       runtimeInjection: z.object({
-        status: z.literal("deferred"),
-        reason: z.string(),
+        status: z.enum(["ready", "blocked", "not-applicable"]),
+        reason: z.string().optional(),
       }),
     })
     .optional(),
@@ -3359,8 +3359,8 @@ export const deploymentPlanResponseSchema = z.object({
       status: z.enum(["ready", "blocked", "not-applicable"]),
       references: deploymentSummarySchema.shape.dependencyBindingReferences.unwrap(),
       runtimeInjection: z.object({
-        status: z.literal("deferred"),
-        reason: z.string(),
+        status: z.enum(["ready", "blocked", "not-applicable"]),
+        reason: z.string().optional(),
       }),
     })
     .optional(),

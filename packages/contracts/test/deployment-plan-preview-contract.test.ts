@@ -31,8 +31,7 @@ describe("deployment plan preview contract", () => {
         },
       ],
       runtimeInjection: {
-        status: "deferred",
-        reason: "runtime dependency environment injection is deferred for this slice",
+        status: "ready",
       },
     };
 
@@ -170,7 +169,7 @@ describe("deployment plan preview contract", () => {
 
     expect(plan.dependencyBindings?.references[0]?.targetName).toBe("DATABASE_URL");
     expect(plan.dependencyBindings?.references[1]?.kind).toBe("redis");
-    expect(show.snapshot?.dependencyBindings?.runtimeInjection.status).toBe("deferred");
+    expect(show.snapshot?.dependencyBindings?.runtimeInjection.status).toBe("ready");
     expect(JSON.stringify({ plan, show })).not.toContain("postgres://");
     expect(JSON.stringify({ plan, show })).not.toContain("redis://");
     expect(JSON.stringify({ plan, show })).not.toContain("super-secret");

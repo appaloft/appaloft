@@ -31,6 +31,8 @@ import { tokens } from "../../tokens";
 import {
   createDependencyBindingSnapshotReferences,
   dependencyBindingSnapshotSummaryFromReferences,
+  dependencyRuntimeInjectionBackendReason,
+  dependencyRuntimeInjectionEnvironmentConflictReason,
 } from "./dependency-binding-snapshot-references";
 import { type DeploymentContextResolver } from "./deployment-context.resolver";
 import { type DeploymentPlanQuery } from "./deployment-plan.query";
@@ -625,7 +627,7 @@ export class DeploymentPlanQueryService {
       const dependencyBindingReferences = yield* createDependencyBindingSnapshotReferences(
         dependencyBindingSummaries,
       );
-      const dependencyBindings = dependencyBindingSnapshotSummaryFromReferences(
+      let dependencyBindings = dependencyBindingSnapshotSummaryFromReferences(
         dependencyBindingReferences,
       );
 
@@ -722,6 +724,14 @@ export class DeploymentPlanQueryService {
         requiredCapabilities: requiredRuntimeTargetCapabilities(runtimePlan),
       });
       if (runtimeTargetBackend.isErr()) {
+        const runtimeInjectionReason =
+          dependencyBindingReferences.length > 0
+            ? "dependency_runtime_injection_target_backend_unsupported"
+            : undefined;
+        dependencyBindings = dependencyBindingSnapshotSummaryFromReferences(
+          dependencyBindingReferences,
+          runtimeInjectionReason ? { runtimeInjectionReason } : {},
+        );
         return ok(
           deploymentPlanPreview({
             destination,
@@ -753,6 +763,15 @@ export class DeploymentPlanQueryService {
           }),
         );
       }
+      const runtimeInjectionReason =
+        dependencyRuntimeInjectionEnvironmentConflictReason({
+          environmentSnapshot: snapshot,
+          references: dependencyBindingReferences,
+        }) ?? dependencyRuntimeInjectionBackendReason(runtimeTargetBackend.value);
+      dependencyBindings = dependencyBindingSnapshotSummaryFromReferences(
+        dependencyBindingReferences,
+        runtimeInjectionReason ? { runtimeInjectionReason } : {},
+      );
 
       return ok(
         deploymentPlanPreview({

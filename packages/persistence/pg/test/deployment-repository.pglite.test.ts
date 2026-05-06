@@ -15,6 +15,7 @@ import {
   Deployment,
   DeploymentByIdSpec,
   DeploymentDependencyBindingSnapshotReadinessValue,
+  DeploymentDependencyRuntimeSecretRef,
   DeploymentId,
   DeploymentTarget,
   DeploymentTargetDescriptor,
@@ -168,6 +169,9 @@ function createDeploymentRecord(input: {
               targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
               scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
               injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+              runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+                "appaloft://dependency-resources/rsi_pg/connection",
+              ),
               snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
             },
           ],
@@ -369,6 +373,9 @@ describe("pglite deployment repository", () => {
       targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
       scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
       injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+      runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+        "appaloft://dependency-resources/rsi_pg/connection",
+      ),
       snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
     });
     const storedSummary = await deploymentReadModel.findOne(

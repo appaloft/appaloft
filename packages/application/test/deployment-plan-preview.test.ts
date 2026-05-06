@@ -148,6 +148,7 @@ class StaticRuntimeTargetBackendRegistry implements RuntimeTargetBackendRegistry
         capabilities: [
           "runtime.apply",
           "runtime.verify",
+          "runtime.dependency-secrets",
           "runtime.logs",
           "proxy.route",
         ] satisfies RuntimeTargetCapability[],
@@ -286,7 +287,9 @@ async function createHarness(input?: { blockedBinding?: boolean }) {
       databaseName: "app",
       maskedConnection: "postgres://app:********@db.example.com:5432/app",
     },
-    connectionSecretRef: DependencyResourceSecretRef.rehydrate("secret://postgres/super-secret"),
+    connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+      "appaloft://dependency-resources/rsi_pg/connection",
+    ),
     providerManaged: false,
     createdAt,
   })._unsafeUnwrap();
@@ -394,16 +397,15 @@ describe("DeploymentPlanQueryService", () => {
         },
       ],
       runtimeInjection: {
-        status: "deferred",
+        status: "ready",
       },
     });
     const serialized = JSON.stringify(preview.dependencyBindings);
     expect(serialized).not.toContain("super-secret");
     expect(serialized).not.toContain("postgres://");
-    expect(serialized).not.toContain("secret://");
   });
 
-  test("[DEP-BIND-SNAP-REF-004] reports not-ready binding as deferred diagnostic without blocking admission preview", async () => {
+  test("[DEP-BIND-SNAP-REF-004] [DEP-BIND-RUNTIME-INJECT-003] reports not-ready binding as blocked runtime injection readiness", async () => {
     const harness = await createHarness({ blockedBinding: true });
 
     const preview = unwrap(await harness.service.execute(harness.context, harness.query));
@@ -421,7 +423,8 @@ describe("DeploymentPlanQueryService", () => {
         },
       ],
       runtimeInjection: {
-        status: "deferred",
+        status: "blocked",
+        reason: "dependency resource readiness is degraded",
       },
     });
   });

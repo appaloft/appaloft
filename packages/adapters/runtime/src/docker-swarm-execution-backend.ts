@@ -192,6 +192,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
     capabilities: RuntimeTargetCapability[] = [
       "runtime.apply",
       "runtime.verify",
+      "runtime.dependency-secrets",
       "runtime.logs",
       "runtime.health",
       "runtime.cleanup",
@@ -217,6 +218,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
     const intentResult = renderDockerSwarmRuntimeIntent({
       runtimePlan: state.runtimePlan,
       environmentSnapshot: state.environmentSnapshot,
+      dependencyBindingReferences: state.dependencyBindingReferences,
       identity,
       ...(this.options.edgeNetworkName ? { edgeNetworkName: this.options.edgeNetworkName } : {}),
     });

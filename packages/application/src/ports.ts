@@ -2494,8 +2494,8 @@ export interface DeploymentDependencyBindingSnapshotSummary {
   status: "ready" | "blocked" | "not-applicable";
   references: DeploymentDependencyBindingSnapshotReferenceSummary[];
   runtimeInjection: {
-    status: "deferred";
-    reason: string;
+    status: "ready" | "blocked" | "not-applicable";
+    reason?: string;
   };
 }
 
@@ -5490,6 +5490,7 @@ export type RuntimeTargetCapability =
   | "runtime.plan-target"
   | "runtime.apply"
   | "runtime.verify"
+  | "runtime.dependency-secrets"
   | "runtime.logs"
   | "runtime.health"
   | "runtime.cleanup"

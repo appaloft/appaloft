@@ -45,7 +45,13 @@ import {
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
-import { createDependencyBindingSnapshotReferences } from "./dependency-binding-snapshot-references";
+import {
+  createDependencyBindingSnapshotReferences,
+  dependencyBindingSnapshotSummaryFromReferences,
+  dependencyRuntimeInjectionBackendReason,
+  dependencyRuntimeInjectionBlockedError,
+  dependencyRuntimeInjectionEnvironmentConflictReason,
+} from "./dependency-binding-snapshot-references";
 import { type DeploymentFactory } from "./deployment.factory";
 import { type DeploymentContextBootstrapService } from "./deployment-config-bootstrap.service";
 import { type DeploymentContextResolver } from "./deployment-context.resolver";
@@ -795,6 +801,18 @@ export class CreateDeploymentUseCase {
             targetProviderKey: runtimePlan.target.providerKey,
           }),
         );
+      }
+      const runtimeInjectionReason =
+        dependencyRuntimeInjectionEnvironmentConflictReason({
+          environmentSnapshot: snapshot,
+          references: dependencyBindingReferences,
+        }) ?? dependencyRuntimeInjectionBackendReason(runtimeTargetBackend.value);
+      const dependencyBindings = dependencyBindingSnapshotSummaryFromReferences(
+        dependencyBindingReferences,
+        runtimeInjectionReason ? { runtimeInjectionReason } : {},
+      );
+      if (dependencyBindings.runtimeInjection.status === "blocked") {
+        return err(dependencyRuntimeInjectionBlockedError(dependencyBindings));
       }
       const admittedDeploymentResult = await mutationCoordinator.runExclusive({
         context,
