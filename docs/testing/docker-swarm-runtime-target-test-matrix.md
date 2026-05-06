@@ -65,8 +65,8 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   Rendered image apply plans also honor internal registry-auth/pull-secret metadata by adding
   `--with-registry-auth` to executable/display commands while exposing only a redacted
   registry-auth marker in the intent and omitting raw registry secret references from intent,
-  command, and display payloads. Real registry-login/pull-secret provisioning and real Swarm smoke
-  coverage remain open.
+  command, and display payloads. Local real Swarm smoke has passed; real registry-login/
+  pull-secret provisioning and registry-auth smoke coverage remain open.
 - `SWARM-TARGET-APPLY-001` has initial adapter contract coverage proving OCI image apply planning
   creates a deployment-specific candidate service before verification, route promotion, and
   superseded-service cleanup. The opt-in fake backend now executes that order, records sanitized
@@ -87,8 +87,8 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   proving the opt-in shell runner executes bounded rendered commands, preserves stdout/stderr and
   nonzero exit codes, and reports timeout failures for backend handling. The default runtime target
   registry can now accept an explicitly composed Docker Swarm backend, and shell configuration keeps
-  that backend disabled unless `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=true`. Real Docker Swarm
-  smoke coverage remains open.
+  that backend disabled unless `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=true`. Local real Docker
+  Swarm smoke coverage is environment-gated and has passed outside default CI.
 - `SWARM-TARGET-APPLY-001`, `SWARM-TARGET-OBS-001`, and `SWARM-TARGET-OBS-002` have PGlite
   persistence/read-model coverage proving sanitized Swarm stack name, service name, and apply-plan
   schema version metadata round-trip through deployment execution metadata without raw command,
@@ -98,11 +98,14 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   failed candidate. Real Swarm rollback command behavior remains open.
 - `SWARM-TARGET-OBS-001` has initial runtime-log adapter coverage proving Swarm-backed OCI image
   deployments read `docker service logs` through sanitized `swarm.serviceName` metadata and return
-  normalized Appaloft runtime log lines with configured redaction applied.
+  normalized Appaloft runtime log lines with configured redaction applied. Coverage now proves the
+  reader executes Swarm service logs through the resolved Swarm manager over SSH when target
+  metadata/repository context is available, while retaining the local Docker fallback for local
+  smoke execution.
 - `SWARM-TARGET-OBS-002` has initial application/adapter coverage proving `resources.health` can
   request an opt-in Swarm runtime probe from sanitized `swarm.serviceName` metadata and normalize
   `docker service ps` task state into Appaloft runtime health/check fields without exposing raw
-  Docker task payloads. Remote-manager probing and real Swarm smoke coverage remain open.
+  Docker task payloads. Remote-manager health probing remains open.
 - `SWARM-TARGET-ROUTE-001` has initial apply-plan coverage proving Traefik route labels are absent
   from candidate service creation and added only in the post-verification `promote-route-target`
   step against the Swarm edge network. Adapter coverage now proves the opt-in execution backend can
@@ -130,5 +133,4 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   descriptors continue to expose `servers.register` from the operation catalog without adding a
   Swarm-specific tool.
 - Docker Swarm runtime target execution is disabled by default in shell configuration and requires
-  explicit opt-in before the default runtime registry includes the Swarm backend. Real Swarm smoke
-  coverage remains open.
+  explicit opt-in before the default runtime registry includes the Swarm backend.

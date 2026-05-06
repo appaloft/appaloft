@@ -138,9 +138,11 @@ No new public operation key is accepted in this Spec Round.
   cleanup, and runs the deployment-scoped cleanup plan for the failed candidate service without
   broad prune or volume commands.
 - `resources.runtime-logs` can read Swarm-backed OCI image deployment logs through `docker service
-  logs` using the sanitized `swarm.serviceName` runtime metadata. Output remains the existing
-  Appaloft `ResourceRuntimeLogLine` shape with resource/deployment/runtime context and configured
-  redactions applied.
+  logs` using the sanitized `swarm.serviceName` runtime metadata. When a Swarm manager target can
+  be resolved, log reading executes the Docker command through the same SSH target boundary used by
+  remote Docker runtimes; otherwise it retains the local Docker fallback used by the opt-in local
+  smoke harness. Output remains the existing Appaloft `ResourceRuntimeLogLine` shape with
+  resource/deployment/runtime context and configured redactions applied.
 - `resources.health` can run an opt-in live runtime probe for Swarm-backed OCI image deployments
   when sanitized `swarm.serviceName` metadata is present. The runtime adapter reads `docker service
   ps` and returns Appaloft `ResourceRuntimeHealthSection` and `ResourceHealthCheck` fields without
@@ -180,9 +182,9 @@ No new public operation key is accepted in this Spec Round.
   apply/route-promotion/scoped cleanup, and then returned Docker to inactive Swarm state.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
-- Default-on Swarm activation, remote-manager health/log execution, end-to-end Swarm edge-proxy
-  route realization, real registry-login/pull-secret provisioning, and real Swarm registry-auth
-  smoke coverage remain open.
+- Default-on Swarm activation, remote-manager health execution, end-to-end Swarm edge-proxy route
+  realization, real registry-login/pull-secret provisioning, and real Swarm registry-auth smoke
+  coverage remain open.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and
