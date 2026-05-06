@@ -29,7 +29,7 @@
   safe source-link context.
 - [x] `PG-PREVIEW-ENV-001B`: preview environment persistence/read models list/show/delete scoped
   identity and latest lifecycle state.
-- [ ] `PG-PREVIEW-CONFIG-001`: scoped preview variables/secrets do not copy production secrets or
+- [x] `PG-PREVIEW-CONFIG-001`: scoped preview variables/secrets do not copy production secrets or
   routes by default.
 - [ ] `PG-PREVIEW-DEPLOY-001`: preview deployment dispatch uses ids-only `deployments.create`.
 - [ ] `PG-PREVIEW-FEEDBACK-001`: comments/checks/status updates are idempotent and retryable.
@@ -51,7 +51,7 @@
 - [ ] Extend source event ingestion for GitHub App pull request preview events.
 - [ ] Add preview lifecycle process manager over policy, environment, deployment, and feedback
   state.
-- [ ] Add scoped preview config/secret resolution.
+- [x] Add scoped preview config/secret resolution.
 - [ ] Dispatch preview deployments through existing ids-only deployment admission.
 - [ ] Add feedback writer ports/adapters and idempotent provider update state.
 - [ ] Add cleanup process manager and scheduler retry behavior.

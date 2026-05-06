@@ -216,6 +216,12 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   return the existing blocked/dispatched/dispatch-failed outcome without creating another preview
   environment update or ids-only deployment request. Feedback and cleanup idempotency remain tied
   to their future process-state implementations.
+- Preview scoped config now has an initial application resolver over the safe
+  `resources.effective-config` read model. It materializes no variables, secret references, or
+  durable routes by default; explicit preview selections may include non-secret variable values and
+  safe secret-reference metadata only. Raw production secret values and durable domain routes are
+  not copied into preview resolution output. Wiring that resolution into a full preview lifecycle
+  process manager remains future work.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No GitHub App preview worker, feedback writer, cleanup scheduler, or cleanup retry state is

@@ -1314,6 +1314,11 @@ Current verification notes:
   lifecycle service. Duplicate deliveries now return the stored preview policy decision without
   mutating preview environment state or dispatching another ids-only deployment request. Feedback
   and cleanup idempotency remain tied to their future process-state slices.
+- 2026-05-06 Phase 7 preview scoped-config slice added an application resolver over
+  `resources.effective-config` that defaults to copying no production secrets or durable routes,
+  resolves only explicit preview variables/secret references, and keeps raw or masked secret values
+  out of preview resolution output. Full lifecycle process-manager wiring, GitHub App routes,
+  feedback, cleanup retry, and active preview environment entrypoints remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,

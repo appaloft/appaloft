@@ -75,6 +75,7 @@ export * from "./operations/preview-deployments/configure-preview-policy.use-cas
 export * from "./operations/preview-deployments/preview-lifecycle.service";
 export * from "./operations/preview-deployments/preview-policy.evaluator";
 export * from "./operations/preview-deployments/preview-policy.schema";
+export * from "./operations/preview-deployments/preview-scoped-config.resolver";
 export * from "./operations/preview-deployments/show-preview-policy.query-service";
 export * from "./operations/projects/archive-project.use-case";
 export * from "./operations/projects/create-project.use-case";
