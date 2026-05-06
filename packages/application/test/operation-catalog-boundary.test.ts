@@ -130,6 +130,77 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[DEP-RES-REDIS-NATIVE-009] Redis provider-native realization reuses stable catalog operations and schemas", () => {
+    const catalogEntries: readonly OperationCatalogEntry[] = operationCatalog;
+    const entriesByKey = new Map<string, OperationCatalogEntry>(
+      catalogEntries.map((entry) => [entry.key, entry]),
+    );
+    const nativeRedisOperations = [
+      {
+        key: "dependency-resources.provision-redis",
+        messageName: "ProvisionRedisDependencyResourceCommand",
+        serviceName: "ProvisionRedisDependencyResourceUseCase",
+        cli: "appaloft dependency redis provision",
+        orpc: { method: "POST", path: "/api/dependency-resources/redis/provision" },
+        sample: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          name: "Managed Redis",
+          providerKey: "appaloft-managed-redis",
+        },
+      },
+      {
+        key: "resources.bind-dependency",
+        messageName: "BindResourceDependencyCommand",
+        serviceName: "BindResourceDependencyUseCase",
+        cli: "appaloft resource dependency bind <resourceId>",
+        orpc: { method: "POST", path: "/api/resources/{resourceId}/dependency-bindings" },
+        sample: {
+          resourceId: "res_web",
+          dependencyResourceId: "rsi_managed_redis",
+          targetName: "REDIS_URL",
+        },
+      },
+      {
+        key: "dependency-resources.delete",
+        messageName: "DeleteDependencyResourceCommand",
+        serviceName: "DeleteDependencyResourceUseCase",
+        cli: "appaloft dependency delete <dependencyResourceId>",
+        orpc: { method: "DELETE", path: "/api/dependency-resources/{dependencyResourceId}" },
+        sample: {
+          dependencyResourceId: "rsi_managed_redis",
+        },
+      },
+    ];
+
+    for (const operation of nativeRedisOperations) {
+      const entry = entriesByKey.get(operation.key);
+
+      expect(entry, operation.key).toMatchObject({
+        kind: "command",
+        messageName: operation.messageName,
+        serviceName: operation.serviceName,
+        transports: {
+          cli: operation.cli,
+          orpc: operation.orpc,
+        },
+      });
+      expect(entry?.inputSchema, operation.key).toBeDefined();
+      const parsed = entry?.inputSchema?.parse({
+        ...operation.sample,
+        rawConnectionUrl: "redis://:super-secret@managed-redis.redis.internal:6379/0",
+        providerResourceHandle: "redis/rsi_managed_redis",
+        providerSdkResponse: { password: "super-secret" },
+      });
+      const serialized = JSON.stringify(parsed);
+
+      expect(serialized).not.toContain("super-secret");
+      expect(serialized).not.toContain("providerResourceHandle");
+      expect(serialized).not.toContain("providerSdkResponse");
+      expect(serialized).not.toContain("rawConnectionUrl");
+    }
+  });
+
   test("[SRV-LIFE-ENTRY-012] server delete is exposed through the active operation catalog", () => {
     const entry = operationCatalog.find((candidate) => candidate.key === "servers.delete");
 
