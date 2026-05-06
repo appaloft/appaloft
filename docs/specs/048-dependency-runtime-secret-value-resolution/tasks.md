@@ -16,7 +16,7 @@
 - [x] Add deployment plan/create blocked-resolution tests for `DEP-BIND-SECRET-RESOLVE-004`.
 - [x] Add runtime adapter tests for single-server resolution and redaction
   `DEP-BIND-SECRET-RESOLVE-005`.
-- [ ] Add Swarm secret materialization tests for `DEP-BIND-SECRET-RESOLVE-006`.
+- [x] Add Swarm secret materialization tests for `DEP-BIND-SECRET-RESOLVE-006`.
 - [ ] Add historical rotation resolution tests for `DEP-BIND-SECRET-RESOLVE-007`.
 
 ## Code Round
@@ -28,7 +28,7 @@
 - [x] Block deployment plan/create on unresolved Appaloft-owned dependency secret refs.
 - [x] Add PG/PGlite persistence for dependency secret values and resolver lookup.
 - [x] Inject resolved values through local-shell/generic-SSH single-server execution.
-- [ ] Create/update Docker Swarm secrets from resolved dependency values.
+- [x] Create/update Docker Swarm secrets from resolved dependency values.
 - [ ] Preserve historical rotated refs needed by retry/redeploy/rollback candidates.
 - [ ] Keep CLI/oRPC/Web surfaces schema-reused and secret-safe.
 

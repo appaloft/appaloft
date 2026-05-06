@@ -910,9 +910,14 @@ Current verification notes:
 - 2026-05-06 Phase 7 single-server dependency runtime secret materialization Code Round slice now
   resolves Appaloft-owned dependency refs into execution-only environment values for local-shell
   and generic-SSH runtimes, includes dependency target env vars in Docker container launch specs,
-  and redacts resolved values in display/output paths. Docker Swarm secret materialization and
-  historical rotated-ref execution coverage remain open, so Postgres/Redis closed-loop exit
-  criteria remain open.
+  and redacts resolved values in display/output paths. At that point, Docker Swarm secret
+  materialization and historical rotated-ref execution coverage remained open, so Postgres/Redis
+  closed-loop exit criteria remained open.
+- 2026-05-06 Phase 7 Docker Swarm dependency runtime secret materialization Code Round slice now
+  resolves Appaloft-owned dependency refs into deployment-scoped Docker secrets before Swarm
+  service update and keeps sanitized service intent on Docker secret handles. Historical
+  rotated-ref execution coverage remains open, so Postgres/Redis closed-loop exit criteria remain
+  open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider

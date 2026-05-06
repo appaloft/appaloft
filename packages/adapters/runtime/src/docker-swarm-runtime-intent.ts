@@ -177,6 +177,16 @@ function renderTargetServiceName(value: string | undefined): string {
   return sanitizeDockerName(value ?? "web", "web");
 }
 
+export function renderDockerSwarmDependencySecretName(input: {
+  identity: DockerSwarmRuntimeIdentityInput;
+  targetName: string;
+}): string {
+  return sanitizeDockerName(
+    `appaloft-${input.identity.deploymentId}-${input.targetName}`,
+    "appaloft-dependency-secret",
+  );
+}
+
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
 }
@@ -210,7 +220,7 @@ function dockerEnvironmentFlags(environment: readonly DockerSwarmEnvironmentVari
   return environment
     .map((variable) =>
       variable.secret
-        ? `--secret ${shellQuote(`source=${variable.name},target=${variable.name}`)}`
+        ? `--secret ${shellQuote(`source=${dockerSecretSource(variable)},target=${variable.name}`)}`
         : `--env ${shellQuote(`${variable.name}=${variable.value ?? ""}`)}`,
     )
     .join(" ");
@@ -222,10 +232,19 @@ function dockerEnvironmentDisplayFlags(
   return environment
     .map((variable) =>
       variable.secret
-        ? `--secret ${shellQuote(`source=${variable.name},target=${variable.name}`)}`
+        ? `--secret ${shellQuote(`source=${dockerSecretSource(variable)},target=${variable.name}`)}`
         : `--env ${shellQuote(`${variable.name}=********`)}`,
     )
     .join(" ");
+}
+
+function dockerSecretSource(variable: DockerSwarmEnvironmentVariableIntent): string {
+  const secretPrefix = "secret:";
+  if (variable.valueFrom?.startsWith(secretPrefix)) {
+    return variable.valueFrom.slice(secretPrefix.length);
+  }
+
+  return variable.name;
 }
 
 function dockerHealthFlags(health: DockerSwarmHealthIntent | undefined): string {
@@ -365,6 +384,7 @@ function isComposeWorkload(runtimePlan: RuntimePlanState, execution: RuntimeExec
 
 function renderEnvironmentVariables(
   environmentSnapshot: EnvironmentSnapshotLike | undefined,
+  identity: DockerSwarmRuntimeIdentityInput,
   dependencyBindingReferences: readonly DeploymentDependencyBindingReferenceState[] = [],
 ): DockerSwarmEnvironmentVariableIntent[] {
   const snapshotVariables =
@@ -394,7 +414,10 @@ function renderEnvironmentVariables(
       exposure: "runtime",
       scope: "deployment",
       secret: true,
-      valueFrom: `secret:${reference.targetName.value}`,
+      valueFrom: `secret:${renderDockerSwarmDependencySecretName({
+        identity,
+        targetName: reference.targetName.value,
+      })}`,
     }));
 
   return [...snapshotVariables, ...dependencyVariables].sort((left, right) =>
@@ -558,6 +581,7 @@ export function renderDockerSwarmRuntimeIntent(
     workload,
     environment: renderEnvironmentVariables(
       input.environmentSnapshot,
+      input.identity,
       input.dependencyBindingReferences,
     ),
     ...(health ? { health } : {}),
