@@ -56,9 +56,9 @@ candidate operations:
 | `source-events.ingest` | Active command / integration boundary | May be extended by a future Code Round to normalize GitHub pull request events after GitHub App verification. It must still persist safe source event state and dedupe before preview policy evaluation. |
 | `preview-policies.show` | Future accepted candidate query | Reads effective preview policy, fork/secret/domain/quota rules, and selected execution owner for a project, resource, integration, or repository scope. |
 | `preview-policies.configure` | Future accepted candidate command | Changes preview policy explicitly. It must not mutate Resource source/runtime/network profile or deployment history as a side effect. |
-| `preview-environments.list` | Future accepted candidate query | Lists durable preview environments with source event, deployment, route, feedback, cleanup, expiry, and audit summaries. |
-| `preview-environments.show` | Future accepted candidate query | Reads one preview environment and its safe latest deployment, route, feedback, policy, cleanup, and diagnostic state. |
-| `preview-environments.delete` | Future accepted candidate command | Requests explicit preview cleanup/deletion. It must dispatch preview-lifecycle cleanup and preserve deployment history/audit. |
+| `preview-environments.list` | Active HTTP/oRPC query | Lists durable preview environments with source event, deployment, route, feedback, cleanup, expiry, and audit summaries. CLI and Web surfaces remain future work. |
+| `preview-environments.show` | Active HTTP/oRPC query | Reads one preview environment and its safe latest deployment, route, feedback, policy, cleanup, and diagnostic state. CLI and Web surfaces remain future work. |
+| `preview-environments.delete` | Active HTTP/oRPC command | Requests explicit preview cleanup/deletion. It dispatches preview-lifecycle cleanup and preserves deployment history/audit. CLI and Web surfaces remain future work. |
 | `deployments.create` | Active command, unchanged input | Creates the actual deployment attempt after preview policy selects or creates the preview Resource/environment context. No preview fields are added. |
 | `deployments.cleanup-preview` | Active command | Remains the narrow runtime/route/source-link cleanup primitive. Product-grade cleanup may call it as part of a broader control-plane cleanup process, but must not expand the command into provider metadata, comments/checks, or generic delete behavior. |
 
@@ -266,20 +266,18 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   The shell composition has a disabled-by-default `previewCleanupRetryScheduler` runner that can be
   explicitly enabled with the shell cleaner registered. Scheduler leases, terminal provider
   metadata cleanup, and cleanup-side feedback updates remain future work.
-- Preview environments now have inactive application operation contracts for
+- Preview environments now have active HTTP/oRPC operation routes for
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete`.
   List/show read from the safe preview environment read model, delete dispatches through the
-  preview cleanup service, and operation catalog entries intentionally expose no CLI/oRPC/Web
-  transports yet.
+  preview cleanup service, and CLI/Web entrypoints remain future work.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No GitHub App preview worker, scheduler leases, terminal provider metadata cleanup, or automatic
   process-manager deployment-status publication is implemented.
-- No active operation catalog transports exist for `preview-policies.*` or
-  `preview-environments.*`.
+- No active operation catalog transports exist for `preview-policies.*`; preview environment
+  operations currently expose HTTP/oRPC only.
 - Product-grade preview public docs/help now map preview policy and preview environment operations
-  to the stable `/docs/deploy/previews/` product-grade preview anchor. Active transport exposure
-  remains deferred until the operation catalog entries are activated.
+  to the stable `/docs/deploy/previews/` product-grade preview anchor.
 
 ## Open Questions
 

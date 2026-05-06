@@ -289,7 +289,7 @@ describe("preview policy operations", () => {
     expect(JSON.stringify(shown._unsafeUnwrap())).not.toContain("token");
   });
 
-  test("[PG-PREVIEW-SURFACE-001] preview environment catalog entries are inactive transports", () => {
+  test("[PG-PREVIEW-SURFACE-001] preview environment catalog entries expose HTTP API transports", () => {
     const list = operationCatalog.find((entry) => entry.key === "preview-environments.list");
     const show = operationCatalog.find((entry) => entry.key === "preview-environments.show");
     const remove = operationCatalog.find((entry) => entry.key === "preview-environments.delete");
@@ -300,7 +300,9 @@ describe("preview policy operations", () => {
       messageName: "ListPreviewEnvironmentsQuery",
       handlerName: "ListPreviewEnvironmentsQueryHandler",
       serviceName: "ListPreviewEnvironmentsQueryService",
-      transports: {},
+      transports: {
+        orpc: { method: "GET", path: "/api/preview-environments" },
+      },
     });
     expect(show).toMatchObject({
       kind: "query",
@@ -308,7 +310,9 @@ describe("preview policy operations", () => {
       messageName: "ShowPreviewEnvironmentQuery",
       handlerName: "ShowPreviewEnvironmentQueryHandler",
       serviceName: "ShowPreviewEnvironmentQueryService",
-      transports: {},
+      transports: {
+        orpc: { method: "GET", path: "/api/preview-environments/{previewEnvironmentId}" },
+      },
     });
     expect(remove).toMatchObject({
       kind: "command",
@@ -316,7 +320,12 @@ describe("preview policy operations", () => {
       messageName: "DeletePreviewEnvironmentCommand",
       handlerName: "DeletePreviewEnvironmentCommandHandler",
       serviceName: "PreviewEnvironmentCleanupService",
-      transports: {},
+      transports: {
+        orpc: {
+          method: "DELETE",
+          path: "/api/resources/{resourceId}/preview-environments/{previewEnvironmentId}",
+        },
+      },
     });
   });
 });
