@@ -5,8 +5,21 @@ import {
   type ResourceHealthProbeRunner,
   type ResourceRuntimeHealthProbeRequest,
   type ResourceRuntimeHealthProbeResult,
+  type ServerRepository,
+  toRepositoryContext,
 } from "@appaloft/application";
-import { domainError, err, ok, type DomainError, type Result } from "@appaloft/core";
+import {
+  DeploymentTargetByIdSpec,
+  DeploymentTargetId,
+  domainError,
+  err,
+  ok,
+  type DomainError,
+  type Result,
+} from "@appaloft/core";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const responsePreviewLimit = 4096;
 const dockerSwarmHealthProbeTimeoutExitCode = 124;
@@ -30,6 +43,73 @@ interface DockerSwarmServiceTask {
   currentState: string;
   desiredState: string;
   error?: string;
+}
+
+interface SshRuntimeHealthTarget {
+  cleanup: () => Promise<void>;
+  host: string;
+  identityFile?: string;
+  port: string;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function hostWithUsername(host: string, username?: string): string {
+  return username && !host.includes("@") ? `${username}@${host}` : host;
+}
+
+async function writeSshIdentityFile(privateKey: string): Promise<{
+  cleanup(): Promise<void>;
+  identityFile: string;
+}> {
+  const sshDir = await mkdtemp(join(tmpdir(), "appaloft-runtime-health-ssh-"));
+  const identityFile = join(sshDir, "id_runtime_health");
+  await writeFile(identityFile, privateKey.endsWith("\n") ? privateKey : `${privateKey}\n`, {
+    mode: 0o600,
+  });
+  await chmod(identityFile, 0o600);
+
+  return {
+    cleanup: () => rm(sshDir, { recursive: true, force: true }),
+    identityFile,
+  };
+}
+
+function sshArgs(target: SshRuntimeHealthTarget): string[] {
+  return [
+    "-p",
+    target.port,
+    ...(target.identityFile
+      ? ["-i", target.identityFile, "-o", "IdentitiesOnly=yes"]
+      : []),
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "PreferredAuthentications=publickey",
+    "-o",
+    "PasswordAuthentication=no",
+    "-o",
+    "KbdInteractiveAuthentication=no",
+    "-o",
+    "NumberOfPasswordPrompts=0",
+    "-o",
+    "StrictHostKeyChecking=accept-new",
+    target.host,
+  ];
+}
+
+function dockerSwarmServicePsCommand(service: string): string {
+  return [
+    "docker",
+    "service",
+    "ps",
+    "--no-trunc",
+    "--format",
+    shellQuote("{{json .}}"),
+    shellQuote(service),
+  ].join(" ");
 }
 
 function normalizedProbeUrl(raw: string): Result<URL, DomainError> {
@@ -363,6 +443,7 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
   constructor(
     private readonly runRuntimeHealthCommand: RuntimeHealthCommandRunner =
       defaultRuntimeHealthCommandRunner,
+    private readonly serverRepository?: ServerRepository,
   ) {}
 
   async probe(
@@ -452,7 +533,7 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
   }
 
   async probeRuntime(
-    _context: ExecutionContext,
+    context: ExecutionContext,
     request: ResourceRuntimeHealthProbeRequest,
   ): Promise<Result<ResourceRuntimeHealthProbeResult, DomainError>> {
     if (request.providerKey !== "docker-swarm") {
@@ -471,10 +552,23 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
 
     const startedAt = Date.now();
     const service = serviceNameResult.value;
-    const commandResult = await this.runRuntimeHealthCommand({
-      args: ["docker", "service", "ps", "--no-trunc", "--format", "{{json .}}", service],
-      timeoutMs: Math.max(1, request.timeoutSeconds) * 1000,
-    });
+    const sshTargetResult = await this.resolveSshTarget(context, request);
+    if (sshTargetResult.isErr()) {
+      return err(sshTargetResult.error);
+    }
+
+    const sshTarget = sshTargetResult.value;
+    let commandResult: Result<RuntimeHealthCommandRunnerResult, DomainError>;
+    try {
+      commandResult = await this.runRuntimeHealthCommand({
+        args: sshTarget
+          ? ["ssh", ...sshArgs(sshTarget), dockerSwarmServicePsCommand(service)]
+          : ["docker", "service", "ps", "--no-trunc", "--format", "{{json .}}", service],
+        timeoutMs: Math.max(1, request.timeoutSeconds) * 1000,
+      });
+    } finally {
+      await sshTarget?.cleanup();
+    }
     const observedAt = new Date().toISOString();
     const durationMs = Date.now() - startedAt;
 
@@ -515,5 +609,43 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
         tasks: tasksResult.value,
       }),
     );
+  }
+
+  private async resolveSshTarget(
+    context: ExecutionContext,
+    request: ResourceRuntimeHealthProbeRequest,
+  ): Promise<Result<SshRuntimeHealthTarget | null, DomainError>> {
+    if (!request.targetServerId || !this.serverRepository) {
+      return ok(null);
+    }
+
+    const server = await this.serverRepository.findOne(
+      toRepositoryContext(context),
+      DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate(request.targetServerId)),
+    );
+    const serverState = server?.toState();
+    if (!serverState) {
+      return ok(null);
+    }
+
+    const username = serverState.credential?.username?.value;
+    const host = username
+      ? hostWithUsername(serverState.host.value, username)
+      : serverState.host.value;
+    let cleanup = async () => {};
+    let identityFile: string | undefined;
+    const privateKey = serverState.credential?.privateKey?.value;
+    if (serverState.credential?.kind.value === "ssh-private-key" && privateKey) {
+      const identity = await writeSshIdentityFile(privateKey);
+      identityFile = identity.identityFile;
+      cleanup = identity.cleanup;
+    }
+
+    return ok({
+      cleanup,
+      host,
+      ...(identityFile ? { identityFile } : {}),
+      port: String(serverState.port.value),
+    });
   }
 }

@@ -1,12 +1,53 @@
 import { describe, expect, test } from "bun:test";
-import { createExecutionContext } from "@appaloft/application";
-import { ok } from "@appaloft/core";
+import { createExecutionContext, type ServerRepository } from "@appaloft/application";
+import {
+  CreatedAt,
+  DeploymentTargetCredentialKindValue,
+  DeploymentTargetId,
+  DeploymentTargetName,
+  DeploymentTargetUsername,
+  HostAddress,
+  ok,
+  PortNumber,
+  ProviderKey,
+  Server,
+  SshPrivateKeyText,
+  TargetKindValue,
+} from "@appaloft/core";
 import { RuntimeResourceHealthProbeRunner } from "../src/resource-health-probes";
 
-function probeRequest() {
+class StaticServerRepository implements ServerRepository {
+  constructor(private readonly server: Server | null) {}
+
+  async findOne(): Promise<Server | null> {
+    return this.server;
+  }
+
+  async upsert(): Promise<void> {}
+}
+
+function sshServer(): Server {
+  return Server.rehydrate({
+    id: DeploymentTargetId.rehydrate("srv_ssh"),
+    name: DeploymentTargetName.rehydrate("SSH server"),
+    host: HostAddress.rehydrate("203.0.113.10"),
+    port: PortNumber.rehydrate(2222),
+    providerKey: ProviderKey.rehydrate("generic-ssh"),
+    targetKind: TargetKindValue.rehydrate("single-server"),
+    credential: {
+      kind: DeploymentTargetCredentialKindValue.rehydrate("ssh-private-key"),
+      username: DeploymentTargetUsername.rehydrate("deployer"),
+      privateKey: SshPrivateKeyText.rehydrate("-----BEGIN TEST KEY-----\nsecret\n-----END TEST KEY-----"),
+    },
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
+}
+
+function probeRequest(input: { targetServerId?: string } = {}) {
   return {
     resourceId: "res_web",
     deploymentId: "dep_web",
+    ...(input.targetServerId ? { targetServerId: input.targetServerId } : {}),
     runtimeKind: "docker-container" as const,
     targetKind: "orchestrator-cluster" as const,
     providerKey: "docker-swarm",
@@ -67,6 +108,39 @@ describe("RuntimeResourceHealthProbeRunner", () => {
           failedTasks: "0",
         },
       },
+    });
+  });
+
+  test("[SWARM-TARGET-OBS-002] probes Docker Swarm service health through the Swarm manager over SSH", async () => {
+    const runner = new RuntimeResourceHealthProbeRunner(
+      async (input) => {
+        expect(input.args[0]).toBe("ssh");
+        expect(input.args).toContain("2222");
+        expect(input.args).toContain("IdentitiesOnly=yes");
+        expect(input.args).toContain("deployer@203.0.113.10");
+        expect(input.args.at(-1)).toBe(
+          "docker service ps --no-trunc --format '{{json .}}' 'appaloft-res-web-dst-demo-dep-web_web'",
+        );
+        return ok({
+          exitCode: 0,
+          stdout: JSON.stringify({
+            Name: "appaloft-res-web-dst-demo-dep-web_web.1",
+            DesiredState: "Running",
+            CurrentState: "Running 12 seconds ago",
+            Error: "",
+          }),
+        });
+      },
+      new StaticServerRepository(sshServer()),
+    );
+
+    const result = await runner.probeRuntime(context, probeRequest({ targetServerId: "srv_ssh" }));
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      lifecycle: "running",
+      health: "healthy",
+      reasonCode: "docker_swarm_service_running",
     });
   });
 

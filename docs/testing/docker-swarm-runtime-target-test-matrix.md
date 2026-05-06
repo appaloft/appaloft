@@ -105,7 +105,10 @@ implemented, but no Docker Swarm execution backend is active in the default runt
 - `SWARM-TARGET-OBS-002` has initial application/adapter coverage proving `resources.health` can
   request an opt-in Swarm runtime probe from sanitized `swarm.serviceName` metadata and normalize
   `docker service ps` task state into Appaloft runtime health/check fields without exposing raw
-  Docker task payloads. Remote-manager health probing remains open.
+  Docker task payloads. Coverage now proves the probe receives the deployment target server id from
+  the application query path and executes `docker service ps` through the resolved Swarm manager
+  over SSH when repository context is available, while retaining the local Docker fallback for local
+  smoke execution.
 - `SWARM-TARGET-ROUTE-001` has initial apply-plan coverage proving Traefik route labels are absent
   from candidate service creation and added only in the post-verification `promote-route-target`
   step against the Swarm edge network. Adapter coverage now proves the opt-in execution backend can

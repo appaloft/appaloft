@@ -2964,6 +2964,7 @@ export interface ResourceHealthProbeResult {
 export interface ResourceRuntimeHealthProbeRequest {
   resourceId: string;
   deploymentId: string;
+  targetServerId?: string;
   runtimeKind: ExecutionStrategyKind;
   targetKind: TargetKind;
   providerKey: string;

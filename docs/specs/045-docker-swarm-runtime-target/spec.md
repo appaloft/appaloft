@@ -145,8 +145,9 @@ No new public operation key is accepted in this Spec Round.
   resource/deployment/runtime context and configured redactions applied.
 - `resources.health` can run an opt-in live runtime probe for Swarm-backed OCI image deployments
   when sanitized `swarm.serviceName` metadata is present. The runtime adapter reads `docker service
-  ps` and returns Appaloft `ResourceRuntimeHealthSection` and `ResourceHealthCheck` fields without
-  exposing raw Docker task payloads.
+  ps` through the resolved Swarm manager SSH target when available, retains a local Docker fallback
+  for local smoke execution, and returns Appaloft `ResourceRuntimeHealthSection` and
+  `ResourceHealthCheck` fields without exposing raw Docker task payloads.
 - Swarm image apply planning now renders Traefik route labels into the `promote-route-target` step
   only. Candidate service creation remains un-routed; route labels are applied after candidate
   verification and target the Swarm edge network without public workload host-port publication.
@@ -182,9 +183,8 @@ No new public operation key is accepted in this Spec Round.
   apply/route-promotion/scoped cleanup, and then returned Docker to inactive Swarm state.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
-- Default-on Swarm activation, remote-manager health execution, end-to-end Swarm edge-proxy route
-  realization, real registry-login/pull-secret provisioning, and real Swarm registry-auth smoke
-  coverage remain open.
+- Default-on Swarm activation, end-to-end Swarm edge-proxy route realization, real registry-login/
+  pull-secret provisioning, and real Swarm registry-auth smoke coverage remain open.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and

@@ -1160,7 +1160,13 @@ export function registerRuntimeDependencies(
     ),
   });
   container.register(tokens.resourceHealthProbeRunner, {
-    useFactory: instanceCachingFactory(() => new RuntimeResourceHealthProbeRunner()),
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RuntimeResourceHealthProbeRunner(
+          undefined,
+          dependencyContainer.resolve(tokens.serverRepository),
+        ),
+    ),
   });
   container.register(tokens.terminalSessionGateway, {
     useFactory: instanceCachingFactory(

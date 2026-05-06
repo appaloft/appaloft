@@ -55,6 +55,7 @@
 - [x] Add Swarm service log reading through the existing runtime log adapter.
 - [x] Add remote-manager SSH execution for Swarm service log reading.
 - [x] Add Swarm service health inspection through the existing resource health query adapter.
+- [x] Add remote-manager SSH execution for Swarm service health inspection.
 - [x] Add post-verification Traefik route label promotion to the Swarm image apply plan.
 - [x] Redact Swarm command failure output before deployment logs/metadata capture.
 - [x] Add bounded shell command runner for the opt-in Swarm execution backend.
