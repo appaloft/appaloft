@@ -41,6 +41,12 @@ export class ConfigurePreviewPolicyUseCase {
         sameRepositoryPreviews: input.policy.sameRepositoryPreviews ?? true,
         forkPreviews: input.policy.forkPreviews ?? "disabled",
         secretBackedPreviews: input.policy.secretBackedPreviews ?? true,
+        ...(input.policy.maxActivePreviews !== undefined
+          ? { maxActivePreviews: input.policy.maxActivePreviews }
+          : {}),
+        ...(input.policy.previewTtlHours !== undefined
+          ? { previewTtlHours: input.policy.previewTtlHours }
+          : {}),
       },
       updatedAt: this.clock.now(),
       ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),

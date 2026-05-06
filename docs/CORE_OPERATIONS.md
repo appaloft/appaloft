@@ -793,7 +793,8 @@ Current boundary:
   [Product-Grade Preview Deployments](./specs/046-product-grade-preview-deployments/spec.md).
   `preview-policies.configure` and `preview-policies.show` now exist as inactive application
   operation catalog entries backed by durable Postgres/PGlite policy storage and safe default or
-  configured read-model summaries, but with no CLI/oRPC/Web transports. `preview-environments.*`
+  configured read-model summaries, including same-repository, fork, secret-backed, active preview
+  quota, and preview TTL settings, but with no CLI/oRPC/Web transports. `preview-environments.*`
   entrypoints, GitHub App ingestion, feedback, cleanup retries, audit, and managed domain lifecycle
   remain future control-plane work.
 

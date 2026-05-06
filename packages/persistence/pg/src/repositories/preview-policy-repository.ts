@@ -74,6 +74,8 @@ export class PgPreviewPolicyRepository implements PreviewPolicyRepository, Previ
               same_repository_previews: values.same_repository_previews,
               fork_previews: values.fork_previews,
               secret_backed_previews: values.secret_backed_previews,
+              max_active_previews: values.max_active_previews,
+              preview_ttl_hours: values.preview_ttl_hours,
               last_idempotency_key: values.last_idempotency_key,
               updated_at: values.updated_at,
             }),
@@ -132,6 +134,8 @@ function settingsFromRow(row: PreviewPolicyRow): PreviewPolicySettings {
         ? row.fork_previews
         : "disabled",
     secretBackedPreviews: row.secret_backed_previews,
+    ...(row.max_active_previews !== null ? { maxActivePreviews: row.max_active_previews } : {}),
+    ...(row.preview_ttl_hours !== null ? { previewTtlHours: row.preview_ttl_hours } : {}),
   };
 }
 
@@ -145,6 +149,8 @@ function rowFromRecord(record: PreviewPolicyRecord): Insertable<Database["previe
     same_repository_previews: record.settings.sameRepositoryPreviews,
     fork_previews: record.settings.forkPreviews,
     secret_backed_previews: record.settings.secretBackedPreviews,
+    max_active_previews: record.settings.maxActivePreviews ?? null,
+    preview_ttl_hours: record.settings.previewTtlHours ?? null,
     last_idempotency_key: record.idempotencyKey ?? null,
     updated_at: record.updatedAt,
   };

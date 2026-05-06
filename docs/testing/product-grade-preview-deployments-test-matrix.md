@@ -66,6 +66,11 @@ coverage in `packages/application/test/product-grade-preview-policy.test.ts` and
 `packages/persistence/pg/test/preview-policy.pglite.test.ts`. The coverage proves blocked fork
 policy decisions are projected by source event id with safe fork/secret-backed details, requested
 secret scope counts only, no deployment dispatch, and no secret-name or provider-token readback.
+`PG-PREVIEW-POLICY-003` has initial application and Postgres/PGlite coverage in the same test
+files. The coverage proves active preview quota blocks new preview events with
+`preview_quota_exceeded`, safe quota details are projected, configured quota/TTL policy settings
+round-trip through persistence, and allowed preview lifecycle events derive/persist preview expiry
+from policy TTL when no explicit expiry is provided.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and

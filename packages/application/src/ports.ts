@@ -4554,6 +4554,8 @@ export interface PreviewPolicySettings {
   sameRepositoryPreviews: boolean;
   forkPreviews: "disabled" | "without-secrets" | "with-secrets";
   secretBackedPreviews: boolean;
+  maxActivePreviews?: number;
+  previewTtlHours?: number;
 }
 
 export interface PreviewPolicyRecord {
@@ -4577,7 +4579,8 @@ export type PreviewPolicyDecisionReasonCode =
   | "preview_same_repository_disabled"
   | "preview_fork_disabled"
   | "preview_fork_secrets_blocked"
-  | "preview_secret_backed_disabled";
+  | "preview_secret_backed_disabled"
+  | "preview_quota_exceeded";
 
 export interface PreviewPolicyDecisionProjection {
   sourceEventId: string;
@@ -4595,12 +4598,15 @@ export interface PreviewPolicyDecisionProjection {
   fork: boolean;
   secretBacked: boolean;
   requestedSecretScopeCount: number;
+  activePreviewCount: number;
   status: "allowed" | "blocked";
   phase: "preview-policy-evaluation";
   deploymentEligible: boolean;
   evaluatedAt: string;
   reasonCode?: PreviewPolicyDecisionReasonCode;
+  maxActivePreviews?: number;
   previewEnvironmentId?: string;
+  previewExpiresAt?: string;
   deploymentId?: string;
 }
 

@@ -205,6 +205,8 @@ describe("preview policy persistence", () => {
           sameRepositoryPreviews: true,
           forkPreviews: "without-secrets",
           secretBackedPreviews: false,
+          maxActivePreviews: 3,
+          previewTtlHours: 24,
         },
         updatedAt: "2026-05-06T01:10:00.000Z",
         idempotencyKey: "idem_preview_policy_resource_2",
@@ -222,6 +224,8 @@ describe("preview policy persistence", () => {
           sameRepositoryPreviews: true,
           forkPreviews: "without-secrets",
           secretBackedPreviews: false,
+          maxActivePreviews: 3,
+          previewTtlHours: 24,
         },
         updatedAt: "2026-05-06T01:10:00.000Z",
         idempotencyKey: "idem_preview_policy_resource_2",
@@ -265,11 +269,13 @@ describe("preview policy persistence", () => {
         fork: true,
         secretBacked: true,
         requestedSecretScopeCount: 2,
+        activePreviewCount: 3,
         status: "blocked",
         phase: "preview-policy-evaluation",
         deploymentEligible: false,
         evaluatedAt: "2026-05-06T02:00:00.000Z",
-        reasonCode: "preview_fork_disabled",
+        reasonCode: "preview_quota_exceeded",
+        maxActivePreviews: 3,
       };
 
       await projection.record(context, blocked);
@@ -279,6 +285,40 @@ describe("preview policy persistence", () => {
       });
 
       expect(readback).toEqual(blocked);
+      const allowed: PreviewPolicyDecisionProjection = {
+        sourceEventId: "sevt_preview_policy_allowed_1",
+        projectId: "prj_preview_policy",
+        environmentId: "env_preview_policy",
+        resourceId: "res_preview_policy_api",
+        provider: "github",
+        eventKind: "pull-request",
+        eventAction: "synchronize",
+        repositoryFullName: "appaloft/demo",
+        headRepositoryFullName: "appaloft/demo",
+        pullRequestNumber: 45,
+        headSha: "allowed5678",
+        baseRef: "main",
+        fork: false,
+        secretBacked: false,
+        requestedSecretScopeCount: 0,
+        activePreviewCount: 2,
+        status: "allowed",
+        phase: "preview-policy-evaluation",
+        deploymentEligible: true,
+        evaluatedAt: "2026-05-06T02:05:00.000Z",
+        maxActivePreviews: 5,
+        previewEnvironmentId: "prenv_policy_allowed_1",
+        previewExpiresAt: "2026-05-07T02:05:00.000Z",
+        deploymentId: "dep_policy_allowed_1",
+      };
+
+      await projection.record(context, allowed);
+
+      expect(
+        await projection.findOne(context, {
+          sourceEventId: "sevt_preview_policy_allowed_1",
+        }),
+      ).toEqual(allowed);
       expect(JSON.stringify(readback)).not.toContain("preview-runtime");
       expect(JSON.stringify(readback)).not.toContain("database");
       expect(JSON.stringify(readback)).not.toContain("secretRef");

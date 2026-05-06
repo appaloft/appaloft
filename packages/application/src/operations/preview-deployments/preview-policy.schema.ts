@@ -18,6 +18,8 @@ export const previewPolicySettingsSchema = z
     sameRepositoryPreviews: z.boolean().optional(),
     forkPreviews: previewPolicyForkModeSchema.optional(),
     secretBackedPreviews: z.boolean().optional(),
+    maxActivePreviews: z.number().int().nonnegative().optional(),
+    previewTtlHours: z.number().int().positive().optional(),
   })
   .default(defaultPreviewPolicySettings)
   .transform((settings) => ({
@@ -36,6 +38,7 @@ export const previewPolicyEvaluationInputSchema = z.object({
   baseRef: nonEmptyTrimmedString("Base ref"),
   verified: z.boolean().default(false),
   requestedSecretScopes: z.array(nonEmptyTrimmedString("Requested secret scope")).default([]),
+  activePreviewCount: z.number().int().nonnegative().default(0),
   policy: previewPolicySettingsSchema,
 });
 

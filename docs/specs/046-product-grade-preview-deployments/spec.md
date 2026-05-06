@@ -201,6 +201,11 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
 - Preview lifecycle now records safe preview policy decision projections by source event id. Blocked
   fork events persist status, reason code, normalized pull-request facts, fork/secret-backed
   booleans, and requested secret scope count without resolving or storing secret names.
+- Preview policy now supports active preview quota and preview TTL settings. Over-quota create/
+  update events are blocked with `preview_quota_exceeded` and safe quota details, while allowed
+  preview lifecycle events derive preview environment expiry from `previewTtlHours` when no
+  explicit expiry is provided. Policy records and decision projections persist quota and expiry
+  readback without provider payloads or secret material.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No GitHub App preview worker, feedback writer, cleanup scheduler, or cleanup retry state is
