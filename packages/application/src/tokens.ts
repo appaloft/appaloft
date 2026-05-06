@@ -81,6 +81,8 @@ export const tokens = {
   sourceEventDeploymentDispatcher: Symbol.for("appaloft.source_event_deployment_dispatcher"),
   sourceEventReadModel: Symbol.for("appaloft.source_event_read_model"),
   previewLifecycleService: Symbol.for("appaloft.preview_lifecycle_service"),
+  previewFeedbackService: Symbol.for("appaloft.preview_feedback_service"),
+  previewDeploymentProcessManager: Symbol.for("appaloft.preview_deployment_process_manager"),
   previewEnvironmentReadModel: Symbol.for("appaloft.preview_environment_read_model"),
   previewPolicyReadModel: Symbol.for("appaloft.preview_policy_read_model"),
   previewPolicyDecisionReadModel: Symbol.for("appaloft.preview_policy_decision_read_model"),

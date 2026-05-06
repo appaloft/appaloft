@@ -97,7 +97,9 @@ source, route, or preview-specific fields.
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves preview
 feedback publish calls reuse an existing provider feedback id for update-in-place and record
 retryable provider failures as safe feedback state while returning `ok` to preserve the accepted
-deployment result.
+deployment result. It also proves the preview deployment process manager publishes idempotent
+PR-comment feedback after accepted deployment dispatch and keeps the accepted deployment result when
+feedback publication is retryable.
 `PG-PREVIEW-FEEDBACK-001` now also has Postgres/PGlite persistence coverage in
 `packages/persistence/pg/test/preview-feedback.pglite.test.ts`. The coverage proves durable
 feedback state upserts by feedback key, preserves provider feedback ids for idempotent updates,

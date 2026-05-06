@@ -22,6 +22,7 @@ import {
   type PreviewCleanupRetryCandidate,
   type PreviewCleanupRetryCandidateReader,
   PreviewCleanupRetryScheduler,
+  PreviewDeploymentProcessManager,
   type PreviewEnvironmentCleaner,
   type PreviewEnvironmentCleanerInput,
   type PreviewEnvironmentCleanerResult,
@@ -944,7 +945,15 @@ describe("PreviewPullRequestEventIngestService", () => {
       new FixedClock("2026-05-06T04:20:00.000Z"),
       new SequentialIdGenerator(),
     );
-    const ingest = new PreviewPullRequestEventIngestService(lifecycle);
+    const feedbackWriter = new CapturingPreviewFeedbackWriter();
+    const feedbackRecorder = new InMemoryPreviewFeedbackRecorder();
+    const feedbackService = new PreviewFeedbackService(
+      feedbackWriter,
+      feedbackRecorder,
+      new FixedClock("2026-05-06T04:21:00.000Z"),
+    );
+    const processManager = new PreviewDeploymentProcessManager(lifecycle, feedbackService);
+    const ingest = new PreviewPullRequestEventIngestService(processManager);
     const context = createExecutionContext({
       requestId: "req_preview_pull_request_ingest_test",
       entrypoint: "system",
@@ -980,6 +989,10 @@ describe("PreviewPullRequestEventIngestService", () => {
         previewEnvironmentId: "prenv_1",
         deploymentId: "dep_preview_1",
       },
+      feedbackResult: {
+        status: "created",
+        providerFeedbackId: "github_feedback_1",
+      },
     });
     expect(repository.previewEnvironment?.toState()).toMatchObject({
       id: { value: "prenv_1" },
@@ -999,6 +1012,108 @@ describe("PreviewPullRequestEventIngestService", () => {
         destinationId: "dst_preview",
       },
     ]);
+    expect(feedbackWriter.inputs).toEqual([
+      {
+        feedbackKey: "feedback:sevt_preview_pull_request_1:github-pr-comment",
+        sourceEventId: "sevt_preview_pull_request_1",
+        previewEnvironmentId: "prenv_1",
+        channel: "github-pr-comment",
+        repositoryFullName: "appaloft/demo",
+        pullRequestNumber: 48,
+        body: [
+          "Preview deployment accepted for appaloft/demo#48.",
+          "Preview environment: prenv_1",
+          "Deployment: dep_preview_1",
+        ].join("\n"),
+      },
+    ]);
+    expect(
+      feedbackRecorder.records.get("feedback:sevt_preview_pull_request_1:github-pr-comment"),
+    ).toEqual({
+      feedbackKey: "feedback:sevt_preview_pull_request_1:github-pr-comment",
+      sourceEventId: "sevt_preview_pull_request_1",
+      previewEnvironmentId: "prenv_1",
+      channel: "github-pr-comment",
+      status: "published",
+      providerFeedbackId: "github_feedback_1",
+      updatedAt: "2026-05-06T04:21:00.000Z",
+    });
+  });
+});
+
+describe("PreviewDeploymentProcessManager", () => {
+  test("[PG-PREVIEW-FEEDBACK-001] preserves accepted deployment result when feedback is retryable", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const lifecycle = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      projection,
+      new FixedClock("2026-05-06T04:24:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const feedbackWriter = new CapturingPreviewFeedbackWriter();
+    feedbackWriter.failRetryably = true;
+    const feedbackRecorder = new InMemoryPreviewFeedbackRecorder();
+    const feedbackService = new PreviewFeedbackService(
+      feedbackWriter,
+      feedbackRecorder,
+      new FixedClock("2026-05-06T04:25:00.000Z"),
+    );
+    const processManager = new PreviewDeploymentProcessManager(lifecycle, feedbackService);
+    const context = createExecutionContext({
+      requestId: "req_preview_process_feedback_retry_test",
+      entrypoint: "system",
+    });
+
+    const result = await processManager.processPullRequestEvent(context, {
+      sourceEventId: "sevt_preview_process_feedback_retry",
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_process_feedback_retry",
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "synchronize",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "appaloft/demo",
+      pullRequestNumber: 49,
+      headSha: "abc1234",
+      baseRef: "main",
+      verified: true,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      lifecycleResult: {
+        status: "dispatched",
+        previewEnvironmentId: "prenv_1",
+        deploymentId: "dep_preview_1",
+      },
+      feedbackResult: {
+        status: "retryable-failed",
+        errorCode: "provider_error",
+        retryable: true,
+      },
+    });
+    expect(
+      feedbackRecorder.records.get(
+        "feedback:sevt_preview_process_feedback_retry:github-pr-comment",
+      ),
+    ).toMatchObject({
+      feedbackKey: "feedback:sevt_preview_process_feedback_retry:github-pr-comment",
+      sourceEventId: "sevt_preview_process_feedback_retry",
+      previewEnvironmentId: "prenv_1",
+      channel: "github-pr-comment",
+      status: "retryable-failed",
+      errorCode: "provider_error",
+      retryable: true,
+    });
+    expect(JSON.stringify(feedbackRecorder.records)).not.toContain("temporarily unavailable");
   });
 });
 

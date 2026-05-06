@@ -5,9 +5,10 @@ import { type ExecutionContext } from "../../execution-context";
 import { type GitHubPreviewPullRequestWebhookEvent } from "../../ports";
 import { tokens } from "../../tokens";
 import {
-  type PreviewLifecycleDeployResult,
-  type PreviewLifecycleService,
-} from "./preview-lifecycle.service";
+  type PreviewDeploymentProcessManager,
+  type PreviewDeploymentProcessResult,
+} from "./preview-deployment-process.manager";
+import { type PreviewLifecycleDeployResult } from "./preview-lifecycle.service";
 import { type PreviewPolicyEvaluationInput } from "./preview-policy.schema";
 
 export interface PreviewPullRequestEventIngestInput {
@@ -29,6 +30,7 @@ export type PreviewPullRequestEventIngestResult =
   | {
       status: "routed";
       lifecycleResult: PreviewLifecycleDeployResult;
+      feedbackResult?: PreviewDeploymentProcessResult["feedbackResult"];
     }
   | {
       status: "ignored";
@@ -38,8 +40,8 @@ export type PreviewPullRequestEventIngestResult =
 @injectable()
 export class PreviewPullRequestEventIngestService {
   constructor(
-    @inject(tokens.previewLifecycleService)
-    private readonly previewLifecycleService: PreviewLifecycleService,
+    @inject(tokens.previewDeploymentProcessManager)
+    private readonly previewDeploymentProcessManager: PreviewDeploymentProcessManager,
   ) {}
 
   async ingest(
@@ -53,7 +55,7 @@ export class PreviewPullRequestEventIngestService {
       });
     }
 
-    const lifecycleResult = await this.previewLifecycleService.deployFromPolicyEligibleEvent(
+    const processResult = await this.previewDeploymentProcessManager.processPullRequestEvent(
       context,
       {
         sourceEventId: input.sourceEventId,
@@ -82,9 +84,10 @@ export class PreviewPullRequestEventIngestService {
         ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
       },
     );
-    return lifecycleResult.map((result) => ({
+    return processResult.map((result) => ({
       status: "routed",
-      lifecycleResult: result,
+      lifecycleResult: result.lifecycleResult,
+      ...(result.feedbackResult ? { feedbackResult: result.feedbackResult } : {}),
     }));
   }
 }

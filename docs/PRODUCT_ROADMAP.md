@@ -1329,6 +1329,12 @@ Current verification notes:
   control-plane context, while closed-event cleanup remains an ignored outcome until cleanup
   process state exists. GitHub App HTTP routes, feedback, cleanup retry, and active preview
   environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview deployment process-manager slice composed policy evaluation,
+  preview environment state, ids-only deployment dispatch, and PR-comment feedback. Accepted
+  preview deployments now publish idempotent source-event-keyed `github-pr-comment` feedback, and
+  retryable feedback failures preserve the accepted deployment result while recording safe feedback
+  state. GitHub check/deployment-status writers, GitHub App HTTP routes, cleanup adapters, and
+  active preview environment entrypoints remain open.
 - 2026-05-06 Phase 7 preview feedback application slice added initial feedback writer/recorder
   ports and a service for idempotent PR comment/check/status updates. Existing provider feedback
   ids are reused for update-in-place, and retryable provider failures are recorded as safe feedback
