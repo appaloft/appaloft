@@ -55,6 +55,8 @@ import { unlockEnvironmentCommandInputSchema } from "./operations/environments/u
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { listOperatorWorkQueryInputSchema } from "./operations/operator-work/list-operator-work.query";
 import { showOperatorWorkQueryInputSchema } from "./operations/operator-work/show-operator-work.query";
+import { configurePreviewPolicyCommandInputSchema } from "./operations/preview-deployments/configure-preview-policy.command";
+import { showPreviewPolicyQueryInputSchema } from "./operations/preview-deployments/show-preview-policy.query";
 import { archiveProjectCommandInputSchema } from "./operations/projects/archive-project.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
@@ -144,6 +146,7 @@ type OperationDomain =
   | "storage-volumes"
   | "deployments"
   | "operator-work"
+  | "preview-policies"
   | "default-access-domain-policies"
   | "domain-bindings"
   | "certificates"
@@ -181,6 +184,28 @@ export interface OperationCatalogEntry {
 // Source of truth for business operations.
 // CLI, oRPC, HTTP, and future MCP tools must dispatch these messages instead of bypassing application handlers.
 export const operationCatalog = [
+  {
+    key: "preview-policies.configure",
+    kind: "command",
+    domain: "preview-policies",
+    messageName: "ConfigurePreviewPolicyCommand",
+    handlerName: "ConfigurePreviewPolicyCommandHandler",
+    serviceName: "ConfigurePreviewPolicyUseCase",
+    inputSchema: configurePreviewPolicyCommandInputSchema,
+    serviceToken: tokens.configurePreviewPolicyUseCase,
+    transports: {},
+  },
+  {
+    key: "preview-policies.show",
+    kind: "query",
+    domain: "preview-policies",
+    messageName: "ShowPreviewPolicyQuery",
+    handlerName: "ShowPreviewPolicyQueryHandler",
+    serviceName: "ShowPreviewPolicyQueryService",
+    inputSchema: showPreviewPolicyQueryInputSchema,
+    serviceToken: tokens.showPreviewPolicyQueryService,
+    transports: {},
+  },
   {
     key: "projects.create",
     kind: "command",

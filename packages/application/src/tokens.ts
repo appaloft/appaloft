@@ -28,6 +28,7 @@ export const tokens = {
   dependencyResourceRepository: Symbol.for("appaloft.dependency_resource_repository"),
   dependencyResourceBackupRepository: Symbol.for("appaloft.dependency_resource_backup_repository"),
   previewEnvironmentRepository: Symbol.for("appaloft.preview_environment_repository"),
+  previewPolicyRepository: Symbol.for("appaloft.preview_policy_repository"),
   resourceDependencyBindingRepository: Symbol.for(
     "appaloft.resource_dependency_binding_repository",
   ),
@@ -74,6 +75,7 @@ export const tokens = {
   sourceEventDeploymentDispatcher: Symbol.for("appaloft.source_event_deployment_dispatcher"),
   sourceEventReadModel: Symbol.for("appaloft.source_event_read_model"),
   previewLifecycleService: Symbol.for("appaloft.preview_lifecycle_service"),
+  previewPolicyReadModel: Symbol.for("appaloft.preview_policy_read_model"),
   deploymentReadModel: Symbol.for("appaloft.deployment_read_model"),
   domainBindingReadModel: Symbol.for("appaloft.domain_binding_read_model"),
   certificateReadModel: Symbol.for("appaloft.certificate_read_model"),
@@ -227,6 +229,8 @@ export const tokens = {
   githubSourceEventWebhookVerifier: Symbol.for("appaloft.github_source_event_webhook_verifier"),
   listSourceEventsQueryService: Symbol.for("appaloft.list_source_events_query_service"),
   showSourceEventQueryService: Symbol.for("appaloft.show_source_event_query_service"),
+  configurePreviewPolicyUseCase: Symbol.for("appaloft.configure_preview_policy_use_case"),
+  showPreviewPolicyQueryService: Symbol.for("appaloft.show_preview_policy_query_service"),
   openTerminalSessionUseCase: Symbol.for("appaloft.open_terminal_session_use_case"),
   relinkSourceLinkUseCase: Symbol.for("appaloft.relink_source_link_use_case"),
   resourceProxyConfigurationPreviewQueryService: Symbol.for(

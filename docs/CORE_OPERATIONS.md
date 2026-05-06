@@ -790,8 +790,19 @@ Current boundary:
   retries, audit, and managed domain lifecycle still require Appaloft Cloud or a self-hosted
   control plane. That future product line must still reuse repository config and explicit
   operations rather than adding preview fields to `deployments.create`. The governing Spec Round is
-  [Product-Grade Preview Deployments](./specs/046-product-grade-preview-deployments/spec.md); no
-  `preview-policies.*` or `preview-environments.*` operation catalog entries are active yet.
+  [Product-Grade Preview Deployments](./specs/046-product-grade-preview-deployments/spec.md).
+  `preview-policies.configure` and `preview-policies.show` now exist as inactive application
+  operation catalog entries with no CLI/oRPC/Web transports. `preview-environments.*` entrypoints,
+  GitHub App ingestion, feedback, cleanup retries, audit, and managed domain lifecycle remain
+  future control-plane work.
+
+Product-grade preview policy operations:
+
+| Name | Kind | Operation key | Command/query | Input | CLI | HTTP/oRPC |
+| --- | --- | --- | --- | --- | --- | --- |
+| Configure preview policy | Command | `preview-policies.configure` | `ConfigurePreviewPolicyCommand` | `ConfigurePreviewPolicyCommandInput` | - | - |
+| Show preview policy | Query | `preview-policies.show` | `ShowPreviewPolicyQuery` | `ShowPreviewPolicyQueryInput` | - | - |
+
 - `APPALOFT_PROJECT_ID`, `APPALOFT_RESOURCE_ID`, `APPALOFT_SERVER_ID`, and similar ids are optional
   trusted selection overrides for CLI/Action mode. They are required only when the operator wants to
   select existing control-plane identity explicitly; pure SSH CLI mode may reuse or create identity
