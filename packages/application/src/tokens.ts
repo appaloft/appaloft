@@ -32,6 +32,7 @@ export const tokens = {
   previewPolicyDecisionRecorder: Symbol.for("appaloft.preview_policy_decision_recorder"),
   previewFeedbackWriter: Symbol.for("appaloft.preview_feedback_writer"),
   previewFeedbackRecorder: Symbol.for("appaloft.preview_feedback_recorder"),
+  previewEnvironmentCleaner: Symbol.for("appaloft.preview_environment_cleaner"),
   resourceDependencyBindingRepository: Symbol.for(
     "appaloft.resource_dependency_binding_repository",
   ),
