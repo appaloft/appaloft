@@ -797,8 +797,9 @@ Current boundary:
   settings.
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete` now
   expose CLI and HTTP/oRPC routes over safe preview environment read models and cleanup-service
-  input. Web surfaces remain future work. GitHub App route wiring, managed domain lifecycle, and
-  scheduler leases remain future control-plane work.
+  input. Future MCP tool contracts are generated from the operation catalog for these preview
+  operations. Web surfaces remain future work. GitHub App route wiring, managed domain lifecycle,
+  and scheduler leases remain future control-plane work.
 
 Product-grade preview policy operations:
 

@@ -152,6 +152,9 @@ environment list/show/delete through `QueryBus` and `CommandBus`.
 configure/show through `CommandBus` and `QueryBus`.
 `packages/orpc/test/preview-environment.http.test.ts` covers the HTTP routes dispatching preview
 environment list/show/delete through `QueryBus` and `CommandBus`.
+`packages/ai/mcp/test/tool-descriptors.test.ts` covers generated future MCP tool descriptors for
+preview policy and preview environment operations using operation-key-derived names and shared
+CLI/API metadata.
 `PG-PREVIEW-SURFACE-001` now also has Postgres/PGlite persistence coverage in
 `packages/persistence/pg/test/preview-policy.pglite.test.ts` for project/resource-scoped policy
 storage, configured/default safe summaries, idempotency-key retention on the write side, and

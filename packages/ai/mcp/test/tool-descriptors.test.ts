@@ -79,6 +79,31 @@ describe("MCP tool descriptors", () => {
       cliCommand: "appaloft server register",
       httpRoute: "POST /api/servers",
     });
+    expect(toolContractsByOperationKey.get("preview-policies.configure")).toMatchObject({
+      name: "preview_policies_configure",
+      cliCommand: "appaloft preview policy configure",
+      httpRoute: "POST /api/preview-policies",
+    });
+    expect(toolContractsByOperationKey.get("preview-policies.show")).toMatchObject({
+      name: "preview_policies_show",
+      cliCommand: "appaloft preview policy show",
+      httpRoute: "POST /api/preview-policies/show",
+    });
+    expect(toolContractsByOperationKey.get("preview-environments.list")).toMatchObject({
+      name: "preview_environments_list",
+      cliCommand: "appaloft preview environment list",
+      httpRoute: "GET /api/preview-environments",
+    });
+    expect(toolContractsByOperationKey.get("preview-environments.show")).toMatchObject({
+      name: "preview_environments_show",
+      cliCommand: "appaloft preview environment show",
+      httpRoute: "GET /api/preview-environments/{previewEnvironmentId}",
+    });
+    expect(toolContractsByOperationKey.get("preview-environments.delete")).toMatchObject({
+      name: "preview_environments_delete",
+      cliCommand: "appaloft preview environment delete",
+      httpRoute: "DELETE /api/resources/{resourceId}/preview-environments/{previewEnvironmentId}",
+    });
     expect(toolContractsByOperationKey.has("server.docker-swarm-target")).toBe(false);
   });
 
