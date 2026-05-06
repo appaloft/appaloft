@@ -1020,6 +1020,10 @@ describe("PreviewPullRequestEventIngestService", () => {
         status: "created",
         providerFeedbackId: "github_feedback_1",
       },
+      deploymentStatusFeedbackResult: {
+        status: "created",
+        providerFeedbackId: "github_feedback_2",
+      },
     });
     expect(repository.previewEnvironment?.toState()).toMatchObject({
       id: { value: "prenv_1" },
@@ -1053,6 +1057,19 @@ describe("PreviewPullRequestEventIngestService", () => {
           "Deployment: dep_preview_1",
         ].join("\n"),
       },
+      {
+        feedbackKey: "feedback:sevt_preview_pull_request_1:github-deployment-status",
+        sourceEventId: "sevt_preview_pull_request_1",
+        previewEnvironmentId: "prenv_1",
+        channel: "github-deployment-status",
+        repositoryFullName: "appaloft/demo",
+        pullRequestNumber: 48,
+        body: [
+          "Preview deployment accepted for appaloft/demo#48.",
+          "Preview environment: prenv_1",
+          "Deployment: dep_preview_1",
+        ].join("\n"),
+      },
     ]);
     expect(
       feedbackRecorder.records.get("feedback:sevt_preview_pull_request_1:github-pr-comment"),
@@ -1063,6 +1080,17 @@ describe("PreviewPullRequestEventIngestService", () => {
       channel: "github-pr-comment",
       status: "published",
       providerFeedbackId: "github_feedback_1",
+      updatedAt: "2026-05-06T04:21:00.000Z",
+    });
+    expect(
+      feedbackRecorder.records.get("feedback:sevt_preview_pull_request_1:github-deployment-status"),
+    ).toEqual({
+      feedbackKey: "feedback:sevt_preview_pull_request_1:github-deployment-status",
+      sourceEventId: "sevt_preview_pull_request_1",
+      previewEnvironmentId: "prenv_1",
+      channel: "github-deployment-status",
+      status: "published",
+      providerFeedbackId: "github_feedback_2",
       updatedAt: "2026-05-06T04:21:00.000Z",
     });
   });
@@ -1316,6 +1344,11 @@ describe("PreviewDeploymentProcessManager", () => {
         errorCode: "provider_error",
         retryable: true,
       },
+      deploymentStatusFeedbackResult: {
+        status: "retryable-failed",
+        errorCode: "provider_error",
+        retryable: true,
+      },
     });
     expect(
       feedbackRecorder.records.get(
@@ -1331,6 +1364,19 @@ describe("PreviewDeploymentProcessManager", () => {
       retryable: true,
     });
     expect(JSON.stringify(feedbackRecorder.records)).not.toContain("temporarily unavailable");
+    expect(
+      feedbackRecorder.records.get(
+        "feedback:sevt_preview_process_feedback_retry:github-deployment-status",
+      ),
+    ).toMatchObject({
+      feedbackKey: "feedback:sevt_preview_process_feedback_retry:github-deployment-status",
+      sourceEventId: "sevt_preview_process_feedback_retry",
+      previewEnvironmentId: "prenv_1",
+      channel: "github-deployment-status",
+      status: "retryable-failed",
+      errorCode: "provider_error",
+      retryable: true,
+    });
   });
 });
 

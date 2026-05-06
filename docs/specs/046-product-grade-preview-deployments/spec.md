@@ -248,10 +248,12 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   bodies or tokens. The GitHub integration also has a hermetic check-run feedback writer that
   resolves the pull-request head SHA, creates check runs, updates existing check runs by provider
   feedback id, and returns safe retryable provider errors. Deployment-status feedback is supported
-  when the caller supplies a provider deployment id; the writer records that deployment id as the
-  provider feedback id so later publishes reuse the same deployment identity for GitHub's append-only
-  status timeline. Shell wiring resolves the GitHub access token per request through the existing
-  integration auth port before delegating to the composite GitHub feedback writer.
+  for supplied provider deployment ids and for automatic product-grade preview feedback; when no
+  deployment id is present, the GitHub writer resolves the pull-request head SHA, creates a
+  transient GitHub preview deployment, records that deployment id as the provider feedback id, and
+  appends deployment statuses to that deployment timeline. Shell wiring resolves the GitHub access
+  token per request through the existing integration auth port before delegating to the composite
+  GitHub feedback writer.
 - Preview environment cleanup now has an initial application service that loads the durable preview
   environment, marks cleanup requested without deleting preview history, and delegates runtime,
   route, source-link, provider metadata, and feedback cleanup to a port with safe source-scope
@@ -288,8 +290,12 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   `X-Appaloft-Source-Binding-Fingerprint` headers, then dispatches
   `IngestPreviewPullRequestEventCommand` through `CommandBus`. Raw signatures, secrets, and
   provider payloads stay out of the command.
-- No GitHub App installation/repository context mapper, scheduler leases, terminal provider
-  metadata cleanup, or automatic process-manager deployment-status publication is implemented.
+- Accepted preview deployment processing now publishes both idempotent PR-comment feedback and
+  idempotent `github-deployment-status` feedback after ids-only deployment dispatch. Retryable
+  deployment-status feedback failures are recorded as safe feedback state without changing the
+  accepted deployment result to `err`.
+- No GitHub App installation/repository context mapper, scheduler leases, or terminal provider
+  metadata cleanup is implemented.
 - Preview policy and preview environment operations currently expose CLI, HTTP/oRPC, and generated
   future MCP tool descriptors. Web exposes preview policy readback/configuration and the read-only
   preview environment list/detail/delete surface.

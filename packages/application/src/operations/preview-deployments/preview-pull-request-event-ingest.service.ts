@@ -47,6 +47,7 @@ export type PreviewPullRequestEventIngestResult =
       status: "routed";
       lifecycleResult: PreviewLifecycleDeployResult;
       feedbackResult?: PreviewDeploymentProcessResult["feedbackResult"];
+      deploymentStatusFeedbackResult?: PreviewDeploymentProcessResult["deploymentStatusFeedbackResult"];
     }
   | {
       status: "ignored";
@@ -109,6 +110,9 @@ export class PreviewPullRequestEventIngestService {
       status: "routed",
       lifecycleResult: result.lifecycleResult,
       ...(result.feedbackResult ? { feedbackResult: result.feedbackResult } : {}),
+      ...(result.deploymentStatusFeedbackResult
+        ? { deploymentStatusFeedbackResult: result.deploymentStatusFeedbackResult }
+        : {}),
     }));
   }
 
