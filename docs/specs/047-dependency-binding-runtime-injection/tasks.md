@@ -31,16 +31,16 @@
 
 ## Docs Round
 
-- [ ] Add/update public docs for binding a dependency and deploying with runtime injection.
-- [ ] Add stable help anchors for plan/show blocked injection readiness.
-- [ ] Confirm CLI/API/Web/future MCP help points to the same anchor.
+- [x] Add/update public docs for binding a dependency and deploying with runtime injection.
+- [x] Add stable help anchors for plan/show blocked injection readiness.
+- [x] Confirm CLI/API/Web/future MCP help points to the same anchor.
 
 ## Verification
 
 - [x] Run targeted application tests.
 - [x] Run targeted contracts and PGlite tests.
 - [x] Run targeted runtime adapter tests.
-- [ ] Run public docs checks after Docs Round.
+- [x] Run public docs checks after Docs Round.
 - [x] Run `bun run lint`.
 - [x] Run `bun turbo run typecheck`.
 - [x] Run `git diff --check`.

@@ -517,7 +517,8 @@ export const apiDocsHrefs = {
   terminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
   storageVolumeLifecycle: resolvePublicDocsHelpHref("storage.volume-lifecycle"),
-  dependencyResourceLifecycle: resolvePublicDocsHelpHref("resource.concept"),
+  dependencyResourceLifecycle: resolvePublicDocsHelpHref("dependency.resource-lifecycle"),
+  dependencyRuntimeInjection: resolvePublicDocsHelpHref("dependency.runtime-injection"),
   sourceAutoDeploySetup: resolvePublicDocsHelpHref("source.auto-deploy-setup"),
   sourceAutoDeploySignatures: resolvePublicDocsHelpHref("source.auto-deploy-signatures"),
   sourceAutoDeployDedupe: resolvePublicDocsHelpHref("source.auto-deploy-dedupe"),
@@ -671,71 +672,71 @@ export const apiRouteDescriptions = {
   ),
   provisionPostgresDependencyResource: routeDescription(
     "Records provider-neutral Appaloft-managed Postgres dependency resource intent without creating provider-native database infrastructure.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   importPostgresDependencyResource: routeDescription(
     "Imports external Postgres dependency metadata while keeping raw connection secrets outside list and show responses.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   provisionRedisDependencyResource: routeDescription(
     "Records provider-neutral Appaloft-managed Redis dependency resource intent without creating provider-native Redis infrastructure.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   importRedisDependencyResource: routeDescription(
     "Imports external Redis dependency metadata while keeping raw connection secrets outside list and show responses.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   listDependencyResources: routeDescription(
     "Lists dependency resources with ownership, masked connection, binding readiness, and backup relationship summaries.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   showDependencyResource: routeDescription(
     "Reads one dependency resource with masked connection and delete-safety metadata.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   renameDependencyResource: routeDescription(
     "Renames one dependency resource without changing provider ownership, bindings, or connection secret boundaries.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   deleteDependencyResource: routeDescription(
     "Deletes only dependency resources that are not blocked by bindings, backup relationships, provider-managed unsafe state, or snapshot references.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   createDependencyResourceBackup: routeDescription(
     "Creates a dependency resource backup through the selected provider while recording safe artifact metadata.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   listDependencyResourceBackups: routeDescription(
     "Lists dependency resource backups without exposing provider-native artifact secrets.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   showDependencyResourceBackup: routeDescription(
     "Reads one dependency resource backup with latest restore attempt metadata.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   restoreDependencyResourceBackup: routeDescription(
     "Restores a ready dependency resource backup after explicit data-overwrite acknowledgements.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   bindResourceDependency: routeDescription(
     "Binds a ready Postgres dependency resource to a resource using safe control-plane metadata only.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   unbindResourceDependency: routeDescription(
     "Removes a resource dependency binding without deleting the dependency resource or external database.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   rotateResourceDependencyBindingSecret: routeDescription(
     "Rotates the safe secret reference used by a resource dependency binding for future deployments.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   listResourceDependencyBindings: routeDescription(
     "Lists safe dependency binding summaries for one resource without exposing raw connection secrets.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   showResourceDependencyBinding: routeDescription(
     "Reads one safe dependency binding summary for a resource without exposing raw connection secrets.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   listScheduledTasks: routeDescription(
     "Lists Resource-owned scheduled task definitions by project, environment, resource, status, cursor, and limit.",

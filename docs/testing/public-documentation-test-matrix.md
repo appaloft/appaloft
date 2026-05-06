@@ -61,6 +61,8 @@ Current status:
   runtime targets now have a registered server docs anchor for default-active Swarm execution.
   Action-only pull request previews and future product-grade previews now have registered
   `deploy/previews` anchors that distinguish workflow-file previews from control-plane previews.
+  Dependency runtime injection now has a registered dependency docs anchor for plan/show blocked
+  readiness and safe bind-to-deploy behavior.
 - `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
   a dedicated automated link checker does not exist yet.
 - `PUB-DOCS-005` is covered for registered help topics by tests that resolve each locale page and
@@ -87,6 +89,9 @@ Current status:
   `server register` help.
 - `PUB-DOCS-011` now also covers scheduled task lifecycle, run-now, run history, and run-log
   guidance through CLI `scheduled-task` help.
+- `PUB-DOCS-011` now also covers dependency resource and resource dependency binding guidance
+  through CLI dependency help. Dependency runtime injection has a registered CLI help target for
+  plan/show blocked readiness.
 - `PUB-DOCS-012` has expanded HTTP/API route-description coverage for high-confusion operations
   including deployment source, SSH credentials, server connectivity, resource profiles, environment
   variables, project lifecycle, domains, certificates, logs, health, diagnostics, and terminal
@@ -97,6 +102,9 @@ Current status:
   `POST /servers` route description.
 - `PUB-DOCS-012` now also covers scheduled task lifecycle, run-now, run history, and run-log
   guidance through the scheduled-task HTTP route descriptions.
+- `PUB-DOCS-012` now also covers dependency resource and resource dependency binding route
+  descriptions through the dependency resource lifecycle anchor. Dependency runtime injection has a
+  registered HTTP/API help target for plan/show blocked readiness.
 - `PUB-DOCS-013` is covered by HTTP adapter tests for embedded docs routing and binary bundle smoke
   verification that `/docs/*` is served separately from Web console assets.
 - `PUB-DOCS-014` is covered by HTTP adapter tests for `docsStaticDir` override behavior and binary
@@ -111,7 +119,8 @@ Current status:
   traceability is recorded as a target-help anchor with deferred execution UI. Scheduled task
   traceability is recorded for active CLI/HTTP/API/Web/future MCP help links. Preview deployment
   traceability is recorded for Action-only CLI/repository-config guidance and future
-  Cloud/self-hosted product-grade preview surfaces.
+  Cloud/self-hosted product-grade preview surfaces. Dependency runtime injection traceability is
+  recorded for safe bind-to-deploy behavior and plan/show blocked readiness.
 - `PUB-DOCS-017` is covered for registered public error guides by
   `packages/docs-registry/test/help-topics.test.ts`.
 

@@ -43,6 +43,12 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.resourceNetworkProfile).toBe(
       "/docs/resources/profiles/health-network/#resource-network-profile",
     );
+    expect(webDocsHrefs.dependencyResourceLifecycle).toBe(
+      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+    );
+    expect(webDocsHrefs.dependencyRuntimeInjection).toBe(
+      "/docs/resources/dependencies/#dependency-runtime-injection",
+    );
   });
 
   test("[PUB-DOCS-010] Web help hrefs cover owner-scoped console surfaces", () => {
