@@ -10,6 +10,8 @@ import {
 } from "@appaloft/core";
 
 import {
+  type CreateDeploymentCommandInput,
+  CreateDeploymentSourceEventDispatcher,
   createExecutionContext,
   type ExecutionContext,
   type PreviewEnvironmentRepository,
@@ -77,6 +79,18 @@ class CapturingPreviewDeploymentDispatcher implements SourceEventDeploymentDispa
   ): Promise<Result<SourceEventDeploymentDispatchResult>> {
     this.inputs.push(input);
     return ok({ deploymentId: `dep_preview_${this.inputs.length}` });
+  }
+}
+
+class CapturingCreateDeploymentUseCase {
+  inputs: CreateDeploymentCommandInput[] = [];
+
+  async execute(
+    _context: ExecutionContext,
+    input: CreateDeploymentCommandInput,
+  ): Promise<Result<{ id: string }>> {
+    this.inputs.push(input);
+    return ok({ id: `dep_create_${this.inputs.length}` });
   }
 }
 
@@ -757,5 +771,41 @@ describe("PreviewScopedConfigResolver", () => {
     });
     expect(JSON.stringify(result)).not.toContain("postgres://");
     expect(JSON.stringify(result)).not.toContain("****");
+  });
+});
+
+describe("PreviewDeploymentDispatch", () => {
+  test("[PG-PREVIEW-DEPLOY-001] dispatches preview deployments through ids-only create input", async () => {
+    const createDeploymentUseCase = new CapturingCreateDeploymentUseCase();
+    const dispatcher = new CreateDeploymentSourceEventDispatcher(createDeploymentUseCase);
+    const context = createExecutionContext({
+      requestId: "req_preview_deploy_dispatch_test",
+      entrypoint: "system",
+    });
+
+    const result = await dispatcher.dispatch(context, {
+      sourceEventId: "sevt_preview_dispatch_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ deploymentId: "dep_create_1" });
+    expect(createDeploymentUseCase.inputs).toEqual([
+      {
+        projectId: "prj_preview",
+        environmentId: "env_preview",
+        resourceId: "res_preview_api",
+        serverId: "srv_preview",
+        destinationId: "dst_preview",
+      },
+    ]);
+    expect(JSON.stringify(createDeploymentUseCase.inputs)).not.toContain("sourceEventId");
+    expect(JSON.stringify(createDeploymentUseCase.inputs)).not.toContain("pullRequestNumber");
+    expect(JSON.stringify(createDeploymentUseCase.inputs)).not.toContain("headSha");
+    expect(JSON.stringify(createDeploymentUseCase.inputs)).not.toContain("baseRef");
   });
 });
