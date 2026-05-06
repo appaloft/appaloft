@@ -8,7 +8,10 @@
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, deployment admission/readiness behavior changes for
   bound dependencies
-- Decision state: governed by [ADR-040](../../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md)
+- Decision state: governed by
+  [ADR-040](../../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md);
+  store-backed secret resolution governed by
+  [ADR-041](../../decisions/ADR-041-dependency-runtime-secret-value-resolution.md)
 
 ## Business Outcome
 
@@ -115,5 +118,6 @@ deployment snapshots, reports runtime injection as `ready | blocked | not-applic
 active non-injectable bindings before deployment acceptance, and routes safe secret handles through
 single-server and Swarm runtime target adapters. Store-backed resolution of `appaloft://...` secret
 references into raw dependency connection values remains a migration gap, so Postgres and Redis
-closed-loop exit criteria stay open. Public docs now describe safe bind-to-deploy behavior and
-blocked runtime injection readiness.
+closed-loop exit criteria stay open. The next governing artifact is
+[Dependency Runtime Secret Value Resolution](../048-dependency-runtime-secret-value-resolution/spec.md).
+Public docs now describe safe bind-to-deploy behavior and blocked runtime injection readiness.

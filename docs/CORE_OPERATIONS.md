@@ -366,8 +366,10 @@ Current boundary:
   The accepted target keeps `deployments.create` ids-only, materializes active ready dependency
   bindings into immutable safe runtime injection snapshots, gates deployment admission on
   injectable bindings, and lets runtime target adapters deliver safe dependency secret handles
-  without exposing raw connection values. Store-backed secret value resolution remains a migration
-  gap before the Postgres/Redis closed-loop exit criteria can be checked.
+  without exposing raw connection values. Store-backed secret value resolution is governed by
+  [ADR-041](./decisions/ADR-041-dependency-runtime-secret-value-resolution.md) and
+  [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md);
+  its Code Round remains open before the Postgres/Redis closed-loop exit criteria can be checked.
 - `resources.rotate-dependency-binding-secret` rotates only the binding-scoped safe secret
   reference/version for future deployment snapshot references. It requires explicit acknowledgement
   that historical snapshots remain unchanged, and it does not rotate provider-native database

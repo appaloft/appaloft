@@ -54,7 +54,9 @@ capability under
 - [Postgres Provider-Native Realization](../specs/038-postgres-provider-native-realization/spec.md)
 - [Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md)
 - [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md)
+- [Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md)
 - [ADR-040: Dependency Binding Runtime Injection Boundary](../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md)
+- [ADR-041: Dependency Runtime Secret Value Resolution](../decisions/ADR-041-dependency-runtime-secret-value-resolution.md)
 - [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
 - [dependency-resource-realization-requested](../events/dependency-resource-realization-requested.md)
 - [dependency-resource-realized](../events/dependency-resource-realized.md)
@@ -280,8 +282,10 @@ hermetic provider capability. Dependency resource backup/restore is implemented 
 provider capability, safe backup read models, restore attempt metadata, lifecycle events, and
 delete-safety blockers. Dependency binding runtime injection is specified by ADR-040 but not
 fully closed: safe runtime secret handles and readiness gating are implemented, while store-backed
-secret value resolution is still open. Web affordances, provider-native Redis realization, managed
-Redis binding admission, and runtime cleanup remain future work.
+secret value resolution is governed by
+[Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md)
+and still open for Code Round. Web affordances, provider-native Redis realization, managed Redis
+binding admission, and runtime cleanup remain future work.
 
 ## Open Questions
 

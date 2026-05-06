@@ -882,6 +882,13 @@ Current verification notes:
   through single-server and Swarm adapters. Store-backed resolution of Appaloft secret references
   into raw dependency connection values and public docs remain open, so Postgres/Redis closed loop
   exit criteria remain open.
+- 2026-05-06 Phase 7 dependency runtime secret value resolution Spec Round added
+  [ADR-041](./decisions/ADR-041-dependency-runtime-secret-value-resolution.md) plus
+  [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md)
+  to govern imported Postgres/Redis connection value storage, managed Postgres reference
+  validation, deployment blocked readiness for unresolved refs, single-server runtime env
+  resolution, and Docker Swarm secret materialization. It does not implement the Code Round yet, so
+  Postgres/Redis closed-loop exit criteria remain open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider

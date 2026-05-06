@@ -23,6 +23,8 @@ ResourceBinding + DependencyResource
 `Deployment` owns the immutable dependency injection snapshot for one attempt. Runtime target
 adapters own provider-specific materialization of that snapshot into Docker environment variables,
 Docker secrets, Compose environment, Swarm secrets, or later backend-native secret mechanisms.
+Store-backed value resolution for Appaloft-owned dependency secret references is governed by
+[ADR-041](./ADR-041-dependency-runtime-secret-value-resolution.md).
 
 Deployment admission must materialize only active, ready, injectable bindings. For the Phase 7 Code
 Round:
@@ -81,6 +83,7 @@ or provider-managed handles, not plain configuration values.
 ## References
 
 - [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md)
+- [Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md)
 - [Dependency Resource Lifecycle](../workflows/dependency-resource-lifecycle.md)
 - [Dependency Resource Test Matrix](../testing/dependency-resource-test-matrix.md)
 - [deployments.create Test Matrix](../testing/deployments.create-test-matrix.md)
