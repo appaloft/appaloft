@@ -5,6 +5,7 @@ import {
   CreatedAt,
   DependencyResourceProviderRealizationAttemptId,
   DependencyResourceProviderRealizationStatusValue,
+  DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
   Environment,
   EnvironmentId,
@@ -200,6 +201,64 @@ describe("Dependency resource binding use cases", () => {
       expect.objectContaining({
         type: "resource-dependency-bound",
         aggregateId: result._unsafeUnwrap().id,
+      }),
+    );
+  });
+
+  test("[DEP-BIND-REDIS-BIND-001] binds imported Redis dependency resource to Resource", async () => {
+    const { bindDependency, context, dependencyResources, listBindings, repositoryContext } =
+      await createHarness();
+    const importedRedis = ResourceInstance.createRedisDependencyResource({
+      id: ResourceInstanceId.rehydrate("rsi_redis"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      name: ResourceInstanceName.rehydrate("External Redis"),
+      kind: ResourceInstanceKindValue.rehydrate("redis"),
+      sourceMode: DependencyResourceSourceModeValue.rehydrate("imported-external"),
+      providerKey: ProviderKey.rehydrate("external-redis"),
+      providerManaged: false,
+      endpoint: {
+        host: "redis.example.com",
+        port: 6379,
+        databaseName: "0",
+        maskedConnection: "redis://:********@redis.example.com:6379/0",
+      },
+      connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+        "appaloft://dependency-resources/rsi_redis/connection",
+      ),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    await dependencyResources.upsert(
+      repositoryContext,
+      importedRedis,
+      UpsertResourceInstanceSpec.fromResourceInstance(importedRedis),
+    );
+
+    const result = await bindDependency.execute(context, {
+      resourceId: "res_web",
+      dependencyResourceId: "rsi_redis",
+      targetName: "REDIS_URL",
+    });
+    const list = await listBindings.execute(
+      context,
+      ListResourceDependencyBindingsQuery.create({ resourceId: "res_web" })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(list._unsafeUnwrap().items).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId: "rsi_redis",
+        kind: "redis",
+        target: expect.objectContaining({
+          targetName: "REDIS_URL",
+          secretRef: "appaloft://dependency-resources/rsi_redis/connection",
+        }),
+        connection: expect.objectContaining({
+          maskedConnection: "redis://:********@redis.example.com:6379/0",
+        }),
+        snapshotReadiness: {
+          status: "ready",
+        },
       }),
     );
   });

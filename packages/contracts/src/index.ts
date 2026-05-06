@@ -1128,7 +1128,7 @@ export const resourceDependencyBindingSummarySchema = z.object({
   dependencyResourceId: z.string(),
   dependencyResourceName: z.string().optional(),
   dependencyResourceSlug: z.string().optional(),
-  kind: z.literal("postgres"),
+  kind: z.enum(["postgres", "redis"]),
   sourceMode: z.enum(["appaloft-managed", "imported-external"]),
   providerKey: z.string(),
   providerManaged: z.boolean(),
@@ -2872,7 +2872,7 @@ export const deploymentSummarySchema = z.object({
       z.object({
         bindingId: z.string(),
         dependencyResourceId: z.string(),
-        kind: z.literal("postgres"),
+        kind: z.enum(["postgres", "redis"]),
         targetName: z.string(),
         scope: z.enum(["environment", "release", "build-only", "runtime-only"]),
         injectionMode: z.enum(["env", "file", "reference"]),

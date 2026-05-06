@@ -18,6 +18,17 @@ describe("deployment plan preview contract", () => {
             status: "ready",
           },
         },
+        {
+          bindingId: "rbd_redis",
+          dependencyResourceId: "rsi_redis",
+          kind: "redis",
+          targetName: "REDIS_URL",
+          scope: "runtime-only",
+          injectionMode: "env",
+          snapshotReadiness: {
+            status: "ready",
+          },
+        },
       ],
       runtimeInjection: {
         status: "deferred",
@@ -158,8 +169,10 @@ describe("deployment plan preview contract", () => {
     });
 
     expect(plan.dependencyBindings?.references[0]?.targetName).toBe("DATABASE_URL");
+    expect(plan.dependencyBindings?.references[1]?.kind).toBe("redis");
     expect(show.snapshot?.dependencyBindings?.runtimeInjection.status).toBe("deferred");
     expect(JSON.stringify({ plan, show })).not.toContain("postgres://");
+    expect(JSON.stringify({ plan, show })).not.toContain("redis://");
     expect(JSON.stringify({ plan, show })).not.toContain("super-secret");
   });
 

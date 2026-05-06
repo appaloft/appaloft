@@ -2462,7 +2462,7 @@ export interface ResourceDependencyBindingSummary {
   dependencyResourceId: string;
   dependencyResourceName?: string;
   dependencyResourceSlug?: string;
-  kind: "postgres";
+  kind: DependencyResourceKind;
   sourceMode: DependencyResourceSourceMode;
   providerKey: string;
   providerManaged: boolean;
@@ -2480,7 +2480,7 @@ export interface ResourceDependencyBindingSummary {
 export interface DeploymentDependencyBindingSnapshotReferenceSummary {
   bindingId: string;
   dependencyResourceId: string;
-  kind: "postgres";
+  kind: DependencyResourceKind;
   targetName: string;
   scope: ResourceDependencyBindingTargetSummary["scope"];
   injectionMode: ResourceDependencyBindingTargetSummary["injectionMode"];

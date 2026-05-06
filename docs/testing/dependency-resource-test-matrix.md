@@ -2,7 +2,7 @@
 
 ## Scope
 
-This matrix covers the Phase 7 Postgres dependency resource lifecycle baseline:
+This matrix covers the Phase 7 dependency resource lifecycle baseline:
 
 - `dependency-resources.provision-postgres`
 - `dependency-resources.import-postgres`
@@ -15,7 +15,7 @@ This matrix covers the Phase 7 Postgres dependency resource lifecycle baseline:
 - `resources.rotate-dependency-binding-secret`
 - `resources.list-dependency-bindings`
 - `resources.show-dependency-binding`
-- deployment snapshot safe binding reference capture for active Postgres Resource bindings
+- deployment snapshot safe binding reference capture for active Postgres and Redis Resource bindings
 - Redis dependency resource lifecycle
 - provider-native Postgres realization scenarios
 - dependency resource backup/restore scenarios
@@ -75,12 +75,14 @@ or cross-resource restore.
 | DEP-BIND-PG-DELETE-002 | `resources.unbind-dependency`; `dependency-resources.delete` | Application | Imported external Postgres is unbound and then deleted. | Appaloft removes only control-plane binding/resource records and does not imply external/provider database deletion. | `packages/application/test/dependency-resource-binding.test.ts` |
 | DEP-BIND-PG-ENTRY-001 | Operation catalog / CLI / oRPC / HTTP | Entrypoint | Dependency binding operations are public through catalog, CLI, and HTTP/oRPC. | Entrypoints dispatch explicit command/query messages, reuse application schemas, and expose no generic update operation. | `packages/application/test/operation-catalog-boundary.test.ts`; `packages/adapters/cli/test/dependency-command.test.ts`; `packages/orpc/test/dependency-resource.http.test.ts` |
 | DEP-BIND-PG-SNAPSHOT-001 | deployment snapshot boundary | Application/read model | Resource has active dependency binding. | Raw binding secrets are not written to deployment snapshots; binding snapshot materialization is no longer deferred for safe references and runtime injection remains deferred. | `packages/application/test/dependency-resource-binding.test.ts`; `packages/application/test/create-deployment.test.ts`; `packages/persistence/pg/test/deployment-repository.pglite.test.ts` |
+| DEP-BIND-REDIS-BIND-001 | `resources.bind-dependency` | Application/read model/persistence/contract | Bind ready imported Redis dependency resource to active Resource. | Persists active `ResourceBinding`, exposes safe Redis binding read model fields, and performs no provider-native Redis action. | `packages/application/test/dependency-resource-binding.test.ts`; `packages/persistence/pg/test/dependency-resource-binding.pglite.test.ts`; `packages/contracts/test/resource-dependency-binding-contract.test.ts` |
 | DEP-BIND-SNAP-REF-001 | `deployments.create` | Core/application | Resource has an active ready Postgres dependency binding. | Accepted deployment snapshot includes safe dependency binding references with binding id, dependency resource id, kind, target name, scope, injection mode, and ready snapshot readiness. | `packages/core/test/deployment.test.ts`; `packages/application/test/create-deployment.test.ts` |
 | DEP-BIND-SNAP-REF-002 | deployment snapshot/read model | Application/persistence/contract | Bound Postgres dependency was imported with secret-bearing connection material. | Deployment snapshot, `deployments.plan`, and `deployments.show` omit raw connection URL, password, token, auth header, cookie, provider credential, secret value, sensitive query parameter, and materialized env values. | `packages/application/test/create-deployment.test.ts`; `packages/application/test/show-deployment.test.ts`; `packages/persistence/pg/test/deployment-repository.pglite.test.ts`; `packages/contracts/test/deployment-dependency-binding-snapshot-contract.test.ts` |
 | DEP-BIND-SNAP-REF-003 | `deployments.create` | Application | Resource had a binding that was removed before deployment. | Removed binding is not copied into the active dependency binding snapshot reference list. | `packages/application/test/create-deployment.test.ts` |
 | DEP-BIND-SNAP-REF-004 | `deployments.plan`; `deployments.create` | Application/read model | Resource has an active binding whose dependency metadata is not ready for safe snapshot reference. | Deployment admission is not blocked in this slice; readiness reports blocked snapshot readiness and runtime injection remains deferred. | `packages/application/test/create-deployment.test.ts`; `packages/application/test/deployment-plan-preview.test.ts` |
 | DEP-BIND-SNAP-REF-005 | `deployments.plan` | Query/read model | Resource has an active Postgres dependency binding. | Preview reports safe dependency binding snapshot readiness and runtime injection deferred without creating a deployment, events, or runtime work. | `packages/application/test/deployment-plan-preview.test.ts`; `packages/contracts/test/deployment-plan-preview-contract.test.ts` |
 | DEP-BIND-SNAP-REF-006 | `deployments.show` | Query/read model | Deployment was accepted with dependency binding references. | Show response reports immutable dependency binding references captured at admission, not current Resource binding state. | `packages/application/test/show-deployment.test.ts`; `packages/contracts/test/deployment-dependency-binding-snapshot-contract.test.ts` |
+| DEP-BIND-REDIS-SNAPSHOT-001 | `deployments.create`; `deployments.plan`; `deployments.show` | Application/contract | Resource has an active ready imported Redis dependency binding. | Safe deployment snapshot references and plan/show contracts carry kind `redis` without raw Redis connection material or materialized env values; runtime injection remains deferred. | `packages/application/test/create-deployment.test.ts`; `packages/contracts/test/deployment-plan-preview-contract.test.ts` |
 | DEP-BIND-ROTATE-001 | `resources.rotate-dependency-binding-secret` | Core/application | Rotate active ResourceBinding secret reference. | Persists a new safe binding secret reference/version, emits `resource-dependency-binding-secret-rotated`, and performs no provider-native database, runtime, or snapshot rewrite side effect. | `packages/core/test/resource-binding.test.ts`; `packages/application/test/dependency-resource-binding.test.ts` |
 | DEP-BIND-ROTATE-002 | `resources.rotate-dependency-binding-secret` | Core/application | Missing, removed, or cross-resource binding. | Returns `not_found` or `resource_dependency_binding_rotation_blocked`, no mutation. | `packages/core/test/resource-binding.test.ts`; `packages/application/test/dependency-resource-binding.test.ts` |
 | DEP-BIND-ROTATE-003 | `resources.rotate-dependency-binding-secret`; binding read models | Application/read model | Secret-bearing rotation input is provided. | No raw password, token, auth header, cookie, SSH credential, provider token, private key, sensitive query, raw connection URL, previous plaintext, or materialized env value appears in output, event, error, log, or snapshot. | `packages/application/test/dependency-resource-binding.test.ts`; `packages/persistence/pg/test/dependency-resource-binding.pglite.test.ts` |
@@ -131,10 +133,12 @@ Tests must assert Postgres dependency resource commands do not:
 
 This baseline implements Postgres dependency resource control-plane records, Resource binding
 metadata, safe read models, active-binding delete blockers, and provider-neutral safe deployment
-snapshot references for active Postgres bindings. Binding secret rotation is implemented for
-binding-scoped safe reference/version metadata only. Redis dependency resource lifecycle is
-implemented as provider-neutral safe metadata. Provider-native Postgres realization is implemented
+snapshot references for active Postgres and imported Redis bindings. Binding secret rotation is
+implemented for binding-scoped safe reference/version metadata only. Redis dependency resource
+lifecycle is implemented as provider-neutral safe metadata with imported Redis binding and safe
+snapshot reference capture. Provider-native Postgres realization is implemented
 through a hermetic provider capability with safe realization state and managed delete cleanup.
 Backup/restore is implemented with hermetic provider capability, safe backup read models, restore
 attempt metadata, lifecycle events, and delete-safety blockers. Provider-native Redis lifecycle,
-runtime env injection, Web affordances, and runtime cleanup remain future Phase 7 work.
+managed Redis binding admission, runtime env injection, Web affordances, and runtime cleanup remain
+future Phase 7 work.

@@ -1494,6 +1494,7 @@ export class MemoryResourceDependencyBindingReadModel
   ): ResourceDependencyBindingSummary {
     const bindingState = binding.toState();
     const dependencyState = dependencyResource.toState();
+    const endpoint = dependencyState.postgresEndpoint ?? dependencyState.redisEndpoint;
     return {
       id: bindingState.id.value,
       projectId: bindingState.projectId.value,
@@ -1526,17 +1527,13 @@ export class MemoryResourceDependencyBindingReadModel
             },
           }
         : {}),
-      ...(dependencyState.postgresEndpoint
+      ...(endpoint
         ? {
             connection: {
-              host: dependencyState.postgresEndpoint.host.value,
-              ...(dependencyState.postgresEndpoint.port
-                ? { port: dependencyState.postgresEndpoint.port.value }
-                : {}),
-              ...(dependencyState.postgresEndpoint.databaseName
-                ? { databaseName: dependencyState.postgresEndpoint.databaseName.value }
-                : {}),
-              maskedConnection: dependencyState.postgresEndpoint.maskedConnection.value,
+              host: endpoint.host.value,
+              ...(endpoint.port ? { port: endpoint.port.value } : {}),
+              ...(endpoint.databaseName ? { databaseName: endpoint.databaseName.value } : {}),
+              maskedConnection: endpoint.maskedConnection.value,
               ...(bindingState.secretRef
                 ? { secretRef: bindingState.secretRef.value }
                 : dependencyState.connectionSecretRef

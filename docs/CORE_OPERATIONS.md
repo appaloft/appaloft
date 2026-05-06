@@ -368,7 +368,9 @@ Current boundary:
   deployment snapshots.
 - Redis dependency resources are provider-neutral `ResourceInstance` records in this slice. Managed
   Redis records do not create provider-native Redis infrastructure, imported external Redis delete
-  removes only Appaloft's record, and list/show output masks Redis connection secrets.
+  removes only Appaloft's record, list/show output masks Redis connection secrets, and ready
+  imported Redis records can be bound as safe deployment snapshot references. Managed Redis binding
+  remains blocked until provider-native Redis realization is specified.
 - Dependency resource backup/restore is governed by
   [ADR-036](./decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md) and
   [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md).

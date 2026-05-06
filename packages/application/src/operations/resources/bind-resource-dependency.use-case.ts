@@ -105,7 +105,10 @@ export class BindResourceDependencyUseCase {
           }),
         );
       }
-      if (dependencyState.status.value !== "ready" || dependencyState.kind.value !== "postgres") {
+      if (
+        dependencyState.status.value !== "ready" ||
+        (dependencyState.kind.value !== "postgres" && dependencyState.kind.value !== "redis")
+      ) {
         return err(
           domainError.validation("Dependency resource is not bindable", {
             phase: "resource-dependency-binding",
@@ -121,9 +124,10 @@ export class BindResourceDependencyUseCase {
         dependencyState.providerRealization?.status.value !== "ready"
       ) {
         return err(
-          domainError.validation("Managed Postgres dependency resource is not realized", {
+          domainError.validation("Managed dependency resource is not realized", {
             phase: "resource-dependency-binding",
             dependencyResourceId: dependencyResourceId.value,
+            dependencyResourceKind: dependencyState.kind.value,
             providerRealizationStatus:
               dependencyState.providerRealization?.status.value ?? "not-realized",
           }),

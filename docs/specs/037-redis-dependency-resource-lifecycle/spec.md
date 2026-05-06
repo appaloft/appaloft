@@ -11,12 +11,13 @@
 ## Business Outcome
 
 Operators can create or import a Redis dependency resource in Appaloft, inspect safe ownership and
-connection metadata, rename it, and delete only records that pass explicit safety checks.
+connection metadata, bind ready imported Redis records to Resources as safe dependency references,
+rename them, and delete only records that pass explicit safety checks.
 
 This slice extends the existing provider-neutral Dependency Resource lifecycle from Postgres to
-Redis. It deliberately keeps provider-native Redis provisioning, runtime environment injection,
-backup/restore, and Redis-specific workload binding semantics out of scope until later Phase 7
-slices.
+Redis. It deliberately keeps provider-native Redis provisioning, managed Redis binding admission,
+runtime environment injection, backup/restore, and Redis-specific materialized workload injection
+semantics out of scope until later Phase 7 slices.
 
 ## Discover Findings
 
@@ -56,6 +57,8 @@ slices.
 | DEP-RES-REDIS-DELETE-001 | Delete imported external Redis record | Imported external Redis has no blockers | `dependency-resources.delete` runs | Appaloft tombstones/removes the control-plane record and does not imply provider/external Redis deletion. |
 | DEP-RES-REDIS-DELETE-002 | Block unsafe Redis delete | Redis has binding, backup, provider-managed unsafe, or retained snapshot/reference blockers | `dependency-resources.delete` runs | Command returns `dependency_resource_delete_blocked`, no mutation, no provider/runtime cleanup. |
 | DEP-RES-REDIS-ENTRY-001 | Public Redis operation catalog | Redis lifecycle operations are active | Operation catalog, CLI, and HTTP/oRPC are inspected | Entrypoints dispatch explicit Redis provision/import commands and existing dependency list/show/rename/delete messages; no generic update command is exposed. |
+| DEP-BIND-REDIS-BIND-001 | Bind imported Redis to Resource | Active Resource and ready imported Redis share project/environment | `resources.bind-dependency` runs with a safe target name such as `REDIS_URL` | An active `ResourceBinding` is persisted, safe Redis binding summaries are readable, and no provider-native Redis action runs. |
+| DEP-BIND-REDIS-SNAPSHOT-001 | Capture Redis binding snapshot reference | Resource has an active ready imported Redis binding | `deployments.create`, `deployments.plan`, or `deployments.show` reports dependency binding references | Safe references carry kind `redis` without raw Redis connection material or materialized env values; runtime injection remains deferred. |
 
 ## Domain Ownership
 
@@ -63,8 +66,9 @@ slices.
 - Aggregate owner: `ResourceInstance` owns Redis dependency resource identity, kind, ownership,
   lifecycle, source/management mode, provider-neutral endpoint metadata, secret reference, binding
   readiness, backup relationship metadata, and delete safety state.
-- Future aggregate relationship: `ResourceBinding` owns workload-to-Redis binding semantics after a
-  later Redis binding slice; this slice only prepares safe dependency records and read models.
+- Aggregate relationship: `ResourceBinding` owns provider-neutral Resource-to-imported-Redis
+  binding metadata and safe snapshot-reference readiness in this slice. Provider-native managed
+  Redis admission and materialized runtime injection remain later work.
 - Upstream/downstream contexts:
   - Workspace provides project/environment context.
   - Workload Delivery later binds Resources to Redis dependency resources.
@@ -75,9 +79,11 @@ slices.
 
 - API/oRPC: add `POST /api/dependency-resources/redis/provision` and
   `POST /api/dependency-resources/redis/import`; extend existing list/show/rename/delete routes to
-  accept and return `redis`.
+  accept and return `redis`; existing dependency binding and deployment plan/show contracts accept
+  Redis safe binding references.
 - CLI: add `appaloft dependency redis provision/import`; reuse
-  `appaloft dependency list/show/rename/delete`.
+  `appaloft dependency list/show/rename/delete`; existing dependency binding commands can bind
+  ready imported Redis.
 - Web/UI: deferred until a Web/Docs Round with i18n and tests.
 - Config: no repository config fields in this slice.
 - Events: reuse generic dependency resource domain events; no Redis-specific event is required.
@@ -106,7 +112,7 @@ values.
 
 ## Non-Goals
 
-- No Redis Resource binding.
+- No managed Redis binding admission until provider-native Redis realization is specified.
 - No provider-native Redis provisioning/deletion.
 - No provider-native credential rotation.
 - No runtime environment injection.
@@ -117,5 +123,5 @@ values.
 
 ## Open Questions
 
-- Redis binding target defaults, runtime env names, and TLS material injection are deferred to a
-  later Redis binding/runtime injection slice.
+- Redis binding target defaults beyond operator-supplied safe target names, runtime env names, and
+  TLS material injection are deferred to a later Redis binding/runtime injection slice.

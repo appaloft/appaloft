@@ -764,6 +764,54 @@ async function createActivePostgresBinding(input: {
   );
 }
 
+async function createActiveRedisBinding(input: {
+  dependencyResources: MemoryDependencyResourceRepository;
+  dependencyBindings: MemoryResourceDependencyBindingRepository;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+}) {
+  const dependencyResource = ResourceInstance.createRedisDependencyResource({
+    id: ResourceInstanceId.rehydrate("rsi_redis"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    name: ResourceInstanceName.rehydrate("External Redis"),
+    kind: ResourceInstanceKindValue.rehydrate("redis"),
+    sourceMode: DependencyResourceSourceModeValue.rehydrate("imported-external"),
+    providerKey: ProviderKey.rehydrate("external-redis"),
+    endpoint: {
+      host: "redis.example.com",
+      port: 6379,
+      databaseName: "0",
+      maskedConnection: "redis://:********@redis.example.com:6379/0",
+    },
+    connectionSecretRef: DependencyResourceSecretRef.rehydrate("secret://redis/super-secret"),
+    providerManaged: false,
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
+  await input.dependencyResources.upsert(
+    input.repositoryContext,
+    dependencyResource,
+    UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
+  );
+
+  const binding = ResourceBinding.create({
+    id: ResourceBindingId.rehydrate("rbd_redis"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    resourceId: ResourceId.rehydrate("res_demo"),
+    resourceInstanceId: ResourceInstanceId.rehydrate("rsi_redis"),
+    targetName: ResourceBindingTargetName.rehydrate("REDIS_URL"),
+    scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+    injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
+
+  await input.dependencyBindings.upsert(
+    input.repositoryContext,
+    binding,
+    UpsertResourceBindingSpec.fromResourceBinding(binding),
+  );
+}
+
 function createStaticSiteResource(input: { publishDirectory?: string } = {}): Resource {
   return Resource.rehydrate({
     id: ResourceId.rehydrate("res_demo"),
@@ -1105,6 +1153,44 @@ describe("CreateDeploymentUseCase", () => {
     expect(serializedReferences).not.toContain("super-secret");
     expect(serializedReferences).not.toContain("db.example.com");
     expect(serializedReferences).not.toContain("postgres://");
+    expect(serializedReferences).not.toContain("secret://");
+  });
+
+  test("[DEP-BIND-REDIS-SNAPSHOT-001] captures active Redis binding safe references without secrets", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActiveRedisBinding({
+      dependencyBindings,
+      dependencyResources,
+      repositoryContext,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const created = unwrapDeploymentCreateResult(result);
+
+    const deployment = deployments.items.get(created.id);
+    expect(deployment?.toState().dependencyBindingReferences).toHaveLength(1);
+    expect(deployment?.toState().dependencyBindingReferences[0]).toMatchObject({
+      bindingId: ResourceBindingId.rehydrate("rbd_redis"),
+      dependencyResourceId: ResourceInstanceId.rehydrate("rsi_redis"),
+      kind: ResourceInstanceKindValue.rehydrate("redis"),
+      targetName: ResourceBindingTargetName.rehydrate("REDIS_URL"),
+      scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+      injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+    });
+    const serializedReferences = JSON.stringify(
+      deployment?.toState().dependencyBindingReferences ?? [],
+    );
+    expect(serializedReferences).not.toContain("super-secret");
+    expect(serializedReferences).not.toContain("redis.example.com");
+    expect(serializedReferences).not.toContain("redis://");
     expect(serializedReferences).not.toContain("secret://");
   });
 
