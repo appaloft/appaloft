@@ -108,6 +108,7 @@ import {
 } from "@appaloft/core";
 import {
   CapturedEventBus,
+  FakeDependencyResourceSecretStore,
   FixedClock,
   MemoryDependencyResourceRepository,
   MemoryDeploymentRepository,
@@ -577,6 +578,7 @@ async function createDeploymentFixture(
   const resources = new MemoryResourceRepository();
   const deployments = new MemoryDeploymentRepository();
   const dependencyResources = new MemoryDependencyResourceRepository();
+  const dependencyResourceSecretStore = new FakeDependencyResourceSecretStore();
   const dependencyBindings = new MemoryResourceDependencyBindingRepository();
   const dependencyBindingReadModel = new MemoryResourceDependencyBindingReadModel(
     dependencyBindings,
@@ -700,6 +702,7 @@ async function createDeploymentFixture(
     options.domainRouteBindingReader,
     options.serverAppliedRouteDesiredStateReader,
     dependencyBindingReadModel,
+    dependencyResourceSecretStore,
   );
   return {
     clock,
@@ -707,6 +710,7 @@ async function createDeploymentFixture(
     createDeploymentUseCase,
     dependencyBindings,
     dependencyBindingReadModel,
+    dependencyResourceSecretStore,
     dependencyResources,
     deployments,
     environment,
@@ -730,6 +734,8 @@ async function createActivePostgresBinding(input: {
   dependencyResources: MemoryDependencyResourceRepository;
   dependencyBindings: MemoryResourceDependencyBindingRepository;
   repositoryContext: ReturnType<typeof toRepositoryContext>;
+  dependencyResourceSecretStore?: FakeDependencyResourceSecretStore;
+  context?: ExecutionContext;
   bindingId?: string;
   dependencyResourceId?: string;
   status?: "active" | "removed";
@@ -759,6 +765,17 @@ async function createActivePostgresBinding(input: {
     dependencyResource,
     UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
   );
+  if (input.dependencyResourceSecretStore && input.context) {
+    await input.dependencyResourceSecretStore.storeConnection(input.context, {
+      dependencyResourceId: input.dependencyResourceId ?? "rsi_pg",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      kind: "postgres",
+      purpose: "connection",
+      secretValue: "postgres://app:super-secret@db.example.com:5432/app",
+      storedAt: "2026-01-01T00:00:00.000Z",
+    });
+  }
 
   const binding = ResourceBinding.create({
     id: ResourceBindingId.rehydrate(input.bindingId ?? "rbd_pg"),
@@ -786,6 +803,8 @@ async function createActiveRedisBinding(input: {
   dependencyResources: MemoryDependencyResourceRepository;
   dependencyBindings: MemoryResourceDependencyBindingRepository;
   repositoryContext: ReturnType<typeof toRepositoryContext>;
+  dependencyResourceSecretStore?: FakeDependencyResourceSecretStore;
+  context?: ExecutionContext;
 }) {
   const dependencyResource = ResourceInstance.createRedisDependencyResource({
     id: ResourceInstanceId.rehydrate("rsi_redis"),
@@ -812,6 +831,17 @@ async function createActiveRedisBinding(input: {
     dependencyResource,
     UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
   );
+  if (input.dependencyResourceSecretStore && input.context) {
+    await input.dependencyResourceSecretStore.storeConnection(input.context, {
+      dependencyResourceId: "rsi_redis",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      kind: "redis",
+      purpose: "connection",
+      secretValue: "redis://:super-secret@redis.example.com:6379/0",
+      storedAt: "2026-01-01T00:00:00.000Z",
+    });
+  }
 
   const binding = ResourceBinding.create({
     id: ResourceBindingId.rehydrate("rbd_redis"),
@@ -1144,13 +1174,16 @@ describe("CreateDeploymentUseCase", () => {
       createDeploymentInput,
       createDeploymentUseCase,
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
       deployments,
       repositoryContext,
     } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
     await createActivePostgresBinding({
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
+      context,
       repositoryContext,
     });
 
@@ -1184,13 +1217,16 @@ describe("CreateDeploymentUseCase", () => {
       createDeploymentInput,
       createDeploymentUseCase,
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
       deployments,
       repositoryContext,
     } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
     await createActiveRedisBinding({
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
+      context,
       repositoryContext,
     });
 
@@ -1224,6 +1260,7 @@ describe("CreateDeploymentUseCase", () => {
       createDeploymentInput,
       createDeploymentUseCase,
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
       deployments,
       environment,
@@ -1232,7 +1269,9 @@ describe("CreateDeploymentUseCase", () => {
     } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
     await createActivePostgresBinding({
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
+      context,
       repositoryContext,
     });
     environment
@@ -1269,6 +1308,7 @@ describe("CreateDeploymentUseCase", () => {
       createDeploymentInput,
       createDeploymentUseCase,
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
       deployments,
       repositoryContext,
@@ -1281,7 +1321,9 @@ describe("CreateDeploymentUseCase", () => {
     });
     await createActivePostgresBinding({
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
+      context,
       repositoryContext,
     });
 
@@ -1298,7 +1340,7 @@ describe("CreateDeploymentUseCase", () => {
     expect(deployments.items.size).toBe(0);
   });
 
-  test("[DEP-BIND-SNAP-REF-003] omits removed bindings from new deployment snapshots", async () => {
+  test("[DEP-BIND-SECRET-RESOLVE-004] rejects active dependency binding with unresolved Appaloft-owned runtime secret ref", async () => {
     const {
       context,
       createDeploymentInput,
@@ -1311,6 +1353,40 @@ describe("CreateDeploymentUseCase", () => {
     await createActivePostgresBinding({
       dependencyBindings,
       dependencyResources,
+      repositoryContext,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "dependency_runtime_injection_blocked",
+      details: {
+        reason: "dependency_runtime_secret_unresolved",
+        bindingCount: 1,
+      },
+    });
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("super-secret");
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("postgres://");
+    expect(deployments.items.size).toBe(0);
+  });
+
+  test("[DEP-BIND-SNAP-REF-003] omits removed bindings from new deployment snapshots", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      context,
       repositoryContext,
       status: "removed",
     });
@@ -1329,13 +1405,16 @@ describe("CreateDeploymentUseCase", () => {
       createDeploymentInput,
       createDeploymentUseCase,
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
       deployments,
       repositoryContext,
     } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
     await createActivePostgresBinding({
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
+      context,
       repositoryContext,
     });
     const result = await createDeploymentUseCase.execute(context, createDeploymentInput);

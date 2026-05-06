@@ -13,7 +13,7 @@
   `DEP-BIND-SECRET-RESOLVE-002`.
 - [x] Add provider-managed Postgres reference validation tests for
   `DEP-BIND-SECRET-RESOLVE-003`.
-- [ ] Add deployment plan/create blocked-resolution tests for `DEP-BIND-SECRET-RESOLVE-004`.
+- [x] Add deployment plan/create blocked-resolution tests for `DEP-BIND-SECRET-RESOLVE-004`.
 - [ ] Add runtime adapter tests for single-server resolution and redaction
   `DEP-BIND-SECRET-RESOLVE-005`.
 - [ ] Add Swarm secret materialization tests for `DEP-BIND-SECRET-RESOLVE-006`.
@@ -25,7 +25,7 @@
 - [x] Store imported Postgres connection URLs through the dependency secret-value store.
 - [x] Store imported Redis connection URLs through the dependency secret-value store.
 - [x] Validate managed Postgres realization refs before marking binding readiness ready.
-- [ ] Block deployment plan/create on unresolved Appaloft-owned dependency secret refs.
+- [x] Block deployment plan/create on unresolved Appaloft-owned dependency secret refs.
 - [x] Add PG/PGlite persistence for dependency secret values and resolver lookup.
 - [ ] Inject resolved values through local-shell/generic-SSH single-server execution.
 - [ ] Create/update Docker Swarm secrets from resolved dependency values.
@@ -34,15 +34,15 @@
 
 ## Docs Round
 
-- [ ] Confirm existing dependency runtime injection docs still explain the user-visible behavior.
-- [ ] Update public docs only if Code Round changes setup, blocked reasons, or recovery steps.
+- [x] Confirm existing dependency runtime injection docs still explain the user-visible behavior.
+- [x] Update public docs only if Code Round changes setup, blocked reasons, or recovery steps.
 
 ## Verification
 
 - [x] Run targeted application tests.
 - [x] Run targeted PGlite persistence tests.
 - [ ] Run targeted runtime adapter tests.
-- [ ] Run contracts/docs tests if reason-code or help output changes.
+- [x] Run contracts/docs tests if reason-code or help output changes.
 - [ ] Run `bun run lint`.
 - [ ] Run `bun turbo run typecheck`.
 - [ ] Run `git diff --check`.

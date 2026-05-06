@@ -102,8 +102,10 @@ Current implementation stores imported Postgres and Redis connection URLs throug
 safe `appaloft://dependency-resources/.../connection` refs plus masked endpoint summaries on
 dependency resource read surfaces. Managed Postgres realization now validates Appaloft-owned
 connection refs before marking binding readiness ready; unresolved Appaloft-owned refs keep the
-provider realization ready while safely blocking binding readiness. It also stores rotated binding
+provider realization ready while safely blocking binding readiness. `deployments.plan` and
+`deployments.create` now validate captured Appaloft-owned dependency runtime refs through the
+dependency resource secret store, report `dependency_runtime_secret_unresolved` safely during plan,
+and reject create before deployment acceptance when resolution fails. It also stores rotated binding
 secret values in `dependency_binding_secrets`. Deployment snapshots capture safe runtime secret
-references and runtime adapters render safe handles, but deployment plan/create unresolved-ref
-blocking, runtime materialization, and redaction coverage remain open before the Postgres and Redis
-closed-loop exit criteria can be checked.
+references and runtime adapters render safe handles, but runtime materialization and redaction
+coverage remain open before the Postgres and Redis closed-loop exit criteria can be checked.
