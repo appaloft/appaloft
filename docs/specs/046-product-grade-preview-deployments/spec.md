@@ -293,7 +293,8 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   no trusted headers are present. The selected project/environment/Resource/server/destination/
   source-fingerprint context is dispatched in `IngestPreviewPullRequestEventCommand` through
   `CommandBus`. Raw signatures, secrets, and provider payloads stay out of the command; GitHub
-  installation id is retained only as safe verification/mapping detail.
+  provider repository id and installation id are retained only as safe verification/mapping detail
+  through the application command handler boundary.
 - Accepted preview deployment processing now publishes both idempotent PR-comment feedback and
   idempotent `github-deployment-status` feedback after ids-only deployment dispatch. Retryable
   deployment-status feedback failures are recorded as safe feedback state without changing the

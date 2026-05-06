@@ -31,6 +31,10 @@ export class IngestPreviewPullRequestEventCommandHandler
         eventKind: command.event.eventKind,
         eventAction: command.event.eventAction,
         repositoryFullName: command.event.repositoryFullName,
+        ...(command.event.providerRepositoryId
+          ? { providerRepositoryId: command.event.providerRepositoryId }
+          : {}),
+        ...(command.event.installationId ? { installationId: command.event.installationId } : {}),
         headRepositoryFullName: command.event.headRepositoryFullName,
         pullRequestNumber: command.event.pullRequestNumber,
         headSha: command.event.headSha,

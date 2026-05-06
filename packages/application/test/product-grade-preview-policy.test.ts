@@ -17,6 +17,8 @@ import {
   CreateDeploymentSourceEventDispatcher,
   createExecutionContext,
   type ExecutionContext,
+  IngestPreviewPullRequestEventCommand,
+  IngestPreviewPullRequestEventCommandHandler,
   type PreviewCleanupAttemptRecord,
   type PreviewCleanupAttemptRecorder,
   type PreviewCleanupRetryCandidate,
@@ -951,6 +953,70 @@ describe("PreviewDeploymentDispatch", () => {
 });
 
 describe("PreviewPullRequestEventIngestService", () => {
+  test("[PG-PREVIEW-EVENT-001] command handler preserves safe GitHub repository and installation facts", async () => {
+    let capturedInput: Parameters<PreviewPullRequestEventIngestService["ingest"]>[1] | undefined;
+    const handler = new IngestPreviewPullRequestEventCommandHandler({
+      ingest: async (
+        _context: ExecutionContext,
+        input: Parameters<PreviewPullRequestEventIngestService["ingest"]>[1],
+      ) => {
+        capturedInput = input;
+        return ok({
+          status: "routed",
+          lifecycleResult: {
+            status: "dispatched",
+            sourceEventId: input.sourceEventId,
+            previewEnvironmentId: "prenv_handler",
+            deploymentId: "dep_handler",
+          },
+        });
+      },
+    } as unknown as PreviewPullRequestEventIngestService);
+    const command = IngestPreviewPullRequestEventCommand.create({
+      sourceEventId: "sevt_preview_handler_1",
+      event: {
+        provider: "github",
+        eventKind: "pull-request",
+        eventAction: "synchronize",
+        repositoryFullName: "appaloft/demo",
+        providerRepositoryId: "123456",
+        installationId: "98765",
+        headRepositoryFullName: "appaloft/demo",
+        pullRequestNumber: 48,
+        headSha: "abc1234",
+        baseRef: "main",
+        verified: true,
+        deliveryId: "delivery_preview_handler",
+      },
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_48",
+    });
+    expect(command.isOk()).toBe(true);
+    if (command.isErr()) {
+      throw command.error;
+    }
+
+    const result = await handler.handle(
+      createExecutionContext({
+        requestId: "req_preview_pull_request_handler_test",
+        entrypoint: "http",
+      }),
+      command.value,
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(capturedInput?.event).toMatchObject({
+      repositoryFullName: "appaloft/demo",
+      providerRepositoryId: "123456",
+      installationId: "98765",
+      deliveryId: "delivery_preview_handler",
+    });
+  });
+
   test("[PG-PREVIEW-EVENT-001] routes normalized pull request events into preview lifecycle", async () => {
     const repository = new InMemoryPreviewEnvironmentRepository();
     const dispatcher = new CapturingPreviewDeploymentDispatcher();

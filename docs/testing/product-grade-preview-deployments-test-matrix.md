@@ -84,6 +84,9 @@ GitHub `pull_request` deliveries on `/api/integrations/github/source-events` dis
 headers when supplied, or with context mapped from the source-event policy reader by repository full
 name/provider repository id and base ref when trusted headers are absent. It also proves missing
 context is rejected before command dispatch when no policy reader mapping is available.
+`packages/application/test/product-grade-preview-policy.test.ts` also covers the preview command
+handler preserving safe GitHub provider repository id and installation id facts when handing the
+command to the preview ingest service.
 `PG-PREVIEW-EVENT-002` has initial application coverage in
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves duplicate
 source event ids return the existing preview policy decision and do not update preview environment
