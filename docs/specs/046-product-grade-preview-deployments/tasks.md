@@ -59,11 +59,11 @@
 
 ## Docs Round
 
-- [ ] Add public docs under `/docs/deploy/previews/` for Action-only previews versus product-grade
+- [x] Add public docs under `/docs/deploy/previews/` for Action-only previews versus product-grade
   control-plane previews.
-- [ ] Add stable help anchors for preview policy, preview environments, cleanup, fork safety,
+- [x] Add stable help anchors for preview policy, preview environments, cleanup, fork safety,
   secrets, comments/checks, quotas, and recovery.
-- [ ] Wire CLI/API/Web descriptions and future MCP descriptors to the stable anchors.
+- [x] Wire CLI/API/Web descriptions and future MCP descriptors to the stable anchors.
 
 ## Verification
 

@@ -2236,6 +2236,31 @@ export const publicDocsOperationCoverage = [
     status: "documented",
     topicId: "deployment.preview-cleanup",
   },
+  {
+    operationKey: "preview-policies.configure",
+    status: "documented",
+    topicId: "deployment.product-grade-previews",
+  },
+  {
+    operationKey: "preview-policies.show",
+    status: "documented",
+    topicId: "deployment.product-grade-previews",
+  },
+  {
+    operationKey: "preview-environments.list",
+    status: "documented",
+    topicId: "deployment.product-grade-previews",
+  },
+  {
+    operationKey: "preview-environments.show",
+    status: "documented",
+    topicId: "deployment.product-grade-previews",
+  },
+  {
+    operationKey: "preview-environments.delete",
+    status: "documented",
+    topicId: "deployment.product-grade-previews",
+  },
   { operationKey: "deployments.create", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.list", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.show", status: "documented", topicId: "deployment.lifecycle" },
