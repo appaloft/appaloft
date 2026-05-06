@@ -2,7 +2,10 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import { createExecutionContext } from "@appaloft/application";
 
-import { createGitHubSourceEventWebhookVerifier } from "../src/index";
+import {
+  createGitHubPreviewPullRequestWebhookVerifier,
+  createGitHubSourceEventWebhookVerifier,
+} from "../src/index";
 
 async function hmacSha256Hex(secretValue: string, body: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -29,6 +32,30 @@ function githubPushPayload() {
       full_name: "appaloft/demo",
       html_url: "https://github.com/appaloft/demo",
       clone_url: "https://github.com/appaloft/demo.git",
+    },
+  };
+}
+
+function githubPullRequestPayload(action = "synchronize") {
+  return {
+    action,
+    number: 42,
+    repository: {
+      id: 123456,
+      full_name: "appaloft/demo",
+      html_url: "https://github.com/appaloft/demo",
+      clone_url: "https://github.com/appaloft/demo.git",
+    },
+    pull_request: {
+      head: {
+        sha: "f1e2d3c4",
+        repo: {
+          full_name: "appaloft/demo",
+        },
+      },
+      base: {
+        ref: "main",
+      },
     },
   };
 }
@@ -126,5 +153,90 @@ describe("GitHub source event webhook verifier", () => {
     expect(result._unsafeUnwrap()).toEqual({
       outcome: "noop",
     });
+  });
+});
+
+describe("GitHub preview pull request webhook verifier", () => {
+  test("[PG-PREVIEW-EVENT-001] verifies pull request signatures and normalizes safe preview facts", async () => {
+    const verifier = createGitHubPreviewPullRequestWebhookVerifier();
+    const rawBody = JSON.stringify(githubPullRequestPayload());
+    const signature = await hmacSha256Hex("correct-secret", rawBody);
+
+    const result = await verifier.verify(
+      createExecutionContext({
+        entrypoint: "http",
+        requestId: "req_github_preview_webhook_test",
+      }),
+      {
+        eventName: "pull_request",
+        deliveryId: "delivery_preview_1",
+        rawBody,
+        signature: `sha256=${signature}`,
+        secretValue: "correct-secret",
+        receivedAt: "2026-05-06T03:00:00.000Z",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({
+      outcome: "preview-pull-request-event",
+      previewEvent: {
+        provider: "github",
+        eventKind: "pull-request",
+        eventAction: "synchronize",
+        repositoryFullName: "appaloft/demo",
+        headRepositoryFullName: "appaloft/demo",
+        pullRequestNumber: 42,
+        headSha: "f1e2d3c4",
+        baseRef: "main",
+        verified: true,
+        deliveryId: "delivery_preview_1",
+        receivedAt: "2026-05-06T03:00:00.000Z",
+      },
+    });
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("correct-secret");
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("sha256=");
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("pull_request");
+  });
+
+  test("[PG-PREVIEW-EVENT-001] rejects invalid preview signatures and unsupported actions safely", async () => {
+    const verifier = createGitHubPreviewPullRequestWebhookVerifier();
+    const context = createExecutionContext({
+      entrypoint: "http",
+      requestId: "req_github_preview_webhook_reject_test",
+    });
+    const rawBody = JSON.stringify(githubPullRequestPayload());
+
+    const invalidSignature = await verifier.verify(context, {
+      eventName: "pull_request",
+      deliveryId: "delivery_preview_invalid",
+      rawBody,
+      signature: "sha256=0000000000000000000000000000000000000000000000000000000000000000",
+      secretValue: "correct-secret",
+    });
+    expect(invalidSignature.isErr()).toBe(true);
+    expect(invalidSignature._unsafeUnwrapErr().code).toBe("source_event_signature_invalid");
+
+    const unsupportedRawBody = JSON.stringify(githubPullRequestPayload("labeled"));
+    const unsupportedAction = await verifier.verify(context, {
+      eventName: "pull_request",
+      deliveryId: "delivery_preview_unsupported",
+      rawBody: unsupportedRawBody,
+      signature: `sha256=${await hmacSha256Hex("correct-secret", unsupportedRawBody)}`,
+      secretValue: "correct-secret",
+    });
+    expect(unsupportedAction.isErr()).toBe(true);
+    expect(unsupportedAction._unsafeUnwrapErr().code).toBe("source_event_unsupported_kind");
+
+    const unsafeRawBody = JSON.stringify({ action: "opened", repository: { full_name: "x/y" } });
+    const unsafePayload = await verifier.verify(context, {
+      eventName: "pull_request",
+      deliveryId: "delivery_preview_unsafe",
+      rawBody: unsafeRawBody,
+      signature: `sha256=${await hmacSha256Hex("correct-secret", unsafeRawBody)}`,
+      secretValue: "correct-secret",
+    });
+    expect(unsafePayload.isErr()).toBe(true);
+    expect(unsafePayload._unsafeUnwrapErr().code).toBe("validation_error");
   });
 });

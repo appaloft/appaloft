@@ -1305,6 +1305,11 @@ Current verification notes:
   readback for safe quota/expiry policy decision details. Scheduler cleanup for expired previews,
   GitHub App ingestion, feedback, cleanup retry, and active preview environment entrypoints remain
   open.
+- 2026-05-06 Phase 7 preview GitHub pull-request event slice added an integration-boundary
+  verifier/normalizer for signed `pull_request` webhooks. It emits only safe preview lifecycle
+  facts, rejects invalid signatures, unsupported actions, and unsafe payloads, and keeps actual
+  GitHub App route wiring, dedupe/idempotency, feedback, cleanup retry, and active preview
+  environment entrypoints open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,

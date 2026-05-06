@@ -2,6 +2,10 @@ import {
   appaloftTraceAttributes,
   createAdapterSpanName,
   type ExecutionContext,
+  type GitHubPreviewPullRequestAction,
+  type GitHubPreviewPullRequestWebhookVerificationInput,
+  type GitHubPreviewPullRequestWebhookVerificationResult,
+  type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubRepositoryBrowser,
   type GitHubRepositorySummary,
   type GitHubSourceEventWebhookVerificationInput,
@@ -178,12 +182,84 @@ export function createGitHubSourceEventWebhookVerifier(): GitHubSourceEventWebho
   return new GitHubWebhookSourceEventVerifier();
 }
 
+export class GitHubPreviewPullRequestWebhookVerifierImpl
+  implements GitHubPreviewPullRequestWebhookVerifier
+{
+  async verify(
+    _context: ExecutionContext,
+    input: GitHubPreviewPullRequestWebhookVerificationInput,
+  ): Promise<Result<GitHubPreviewPullRequestWebhookVerificationResult>> {
+    const expectedSignature = await hmacSha256Hex(input.secretValue, input.rawBody);
+    const suppliedSignature = normalizeSha256Signature(input.signature);
+    if (!suppliedSignature || !constantTimeEqualHex(expectedSignature, suppliedSignature)) {
+      return err(
+        domainError.sourceEventSignatureInvalid("Preview pull request signature is invalid", {
+          phase: "preview-webhook-verification",
+          sourceKind: "github",
+          eventKind: input.eventName,
+          ...(input.deliveryId ? { deliveryId: input.deliveryId } : {}),
+        }),
+      );
+    }
+
+    if (input.eventName === "ping") {
+      return ok({ outcome: "noop" });
+    }
+
+    if (input.eventName !== "pull_request") {
+      return err(
+        domainError.sourceEventUnsupportedKind("GitHub preview event kind is unsupported", {
+          phase: "preview-webhook-verification",
+          sourceKind: "github",
+          eventKind: input.eventName,
+          ...(input.deliveryId ? { deliveryId: input.deliveryId } : {}),
+        }),
+      );
+    }
+
+    const payload = parseGitHubPullRequestPayload(input.rawBody, input.deliveryId);
+    if (payload.isErr()) {
+      return err(payload.error);
+    }
+
+    return ok({
+      outcome: "preview-pull-request-event",
+      previewEvent: {
+        provider: "github",
+        eventKind: "pull-request",
+        eventAction: payload.value.action,
+        repositoryFullName: payload.value.repositoryFullName,
+        headRepositoryFullName: payload.value.headRepositoryFullName,
+        pullRequestNumber: payload.value.pullRequestNumber,
+        headSha: payload.value.headSha,
+        baseRef: payload.value.baseRef,
+        verified: true,
+        ...(input.deliveryId ? { deliveryId: input.deliveryId } : {}),
+        ...(input.receivedAt ? { receivedAt: input.receivedAt } : {}),
+      },
+    });
+  }
+}
+
+export function createGitHubPreviewPullRequestWebhookVerifier(): GitHubPreviewPullRequestWebhookVerifier {
+  return new GitHubPreviewPullRequestWebhookVerifierImpl();
+}
+
 interface GitHubPushPayloadFacts {
   locator: string;
   providerRepositoryId: string;
   repositoryFullName: string;
   ref: string;
   revision: string;
+}
+
+interface GitHubPullRequestPayloadFacts {
+  action: GitHubPreviewPullRequestAction;
+  repositoryFullName: string;
+  headRepositoryFullName: string;
+  pullRequestNumber: number;
+  headSha: string;
+  baseRef: string;
 }
 
 function parseGitHubPushPayload(
@@ -234,6 +310,80 @@ function parseGitHubPushPayload(
     ref,
     revision,
   });
+}
+
+function parseGitHubPullRequestPayload(
+  rawBody: string,
+  deliveryId: string | undefined,
+): Result<GitHubPullRequestPayloadFacts> {
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(rawBody);
+  } catch {
+    return err(
+      domainError.validation("GitHub preview event body must be valid JSON", {
+        phase: "preview-webhook-normalization",
+        sourceKind: "github",
+        ...(deliveryId ? { deliveryId } : {}),
+      }),
+    );
+  }
+
+  const payload = objectRecord(parsedJson);
+  const action = payload ? previewPullRequestAction(payload.action) : null;
+  if (payload && !action) {
+    return err(
+      domainError.sourceEventUnsupportedKind("GitHub preview pull request action is unsupported", {
+        phase: "preview-webhook-normalization",
+        sourceKind: "github",
+        eventKind: "pull_request",
+        ...(deliveryId ? { deliveryId } : {}),
+      }),
+    );
+  }
+
+  const pullRequest = payload ? objectRecord(payload.pull_request) : null;
+  const repository = payload ? objectRecord(payload.repository) : null;
+  const head = pullRequest ? objectRecord(pullRequest.head) : null;
+  const headRepository = head ? objectRecord(head.repo) : null;
+  const base = pullRequest ? objectRecord(pullRequest.base) : null;
+  const repositoryFullName = repository ? nonEmptyString(repository.full_name) : null;
+  const headRepositoryFullName = headRepository ? nonEmptyString(headRepository.full_name) : null;
+  const pullRequestNumber = payload ? positiveInteger(payload.number) : null;
+  const headSha = head ? nonEmptyString(head.sha) : null;
+  const baseRef = base ? nonEmptyString(base.ref) : null;
+
+  if (
+    !action ||
+    !repositoryFullName ||
+    !headRepositoryFullName ||
+    pullRequestNumber === null ||
+    !headSha ||
+    !baseRef
+  ) {
+    return err(
+      domainError.validation("GitHub preview event body is invalid", {
+        phase: "preview-webhook-normalization",
+        sourceKind: "github",
+        ...(deliveryId ? { deliveryId } : {}),
+      }),
+    );
+  }
+
+  return ok({
+    action,
+    repositoryFullName,
+    headRepositoryFullName,
+    pullRequestNumber,
+    headSha,
+    baseRef,
+  });
+}
+
+function previewPullRequestAction(value: unknown): GitHubPreviewPullRequestAction | null {
+  return value === "opened" || value === "reopened" || value === "synchronize" || value === "closed"
+    ? value
+    : null;
 }
 
 function normalizeGitHubRef(ref: string): string {
@@ -310,4 +460,8 @@ function objectRecord(value: unknown): Record<string, unknown> | null {
 
 function nonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function positiveInteger(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
