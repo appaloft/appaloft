@@ -1100,6 +1100,7 @@ export function registerRuntimeDependencies(
           dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
           input.resourceAccessFailureRenderer,
           dependencyContainer.resolve(tokens.deploymentExecutionGuard),
+          dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
         ),
         sshBackend: new SshExecutionBackend(
           join(input.config.dataDir, "runtime"),
@@ -1111,6 +1112,7 @@ export function registerRuntimeDependencies(
           input.config.remoteRuntimeRoot,
           input.resourceAccessFailureRenderer,
           dependencyContainer.resolve(tokens.deploymentExecutionGuard),
+          dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
         ),
         ...(input.config.dockerSwarmExecution.enabled
           ? {

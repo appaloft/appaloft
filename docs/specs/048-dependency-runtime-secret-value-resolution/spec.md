@@ -105,7 +105,10 @@ connection refs before marking binding readiness ready; unresolved Appaloft-owne
 provider realization ready while safely blocking binding readiness. `deployments.plan` and
 `deployments.create` now validate captured Appaloft-owned dependency runtime refs through the
 dependency resource secret store, report `dependency_runtime_secret_unresolved` safely during plan,
-and reject create before deployment acceptance when resolution fails. It also stores rotated binding
-secret values in `dependency_binding_secrets`. Deployment snapshots capture safe runtime secret
-references and runtime adapters render safe handles, but runtime materialization and redaction
-coverage remain open before the Postgres and Redis closed-loop exit criteria can be checked.
+and reject create before deployment acceptance when resolution fails. Local-shell and generic-SSH
+single-server execution now resolve Appaloft-owned dependency refs into execution-only runtime
+environment values and mark dependency target variables for redaction in Docker command display and
+runtime output. It also stores rotated binding secret values in `dependency_binding_secrets`.
+Deployment snapshots capture safe runtime secret references and runtime adapters render safe
+handles, but Docker Swarm secret materialization and historical rotated-ref execution coverage
+remain open before the Postgres and Redis closed-loop exit criteria can be checked.
