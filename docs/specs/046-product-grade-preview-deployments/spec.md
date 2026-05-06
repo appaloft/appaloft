@@ -54,11 +54,11 @@ candidate operations:
 | Surface | State | Rule |
 | --- | --- | --- |
 | `source-events.ingest` | Active command / integration boundary | May be extended by a future Code Round to normalize GitHub pull request events after GitHub App verification. It must still persist safe source event state and dedupe before preview policy evaluation. |
-| `preview-policies.show` | Active CLI and HTTP/oRPC query | Reads effective preview policy, fork/secret/domain/quota rules, and selected execution owner for a project or resource scope. Web surfaces remain future work. |
-| `preview-policies.configure` | Active CLI and HTTP/oRPC command | Changes preview policy explicitly. It must not mutate Resource source/runtime/network profile or deployment history as a side effect. Web surfaces remain future work. |
-| `preview-environments.list` | Active CLI and HTTP/oRPC query | Lists durable preview environments with source event, deployment, route, feedback, cleanup, expiry, and audit summaries. Web surfaces remain future work. |
-| `preview-environments.show` | Active CLI and HTTP/oRPC query | Reads one preview environment and its safe latest deployment, route, feedback, policy, cleanup, and diagnostic state. Web surfaces remain future work. |
-| `preview-environments.delete` | Active CLI and HTTP/oRPC command | Requests explicit preview cleanup/deletion. It dispatches preview-lifecycle cleanup and preserves deployment history/audit. Web surfaces remain future work. |
+| `preview-policies.show` | Active CLI, HTTP/oRPC, and Web query | Reads effective preview policy, fork/secret/domain/quota rules, and selected execution owner for a project or resource scope. |
+| `preview-policies.configure` | Active CLI, HTTP/oRPC, and Web command | Changes preview policy explicitly. It must not mutate Resource source/runtime/network profile or deployment history as a side effect. |
+| `preview-environments.list` | Active CLI, HTTP/oRPC, and Web query | Lists durable preview environments with source event, deployment, route, feedback, cleanup, expiry, and audit summaries. |
+| `preview-environments.show` | Active CLI, HTTP/oRPC, and Web query | Reads one preview environment and its safe latest deployment, route, feedback, policy, cleanup, and diagnostic state. |
+| `preview-environments.delete` | Active CLI, HTTP/oRPC, and Web command | Requests explicit preview cleanup/deletion. It dispatches preview-lifecycle cleanup and preserves deployment history/audit. |
 | `deployments.create` | Active command, unchanged input | Creates the actual deployment attempt after preview policy selects or creates the preview Resource/environment context. No preview fields are added. |
 | `deployments.cleanup-preview` | Active command | Remains the narrow runtime/route/source-link cleanup primitive. Product-grade cleanup may call it as part of a broader control-plane cleanup process, but must not expand the command into provider metadata, comments/checks, or generic delete behavior. |
 
