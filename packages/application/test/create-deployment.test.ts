@@ -111,9 +111,13 @@ import {
 } from "@appaloft/core";
 import {
   CapturedEventBus,
+  FakeDependencyResourceBackupProvider,
   FakeDependencyResourceSecretStore,
+  FakeManagedRedisProvider,
   FixedClock,
+  MemoryDependencyResourceBackupRepository,
   MemoryDependencyResourceRepository,
+  MemoryDeploymentReadModel,
   MemoryDeploymentRepository,
   MemoryDestinationRepository,
   MemoryEnvironmentRepository,
@@ -156,6 +160,8 @@ import {
   type SourceDetector,
 } from "../src/ports";
 import {
+  BindResourceDependencyUseCase,
+  CreateDependencyResourceBackupUseCase,
   CreateDeploymentUseCase,
   DefaultAccessDomainRuntimePlanResolver,
   DeploymentContextBootstrapService,
@@ -163,7 +169,10 @@ import {
   DeploymentContextResolver,
   DeploymentFactory,
   DeploymentLifecycleService,
+  DeploymentLogsQueryService,
   DeploymentSnapshotFactory,
+  ProvisionRedisDependencyResourceUseCase,
+  RestoreDependencyResourceBackupUseCase,
   RuntimePlanResolutionInputBuilder,
 } from "../src/use-cases";
 
@@ -580,9 +589,13 @@ async function createDeploymentFixture(
   const environments = new MemoryEnvironmentRepository();
   const resources = new MemoryResourceRepository();
   const deployments = new MemoryDeploymentRepository();
+  const deploymentReadModel = new MemoryDeploymentReadModel(deployments);
   const dependencyResources = new MemoryDependencyResourceRepository();
   const dependencyResourceSecretStore = new FakeDependencyResourceSecretStore();
   const dependencyBindings = new MemoryResourceDependencyBindingRepository();
+  const dependencyResourceBackups = new MemoryDependencyResourceBackupRepository();
+  const dependencyResourceBackupProvider = new FakeDependencyResourceBackupProvider();
+  const managedRedisProvider = new FakeManagedRedisProvider();
   const dependencyBindingReadModel = new MemoryResourceDependencyBindingReadModel(
     dependencyBindings,
     dependencyResources,
@@ -708,19 +721,63 @@ async function createDeploymentFixture(
     dependencyResourceSecretStore,
   );
   return {
+    bindDependency: new BindResourceDependencyUseCase(
+      resources,
+      dependencyResources,
+      dependencyBindings,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+    ),
+    createBackup: new CreateDependencyResourceBackupUseCase(
+      dependencyResources,
+      dependencyResourceBackups,
+      dependencyResourceBackupProvider,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+    ),
     clock,
     context,
     createDeploymentUseCase,
+    deploymentLogs: new DeploymentLogsQueryService(deploymentReadModel),
+    deploymentReadModel,
     dependencyBindings,
     dependencyBindingReadModel,
+    dependencyResourceBackupProvider,
+    dependencyResourceBackups,
     dependencyResourceSecretStore,
     dependencyResources,
     deployments,
     environment,
     environments,
     eventBus,
+    managedRedisProvider,
+    provisionRedis: new ProvisionRedisDependencyResourceUseCase(
+      projects,
+      environments,
+      dependencyResources,
+      dependencyResourceSecretStore,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+      managedRedisProvider,
+    ),
     logger,
+    projects,
     repositoryContext,
+    restoreBackup: new RestoreDependencyResourceBackupUseCase(
+      dependencyResources,
+      dependencyResourceBackups,
+      dependencyResourceBackupProvider,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+    ),
     resources,
     servers,
     createDeploymentInput: {
@@ -1374,6 +1431,113 @@ describe("CreateDeploymentUseCase", () => {
     expect(serializedReferences).not.toContain("super-secret");
     expect(serializedReferences).not.toContain("managed-redis.redis.internal");
     expect(serializedReferences).not.toContain("redis://");
+  });
+
+  test("[DEP-RES-REDIS-CLOSED-LOOP-001] verifies managed Redis provision bind deploy observe backup restore loop", async () => {
+    const {
+      bindDependency,
+      context,
+      createBackup,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deploymentLogs,
+      deploymentReadModel,
+      dependencyResourceBackupProvider,
+      dependencyResourceSecretStore,
+      managedRedisProvider,
+      provisionRedis,
+      repositoryContext,
+      restoreBackup,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    dependencyResourceBackupProvider.setSupported(["appaloft-managed-redis:redis"]);
+    managedRedisProvider.setRealizationResult(
+      ok({
+        providerResourceHandle: "redis/rsi_0001",
+        endpoint: {
+          host: "main-cache.redis.internal",
+          port: 6379,
+          databaseName: "0",
+          maskedConnection: "redis://:********@main-cache.redis.internal:6379/0",
+        },
+        connectionSecretValue: "redis://:super-secret@main-cache.redis.internal:6379/0",
+        realizedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    const provisioned = await provisionRedis.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main Cache",
+    });
+    expect(provisioned.isOk()).toBe(true);
+    const dependencyResourceId = provisioned._unsafeUnwrap().id;
+    const secretRef = `appaloft://dependency-resources/${dependencyResourceId}/connection`;
+
+    const bound = await bindDependency.execute(context, {
+      resourceId: "res_demo",
+      dependencyResourceId,
+      targetName: "REDIS_URL",
+    });
+    expect(bound.isOk()).toBe(true);
+
+    const deployed = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const createdDeployment = unwrapDeploymentCreateResult(deployed);
+    const observed = await deploymentReadModel.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(createdDeployment.id)),
+    );
+    const observedLogs = await deploymentLogs.execute(context, createdDeployment.id);
+
+    expect(observed).toMatchObject({
+      id: createdDeployment.id,
+      status: "succeeded",
+      dependencyBindingReferences: [
+        expect.objectContaining({
+          dependencyResourceId,
+          kind: "redis",
+          targetName: "REDIS_URL",
+        }),
+      ],
+    });
+    expect(observedLogs.logs).toContainEqual(
+      expect.objectContaining({
+        level: "info",
+        message: "Hermetic execution backend applied runtime plan",
+      }),
+    );
+    expect(JSON.stringify(observed)).not.toContain("super-secret");
+    expect(JSON.stringify(observed)).not.toContain("redis://:super-secret");
+    const resolvedSecret = await dependencyResourceSecretStore.resolve(context, {
+      secretRef,
+    });
+    expect(resolvedSecret.isOk()).toBe(true);
+    expect(resolvedSecret._unsafeUnwrap()).toEqual({
+      secretRef,
+      secretValue: "redis://:super-secret@main-cache.redis.internal:6379/0",
+    });
+
+    const backup = await createBackup.execute(context, { dependencyResourceId });
+    expect(backup.isOk()).toBe(true);
+    const restored = await restoreBackup.execute(context, {
+      backupId: backup._unsafeUnwrap().id,
+      acknowledgeDataOverwrite: true,
+      acknowledgeRuntimeNotRestarted: true,
+    });
+
+    expect(restored.isOk()).toBe(true);
+    expect(dependencyResourceBackupProvider.backups).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId,
+        providerKey: "appaloft-managed-redis",
+        dependencyKind: "redis",
+      }),
+    );
+    expect(dependencyResourceBackupProvider.restores).toContainEqual(
+      expect.objectContaining({
+        backupId: backup._unsafeUnwrap().id,
+        dependencyResourceId,
+      }),
+    );
   });
 
   test("[DEP-BIND-RUNTIME-INJECT-004] rejects active dependency binding when the runtime target name conflicts", async () => {

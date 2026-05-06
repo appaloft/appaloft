@@ -2463,7 +2463,7 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
           dependencyBindingReferences: deployment.dependencyBindingReferences.map((reference) => ({
             bindingId: reference.bindingId.value,
             dependencyResourceId: reference.dependencyResourceId.value,
-            kind: "postgres",
+            kind: reference.kind.value as "postgres" | "redis",
             targetName: reference.targetName.value,
             scope: reference.scope.value,
             injectionMode: reference.injectionMode.value,
