@@ -25,6 +25,10 @@ import {
   type DependencyResourceRepository,
   type DependencyResourceRestoreProviderInput,
   type DependencyResourceRestoreProviderResult,
+  type DependencyResourceSecretResolutionInput,
+  type DependencyResourceSecretResolutionResult,
+  type DependencyResourceSecretStore,
+  type DependencyResourceSecretStoreInput,
   type DependencyResourceSummary,
   type DeploymentLogSummary,
   type DeploymentReadModel,
@@ -280,6 +284,36 @@ export class FakeDependencyBindingSecretStore implements DependencyBindingSecret
       secretRef: `${this.secretRefPrefix}://${input.bindingId}/${input.secretVersion}`,
       secretVersion: input.secretVersion,
     });
+  }
+}
+
+export class FakeDependencyResourceSecretStore implements DependencyResourceSecretStore {
+  readonly stored: DependencyResourceSecretStoreInput[] = [];
+  private readonly values = new Map<string, string>();
+
+  constructor(private secretRefPrefix = "appaloft://dependency-resources") {}
+
+  async storeConnection(
+    context: ExecutionContext,
+    input: DependencyResourceSecretStoreInput,
+  ): Promise<Result<{ secretRef: string }, DomainError>> {
+    void context;
+    this.stored.push(input);
+    const secretRef = `${this.secretRefPrefix}/${input.dependencyResourceId}/${input.purpose}`;
+    this.values.set(secretRef, input.secretValue);
+    return ok({ secretRef });
+  }
+
+  async resolve(
+    context: ExecutionContext,
+    input: DependencyResourceSecretResolutionInput,
+  ): Promise<Result<DependencyResourceSecretResolutionResult, DomainError>> {
+    void context;
+    const secretValue = this.values.get(input.secretRef);
+    if (!secretValue) {
+      return err(domainError.notFound("dependency_resource_secret", input.secretRef));
+    }
+    return ok({ secretRef: input.secretRef, secretValue });
   }
 }
 

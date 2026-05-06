@@ -64,6 +64,7 @@ import { previewPolicyDecisionsMigration } from "./migrations/056_preview_policy
 import { previewPolicyQuotaExpiryMigration } from "./migrations/057_preview_policy_quota_expiry";
 import { previewFeedbackRecordsMigration } from "./migrations/058_preview_feedback_records";
 import { previewCleanupAttemptsMigration } from "./migrations/059_preview_cleanup_attempts";
+import { dependencyResourceSecretsMigration } from "./migrations/060_dependency_resource_secrets";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -219,6 +220,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "057_preview_policy_quota_expiry": previewPolicyQuotaExpiryMigration,
       "058_preview_feedback_records": previewFeedbackRecordsMigration,
       "059_preview_cleanup_attempts": previewCleanupAttemptsMigration,
+      "060_dependency_resource_secrets": dependencyResourceSecretsMigration,
     };
   }
 }

@@ -85,6 +85,7 @@ import {
   PgDependencyResourceDeleteSafetyReader,
   PgDependencyResourceReadModel,
   PgDependencyResourceRepository,
+  PgDependencyResourceSecretStore,
   PgDeploymentReadModel,
   PgDeploymentRepository,
   PgDestinationRepository,
@@ -934,6 +935,11 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.dependencyBindingSecretStore, {
     useFactory: instanceCachingFactory(() => new PgDependencyBindingSecretStore(input.database.db)),
+  });
+  container.register(tokens.dependencyResourceSecretStore, {
+    useFactory: instanceCachingFactory(
+      () => new PgDependencyResourceSecretStore(input.database.db),
+    ),
   });
   container.register(tokens.certificateHttpChallengeTokenStore, {
     useFactory: instanceCachingFactory(() => new InMemoryCertificateHttpChallengeTokenStore()),

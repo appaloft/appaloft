@@ -17,6 +17,7 @@ import {
 } from "@appaloft/core";
 import {
   CapturedEventBus,
+  FakeDependencyResourceSecretStore,
   FakeManagedPostgresProvider,
   FixedClock,
   MemoryDependencyResourceDeleteSafetyReader,
@@ -55,6 +56,7 @@ async function createHarness() {
   const projects = new MemoryProjectRepository();
   const environments = new MemoryEnvironmentRepository();
   const dependencyResources = new MemoryDependencyResourceRepository();
+  const dependencyResourceSecretStore = new FakeDependencyResourceSecretStore();
   const deleteSafetyReader = new MemoryDependencyResourceDeleteSafetyReader();
   const readModel = new MemoryDependencyResourceReadModel(dependencyResources, deleteSafetyReader);
   const eventBus = new CapturedEventBus();
@@ -95,12 +97,14 @@ async function createHarness() {
     ),
     deleteSafetyReader,
     dependencyResources,
+    dependencyResourceSecretStore,
     eventBus,
     managedPostgresProvider,
     importPostgres: new ImportPostgresDependencyResourceUseCase(
       projects,
       environments,
       dependencyResources,
+      dependencyResourceSecretStore,
       clock,
       idGenerator,
       eventBus,
@@ -110,6 +114,7 @@ async function createHarness() {
       projects,
       environments,
       dependencyResources,
+      dependencyResourceSecretStore,
       clock,
       idGenerator,
       eventBus,
@@ -284,6 +289,49 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     const detail = JSON.stringify(shown._unsafeUnwrap());
     expect(detail).toContain("********");
     expect(detail).toContain("db.example.com");
+    expect(detail).not.toContain("super-secret");
+    expect(detail).not.toContain("hidden");
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-001] stores imported Postgres connection value behind safe ref", async () => {
+    const { context, dependencyResourceSecretStore, importPostgres, showDependencyResource } =
+      await createHarness();
+
+    const connectionUrl =
+      "postgres://app:super-secret@db.example.com:5432/app?sslmode=require&token=hidden";
+    const created = await importPostgres.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "External DB",
+      connectionUrl,
+    });
+
+    expect(created.isOk()).toBe(true);
+    const createdId = created._unsafeUnwrap().id;
+    expect(dependencyResourceSecretStore.stored).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId: createdId,
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        kind: "postgres",
+        purpose: "connection",
+        secretValue: connectionUrl,
+      }),
+    );
+    const resolved = await dependencyResourceSecretStore.resolve(context, {
+      secretRef: `appaloft://dependency-resources/${createdId}/connection`,
+    });
+    expect(resolved._unsafeUnwrap()).toMatchObject({
+      secretRef: `appaloft://dependency-resources/${createdId}/connection`,
+      secretValue: connectionUrl,
+    });
+
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({ dependencyResourceId: createdId })._unsafeUnwrap(),
+    );
+    const detail = JSON.stringify(shown._unsafeUnwrap());
+    expect(detail).toContain(`appaloft://dependency-resources/${createdId}/connection`);
     expect(detail).not.toContain("super-secret");
     expect(detail).not.toContain("hidden");
   });
@@ -503,6 +551,48 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     expect(detail).toContain("********");
     expect(detail).toContain("cache.example.com");
     expect(detail).toContain('"kind":"redis"');
+    expect(detail).not.toContain("super-secret");
+    expect(detail).not.toContain("hidden");
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-002] stores imported Redis connection value behind safe ref", async () => {
+    const { context, dependencyResourceSecretStore, importRedis, showDependencyResource } =
+      await createHarness();
+
+    const connectionUrl = "rediss://default:super-secret@cache.example.com:6380/0?token=hidden";
+    const created = await importRedis.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "External Cache",
+      connectionUrl,
+    });
+
+    expect(created.isOk()).toBe(true);
+    const createdId = created._unsafeUnwrap().id;
+    expect(dependencyResourceSecretStore.stored).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId: createdId,
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        kind: "redis",
+        purpose: "connection",
+        secretValue: connectionUrl,
+      }),
+    );
+    const resolved = await dependencyResourceSecretStore.resolve(context, {
+      secretRef: `appaloft://dependency-resources/${createdId}/connection`,
+    });
+    expect(resolved._unsafeUnwrap()).toMatchObject({
+      secretRef: `appaloft://dependency-resources/${createdId}/connection`,
+      secretValue: connectionUrl,
+    });
+
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({ dependencyResourceId: createdId })._unsafeUnwrap(),
+    );
+    const detail = JSON.stringify(shown._unsafeUnwrap());
+    expect(detail).toContain(`appaloft://dependency-resources/${createdId}/connection`);
     expect(detail).not.toContain("super-secret");
     expect(detail).not.toContain("hidden");
   });

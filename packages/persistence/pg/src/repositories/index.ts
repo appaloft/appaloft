@@ -6,6 +6,7 @@ export * from "./default-access-domain-policy-repository";
 export * from "./dependency-binding-secret-store";
 export * from "./dependency-resource-backup-repository";
 export * from "./dependency-resource-repository";
+export * from "./dependency-resource-secret-store";
 export * from "./deployment-read-model";
 export * from "./deployment-repository";
 export * from "./destination-repository";
