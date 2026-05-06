@@ -61,6 +61,11 @@ default fork blocking, secret-backed fork blocking, and opt-in fork previews wit
 `PG-PREVIEW-POLICY-001` now also has initial application process coverage in the same test file
 for policy-eligible pull-request events creating/updating a preview environment and dispatching one
 ids-only deployment request without copying pull-request source facts into deployment admission.
+`PG-PREVIEW-POLICY-002` now also has `PG-PREVIEW-POLICY-002B` application and Postgres/PGlite
+coverage in `packages/application/test/product-grade-preview-policy.test.ts` and
+`packages/persistence/pg/test/preview-policy.pglite.test.ts`. The coverage proves blocked fork
+policy decisions are projected by source event id with safe fork/secret-backed details, requested
+secret scope counts only, no deployment dispatch, and no secret-name or provider-token readback.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and

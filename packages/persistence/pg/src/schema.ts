@@ -460,6 +460,31 @@ export interface PreviewPoliciesTable {
   updated_at: UpdatableTimestampColumn;
 }
 
+export interface PreviewPolicyDecisionsTable {
+  source_event_id: string;
+  project_id: string;
+  environment_id: string;
+  resource_id: string;
+  provider: string;
+  event_kind: string;
+  event_action: string;
+  repository_full_name: string;
+  head_repository_full_name: string;
+  pull_request_number: number;
+  head_sha: string;
+  base_ref: string;
+  fork: boolean;
+  secret_backed: boolean;
+  requested_secret_scope_count: number;
+  status: string;
+  phase: string;
+  deployment_eligible: boolean;
+  reason_code: string | null;
+  preview_environment_id: string | null;
+  deployment_id: string | null;
+  evaluated_at: UpdatableTimestampColumn;
+}
+
 export interface DefaultAccessDomainPoliciesTable {
   id: string;
   scope_key: string;
@@ -624,6 +649,7 @@ export interface Database {
   source_events: SourceEventsTable;
   preview_environments: PreviewEnvironmentsTable;
   preview_policies: PreviewPoliciesTable;
+  preview_policy_decisions: PreviewPolicyDecisionsTable;
   default_access_domain_policies: DefaultAccessDomainPoliciesTable;
   server_applied_route_states: ServerAppliedRouteStatesTable;
   mutation_coordinations: MutationCoordinationsTable;

@@ -29,6 +29,8 @@ import {
   type Clock,
   type IdGenerator,
   type PreviewEnvironmentRepository,
+  type PreviewPolicyDecisionProjection,
+  type PreviewPolicyDecisionRecorder,
   type SourceEventDeploymentDispatcher,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -65,6 +67,8 @@ export class PreviewLifecycleService {
     private readonly previewEnvironmentRepository: PreviewEnvironmentRepository,
     @inject(tokens.sourceEventDeploymentDispatcher)
     private readonly sourceEventDeploymentDispatcher: SourceEventDeploymentDispatcher,
+    @inject(tokens.previewPolicyDecisionRecorder)
+    private readonly previewPolicyDecisionRecorder: PreviewPolicyDecisionRecorder,
     @inject(tokens.clock)
     private readonly clock: Clock,
     @inject(tokens.idGenerator)
@@ -81,6 +85,7 @@ export class PreviewLifecycleService {
     }
 
     if (!policyDecision.value.deploymentEligible) {
+      await this.recordPolicyDecision(context, input, policyDecision.value);
       return ok({
         status: "blocked",
         policyDecision: policyDecision.value,
@@ -103,6 +108,9 @@ export class PreviewLifecycleService {
     });
 
     if (dispatch.isErr()) {
+      await this.recordPolicyDecision(context, input, policyDecision.value, {
+        previewEnvironmentId: state.id.value,
+      });
       return ok({
         status: "dispatch-failed",
         policyDecision: policyDecision.value,
@@ -111,12 +119,57 @@ export class PreviewLifecycleService {
       });
     }
 
+    await this.recordPolicyDecision(context, input, policyDecision.value, {
+      previewEnvironmentId: state.id.value,
+      deploymentId: dispatch.value.deploymentId,
+    });
+
     return ok({
       status: "dispatched",
       policyDecision: policyDecision.value,
       previewEnvironmentId: state.id.value,
       deploymentId: dispatch.value.deploymentId,
     });
+  }
+
+  private async recordPolicyDecision(
+    context: ExecutionContext,
+    input: PreviewLifecycleDeployInput,
+    policyDecision: PreviewPolicyDecision,
+    lifecycleResult?: {
+      previewEnvironmentId?: string;
+      deploymentId?: string;
+    },
+  ): Promise<void> {
+    const safeDetails = policyDecision.safeDetails;
+    const projection: PreviewPolicyDecisionProjection = {
+      sourceEventId: input.sourceEventId,
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      resourceId: input.resourceId,
+      provider: safeDetails.provider,
+      eventKind: safeDetails.eventKind,
+      eventAction: safeDetails.eventAction,
+      repositoryFullName: safeDetails.repositoryFullName,
+      headRepositoryFullName: safeDetails.headRepositoryFullName,
+      pullRequestNumber: safeDetails.pullRequestNumber,
+      headSha: safeDetails.headSha,
+      baseRef: safeDetails.baseRef,
+      fork: safeDetails.fork,
+      secretBacked: safeDetails.secretBacked,
+      requestedSecretScopeCount: safeDetails.requestedSecretScopeCount,
+      status: policyDecision.status,
+      phase: policyDecision.phase,
+      deploymentEligible: policyDecision.deploymentEligible,
+      evaluatedAt: this.clock.now(),
+      ...(policyDecision.reasonCode ? { reasonCode: policyDecision.reasonCode } : {}),
+      ...(lifecycleResult?.previewEnvironmentId
+        ? { previewEnvironmentId: lifecycleResult.previewEnvironmentId }
+        : {}),
+      ...(lifecycleResult?.deploymentId ? { deploymentId: lifecycleResult.deploymentId } : {}),
+    };
+
+    await this.previewPolicyDecisionRecorder.record(toRepositoryContext(context), projection);
   }
 
   private async createOrUpdatePreviewEnvironment(

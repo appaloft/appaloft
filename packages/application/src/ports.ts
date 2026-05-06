@@ -4572,6 +4572,38 @@ export interface PreviewPolicySummary {
   updatedAt?: string;
 }
 
+export type PreviewPolicyDecisionReasonCode =
+  | "preview_event_unverified"
+  | "preview_same_repository_disabled"
+  | "preview_fork_disabled"
+  | "preview_fork_secrets_blocked"
+  | "preview_secret_backed_disabled";
+
+export interface PreviewPolicyDecisionProjection {
+  sourceEventId: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  provider: "github";
+  eventKind: "pull-request";
+  eventAction: "opened" | "reopened" | "synchronize";
+  repositoryFullName: string;
+  headRepositoryFullName: string;
+  pullRequestNumber: number;
+  headSha: string;
+  baseRef: string;
+  fork: boolean;
+  secretBacked: boolean;
+  requestedSecretScopeCount: number;
+  status: "allowed" | "blocked";
+  phase: "preview-policy-evaluation";
+  deploymentEligible: boolean;
+  evaluatedAt: string;
+  reasonCode?: PreviewPolicyDecisionReasonCode;
+  previewEnvironmentId?: string;
+  deploymentId?: string;
+}
+
 export interface ConfigurePreviewPolicyResult {
   id: string;
 }
@@ -4595,6 +4627,19 @@ export interface PreviewPolicyReadModel {
     context: RepositoryContext,
     scope: PreviewPolicyScope,
   ): Promise<PreviewPolicySummary>;
+}
+
+export interface PreviewPolicyDecisionRecorder {
+  record(context: RepositoryContext, projection: PreviewPolicyDecisionProjection): Promise<void>;
+}
+
+export interface PreviewPolicyDecisionReadModel {
+  findOne(
+    context: RepositoryContext,
+    input: {
+      sourceEventId: string;
+    },
+  ): Promise<PreviewPolicyDecisionProjection | null>;
 }
 
 export interface ProjectReadModel {

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createExecutionContext,
+  type PreviewPolicyDecisionProjection,
   type PreviewPolicyRecord,
   toRepositoryContext,
 } from "@appaloft/application";
@@ -225,6 +226,63 @@ describe("preview policy persistence", () => {
         updatedAt: "2026-05-06T01:10:00.000Z",
         idempotencyKey: "idem_preview_policy_resource_2",
       });
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
+
+  test("[PG-PREVIEW-POLICY-002B] persists blocked preview policy decision projections safely", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-preview-policy-decision-"));
+    const { createDatabase, createMigrator, PgPreviewPolicyDecisionProjection } = await import(
+      "../src"
+    );
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      await seedPreviewPolicyOwners(database.db);
+      const context = contextFixture();
+      const projection = new PgPreviewPolicyDecisionProjection(database.db);
+      const blocked: PreviewPolicyDecisionProjection = {
+        sourceEventId: "sevt_preview_policy_blocked_1",
+        projectId: "prj_preview_policy",
+        environmentId: "env_preview_policy",
+        resourceId: "res_preview_policy_api",
+        provider: "github",
+        eventKind: "pull-request",
+        eventAction: "opened",
+        repositoryFullName: "appaloft/demo",
+        headRepositoryFullName: "external/demo-fork",
+        pullRequestNumber: 44,
+        headSha: "blocked5678",
+        baseRef: "main",
+        fork: true,
+        secretBacked: true,
+        requestedSecretScopeCount: 2,
+        status: "blocked",
+        phase: "preview-policy-evaluation",
+        deploymentEligible: false,
+        evaluatedAt: "2026-05-06T02:00:00.000Z",
+        reasonCode: "preview_fork_disabled",
+      };
+
+      await projection.record(context, blocked);
+
+      const readback = await projection.findOne(context, {
+        sourceEventId: "sevt_preview_policy_blocked_1",
+      });
+
+      expect(readback).toEqual(blocked);
+      expect(JSON.stringify(readback)).not.toContain("preview-runtime");
+      expect(JSON.stringify(readback)).not.toContain("database");
+      expect(JSON.stringify(readback)).not.toContain("secretRef");
+      expect(JSON.stringify(readback)).not.toContain("token");
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });

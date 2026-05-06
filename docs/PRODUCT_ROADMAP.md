@@ -1295,6 +1295,11 @@ Current verification notes:
   Safe read models now return configured or default project/Resource policy summaries without
   exposing idempotency keys, provider payloads, or secret material. Active transports, GitHub App
   ingestion, feedback, cleanup retry, and preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview blocked-policy projection slice added application and Postgres/PGlite
+  projection of blocked preview policy decisions by source event id. Fork policy blocks now expose
+  safe reason/readback details and requested secret scope counts without dispatching deployments or
+  storing secret names/provider tokens. GitHub App ingestion, feedback, cleanup retry, and active
+  preview environment entrypoints remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
