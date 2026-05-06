@@ -62,6 +62,11 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   credential and provider response redaction remain open with apply/log/diagnostic adapters.
   Rendered Swarm apply-plan display commands now redact non-secret runtime environment values while
   retaining the executable command internally for explicit execution.
+  Rendered image apply plans also honor internal registry-auth/pull-secret metadata by adding
+  `--with-registry-auth` to executable/display commands while exposing only a redacted
+  registry-auth marker in the intent and omitting raw registry secret references from intent,
+  command, and display payloads. Real registry-login/pull-secret provisioning and real Swarm smoke
+  coverage remain open.
 - `SWARM-TARGET-APPLY-001` has initial adapter contract coverage proving OCI image apply planning
   creates a deployment-specific candidate service before verification, route promotion, and
   superseded-service cleanup. The opt-in fake backend now executes that order, records sanitized

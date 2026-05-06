@@ -102,7 +102,7 @@ function runtimeEnvironmentSnapshot(): EnvironmentConfigSnapshot {
   });
 }
 
-function imageRuntimePlan(): RuntimePlan {
+function imageRuntimePlan(metadata?: Record<string, string>): RuntimePlan {
   const accessRoute = AccessRoute.rehydrate({
     proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
     domains: [PublicDomainName.rehydrate("pr-1.example.com")],
@@ -142,6 +142,7 @@ function imageRuntimePlan(): RuntimePlan {
       kind: RuntimeArtifactKindValue.rehydrate("image"),
       intent: RuntimeArtifactIntentValue.rehydrate("prebuilt-image"),
       image: ImageReference.rehydrate("registry.example.com/team/app:sha"),
+      ...(metadata ? { metadata } : {}),
     }),
     target: baseTarget(),
     detectSummary: DetectSummary.rehydrate("Prebuilt image"),
@@ -260,6 +261,35 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(result._unsafeUnwrap().stackName).toBe("appaloft-res-api-dst-preview-dep-124");
   });
 
+  test("[SWARM-TARGET-SECRET-001] keeps registry auth metadata redacted while requiring Swarm registry auth", () => {
+    const result = renderDockerSwarmRuntimeIntent({
+      runtimePlan: imageRuntimePlan({
+        swarmRegistryAuthSecretRef: "raw-registry-token-value",
+      }),
+      environmentSnapshot: runtimeEnvironmentSnapshot(),
+      identity: {
+        resourceId: "res_api",
+        deploymentId: "dep_registry",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_prod",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const intent = result._unsafeUnwrap();
+
+    expect(intent.workload).toMatchObject({
+      kind: "image",
+      image: "registry.example.com/team/app:sha",
+      registryAuth: {
+        required: true,
+        secretRef: "********",
+        redacted: true,
+      },
+    });
+    expect(JSON.stringify(intent)).not.toContain("raw-registry-token-value");
+  });
+
   test("[SWARM-TARGET-RENDER-002] rejects Compose intent without an unambiguous target service", () => {
     const result = renderDockerSwarmRuntimeIntent({
       runtimePlan: composeRuntimePlan(),
@@ -360,6 +390,26 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(createDisplayCommand).toContain("--secret 'source=DATABASE_URL,target=DATABASE_URL'");
     expect(createDisplayCommand).not.toContain("PUBLIC_FLAG=enabled");
     expect(createDisplayCommand).not.toContain("postgres://secret-value");
+
+    const privateRegistryIntent = renderDockerSwarmRuntimeIntent({
+      runtimePlan: imageRuntimePlan({
+        imagePullSecretRef: "raw-private-registry-token",
+      }),
+      environmentSnapshot: runtimeEnvironmentSnapshot(),
+      identity: {
+        resourceId: "res_api",
+        deploymentId: "dep_private_registry",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_prod",
+      },
+    })._unsafeUnwrap();
+    const privateRegistryPlan = renderDockerSwarmApplyPlan(privateRegistryIntent)._unsafeUnwrap();
+    const privateRegistryCreateCommand = privateRegistryPlan.steps[0]?.command ?? "";
+    const privateRegistryDisplayCommand = privateRegistryPlan.steps[0]?.displayCommand ?? "";
+    expect(privateRegistryCreateCommand).toContain("--with-registry-auth");
+    expect(privateRegistryDisplayCommand).toContain("--with-registry-auth");
+    expect(privateRegistryCreateCommand).not.toContain("raw-private-registry-token");
+    expect(privateRegistryDisplayCommand).not.toContain("raw-private-registry-token");
 
     const promoteCommand = plan.steps[2]?.command ?? "";
     expect(plan.routeLabels).toContain("traefik.enable=true");

@@ -34,6 +34,11 @@ export interface DockerSwarmImageWorkloadIntent {
   kind: "image";
   image: string;
   port?: number;
+  registryAuth?: {
+    required: true;
+    secretRef: "********";
+    redacted: true;
+  };
 }
 
 export interface DockerSwarmComposeWorkloadIntent {
@@ -140,6 +145,12 @@ const composeTargetServiceMetadataKeys = [
   "swarmTargetService",
   "composeTargetService",
   "targetServiceName",
+] as const;
+const registryAuthMetadataKeys = [
+  "swarmRegistryAuthSecretRef",
+  "registryAuthSecretRef",
+  "imagePullSecretRef",
+  "pullSecretRef",
 ] as const;
 
 function sanitizeDockerName(value: string, fallback: string): string {
@@ -299,10 +310,15 @@ function renderImageWorkload(
     );
   }
 
+  const registryAuthSecretRef = metadataValue(runtimePlan, execution, registryAuthMetadataKeys);
+
   return ok({
     kind: "image",
     image: image.value,
     ...(execution.port ? { port: execution.port.value } : {}),
+    ...(registryAuthSecretRef
+      ? { registryAuth: { required: true, secretRef: "********", redacted: true } }
+      : {}),
   });
 }
 
@@ -575,6 +591,7 @@ export function renderDockerSwarmApplyPlan(
     `--name ${shellQuote(intent.serviceName)}`,
     dockerLabelFlags(intent.labels),
     `--network ${shellQuote(primaryNetwork)}`,
+    intent.workload.registryAuth ? "--with-registry-auth" : "",
     dockerEnvironmentFlags(intent.environment),
     dockerHealthFlags(intent.health),
     shellQuote(intent.workload.image),
@@ -584,6 +601,7 @@ export function renderDockerSwarmApplyPlan(
     `--name ${shellQuote(intent.serviceName)}`,
     dockerLabelFlags(intent.labels),
     `--network ${shellQuote(primaryNetwork)}`,
+    intent.workload.registryAuth ? "--with-registry-auth" : "",
     dockerEnvironmentDisplayFlags(intent.environment),
     dockerHealthFlags(intent.health),
     shellQuote(intent.workload.image),
