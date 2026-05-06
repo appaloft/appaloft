@@ -708,6 +708,22 @@ function dockerSwarmServiceLogsCommand(input: {
   ];
 }
 
+function dockerSwarmServiceLogsShellCommand(input: {
+  serviceName: string;
+  request: ResourceRuntimeLogRequest;
+}): string {
+  return [
+    "docker",
+    "service",
+    "logs",
+    "--raw",
+    "--tail",
+    shellQuote(String(input.request.tailLines)),
+    ...(input.request.follow ? ["--follow"] : []),
+    shellQuote(input.serviceName),
+  ].join(" ");
+}
+
 async function createFileRuntimeLogStream(input: {
   path: string;
   request: ResourceRuntimeLogRequest;
@@ -882,6 +898,32 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
             );
           }
 
+          const sshTargetResult = await this.resolveSshTarget(context, logContext);
+          if (sshTargetResult.isErr()) {
+            return err(sshTargetResult.error);
+          }
+
+          const sshTarget = sshTargetResult.value;
+          if (sshTarget) {
+            return ok(
+              createProcessRuntimeLogStream({
+                args: [
+                  "ssh",
+                  ...sshArgs(sshTarget, { reuseConnection: request.follow }),
+                  dockerSwarmServiceLogsShellCommand({ serviceName, request }),
+                ],
+                command: "docker_swarm_service_logs",
+                context: logContext,
+                executionContext: context,
+                request,
+                signal,
+                spawnProcess: this.spawnProcess,
+                boundedProcessTimeoutMs: this.boundedProcessTimeoutMs,
+                cleanupBackend: sshTarget.cleanup,
+              }),
+            );
+          }
+
           return ok(
             createProcessRuntimeLogStream({
               args: dockerSwarmServiceLogsCommand({ serviceName, request }),
@@ -1037,7 +1079,7 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
     context: ExecutionContext,
     logContext: ResourceRuntimeLogContext,
   ): Promise<Result<SshRuntimeLogTarget | null>> {
-    if (!isGenericSshRuntime(logContext)) {
+    if (!isGenericSshRuntime(logContext) && !isDockerSwarmRuntime(logContext)) {
       return ok(null);
     }
 
@@ -1074,6 +1116,10 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
     }
 
     if (!host) {
+      if (isDockerSwarmRuntime(logContext)) {
+        return ok(null);
+      }
+
       return err(
         domainError.resourceRuntimeLogsUnavailable("SSH runtime target is not available", {
           phase: "runtime-instance-resolution",

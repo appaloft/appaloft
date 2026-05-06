@@ -1296,6 +1296,10 @@ Current verification notes:
   manager with `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to
   inactive Swarm state. Default activation, real edge-proxy route realization, remote-manager
   observation, and registry-auth smoke coverage remain open.
+- 2026-05-06 Phase 7 Docker Swarm remote-log observation slice made `resources.runtime-logs` execute
+  Swarm service log reads through the resolved Swarm manager SSH target when available, while
+  preserving the local Docker fallback for local smoke runs. Remote-manager health observation
+  remains open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1557,9 +1561,9 @@ Required:
   observation, Swarm health observation, initial Traefik route label promotion, the public docs
   anchor, command-failure redaction, sanitized runtime identity readback, and CLI/API/Web help
   links are implemented; opt-in shell composition and `bun run smoke:swarm` real smoke harness
-  exist, and the local real smoke passed against a temporary Swarm manager; default activation,
-  real edge-proxy route realization, remote-manager observation, and registry-auth smoke coverage
-  remain open.
+  exist, and the local real smoke passed against a temporary Swarm manager; Swarm service log
+  reads can run through the resolved manager over SSH. Default activation, real edge-proxy route
+  realization, remote-manager health observation, and registry-auth smoke coverage remain open.
 
 Exit criteria:
 

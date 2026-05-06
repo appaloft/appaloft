@@ -449,6 +449,37 @@ describe("RuntimeResourceRuntimeLogReader", () => {
     );
   });
 
+  test("[SWARM-TARGET-OBS-001] opens Docker Swarm service logs through the Swarm manager over SSH", async () => {
+    const calls: SpawnCall[] = [];
+    const reader = await createReader(
+      new StaticServerRepository(sshServer()),
+      createSpawn(calls, ["remote ready\n"]),
+    );
+    const result = await reader.open(
+      createTestExecutionContext(),
+      logContext({
+        providerKey: "docker-swarm",
+        executionMetadata: {
+          "swarm.serviceName": "appaloft-res-web-dst-demo-dep-web_web",
+        },
+      }),
+      request({ follow: true }),
+      new AbortController().signal,
+    );
+
+    expect(result.isOk()).toBe(true);
+    await collectEvents(result._unsafeUnwrap());
+
+    expect(calls[0]?.args[0]).toBe("ssh");
+    expect(calls[0]?.args).toContain("2222");
+    expect(calls[0]?.args).toContain("IdentitiesOnly=yes");
+    expect(calls[0]?.args).toContain("deployer@203.0.113.10");
+    expect(calls[0]?.args).toContain("ControlMaster=auto");
+    expect(calls[0]?.args.at(-1)).toBe(
+      "docker service logs --raw --tail '25' --follow 'appaloft-res-web-dst-demo-dep-web_web'",
+    );
+  });
+
   test("opens generic SSH Compose logs from the remote workdir", async () => {
     const calls: SpawnCall[] = [];
     const reader = await createReader(
