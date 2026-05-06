@@ -355,12 +355,243 @@ export class GitHubPreviewPrCommentFeedbackWriter implements PreviewFeedbackWrit
   }
 }
 
+type GitHubRepositoryParts = NonNullable<ReturnType<typeof parseRepositoryFullName>>;
+
+export class GitHubPreviewCheckRunFeedbackWriter implements PreviewFeedbackWriter {
+  constructor(
+    private readonly accessToken: string,
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly apiBaseUrl = "https://api.github.com",
+  ) {}
+
+  async publish(
+    context: ExecutionContext,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<PreviewFeedbackWriterResult>> {
+    return context.tracer.startActiveSpan(
+      createAdapterSpanName("github_preview_feedback", "publish_check_run"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.integrationKey]: "github",
+          "appaloft.preview_feedback.channel": input.channel,
+        },
+      },
+      async () => {
+        if (input.channel !== "github-check") {
+          return err(
+            domainError.providerCapabilityUnsupported(
+              "GitHub preview feedback channel is not supported by this writer",
+              {
+                phase: "preview-feedback",
+                provider: "github",
+                channel: input.channel,
+              },
+            ),
+          );
+        }
+
+        const repository = parseRepositoryFullName(input.repositoryFullName);
+        if (!repository) {
+          return err(
+            domainError.validation("GitHub repository full name is invalid", {
+              phase: "preview-feedback",
+              provider: "github",
+            }),
+          );
+        }
+
+        let headSha: string | undefined;
+        if (!input.providerFeedbackId) {
+          const resolvedHeadSha = await this.resolvePullRequestHeadSha(repository, input);
+          if (resolvedHeadSha.isErr()) {
+            return err(resolvedHeadSha.error);
+          }
+          headSha = resolvedHeadSha.value;
+        }
+
+        const url = input.providerFeedbackId
+          ? gitHubApiUrl(
+              this.apiBaseUrl,
+              `/repos/${repository.owner}/${repository.name}/check-runs/${encodeURIComponent(
+                input.providerFeedbackId,
+              )}`,
+            )
+          : gitHubApiUrl(
+              this.apiBaseUrl,
+              `/repos/${repository.owner}/${repository.name}/check-runs`,
+            );
+        const response = await this.fetcher(url, {
+          method: input.providerFeedbackId ? "PATCH" : "POST",
+          headers: githubJsonHeaders(this.accessToken),
+          body: JSON.stringify({
+            name: "Appaloft preview",
+            ...(headSha ? { head_sha: headSha } : {}),
+            status: "completed",
+            conclusion: "success",
+            output: {
+              title: "Preview deployment accepted",
+              summary: input.body,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          return err(
+            domainError.provider(
+              "GitHub preview check run request failed",
+              {
+                phase: "preview-feedback",
+                provider: "github",
+                channel: input.channel,
+                statusCode: response.status,
+              },
+              isRetryableGitHubStatus(response.status),
+            ),
+          );
+        }
+
+        const payload = objectRecord(await response.json().catch(() => null));
+        const providerFeedbackId =
+          typeof payload?.id === "number" || typeof payload?.id === "string"
+            ? String(payload.id)
+            : input.providerFeedbackId;
+        if (!providerFeedbackId) {
+          return err(
+            domainError.provider(
+              "GitHub preview check run response did not include a check run id",
+              {
+                phase: "preview-feedback",
+                provider: "github",
+                channel: input.channel,
+                statusCode: response.status,
+              },
+              true,
+            ),
+          );
+        }
+
+        return ok({ providerFeedbackId });
+      },
+    );
+  }
+
+  private async resolvePullRequestHeadSha(
+    repository: GitHubRepositoryParts,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<string>> {
+    const response = await this.fetcher(
+      gitHubApiUrl(
+        this.apiBaseUrl,
+        `/repos/${repository.owner}/${repository.name}/pulls/${input.pullRequestNumber}`,
+      ),
+      {
+        method: "GET",
+        headers: githubJsonHeaders(this.accessToken),
+      },
+    );
+    if (!response.ok) {
+      return err(
+        domainError.provider(
+          "GitHub preview pull request lookup failed",
+          {
+            phase: "preview-feedback",
+            provider: "github",
+            channel: input.channel,
+            statusCode: response.status,
+          },
+          isRetryableGitHubStatus(response.status),
+        ),
+      );
+    }
+
+    const payload = objectRecord(await response.json().catch(() => null));
+    const head = payload ? objectRecord(payload.head) : null;
+    const sha = head ? nonEmptyString(head.sha) : null;
+    if (!sha) {
+      return err(
+        domainError.provider(
+          "GitHub preview pull request lookup did not include a head SHA",
+          {
+            phase: "preview-feedback",
+            provider: "github",
+            channel: input.channel,
+            statusCode: response.status,
+          },
+          true,
+        ),
+      );
+    }
+
+    return ok(sha);
+  }
+}
+
+export class GitHubPreviewCompositeFeedbackWriter implements PreviewFeedbackWriter {
+  private readonly prCommentWriter: PreviewFeedbackWriter;
+  private readonly checkRunWriter: PreviewFeedbackWriter;
+
+  constructor(
+    accessToken: string,
+    fetcher: typeof fetch = fetch,
+    apiBaseUrl = "https://api.github.com",
+  ) {
+    this.prCommentWriter = new GitHubPreviewPrCommentFeedbackWriter(
+      accessToken,
+      fetcher,
+      apiBaseUrl,
+    );
+    this.checkRunWriter = new GitHubPreviewCheckRunFeedbackWriter(accessToken, fetcher, apiBaseUrl);
+  }
+
+  publish(
+    context: ExecutionContext,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<PreviewFeedbackWriterResult>> {
+    if (input.channel === "github-pr-comment") {
+      return this.prCommentWriter.publish(context, input);
+    }
+
+    if (input.channel === "github-check") {
+      return this.checkRunWriter.publish(context, input);
+    }
+
+    return Promise.resolve(
+      err(
+        domainError.providerCapabilityUnsupported(
+          "GitHub preview feedback channel is not supported by this writer",
+          {
+            phase: "preview-feedback",
+            provider: "github",
+            channel: input.channel,
+          },
+        ),
+      ),
+    );
+  }
+}
+
 export function createGitHubPreviewPrCommentFeedbackWriter(
   accessToken: string,
   fetcher?: typeof fetch,
   apiBaseUrl?: string,
 ): PreviewFeedbackWriter {
   return new GitHubPreviewPrCommentFeedbackWriter(accessToken, fetcher, apiBaseUrl);
+}
+
+export function createGitHubPreviewCheckRunFeedbackWriter(
+  accessToken: string,
+  fetcher?: typeof fetch,
+  apiBaseUrl?: string,
+): PreviewFeedbackWriter {
+  return new GitHubPreviewCheckRunFeedbackWriter(accessToken, fetcher, apiBaseUrl);
+}
+
+export function createGitHubPreviewFeedbackWriter(
+  accessToken: string,
+  fetcher?: typeof fetch,
+  apiBaseUrl?: string,
+): PreviewFeedbackWriter {
+  return new GitHubPreviewCompositeFeedbackWriter(accessToken, fetcher, apiBaseUrl);
 }
 
 interface GitHubPushPayloadFacts {
@@ -530,6 +761,16 @@ function parseRepositoryFullName(value: string): { owner: string; name: string }
 
 function gitHubApiUrl(apiBaseUrl: string, path: string): URL {
   return new URL(path, apiBaseUrl);
+}
+
+function githubJsonHeaders(accessToken: string): Record<string, string> {
+  return {
+    accept: "application/vnd.github+json",
+    authorization: `Bearer ${accessToken}`,
+    "content-type": "application/json",
+    "user-agent": "appaloft-control-plane",
+    "x-github-api-version": "2022-11-28",
+  };
 }
 
 function isRetryableGitHubStatus(status: number): boolean {

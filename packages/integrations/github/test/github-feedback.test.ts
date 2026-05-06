@@ -3,7 +3,11 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import { createExecutionContext } from "@appaloft/application";
 
-import { createGitHubPreviewPrCommentFeedbackWriter } from "../src";
+import {
+  createGitHubPreviewCheckRunFeedbackWriter,
+  createGitHubPreviewFeedbackWriter,
+  createGitHubPreviewPrCommentFeedbackWriter,
+} from "../src";
 
 interface CapturedRequest {
   url: string;
@@ -22,6 +26,14 @@ function feedbackInput(input?: { providerFeedbackId?: string }) {
     pullRequestNumber: 42,
     body: "Preview feedback body",
     ...(input?.providerFeedbackId ? { providerFeedbackId: input.providerFeedbackId } : {}),
+  };
+}
+
+function checkInput(input?: { providerFeedbackId?: string }) {
+  return {
+    ...feedbackInput(input),
+    feedbackKey: "feedback:sevt_preview_feedback_1:github-check",
+    channel: "github-check" as const,
   };
 }
 
@@ -100,6 +112,152 @@ describe("GitHub preview feedback writer", () => {
     ]);
   });
 
+  test("[PG-PREVIEW-FEEDBACK-001] creates a check run for preview feedback", async () => {
+    const requests: CapturedRequest[] = [];
+    const writer = createGitHubPreviewCheckRunFeedbackWriter(
+      "github-token",
+      async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method ?? "GET",
+          authorization: new Headers(init?.headers).get("authorization"),
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+
+        if (String(input).endsWith("/repos/appaloft/demo/pulls/42")) {
+          return new Response(JSON.stringify({ head: { sha: "abc1234" } }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ id: 200 }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      },
+      "https://api.github.test",
+    );
+
+    const result = await writer.publish(
+      createExecutionContext({ entrypoint: "system", requestId: "req_github_check_create" }),
+      checkInput(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ providerFeedbackId: "200" });
+    expect(requests).toEqual([
+      {
+        url: "https://api.github.test/repos/appaloft/demo/pulls/42",
+        method: "GET",
+        authorization: "Bearer github-token",
+        body: null,
+      },
+      {
+        url: "https://api.github.test/repos/appaloft/demo/check-runs",
+        method: "POST",
+        authorization: "Bearer github-token",
+        body: {
+          name: "Appaloft preview",
+          head_sha: "abc1234",
+          status: "completed",
+          conclusion: "success",
+          output: {
+            title: "Preview deployment accepted",
+            summary: "Preview feedback body",
+          },
+        },
+      },
+    ]);
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("github-token");
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("Preview feedback body");
+  });
+
+  test("[PG-PREVIEW-FEEDBACK-001] updates an existing check run in place", async () => {
+    const requests: CapturedRequest[] = [];
+    const writer = createGitHubPreviewCheckRunFeedbackWriter(
+      "github-token",
+      async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method ?? "GET",
+          authorization: new Headers(init?.headers).get("authorization"),
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return new Response(JSON.stringify({ id: 200 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+      "https://api.github.test",
+    );
+
+    const result = await writer.publish(
+      createExecutionContext({ entrypoint: "system", requestId: "req_github_check_update" }),
+      checkInput({ providerFeedbackId: "200" }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ providerFeedbackId: "200" });
+    expect(requests).toEqual([
+      {
+        url: "https://api.github.test/repos/appaloft/demo/check-runs/200",
+        method: "PATCH",
+        authorization: "Bearer github-token",
+        body: {
+          name: "Appaloft preview",
+          status: "completed",
+          conclusion: "success",
+          output: {
+            title: "Preview deployment accepted",
+            summary: "Preview feedback body",
+          },
+        },
+      },
+    ]);
+  });
+
+  test("[PG-PREVIEW-FEEDBACK-001] returns safe retryable check run errors", async () => {
+    const writer = createGitHubPreviewCheckRunFeedbackWriter(
+      "github-token",
+      async (input) => {
+        if (String(input).endsWith("/repos/appaloft/demo/pulls/42")) {
+          return new Response(JSON.stringify({ head: { sha: "abc1234" } }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ message: "provider check body" }), {
+          status: 500,
+          headers: { "content-type": "application/json" },
+        });
+      },
+      "https://api.github.test",
+    );
+
+    const result = await writer.publish(
+      createExecutionContext({ entrypoint: "system", requestId: "req_github_check_error" }),
+      checkInput(),
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "provider_error",
+      category: "provider",
+      retryable: true,
+      details: {
+        phase: "preview-feedback",
+        provider: "github",
+        channel: "github-check",
+        statusCode: 500,
+      },
+    });
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("github-token");
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("provider check body");
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("Preview feedback body");
+  });
+
   test("[PG-PREVIEW-FEEDBACK-001] returns safe retryable provider errors without response bodies or tokens", async () => {
     const writer = createGitHubPreviewPrCommentFeedbackWriter(
       "github-token",
@@ -135,8 +293,55 @@ describe("GitHub preview feedback writer", () => {
     expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("Preview feedback body");
   });
 
-  test("[PG-PREVIEW-FEEDBACK-001] leaves checks and deployment statuses unsupported in the PR comment writer", async () => {
-    const writer = createGitHubPreviewPrCommentFeedbackWriter(
+  test("[PG-PREVIEW-FEEDBACK-001] routes comments and checks through the composite writer", async () => {
+    const requests: CapturedRequest[] = [];
+    const writer = createGitHubPreviewFeedbackWriter(
+      "github-token",
+      async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method ?? "GET",
+          authorization: new Headers(init?.headers).get("authorization"),
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+
+        if (String(input).endsWith("/repos/appaloft/demo/pulls/42")) {
+          return new Response(JSON.stringify({ head: { sha: "abc1234" } }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ id: requests.length === 1 ? 100 : 200 }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      },
+      "https://api.github.test",
+    );
+
+    const comment = await writer.publish(
+      createExecutionContext({ entrypoint: "system", requestId: "req_github_composite_comment" }),
+      feedbackInput(),
+    );
+    const check = await writer.publish(
+      createExecutionContext({ entrypoint: "system", requestId: "req_github_composite_check" }),
+      checkInput(),
+    );
+
+    expect(comment.isOk()).toBe(true);
+    expect(check.isOk()).toBe(true);
+    expect(comment._unsafeUnwrap()).toEqual({ providerFeedbackId: "100" });
+    expect(check._unsafeUnwrap()).toEqual({ providerFeedbackId: "200" });
+    expect(requests.map((request) => request.url)).toEqual([
+      "https://api.github.test/repos/appaloft/demo/issues/42/comments",
+      "https://api.github.test/repos/appaloft/demo/pulls/42",
+      "https://api.github.test/repos/appaloft/demo/check-runs",
+    ]);
+  });
+
+  test("[PG-PREVIEW-FEEDBACK-001] leaves deployment statuses unsupported in the composite writer", async () => {
+    const writer = createGitHubPreviewFeedbackWriter(
       "github-token",
       async () => {
         throw new Error("fetch should not be called");
@@ -151,7 +356,7 @@ describe("GitHub preview feedback writer", () => {
       }),
       {
         ...feedbackInput(),
-        channel: "github-check",
+        channel: "github-deployment-status",
       },
     );
 
@@ -163,7 +368,7 @@ describe("GitHub preview feedback writer", () => {
       details: {
         phase: "preview-feedback",
         provider: "github",
-        channel: "github-check",
+        channel: "github-deployment-status",
       },
     });
   });

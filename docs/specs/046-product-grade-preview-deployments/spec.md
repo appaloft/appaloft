@@ -244,9 +244,12 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   provider payloads, tokens, and secret-shaped values are not persisted in the feedback state.
   The GitHub integration now has a hermetic PR comment feedback writer that creates or updates
   issue comments by provider feedback id and returns safe retryable provider errors without response
-  bodies or tokens. Shell wiring resolves the GitHub access token per request through the existing
-  integration auth port before delegating to the PR comment writer. GitHub check/deployment-status
-  writers remain future work.
+  bodies or tokens. The GitHub integration also has a hermetic check-run feedback writer that
+  resolves the pull-request head SHA, creates check runs, updates existing check runs by provider
+  feedback id, and returns safe retryable provider errors. Shell wiring resolves the GitHub access
+  token per request through the existing integration auth port before delegating to the composite
+  GitHub feedback writer. GitHub deployment-status feedback remains future work because the current
+  feedback input does not carry the provider deployment identity needed for in-place status updates.
 - Preview environment cleanup now has an initial application service that loads the durable preview
   environment, marks cleanup requested without deleting preview history, and delegates runtime,
   route, source-link, provider metadata, and feedback cleanup to a port with safe source-scope

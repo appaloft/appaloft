@@ -107,11 +107,13 @@ records safe retryable error state, and omits feedback bodies, provider payloads
 secret-shaped values.
 `PG-PREVIEW-FEEDBACK-001` now also has hermetic GitHub integration coverage in
 `packages/integrations/github/test/github-feedback.test.ts`. The coverage proves PR comment
-feedback creates comments, updates existing comments by provider feedback id, returns safe
-retryable provider errors without response bodies/tokens, and explicitly leaves check/deployment
-status channels unsupported by the PR comment writer.
+feedback creates comments, updates existing comments by provider feedback id, creates check runs
+after resolving the pull-request head SHA, updates existing check runs by provider feedback id,
+returns safe retryable provider errors without response bodies/tokens, and explicitly leaves
+deployment-status feedback unsupported by the composite GitHub writer.
 Shell wiring registers a request-scoped GitHub preview feedback writer that obtains the GitHub
-access token through the existing integration auth port before delegating to the PR comment writer.
+access token through the existing integration auth port before delegating to the composite GitHub
+feedback writer.
 `PG-PREVIEW-CLEANUP-001` has initial core and application coverage in
 `packages/core/test/preview-environment.test.ts` and
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves cleanup
