@@ -1241,7 +1241,7 @@ Current verification notes:
   `resources.health`: Swarm-backed OCI image deployments can request opt-in live runtime inspection
   from sanitized `swarm.serviceName` metadata, and the runtime adapter normalizes `docker service
   ps` task state into Appaloft runtime health/check fields without exposing raw Docker payloads.
-  Remote-manager probing and real Swarm smoke coverage remain open.
+  Remote-manager probing remained open; local real Swarm smoke coverage was added by a later slice.
 - 2026-05-06 Phase 7 Docker Swarm route-label slice bound initial `SWARM-TARGET-ROUTE-001`
   coverage to image apply planning: Traefik route labels are absent from candidate service
   creation, promoted only after candidate verification, and target the Swarm edge network without
@@ -1255,7 +1255,7 @@ Current verification notes:
 - 2026-05-06 Phase 7 Docker Swarm shell-runner slice added `DockerSwarmShellCommandRunner` for the
   opt-in backend, with bounded command execution, stdout/stderr capture, nonzero exit preservation,
   and timeout handling. The default registry still leaves Swarm unsupported until explicitly
-  composed; real Swarm smoke/default activation remains open.
+  composed; default activation remains open.
 - 2026-05-06 Phase 7 Docker Swarm runtime-identity readback slice bound initial
   `SWARM-TARGET-APPLY-001` / `SWARM-TARGET-OBS-001` / `SWARM-TARGET-OBS-002` persistence coverage
   to PGlite deployment repository and read-model tests. Sanitized Swarm stack/service/schema
@@ -1265,19 +1265,19 @@ Current verification notes:
   covered by existing adapter and fake-backend tests: candidate services are created before
   verification, route promotion, and superseded-service cleanup; failed candidate verification
   records failure, skips superseded-service cleanup, and cleans only the deployment-scoped
-  candidate. Real Swarm smoke/default activation remains open.
+  candidate. Default activation remains open.
 - 2026-05-06 Phase 7 Docker Swarm display-command redaction slice added apply-plan display command
   redaction for non-secret runtime environment values while keeping executable runner commands
-  intact. Full registry/pull-secret handling and real Swarm smoke/default activation remain open.
+  intact. Full registry/pull-secret handling and default activation remain open.
 - 2026-05-06 Phase 7 Docker Swarm registry-auth render slice made image apply plans honor internal
   registry-auth/pull-secret metadata with Docker's `--with-registry-auth` flag while keeping raw
   registry secret references out of rendered intent, executable command, and display command
-  payloads. Real registry-login/pull-secret provisioning and real Swarm smoke/default activation
-  remain open.
+  payloads. Real registry-login/pull-secret provisioning, registry-auth smoke coverage, and default
+  activation remain open.
 - 2026-05-06 Phase 7 Docker Swarm opt-in composition slice added disabled-by-default shell
   configuration for the real Swarm execution backend. `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED`
   composes the `DockerSwarmExecutionBackend` into the runtime target registry with bounded command
-  timeout configuration, while default-on activation and real Swarm smoke coverage remain open.
+  timeout configuration, while default-on activation remains open.
 - 2026-05-06 Phase 7 Docker Swarm real-smoke harness slice added an environment-gated adapter
   smoke test for real Swarm apply, post-verification route-label promotion, secret metadata
   redaction, and scoped cleanup through `DockerSwarmExecutionBackend` and
