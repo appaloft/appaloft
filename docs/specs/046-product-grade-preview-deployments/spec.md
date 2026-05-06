@@ -222,6 +222,10 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   safe secret-reference metadata only. Raw production secret values and durable domain routes are
   not copied into preview resolution output. Wiring that resolution into a full preview lifecycle
   process manager remains future work.
+- Preview deployment dispatch uses the existing deployment admission path through
+  `CreateDeploymentSourceEventDispatcher`. The dispatcher forwards only project, environment,
+  Resource, server, and optional destination ids into `deployments.create`; preview source event,
+  pull request, branch, route, and source details stay in preview/source read-model state.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No GitHub App preview worker, feedback writer, cleanup scheduler, or cleanup retry state is

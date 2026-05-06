@@ -86,6 +86,11 @@ blocked on those future process-state implementations.
 scoped config resolution materializes no production secrets or durable routes by default, resolves
 only explicit non-secret preview variables, returns safe secret-reference metadata without raw or
 masked secret values, and never copies durable routes into preview output.
+`PG-PREVIEW-DEPLOY-001` has application coverage in
+`packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves preview
+deployment dispatch delegates to the existing `deployments.create` admission use case with only
+project/environment/resource/server/destination ids, excluding source event, pull request, branch,
+source, route, or preview-specific fields.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and

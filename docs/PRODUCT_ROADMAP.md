@@ -1319,6 +1319,11 @@ Current verification notes:
   resolves only explicit preview variables/secret references, and keeps raw or masked secret values
   out of preview resolution output. Full lifecycle process-manager wiring, GitHub App routes,
   feedback, cleanup retry, and active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview deployment-dispatch slice bound preview dispatch to the existing
+  `deployments.create` admission adapter and added explicit `PG-PREVIEW-DEPLOY-001` coverage that
+  only ids cross the deployment boundary. Pull-request/source/route/preview details remain
+  read-model or process context. GitHub App routes, feedback, cleanup retry, and active preview
+  environment entrypoints remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,

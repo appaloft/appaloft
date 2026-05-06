@@ -31,7 +31,7 @@
   identity and latest lifecycle state.
 - [x] `PG-PREVIEW-CONFIG-001`: scoped preview variables/secrets do not copy production secrets or
   routes by default.
-- [ ] `PG-PREVIEW-DEPLOY-001`: preview deployment dispatch uses ids-only `deployments.create`.
+- [x] `PG-PREVIEW-DEPLOY-001`: preview deployment dispatch uses ids-only `deployments.create`.
 - [ ] `PG-PREVIEW-FEEDBACK-001`: comments/checks/status updates are idempotent and retryable.
 - [ ] `PG-PREVIEW-CLEANUP-001`: cleanup preserves deployment history and audit while removing
   preview runtime, route, source-link, and provider metadata.
@@ -52,7 +52,7 @@
 - [ ] Add preview lifecycle process manager over policy, environment, deployment, and feedback
   state.
 - [x] Add scoped preview config/secret resolution.
-- [ ] Dispatch preview deployments through existing ids-only deployment admission.
+- [x] Dispatch preview deployments through existing ids-only deployment admission.
 - [ ] Add feedback writer ports/adapters and idempotent provider update state.
 - [ ] Add cleanup process manager and scheduler retry behavior.
 - [ ] Add Web/API/CLI/future MCP entrypoints.
