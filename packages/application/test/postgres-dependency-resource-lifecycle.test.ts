@@ -817,6 +817,81 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     expect(shown._unsafeUnwrapErr().code).toBe("not_found");
   });
 
+  test("[DEP-RES-REDIS-NATIVE-007] blocks protected realized managed Redis delete before provider cleanup", async () => {
+    const {
+      context,
+      deleteDependencyResource,
+      deleteSafetyReader,
+      managedRedisProvider,
+      provisionRedis,
+    } = await createHarness();
+    const bound = (
+      await provisionRedis.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Bound Cache",
+      })
+    )._unsafeUnwrap();
+    const retained = (
+      await provisionRedis.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Retained Cache",
+        backupRelationship: {
+          retentionRequired: true,
+          reason: "Retained by restore point",
+        },
+      })
+    )._unsafeUnwrap();
+    const referenced = (
+      await provisionRedis.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Referenced Cache",
+      })
+    )._unsafeUnwrap();
+    deleteSafetyReader.setBlockers(bound.id, [{ kind: "resource-binding", count: 1 }]);
+    deleteSafetyReader.setBlockers(referenced.id, [
+      { kind: "deployment-snapshot-reference", count: 1 },
+    ]);
+
+    const boundDelete = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: bound.id,
+    });
+    const retainedDelete = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: retained.id,
+    });
+    const referencedDelete = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: referenced.id,
+    });
+
+    expect(boundDelete.isErr()).toBe(true);
+    expect(boundDelete._unsafeUnwrapErr()).toMatchObject({
+      code: "dependency_resource_delete_blocked",
+      details: {
+        phase: "dependency-resource-delete-safety",
+        deletionBlockers: expect.stringContaining("resource-binding"),
+      },
+    });
+    expect(retainedDelete.isErr()).toBe(true);
+    expect(retainedDelete._unsafeUnwrapErr()).toMatchObject({
+      code: "dependency_resource_delete_blocked",
+      details: {
+        phase: "dependency-resource-delete-safety",
+        deletionBlockers: expect.stringContaining("backup-relationship"),
+      },
+    });
+    expect(referencedDelete.isErr()).toBe(true);
+    expect(referencedDelete._unsafeUnwrapErr()).toMatchObject({
+      code: "dependency_resource_delete_blocked",
+      details: {
+        phase: "dependency-resource-delete-safety",
+        deletionBlockers: expect.stringContaining("deployment-snapshot-reference"),
+      },
+    });
+    expect(managedRedisProvider.deleted).toEqual([]);
+  });
+
   test("[DEP-RES-REDIS-IMPORT-001] [DEP-RES-REDIS-READ-002] imports external Redis with masked read model", async () => {
     const { context, importRedis, showDependencyResource } = await createHarness();
 
