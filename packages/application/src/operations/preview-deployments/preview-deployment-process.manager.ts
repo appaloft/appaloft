@@ -20,10 +20,15 @@ export interface PreviewDeploymentProcessInput extends PreviewLifecycleDeployInp
 export interface PreviewDeploymentProcessResult {
   lifecycleResult: PreviewLifecycleDeployResult;
   feedbackResult?: PublishPreviewFeedbackResult;
+  deploymentStatusFeedbackResult?: PublishPreviewFeedbackResult;
 }
 
 function feedbackKey(input: PreviewDeploymentProcessInput): string {
   return `feedback:${input.sourceEventId}:github-pr-comment`;
+}
+
+function deploymentStatusFeedbackKey(input: PreviewDeploymentProcessInput): string {
+  return `feedback:${input.sourceEventId}:github-deployment-status`;
 }
 
 function feedbackBody(
@@ -87,9 +92,23 @@ export class PreviewDeploymentProcessManager {
       return err(feedback.error);
     }
 
+    const deploymentStatusFeedback = await this.previewFeedbackService.publish(context, {
+      feedbackKey: deploymentStatusFeedbackKey(input),
+      sourceEventId: input.sourceEventId,
+      previewEnvironmentId: lifecycle.value.previewEnvironmentId,
+      channel: "github-deployment-status",
+      repositoryFullName: input.repositoryFullName,
+      pullRequestNumber: input.pullRequestNumber,
+      body: feedbackBody(input, lifecycle.value),
+    });
+    if (deploymentStatusFeedback.isErr()) {
+      return err(deploymentStatusFeedback.error);
+    }
+
     return ok({
       lifecycleResult: lifecycle.value,
       feedbackResult: feedback.value,
+      deploymentStatusFeedbackResult: deploymentStatusFeedback.value,
     });
   }
 }

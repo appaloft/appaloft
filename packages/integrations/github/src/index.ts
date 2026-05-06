@@ -569,14 +569,25 @@ export class GitHubPreviewDeploymentStatusFeedbackWriter implements PreviewFeedb
           );
         }
 
-        const deploymentId = input.providerFeedbackId ?? input.providerDeploymentId;
+        let deploymentId = input.providerFeedbackId ?? input.providerDeploymentId;
+        if (!deploymentId) {
+          const createdDeployment = await this.createDeployment(repository, input);
+          if (createdDeployment.isErr()) {
+            return err(createdDeployment.error);
+          }
+          deploymentId = createdDeployment.value;
+        }
         if (!deploymentId) {
           return err(
-            domainError.validation("GitHub preview deployment status requires a deployment id", {
-              phase: "preview-feedback",
-              provider: "github",
-              channel: input.channel,
-            }),
+            domainError.provider(
+              "GitHub preview deployment creation did not return a deployment id",
+              {
+                phase: "preview-feedback",
+                provider: "github",
+                channel: input.channel,
+              },
+              true,
+            ),
           );
         }
 
@@ -619,6 +630,119 @@ export class GitHubPreviewDeploymentStatusFeedbackWriter implements PreviewFeedb
         return ok({ providerFeedbackId: deploymentId });
       },
     );
+  }
+
+  private async createDeployment(
+    repository: GitHubRepositoryParts,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<string>> {
+    const headSha = await this.resolvePullRequestHeadSha(repository, input);
+    if (headSha.isErr()) {
+      return err(headSha.error);
+    }
+
+    const response = await this.fetcher(
+      gitHubApiUrl(this.apiBaseUrl, `/repos/${repository.owner}/${repository.name}/deployments`),
+      {
+        method: "POST",
+        headers: githubJsonHeaders(this.accessToken),
+        body: JSON.stringify({
+          ref: headSha.value,
+          environment: "preview",
+          description: "Appaloft preview deployment",
+          auto_merge: false,
+          required_contexts: [],
+          transient_environment: true,
+          production_environment: false,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      return err(
+        domainError.provider(
+          "GitHub preview deployment creation failed",
+          {
+            phase: "preview-feedback",
+            provider: "github",
+            channel: input.channel,
+            statusCode: response.status,
+          },
+          isRetryableGitHubStatus(response.status),
+        ),
+      );
+    }
+
+    const payload = objectRecord(await response.json().catch(() => null));
+    const deploymentId =
+      typeof payload?.id === "number" || typeof payload?.id === "string"
+        ? String(payload.id)
+        : undefined;
+
+    return deploymentId
+      ? ok(deploymentId)
+      : err(
+          domainError.provider(
+            "GitHub preview deployment creation response did not include a deployment id",
+            {
+              phase: "preview-feedback",
+              provider: "github",
+              channel: input.channel,
+              statusCode: response.status,
+            },
+            true,
+          ),
+        );
+  }
+
+  private async resolvePullRequestHeadSha(
+    repository: GitHubRepositoryParts,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<string>> {
+    const response = await this.fetcher(
+      gitHubApiUrl(
+        this.apiBaseUrl,
+        `/repos/${repository.owner}/${repository.name}/pulls/${input.pullRequestNumber}`,
+      ),
+      {
+        method: "GET",
+        headers: githubJsonHeaders(this.accessToken),
+      },
+    );
+    if (!response.ok) {
+      return err(
+        domainError.provider(
+          "GitHub preview pull request lookup failed",
+          {
+            phase: "preview-feedback",
+            provider: "github",
+            channel: input.channel,
+            statusCode: response.status,
+          },
+          isRetryableGitHubStatus(response.status),
+        ),
+      );
+    }
+
+    const payload = objectRecord(await response.json().catch(() => null));
+    const head = payload ? objectRecord(payload.head) : null;
+    const sha = head ? nonEmptyString(head.sha) : null;
+    if (!sha) {
+      return err(
+        domainError.provider(
+          "GitHub preview pull request lookup did not include a head SHA",
+          {
+            phase: "preview-feedback",
+            provider: "github",
+            channel: input.channel,
+            statusCode: response.status,
+          },
+          true,
+        ),
+      );
+    }
+
+    return ok(sha);
   }
 }
 

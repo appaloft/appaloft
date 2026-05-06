@@ -353,6 +353,87 @@ describe("GitHub preview feedback writer", () => {
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("Preview feedback body");
   });
 
+  test("[PG-PREVIEW-FEEDBACK-001] creates a GitHub deployment before automatic deployment status feedback", async () => {
+    const requests: CapturedRequest[] = [];
+    const writer = createGitHubPreviewDeploymentStatusFeedbackWriter(
+      "github-token",
+      async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method ?? "GET",
+          authorization: new Headers(init?.headers).get("authorization"),
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+
+        if (String(input).endsWith("/repos/appaloft/demo/pulls/42")) {
+          return new Response(JSON.stringify({ head: { sha: "abc1234" } }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        if (String(input).endsWith("/repos/appaloft/demo/deployments")) {
+          return new Response(JSON.stringify({ id: "github_deployment_301" }), {
+            status: 201,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ id: 302 }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      },
+      "https://api.github.test",
+    );
+
+    const result = await writer.publish(
+      createExecutionContext({
+        entrypoint: "system",
+        requestId: "req_github_deployment_status_auto_create",
+      }),
+      deploymentStatusInput(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ providerFeedbackId: "github_deployment_301" });
+    expect(requests).toEqual([
+      {
+        url: "https://api.github.test/repos/appaloft/demo/pulls/42",
+        method: "GET",
+        authorization: "Bearer github-token",
+        body: null,
+      },
+      {
+        url: "https://api.github.test/repos/appaloft/demo/deployments",
+        method: "POST",
+        authorization: "Bearer github-token",
+        body: {
+          ref: "abc1234",
+          environment: "preview",
+          description: "Appaloft preview deployment",
+          auto_merge: false,
+          required_contexts: [],
+          transient_environment: true,
+          production_environment: false,
+        },
+      },
+      {
+        url: "https://api.github.test/repos/appaloft/demo/deployments/github_deployment_301/statuses",
+        method: "POST",
+        authorization: "Bearer github-token",
+        body: {
+          state: "success",
+          description: "Appaloft preview deployment accepted",
+          environment: "preview",
+          auto_inactive: false,
+        },
+      },
+    ]);
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("github-token");
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("Preview feedback body");
+  });
+
   test("[PG-PREVIEW-FEEDBACK-001] reuses an existing deployment id for status updates", async () => {
     const requests: CapturedRequest[] = [];
     const writer = createGitHubPreviewDeploymentStatusFeedbackWriter(

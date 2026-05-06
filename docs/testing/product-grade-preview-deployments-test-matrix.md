@@ -102,8 +102,8 @@ source, route, or preview-specific fields.
 feedback publish calls reuse an existing provider feedback id for update-in-place and record
 retryable provider failures as safe feedback state while returning `ok` to preserve the accepted
 deployment result. It also proves the preview deployment process manager publishes idempotent
-PR-comment feedback after accepted deployment dispatch and keeps the accepted deployment result when
-feedback publication is retryable.
+PR-comment and deployment-status feedback after accepted deployment dispatch and keeps the accepted
+deployment result when feedback publication is retryable.
 `PG-PREVIEW-FEEDBACK-001` now also has Postgres/PGlite persistence coverage in
 `packages/persistence/pg/test/preview-feedback.pglite.test.ts`. The coverage proves durable
 feedback state upserts by feedback key, preserves provider feedback ids for idempotent updates,
@@ -113,9 +113,11 @@ secret-shaped values.
 `packages/integrations/github/test/github-feedback.test.ts`. The coverage proves PR comment
 feedback creates comments, updates existing comments by provider feedback id, creates check runs
 after resolving the pull-request head SHA, updates existing check runs by provider feedback id,
-creates deployment statuses when a provider deployment id is supplied, reuses that deployment id for
-later append-only status updates, returns safe retryable provider errors without response
-bodies/tokens, and routes all supported channels through the composite GitHub writer.
+creates deployment statuses when a provider deployment id is supplied, creates a transient GitHub
+preview deployment by resolving the pull-request head SHA when automatic process-manager feedback
+has no deployment id yet, reuses that deployment id for later append-only status updates, returns
+safe retryable provider errors without response bodies/tokens, and routes all supported channels
+through the composite GitHub writer.
 Shell wiring registers a request-scoped GitHub preview feedback writer that obtains the GitHub
 access token through the existing integration auth port before delegating to the composite GitHub
 feedback writer.
@@ -199,9 +201,8 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-Automatic process-manager deployment-status publication, scheduler leases, terminal provider
-metadata cleanup, repository/installation mapping, and active GitHub App preview worker transports
-remain open.
+Scheduler leases, terminal provider metadata cleanup, repository/installation mapping, and active
+GitHub App preview worker transports remain open.
 Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 

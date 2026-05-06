@@ -1416,19 +1416,26 @@ Current verification notes:
   `pull_request` deliveries on `/api/integrations/github/source-events` to
   `IngestPreviewPullRequestEventCommand` through `CommandBus`, using trusted Appaloft preview
   context headers for project/environment/Resource/server/destination/source-fingerprint selection.
-  Repository or installation mapping, scheduler leases, terminal provider metadata cleanup, and
-  automatic deployment-status publication remain open.
+  Repository or installation mapping, scheduler leases, and terminal provider metadata cleanup
+  remain open.
 - 2026-05-06 Phase 7 preview closed-event cleanup slice routed GitHub `pull_request.closed`
   ingestion through source-scope preview environment lookup into the preview cleanup service.
   Existing previews now preserve history while requesting runtime/route/source-link/provider/
   feedback cleanup, and missing previews return an idempotent ignored result. Repository or
-  installation mapping, scheduler leases, terminal provider metadata cleanup, and automatic
-  deployment-status publication remain open.
+  installation mapping, scheduler leases, and terminal provider metadata cleanup remain open.
 - 2026-05-06 Phase 7 preview cleanup feedback slice added latest-feedback lookup by preview
   environment/channel, cleanup-side PR-comment updates through the existing idempotent feedback
   writer path, skipped cleanup feedback when no prior feedback exists, and safe retryable failure
   propagation into cleanup retry handling. Repository or installation mapping, scheduler leases,
-  terminal provider metadata cleanup, and automatic deployment-status publication remain open.
+  and terminal provider metadata cleanup remain open.
+- 2026-05-06 Phase 7 preview deployment-status publication slice made the preview deployment
+  process manager publish idempotent `github-deployment-status` feedback after accepted ids-only
+  deployment dispatch. The GitHub feedback writer now creates a transient GitHub preview deployment
+  from the pull-request head SHA when automatic feedback has no provider deployment id yet, records
+  that deployment id for later append-only status updates, and keeps retryable provider failures in
+  safe feedback state without rewriting the accepted deployment result. Repository or installation
+  mapping, scheduler leases, terminal provider metadata cleanup, and active GitHub App preview
+  worker transports remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
@@ -1476,9 +1483,9 @@ Required:
   [docs/specs/046-product-grade-preview-deployments](./specs/046-product-grade-preview-deployments/spec.md)
   with a dedicated test matrix; preview policy/environment operations, feedback, cleanup retry,
   Web/API/CLI/future MCP surfaces, public docs, an initial signed GitHub pull-request HTTP route,
-  close-event cleanup routing, and cleanup-side feedback update are implemented. Repository or
-  installation mapping, scheduler leases, terminal provider metadata cleanup, and automatic
-  deployment-status publication remain open.
+  close-event cleanup routing, cleanup-side feedback update, and automatic deployment-status
+  feedback publication are implemented. Repository or installation mapping, scheduler leases,
+  terminal provider metadata cleanup, and active GitHub App preview worker transports remain open.
 - [x] Add scheduled task/cron resource shape with run history and logs after workload service
   semantics are specified. ADR-039/spec matrix now position ownership and target operations.
 - [x] Complete the Docker Swarm Spec Round as the first cluster runtime target:
