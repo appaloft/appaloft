@@ -1267,6 +1267,11 @@ Current verification notes:
   `docs/testing/product-grade-preview-deployments-test-matrix.md` covering preview policy,
   environment identity, scoped preview config, ids-only deployment dispatch, feedback,
   cleanup retries, quotas, and public-surface requirements. Code Round remains open.
+- 2026-05-06 Phase 7 product-grade preview policy evaluator slice added initial normalized
+  GitHub pull-request policy evaluation for verified same-repository events, unverified events,
+  default fork blocking, secret-backed fork blocking, and opt-in fork previews without secrets.
+  Preview environment state, deployment dispatch, read models, GitHub App ingestion, feedback,
+  cleanup retry, and entrypoints remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,

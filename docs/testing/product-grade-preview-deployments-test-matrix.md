@@ -54,8 +54,15 @@ admission, and durable cleanup retry state.
 
 ## Current Implementation Notes And Migration Gaps
 
-No product-grade preview deployment tests are implemented yet. Existing coverage belongs to
-Action-only PR previews and `deployments.cleanup-preview`.
+`PG-PREVIEW-POLICY-001` and `PG-PREVIEW-POLICY-002` have initial application-service coverage in
+`packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves normalized
+GitHub pull request policy evaluation for verified same-repository events, unverified events,
+default fork blocking, secret-backed fork blocking, and opt-in fork previews without secrets.
+
+Preview environment creation/update, deployment dispatch, blocked-event read models, GitHub App
+webhook normalization, feedback, cleanup retry, and active operation entrypoints remain open.
+Existing non-product-grade coverage belongs to Action-only PR previews and
+`deployments.cleanup-preview`.
 
 Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add
 persistence, adapter, transport, Web, CLI, and public-docs coverage as each surface is activated.
