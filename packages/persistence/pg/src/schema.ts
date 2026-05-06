@@ -502,6 +502,21 @@ export interface PreviewFeedbackRecordsTable {
   updated_at: UpdatableTimestampColumn;
 }
 
+export interface PreviewCleanupAttemptsTable {
+  attempt_id: string;
+  preview_environment_id: string;
+  resource_id: string;
+  source_binding_fingerprint: string;
+  owner: string;
+  status: string;
+  phase: string;
+  attempted_at: UpdatableTimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+  error_code: string | null;
+  retryable: boolean | null;
+  next_retry_at: NullableUpdatableTimestampColumn;
+}
+
 export interface DefaultAccessDomainPoliciesTable {
   id: string;
   scope_key: string;
@@ -668,6 +683,7 @@ export interface Database {
   preview_policies: PreviewPoliciesTable;
   preview_policy_decisions: PreviewPolicyDecisionsTable;
   preview_feedback_records: PreviewFeedbackRecordsTable;
+  preview_cleanup_attempts: PreviewCleanupAttemptsTable;
   default_access_domain_policies: DefaultAccessDomainPoliciesTable;
   server_applied_route_states: ServerAppliedRouteStatesTable;
   mutation_coordinations: MutationCoordinationsTable;
