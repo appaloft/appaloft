@@ -143,16 +143,19 @@ describe("resolveConfig", () => {
       env: {
         APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED: "true",
         APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS: "45000",
+        APPALOFT_DOCKER_SWARM_EDGE_NETWORK: "appaloft-smoke-edge",
       },
     });
 
     expect(defaults.dockerSwarmExecution).toEqual({
       enabled: false,
       commandTimeoutMs: 60000,
+      edgeNetworkName: "appaloft-edge",
     });
     expect(configured.dockerSwarmExecution).toEqual({
       enabled: true,
       commandTimeoutMs: 45000,
+      edgeNetworkName: "appaloft-smoke-edge",
     });
   });
 

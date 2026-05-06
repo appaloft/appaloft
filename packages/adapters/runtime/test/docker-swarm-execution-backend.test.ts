@@ -365,6 +365,19 @@ describe("DockerSwarmExecutionBackend", () => {
     expect(runner.calls[0]?.command).not.toContain("docker volume");
   });
 
+  test("[SWARM-TARGET-ROUTE-001B] applies a configured Swarm edge network name", async () => {
+    const runner = new RecordingSwarmCommandRunner();
+    const backend = new DockerSwarmExecutionBackend(runner, undefined, {
+      edgeNetworkName: "appaloft-smoke-edge",
+    });
+
+    const result = await backend.execute(createContext(), runningDeployment());
+
+    expect(result.isOk()).toBe(true);
+    expect(runner.calls[0]?.command).toContain("--network 'appaloft-smoke-edge'");
+    expect(runner.calls[2]?.command).toContain("traefik.docker.network=appaloft-smoke-edge");
+  });
+
   test("[SWARM-TARGET-APPLY-002][SWARM-TARGET-CLEAN-001] cleans only the failed candidate when fake verification fails", async () => {
     const runner = new FailingVerifySwarmCommandRunner();
     const backend = new DockerSwarmExecutionBackend(runner);
@@ -427,11 +440,13 @@ describe("DockerSwarmExecutionBackend", () => {
       ]);
       expect(swarmState).toBe("active true");
 
+      const edgeNetworkName =
+        Bun.env.APPALOFT_DOCKER_SWARM_EDGE_NETWORK ?? "appaloft-edge";
       const edgeNetwork = commandOutput([
         "docker",
         "network",
         "inspect",
-        "appaloft-edge",
+        edgeNetworkName,
         "--format",
         "{{.Driver}} {{.Scope}}",
       ]);
@@ -444,6 +459,8 @@ describe("DockerSwarmExecutionBackend", () => {
         new DockerSwarmShellCommandRunner({
           timeoutMs: Number(Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_TIMEOUT_MS ?? "120000"),
         }),
+        undefined,
+        { edgeNetworkName },
       );
 
       try {

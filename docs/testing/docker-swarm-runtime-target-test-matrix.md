@@ -105,8 +105,10 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   Docker task payloads. Remote-manager probing and real Swarm smoke coverage remain open.
 - `SWARM-TARGET-ROUTE-001` has initial apply-plan coverage proving Traefik route labels are absent
   from candidate service creation and added only in the post-verification `promote-route-target`
-  step against the Swarm edge network. End-to-end route realization against a real Swarm edge proxy
-  remains open.
+  step against the Swarm edge network. Adapter coverage now proves the opt-in execution backend can
+  use `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` to target a configured overlay network for both service
+  attachment and route labels. End-to-end route realization against a real Swarm edge proxy remains
+  open.
 - `SWARM-TARGET-SECRET-001` has initial fake-backend coverage proving Swarm command failure output
   is redacted before deployment logs and execution metadata capture common auth headers, cookies,
   key/value secrets, URL credentials, private-key blocks, or exact deployment snapshot secret
@@ -114,11 +116,11 @@ implemented, but no Docker Swarm execution backend is active in the default runt
 - `packages/adapters/runtime/test/docker-swarm-execution-backend.test.ts` now includes an
   environment-gated real Docker Swarm smoke harness for
   `SWARM-TARGET-ROUTE-001B`/`SWARM-TARGET-SECRET-001B`. It runs only when
-  `APPALOFT_DOCKER_SWARM_SMOKE=1`, requires an active local manager and an `appaloft-edge` overlay
-  network, deploys through `DockerSwarmExecutionBackend` with `DockerSwarmShellCommandRunner`, and
-  cleans the scoped service afterward. `bun run smoke:swarm` is the first-class opt-in command for
-  that harness. Default CI keeps this smoke skipped until a real Swarm environment is explicitly
-  available.
+  `APPALOFT_DOCKER_SWARM_SMOKE=1`, requires an active local manager and an overlay network named by
+  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` or `appaloft-edge`, deploys through
+  `DockerSwarmExecutionBackend` with `DockerSwarmShellCommandRunner`, and cleans the scoped service
+  afterward. `bun run smoke:swarm` is the first-class opt-in command for that harness. Default CI
+  keeps this smoke skipped until a real Swarm environment is explicitly available.
 - `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
   explaining Swarm target registration, manager readiness expectations, image registry access,
   rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI `server register`,

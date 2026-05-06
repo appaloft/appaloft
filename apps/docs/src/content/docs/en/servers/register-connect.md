@@ -114,8 +114,9 @@ Appaloft can reach through the selected transport.
 
 Current status: Appaloft can record Swarm target metadata, run non-mutating manager readiness
 checks through `server test` or `server doctor`, and reject unsupported Swarm-specific deployment
-fields before a deployment is created. The default runtime backend does not execute Swarm
-deployments yet. Until a Swarm execution backend is enabled, deploying to a Swarm target should fail
+fields before a deployment is created. Swarm execution is opt-in with
+`APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=true`; the default runtime backend does not execute Swarm
+deployments. Until a Swarm execution backend is enabled, deploying to a Swarm target should fail
 before acceptance with `runtime_target_unsupported`.
 
 Keep deployment requests ids-only. Do not add Swarm fields such as namespace, stack name, service
@@ -134,6 +135,8 @@ Before Swarm execution is supported for a target, `server test`/`server doctor` 
 Operators should also verify:
 
 - image registry access is configured without exposing secret values;
+- the Swarm edge network is an overlay network; set `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` when the
+  deployment should use a network name other than `appaloft-edge`;
 - health checks and service logs can be read in a form Appaloft can normalize.
 
 When Swarm execution is active, rollout should preserve the previous service until verification

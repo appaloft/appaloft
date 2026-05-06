@@ -52,6 +52,10 @@ export interface DockerSwarmShellCommandRunnerOptions {
   timeoutMs?: number;
 }
 
+export interface DockerSwarmExecutionBackendOptions {
+  edgeNetworkName?: string;
+}
+
 type SwarmExecutionPhase = "deploy" | "verify" | "rollback";
 type SwarmLogLevel = "debug" | "info" | "warn" | "error";
 const dockerSwarmShellCommandTimeoutExitCode = 124;
@@ -193,6 +197,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       "runtime.cleanup",
       "proxy.route",
     ],
+    private readonly options: DockerSwarmExecutionBackendOptions = {},
   ) {
     this.descriptor = {
       key: "docker-swarm",
@@ -213,6 +218,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       runtimePlan: state.runtimePlan,
       environmentSnapshot: state.environmentSnapshot,
       identity,
+      ...(this.options.edgeNetworkName ? { edgeNetworkName: this.options.edgeNetworkName } : {}),
     });
     if (intentResult.isErr()) {
       const message = safeFailureMessage(intentResult.error.message, redactions);
