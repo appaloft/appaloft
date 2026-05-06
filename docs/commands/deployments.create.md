@@ -32,9 +32,11 @@ This command inherits the shared platform contracts:
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
+- [ADR-040: Dependency Binding Runtime Injection Boundary](../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md)
 - [resources.archive Command Spec](./resources.archive.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
 - [Runtime Plan Resolution Unsupported/Override Contract](../specs/018-runtime-plan-resolution-unsupported-override-contract/spec.md)
+- [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Error Model](../errors/model.md)
@@ -155,6 +157,9 @@ The command must perform or delegate these admission steps before returning acce
     naming intent when present.
 12. Resolve network endpoint configuration from `ResourceNetworkProfile`.
 13. Create an immutable environment snapshot.
+13. After the dependency binding runtime injection Code Round, materialize active ready dependency
+    bindings into an immutable safe runtime injection snapshot and reject active non-injectable
+    bindings before acceptance.
 14. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
 15. Resolve the runtime plan, Docker/OCI artifact requirements, and network/access snapshots.
 16. Resolve that the selected deployment target/destination has a runtime target backend with the
@@ -508,6 +513,10 @@ Migration gaps:
   `RuntimeTargetBackendRegistry` for local-shell and generic-SSH single-server backends; admission
   rejects unresolved backends with pre-acceptance `runtime_target_unsupported` checks before Swarm
   or Kubernetes backends are added.
+- dependency binding runtime injection is governed by ADR-040 and
+  [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md).
+  The current implementation captures safe binding references but still reports runtime injection as
+  deferred.
 - generated default access routing is governed by ADR-017, but the current runtime adapter path still contains adapter-facing requested deployment route fields that must be replaced by provider-neutral route resolution.
 
 ## Open Questions

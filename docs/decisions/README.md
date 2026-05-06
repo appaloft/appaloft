@@ -64,6 +64,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-037: Source Event Auto Deploy Ownership](./ADR-037-source-event-auto-deploy-ownership.md) | Accepted | Defines Resource-owned auto-deploy policy, source event ingestion/dedupe/read-model ownership, generic webhook secret scope, and Phase 7 process-state baseline. |
 | [ADR-038: Resource Runtime Control Ownership](./ADR-038-resource-runtime-control-ownership.md) | Accepted | Defines Resource runtime stop/start/restart ownership, process-state baseline, coordination, and restart-versus-redeploy semantics. |
 | [ADR-039: Scheduled Task Resource Ownership](./ADR-039-scheduled-task-resource-ownership.md) | Accepted | Defines Resource-owned scheduled tasks, run attempts, logs, scheduler admission, and deployment-boundary separation. |
+| [ADR-040: Dependency Binding Runtime Injection Boundary](./ADR-040-dependency-binding-runtime-injection-boundary.md) | Accepted | Defines how Resource dependency bindings become runtime inputs through deployment admission and runtime target adapters without adding dependency fields to `deployments.create`. |
 
 ## Authoring Rules
 
