@@ -1,6 +1,7 @@
 import {
   type AppLogger,
   type ExecutionContextFactory,
+  type MutationCoordinator,
   type PreviewCleanupRetryScheduler,
 } from "@appaloft/application";
 import { type AppConfig } from "@appaloft/config";
@@ -13,9 +14,20 @@ export interface PreviewCleanupRetrySchedulerRunner {
 export interface PreviewCleanupRetrySchedulerRunnerInput {
   config: AppConfig["previewCleanupRetryScheduler"];
   scheduler: Pick<PreviewCleanupRetryScheduler, "run">;
+  mutationCoordinator?: Pick<MutationCoordinator, "runExclusive">;
   executionContextFactory: ExecutionContextFactory;
   logger: AppLogger;
 }
+
+const previewCleanupRetrySchedulerPolicy = {
+  operationKey: "preview-cleanup-retry-scheduler",
+  scopeKind: "preview-lifecycle",
+  mode: "serialize-with-bounded-wait",
+  waitTimeoutMs: 5_000,
+  retryIntervalMs: 250,
+  leaseTtlMs: 30_000,
+  heartbeatIntervalMs: 5_000,
+} as const;
 
 export function createPreviewCleanupRetrySchedulerRunner(
   input: PreviewCleanupRetrySchedulerRunnerInput,
@@ -38,9 +50,34 @@ export function createPreviewCleanupRetrySchedulerRunner(
           label: "Preview cleanup retry scheduler",
         },
       });
-      const result = await input.scheduler.run(context, {
-        limit: input.config.batchSize,
-      });
+      const result = input.mutationCoordinator
+        ? await input.mutationCoordinator.runExclusive({
+            context,
+            policy: previewCleanupRetrySchedulerPolicy,
+            scope: {
+              kind: "preview-lifecycle",
+              key: "preview-cleanup-retry-scheduler",
+            },
+            owner: {
+              ownerId: context.requestId,
+              label: "Preview cleanup retry scheduler",
+            },
+            work: () =>
+              input.scheduler.run(context, {
+                limit: input.config.batchSize,
+              }),
+          })
+        : await input.scheduler.run(context, {
+            limit: input.config.batchSize,
+          });
+
+      if (result.isErr()) {
+        input.logger.warn("preview_cleanup_retry_scheduler.lease_or_tick_failed", {
+          code: result.error.code,
+          retryable: result.error.retryable,
+        });
+        return;
+      }
 
       if (result.isOk() && (result.value.dispatched.length > 0 || result.value.failed.length > 0)) {
         input.logger.info("preview_cleanup_retry_scheduler.tick_completed", {
