@@ -174,8 +174,8 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
 ## Current Implementation Notes And Migration Gaps
 
 - Action-only preview deploy/update and explicit close-event cleanup exist in the CLI/config
-  workflow and reference wrapper, but the public `appaloft/deploy-action` wrapper repository and
-  Marketplace documentation are still open roadmap work.
+  workflow and reference wrapper. The public `appaloft/deploy-action` wrapper repository and
+  Marketplace documentation are now published from the deterministic reference export.
 - The application layer now has an initial product-grade preview policy evaluator with a normalized
   GitHub pull-request input schema. It allows verified same-repository pull request events, blocks
   unverified events, blocks secret-backed fork previews by default, and permits fork previews

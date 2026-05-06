@@ -59,8 +59,8 @@ Historical alignment notes:
   deploys, and Web runtime profile editing is merged on `origin/main`, and the current preview
   runtime-name template variables on `main` are `{preview_id}` and `{pr_number}`.
 - [x] On 2026-04-22, Action/CLI PR preview deploy profile flag support and explicit preview cleanup
-  command support are implemented in the CLI/config bootstrap path, but the public
-  deploy-action wrapper and product-grade GitHub App preview lifecycle remain incomplete.
+  command support are implemented in the CLI/config bootstrap path. The public deploy-action
+  wrapper is now published; product-grade GitHub App preview lifecycle work is tracked separately.
 - [x] On 2026-04-23, `deployments.stream-events` is active in the operation catalog, application
   query slice, HTTP/oRPC replay and stream routes, CLI events command, shell observer, and Web
   deployment detail timeline. Remaining work is reconnect/gap/CLI test hardening, not first-class
@@ -71,7 +71,7 @@ Historical alignment notes:
   after deployment.
 - [x] On 2026-04-24, the main repository has a docs PR preview workflow that uses the Appaloft CLI
   preview path for same-repository docs changes and runs explicit preview cleanup when the PR is
-  closed; the public `appaloft/deploy-action` wrapper remains separate roadmap work.
+  closed; the public `appaloft/deploy-action` wrapper is now published from the reference export.
 - [x] Release Please keeps pre-`1.0.0` feature and minor bumps on the current patch line by
   default; the `release_as` workflow input is required only when the roadmap gate allows a target
   minor or explicit hotfix version.
@@ -1162,13 +1162,13 @@ Current verification notes:
 - 2026-05-05 Phase 7 deploy-action reference wrapper slice added
   `.github/actions/deploy-action` with composite action metadata, release-archive install/checksum
   verification script, deploy invocation script, SSH private-key temp-file handling, PR preview flag
-  mapping, and `scripts/test/deploy-action-wrapper.test.ts` coverage. The roadmap row remains open
-  until this reference is promoted to the public `appaloft/deploy-action` repository with
-  Marketplace docs/examples, public wrapper CI, and cleanup examples.
+  mapping, and `scripts/test/deploy-action-wrapper.test.ts` coverage. The reference is now
+  promoted to the public `appaloft/deploy-action` repository with Marketplace docs/examples, public
+  wrapper CI, and cleanup examples.
 - 2026-05-05 Phase 7 deploy-action preview-output slice added CLI `--preview-output-file`
   handling and wrapper temp-file parsing so Action PR previews can publish generated/default or
   custom `preview-url` values from deployment read models instead of deriving only from templates.
-  Public `appaloft/deploy-action` promotion remains open.
+  Public `appaloft/deploy-action` promotion is now complete.
 - 2026-05-05 Phase 7 existing-resource profile-drift help slice closed the stable public
   `resource.profile-drift` help topic, Web Resource diagnostics help link, CLI `resource show`
   help target, HTTP route description, docs traceability, and matrix/task sync. Default
@@ -1178,9 +1178,7 @@ Current verification notes:
   `@appaloft/ai-mcp` tool list with descriptors generated from
   `packages/application/src/operation-catalog.ts`. `MCP-TOOL-DESC-001` through
   `MCP-TOOL-DESC-003` assert one descriptor per operation key, stable operation-key tool names,
-  serializable CLI/API metadata, and high-value deployment/resource/source-event mappings. The full
-  `0.9.0` release rule remains blocked by the public deploy-action promotion, product-grade preview
-  deployments, and cluster runtime items.
+  serializable CLI/API metadata, and high-value deployment/resource/source-event mappings.
 - 2026-05-05 Phase 7 scheduled task resource Spec Round added ADR-039 and
   `docs/specs/044-scheduled-task-resource-shape` to position Resource-owned scheduled task
   definitions, run attempts, task-run logs, scheduler admission, and deployment-boundary separation.
@@ -1614,22 +1612,25 @@ Current verification notes:
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
-  Marketplace README, and public wrapper tests remain open.
+  Marketplace README, and public wrapper CI are now published.
 - 2026-05-05 Phase 7 deploy-action wrapper cleanup/README slice added `command:
   preview-cleanup` to the reference composite action, a Marketplace-facing README with deploy, PR
   preview, close-event cleanup, fork-safety, minimal config, and reserved control-plane examples,
   plus wrapper tests for cleanup mapping and README safety examples. The public
-  `appaloft/deploy-action` repository and public wrapper CI/layout tests remain open.
+  `appaloft/deploy-action` repository and public wrapper CI/layout tests are now published.
 - 2026-05-06 Phase 7 deploy-action wrapper export slice added a deterministic export script for
   mirroring the reference `action.yml`, Marketplace README, and install/deploy scripts into the
-  future public `appaloft/deploy-action` repository, with a layout test proving exported files match
-  the reference and shell scripts keep executable bits. Creating the public repository and wiring
-  public wrapper CI remain open.
+  public `appaloft/deploy-action` repository, with a layout test proving exported files match the
+  reference and shell scripts keep executable bits.
 - 2026-05-06 Phase 7 deploy-action public CI export slice added the wrapper repository CI workflow
   to the exported layout. The workflow validates shell syntax, dry-run PR preview mapping and
-  outputs, and an opt-in exact-version install smoke controlled by the future public repository's
-  `APPALOFT_INSTALL_SMOKE_VERSION` variable. Creating the public repository and enabling that
-  exported CI remain external release/publishing work.
+  outputs, and an opt-in exact-version install smoke controlled by the public repository's
+  `APPALOFT_INSTALL_SMOKE_VERSION` variable.
+- 2026-05-06 Phase 7 deploy-action public repository publication slice merged
+  `appaloft/deploy-action#1`, making the public `main` branch match the deterministic reference
+  export plus the repository license. Public wrapper CI `validate` passed before merge, and
+  post-merge comparison confirmed the exported `README.md`, `action.yml`, install/deploy scripts,
+  and `.github/workflows/ci.yml` match byte-for-byte.
 
 Required:
 
@@ -1656,11 +1657,11 @@ Required:
   specified.
 - [x] Add source binding and auto-deploy.
 - [x] Add push webhook and generic signed deploy webhook.
-- [ ] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
+- [x] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
   GitHub Actions workflow. Public docs now distinguish Action-only workflow-file previews from
-  future product-grade control-plane previews, but the public `appaloft/deploy-action` wrapper
-  repository remains open; reference action asset export and the exported public wrapper CI workflow
-  are implemented and layout-tested locally.
+  future product-grade control-plane previews; the public `appaloft/deploy-action` repository is
+  published from the deterministic reference export with Marketplace README examples, preview
+  cleanup mapping, and public wrapper CI.
 - [x] Add existing-resource profile-drift handling.
 - [x] Add product-grade preview deployments after source binding and webhook ingestion are durable,
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
