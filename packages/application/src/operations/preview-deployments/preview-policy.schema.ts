@@ -7,7 +7,7 @@ export const previewPolicyEventKindSchema = z.literal("pull-request");
 export const previewPolicyPullRequestActionSchema = z.enum(["opened", "reopened", "synchronize"]);
 export const previewPolicyForkModeSchema = z.enum(["disabled", "without-secrets", "with-secrets"]);
 
-const defaultPreviewPolicySettings = {
+export const defaultPreviewPolicySettings = {
   sameRepositoryPreviews: true,
   forkPreviews: "disabled" as const,
   secretBackedPreviews: true,

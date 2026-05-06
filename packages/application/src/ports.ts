@@ -4539,6 +4539,64 @@ export interface PreviewEnvironmentReadModel {
   ): Promise<PreviewEnvironmentSummary | null>;
 }
 
+export type PreviewPolicyScope =
+  | {
+      kind: "project";
+      projectId: string;
+    }
+  | {
+      kind: "resource";
+      projectId: string;
+      resourceId: string;
+    };
+
+export interface PreviewPolicySettings {
+  sameRepositoryPreviews: boolean;
+  forkPreviews: "disabled" | "without-secrets" | "with-secrets";
+  secretBackedPreviews: boolean;
+}
+
+export interface PreviewPolicyRecord {
+  id: string;
+  scope: PreviewPolicyScope;
+  settings: PreviewPolicySettings;
+  updatedAt: string;
+  idempotencyKey?: string;
+}
+
+export interface PreviewPolicySummary {
+  id?: string;
+  scope: PreviewPolicyScope;
+  settings: PreviewPolicySettings;
+  source: "default" | "configured";
+  updatedAt?: string;
+}
+
+export interface ConfigurePreviewPolicyResult {
+  id: string;
+}
+
+export interface ShowPreviewPolicyResult {
+  schemaVersion: "preview-policies.show/v1";
+  policy: PreviewPolicySummary;
+  generatedAt: string;
+}
+
+export interface PreviewPolicyRepository {
+  findOne(
+    context: RepositoryContext,
+    scope: PreviewPolicyScope,
+  ): Promise<PreviewPolicyRecord | null>;
+  upsert(context: RepositoryContext, record: PreviewPolicyRecord): Promise<PreviewPolicyRecord>;
+}
+
+export interface PreviewPolicyReadModel {
+  findOneSummary(
+    context: RepositoryContext,
+    scope: PreviewPolicyScope,
+  ): Promise<PreviewPolicySummary>;
+}
+
 export interface ProjectReadModel {
   list(context: RepositoryContext): Promise<ProjectSummary[]>;
   findOne(context: RepositoryContext, spec: ProjectSelectionSpec): Promise<ProjectSummary | null>;

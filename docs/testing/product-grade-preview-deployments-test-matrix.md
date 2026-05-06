@@ -61,6 +61,10 @@ default fork blocking, secret-backed fork blocking, and opt-in fork previews wit
 `PG-PREVIEW-POLICY-001` now also has initial application process coverage in the same test file
 for policy-eligible pull-request events creating/updating a preview environment and dispatching one
 ids-only deployment request without copying pull-request source facts into deployment admission.
+`PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
+`packages/application/test/preview-policy-operations.test.ts` for shared
+`preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
+operation catalog entries with no active transports.
 
 `PG-PREVIEW-ENV-001` and `PG-PREVIEW-CLEANUP-001` have initial core-domain coverage in
 `packages/core/test/preview-environment.test.ts`. The coverage proves scoped preview environment

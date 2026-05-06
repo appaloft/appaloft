@@ -192,10 +192,13 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   policy-eligible pull-request event. It creates or updates the scoped `PreviewEnvironment`, then
   dispatches exactly one ids-only deployment request through the existing deployment dispatcher.
   Pull-request source facts stay in preview lifecycle state rather than `deployments.create`.
+- Preview policy now has inactive application operation contracts for `preview-policies.configure`
+  and `preview-policies.show`, including shared command/query schemas, handlers, repository/read
+  model ports, and operation catalog entries without CLI/oRPC/Web transports.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
-- No preview policy aggregate/read model, GitHub App preview worker, feedback writer, cleanup
-  scheduler, or cleanup retry state is implemented.
+- No durable preview policy persistence adapter, GitHub App preview worker, feedback writer,
+  cleanup scheduler, or cleanup retry state is implemented.
 - No active operation catalog entries exist for `preview-policies.*` or `preview-environments.*`.
 - Product-grade preview public docs/help are not yet implemented.
 

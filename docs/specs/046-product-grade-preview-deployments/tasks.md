@@ -43,7 +43,7 @@
 
 - [x] Add initial preview policy evaluator schema/application service for same-repository and
   default fork-secret decisions.
-- [ ] Add preview policy command/query schemas, handlers, read models, and operation catalog
+- [x] Add preview policy command/query schemas, handlers, read models, and operation catalog
   entries.
 - [x] Add core preview environment aggregate state.
 - [x] Add preview environment read models and persistence.

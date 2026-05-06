@@ -1285,6 +1285,11 @@ Current verification notes:
   `PreviewLifecycleService` coverage for eligible pull-request policy results creating/updating
   preview environments and dispatching one ids-only deployment request. GitHub App ingestion,
   blocked-event read models, feedback, cleanup retry, and entrypoints remain open.
+- 2026-05-06 Phase 7 preview policy operation-contract slice added inactive
+  `preview-policies.configure` and `preview-policies.show` command/query schemas, handlers,
+  repository/read-model ports, operation catalog entries, and tests. Durable policy persistence,
+  active transports, GitHub App ingestion, feedback, cleanup retry, and preview environment
+  entrypoints remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
