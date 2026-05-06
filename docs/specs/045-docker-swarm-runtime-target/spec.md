@@ -154,6 +154,10 @@ No new public operation key is accepted in this Spec Round.
 - Swarm apply-plan display commands redact non-secret runtime environment values while the
   executable command retains the real value for the explicitly composed runner. Runtime secret
   values remain represented as Docker secret references only.
+- Swarm image apply planning now recognizes internal registry-auth/pull-secret metadata and renders
+  Docker's `--with-registry-auth` flag for explicit execution. The rendered intent exposes only a
+  redacted registry-auth marker; raw registry secret references or credential values are not
+  serialized into the intent, executable command, or display command.
 - The opt-in Swarm execution backend now has a bounded shell command runner that can execute the
   rendered apply, verify, promote, and cleanup commands and preserve stdout/stderr/exit-code
   results for backend handling. The runner is exported for explicit composition and is still not
@@ -165,7 +169,8 @@ No new public operation key is accepted in this Spec Round.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
 - Default Swarm backend activation, remote-manager health/log execution, end-to-end Swarm route
-  smoke coverage, and full registry/pull-secret handling remain open.
+  smoke coverage, real registry-login/pull-secret provisioning, and real Swarm registry-auth smoke
+  coverage remain open.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and

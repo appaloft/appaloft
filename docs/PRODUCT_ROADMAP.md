@@ -1269,6 +1269,11 @@ Current verification notes:
 - 2026-05-06 Phase 7 Docker Swarm display-command redaction slice added apply-plan display command
   redaction for non-secret runtime environment values while keeping executable runner commands
   intact. Full registry/pull-secret handling and real Swarm smoke/default activation remain open.
+- 2026-05-06 Phase 7 Docker Swarm registry-auth render slice made image apply plans honor internal
+  registry-auth/pull-secret metadata with Docker's `--with-registry-auth` flag while keeping raw
+  registry secret references out of rendered intent, executable command, and display command
+  payloads. Real registry-login/pull-secret provisioning and real Swarm smoke/default activation
+  remain open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
