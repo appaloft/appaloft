@@ -89,6 +89,7 @@ import {
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
   PgMutationCoordinator,
+  PgPreviewCleanupAttemptRecorder,
   PgPreviewEnvironmentReadModel,
   PgPreviewEnvironmentRepository,
   PgPreviewFeedbackRecorder,
@@ -778,6 +779,11 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.previewFeedbackRecorder, {
     useFactory: instanceCachingFactory(() => new PgPreviewFeedbackRecorder(input.database.db)),
+  });
+  container.register(tokens.previewCleanupAttemptRecorder, {
+    useFactory: instanceCachingFactory(
+      () => new PgPreviewCleanupAttemptRecorder(input.database.db),
+    ),
   });
   container.register(tokens.scheduledTaskDefinitionRepository, {
     useFactory: instanceCachingFactory(

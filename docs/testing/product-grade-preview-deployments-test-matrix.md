@@ -113,6 +113,11 @@ route, source-link, provider metadata, and feedback cleanup with safe source-sco
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves retryable
 cleanup failures record `retry-scheduled` attempt state with owner, new `pcln_*` attempt ids per
 run, safe failure phase, provider error code, next retry time, and no provider error text.
+`PG-PREVIEW-CLEANUP-002` now also has Postgres/PGlite persistence coverage in
+`packages/persistence/pg/test/preview-cleanup-attempt.pglite.test.ts`. The coverage proves durable
+cleanup attempt rows retain attempt id, preview environment id, Resource id, source fingerprint,
+owner, status, safe phase, retry timing, and safe error code without provider error text, tokens, or
+secret-shaped values.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
@@ -135,10 +140,9 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-GitHub App route wiring, GitHub feedback writer adapters, durable cleanup attempt persistence,
-concrete cleanup adapters, scheduler retry dispatch, and active CLI/API/Web/future MCP transports
-remain open. Existing non-product-grade coverage belongs to Action-only PR previews and
-`deployments.cleanup-preview`.
+GitHub App route wiring, GitHub feedback writer adapters, concrete cleanup adapters, scheduler
+retry dispatch, and active CLI/API/Web/future MCP transports remain open. Existing
+non-product-grade coverage belongs to Action-only PR previews and `deployments.cleanup-preview`.
 
 Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add
 persistence, adapter, transport, Web, CLI, and public-docs coverage as each surface is activated.

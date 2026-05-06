@@ -1350,6 +1350,12 @@ Current verification notes:
   record safe owner, phase, error code, and next retry time, and responses omit provider error text.
   Durable cleanup attempt persistence, scheduler dispatch, concrete cleanup adapters, GitHub App
   HTTP routes, and active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview cleanup attempt persistence slice added Postgres/PGlite storage and
+  shell wiring for durable cleanup retry records keyed by `pcln_*` attempt id. Stored state keeps
+  preview environment id, Resource id, source fingerprint, owner, status, phase, retry timing, and
+  safe error code without provider error text, tokens, or secret-shaped values. Scheduler dispatch,
+  concrete cleanup adapters, GitHub App HTTP routes, and active preview environment entrypoints
+  remain open.
 - 2026-05-06 Phase 7 preview environment surface-contract slice added inactive
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete`
   application contracts plus operation catalog entries. List/show read from the safe preview
