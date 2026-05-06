@@ -90,6 +90,7 @@ import {
   PgEnvironmentRepository,
   PgMutationCoordinator,
   PgPreviewEnvironmentRepository,
+  PgPreviewPolicyDecisionProjection,
   PgPreviewPolicyRepository,
   PgProcessAttemptJournal,
   PgProjectReadModel,
@@ -765,6 +766,11 @@ export function registerRuntimeDependencies(
   container.register(tokens.previewPolicyRepository, {
     useFactory: instanceCachingFactory(() => new PgPreviewPolicyRepository(input.database.db)),
   });
+  container.register(tokens.previewPolicyDecisionRecorder, {
+    useFactory: instanceCachingFactory(
+      () => new PgPreviewPolicyDecisionProjection(input.database.db),
+    ),
+  });
   container.register(tokens.scheduledTaskDefinitionRepository, {
     useFactory: instanceCachingFactory(
       () => new PgScheduledTaskDefinitionRepository(input.database.db),
@@ -912,6 +918,11 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.previewPolicyReadModel, {
     useFactory: instanceCachingFactory(() => new PgPreviewPolicyRepository(input.database.db)),
+  });
+  container.register(tokens.previewPolicyDecisionReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgPreviewPolicyDecisionProjection(input.database.db),
+    ),
   });
   container.register(tokens.scheduledTaskReadModel, {
     useFactory: instanceCachingFactory(() => new PgScheduledTaskReadModel(input.database.db)),

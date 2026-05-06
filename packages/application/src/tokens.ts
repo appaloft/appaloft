@@ -29,6 +29,7 @@ export const tokens = {
   dependencyResourceBackupRepository: Symbol.for("appaloft.dependency_resource_backup_repository"),
   previewEnvironmentRepository: Symbol.for("appaloft.preview_environment_repository"),
   previewPolicyRepository: Symbol.for("appaloft.preview_policy_repository"),
+  previewPolicyDecisionRecorder: Symbol.for("appaloft.preview_policy_decision_recorder"),
   resourceDependencyBindingRepository: Symbol.for(
     "appaloft.resource_dependency_binding_repository",
   ),
@@ -76,6 +77,7 @@ export const tokens = {
   sourceEventReadModel: Symbol.for("appaloft.source_event_read_model"),
   previewLifecycleService: Symbol.for("appaloft.preview_lifecycle_service"),
   previewPolicyReadModel: Symbol.for("appaloft.preview_policy_read_model"),
+  previewPolicyDecisionReadModel: Symbol.for("appaloft.preview_policy_decision_read_model"),
   deploymentReadModel: Symbol.for("appaloft.deployment_read_model"),
   domainBindingReadModel: Symbol.for("appaloft.domain_binding_read_model"),
   certificateReadModel: Symbol.for("appaloft.certificate_read_model"),

@@ -1,5 +1,6 @@
 import { type Result } from "@appaloft/core";
 
+import { type PreviewPolicyDecisionReasonCode } from "../../ports";
 import { parseOperationInput } from "../shared-schema";
 import {
   type PreviewPolicyEvaluationInput,
@@ -9,12 +10,7 @@ import {
 
 export type PreviewPolicyDecisionStatus = "allowed" | "blocked";
 
-export type PreviewPolicyBlockedReason =
-  | "preview_event_unverified"
-  | "preview_same_repository_disabled"
-  | "preview_fork_disabled"
-  | "preview_fork_secrets_blocked"
-  | "preview_secret_backed_disabled";
+export type PreviewPolicyBlockedReason = PreviewPolicyDecisionReasonCode;
 
 export interface PreviewPolicyDecisionSafeDetails {
   provider: "github";

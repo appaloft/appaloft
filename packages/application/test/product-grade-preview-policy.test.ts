@@ -14,11 +14,15 @@ import {
   type ExecutionContext,
   type PreviewEnvironmentRepository,
   PreviewLifecycleService,
+  type PreviewPolicyDecisionProjection,
+  type PreviewPolicyDecisionReadModel,
+  type PreviewPolicyDecisionRecorder,
   PreviewPolicyEvaluator,
   type RepositoryContext,
   type SourceEventDeploymentDispatcher,
   type SourceEventDeploymentDispatchInput,
   type SourceEventDeploymentDispatchResult,
+  toRepositoryContext,
 } from "../src";
 
 class SequentialIdGenerator {
@@ -72,6 +76,26 @@ class CapturingPreviewDeploymentDispatcher implements SourceEventDeploymentDispa
   ): Promise<Result<SourceEventDeploymentDispatchResult>> {
     this.inputs.push(input);
     return ok({ deploymentId: `dep_preview_${this.inputs.length}` });
+  }
+}
+
+class InMemoryPreviewPolicyDecisionProjection
+  implements PreviewPolicyDecisionRecorder, PreviewPolicyDecisionReadModel
+{
+  private readonly projections = new Map<string, PreviewPolicyDecisionProjection>();
+
+  async record(
+    _context: RepositoryContext,
+    projection: PreviewPolicyDecisionProjection,
+  ): Promise<void> {
+    this.projections.set(projection.sourceEventId, projection);
+  }
+
+  async findOne(
+    _context: RepositoryContext,
+    input: { sourceEventId: string },
+  ): Promise<PreviewPolicyDecisionProjection | null> {
+    return this.projections.get(input.sourceEventId) ?? null;
   }
 }
 
@@ -193,38 +217,38 @@ describe("PreviewPolicyEvaluator", () => {
   test("[PG-PREVIEW-POLICY-001B] creates preview environment and dispatches ids-only deployment", async () => {
     const repository = new InMemoryPreviewEnvironmentRepository();
     const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
     const service = new PreviewLifecycleService(
       repository,
       dispatcher,
+      projection,
       new FixedClock("2026-05-06T01:00:00.000Z"),
       new SequentialIdGenerator(),
     );
 
-    const result = await service.deployFromPolicyEligibleEvent(
-      createExecutionContext({
-        requestId: "req_preview_lifecycle_test",
-        entrypoint: "system",
-      }),
-      {
-        sourceEventId: "sevt_preview_1",
-        projectId: "prj_preview",
-        environmentId: "env_preview",
-        resourceId: "res_preview_api",
-        serverId: "srv_preview",
-        destinationId: "dst_preview",
-        sourceBindingFingerprint: "srcfp_preview_42",
-        provider: "github",
-        eventKind: "pull-request",
-        eventAction: "synchronize",
-        repositoryFullName: "appaloft/demo",
-        headRepositoryFullName: "appaloft/demo",
-        pullRequestNumber: 42,
-        headSha: "abc1234",
-        baseRef: "main",
-        verified: true,
-        requestedSecretScopes: ["preview-runtime"],
-      },
-    );
+    const context = createExecutionContext({
+      requestId: "req_preview_lifecycle_test",
+      entrypoint: "system",
+    });
+    const result = await service.deployFromPolicyEligibleEvent(context, {
+      sourceEventId: "sevt_preview_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_42",
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "synchronize",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "appaloft/demo",
+      pullRequestNumber: 42,
+      headSha: "abc1234",
+      baseRef: "main",
+      verified: true,
+      requestedSecretScopes: ["preview-runtime"],
+    });
 
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap()).toMatchObject({
@@ -252,16 +276,35 @@ describe("PreviewPolicyEvaluator", () => {
     ]);
     expect(JSON.stringify(dispatcher.inputs)).not.toContain("pullRequestNumber");
     expect(JSON.stringify(dispatcher.inputs)).not.toContain("headSha");
+    expect(
+      await projection.findOne(toRepositoryContext(context), {
+        sourceEventId: "sevt_preview_1",
+      }),
+    ).toMatchObject({
+      sourceEventId: "sevt_preview_1",
+      status: "allowed",
+      deploymentEligible: true,
+      previewEnvironmentId: "prenv_1",
+      deploymentId: "dep_preview_1",
+    });
   });
 
   test("[PG-PREVIEW-POLICY-001B] updates existing preview environment before dispatch", async () => {
     const repository = new InMemoryPreviewEnvironmentRepository();
     const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
     const service = new PreviewLifecycleService(
       repository,
       dispatcher,
+      projection,
       new FixedClock("2026-05-06T01:05:00.000Z"),
       new SequentialIdGenerator(),
+    );
+    const repositoryContext = toRepositoryContext(
+      createExecutionContext({
+        requestId: "req_preview_lifecycle_projection_lookup_test",
+        entrypoint: "system",
+      }),
     );
 
     const first = await service.deployFromPolicyEligibleEvent(
@@ -323,5 +366,93 @@ describe("PreviewPolicyEvaluator", () => {
     expect(repository.upsertCount).toBe(2);
     expect(repository.previewEnvironment?.toState().source.headSha.value).toBe("def5678");
     expect(dispatcher.inputs).toHaveLength(2);
+    expect(
+      await projection.findOne(repositoryContext, {
+        sourceEventId: "sevt_preview_2",
+      }),
+    ).toMatchObject({
+      sourceEventId: "sevt_preview_2",
+      status: "allowed",
+      deploymentEligible: true,
+      previewEnvironmentId: "prenv_1",
+      deploymentId: "dep_preview_2",
+    });
+  });
+
+  test("[PG-PREVIEW-POLICY-002B] projects blocked fork policy decisions with safe details", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const service = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      new FixedClock("2026-05-06T01:15:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const context = createExecutionContext({
+      requestId: "req_preview_lifecycle_blocked_test",
+      entrypoint: "system",
+    });
+
+    const result = await service.deployFromPolicyEligibleEvent(context, {
+      sourceEventId: "sevt_preview_blocked_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_43",
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "opened",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "external/demo-fork",
+      pullRequestNumber: 43,
+      headSha: "blocked1234",
+      baseRef: "main",
+      verified: true,
+      requestedSecretScopes: ["preview-runtime", "database"],
+    });
+    const projected = await projection.findOne(toRepositoryContext(context), {
+      sourceEventId: "sevt_preview_blocked_1",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "blocked",
+      policyDecision: {
+        status: "blocked",
+        reasonCode: "preview_fork_disabled",
+        deploymentEligible: false,
+      },
+    });
+    expect(repository.upsertCount).toBe(0);
+    expect(dispatcher.inputs).toEqual([]);
+    expect(projected).toEqual({
+      sourceEventId: "sevt_preview_blocked_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "opened",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "external/demo-fork",
+      pullRequestNumber: 43,
+      headSha: "blocked1234",
+      baseRef: "main",
+      fork: true,
+      secretBacked: true,
+      requestedSecretScopeCount: 2,
+      status: "blocked",
+      phase: "preview-policy-evaluation",
+      deploymentEligible: false,
+      evaluatedAt: "2026-05-06T01:15:00.000Z",
+      reasonCode: "preview_fork_disabled",
+    });
+    expect(JSON.stringify(projected)).not.toContain("preview-runtime");
+    expect(JSON.stringify(projected)).not.toContain("database");
+    expect(JSON.stringify(projected)).not.toContain("secretRef");
   });
 });

@@ -19,7 +19,7 @@
   and dispatches one ids-only deployment attempt.
 - [x] `PG-PREVIEW-POLICY-002A`: policy evaluator blocks secret-backed fork preview deployment by
   default.
-- [ ] `PG-PREVIEW-POLICY-002B`: blocked fork policy result is projected with safe ignored/blocked
+- [x] `PG-PREVIEW-POLICY-002B`: blocked fork policy result is projected with safe ignored/blocked
   read-model detail and no secret lookup.
 - [ ] `PG-PREVIEW-POLICY-003`: quotas and expiry block or schedule previews with readable reasons.
 - [ ] `PG-PREVIEW-EVENT-001`: GitHub App pull request event verification/normalization is safe.
