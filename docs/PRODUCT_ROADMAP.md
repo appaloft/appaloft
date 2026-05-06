@@ -1246,8 +1246,8 @@ Current verification notes:
 - 2026-05-06 Phase 7 Docker Swarm route-label slice bound initial `SWARM-TARGET-ROUTE-001`
   coverage to image apply planning: Traefik route labels are absent from candidate service
   creation, promoted only after candidate verification, and target the Swarm edge network without
-  public workload host-port publication. End-to-end route realization against a real Swarm edge
-  proxy remains open.
+  public workload host-port publication. Real edge-proxy route realization was closed by the later
+  route smoke slice.
 - 2026-05-06 Phase 7 Docker Swarm failure-redaction slice bound initial
   `SWARM-TARGET-SECRET-001` coverage to the opt-in Swarm execution backend: command failure output
   is redacted before deployment logs and execution metadata capture common auth headers, cookies,
@@ -1296,15 +1296,23 @@ Current verification notes:
   separators and made the opt-in real smoke provision a smoke-specific Docker secret reference and
   use an nginx-compatible health check. `bun run smoke:swarm` passed against a temporary local Swarm
   manager with `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to
-  inactive Swarm state. Default activation and real edge-proxy route realization remain open;
-  registry-auth smoke coverage was closed by the later registry-auth smoke slice.
+  inactive Swarm state. Real edge-proxy route realization and registry-auth smoke coverage were
+  closed by later smoke slices; default activation remains open.
 - 2026-05-06 Phase 7 Docker Swarm registry-auth smoke slice extended `bun run smoke:swarm` to
   provision a temporary authenticated registry, push a smoke image, deploy that private image
   through `DockerSwarmExecutionBackend` with `--with-registry-auth`, and assert registry secret
   material, secret references, and runtime env secret values stay out of deployment logs/metadata.
   The smoke passed against a temporary local Swarm manager with
   `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to inactive Swarm
-  state. Default activation and real edge-proxy route realization remain open.
+  state. Real edge-proxy route realization was closed by the later route smoke slice; default
+  activation remains open.
+- 2026-05-06 Phase 7 Docker Swarm route-realization smoke slice extended `bun run smoke:swarm` to
+  provision a temporary Traefik Swarm edge proxy on the smoke overlay network, deploy the nginx
+  workload without publishing the workload service port, promote Appaloft Traefik route labels after
+  candidate verification, and verify `Host: api.example.com` reaches nginx through the published
+  proxy entrypoint. The smoke passed against a temporary local Swarm manager with
+  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to inactive Swarm
+  state. Default activation remains open.
 - 2026-05-06 Phase 7 Docker Swarm remote-log observation slice made `resources.runtime-logs` execute
   Swarm service log reads through the resolved Swarm manager SSH target when available, while
   preserving the local Docker fallback for local smoke runs. Remote-manager health observation
@@ -1576,8 +1584,8 @@ Required:
   links are implemented; opt-in shell composition and `bun run smoke:swarm` real smoke harness
   exist, and the local real smoke passed against a temporary Swarm manager; Swarm service log and
   health reads can run through the resolved manager over SSH; registry-authenticated image pull is
-  covered by the opt-in real smoke. Default activation and real edge-proxy route realization remain
-  open.
+  covered by the opt-in real smoke; real edge-proxy route realization is covered by the opt-in real
+  smoke. Default activation remains open.
 
 Exit criteria:
 

@@ -33,7 +33,7 @@
 - [x] `SWARM-TARGET-CLEAN-001`: cleanup stays resource/deployment/destination scoped.
 - [x] `SWARM-TARGET-ROUTE-001A`: Traefik reverse-proxy labels are promoted only after candidate
   verification and attach to the Swarm service/network identity without public workload host ports.
-- [ ] `SWARM-TARGET-ROUTE-001B`: end-to-end reverse-proxy route realization is verified against a
+- [x] `SWARM-TARGET-ROUTE-001B`: end-to-end reverse-proxy route realization is verified against a
   real Swarm edge proxy.
 - [x] `SWARM-TARGET-SECRET-001A`: Swarm command failure output stored in deployment logs and
   metadata is redacted.
