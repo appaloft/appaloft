@@ -19,6 +19,7 @@ import {
   type Result,
 } from "@appaloft/core";
 import {
+  type DependencyResourceSecretStore,
   type ExecutionContext,
   type RuntimeTargetBackend,
   type RuntimeTargetBackendDescriptor,
@@ -27,10 +28,11 @@ import {
 import {
   renderDockerSwarmApplyPlan,
   renderDockerSwarmCleanupPlan,
+  renderDockerSwarmDependencySecretName,
   renderDockerSwarmRuntimeIntent,
-  type DockerSwarmApplyPlanStep,
   type DockerSwarmRuntimeIdentityInput,
 } from "./docker-swarm-runtime-intent";
+import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
 
 export interface DockerSwarmCommandRunnerInput {
   step: string;
@@ -60,6 +62,14 @@ type SwarmExecutionPhase = "deploy" | "verify" | "rollback";
 type SwarmLogLevel = "debug" | "info" | "warn" | "error";
 const dockerSwarmShellCommandTimeoutExitCode = 124;
 const defaultDockerSwarmShellCommandTimeoutMs = 60_000;
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function commandParts(parts: readonly string[]): string {
+  return parts.filter((part) => part.trim().length > 0).join(" ");
+}
 
 function phaseLog(
   phase: SwarmExecutionPhase,
@@ -199,6 +209,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       "proxy.route",
     ],
     private readonly options: DockerSwarmExecutionBackendOptions = {},
+    private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
   ) {
     this.descriptor = {
       key: "docker-swarm",
@@ -209,12 +220,33 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
   }
 
   async execute(
-    _context: ExecutionContext,
+    context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
     const state = deployment.toState();
     const identity = deploymentIdentity(deployment);
-    const redactions = deploymentSecretRedactions(deployment);
+    const runtimeEnvResult = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+    });
+    if (runtimeEnvResult.isErr()) {
+      const message = safeFailureMessage(runtimeEnvResult.error.message, deploymentSecretRedactions(deployment));
+      return applyExecutionResult(
+        deployment,
+        executionResult({
+          status: "failed",
+          exitCode: 1,
+          logs: [phaseLog("deploy", message, "error")],
+          retryable: true,
+          errorCode: runtimeEnvResult.error.code,
+          metadata: { phase: "dependency-runtime-secret-resolution", message },
+        }),
+      );
+    }
+
+    const runtimeEnv = runtimeEnvResult.value;
+    const redactions = [...deploymentSecretRedactions(deployment), ...runtimeEnv.redactions];
     const intentResult = renderDockerSwarmRuntimeIntent({
       runtimePlan: state.runtimePlan,
       environmentSnapshot: state.environmentSnapshot,
@@ -254,7 +286,12 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
     }
 
     const logs: DeploymentLogEntry[] = [];
-    for (const step of applyPlanResult.value.steps) {
+    const dependencySecretSteps = this.renderDependencySecretMaterializationSteps({
+      identity,
+      env: runtimeEnv.env,
+      dependencyTargetNames: runtimeEnv.dependencyTargetNames,
+    });
+    for (const step of [...dependencySecretSteps, ...applyPlanResult.value.steps]) {
       const result = await this.runStep(step);
       logs.push(phaseLog(step.step === "verify-candidate-service" ? "verify" : "deploy", step.step));
 
@@ -362,12 +399,48 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
   }
 
   private async runStep(
-    step: DockerSwarmApplyPlanStep,
+    step: DockerSwarmCommandRunnerInput,
   ): Promise<Result<DockerSwarmCommandRunnerResult>> {
     return await this.runner.run({
       step: step.step,
       command: step.command,
       displayCommand: step.displayCommand,
+    });
+  }
+
+  private renderDependencySecretMaterializationSteps(input: {
+    identity: DockerSwarmRuntimeIdentityInput;
+    env: NodeJS.ProcessEnv;
+    dependencyTargetNames: ReadonlySet<string>;
+  }): DockerSwarmCommandRunnerInput[] {
+    return [...input.dependencyTargetNames].sort().flatMap((targetName) => {
+      const secretValue = input.env[targetName];
+      if (typeof secretValue !== "string") {
+        return [];
+      }
+
+      const secretName = renderDockerSwarmDependencySecretName({
+        identity: input.identity,
+        targetName,
+      });
+      const createLabels = commandParts([
+        `--label ${shellQuote("appaloft.managed=true")}`,
+        `--label ${shellQuote("appaloft.runtime-target=docker-swarm")}`,
+        `--label ${shellQuote(`appaloft.deployment-id=${input.identity.deploymentId}`)}`,
+        `--label ${shellQuote(`appaloft.target-id=${input.identity.targetId}`)}`,
+        `--label ${shellQuote(`appaloft.destination-id=${input.identity.destinationId}`)}`,
+        `--label ${shellQuote(`appaloft.dependency-target=${targetName}`)}`,
+      ]);
+      const inspect = `docker secret inspect ${shellQuote(secretName)} >/dev/null 2>&1`;
+      const create = `printf %s ${shellQuote(secretValue)} | docker secret create ${createLabels} ${shellQuote(secretName)} -`;
+      const displayCreate = `printf %s ${shellQuote("[redacted]")} | docker secret create ${createLabels} ${shellQuote(secretName)} -`;
+      return [
+        {
+          step: `materialize-dependency-secret:${targetName}`,
+          command: `${inspect} || ${create}`,
+          displayCommand: `${inspect} || ${displayCreate}`,
+        },
+      ];
     });
   }
 

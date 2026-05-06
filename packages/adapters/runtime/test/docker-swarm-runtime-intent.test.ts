@@ -282,7 +282,7 @@ describe("renderDockerSwarmRuntimeIntent", () => {
       exposure: "runtime",
       scope: "deployment",
       secret: true,
-      valueFrom: "secret:DATABASE_URL",
+      valueFrom: "secret:appaloft-dep-123-database-url",
     });
     expect(JSON.stringify(intent)).not.toContain("appaloft://dependency-resources");
     expect(JSON.stringify(intent)).not.toContain("postgres://");

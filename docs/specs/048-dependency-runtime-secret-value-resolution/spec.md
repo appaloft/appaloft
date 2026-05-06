@@ -108,7 +108,9 @@ dependency resource secret store, report `dependency_runtime_secret_unresolved` 
 and reject create before deployment acceptance when resolution fails. Local-shell and generic-SSH
 single-server execution now resolve Appaloft-owned dependency refs into execution-only runtime
 environment values and mark dependency target variables for redaction in Docker command display and
-runtime output. It also stores rotated binding secret values in `dependency_binding_secrets`.
-Deployment snapshots capture safe runtime secret references and runtime adapters render safe
-handles, but Docker Swarm secret materialization and historical rotated-ref execution coverage
-remain open before the Postgres and Redis closed-loop exit criteria can be checked.
+runtime output. Docker Swarm execution now resolves Appaloft-owned dependency refs into
+deployment-scoped Docker secrets before service update and renders only Docker secret handles in
+sanitized service intent. It also stores rotated binding secret values in
+`dependency_binding_secrets`. Deployment snapshots capture safe runtime secret references and
+runtime adapters render safe handles, but historical rotated-ref execution coverage remains open
+before the Postgres and Redis closed-loop exit criteria can be checked.

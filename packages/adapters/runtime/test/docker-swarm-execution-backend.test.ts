@@ -8,6 +8,8 @@ import {
   ConfigValueText,
   CreatedAt,
   Deployment,
+  DeploymentDependencyBindingSnapshotReadinessValue,
+  DeploymentDependencyRuntimeSecretRef,
   DeploymentId,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
@@ -37,7 +39,13 @@ import {
   ProjectId,
   ProviderKey,
   PublicDomainName,
+  ResourceBindingId,
+  ResourceBindingScopeValue,
+  ResourceBindingTargetName,
   ResourceId,
+  ResourceInjectionModeValue,
+  ResourceInstanceId,
+  ResourceInstanceKindValue,
   RoutePathPrefix,
   RuntimeArtifactIntentValue,
   RuntimeArtifactKindValue,
@@ -53,10 +61,12 @@ import {
   TlsModeValue,
   VariableExposureValue,
   VariableKindValue,
+  domainError,
+  err,
   ok,
   type Result,
 } from "@appaloft/core";
-import { type ExecutionContext } from "@appaloft/application";
+import { type DependencyResourceSecretStore, type ExecutionContext } from "@appaloft/application";
 import {
   DockerSwarmExecutionBackend,
   DockerSwarmShellCommandRunner,
@@ -76,6 +86,32 @@ class RecordingSwarmCommandRunner implements DockerSwarmCommandRunner {
   ): Promise<Result<DockerSwarmCommandRunnerResult>> {
     this.calls.push(input);
     return ok({ exitCode: 0, stdout: "ok" });
+  }
+}
+
+class MemoryDependencyResourceSecretStore implements DependencyResourceSecretStore {
+  private readonly values = new Map<string, string>();
+
+  store(input: { dependencyResourceId: string; purpose: "connection"; secretValue: string }): void {
+    this.values.set(
+      `appaloft://dependency-resources/${input.dependencyResourceId}/${input.purpose}`,
+      input.secretValue,
+    );
+  }
+
+  async storeConnection(): ReturnType<DependencyResourceSecretStore["storeConnection"]> {
+    throw new Error("storeConnection is not used by this test");
+  }
+
+  async resolve(
+    _context: ExecutionContext,
+    input: Parameters<DependencyResourceSecretStore["resolve"]>[1],
+  ): ReturnType<DependencyResourceSecretStore["resolve"]> {
+    const value = this.values.get(input.secretRef);
+    if (!value) {
+      return err(domainError.notFound("dependency_resource_secret", input.secretRef));
+    }
+    return ok({ secretRef: input.secretRef, secretValue: value });
   }
 }
 
@@ -247,6 +283,7 @@ function runtimePlan(
 function runningDeployment(
   input: {
     deploymentId?: string;
+    dependencySecretRef?: string;
     healthPath?: string;
     image?: string;
     metadata?: Record<string, string>;
@@ -264,6 +301,24 @@ function runningDeployment(
     destinationId: DestinationId.rehydrate("dst_prod"),
     runtimePlan: runtimePlan(input),
     environmentSnapshot: runtimeEnvironmentSnapshot(input),
+    ...(input.dependencySecretRef
+      ? {
+          dependencyBindingReferences: [
+            {
+              bindingId: ResourceBindingId.rehydrate("rbd_pg"),
+              dependencyResourceId: ResourceInstanceId.rehydrate("rsi_pg"),
+              kind: ResourceInstanceKindValue.rehydrate("postgres"),
+              targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
+              scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+              injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+              runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+                input.dependencySecretRef,
+              ),
+              snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
+            },
+          ],
+        }
+      : {}),
     createdAt: CreatedAt.rehydrate("2026-04-01T00:00:00.000Z"),
   })._unsafeUnwrap();
 
@@ -597,6 +652,80 @@ describe("DockerSwarmExecutionBackend", () => {
       "swarm.serviceName": "appaloft-res-api-dst-prod-dep-swarm-backend_web",
       "swarm.applyPlanSchemaVersion": "docker-swarm.apply-plan/v1",
     });
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-006] materializes resolved dependency refs as Swarm secrets before service create", async () => {
+    const runner = new RecordingSwarmCommandRunner();
+    const store = new MemoryDependencyResourceSecretStore();
+    const secretValue = "postgres://app:swarm-secret@db.example.com:5432/app";
+    store.store({
+      dependencyResourceId: "rsi_pg",
+      purpose: "connection",
+      secretValue,
+    });
+    const backend = new DockerSwarmExecutionBackend(runner, undefined, {}, store);
+
+    const result = await backend.execute(
+      createContext(),
+      runningDeployment({
+        dependencySecretRef: "appaloft://dependency-resources/rsi_pg/connection",
+      }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(runner.calls.map((call) => call.step)).toEqual([
+      "materialize-dependency-secret:DATABASE_URL",
+      "create-candidate-service",
+      "verify-candidate-service",
+      "promote-route-target",
+      "cleanup-superseded-services",
+    ]);
+    expect(runner.calls[0]?.command).toContain(
+      "docker secret inspect 'appaloft-dep-swarm-backend-database-url'",
+    );
+    expect(runner.calls[0]?.command).toContain(
+      "'appaloft-dep-swarm-backend-database-url' -",
+    );
+    expect(runner.calls[0]?.command).toContain(secretValue);
+    expect(runner.calls[0]?.displayCommand).toContain("[redacted]");
+    expect(runner.calls[0]?.displayCommand).not.toContain(secretValue);
+    expect(runner.calls[1]?.command).toContain(
+      "--secret 'source=appaloft-dep-swarm-backend-database-url,target=DATABASE_URL'",
+    );
+    expect(runner.calls[1]?.displayCommand).toContain(
+      "--secret 'source=appaloft-dep-swarm-backend-database-url,target=DATABASE_URL'",
+    );
+    expect(runner.calls[1]?.command).not.toContain(secretValue);
+    expect(runner.calls[1]?.displayCommand).not.toContain(secretValue);
+
+    const deployment = result._unsafeUnwrap().deployment.toState();
+    const serialized = JSON.stringify({
+      logs: deployment.logs,
+      metadata: deployment.runtimePlan.execution.metadata,
+    });
+    expect(serialized).not.toContain(secretValue);
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-006] fails safely when the Swarm dependency secret resolver is unavailable", async () => {
+    const runner = new RecordingSwarmCommandRunner();
+    const backend = new DockerSwarmExecutionBackend(runner);
+
+    const result = await backend.execute(
+      createContext(),
+      runningDeployment({
+        dependencySecretRef: "appaloft://dependency-resources/rsi_pg/connection",
+      }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(runner.calls).toHaveLength(0);
+    const deployment = result._unsafeUnwrap().deployment.toState();
+    expect(deployment.status.value).toBe("failed");
+    expect(deployment.runtimePlan.execution.metadata).toMatchObject({
+      phase: "dependency-runtime-secret-resolution",
+      errorCode: "dependency_runtime_injection_blocked",
+    });
+    expect(JSON.stringify(deployment.logs)).not.toContain("appaloft://dependency-resources");
   });
 
   test("[SWARM-TARGET-CLEAN-001] executes fake Swarm cleanup through cancel using scoped labels", async () => {

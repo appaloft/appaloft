@@ -1126,6 +1126,7 @@ export function registerRuntimeDependencies(
                     ? { edgeNetworkName: input.config.dockerSwarmExecution.edgeNetworkName }
                     : {}),
                 },
+                dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
               ),
             }
           : {}),

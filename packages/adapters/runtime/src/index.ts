@@ -106,6 +106,7 @@ export { RuntimeResourceRuntimeLogReader } from "./resource-runtime-logs";
 export {
   renderDockerSwarmApplyPlan,
   renderDockerSwarmCleanupPlan,
+  renderDockerSwarmDependencySecretName,
   renderDockerSwarmRuntimeIntent,
   type DockerSwarmApplyPlan,
   type DockerSwarmApplyPlanStep,
