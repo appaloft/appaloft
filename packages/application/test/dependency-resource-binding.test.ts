@@ -3,11 +3,14 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   CreatedAt,
+  DeletedAt,
+  DependencyResourceProviderFailureCode,
   DependencyResourceProviderRealizationAttemptId,
   DependencyResourceProviderRealizationStatusValue,
   DependencyResourceProviderResourceHandle,
   DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
+  DescriptionText,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
@@ -430,6 +433,136 @@ describe("Dependency resource binding use cases", () => {
         phase: "resource-dependency-binding",
       },
     });
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-004] rejects binding unavailable managed Redis realizations", async () => {
+    const { bindDependency, context, dependencyResources, listBindings, repositoryContext } =
+      await createHarness();
+    const baseInput = {
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      kind: ResourceInstanceKindValue.rehydrate("redis"),
+      sourceMode: DependencyResourceSourceModeValue.rehydrate("appaloft-managed"),
+      providerKey: ProviderKey.rehydrate("appaloft-managed-redis"),
+      providerManaged: true,
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    };
+    const failedManaged = ResourceInstance.createRedisDependencyResource({
+      ...baseInput,
+      id: ResourceInstanceId.rehydrate("rsi_failed_redis"),
+      name: ResourceInstanceName.rehydrate("Failed Cache"),
+      providerRealization: {
+        status: DependencyResourceProviderRealizationStatusValue.pending(),
+        attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_failed_redis"),
+        attemptedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      },
+    })._unsafeUnwrap();
+    failedManaged
+      .markProviderRealizationFailed({
+        attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_failed_redis"),
+        failureCode: DependencyResourceProviderFailureCode.rehydrate("provider_error"),
+        failureMessage: DescriptionText.rehydrate("Provider failed"),
+        failedAt: OccurredAt.rehydrate("2026-01-01T00:01:00.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const unresolvedManaged = ResourceInstance.createRedisDependencyResource({
+      ...baseInput,
+      id: ResourceInstanceId.rehydrate("rsi_unresolved_redis"),
+      name: ResourceInstanceName.rehydrate("Unresolved Cache"),
+      providerRealization: {
+        status: DependencyResourceProviderRealizationStatusValue.pending(),
+        attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_unresolved_redis"),
+        attemptedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      },
+    })._unsafeUnwrap();
+    unresolvedManaged
+      .markProviderRealized({
+        attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_unresolved_redis"),
+        providerResourceHandle: DependencyResourceProviderResourceHandle.rehydrate(
+          "redis/rsi_unresolved_redis",
+        ),
+        endpoint: {
+          host: "unresolved-cache.redis.internal",
+          port: 6379,
+          databaseName: "0",
+          maskedConnection: "redis://:********@unresolved-cache.redis.internal:6379/0",
+        },
+        connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+          "appaloft://dependency-resources/rsi_unresolved_redis/connection",
+        ),
+        bindingReadiness: {
+          status: "blocked",
+          reason: DescriptionText.rehydrate("dependency_runtime_secret_unresolved"),
+        },
+        realizedAt: OccurredAt.rehydrate("2026-01-01T00:01:00.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const deletedManaged = ResourceInstance.createRedisDependencyResource({
+      ...baseInput,
+      id: ResourceInstanceId.rehydrate("rsi_deleted_redis"),
+      name: ResourceInstanceName.rehydrate("Deleted Cache"),
+      providerRealization: {
+        status: DependencyResourceProviderRealizationStatusValue.pending(),
+        attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_deleted_redis"),
+        attemptedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      },
+    })._unsafeUnwrap();
+    deletedManaged
+      .markProviderRealized({
+        attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_deleted_redis"),
+        providerResourceHandle:
+          DependencyResourceProviderResourceHandle.rehydrate("redis/rsi_deleted_redis"),
+        endpoint: {
+          host: "deleted-cache.redis.internal",
+          port: 6379,
+          databaseName: "0",
+          maskedConnection: "redis://:********@deleted-cache.redis.internal:6379/0",
+        },
+        connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+          "secret://dependency/redis/rsi_deleted_redis",
+        ),
+        bindingReadiness: { status: "ready" },
+        realizedAt: OccurredAt.rehydrate("2026-01-01T00:01:00.000Z"),
+      })
+      ._unsafeUnwrap();
+    deletedManaged
+      .delete({
+        deletedAt: DeletedAt.rehydrate("2026-01-01T00:02:00.000Z"),
+        blockers: [],
+        allowProviderManaged: true,
+      })
+      ._unsafeUnwrap();
+
+    for (const dependencyResource of [failedManaged, unresolvedManaged, deletedManaged]) {
+      await dependencyResources.upsert(
+        repositoryContext,
+        dependencyResource,
+        UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
+      );
+    }
+
+    for (const dependencyResourceId of [
+      "rsi_failed_redis",
+      "rsi_unresolved_redis",
+      "rsi_deleted_redis",
+    ]) {
+      const rejected = await bindDependency.execute(context, {
+        resourceId: "res_web",
+        dependencyResourceId,
+        targetName: "REDIS_URL",
+      });
+
+      expect(rejected.isErr()).toBe(true);
+      expect(["validation_error", "not_found"]).toContain(rejected._unsafeUnwrapErr().code);
+    }
+
+    const list = await listBindings.execute(
+      context,
+      ListResourceDependencyBindingsQuery.create({ resourceId: "res_web" })._unsafeUnwrap(),
+    );
+    expect(list._unsafeUnwrap().items).toHaveLength(0);
   });
 
   test("[DEP-RES-REDIS-NATIVE-005] binds realized managed Redis dependency", async () => {

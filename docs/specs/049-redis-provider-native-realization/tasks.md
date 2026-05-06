@@ -16,9 +16,8 @@
   output, and resolvable connection refs.
 - [x] DEP-RES-REDIS-NATIVE-003: add application tests for provider realization failure preserving
   accepted command semantics.
-- [x] DEP-RES-REDIS-NATIVE-004: add bind admission tests for pending managed Redis; failed,
-  deleted, and unresolved-ref variants remain covered by generic readiness behavior and need broader
-  matrix coverage.
+- [x] DEP-RES-REDIS-NATIVE-004: add bind admission tests for pending, failed, deleted, and
+  unresolved Appaloft-owned ref managed Redis.
 - [x] DEP-RES-REDIS-NATIVE-005: add application binding, deployment snapshot, and runtime-injection
   tests for realized ready managed Redis.
 - [x] DEP-RES-REDIS-NATIVE-006 and DEP-RES-REDIS-NATIVE-007: add full managed delete safety and
@@ -56,9 +55,9 @@
 - [x] Run runtime adapter tests for `REDIS_URL` materialization if touched.
 - [x] Run CLI/oRPC/HTTP tests touched by route/schema changes.
 - [x] Run operation catalog boundary tests.
-- [ ] Run `bun run lint`.
-- [ ] Run `bun turbo run typecheck`.
-- [ ] Run `git diff --check`.
+- [x] Run `bun run lint`.
+- [x] Run `bun turbo run typecheck`.
+- [x] Run `git diff --check`.
 
 ## Post-Implementation Sync
 

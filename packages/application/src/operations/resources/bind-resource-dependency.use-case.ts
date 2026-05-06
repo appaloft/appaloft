@@ -134,6 +134,22 @@ export class BindResourceDependencyUseCase {
         );
       }
       if (
+        dependencyState.bindingReadiness &&
+        dependencyState.bindingReadiness.status === "blocked"
+      ) {
+        return err(
+          domainError.validation("Dependency resource is not ready for binding", {
+            phase: "resource-dependency-binding",
+            dependencyResourceId: dependencyResourceId.value,
+            dependencyResourceKind: dependencyState.kind.value,
+            bindingReadinessStatus: dependencyState.bindingReadiness.status,
+            ...(dependencyState.bindingReadiness.reason
+              ? { bindingReadinessReason: dependencyState.bindingReadiness.reason.value }
+              : {}),
+          }),
+        );
+      }
+      if (
         !dependencyState.projectId?.equals(resourceState.projectId) ||
         !dependencyState.environmentId?.equals(resourceState.environmentId)
       ) {
