@@ -123,9 +123,16 @@ preview deployment by resolving the pull-request head SHA when automatic process
 has no deployment id yet, reuses that deployment id for later append-only status updates, returns
 safe retryable provider errors without response bodies/tokens, and routes all supported channels
 through the composite GitHub writer.
-Shell wiring registers a request-scoped GitHub preview feedback writer that obtains the GitHub
-access token through the existing integration auth port before delegating to the composite GitHub
-feedback writer.
+Shell wiring registers a GitHub preview feedback writer that obtains a request-scoped GitHub
+access token through the existing integration auth port when available, or falls back to the
+explicit preview feedback worker token for webhook and scheduler execution contexts, before
+delegating to the composite GitHub feedback writer.
+`apps/shell/test/github-preview-feedback-writer.test.ts` covers the shell feedback transport for
+webhook/scheduler worker contexts: request-scoped GitHub tokens are preferred when present,
+`APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN` is used when no request auth scope exists, and missing
+token configuration returns a safe `preview-feedback` validation error without leaking token
+material. `packages/config/test/index.test.ts` covers parsing that worker token from runtime
+configuration.
 `PG-PREVIEW-CLEANUP-001` has initial core and application coverage in
 `packages/core/test/preview-environment.test.ts` and
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves cleanup
@@ -210,8 +217,9 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-Active GitHub App preview worker transports remain open. Existing non-product-grade coverage
-belongs to Action-only PR previews and `deployments.cleanup-preview`.
+Full GitHub App installation-token onboarding and provider smoke tests remain future public
+enablement work. Existing non-product-grade coverage belongs to Action-only PR previews and
+`deployments.cleanup-preview`.
 
-Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add
-persistence, adapter, transport, Web, CLI, and public-docs coverage as each surface is activated.
+Future hardening rounds should add provider smoke tests and GitHub App installation-token
+onboarding coverage after that public enablement decision is accepted.

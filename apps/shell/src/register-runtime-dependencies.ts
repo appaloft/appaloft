@@ -674,24 +674,41 @@ class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   }
 }
 
-class RequestScopedGitHubPreviewFeedbackWriter implements PreviewFeedbackWriter {
-  constructor(private readonly integrationAuthPort: IntegrationAuthPort) {}
+export class ShellGitHubPreviewFeedbackWriter implements PreviewFeedbackWriter {
+  constructor(
+    private readonly integrationAuthPort: IntegrationAuthPort,
+    private readonly workerAccessToken?: string,
+    private readonly writerFactory: (accessToken: string) => PreviewFeedbackWriter = (
+      accessToken,
+    ) => createGitHubPreviewFeedbackWriter(accessToken),
+  ) {}
 
   async publish(
     context: ExecutionContext,
     input: PreviewFeedbackWriterInput,
   ): Promise<Result<PreviewFeedbackWriterResult>> {
-    const accessToken = await this.integrationAuthPort.getProviderAccessToken(context, "github");
+    const requestAccessToken = await this.integrationAuthPort.getProviderAccessToken(
+      context,
+      "github",
+    );
+    const accessToken = requestAccessToken?.trim()
+      ? requestAccessToken
+      : this.workerAccessToken?.trim()
+        ? this.workerAccessToken
+        : undefined;
     if (!accessToken) {
       return err(
-        domainError.validation("GitHub account is not connected for preview feedback publishing", {
-          phase: "preview-feedback",
-          provider: "github",
-        }),
+        domainError.validation(
+          "GitHub account or preview feedback worker token is not configured",
+          {
+            phase: "preview-feedback",
+            provider: "github",
+          },
+        ),
       );
     }
 
-    return createGitHubPreviewFeedbackWriter(accessToken).publish(context, input);
+    return this.writerFactory(accessToken).publish(context, input);
   }
 }
 
@@ -812,8 +829,9 @@ export function registerRuntimeDependencies(
   container.register(tokens.previewFeedbackWriter, {
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
-        new RequestScopedGitHubPreviewFeedbackWriter(
+        new ShellGitHubPreviewFeedbackWriter(
           dependencyContainer.resolve(tokens.integrationAuthPort),
+          input.config.githubPreviewFeedbackToken,
         ),
     ),
   });

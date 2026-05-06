@@ -60,6 +60,7 @@ export interface AppConfig {
   githubClientId?: string;
   githubClientSecret?: string;
   githubWebhookSecret?: string;
+  githubPreviewFeedbackToken?: string;
   httpHost: string;
   httpPort: number;
   webOrigin: string;
@@ -453,6 +454,16 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
             source.flags?.githubWebhookSecret ??
             env.APPALOFT_GITHUB_WEBHOOK_SECRET ??
             fileConfig.githubWebhookSecret,
+        }
+      : {}),
+    ...(source.flags?.githubPreviewFeedbackToken ||
+    env.APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN ||
+    fileConfig.githubPreviewFeedbackToken
+      ? {
+          githubPreviewFeedbackToken:
+            source.flags?.githubPreviewFeedbackToken ??
+            env.APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN ??
+            fileConfig.githubPreviewFeedbackToken,
         }
       : {}),
     httpHost:
