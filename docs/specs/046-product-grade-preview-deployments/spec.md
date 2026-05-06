@@ -246,10 +246,11 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   issue comments by provider feedback id and returns safe retryable provider errors without response
   bodies or tokens. The GitHub integration also has a hermetic check-run feedback writer that
   resolves the pull-request head SHA, creates check runs, updates existing check runs by provider
-  feedback id, and returns safe retryable provider errors. Shell wiring resolves the GitHub access
-  token per request through the existing integration auth port before delegating to the composite
-  GitHub feedback writer. GitHub deployment-status feedback remains future work because the current
-  feedback input does not carry the provider deployment identity needed for in-place status updates.
+  feedback id, and returns safe retryable provider errors. Deployment-status feedback is supported
+  when the caller supplies a provider deployment id; the writer records that deployment id as the
+  provider feedback id so later publishes reuse the same deployment identity for GitHub's append-only
+  status timeline. Shell wiring resolves the GitHub access token per request through the existing
+  integration auth port before delegating to the composite GitHub feedback writer.
 - Preview environment cleanup now has an initial application service that loads the durable preview
   environment, marks cleanup requested without deleting preview history, and delegates runtime,
   route, source-link, provider metadata, and feedback cleanup to a port with safe source-scope
@@ -272,8 +273,8 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   transports yet.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
-- No GitHub App preview worker, GitHub deployment-status feedback writer, scheduler leases, or
-  terminal provider metadata cleanup is implemented.
+- No GitHub App preview worker, scheduler leases, terminal provider metadata cleanup, or automatic
+  process-manager deployment-status publication is implemented.
 - No active operation catalog transports exist for `preview-policies.*` or
   `preview-environments.*`.
 - Product-grade preview public docs/help now map preview policy and preview environment operations

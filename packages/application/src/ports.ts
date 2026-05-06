@@ -4499,6 +4499,7 @@ export interface PreviewFeedbackWriterInput {
   repositoryFullName: string;
   pullRequestNumber: number;
   body: string;
+  providerDeploymentId?: string;
   providerFeedbackId?: string;
 }
 

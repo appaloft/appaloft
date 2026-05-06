@@ -231,7 +231,10 @@ class CapturingPreviewFeedbackWriter implements PreviewFeedbackWriter {
     }
 
     return ok({
-      providerFeedbackId: input.providerFeedbackId ?? `github_feedback_${this.inputs.length}`,
+      providerFeedbackId:
+        input.providerFeedbackId ??
+        input.providerDeploymentId ??
+        `github_feedback_${this.inputs.length}`,
     });
   }
 }
@@ -1173,6 +1176,65 @@ describe("PreviewFeedbackService", () => {
       status: "published",
       providerFeedbackId: "github_feedback_1",
       updatedAt: "2026-05-06T04:30:00.000Z",
+    });
+  });
+
+  test("[PG-PREVIEW-FEEDBACK-001] records deployment ids for append-only status updates", async () => {
+    const writer = new CapturingPreviewFeedbackWriter();
+    const recorder = new InMemoryPreviewFeedbackRecorder();
+    const service = new PreviewFeedbackService(
+      writer,
+      recorder,
+      new FixedClock("2026-05-06T04:32:00.000Z"),
+    );
+    const context = createExecutionContext({
+      requestId: "req_preview_feedback_deployment_status_test",
+      entrypoint: "system",
+    });
+    const input = {
+      feedbackKey: "feedback:sevt_preview_1:deployment-status",
+      sourceEventId: "sevt_preview_1",
+      previewEnvironmentId: "prenv_1",
+      channel: "github-deployment-status" as const,
+      repositoryFullName: "appaloft/demo",
+      pullRequestNumber: 48,
+      body: "Preview deployment accepted.",
+      providerDeploymentId: "github_deployment_300",
+    };
+
+    const first = await service.publish(context, input);
+    const second = await service.publish(context, {
+      ...input,
+      body: "Preview deployment updated.",
+    });
+
+    expect(first._unsafeUnwrap()).toEqual({
+      status: "created",
+      providerFeedbackId: "github_deployment_300",
+    });
+    expect(second._unsafeUnwrap()).toEqual({
+      status: "updated",
+      providerFeedbackId: "github_deployment_300",
+    });
+    expect(writer.inputs).toEqual([
+      expect.objectContaining({
+        feedbackKey: "feedback:sevt_preview_1:deployment-status",
+        providerDeploymentId: "github_deployment_300",
+      }),
+      expect.objectContaining({
+        feedbackKey: "feedback:sevt_preview_1:deployment-status",
+        providerDeploymentId: "github_deployment_300",
+        providerFeedbackId: "github_deployment_300",
+      }),
+    ]);
+    expect(recorder.records.get("feedback:sevt_preview_1:deployment-status")).toEqual({
+      feedbackKey: "feedback:sevt_preview_1:deployment-status",
+      sourceEventId: "sevt_preview_1",
+      previewEnvironmentId: "prenv_1",
+      channel: "github-deployment-status",
+      status: "published",
+      providerFeedbackId: "github_deployment_300",
+      updatedAt: "2026-05-06T04:32:00.000Z",
     });
   });
 

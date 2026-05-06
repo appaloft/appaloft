@@ -526,9 +526,106 @@ export class GitHubPreviewCheckRunFeedbackWriter implements PreviewFeedbackWrite
   }
 }
 
+export class GitHubPreviewDeploymentStatusFeedbackWriter implements PreviewFeedbackWriter {
+  constructor(
+    private readonly accessToken: string,
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly apiBaseUrl = "https://api.github.com",
+  ) {}
+
+  async publish(
+    context: ExecutionContext,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<PreviewFeedbackWriterResult>> {
+    return context.tracer.startActiveSpan(
+      createAdapterSpanName("github_preview_feedback", "publish_deployment_status"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.integrationKey]: "github",
+          "appaloft.preview_feedback.channel": input.channel,
+        },
+      },
+      async () => {
+        if (input.channel !== "github-deployment-status") {
+          return err(
+            domainError.providerCapabilityUnsupported(
+              "GitHub preview feedback channel is not supported by this writer",
+              {
+                phase: "preview-feedback",
+                provider: "github",
+                channel: input.channel,
+              },
+            ),
+          );
+        }
+
+        const repository = parseRepositoryFullName(input.repositoryFullName);
+        if (!repository) {
+          return err(
+            domainError.validation("GitHub repository full name is invalid", {
+              phase: "preview-feedback",
+              provider: "github",
+            }),
+          );
+        }
+
+        const deploymentId = input.providerFeedbackId ?? input.providerDeploymentId;
+        if (!deploymentId) {
+          return err(
+            domainError.validation("GitHub preview deployment status requires a deployment id", {
+              phase: "preview-feedback",
+              provider: "github",
+              channel: input.channel,
+            }),
+          );
+        }
+
+        const response = await this.fetcher(
+          gitHubApiUrl(
+            this.apiBaseUrl,
+            `/repos/${repository.owner}/${repository.name}/deployments/${encodeURIComponent(
+              deploymentId,
+            )}/statuses`,
+          ),
+          {
+            method: "POST",
+            headers: githubJsonHeaders(this.accessToken),
+            body: JSON.stringify({
+              state: "success",
+              description: "Appaloft preview deployment accepted",
+              environment: "preview",
+              auto_inactive: false,
+            }),
+          },
+        );
+
+        if (!response.ok) {
+          return err(
+            domainError.provider(
+              "GitHub preview deployment status request failed",
+              {
+                phase: "preview-feedback",
+                provider: "github",
+                channel: input.channel,
+                statusCode: response.status,
+              },
+              isRetryableGitHubStatus(response.status),
+            ),
+          );
+        }
+
+        await response.json().catch(() => null);
+
+        return ok({ providerFeedbackId: deploymentId });
+      },
+    );
+  }
+}
+
 export class GitHubPreviewCompositeFeedbackWriter implements PreviewFeedbackWriter {
   private readonly prCommentWriter: PreviewFeedbackWriter;
   private readonly checkRunWriter: PreviewFeedbackWriter;
+  private readonly deploymentStatusWriter: PreviewFeedbackWriter;
 
   constructor(
     accessToken: string,
@@ -541,6 +638,11 @@ export class GitHubPreviewCompositeFeedbackWriter implements PreviewFeedbackWrit
       apiBaseUrl,
     );
     this.checkRunWriter = new GitHubPreviewCheckRunFeedbackWriter(accessToken, fetcher, apiBaseUrl);
+    this.deploymentStatusWriter = new GitHubPreviewDeploymentStatusFeedbackWriter(
+      accessToken,
+      fetcher,
+      apiBaseUrl,
+    );
   }
 
   publish(
@@ -553,6 +655,10 @@ export class GitHubPreviewCompositeFeedbackWriter implements PreviewFeedbackWrit
 
     if (input.channel === "github-check") {
       return this.checkRunWriter.publish(context, input);
+    }
+
+    if (input.channel === "github-deployment-status") {
+      return this.deploymentStatusWriter.publish(context, input);
     }
 
     return Promise.resolve(
@@ -584,6 +690,14 @@ export function createGitHubPreviewCheckRunFeedbackWriter(
   apiBaseUrl?: string,
 ): PreviewFeedbackWriter {
   return new GitHubPreviewCheckRunFeedbackWriter(accessToken, fetcher, apiBaseUrl);
+}
+
+export function createGitHubPreviewDeploymentStatusFeedbackWriter(
+  accessToken: string,
+  fetcher?: typeof fetch,
+  apiBaseUrl?: string,
+): PreviewFeedbackWriter {
+  return new GitHubPreviewDeploymentStatusFeedbackWriter(accessToken, fetcher, apiBaseUrl);
 }
 
 export function createGitHubPreviewFeedbackWriter(
