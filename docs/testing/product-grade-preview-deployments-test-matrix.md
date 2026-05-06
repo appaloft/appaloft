@@ -108,6 +108,8 @@ secret-shaped values.
 feedback creates comments, updates existing comments by provider feedback id, returns safe
 retryable provider errors without response bodies/tokens, and explicitly leaves check/deployment
 status channels unsupported by the PR comment writer.
+Shell wiring registers a request-scoped GitHub preview feedback writer that obtains the GitHub
+access token through the existing integration auth port before delegating to the PR comment writer.
 `PG-PREVIEW-CLEANUP-001` has initial core and application coverage in
 `packages/core/test/preview-environment.test.ts` and
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves cleanup
@@ -145,9 +147,9 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-GitHub App route wiring, GitHub check/deployment-status feedback writers, feedback writer shell
-wiring, concrete cleanup adapters, scheduler retry dispatch, and active CLI/API/Web/future MCP
-transports remain open. Existing non-product-grade coverage belongs to Action-only PR previews and
+GitHub App route wiring, GitHub check/deployment-status feedback writers, concrete cleanup
+adapters, scheduler retry dispatch, and active CLI/API/Web/future MCP transports remain open.
+Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 
 Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add
