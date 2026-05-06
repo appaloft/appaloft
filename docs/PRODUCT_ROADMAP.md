@@ -1321,6 +1321,11 @@ Current verification notes:
   server id into Swarm runtime health inspection and made `resources.health` execute
   `docker service ps` through the resolved Swarm manager SSH target when available, while preserving
   the local Docker fallback for local smoke runs.
+- 2026-05-06 Phase 7 deployment target parity sync closed the target-surface exit criterion:
+  single-server Docker/Compose remains covered by the zero-to-SSH supported catalog harness, and
+  the Docker Swarm backend is active by default with real smoke evidence for apply, route
+  realization, registry-authenticated image pull, secret-safe metadata, and scoped cleanup. Both
+  paths use the same ids-only `deployments.create` admission boundary.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1593,7 +1598,7 @@ Exit criteria:
   rollback candidates without editing files on the server.
 - [ ] Postgres has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
 - [ ] Redis has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
-- [ ] Operators can deploy through both the single-server Docker/Compose path and the Docker Swarm
+- [x] Operators can deploy through both the single-server Docker/Compose path and the Docker Swarm
   cluster path without changing the public deployment admission surface.
 - [ ] Rollback/redeploy are no longer rebuild-required if they are exposed.
 
