@@ -13,8 +13,14 @@
 
 ## Test-First
 
-- [ ] `PG-PREVIEW-POLICY-001`: policy allows a verified same-repository pull request event.
-- [ ] `PG-PREVIEW-POLICY-002`: fork policy blocks secret-backed preview deployment by default.
+- [x] `PG-PREVIEW-POLICY-001A`: policy evaluator allows a verified same-repository pull request
+  event.
+- [ ] `PG-PREVIEW-POLICY-001B`: eligible policy result creates or updates a preview environment
+  and dispatches one ids-only deployment attempt.
+- [x] `PG-PREVIEW-POLICY-002A`: policy evaluator blocks secret-backed fork preview deployment by
+  default.
+- [ ] `PG-PREVIEW-POLICY-002B`: blocked fork policy result is projected with safe ignored/blocked
+  read-model detail and no secret lookup.
 - [ ] `PG-PREVIEW-POLICY-003`: quotas and expiry block or schedule previews with readable reasons.
 - [ ] `PG-PREVIEW-EVENT-001`: GitHub App pull request event verification/normalization is safe.
 - [ ] `PG-PREVIEW-EVENT-002`: duplicate provider events are idempotent across environment,
@@ -33,11 +39,14 @@
 
 ## Implementation
 
-- [ ] Add preview policy command/query schemas, handlers, application services, and operation
-  catalog entries.
+- [x] Add initial preview policy evaluator schema/application service for same-repository and
+  default fork-secret decisions.
+- [ ] Add preview policy command/query schemas, handlers, read models, and operation catalog
+  entries.
 - [ ] Add preview environment state, read models, and persistence.
 - [ ] Extend source event ingestion for GitHub App pull request preview events.
-- [ ] Add preview policy evaluator and preview lifecycle process manager.
+- [ ] Add preview lifecycle process manager over policy, environment, deployment, and feedback
+  state.
 - [ ] Add scoped preview config/secret resolution.
 - [ ] Dispatch preview deployments through existing ids-only deployment admission.
 - [ ] Add feedback writer ports/adapters and idempotent provider update state.

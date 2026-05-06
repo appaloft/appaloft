@@ -2,11 +2,11 @@
 
 ## Status
 
-Spec Round for Phase 7 / `0.9.0`.
+Spec Round complete; Code Round started for Phase 7 / `0.9.0`.
 
-This artifact positions product-grade preview deployments before Code Round. It does not activate
-new operation catalog entries, HTTP routes, CLI commands, Web controls, GitHub App routes, workers,
-or scheduler behavior.
+This artifact positions product-grade preview deployments and records incremental Code Round
+progress. It does not activate new operation catalog entries, HTTP routes, CLI commands, Web
+controls, GitHub App routes, workers, or scheduler behavior.
 
 ## Problem
 
@@ -176,6 +176,10 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
 - Action-only preview deploy/update and explicit close-event cleanup exist in the CLI/config
   workflow and reference wrapper, but the public `appaloft/deploy-action` wrapper repository and
   Marketplace documentation are still open roadmap work.
+- The application layer now has an initial product-grade preview policy evaluator with a normalized
+  GitHub pull-request input schema. It allows verified same-repository pull request events, blocks
+  unverified events, blocks secret-backed fork previews by default, and permits fork previews
+  without secrets only when policy opts in.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No preview policy aggregate/read model, preview environment read model, GitHub App preview worker,

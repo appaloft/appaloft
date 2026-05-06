@@ -71,6 +71,8 @@ export * from "./operations/environments/set-environment-variable.use-case";
 export * from "./operations/environments/show-environment.query-service";
 export * from "./operations/environments/unlock-environment.use-case";
 export * from "./operations/environments/unset-environment-variable.use-case";
+export * from "./operations/preview-deployments/preview-policy.evaluator";
+export * from "./operations/preview-deployments/preview-policy.schema";
 export * from "./operations/projects/archive-project.use-case";
 export * from "./operations/projects/create-project.use-case";
 export * from "./operations/projects/list-projects.query-service";
