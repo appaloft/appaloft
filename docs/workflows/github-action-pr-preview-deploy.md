@@ -454,8 +454,9 @@ remain in sync with config profile fields so Action previews can be expressed wi
 temporary config file. The main repository now includes a reference `.github/actions/deploy-action`
 composite wrapper that maps trusted PR preview inputs to the CLI, handles SSH private-key temp-file
 custody, maps `command: preview-cleanup` to `appaloft preview cleanup`, and includes
-Marketplace-facing examples. The public `appaloft/deploy-action` repository is not yet
-implemented.
+Marketplace-facing examples. A deterministic export script now mirrors the reference wrapper assets
+into a standalone repository layout, but the public `appaloft/deploy-action` repository is not yet
+created.
 
 The main Appaloft repository now includes `.github/workflows/deploy-docs-preview.yml` as a
 repository-authored docs preview workflow over the same CLI path. It classifies PRs whose changed
@@ -470,8 +471,7 @@ preview feature; it does not replace the public `appaloft/deploy-action` wrapper
 Missing pieces before Action PR preview can be documented as supported:
 
 - `appaloft/deploy-action` wrapper repository;
-- promotion or mirroring of the reference Marketplace README, action metadata, scripts, and tests
-  into that repository;
+- running the reference export into that repository and wiring public wrapper CI;
 - wrapper tests for fixture or real-release install and GitHub deployment/environment metadata
   cleanup behavior in the public wrapper repository.
 

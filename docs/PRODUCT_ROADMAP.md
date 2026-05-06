@@ -1462,6 +1462,11 @@ Current verification notes:
   preview, close-event cleanup, fork-safety, minimal config, and reserved control-plane examples,
   plus wrapper tests for cleanup mapping and README safety examples. The public
   `appaloft/deploy-action` repository and public wrapper CI/layout tests remain open.
+- 2026-05-06 Phase 7 deploy-action wrapper export slice added a deterministic export script for
+  mirroring the reference `action.yml`, Marketplace README, and install/deploy scripts into the
+  future public `appaloft/deploy-action` repository, with a layout test proving exported files match
+  the reference and shell scripts keep executable bits. Creating the public repository and wiring
+  public wrapper CI remain open.
 
 Required:
 
@@ -1491,8 +1496,8 @@ Required:
 - [ ] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
   GitHub Actions workflow. Public docs now distinguish Action-only workflow-file previews from
   future product-grade control-plane previews, but the public `appaloft/deploy-action` wrapper
-  repository, public wrapper CI/layout tests, and promotion of the reference action assets remain
-  open.
+  repository and public wrapper CI remain open; reference action asset export is implemented and
+  layout-tested locally.
 - [x] Add existing-resource profile-drift handling.
 - [ ] Add product-grade preview deployments after source binding and webhook ingestion are durable,
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup

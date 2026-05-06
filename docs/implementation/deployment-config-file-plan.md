@@ -232,9 +232,9 @@ Remaining gaps:
   the config-file entry workflow yet.
 - The main repository now has a reference `.github/actions/deploy-action` wrapper with action
   metadata, Marketplace-facing README examples, install/checksum script, SSH secret temp-key
-  handling, PR preview flag mapping, preview cleanup command mapping, and wrapper-level tests. The
-  public `appaloft/deploy-action` install UX still needs its own repository, public wrapper CI, and
-  public repository layout tests.
+  handling, PR preview flag mapping, preview cleanup command mapping, wrapper-level tests, and a
+  deterministic export script with local public-layout coverage. The public
+  `appaloft/deploy-action` install UX still needs its own repository and public wrapper CI.
 - Action PR preview deploy is specified as an entry workflow in
   [GitHub Action PR Preview Deploy](../workflows/github-action-pr-preview-deploy.md). The CLI now
   supports preview-scoped source fingerprints, non-interactive preview environment selection,

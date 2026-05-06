@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -7,6 +15,7 @@ const actionRoot = resolve(import.meta.dir, "../../.github/actions/deploy-action
 const actionYaml = readFileSync(join(actionRoot, "action.yml"), "utf8");
 const readme = readFileSync(join(actionRoot, "README.md"), "utf8");
 const runDeployScript = join(actionRoot, "scripts/run-deploy.sh");
+const exportScript = resolve(import.meta.dir, "../export-deploy-action-wrapper.ts");
 
 function runDeploy(input: Record<string, string | undefined>) {
   const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-test-"));
@@ -53,6 +62,34 @@ describe("deploy-action wrapper reference", () => {
     expect(actionYaml).not.toContain("project:");
     expect(actionYaml).not.toContain("resource:");
     expect(actionYaml).not.toContain("server:");
+  });
+
+  test("[CONFIG-FILE-ENTRY-009] exports the public deploy-action repository layout", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-export-"));
+    const outputRoot = join(workspace, "deploy-action");
+    const result = Bun.spawnSync([process.execPath, exportScript, outputRoot], {
+      cwd: resolve(import.meta.dir, "../.."),
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      for (const file of [
+        "action.yml",
+        "README.md",
+        "scripts/install-appaloft.sh",
+        "scripts/run-deploy.sh",
+      ]) {
+        expect(readFileSync(join(outputRoot, file), "utf8")).toBe(
+          readFileSync(join(actionRoot, file), "utf8"),
+        );
+      }
+      expect(statSync(join(outputRoot, "scripts/install-appaloft.sh")).mode & 0o111).toBeTruthy();
+      expect(statSync(join(outputRoot, "scripts/run-deploy.sh")).mode & 0o111).toBeTruthy();
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
   });
 
   test("[CONFIG-FILE-ENTRY-010][CONFIG-FILE-ENTRY-015] maps trusted action inputs to CLI preview flags", () => {

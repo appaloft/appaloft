@@ -192,9 +192,9 @@ selection overrides, not required setup.
   configuration and resource diagnostic summaries without creating managed `Certificate` state.
 - The main repository now has a reference `.github/actions/deploy-action` wrapper with action
   metadata, Marketplace-facing README examples, install/checksum script, SSH secret temp-key
-  handling, preview cleanup mapping, and wrapper tests. A separate public `appaloft/deploy-action`
-  repository still needs promotion/mirroring and public wrapper CI before the install UX is
-  release-complete.
+  handling, preview cleanup mapping, wrapper tests, and a deterministic export script for the
+  future public repository layout. A separate public `appaloft/deploy-action` repository still
+  needs creation and public wrapper CI before the install UX is release-complete.
 - Pure CLI mode has no always-on DNS observer, Appaloft certificate scheduler, or cleanup retry
   loop after the process exits.
 - Hosted/cloud adoption, GitHub App webhook previews, team auth, audit, and fleet visibility are
