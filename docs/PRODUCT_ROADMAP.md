@@ -1453,6 +1453,10 @@ Current verification notes:
   base ref to project/environment/Resource/server/destination/source-fingerprint context, carries
   GitHub installation id only as safe verification detail, and still rejects ambiguous or missing
   policy matches before command dispatch. Active GitHub App preview worker transports remain open.
+- 2026-05-06 Phase 7 preview GitHub safe-metadata propagation slice ensured the
+  `IngestPreviewPullRequestEventCommandHandler` preserves safe provider repository id and
+  installation id facts when handing signed GitHub preview events to the application ingest service.
+  Active GitHub App preview worker transports remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
