@@ -155,6 +155,11 @@ environment list/show/delete through `QueryBus` and `CommandBus`.
 `packages/ai/mcp/test/tool-descriptors.test.ts` covers generated future MCP tool descriptors for
 preview policy and preview environment operations using operation-key-derived names and shared
 CLI/API metadata.
+`apps/web/src/lib/console/preview-policies.test.ts` covers the Web console preview policy
+entrypoint, project/resource scope selection, policy readback through
+`orpcClient.previewPolicies.show`, policy configuration through
+`orpcClient.previewPolicies.configure`, navigation registration, and the product-grade preview
+help anchor.
 `apps/web/src/lib/console/preview-environments.test.ts` covers the read-only Web console preview
 environment list entrypoint, shared query helper binding to `orpcClient.previewEnvironments.list`,
 navigation registration, product-grade preview help anchor, and typed oRPC client contract surface.
@@ -174,8 +179,8 @@ preview environment upsert, lookup by id/source scope, safe list/show read model
 status readback, scoped delete, and owner Resource retention after delete.
 
 GitHub App route wiring, automatic process-manager deployment-status publication, scheduler leases,
-terminal provider metadata cleanup, cleanup-side feedback updates, Web policy/detail/delete
-controls, and active GitHub App preview worker transports remain open.
+terminal provider metadata cleanup, cleanup-side feedback updates, Web preview environment
+detail/delete controls, and active GitHub App preview worker transports remain open.
 Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 

@@ -15,6 +15,7 @@
     Rocket,
     Server,
     ServerCrash,
+    ShieldCheck,
     Sun,
     UserRound,
   } from "@lucide/svelte";
@@ -91,6 +92,11 @@
       href: "/preview-environments",
       labelKey: i18nKeys.console.nav.previewEnvironments,
       icon: GitBranch,
+    },
+    {
+      href: "/preview-policies",
+      labelKey: i18nKeys.console.nav.previewPolicies,
+      icon: ShieldCheck,
     },
   ] as const;
 
