@@ -25,8 +25,10 @@
 - [ ] `PG-PREVIEW-EVENT-001`: GitHub App pull request event verification/normalization is safe.
 - [ ] `PG-PREVIEW-EVENT-002`: duplicate provider events are idempotent across environment,
   deployment, feedback, and cleanup state.
-- [ ] `PG-PREVIEW-ENV-001`: preview environment create/update stores scoped identity and safe
-  source-link context.
+- [x] `PG-PREVIEW-ENV-001A`: core preview environment create/update stores scoped identity and
+  safe source-link context.
+- [ ] `PG-PREVIEW-ENV-001B`: preview environment persistence/read models list/show/delete scoped
+  identity and latest lifecycle state.
 - [ ] `PG-PREVIEW-CONFIG-001`: scoped preview variables/secrets do not copy production secrets or
   routes by default.
 - [ ] `PG-PREVIEW-DEPLOY-001`: preview deployment dispatch uses ids-only `deployments.create`.
@@ -43,7 +45,8 @@
   default fork-secret decisions.
 - [ ] Add preview policy command/query schemas, handlers, read models, and operation catalog
   entries.
-- [ ] Add preview environment state, read models, and persistence.
+- [x] Add core preview environment aggregate state.
+- [ ] Add preview environment read models and persistence.
 - [ ] Extend source event ingestion for GitHub App pull request preview events.
 - [ ] Add preview lifecycle process manager over policy, environment, deployment, and feedback
   state.

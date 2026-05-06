@@ -180,10 +180,14 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   GitHub pull-request input schema. It allows verified same-repository pull request events, blocks
   unverified events, blocks secret-backed fork previews by default, and permits fork previews
   without secrets only when policy opts in.
+- The core domain now has a foundational `PreviewEnvironment` aggregate for product-grade preview
+  identity. It stores scoped project/environment/resource/target placement, safe source fingerprint
+  and pull-request context, active/cleanup-requested status, expiry, and cleanup-request state
+  without adding preview fields to `deployments.create`.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
-- No preview policy aggregate/read model, preview environment read model, GitHub App preview worker,
-  feedback writer, cleanup scheduler, or cleanup retry state is implemented.
+- No preview policy aggregate/read model, preview environment persistence/read model, GitHub App
+  preview worker, feedback writer, cleanup scheduler, or cleanup retry state is implemented.
 - No active operation catalog entries exist for `preview-policies.*` or `preview-environments.*`.
 - Product-grade preview public docs/help are not yet implemented.
 

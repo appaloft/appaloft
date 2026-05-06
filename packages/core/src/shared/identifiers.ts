@@ -148,6 +148,27 @@ export class DeploymentId extends IdentifierValue {
   }
 }
 
+const previewEnvironmentIdBrand: unique symbol = Symbol("PreviewEnvironmentId");
+export class PreviewEnvironmentId extends IdentifierValue {
+  private [previewEnvironmentIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<PreviewEnvironmentId> {
+    return createIdentifierValue(
+      value,
+      "Preview environment ID",
+      (normalized) => new PreviewEnvironmentId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): PreviewEnvironmentId {
+    return new PreviewEnvironmentId(value.trim());
+  }
+}
+
 const releaseIdBrand: unique symbol = Symbol("ReleaseId");
 export class ReleaseId extends IdentifierValue {
   private [releaseIdBrand]!: void;

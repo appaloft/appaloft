@@ -471,11 +471,13 @@ Current scope:
 Owns:
 - `Release`
 - `Deployment`
+- `PreviewEnvironment`
 - rollback plans and execution results
 
 Implemented now:
 - `Release`
 - `Deployment`
+- foundational `PreviewEnvironment`
 - `RuntimePlan`
 - `RollbackPlan`
 
@@ -509,6 +511,11 @@ Boundary rule:
 - public rollback is active under ADR-016/ADR-034, and rollback plans in the v1 model reference
   prior deployment snapshots and Docker/OCI runtime artifact identity rather than reconstructing
   host-process command state
+- `PreviewEnvironment` is the product-grade preview lifecycle identity for one preview scope, such
+  as a GitHub pull request. It records project/environment/resource/target placement, safe source
+  fingerprint context, provider-neutral status, expiry, and cleanup-request state. It does not own
+  source binding, production config, deployment admission input, provider comments/checks, or
+  runtime cleanup execution.
 
 ### Identity & Governance
 

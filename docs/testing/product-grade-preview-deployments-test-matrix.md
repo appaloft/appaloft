@@ -59,9 +59,14 @@ admission, and durable cleanup retry state.
 GitHub pull request policy evaluation for verified same-repository events, unverified events,
 default fork blocking, secret-backed fork blocking, and opt-in fork previews without secrets.
 
-Preview environment creation/update, deployment dispatch, blocked-event read models, GitHub App
-webhook normalization, feedback, cleanup retry, and active operation entrypoints remain open.
-Existing non-product-grade coverage belongs to Action-only PR previews and
+`PG-PREVIEW-ENV-001` and `PG-PREVIEW-CLEANUP-001` have initial core-domain coverage in
+`packages/core/test/preview-environment.test.ts`. The coverage proves scoped preview environment
+identity creation, safe source context update, expiry checks, cleanup-request transition, and
+blocking source updates after cleanup is requested.
+
+Preview environment persistence/read models, deployment dispatch, blocked-event read models,
+GitHub App webhook normalization, feedback, cleanup retry, and active operation entrypoints remain
+open. Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 
 Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add
