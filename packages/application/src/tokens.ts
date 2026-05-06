@@ -83,6 +83,9 @@ export const tokens = {
   previewLifecycleService: Symbol.for("appaloft.preview_lifecycle_service"),
   previewFeedbackService: Symbol.for("appaloft.preview_feedback_service"),
   previewDeploymentProcessManager: Symbol.for("appaloft.preview_deployment_process_manager"),
+  previewPullRequestEventIngestService: Symbol.for(
+    "appaloft.preview_pull_request_event_ingest_service",
+  ),
   previewEnvironmentReadModel: Symbol.for("appaloft.preview_environment_read_model"),
   previewPolicyReadModel: Symbol.for("appaloft.preview_policy_read_model"),
   previewPolicyDecisionReadModel: Symbol.for("appaloft.preview_policy_decision_read_model"),
@@ -237,6 +240,9 @@ export const tokens = {
   ingestSourceEventUseCase: Symbol.for("appaloft.ingest_source_event_use_case"),
   sourceEventVerificationPort: Symbol.for("appaloft.source_event_verification_port"),
   githubSourceEventWebhookVerifier: Symbol.for("appaloft.github_source_event_webhook_verifier"),
+  githubPreviewPullRequestWebhookVerifier: Symbol.for(
+    "appaloft.github_preview_pull_request_webhook_verifier",
+  ),
   listSourceEventsQueryService: Symbol.for("appaloft.list_source_events_query_service"),
   showSourceEventQueryService: Symbol.for("appaloft.show_source_event_query_service"),
   configurePreviewPolicyUseCase: Symbol.for("appaloft.configure_preview_policy_use_case"),

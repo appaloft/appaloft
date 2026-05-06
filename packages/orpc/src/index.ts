@@ -102,11 +102,13 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   environmentEffectivePrecedenceQueryInputSchema,
+  type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
   ImportCertificateCommand,
   ImportPostgresDependencyResourceCommand,
   ImportRedisDependencyResourceCommand,
   ImportResourceVariablesCommand,
+  IngestPreviewPullRequestEventCommand,
   IngestSourceEventCommand,
   IssueOrRenewCertificateCommand,
   importCertificateCommandInputSchema,
@@ -433,6 +435,7 @@ export interface AppaloftOrpcContext {
   resourceRepository?: ResourceRepository;
   sourceEventVerificationPort?: SourceEventVerificationPort;
   githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
+  githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
   githubWebhookSecret?: string;
 }
 
@@ -3412,6 +3415,29 @@ function sourceEventRouteUnavailableResponse(): Response {
   );
 }
 
+function requiredPreviewContextHeader(
+  request: Request,
+  headerName: string,
+  label: string,
+): Result<string> {
+  const value = request.headers.get(headerName)?.trim();
+  if (value) {
+    return ok(value);
+  }
+
+  return err(
+    domainError.validation(`${label} header is required for preview pull request ingestion`, {
+      phase: "preview-event-ingestion",
+      header: headerName,
+    }),
+  );
+}
+
+function previewSourceEventIdFromDelivery(deliveryId: string): string {
+  const normalized = deliveryId.replace(/[^A-Za-z0-9_]/g, "_").replace(/^_+|_+$/g, "");
+  return `sevt_preview_${normalized.slice(0, 96) || "delivery"}`;
+}
+
 function parseGenericSignedSourceEventBody(
   rawBody: string,
   executionContext: ExecutionContext,
@@ -3581,7 +3607,10 @@ async function handleGitHubSourceEventRoute(input: {
   request: Request;
 }): Promise<Response> {
   const { context, executionContext, request } = input;
-  if (!context.githubSourceEventWebhookVerifier) {
+  if (
+    !context.githubSourceEventWebhookVerifier &&
+    !context.githubPreviewPullRequestWebhookVerifier
+  ) {
     return sourceEventRouteUnavailableResponse();
   }
 
@@ -3603,6 +3632,24 @@ async function handleGitHubSourceEventRoute(input: {
   const deliveryId = request.headers.get("x-github-delivery")?.trim();
   const signature = request.headers.get("x-hub-signature-256") ?? "";
   const rawBody = await request.text();
+
+  if (eventName === "pull_request") {
+    return handleGitHubPreviewPullRequestRoute({
+      context,
+      executionContext,
+      request,
+      eventName,
+      signature,
+      rawBody,
+      secretValue,
+      ...(deliveryId ? { deliveryId } : {}),
+    });
+  }
+
+  if (!context.githubSourceEventWebhookVerifier) {
+    return sourceEventRouteUnavailableResponse();
+  }
+
   const verified = await context.githubSourceEventWebhookVerifier.verify(executionContext, {
     eventName,
     rawBody,
@@ -3619,6 +3666,115 @@ async function handleGitHubSourceEventRoute(input: {
   }
 
   const command = IngestSourceEventCommand.create(verified.value.sourceEvent);
+  if (command.isErr()) {
+    return domainErrorHttpResponse(command.error, executionContext);
+  }
+
+  const result = await context.commandBus.execute(executionContext, command.value);
+  if (result.isErr()) {
+    return domainErrorHttpResponse(result.error, executionContext);
+  }
+
+  return Response.json(result.value);
+}
+
+async function handleGitHubPreviewPullRequestRoute(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  request: Request;
+  eventName: string;
+  deliveryId?: string;
+  signature: string;
+  rawBody: string;
+  secretValue: string;
+}): Promise<Response> {
+  const {
+    context,
+    executionContext,
+    request,
+    eventName,
+    deliveryId,
+    signature,
+    rawBody,
+    secretValue,
+  } = input;
+  if (!context.githubPreviewPullRequestWebhookVerifier) {
+    return sourceEventRouteUnavailableResponse();
+  }
+
+  if (!deliveryId) {
+    return domainErrorHttpResponse(
+      domainError.validation("GitHub delivery id is required for preview pull request ingestion", {
+        phase: "preview-webhook-verification",
+        sourceKind: "github",
+        eventKind: eventName,
+      }),
+      executionContext,
+    );
+  }
+
+  const verified = await context.githubPreviewPullRequestWebhookVerifier.verify(executionContext, {
+    eventName,
+    rawBody,
+    signature,
+    secretValue,
+    deliveryId,
+  });
+  if (verified.isErr()) {
+    return domainErrorHttpResponse(verified.error, executionContext);
+  }
+
+  if (verified.value.outcome === "noop") {
+    return new Response(null, { status: 204 });
+  }
+
+  const projectId = requiredPreviewContextHeader(request, "x-appaloft-project-id", "Project id");
+  const environmentId = requiredPreviewContextHeader(
+    request,
+    "x-appaloft-environment-id",
+    "Environment id",
+  );
+  const resourceId = requiredPreviewContextHeader(request, "x-appaloft-resource-id", "Resource id");
+  const serverId = requiredPreviewContextHeader(request, "x-appaloft-server-id", "Server id");
+  const destinationId = requiredPreviewContextHeader(
+    request,
+    "x-appaloft-destination-id",
+    "Destination id",
+  );
+  const sourceBindingFingerprint = requiredPreviewContextHeader(
+    request,
+    "x-appaloft-source-binding-fingerprint",
+    "Source binding fingerprint",
+  );
+  if (projectId.isErr()) {
+    return domainErrorHttpResponse(projectId.error, executionContext);
+  }
+  if (environmentId.isErr()) {
+    return domainErrorHttpResponse(environmentId.error, executionContext);
+  }
+  if (resourceId.isErr()) {
+    return domainErrorHttpResponse(resourceId.error, executionContext);
+  }
+  if (serverId.isErr()) {
+    return domainErrorHttpResponse(serverId.error, executionContext);
+  }
+  if (destinationId.isErr()) {
+    return domainErrorHttpResponse(destinationId.error, executionContext);
+  }
+  if (sourceBindingFingerprint.isErr()) {
+    return domainErrorHttpResponse(sourceBindingFingerprint.error, executionContext);
+  }
+
+  const command = IngestPreviewPullRequestEventCommand.create({
+    sourceEventId: previewSourceEventIdFromDelivery(deliveryId),
+    event: verified.value.previewEvent,
+    projectId: projectId.value,
+    environmentId: environmentId.value,
+    resourceId: resourceId.value,
+    serverId: serverId.value,
+    destinationId: destinationId.value,
+    sourceBindingFingerprint: sourceBindingFingerprint.value,
+  });
   if (command.isErr()) {
     return domainErrorHttpResponse(command.error, executionContext);
   }

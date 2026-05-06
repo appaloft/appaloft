@@ -58,6 +58,10 @@ export {
   deletePreviewEnvironmentCommandInputSchema,
 } from "./operations/preview-deployments/delete-preview-environment.schema";
 export {
+  type IngestPreviewPullRequestEventCommandInput,
+  ingestPreviewPullRequestEventCommandInputSchema,
+} from "./operations/preview-deployments/ingest-preview-pull-request-event.schema";
+export {
   type ListPreviewEnvironmentsQueryInput,
   listPreviewEnvironmentsQueryInputSchema,
 } from "./operations/preview-deployments/list-preview-environments.schema";

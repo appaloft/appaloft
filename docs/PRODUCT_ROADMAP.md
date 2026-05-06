@@ -1395,6 +1395,12 @@ Current verification notes:
   application contracts plus operation catalog entries. List/show read from the safe preview
   environment read model, delete uses cleanup-service input, and CLI/API/Web/future MCP transports
   remain inactive until the product-grade control-plane route is wired.
+- 2026-05-06 Phase 7 preview GitHub pull-request HTTP route slice wired signed
+  `pull_request` deliveries on `/api/integrations/github/source-events` to
+  `IngestPreviewPullRequestEventCommand` through `CommandBus`, using trusted Appaloft preview
+  context headers for project/environment/Resource/server/destination/source-fingerprint selection.
+  Repository or installation mapping, scheduler leases, terminal provider metadata cleanup, and
+  automatic deployment-status publication remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
@@ -1440,8 +1446,10 @@ Required:
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
   retries. Spec Round is positioned in
   [docs/specs/046-product-grade-preview-deployments](./specs/046-product-grade-preview-deployments/spec.md)
-  with a dedicated test matrix; GitHub App/webhook ingestion, preview policy/environment
-  operations, feedback, scheduler retry, entrypoints, and public docs remain open.
+  with a dedicated test matrix; preview policy/environment operations, feedback, cleanup retry,
+  Web/API/CLI/future MCP surfaces, public docs, and an initial signed GitHub pull-request HTTP
+  route are implemented. Repository or installation mapping, scheduler leases, terminal provider
+  metadata cleanup, and automatic deployment-status publication remain open.
 - [x] Add scheduled task/cron resource shape with run history and logs after workload service
   semantics are specified. ADR-039/spec matrix now position ownership and target operations.
 - [x] Complete the Docker Swarm Spec Round as the first cluster runtime target:

@@ -800,7 +800,10 @@ Current boundary:
   input. Future MCP tool contracts are generated from the operation catalog for these preview
   operations. Web now exposes `/preview-policies` controls for policy readback/configuration and a
   `/preview-environments` console surface backed by preview environment list/show/delete
-  operations. GitHub App route wiring, managed domain lifecycle, and scheduler leases remain future
+  operations. The GitHub source-event HTTP route now accepts verified `pull_request` deliveries for
+  the first product-grade preview slice when trusted Appaloft project/environment/resource/server/
+  destination/source-fingerprint context headers are supplied; repository or installation mapping
+  remains future control-plane work. Managed domain lifecycle and scheduler leases remain future
   control-plane work.
 
 Product-grade preview policy operations:
