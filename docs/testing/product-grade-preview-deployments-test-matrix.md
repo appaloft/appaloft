@@ -58,6 +58,9 @@ admission, and durable cleanup retry state.
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves normalized
 GitHub pull request policy evaluation for verified same-repository events, unverified events,
 default fork blocking, secret-backed fork blocking, and opt-in fork previews without secrets.
+`PG-PREVIEW-POLICY-001` now also has initial application process coverage in the same test file
+for policy-eligible pull-request events creating/updating a preview environment and dispatching one
+ids-only deployment request without copying pull-request source facts into deployment admission.
 
 `PG-PREVIEW-ENV-001` and `PG-PREVIEW-CLEANUP-001` have initial core-domain coverage in
 `packages/core/test/preview-environment.test.ts`. The coverage proves scoped preview environment
