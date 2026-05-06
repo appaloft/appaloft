@@ -111,6 +111,13 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   is redacted before deployment logs and execution metadata capture common auth headers, cookies,
   key/value secrets, URL credentials, private-key blocks, or exact deployment snapshot secret
   values. Full registry/pull-secret handling across real Swarm execution remains open.
+- `packages/adapters/runtime/test/docker-swarm-execution-backend.test.ts` now includes an
+  environment-gated real Docker Swarm smoke harness for
+  `SWARM-TARGET-ROUTE-001B`/`SWARM-TARGET-SECRET-001B`. It runs only when
+  `APPALOFT_DOCKER_SWARM_SMOKE=1`, requires an active local manager and an `appaloft-edge` overlay
+  network, deploys through `DockerSwarmExecutionBackend` with `DockerSwarmShellCommandRunner`, and
+  cleans the scoped service afterward. Default CI keeps this smoke skipped until a real Swarm
+  environment is explicitly available.
 - `SWARM-TARGET-DOCS-001` has a registered public docs/help topic and bilingual server docs anchor
   explaining Swarm target registration, manager readiness expectations, image registry access,
   rollout/log/health/cleanup expectations, and unsupported-field recovery. CLI `server register`,

@@ -1278,6 +1278,12 @@ Current verification notes:
   configuration for the real Swarm execution backend. `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED`
   composes the `DockerSwarmExecutionBackend` into the runtime target registry with bounded command
   timeout configuration, while default-on activation and real Swarm smoke coverage remain open.
+- 2026-05-06 Phase 7 Docker Swarm real-smoke harness slice added an environment-gated adapter
+  smoke test for real Swarm apply, post-verification route-label promotion, secret metadata
+  redaction, and scoped cleanup through `DockerSwarmExecutionBackend` and
+  `DockerSwarmShellCommandRunner`. The smoke is skipped by default and requires
+  `APPALOFT_DOCKER_SWARM_SMOKE=1`, an active local Swarm manager, and an `appaloft-edge` overlay
+  network before mutating Docker state; running it against a real manager remains environment-gated.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1538,8 +1544,8 @@ Required:
   label-scoped cleanup plan rendering, opt-in fake backend acceptance coverage, Swarm runtime-log
   observation, Swarm health observation, initial Traefik route label promotion, the public docs
   anchor, command-failure redaction, sanitized runtime identity readback, and CLI/API/Web help
-  links are implemented; opt-in shell composition exists, but real Swarm smoke/default activation
-  remains open.
+  links are implemented; opt-in shell composition and an environment-gated real smoke harness
+  exist, but a real Swarm smoke run and default activation remain open.
 
 Exit criteria:
 

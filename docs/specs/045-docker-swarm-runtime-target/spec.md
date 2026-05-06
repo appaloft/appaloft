@@ -168,6 +168,10 @@ No new public operation key is accepted in this Spec Round.
   runtime identity metadata, including stack name, service name, and apply-plan schema version,
   through the existing deployment execution metadata boundary. Raw Docker commands, provider
   payloads, and registry secret values are not part of that readback contract.
+- The runtime adapter test suite now includes an environment-gated real Docker Swarm smoke harness
+  for apply, post-verification route-label promotion, secret redaction, and scoped cleanup. It is
+  skipped by default and requires `APPALOFT_DOCKER_SWARM_SMOKE=1`, an active local Swarm manager,
+  and an `appaloft-edge` overlay network before it mutates Docker state.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
 - Default-on Swarm activation, remote-manager health/log execution, end-to-end Swarm route smoke
