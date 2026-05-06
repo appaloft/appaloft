@@ -1329,6 +1329,11 @@ Current verification notes:
   control-plane context, while closed-event cleanup remains an ignored outcome until cleanup
   process state exists. GitHub App HTTP routes, feedback, cleanup retry, and active preview
   environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview feedback application slice added initial feedback writer/recorder
+  ports and a service for idempotent PR comment/check/status updates. Existing provider feedback
+  ids are reused for update-in-place, and retryable provider failures are recorded as safe feedback
+  state without turning the accepted deployment path into `err`. Durable feedback persistence,
+  GitHub App HTTP routes, cleanup retry, and active preview environment entrypoints remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,

@@ -230,10 +230,14 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   GitHub preview facts plus selected control-plane context, routes create/update actions into the
   preview lifecycle service, and leaves closed-event cleanup as an explicit ignored outcome until
   cleanup process state is implemented.
+- Preview feedback now has initial application ports and service coverage for idempotent provider
+  feedback updates. Existing provider feedback ids are reused for update-in-place, and retryable
+  provider failures are recorded as safe feedback state while publish returns `ok`; GitHub adapter
+  wiring and durable persistence remain future work.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
-- No GitHub App preview worker, feedback writer, cleanup scheduler, or cleanup retry state is
-  implemented.
+- No GitHub App preview worker, durable feedback adapter/persistence, cleanup scheduler, or cleanup
+  retry state is implemented.
 - No active operation catalog entries exist for `preview-policies.*` or `preview-environments.*`.
 - Product-grade preview public docs/help are not yet implemented.
 
