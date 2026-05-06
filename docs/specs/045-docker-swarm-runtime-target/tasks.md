@@ -56,7 +56,8 @@
 - [x] Add Swarm service health inspection through the existing resource health query adapter.
 - [x] Add post-verification Traefik route label promotion to the Swarm image apply plan.
 - [x] Redact Swarm command failure output before deployment logs/metadata capture.
-- [ ] Implement real apply/verify/cleanup behind runtime adapters.
+- [x] Add bounded shell command runner for the opt-in Swarm execution backend.
+- [ ] Activate and smoke-test real apply/verify/cleanup against a Swarm manager.
 - [ ] Add sanitized target identity persistence/read-model support where required.
 - [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.
 

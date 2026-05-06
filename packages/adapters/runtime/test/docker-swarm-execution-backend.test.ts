@@ -58,6 +58,7 @@ import {
 import { type ExecutionContext } from "@appaloft/application";
 import {
   DockerSwarmExecutionBackend,
+  DockerSwarmShellCommandRunner,
   type DockerSwarmCommandRunner,
   type DockerSwarmCommandRunnerInput,
   type DockerSwarmCommandRunnerResult,
@@ -249,6 +250,56 @@ function runningDeployment(): Deployment {
 }
 
 describe("DockerSwarmExecutionBackend", () => {
+  test("[SWARM-TARGET-APPLY-001][SWARM-TARGET-CLEAN-001] shell command runner executes bounded Swarm commands", async () => {
+    const runner = new DockerSwarmShellCommandRunner();
+
+    const result = await runner.run({
+      step: "verify-candidate-service",
+      command: "printf 'swarm-ok'",
+      displayCommand: "printf 'swarm-ok'",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({
+      exitCode: 0,
+      stdout: "swarm-ok",
+      stderr: "",
+    });
+  });
+
+  test("[SWARM-TARGET-APPLY-002] shell command runner preserves nonzero exit output", async () => {
+    const runner = new DockerSwarmShellCommandRunner();
+
+    const result = await runner.run({
+      step: "verify-candidate-service",
+      command: "printf 'swarm-error' >&2; exit 17",
+      displayCommand: "printf 'swarm-error' >&2; exit 17",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({
+      exitCode: 17,
+      stdout: "",
+      stderr: "swarm-error",
+    });
+  });
+
+  test("[SWARM-TARGET-APPLY-002] shell command runner times out bounded Swarm commands", async () => {
+    const runner = new DockerSwarmShellCommandRunner({ timeoutMs: 1 });
+
+    const result = await runner.run({
+      step: "verify-candidate-service",
+      command: "sleep 2",
+      displayCommand: "sleep 2",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      exitCode: 124,
+      stderr: "Docker Swarm command timed out at verify-candidate-service.",
+    });
+  });
+
   test("[SWARM-TARGET-APPLY-001][SWARM-TARGET-CLEAN-001] executes fake Swarm apply commands without default registry activation", async () => {
     const runner = new RecordingSwarmCommandRunner();
     const backend = new DockerSwarmExecutionBackend(runner);
