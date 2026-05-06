@@ -863,9 +863,14 @@ Current verification notes:
 - 2026-05-05 Phase 7 Redis dependency resource lifecycle Code Round implemented
   provider-neutral Redis provision/import plus list/show/rename/delete inclusion across core,
   application, PG/PGlite persistence, contracts, CLI, and oRPC/HTTP dispatch. It does not create
-  provider-native Redis infrastructure or bind Redis to workloads yet, so the full `0.9.0` release
-  rule remains blocked by provider-native database realization, backup/restore, recovery,
-  auto-deploy, preview, and cluster runtime items.
+  provider-native Redis infrastructure or materialize Redis runtime environment injection yet, so
+  the full `0.9.0` release rule remains blocked by provider-native database realization,
+  backup/restore, recovery, auto-deploy, preview, and cluster runtime items.
+- 2026-05-06 Phase 7 Redis dependency binding safe snapshot reference Code Round allowed ready
+  imported Redis dependency resources to bind to Resources and appear in safe deployment snapshot
+  references with kind `redis`. Managed Redis binding, provider-native Redis infrastructure, and
+  runtime environment injection remain deferred, so the Redis closed loop exit criterion remains
+  open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider

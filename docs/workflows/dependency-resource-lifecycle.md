@@ -79,13 +79,15 @@ The workflow lets operators:
    binding readiness, and backup relationship metadata.
 4. Rename a dependency resource without changing bindings, backup metadata, provider state,
    runtime state, or snapshots.
-5. Bind a Postgres dependency resource to a Resource with safe target metadata.
+5. Bind a Postgres dependency resource or imported Redis dependency resource to a Resource with
+   safe target metadata.
 6. List/show Resource dependency binding summaries without exposing raw secrets.
 7. Unbind without deleting the dependency resource or any external/provider database.
 8. Record provider-neutral safe dependency binding references in new deployment attempt snapshots.
 9. Rotate a binding-scoped secret reference for future deployment snapshots without changing
    historical deployments.
-10. Register Redis dependency resources as safe provider-neutral records.
+10. Register Redis dependency resources as safe provider-neutral records and copy ready imported
+    Redis bindings into safe deployment snapshot references.
 11. Create safe backup restore points and restore them in place after explicit acknowledgement.
 12. Delete only dependency resources that pass safety checks.
 
@@ -261,11 +263,12 @@ The current implementation adds Postgres dependency resource lifecycle records, 
 metadata, safe read models, real active-binding delete blockers, and safe dependency binding
 snapshot references. Binding secret rotation updates binding-scoped safe secret references for
 future deployment snapshots only. Redis dependency resource lifecycle records are implemented as
-provider-neutral safe metadata. Provider-native Postgres realization is implemented with a
+provider-neutral safe metadata, and ready imported Redis records can bind to Resources and appear as
+safe deployment snapshot references. Provider-native Postgres realization is implemented with a
 hermetic provider capability. Dependency resource backup/restore is implemented with a hermetic
 provider capability, safe backup read models, restore attempt metadata, lifecycle events, and
 delete-safety blockers. Runtime env injection, Web affordances, provider-native Redis realization,
-and runtime cleanup remain future work.
+managed Redis binding admission, and runtime cleanup remain future work.
 
 ## Open Questions
 

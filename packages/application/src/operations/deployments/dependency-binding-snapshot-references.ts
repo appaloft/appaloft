@@ -22,6 +22,16 @@ import {
 const runtimeInjectionDeferredReason =
   "runtime dependency environment injection is deferred for this slice";
 
+function toDependencyBindingReferenceKind(
+  kind: ResourceInstanceKindValue,
+): DeploymentDependencyBindingSnapshotReferenceSummary["kind"] {
+  if (kind.value === "postgres" || kind.value === "redis") {
+    return kind.value;
+  }
+
+  throw new Error(`Deployment dependency binding reference kind ${kind.value} is not supported`);
+}
+
 function snapshotReadiness(input: ResourceDependencyBindingSummary): {
   value: DeploymentDependencyBindingSnapshotReadinessValue;
   reason?: DescriptionText;
@@ -91,7 +101,7 @@ export function dependencyBindingReferenceSummary(
   return {
     bindingId: reference.bindingId.value,
     dependencyResourceId: reference.dependencyResourceId.value,
-    kind: "postgres",
+    kind: toDependencyBindingReferenceKind(reference.kind),
     targetName: reference.targetName.value,
     scope: reference.scope.value,
     injectionMode: reference.injectionMode.value,
