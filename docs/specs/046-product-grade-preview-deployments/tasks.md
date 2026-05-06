@@ -22,7 +22,7 @@
 - [x] `PG-PREVIEW-POLICY-002B`: blocked fork policy result is projected with safe ignored/blocked
   read-model detail and no secret lookup.
 - [x] `PG-PREVIEW-POLICY-003`: quotas and expiry block or schedule previews with readable reasons.
-- [ ] `PG-PREVIEW-EVENT-001`: GitHub App pull request event verification/normalization is safe.
+- [x] `PG-PREVIEW-EVENT-001`: GitHub App pull request event verification/normalization is safe.
 - [ ] `PG-PREVIEW-EVENT-002`: duplicate provider events are idempotent across environment,
   deployment, feedback, and cleanup state.
 - [x] `PG-PREVIEW-ENV-001A`: core preview environment create/update stores scoped identity and

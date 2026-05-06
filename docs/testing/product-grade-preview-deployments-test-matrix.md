@@ -71,6 +71,11 @@ files. The coverage proves active preview quota blocks new preview events with
 `preview_quota_exceeded`, safe quota details are projected, configured quota/TTL policy settings
 round-trip through persistence, and allowed preview lifecycle events derive/persist preview expiry
 from policy TTL when no explicit expiry is provided.
+`PG-PREVIEW-EVENT-001` has initial integration-boundary coverage in
+`packages/integrations/github/test/github-webhook.test.ts`. The coverage proves signed GitHub
+`pull_request` payloads normalize to safe preview facts, invalid signatures reject before
+normalization, unsupported actions reject, unsafe payload shapes reject, and secrets/signature
+material are not returned.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and

@@ -4431,6 +4431,47 @@ export interface GitHubSourceEventWebhookVerifier {
   ): Promise<Result<GitHubSourceEventWebhookVerificationResult>>;
 }
 
+export type GitHubPreviewPullRequestAction = "opened" | "reopened" | "synchronize" | "closed";
+
+export interface GitHubPreviewPullRequestWebhookEvent {
+  provider: "github";
+  eventKind: "pull-request";
+  eventAction: GitHubPreviewPullRequestAction;
+  repositoryFullName: string;
+  headRepositoryFullName: string;
+  pullRequestNumber: number;
+  headSha: string;
+  baseRef: string;
+  verified: true;
+  deliveryId?: string;
+  receivedAt?: string;
+}
+
+export interface GitHubPreviewPullRequestWebhookVerificationInput {
+  eventName: string;
+  rawBody: string;
+  signature: string;
+  secretValue: string;
+  deliveryId?: string;
+  receivedAt?: string;
+}
+
+export type GitHubPreviewPullRequestWebhookVerificationResult =
+  | {
+      outcome: "preview-pull-request-event";
+      previewEvent: GitHubPreviewPullRequestWebhookEvent;
+    }
+  | {
+      outcome: "noop";
+    };
+
+export interface GitHubPreviewPullRequestWebhookVerifier {
+  verify(
+    context: ExecutionContext,
+    input: GitHubPreviewPullRequestWebhookVerificationInput,
+  ): Promise<Result<GitHubPreviewPullRequestWebhookVerificationResult>>;
+}
+
 export interface SourceEventPolicyCandidate {
   projectId: string;
   environmentId: string;

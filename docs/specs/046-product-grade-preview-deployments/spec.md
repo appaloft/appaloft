@@ -206,6 +206,11 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   preview lifecycle events derive preview environment expiry from `previewTtlHours` when no
   explicit expiry is provided. Policy records and decision projections persist quota and expiry
   readback without provider payloads or secret material.
+- The GitHub integration now has an initial preview pull-request webhook verifier/normalizer. It
+  verifies `X-Hub-Signature-256`-compatible HMAC input, treats verified `ping` as no-op, rejects
+  unsupported pull request actions, and emits only safe preview facts needed by policy/lifecycle
+  evaluation: repository identities, pull request number, head SHA, base ref, delivery id, and
+  received timestamp.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No GitHub App preview worker, feedback writer, cleanup scheduler, or cleanup retry state is
