@@ -4,7 +4,7 @@
 
 This matrix covers Docker Swarm as the first cluster runtime target backend behind existing
 deployment, log, health, proxy, diagnostic, and capacity surfaces. Early adapter-contract slices are
-implemented, but no Docker Swarm execution backend is active yet.
+implemented, but no Docker Swarm execution backend is active in the default runtime registry yet.
 
 ## Global References
 
@@ -74,6 +74,10 @@ implemented, but no Docker Swarm execution backend is active yet.
 - The opt-in `DockerSwarmExecutionBackend` has fake-runner acceptance coverage proving image apply
   commands run in candidate-create, verify, route-promotion, cleanup order, record sanitized Swarm
   runtime metadata, and remain outside the default runtime backend registry.
+- `SWARM-TARGET-APPLY-001` and `SWARM-TARGET-CLEAN-001` have initial command-runner coverage
+  proving the opt-in shell runner executes bounded rendered commands, preserves stdout/stderr and
+  nonzero exit codes, and reports timeout failures for backend handling. Real Docker Swarm smoke
+  coverage remains open.
 - `SWARM-TARGET-APPLY-002` has fake-runner backend coverage proving a failed candidate verification
   records deployment failure metadata and runs only the deployment-scoped cleanup command for the
   failed candidate. Real Swarm rollback command behavior remains open.

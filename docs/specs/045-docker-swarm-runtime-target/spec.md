@@ -150,11 +150,15 @@ No new public operation key is accepted in this Spec Round.
   written to deployment logs or execution metadata. This covers common bearer/basic auth text,
   cookies, key/value secrets, URL credentials, private-key blocks, and exact deployment snapshot
   secret values.
+- The opt-in Swarm execution backend now has a bounded shell command runner that can execute the
+  rendered apply, verify, promote, and cleanup commands and preserve stdout/stderr/exit-code
+  results for backend handling. The runner is exported for explicit composition and is still not
+  registered in the default runtime backend registry.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
-- Real Swarm command execution, failed-rollout rollback behavior, remote-manager health/log
+- Default Swarm backend activation, failed-rollout rollback behavior, remote-manager health/log
   execution, end-to-end Swarm route smoke coverage, full registry/pull-secret handling, and
-  read-model persistence are not implemented.
+  read-model persistence remain open.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and

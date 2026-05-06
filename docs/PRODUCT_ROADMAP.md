@@ -1251,6 +1251,10 @@ Current verification notes:
   is redacted before deployment logs and execution metadata capture common auth headers, cookies,
   key/value secrets, URL credentials, private-key blocks, or exact deployment snapshot secret
   values. Full registry/pull-secret handling across real Swarm execution remains open.
+- 2026-05-06 Phase 7 Docker Swarm shell-runner slice added `DockerSwarmShellCommandRunner` for the
+  opt-in backend, with bounded command execution, stdout/stderr capture, nonzero exit preservation,
+  and timeout handling. The default registry still leaves Swarm unsupported until explicitly
+  composed; real Swarm smoke/default activation remains open.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and

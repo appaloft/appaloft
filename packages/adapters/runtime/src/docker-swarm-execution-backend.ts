@@ -48,8 +48,14 @@ export interface DockerSwarmCommandRunner {
   run(input: DockerSwarmCommandRunnerInput): Promise<Result<DockerSwarmCommandRunnerResult>>;
 }
 
+export interface DockerSwarmShellCommandRunnerOptions {
+  timeoutMs?: number;
+}
+
 type SwarmExecutionPhase = "deploy" | "verify" | "rollback";
 type SwarmLogLevel = "debug" | "info" | "warn" | "error";
+const dockerSwarmShellCommandTimeoutExitCode = 124;
+const defaultDockerSwarmShellCommandTimeoutMs = 60_000;
 
 function phaseLog(
   phase: SwarmExecutionPhase,
@@ -119,6 +125,59 @@ function executionResult(input: {
     ...(input.errorCode ? { errorCode: ErrorCodeText.rehydrate(input.errorCode) } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
   });
+}
+
+export class DockerSwarmShellCommandRunner implements DockerSwarmCommandRunner {
+  private readonly timeoutMs: number;
+
+  constructor(options: DockerSwarmShellCommandRunnerOptions = {}) {
+    this.timeoutMs = options.timeoutMs ?? defaultDockerSwarmShellCommandTimeoutMs;
+  }
+
+  async run(input: DockerSwarmCommandRunnerInput): Promise<Result<DockerSwarmCommandRunnerResult>> {
+    try {
+      const process = Bun.spawn(["sh", "-lc", input.command], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const stdoutPromise = new Response(process.stdout).text();
+      const stderrPromise = new Response(process.stderr).text();
+      let timeout: Timer | undefined;
+      const timedOut = new Promise<"timeout">((resolve) => {
+        timeout = setTimeout(() => resolve("timeout"), this.timeoutMs);
+      });
+      const outcome = await Promise.race([process.exited, timedOut]);
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+
+      if (outcome === "timeout") {
+        process.kill();
+        const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise]);
+        return ok({
+          exitCode: dockerSwarmShellCommandTimeoutExitCode,
+          stdout,
+          stderr: stderr || `Docker Swarm command timed out at ${input.step}.`,
+        });
+      }
+
+      const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise]);
+      return ok({
+        exitCode: outcome,
+        stdout,
+        stderr,
+      });
+    } catch (error) {
+      return err(
+        domainError.infra(
+          error instanceof Error ? error.message : "Docker Swarm command runner failed",
+          {
+            phase: input.step,
+          },
+        ),
+      );
+    }
+  }
 }
 
 export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
