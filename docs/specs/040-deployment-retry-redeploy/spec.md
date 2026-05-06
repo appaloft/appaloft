@@ -3,7 +3,7 @@
 ## Status
 
 - Round: Spec Round
-- Artifact state: planned for Code Round
+- Artifact state: Code Round active
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, additive recovery write commands and public entrypoints
 - Decision state: governed by ADR-016 and ADR-034; no new ADR required for this slice because the
@@ -16,8 +16,8 @@ Operators can start a new deployment attempt from either:
 - a failed deployment attempt's retained immutable snapshot intent (`deployments.retry`); or
 - the current Resource profile and current effective configuration (`deployments.redeploy`).
 
-This slice reintroduces only retry and redeploy under ADR-016. Rollback remains a separate Phase 7
-Code Round because it depends on retained artifact/candidate execution semantics.
+This slice reintroduced retry and redeploy under ADR-016. Rollback is governed by the separate
+Phase 7 rollback spec.
 
 ## Ubiquitous Language
 
@@ -49,8 +49,8 @@ Code Round because it depends on retained artifact/candidate execution semantics
   - `appaloft deployments retry <deploymentId>`
   - `appaloft deployments redeploy <resourceId>`
 - HTTP/oRPC:
-  - `POST /api/deployments/{deploymentId}/retries`
-  - `POST /api/resources/{resourceId}/redeployments`
+  - `POST /api/deployments/{deploymentId}/retry`
+  - `POST /api/resources/{resourceId}/redeploy`
 - Web:
   - Deployment detail recovery panel may enable retry/redeploy actions only when
     `deployments.recovery-readiness` says the action is technically ready and the operation catalog
@@ -110,7 +110,7 @@ readiness reason codes, command name, phase, and safe state markers.
 
 ## Non-Goals
 
-- No rollback command in this slice.
+- Rollback is governed by the separate deployment rollback spec.
 - No public cancel, reattach, manual health check, or rerun-one-phase command.
 - No stateful data rollback, dependency resource restore, volume restore, or secret rollback.
 - No event replay as retry.
@@ -119,11 +119,12 @@ readiness reason codes, command name, phase, and safe state markers.
 
 ## Current Implementation Notes And Migration Gaps
 
-- `deployments.create` currently contains the full context-resolution, detect, plan, supersede,
-  execution, and terminal persistence pipeline. Code Round should extract or reuse a shared
-  application service so redeploy does not duplicate this pipeline.
-- Retry can reuse retained snapshot/runtime plan state, but Code Round must add explicit recovery
-  trigger metadata to `Deployment` with value objects instead of loose primitive state.
-- Recovery readiness currently marks retry/redeploy commands inactive. Code Round must flip command
-  active state only after operation catalog, entrypoints, docs/help, and tests are synchronized.
-- Rollback remains future work and must keep `recovery-command-not-active` until its own Code Round.
+- `deployments.retry` and `deployments.redeploy` are active through `CORE_OPERATIONS.md`,
+  operation catalog entries, CLI commands, HTTP/oRPC routes, public docs/help, and Web recovery
+  actions gated by `deployments.recovery-readiness`.
+- Retry uses retained snapshot/runtime plan state and records explicit recovery trigger metadata on
+  the new deployment attempt.
+- Redeploy reuses the current-profile deployment pipeline instead of accepting source/runtime/
+  network/profile override fields.
+- Some edge-case rows in the recovery test matrix remain deferred, but the operations are no longer
+  rebuild-required public behaviors.
