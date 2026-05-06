@@ -265,8 +265,10 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   attempts, skips stale attempts after a newer cleanup attempt exists for the same preview target,
   and dispatches retries through the cleanup service so every retry creates a new attempt id.
   The shell composition has a disabled-by-default `previewCleanupRetryScheduler` runner that can be
-  explicitly enabled with the shell cleaner registered. Scheduler leases, terminal provider
-  metadata cleanup, and cleanup-side feedback updates remain future work.
+  explicitly enabled with the shell cleaner registered. The runner has an in-process non-overlap
+  guard so interval ticks do not run concurrently in one shell process. Durable cross-process
+  scheduler leases, terminal provider metadata cleanup, and cleanup-side feedback updates remain
+  future work.
 - Preview policy and preview environment operations now have active CLI and HTTP/oRPC routes for
   `preview-policies.configure`, `preview-policies.show`, `preview-environments.list`,
   `preview-environments.show`, and `preview-environments.delete`. Policy routes reuse the shared
