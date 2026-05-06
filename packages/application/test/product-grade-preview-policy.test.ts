@@ -206,6 +206,21 @@ class InMemoryPreviewFeedbackRecorder implements PreviewFeedbackRecorder {
     return this.records.get(input.feedbackKey) ?? null;
   }
 
+  async findLatestForPreviewEnvironment(
+    _context: RepositoryContext,
+    input: { previewEnvironmentId: string; channel: PreviewFeedbackRecord["channel"] },
+  ): Promise<PreviewFeedbackRecord | null> {
+    return (
+      [...this.records.values()]
+        .filter(
+          (record) =>
+            record.previewEnvironmentId === input.previewEnvironmentId &&
+            record.channel === input.channel,
+        )
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0] ?? null
+    );
+  }
+
   async record(_context: RepositoryContext, record: PreviewFeedbackRecord): Promise<void> {
     this.records.set(record.feedbackKey, record);
   }
@@ -1477,6 +1492,93 @@ describe("PreviewFeedbackService", () => {
       retryable: true,
       updatedAt: "2026-05-06T04:35:00.000Z",
     });
+  });
+
+  test("[PG-PREVIEW-CLEANUP-001] updates latest preview feedback during cleanup", async () => {
+    const writer = new CapturingPreviewFeedbackWriter();
+    const recorder = new InMemoryPreviewFeedbackRecorder();
+    await recorder.record(toRepositoryContext(createExecutionContext({ entrypoint: "system" })), {
+      feedbackKey: "feedback:sevt_preview_old:github-pr-comment",
+      sourceEventId: "sevt_preview_old",
+      previewEnvironmentId: "prenv_cleanup_feedback",
+      channel: "github-pr-comment",
+      status: "published",
+      providerFeedbackId: "github_comment_old",
+      updatedAt: "2026-05-06T04:00:00.000Z",
+    });
+    await recorder.record(toRepositoryContext(createExecutionContext({ entrypoint: "system" })), {
+      feedbackKey: "feedback:sevt_preview_latest:github-pr-comment",
+      sourceEventId: "sevt_preview_latest",
+      previewEnvironmentId: "prenv_cleanup_feedback",
+      channel: "github-pr-comment",
+      status: "published",
+      providerFeedbackId: "github_comment_latest",
+      updatedAt: "2026-05-06T04:10:00.000Z",
+    });
+    const service = new PreviewFeedbackService(
+      writer,
+      recorder,
+      new FixedClock("2026-05-06T04:40:00.000Z"),
+    );
+    const context = createExecutionContext({
+      requestId: "req_preview_feedback_cleanup_update_test",
+      entrypoint: "system",
+    });
+
+    const result = await service.publishCleanupUpdate(context, {
+      previewEnvironmentId: "prenv_cleanup_feedback",
+      repositoryFullName: "appaloft/demo",
+      pullRequestNumber: 50,
+      body: "Preview cleanup completed.",
+    });
+
+    expect(result._unsafeUnwrap()).toEqual({
+      status: "updated",
+      providerFeedbackId: "github_comment_latest",
+    });
+    expect(writer.inputs).toEqual([
+      expect.objectContaining({
+        feedbackKey: "feedback:sevt_preview_latest:github-pr-comment",
+        sourceEventId: "sevt_preview_latest",
+        previewEnvironmentId: "prenv_cleanup_feedback",
+        providerFeedbackId: "github_comment_latest",
+        body: "Preview cleanup completed.",
+      }),
+    ]);
+    expect(recorder.records.get("feedback:sevt_preview_latest:github-pr-comment")).toEqual({
+      feedbackKey: "feedback:sevt_preview_latest:github-pr-comment",
+      sourceEventId: "sevt_preview_latest",
+      previewEnvironmentId: "prenv_cleanup_feedback",
+      channel: "github-pr-comment",
+      status: "published",
+      providerFeedbackId: "github_comment_latest",
+      updatedAt: "2026-05-06T04:40:00.000Z",
+    });
+  });
+
+  test("[PG-PREVIEW-CLEANUP-001] skips cleanup feedback when no preview feedback exists", async () => {
+    const writer = new CapturingPreviewFeedbackWriter();
+    const service = new PreviewFeedbackService(
+      writer,
+      new InMemoryPreviewFeedbackRecorder(),
+      new FixedClock("2026-05-06T04:40:00.000Z"),
+    );
+
+    const result = await service.publishCleanupUpdate(
+      createExecutionContext({
+        requestId: "req_preview_feedback_cleanup_skip_test",
+        entrypoint: "system",
+      }),
+      {
+        previewEnvironmentId: "prenv_cleanup_feedback_missing",
+        repositoryFullName: "appaloft/demo",
+        pullRequestNumber: 50,
+        body: "Preview cleanup completed.",
+      },
+    );
+
+    expect(result._unsafeUnwrap()).toEqual({ status: "skipped" });
+    expect(writer.inputs).toEqual([]);
   });
 });
 

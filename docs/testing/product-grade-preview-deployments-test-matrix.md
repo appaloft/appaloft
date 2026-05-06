@@ -150,6 +150,12 @@ details.
 pull-request ingestion routing through source-scope preview environment lookup into the preview
 cleanup service, plus idempotent ignored results when a closed event has no durable preview
 environment.
+`packages/application/test/product-grade-preview-policy.test.ts`,
+`packages/persistence/pg/test/preview-feedback.pglite.test.ts`, and
+`apps/shell/test/preview-environment-cleaner.test.ts` now also cover cleanup-side feedback updates:
+the feedback recorder reads the latest feedback record by preview environment/channel, cleanup
+publishes an idempotent PR-comment update when feedback exists, missing feedback is skipped, and
+retryable provider feedback failures are returned as safe cleanup retry failures.
 `PG-PREVIEW-SURFACE-001` has initial operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
@@ -194,8 +200,8 @@ preview environment upsert, lookup by id/source scope, safe list/show read model
 status readback, scoped delete, and owner Resource retention after delete.
 
 Automatic process-manager deployment-status publication, scheduler leases, terminal provider
-metadata cleanup, cleanup-side feedback updates, repository/installation mapping, and active GitHub
-App preview worker transports remain open.
+metadata cleanup, repository/installation mapping, and active GitHub App preview worker transports
+remain open.
 Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 
