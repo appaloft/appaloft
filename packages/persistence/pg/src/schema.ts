@@ -490,6 +490,18 @@ export interface PreviewPolicyDecisionsTable {
   evaluated_at: UpdatableTimestampColumn;
 }
 
+export interface PreviewFeedbackRecordsTable {
+  feedback_key: string;
+  source_event_id: string;
+  preview_environment_id: string;
+  channel: string;
+  status: string;
+  provider_feedback_id: string | null;
+  error_code: string | null;
+  retryable: boolean | null;
+  updated_at: UpdatableTimestampColumn;
+}
+
 export interface DefaultAccessDomainPoliciesTable {
   id: string;
   scope_key: string;
@@ -655,6 +667,7 @@ export interface Database {
   preview_environments: PreviewEnvironmentsTable;
   preview_policies: PreviewPoliciesTable;
   preview_policy_decisions: PreviewPolicyDecisionsTable;
+  preview_feedback_records: PreviewFeedbackRecordsTable;
   default_access_domain_policies: DefaultAccessDomainPoliciesTable;
   server_applied_route_states: ServerAppliedRouteStatesTable;
   mutation_coordinations: MutationCoordinationsTable;

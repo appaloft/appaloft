@@ -98,6 +98,11 @@ source, route, or preview-specific fields.
 feedback publish calls reuse an existing provider feedback id for update-in-place and record
 retryable provider failures as safe feedback state while returning `ok` to preserve the accepted
 deployment result.
+`PG-PREVIEW-FEEDBACK-001` now also has Postgres/PGlite persistence coverage in
+`packages/persistence/pg/test/preview-feedback.pglite.test.ts`. The coverage proves durable
+feedback state upserts by feedback key, preserves provider feedback ids for idempotent updates,
+records safe retryable error state, and omits feedback bodies, provider payloads, tokens, and
+secret-shaped values.
 `PG-PREVIEW-CLEANUP-001` has initial core and application coverage in
 `packages/core/test/preview-environment.test.ts` and
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves cleanup
@@ -130,9 +135,9 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-GitHub App route wiring, durable feedback adapters/persistence, durable cleanup attempt
-persistence, concrete cleanup adapters, scheduler retry dispatch, and active CLI/API/Web/future MCP
-transports remain open. Existing non-product-grade coverage belongs to Action-only PR previews and
+GitHub App route wiring, GitHub feedback writer adapters, durable cleanup attempt persistence,
+concrete cleanup adapters, scheduler retry dispatch, and active CLI/API/Web/future MCP transports
+remain open. Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 
 Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add
