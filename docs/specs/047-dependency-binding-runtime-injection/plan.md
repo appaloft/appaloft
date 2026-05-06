@@ -9,6 +9,7 @@ adding dependency-specific deployment input fields.
 
 - [ADR-040](../../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md)
 - [Dependency Binding Runtime Injection Spec](./spec.md)
+- [Dependency Runtime Secret Value Resolution](../048-dependency-runtime-secret-value-resolution/spec.md)
 - [Dependency Resource Lifecycle](../../workflows/dependency-resource-lifecycle.md)
 - [Dependency Resource Test Matrix](../../testing/dependency-resource-test-matrix.md)
 - [deployments.create Test Matrix](../../testing/deployments.create-test-matrix.md)
@@ -68,3 +69,5 @@ adding dependency-specific deployment input fields.
 - File/reference injection modes.
 - Provider-native credential rotation.
 - Backend-native secret-store integrations beyond the first single-server and Swarm delivery path.
+- Store-backed dependency secret value resolution is now governed by
+  [Dependency Runtime Secret Value Resolution](../048-dependency-runtime-secret-value-resolution/spec.md).
