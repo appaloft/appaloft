@@ -255,8 +255,9 @@ ADR-040 and the dependency binding runtime injection spec govern the runtime pat
 `deployments.plan` reports `ready` or `blocked` runtime injection readiness, and
 `deployments.create` rejects active non-injectable bindings before acceptance. Runtime target
 adapters deliver safe dependency secret handles as close to execution as possible and redact command
-display, logs, events, errors, and diagnostics. Store-backed resolution of Appaloft secret
-references into raw dependency connection values remains a migration gap.
+display, logs, events, errors, and diagnostics. Store-backed resolution of Appaloft-owned
+dependency and retained binding secret references is governed by
+[Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md).
 
 `deployments.create` must not accept dependency resource, database URL, username, password, or
 secret-rotation fields.
@@ -280,12 +281,12 @@ provider-neutral safe metadata, and ready imported Redis records can bind to Res
 safe deployment snapshot references. Provider-native Postgres realization is implemented with a
 hermetic provider capability. Dependency resource backup/restore is implemented with a hermetic
 provider capability, safe backup read models, restore attempt metadata, lifecycle events, and
-delete-safety blockers. Dependency binding runtime injection is specified by ADR-040 but not
-fully closed: safe runtime secret handles and readiness gating are implemented, while store-backed
-secret value resolution is governed by
-[Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md)
-and still open for Code Round. Web affordances, provider-native Redis realization, managed Redis
-binding admission, and runtime cleanup remain future work.
+delete-safety blockers. Dependency binding runtime injection is specified by ADR-040, and
+store-backed dependency runtime secret value resolution is implemented for imported Postgres,
+imported Redis, single-server runtimes, Docker Swarm, and retained rotated binding refs through
+[Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md).
+Web affordances, provider-native Redis realization, managed Redis binding admission, final
+closed-loop verification, and runtime cleanup remain future work.
 
 ## Open Questions
 

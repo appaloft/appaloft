@@ -293,6 +293,10 @@ export class FakeDependencyResourceSecretStore implements DependencyResourceSecr
 
   constructor(private secretRefPrefix = "appaloft://dependency-resources") {}
 
+  setResolvedValue(secretRef: string, secretValue: string): void {
+    this.values.set(secretRef, secretValue);
+  }
+
   async storeConnection(
     context: ExecutionContext,
     input: DependencyResourceSecretStoreInput,

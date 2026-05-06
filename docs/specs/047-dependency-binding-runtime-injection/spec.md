@@ -116,8 +116,8 @@ credentials, or provider response payloads.
 Current implementation captures safe Postgres and imported Redis runtime secret references in
 deployment snapshots, reports runtime injection as `ready | blocked | not-applicable`, rejects
 active non-injectable bindings before deployment acceptance, and routes safe secret handles through
-single-server and Swarm runtime target adapters. Store-backed resolution of `appaloft://...` secret
-references into raw dependency connection values remains a migration gap, so Postgres and Redis
-closed-loop exit criteria stay open. The next governing artifact is
+single-server and Swarm runtime target adapters. Store-backed resolution of Appaloft-owned
+dependency refs and retained rotated binding refs is implemented by
 [Dependency Runtime Secret Value Resolution](../048-dependency-runtime-secret-value-resolution/spec.md).
-Public docs now describe safe bind-to-deploy behavior and blocked runtime injection readiness.
+Final Postgres and Redis closed-loop exit verification remains open. Public docs now describe safe
+bind-to-deploy behavior and blocked runtime injection readiness.

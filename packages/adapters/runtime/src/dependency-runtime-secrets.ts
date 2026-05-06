@@ -11,7 +11,10 @@ import {
   type Result,
 } from "@appaloft/core";
 
-const appaloftOwnedDependencySecretRefPrefix = "appaloft://dependency-resources/";
+const appaloftOwnedDependencySecretRefPrefixes = [
+  "appaloft://dependency-resources/",
+  "appaloft+pg://resource-binding/",
+];
 
 export interface DependencyRuntimeEnvironment {
   env: NodeJS.ProcessEnv;
@@ -31,7 +34,7 @@ function isInjectableDependencyReference(
 }
 
 function isAppaloftOwnedDependencySecretRef(secretRef: string): boolean {
-  return secretRef.startsWith(appaloftOwnedDependencySecretRefPrefix);
+  return appaloftOwnedDependencySecretRefPrefixes.some((prefix) => secretRef.startsWith(prefix));
 }
 
 async function resolveDependencyRuntimeSecretValue(input: {

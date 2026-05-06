@@ -17,7 +17,7 @@
 - [x] Add runtime adapter tests for single-server resolution and redaction
   `DEP-BIND-SECRET-RESOLVE-005`.
 - [x] Add Swarm secret materialization tests for `DEP-BIND-SECRET-RESOLVE-006`.
-- [ ] Add historical rotation resolution tests for `DEP-BIND-SECRET-RESOLVE-007`.
+- [x] Add historical rotation resolution tests for `DEP-BIND-SECRET-RESOLVE-007`.
 
 ## Code Round
 
@@ -29,8 +29,8 @@
 - [x] Add PG/PGlite persistence for dependency secret values and resolver lookup.
 - [x] Inject resolved values through local-shell/generic-SSH single-server execution.
 - [x] Create/update Docker Swarm secrets from resolved dependency values.
-- [ ] Preserve historical rotated refs needed by retry/redeploy/rollback candidates.
-- [ ] Keep CLI/oRPC/Web surfaces schema-reused and secret-safe.
+- [x] Preserve historical rotated refs needed by retry/redeploy/rollback candidates.
+- [x] Keep CLI/oRPC/Web surfaces schema-reused and secret-safe.
 
 ## Docs Round
 
@@ -51,4 +51,4 @@
 
 - [ ] Update `docs/PRODUCT_ROADMAP.md` only after Postgres and Redis closed loops are actually
   verified.
-- [ ] Reconcile migration notes in dependency workflow and runtime injection specs after Code Round.
+- [x] Reconcile migration notes in dependency workflow and runtime injection specs after Code Round.
