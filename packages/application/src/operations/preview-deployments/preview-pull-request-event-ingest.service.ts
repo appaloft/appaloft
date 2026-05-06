@@ -1,9 +1,25 @@
-import { ok, type Result } from "@appaloft/core";
+import {
+  err,
+  ok,
+  PreviewEnvironmentBySourceScopeSpec,
+  PreviewEnvironmentProviderValue,
+  PreviewPullRequestNumber,
+  ResourceId,
+  type Result,
+  SourceRepositoryFullName,
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
-import { type ExecutionContext } from "../../execution-context";
-import { type GitHubPreviewPullRequestWebhookEvent } from "../../ports";
+import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import {
+  type GitHubPreviewPullRequestWebhookEvent,
+  type PreviewEnvironmentRepository,
+} from "../../ports";
 import { tokens } from "../../tokens";
+import {
+  type CleanupPreviewEnvironmentResult,
+  type PreviewEnvironmentCleanupService,
+} from "./preview-cleanup.service";
 import {
   type PreviewDeploymentProcessManager,
   type PreviewDeploymentProcessResult,
@@ -34,7 +50,11 @@ export type PreviewPullRequestEventIngestResult =
     }
   | {
       status: "ignored";
-      reason: "preview-cleanup-not-implemented";
+      reason: "preview-environment-not-found";
+    }
+  | {
+      status: "cleanup-routed";
+      cleanupResult: CleanupPreviewEnvironmentResult;
     };
 
 @injectable()
@@ -42,6 +62,10 @@ export class PreviewPullRequestEventIngestService {
   constructor(
     @inject(tokens.previewDeploymentProcessManager)
     private readonly previewDeploymentProcessManager: PreviewDeploymentProcessManager,
+    @inject(tokens.previewEnvironmentRepository)
+    private readonly previewEnvironmentRepository: PreviewEnvironmentRepository,
+    @inject(tokens.previewEnvironmentCleanupService)
+    private readonly previewEnvironmentCleanupService: PreviewEnvironmentCleanupService,
   ) {}
 
   async ingest(
@@ -49,10 +73,7 @@ export class PreviewPullRequestEventIngestService {
     input: PreviewPullRequestEventIngestInput,
   ): Promise<Result<PreviewPullRequestEventIngestResult>> {
     if (input.event.eventAction === "closed") {
-      return ok({
-        status: "ignored",
-        reason: "preview-cleanup-not-implemented",
-      });
+      return this.cleanupClosedPullRequest(context, input);
     }
 
     const processResult = await this.previewDeploymentProcessManager.processPullRequestEvent(
@@ -88,6 +109,48 @@ export class PreviewPullRequestEventIngestService {
       status: "routed",
       lifecycleResult: result.lifecycleResult,
       ...(result.feedbackResult ? { feedbackResult: result.feedbackResult } : {}),
+    }));
+  }
+
+  private async cleanupClosedPullRequest(
+    context: ExecutionContext,
+    input: PreviewPullRequestEventIngestInput,
+  ): Promise<Result<PreviewPullRequestEventIngestResult>> {
+    const repositoryFullName = SourceRepositoryFullName.create(input.event.repositoryFullName);
+    if (repositoryFullName.isErr()) return err(repositoryFullName.error);
+
+    const pullRequestNumber = PreviewPullRequestNumber.create(input.event.pullRequestNumber);
+    if (pullRequestNumber.isErr()) return err(pullRequestNumber.error);
+
+    const resourceId = ResourceId.create(input.resourceId);
+    if (resourceId.isErr()) return err(resourceId.error);
+
+    const previewEnvironment = await this.previewEnvironmentRepository.findOne(
+      toRepositoryContext(context),
+      PreviewEnvironmentBySourceScopeSpec.create({
+        provider: PreviewEnvironmentProviderValue.github(),
+        repositoryFullName: repositoryFullName.value,
+        pullRequestNumber: pullRequestNumber.value,
+        resourceId: resourceId.value,
+      }),
+    );
+
+    if (!previewEnvironment) {
+      return ok({
+        status: "ignored",
+        reason: "preview-environment-not-found",
+      });
+    }
+
+    const state = previewEnvironment.toState();
+    const cleanup = await this.previewEnvironmentCleanupService.cleanup(context, {
+      previewEnvironmentId: state.id.value,
+      resourceId: state.resourceId.value,
+    });
+
+    return cleanup.map((cleanupResult) => ({
+      status: "cleanup-routed",
+      cleanupResult,
     }));
   }
 }
