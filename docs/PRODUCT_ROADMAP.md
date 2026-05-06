@@ -1241,7 +1241,8 @@ Current verification notes:
   `resources.health`: Swarm-backed OCI image deployments can request opt-in live runtime inspection
   from sanitized `swarm.serviceName` metadata, and the runtime adapter normalizes `docker service
   ps` task state into Appaloft runtime health/check fields without exposing raw Docker payloads.
-  Remote-manager probing remained open; local real Swarm smoke coverage was added by a later slice.
+  Remote-manager probing remained open until the later remote-health observation slice; local real
+  Swarm smoke coverage was added by a later slice.
 - 2026-05-06 Phase 7 Docker Swarm route-label slice bound initial `SWARM-TARGET-ROUTE-001`
   coverage to image apply planning: Traefik route labels are absent from candidate service
   creation, promoted only after candidate verification, and target the Swarm edge network without
@@ -1294,12 +1295,16 @@ Current verification notes:
   separators and made the opt-in real smoke provision a smoke-specific Docker secret reference and
   use an nginx-compatible health check. `bun run smoke:swarm` passed against a temporary local Swarm
   manager with `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to
-  inactive Swarm state. Default activation, real edge-proxy route realization, remote-manager
-  observation, and registry-auth smoke coverage remain open.
+  inactive Swarm state. Default activation, real edge-proxy route realization, and registry-auth
+  smoke coverage remain open.
 - 2026-05-06 Phase 7 Docker Swarm remote-log observation slice made `resources.runtime-logs` execute
   Swarm service log reads through the resolved Swarm manager SSH target when available, while
   preserving the local Docker fallback for local smoke runs. Remote-manager health observation
-  remains open.
+  remained open until the following slice.
+- 2026-05-06 Phase 7 Docker Swarm remote-health observation slice passed the deployment target
+  server id into Swarm runtime health inspection and made `resources.health` execute
+  `docker service ps` through the resolved Swarm manager SSH target when available, while preserving
+  the local Docker fallback for local smoke runs.
 - 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
   App/control-plane previews as a separate workflow from Action-only previews, with
   `docs/specs/046-product-grade-preview-deployments` and
@@ -1561,9 +1566,9 @@ Required:
   observation, Swarm health observation, initial Traefik route label promotion, the public docs
   anchor, command-failure redaction, sanitized runtime identity readback, and CLI/API/Web help
   links are implemented; opt-in shell composition and `bun run smoke:swarm` real smoke harness
-  exist, and the local real smoke passed against a temporary Swarm manager; Swarm service log
-  reads can run through the resolved manager over SSH. Default activation, real edge-proxy route
-  realization, remote-manager health observation, and registry-auth smoke coverage remain open.
+  exist, and the local real smoke passed against a temporary Swarm manager; Swarm service log and
+  health reads can run through the resolved manager over SSH. Default activation, real edge-proxy
+  route realization, and registry-auth smoke coverage remain open.
 
 Exit criteria:
 

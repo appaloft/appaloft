@@ -1333,6 +1333,7 @@ export class ResourceHealthQueryService {
     return {
       resourceId: resource.id,
       deploymentId: deployment.id,
+      ...(deployment.serverId ? { targetServerId: deployment.serverId } : {}),
       runtimeKind: deployment.runtimePlan.execution.kind,
       targetKind: deployment.runtimePlan.target.kind,
       providerKey: deployment.runtimePlan.target.providerKey,
