@@ -791,10 +791,9 @@ Current boundary:
   control plane. That future product line must still reuse repository config and explicit
   operations rather than adding preview fields to `deployments.create`. The governing Spec Round is
   [Product-Grade Preview Deployments](./specs/046-product-grade-preview-deployments/spec.md).
-  `preview-policies.configure` and `preview-policies.show` now exist as inactive application
-  operation catalog entries backed by durable Postgres/PGlite policy storage and safe default or
-  configured read-model summaries, including same-repository, fork, secret-backed, active preview
-  quota, and preview TTL settings, but with no CLI/oRPC/Web transports.
+  `preview-policies.configure` and `preview-policies.show` now expose HTTP/oRPC routes backed by
+  durable Postgres/PGlite policy storage and safe default or configured read-model summaries,
+  including same-repository, fork, secret-backed, active preview quota, and preview TTL settings.
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete` now
   expose HTTP/oRPC routes over safe preview environment read models and cleanup-service input. CLI
   and Web surfaces remain future work. GitHub App route wiring, managed domain lifecycle, and
@@ -804,8 +803,8 @@ Product-grade preview policy operations:
 
 | Name | Kind | Operation key | Command/query | Input | CLI | HTTP/oRPC |
 | --- | --- | --- | --- | --- | --- | --- |
-| Configure preview policy | Command | `preview-policies.configure` | `ConfigurePreviewPolicyCommand` | `ConfigurePreviewPolicyCommandInput` | - | - |
-| Show preview policy | Query | `preview-policies.show` | `ShowPreviewPolicyQuery` | `ShowPreviewPolicyQueryInput` | - | - |
+| Configure preview policy | Command | `preview-policies.configure` | `ConfigurePreviewPolicyCommand` | `ConfigurePreviewPolicyCommandInput` | - | `POST /api/preview-policies` |
+| Show preview policy | Query | `preview-policies.show` | `ShowPreviewPolicyQuery` | `ShowPreviewPolicyQueryInput` | - | `POST /api/preview-policies/show` |
 | List preview environments | Query | `preview-environments.list` | `ListPreviewEnvironmentsQuery` | `ListPreviewEnvironmentsQueryInput` | - | `GET /api/preview-environments` |
 | Show preview environment | Query | `preview-environments.show` | `ShowPreviewEnvironmentQuery` | `ShowPreviewEnvironmentQueryInput` | - | `GET /api/preview-environments/{previewEnvironmentId}` |
 | Delete preview environment | Command | `preview-environments.delete` | `DeletePreviewEnvironmentCommand` | `DeletePreviewEnvironmentCommandInput` | - | `DELETE /api/resources/{resourceId}/preview-environments/{previewEnvironmentId}` |

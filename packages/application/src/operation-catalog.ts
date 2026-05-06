@@ -197,7 +197,9 @@ export const operationCatalog = [
     serviceName: "ConfigurePreviewPolicyUseCase",
     inputSchema: configurePreviewPolicyCommandInputSchema,
     serviceToken: tokens.configurePreviewPolicyUseCase,
-    transports: {},
+    transports: {
+      orpc: { method: "POST", path: "/api/preview-policies" },
+    },
   },
   {
     key: "preview-policies.show",
@@ -208,7 +210,9 @@ export const operationCatalog = [
     serviceName: "ShowPreviewPolicyQueryService",
     inputSchema: showPreviewPolicyQueryInputSchema,
     serviceToken: tokens.showPreviewPolicyQueryService,
-    transports: {},
+    transports: {
+      orpc: { method: "POST", path: "/api/preview-policies/show" },
+    },
   },
   {
     key: "preview-environments.list",

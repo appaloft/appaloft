@@ -208,7 +208,7 @@ describe("preview policy operations", () => {
     });
   });
 
-  test("[PG-PREVIEW-SURFACE-001] preview policy catalog entries are inactive transports", () => {
+  test("[PG-PREVIEW-SURFACE-001] preview policy catalog entries expose HTTP API transports", () => {
     const configure = operationCatalog.find((entry) => entry.key === "preview-policies.configure");
     const show = operationCatalog.find((entry) => entry.key === "preview-policies.show");
 
@@ -218,7 +218,9 @@ describe("preview policy operations", () => {
       messageName: "ConfigurePreviewPolicyCommand",
       handlerName: "ConfigurePreviewPolicyCommandHandler",
       serviceName: "ConfigurePreviewPolicyUseCase",
-      transports: {},
+      transports: {
+        orpc: { method: "POST", path: "/api/preview-policies" },
+      },
     });
     expect(show).toMatchObject({
       kind: "query",
@@ -226,7 +228,9 @@ describe("preview policy operations", () => {
       messageName: "ShowPreviewPolicyQuery",
       handlerName: "ShowPreviewPolicyQueryHandler",
       serviceName: "ShowPreviewPolicyQueryService",
-      transports: {},
+      transports: {
+        orpc: { method: "POST", path: "/api/preview-policies/show" },
+      },
     });
   });
 
