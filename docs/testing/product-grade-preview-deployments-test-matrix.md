@@ -138,13 +138,14 @@ runner config and environment overrides for preview cleanup retry scheduling.
 product-grade preview environment cleanup to the existing source-fingerprint
 `deployments.cleanup-preview` primitive and preserves retryable failures with safe preview scope
 details.
-`PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
+`PG-PREVIEW-SURFACE-001` has initial operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
-operation catalog entries with no active transports. It also covers inactive
+operation catalog entries with no active transports. It also covers the
 `preview-environments.list` / `preview-environments.show` / `preview-environments.delete`
-contracts, safe list/show read-model output, cleanup-backed delete command input, and inactive
-catalog entries.
+contracts, safe list/show read-model output, cleanup-backed delete command input, and active
+HTTP/oRPC catalog entries. `packages/orpc/test/preview-environment.http.test.ts` covers the HTTP
+routes dispatching preview environment list/show/delete through `QueryBus` and `CommandBus`.
 `PG-PREVIEW-SURFACE-001` now also has Postgres/PGlite persistence coverage in
 `packages/persistence/pg/test/preview-policy.pglite.test.ts` for project/resource-scoped policy
 storage, configured/default safe summaries, idempotency-key retention on the write side, and
@@ -161,8 +162,8 @@ preview environment upsert, lookup by id/source scope, safe list/show read model
 status readback, scoped delete, and owner Resource retention after delete.
 
 GitHub App route wiring, automatic process-manager deployment-status publication, scheduler leases,
-terminal provider metadata cleanup, cleanup-side feedback updates, and active CLI/API/Web/future MCP
-transports remain open.
+terminal provider metadata cleanup, cleanup-side feedback updates, preview policy transports, and
+active CLI/Web/future MCP transports remain open.
 Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 

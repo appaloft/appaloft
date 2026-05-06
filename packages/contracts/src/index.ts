@@ -1756,6 +1756,63 @@ export const showSourceEventResponseSchema = z.object({
   receivedAt: z.string(),
 });
 
+export const previewEnvironmentStatusSchema = z.enum(["active", "cleanup-requested"]);
+
+export const previewEnvironmentSourceSummarySchema = z.object({
+  provider: z.literal("github"),
+  repositoryFullName: z.string(),
+  headRepositoryFullName: z.string(),
+  pullRequestNumber: z.number().int().positive(),
+  baseRef: z.string(),
+  headSha: z.string(),
+  sourceBindingFingerprint: z.string(),
+});
+
+export const previewEnvironmentSummarySchema = z.object({
+  previewEnvironmentId: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  resourceId: z.string(),
+  serverId: z.string(),
+  destinationId: z.string(),
+  source: previewEnvironmentSourceSummarySchema,
+  status: previewEnvironmentStatusSchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  expiresAt: z.string().optional(),
+});
+
+export const listPreviewEnvironmentsResponseSchema = z.object({
+  schemaVersion: z.literal("preview-environments.list/v1"),
+  items: z.array(previewEnvironmentSummarySchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const showPreviewEnvironmentResponseSchema = z.object({
+  schemaVersion: z.literal("preview-environments.show/v1"),
+  previewEnvironment: previewEnvironmentSummarySchema,
+  generatedAt: z.string(),
+});
+
+export const deletePreviewEnvironmentResponseSchema = z.object({
+  status: z.enum(["cleaned", "already-clean", "retry-scheduled", "failed"]),
+  attemptId: z.string(),
+  previewEnvironmentId: z.string(),
+  resourceId: z.string(),
+  sourceBindingFingerprint: z.string(),
+  previewEnvironmentStatus: z.literal("cleanup-requested"),
+  cleanedRuntime: z.boolean(),
+  removedRoute: z.boolean(),
+  removedSourceLink: z.boolean(),
+  removedProviderMetadata: z.boolean(),
+  updatedFeedback: z.boolean(),
+  errorCode: z.string().optional(),
+  retryable: z.boolean().optional(),
+  failurePhase: z.string().optional(),
+  nextRetryAt: z.string().optional(),
+});
+
 export const attachResourceStorageInputSchema = z.object({
   resourceId: z.string().min(1),
   storageVolumeId: z.string().min(1),
@@ -4099,6 +4156,14 @@ export type SourceEventVerificationSummary = z.infer<typeof sourceEventVerificat
 export type SourceEventPolicyResult = z.infer<typeof sourceEventPolicyResultSchema>;
 export type ShowSourceEventInput = z.infer<typeof showSourceEventInputSchema>;
 export type ShowSourceEventResponse = z.infer<typeof showSourceEventResponseSchema>;
+export type PreviewEnvironmentStatus = z.infer<typeof previewEnvironmentStatusSchema>;
+export type PreviewEnvironmentSourceSummary = z.infer<typeof previewEnvironmentSourceSummarySchema>;
+export type PreviewEnvironmentSummary = z.infer<typeof previewEnvironmentSummarySchema>;
+export type ListPreviewEnvironmentsResponse = z.infer<typeof listPreviewEnvironmentsResponseSchema>;
+export type ShowPreviewEnvironmentResponse = z.infer<typeof showPreviewEnvironmentResponseSchema>;
+export type DeletePreviewEnvironmentResponse = z.infer<
+  typeof deletePreviewEnvironmentResponseSchema
+>;
 export type AttachResourceStorageInput = z.infer<typeof attachResourceStorageInputSchema>;
 export type AttachResourceStorageResponse = z.infer<typeof attachResourceStorageResponseSchema>;
 export type DetachResourceStorageInput = z.infer<typeof detachResourceStorageInputSchema>;

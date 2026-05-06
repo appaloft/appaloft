@@ -67,6 +67,7 @@ import {
   DeleteCertificateCommand,
   DeleteDependencyResourceCommand,
   DeleteDomainBindingCommand,
+  DeletePreviewEnvironmentCommand,
   DeleteResourceCommand,
   DeleteScheduledTaskCommand,
   DeleteServerCommand,
@@ -84,6 +85,7 @@ import {
   deleteCertificateCommandInputSchema,
   deleteDependencyResourceCommandInputSchema,
   deleteDomainBindingCommandInputSchema,
+  deletePreviewEnvironmentCommandInputSchema,
   deleteResourceCommandInputSchema,
   deleteScheduledTaskCommandInputSchema,
   deleteServerCommandInputSchema,
@@ -120,6 +122,7 @@ import {
   ListGitHubRepositoriesQuery,
   ListOperatorWorkQuery,
   ListPluginsQuery,
+  ListPreviewEnvironmentsQuery,
   ListProjectsQuery,
   ListProvidersQuery,
   ListResourceDependencyBindingsQuery,
@@ -140,6 +143,7 @@ import {
   listEnvironmentsQueryInputSchema,
   listGitHubRepositoriesQueryInputSchema,
   listOperatorWorkQueryInputSchema,
+  listPreviewEnvironmentsQueryInputSchema,
   listResourceDependencyBindingsQueryInputSchema,
   listResourcesQueryInputSchema,
   listScheduledTaskRunsQueryInputSchema,
@@ -219,6 +223,7 @@ import {
   ShowDomainBindingQuery,
   ShowEnvironmentQuery,
   ShowOperatorWorkQuery,
+  ShowPreviewEnvironmentQuery,
   ShowProjectQuery,
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
@@ -245,6 +250,7 @@ import {
   showDomainBindingQueryInputSchema,
   showEnvironmentQueryInputSchema,
   showOperatorWorkQueryInputSchema,
+  showPreviewEnvironmentQueryInputSchema,
   showProjectQueryInputSchema,
   showResourceDependencyBindingQueryInputSchema,
   showResourceQueryInputSchema,
@@ -300,6 +306,7 @@ import {
   deactivateServerResponseSchema,
   deleteCertificateResponseSchema,
   deleteDomainBindingResponseSchema,
+  deletePreviewEnvironmentResponseSchema,
   deleteResourceResponseSchema,
   deleteScheduledTaskResponseSchema,
   deleteServerResponseSchema,
@@ -330,6 +337,7 @@ import {
   listGitHubRepositoriesResponseSchema,
   listOperatorWorkResponseSchema,
   listPluginsResponseSchema,
+  listPreviewEnvironmentsResponseSchema,
   listProjectsResponseSchema,
   listProvidersResponseSchema,
   listResourceDependencyBindingsResponseSchema,
@@ -376,6 +384,7 @@ import {
   showDeploymentResponseSchema,
   showDomainBindingResponseSchema,
   showOperatorWorkResponseSchema,
+  showPreviewEnvironmentResponseSchema,
   showProjectResponseSchema,
   showResourceDependencyBindingResponseSchema,
   showScheduledTaskResponseSchema,
@@ -504,6 +513,7 @@ export const apiDocsHrefs = {
   sourceAutoDeployIgnoredEvents: resolvePublicDocsHelpHref("source.auto-deploy-ignored-events"),
   sourceAutoDeployRecovery: resolvePublicDocsHelpHref("source.auto-deploy-recovery"),
   scheduledTaskLifecycle: resolvePublicDocsHelpHref("scheduled-task.resource-lifecycle"),
+  productGradePreviews: resolvePublicDocsHelpHref("deployment.product-grade-previews"),
 } as const;
 
 export const apiRouteDescriptions = {
@@ -896,6 +906,18 @@ export const apiRouteDescriptions = {
   showSourceEvent: routeDescription(
     "Reads one safe source event delivery with dedupe, policy, and dispatch details.",
     "source.auto-deploy-ignored-events",
+  ),
+  listPreviewEnvironments: routeDescription(
+    "Lists durable preview environments with source, ownership, status, and expiry summaries.",
+    "deployment.product-grade-previews",
+  ),
+  showPreviewEnvironment: routeDescription(
+    "Reads one durable preview environment with safe source, ownership, status, and expiry detail.",
+    "deployment.product-grade-previews",
+  ),
+  deletePreviewEnvironment: routeDescription(
+    "Requests cleanup for one preview environment while preserving deployment history and audit.",
+    "deployment.product-grade-previews",
   ),
 } as const;
 export const createDeploymentRouteDescription = apiRouteDescriptions.createDeployment;
@@ -2334,6 +2356,45 @@ export const showSourceEventProcedure = base
   .output(showSourceEventResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ShowSourceEventQuery.create(input)));
 
+export const listPreviewEnvironmentsProcedure = base
+  .route({
+    method: "GET",
+    path: "/preview-environments",
+    description: apiRouteDescriptions.listPreviewEnvironments,
+    successStatus: 200,
+  })
+  .input(listPreviewEnvironmentsQueryInputSchema)
+  .output(listPreviewEnvironmentsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListPreviewEnvironmentsQuery.create(input)),
+  );
+
+export const showPreviewEnvironmentProcedure = base
+  .route({
+    method: "GET",
+    path: "/preview-environments/{previewEnvironmentId}",
+    description: apiRouteDescriptions.showPreviewEnvironment,
+    successStatus: 200,
+  })
+  .input(showPreviewEnvironmentQueryInputSchema)
+  .output(showPreviewEnvironmentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowPreviewEnvironmentQuery.create(input)),
+  );
+
+export const deletePreviewEnvironmentProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/resources/{resourceId}/preview-environments/{previewEnvironmentId}",
+    description: apiRouteDescriptions.deletePreviewEnvironment,
+    successStatus: 202,
+  })
+  .input(deletePreviewEnvironmentCommandInputSchema)
+  .output(deletePreviewEnvironmentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeletePreviewEnvironmentCommand.create(input)),
+  );
+
 export const createDeploymentProcedure = base
   .route({
     method: "POST",
@@ -3231,6 +3292,11 @@ export const appaloftOrpcRouter = {
     list: listSourceEventsProcedure,
     show: showSourceEventProcedure,
   },
+  previewEnvironments: {
+    list: listPreviewEnvironmentsProcedure,
+    show: showPreviewEnvironmentProcedure,
+    delete: deletePreviewEnvironmentProcedure,
+  },
   providers: {
     list: listProvidersProcedure,
   },
@@ -3710,6 +3776,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/runtime/stop",
     "/api/resources/:resourceId/runtime/start",
     "/api/resources/:resourceId/runtime/restart",
+    "/api/resources/:resourceId/preview-environments/:previewEnvironmentId",
     "/api/resources/:resourceId/dependency-bindings",
     "/api/resources/:resourceId/dependency-bindings/:bindingId",
     "/api/resources/:resourceId/dependency-bindings/:bindingId/secret-rotations",
@@ -3755,6 +3822,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/dependency-resources/:dependencyResourceId/rename",
     "/api/operator-work",
     "/api/operator-work/:workId",
+    "/api/preview-environments",
+    "/api/preview-environments/:previewEnvironmentId",
     "/api/providers",
     "/api/plugins",
     "/api/integrations/github/repositories",

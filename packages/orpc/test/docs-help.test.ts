@@ -65,6 +65,9 @@ describe("HTTP API docs help links", () => {
     expect(apiDocsHrefs.scheduledTaskLifecycle).toBe(
       "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
     );
+    expect(apiDocsHrefs.productGradePreviews).toBe(
+      "/docs/deploy/previews/#product-grade-preview-deployments",
+    );
 
     expect(apiRouteDescriptions.configureServerCredential).toContain(apiDocsHrefs.serverCredential);
     expect(apiRouteDescriptions.registerServer).toContain(apiDocsHrefs.serverDockerSwarmTarget);
@@ -95,6 +98,15 @@ describe("HTTP API docs help links", () => {
     expect(apiRouteDescriptions.listSourceEvents).toContain(apiDocsHrefs.sourceAutoDeployDedupe);
     expect(apiRouteDescriptions.showSourceEvent).toContain(
       apiDocsHrefs.sourceAutoDeployIgnoredEvents,
+    );
+    expect(apiRouteDescriptions.listPreviewEnvironments).toContain(
+      apiDocsHrefs.productGradePreviews,
+    );
+    expect(apiRouteDescriptions.showPreviewEnvironment).toContain(
+      apiDocsHrefs.productGradePreviews,
+    );
+    expect(apiRouteDescriptions.deletePreviewEnvironment).toContain(
+      apiDocsHrefs.productGradePreviews,
     );
     expect(apiRouteDescriptions.createScheduledTask).toContain(apiDocsHrefs.scheduledTaskLifecycle);
     expect(apiRouteDescriptions.runScheduledTaskNow).toContain(apiDocsHrefs.scheduledTaskLifecycle);

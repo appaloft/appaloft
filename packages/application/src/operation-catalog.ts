@@ -219,7 +219,9 @@ export const operationCatalog = [
     serviceName: "ListPreviewEnvironmentsQueryService",
     inputSchema: listPreviewEnvironmentsQueryInputSchema,
     serviceToken: tokens.listPreviewEnvironmentsQueryService,
-    transports: {},
+    transports: {
+      orpc: { method: "GET", path: "/api/preview-environments" },
+    },
   },
   {
     key: "preview-environments.show",
@@ -230,7 +232,9 @@ export const operationCatalog = [
     serviceName: "ShowPreviewEnvironmentQueryService",
     inputSchema: showPreviewEnvironmentQueryInputSchema,
     serviceToken: tokens.showPreviewEnvironmentQueryService,
-    transports: {},
+    transports: {
+      orpc: { method: "GET", path: "/api/preview-environments/{previewEnvironmentId}" },
+    },
   },
   {
     key: "preview-environments.delete",
@@ -241,7 +245,12 @@ export const operationCatalog = [
     serviceName: "PreviewEnvironmentCleanupService",
     inputSchema: deletePreviewEnvironmentCommandInputSchema,
     serviceToken: tokens.previewEnvironmentCleanupService,
-    transports: {},
+    transports: {
+      orpc: {
+        method: "DELETE",
+        path: "/api/resources/{resourceId}/preview-environments/{previewEnvironmentId}",
+      },
+    },
   },
   {
     key: "projects.create",
