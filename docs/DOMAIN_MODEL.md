@@ -446,8 +446,8 @@ Current scope:
   [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md)
 - Phase 7 provider-native Redis realization under
   [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md)
-- provider-native credential rotation, managed Redis runtime materialization coverage, runtime
-  cleanup, and final closed-loop verification are future Phase 7 work
+- provider-native credential rotation, runtime cleanup, and final closed-loop verification are
+  future Phase 7 work
 
 ### Dependency Resource Backup
 

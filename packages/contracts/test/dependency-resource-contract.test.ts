@@ -71,4 +71,39 @@ describe("dependency resource contract", () => {
     expect(postgres.providerRealization?.status).toBe("ready");
     expect(JSON.stringify(postgres)).not.toContain("super-secret");
   });
+
+  test("[DEP-RES-REDIS-NATIVE-002] accepts safe managed Redis realization metadata", () => {
+    const redis = dependencyResourceSummarySchema.parse({
+      id: "rsi_managed_redis",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Managed Redis",
+      slug: "managed-redis",
+      kind: "redis",
+      sourceMode: "appaloft-managed",
+      providerKey: "appaloft-managed-redis",
+      providerManaged: true,
+      lifecycleStatus: "ready",
+      connection: {
+        host: "managed-redis.redis.internal",
+        port: 6379,
+        databaseName: "0",
+        maskedConnection: "redis://:********@managed-redis.redis.internal:6379/0",
+        secretRef: "secret://dependency/redis/rsi_managed_redis",
+      },
+      providerRealization: {
+        status: "ready",
+        attemptId: "dpr_redis_1",
+        attemptedAt: "2026-01-01T00:00:00.000Z",
+        providerResourceHandle: "redis/rsi_managed_redis",
+        realizedAt: "2026-01-01T00:00:00.000Z",
+      },
+      bindingReadiness: { status: "ready" },
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(redis.providerRealization?.status).toBe("ready");
+    expect(redis.kind).toBe("redis");
+    expect(JSON.stringify(redis)).not.toContain("super-secret");
+  });
 });

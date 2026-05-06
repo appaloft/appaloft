@@ -48,10 +48,6 @@ function runtimeInjectionBlockReason(
     return "dependency_runtime_injection_kind_unsupported";
   }
 
-  if (binding.kind === "redis" && binding.sourceMode !== "imported-external") {
-    return "dependency_runtime_injection_managed_redis_unsupported";
-  }
-
   if (binding.target.scope !== "runtime-only") {
     return "dependency_runtime_injection_scope_unsupported";
   }

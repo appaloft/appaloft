@@ -93,7 +93,15 @@ class MemoryDependencyResourceSecretStore implements DependencyResourceSecretSto
   }
 }
 
-function createDeploymentWithDependencyRef(secretRef: string): Deployment {
+function createDeploymentWithDependencyRef(
+  secretRef: string,
+  input: {
+    bindingId?: string;
+    dependencyResourceId?: string;
+    kind?: "postgres" | "redis";
+    targetName?: string;
+  } = {},
+): Deployment {
   return Deployment.create({
     id: DeploymentId.rehydrate("dep_runtime_secret"),
     projectId: ProjectId.rehydrate("prj_demo"),
@@ -142,10 +150,10 @@ function createDeploymentWithDependencyRef(secretRef: string): Deployment {
     }),
     dependencyBindingReferences: [
       {
-        bindingId: ResourceBindingId.rehydrate("rbd_pg"),
-        dependencyResourceId: ResourceInstanceId.rehydrate("rsi_pg"),
-        kind: ResourceInstanceKindValue.rehydrate("postgres"),
-        targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
+        bindingId: ResourceBindingId.rehydrate(input.bindingId ?? "rbd_pg"),
+        dependencyResourceId: ResourceInstanceId.rehydrate(input.dependencyResourceId ?? "rsi_pg"),
+        kind: ResourceInstanceKindValue.rehydrate(input.kind ?? "postgres"),
+        targetName: ResourceBindingTargetName.rehydrate(input.targetName ?? "DATABASE_URL"),
         scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
         injectionMode: ResourceInjectionModeValue.rehydrate("env"),
         runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(secretRef),
@@ -199,6 +207,57 @@ describe("dependency runtime secret resolution", () => {
     expect(renderRuntimeCommandString(command, { quote: shellQuote })).toContain(secretValue);
     const display = renderRuntimeCommandString(command, { quote: shellQuote, mode: "display" });
     expect(display).toContain("DATABASE_URL=[redacted]");
+    expect(display).not.toContain(secretValue);
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-005] resolves realized managed Redis refs into REDIS_URL with redaction metadata", async () => {
+    const context = testContext("req_managed_redis_runtime_secret_test");
+    const store = new MemoryDependencyResourceSecretStore();
+    const secretValue = "redis://:super-secret@managed-redis.redis.internal:6379/0";
+    store.store({
+      dependencyResourceId: "rsi_managed_redis",
+      purpose: "connection",
+      secretValue,
+    });
+
+    const resolved = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment: createDeploymentWithDependencyRef(
+        "appaloft://dependency-resources/rsi_managed_redis/connection",
+        {
+          bindingId: "rbd_managed_redis",
+          dependencyResourceId: "rsi_managed_redis",
+          kind: "redis",
+          targetName: "REDIS_URL",
+        },
+      ),
+      dependencyResourceSecretStore: store,
+      port: 4000,
+      baseEnv: {},
+    });
+
+    expect(resolved.isOk()).toBe(true);
+    const runtime = resolved._unsafeUnwrap();
+    expect(runtime.env.REDIS_URL).toBe(secretValue);
+    expect(runtime.env.PORT).toBe("4000");
+    expect(runtime.redactions).toContain(secretValue);
+    expect(runtime.dependencyTargetNames.has("REDIS_URL")).toBe(true);
+    expect(JSON.stringify(runtime.env)).not.toContain("DATABASE_URL");
+
+    const command = RuntimeCommandBuilder.docker().runContainer({
+      image: "registry.example.com/app:latest",
+      containerName: "appaloft-dep_runtime_secret",
+      env: [
+        {
+          name: "REDIS_URL",
+          value: runtime.env.REDIS_URL ?? "",
+          redacted: runtime.dependencyTargetNames.has("REDIS_URL"),
+        },
+      ],
+    });
+    expect(renderRuntimeCommandString(command, { quote: shellQuote })).toContain(secretValue);
+    const display = renderRuntimeCommandString(command, { quote: shellQuote, mode: "display" });
+    expect(display).toContain("REDIS_URL=[redacted]");
     expect(display).not.toContain(secretValue);
   });
 

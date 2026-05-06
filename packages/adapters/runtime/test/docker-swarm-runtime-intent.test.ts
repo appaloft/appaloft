@@ -288,6 +288,45 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(JSON.stringify(intent)).not.toContain("postgres://");
   });
 
+  test("[DEP-RES-REDIS-NATIVE-005] renders realized managed Redis runtime secret handles without exposing raw values", () => {
+    const result = renderDockerSwarmRuntimeIntent({
+      runtimePlan: imageRuntimePlan(),
+      dependencyBindingReferences: [
+        {
+          bindingId: ResourceBindingId.rehydrate("rbd_managed_redis"),
+          dependencyResourceId: ResourceInstanceId.rehydrate("rsi_managed_redis"),
+          kind: ResourceInstanceKindValue.rehydrate("redis"),
+          targetName: ResourceBindingTargetName.rehydrate("REDIS_URL"),
+          scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+          injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+          runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+            "appaloft://dependency-resources/rsi_managed_redis/connection",
+          ),
+          snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
+        },
+      ],
+      identity: {
+        resourceId: "res_api",
+        deploymentId: "dep_managed_redis",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_prod",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const intent = result._unsafeUnwrap();
+
+    expect(intent.environment).toContainEqual({
+      name: "REDIS_URL",
+      exposure: "runtime",
+      scope: "deployment",
+      secret: true,
+      valueFrom: "secret:appaloft-dep-managed-redis-redis-url",
+    });
+    expect(JSON.stringify(intent)).not.toContain("appaloft://dependency-resources");
+    expect(JSON.stringify(intent)).not.toContain("redis://");
+  });
+
   test("[SWARM-TARGET-RENDER-002] renders Compose intent when target service metadata is explicit", () => {
     const result = renderDockerSwarmRuntimeIntent({
       runtimePlan: composeRuntimePlan({ swarmTargetService: "web" }),

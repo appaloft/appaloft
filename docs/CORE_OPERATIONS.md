@@ -361,7 +361,8 @@ Current boundary:
   `dependency-resources.delete` boundaries. It uses a hermetic managed Redis provider capability,
   safe realization state, ready binding admission, unsupported-provider admission rejection, and
   managed Redis provider cleanup on delete. Persistence/contract/runtime materialization coverage
-  remains open.
+  is implemented for safe realization metadata, deployment snapshots, single-server secret
+  resolution, and Swarm secret handle rendering.
 - Resource dependency bindings are provider-neutral `ResourceBinding` records in this slice. Bind
   requires matching project/environment ownership, stores only safe target metadata and secret
   reference pointers, and reports safe deployment snapshot-reference readiness. Unbind removes only
@@ -377,8 +378,9 @@ Current boundary:
   [ADR-041](./decisions/ADR-041-dependency-runtime-secret-value-resolution.md) and
   [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md);
   its Code Round is implemented for imported Postgres, imported Redis, managed Postgres
-  Appaloft-owned refs, single-server runtimes, Docker Swarm, and retained rotated binding refs.
-  Final Postgres/Redis closed-loop exit criteria still require end-to-end verification.
+  Appaloft-owned refs, managed Redis refs, single-server runtimes, Docker Swarm, and retained
+  rotated binding refs. Final Postgres/Redis closed-loop exit criteria still require end-to-end
+  verification.
 - `resources.rotate-dependency-binding-secret` rotates only the binding-scoped safe secret
   reference/version for future deployment snapshot references. It requires explicit acknowledgement
   that historical snapshots remain unchanged, and it does not rotate provider-native database
