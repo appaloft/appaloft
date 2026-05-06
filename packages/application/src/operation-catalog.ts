@@ -198,6 +198,7 @@ export const operationCatalog = [
     inputSchema: configurePreviewPolicyCommandInputSchema,
     serviceToken: tokens.configurePreviewPolicyUseCase,
     transports: {
+      cli: "appaloft preview policy configure",
       orpc: { method: "POST", path: "/api/preview-policies" },
     },
   },
@@ -211,6 +212,7 @@ export const operationCatalog = [
     inputSchema: showPreviewPolicyQueryInputSchema,
     serviceToken: tokens.showPreviewPolicyQueryService,
     transports: {
+      cli: "appaloft preview policy show",
       orpc: { method: "POST", path: "/api/preview-policies/show" },
     },
   },

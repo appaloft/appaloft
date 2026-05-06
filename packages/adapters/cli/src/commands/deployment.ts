@@ -68,6 +68,7 @@ import {
   type SourceFingerprintScope,
 } from "./deployment-state.js";
 import { cliCommandDescriptions, cliDocsHrefs } from "./docs-help.js";
+import { previewPolicyCommand } from "./preview-policy.js";
 
 const pathOrSourceArg = Args.text({ name: "pathOrSource" }).pipe(Args.optional);
 const deploymentIdArg = Args.text({ name: "deploymentId" });
@@ -1668,5 +1669,5 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
 
 export const previewCommand = EffectCommand.make("preview").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.preview),
-  EffectCommand.withSubcommands([previewCleanupCommand]),
+  EffectCommand.withSubcommands([previewCleanupCommand, previewPolicyCommand]),
 );
