@@ -175,12 +175,14 @@ No new public operation key is accepted in this Spec Round.
   skipped by default and requires `APPALOFT_DOCKER_SWARM_SMOKE=1`, an active local Swarm manager,
   and an overlay network named by `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` or `appaloft-edge` before it
   mutates Docker state. `bun run smoke:swarm` is the first-class repository command for that opt-in
-  smoke.
+  smoke. The 2026-05-06 local smoke run initialized a temporary Swarm manager, used
+  `appaloft-smoke-edge`, created a smoke-specific Docker secret reference, verified
+  apply/route-promotion/scoped cleanup, and then returned Docker to inactive Swarm state.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
-- Default-on Swarm activation, remote-manager health/log execution, end-to-end Swarm route smoke
-  coverage, real registry-login/pull-secret provisioning, and real Swarm registry-auth smoke
-  coverage remain open.
+- Default-on Swarm activation, remote-manager health/log execution, end-to-end Swarm edge-proxy
+  route realization, real registry-login/pull-secret provisioning, and real Swarm registry-auth
+  smoke coverage remain open.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and

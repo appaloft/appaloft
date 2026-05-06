@@ -627,8 +627,8 @@ export function renderDockerSwarmApplyPlan(
       "appaloft.runtime-target": "docker-swarm",
     }),
     "| while read -r service_id; do",
-    `current_deployment=$(docker service inspect "$service_id" --format ${shellQuote("{{ index .Spec.Labels \"appaloft.deployment-id\" }}")})`,
-    `if [ "$current_deployment" != ${shellQuote(intent.labels["appaloft.deployment-id"] ?? "")} ]; then docker service rm "$service_id"; fi`,
+    `current_deployment=$(docker service inspect "$service_id" --format ${shellQuote("{{ index .Spec.Labels \"appaloft.deployment-id\" }}")});`,
+    `if [ "$current_deployment" != ${shellQuote(intent.labels["appaloft.deployment-id"] ?? "")} ]; then docker service rm "$service_id"; fi;`,
     "done",
   ]);
 
