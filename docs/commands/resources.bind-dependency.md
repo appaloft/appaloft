@@ -32,7 +32,7 @@ runtime injection.
 | --- | --- | --- | --- |
 | Bind | Active Resource and ready bindable Dependency Resource share project/environment | Persist active ResourceBinding. | `ok({ id })` |
 | Managed Postgres not realized | Appaloft-managed Postgres realization is pending, failed, unsupported, or deleted | Reject before mutation. | `resource_dependency_binding_blocked` or structured lifecycle/conflict error |
-| Managed Redis not realized | Appaloft-managed Redis has no provider-native realization in this slice | Reject before mutation. | `resource_dependency_binding_blocked` |
+| Managed Redis not realized | Appaloft-managed Redis has no provider-native realization in current code, or realization is pending, failed, unsupported, deleted, or has an unresolved Appaloft-owned connection ref after the Redis provider-native Code Round | Reject before mutation. | `resource_dependency_binding_blocked` |
 | Cross context | Resource and Dependency Resource differ by project/environment | Reject before mutation. | `resource_dependency_binding_context_mismatch` |
 | Duplicate target | Same active Resource/Dependency/target policy exists | Reject before mutation. | `conflict`, `phase = resource-dependency-binding` |
 | Inactive participant | Resource or Dependency Resource is missing, archived, deleted, or not bindable | Reject before mutation. | `not_found`, lifecycle error, or validation error |
@@ -50,4 +50,8 @@ The command does not write raw connection secrets, mutate historical deployment 
 runtime environment variables, create deployments, trigger redeploy/retry/rollback, create or
 delete provider-native databases or Redis instances, rotate secrets, or run backup/restore. After
 provider-native Postgres realization, binding admission requires a realized ready managed database.
-Managed Redis remains blocked until provider-native Redis realization is specified and implemented.
+Managed Redis remains blocked until provider-native Redis realization is implemented.
+The governing Spec Round is
+[Redis Provider-Native Realization](../specs/049-redis-provider-native-realization/spec.md);
+managed Redis binding must stay blocked until its Code Round makes realized ready Redis resources
+resolvable through the dependency runtime secret store.

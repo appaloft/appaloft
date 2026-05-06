@@ -6,8 +6,8 @@ Record that Appaloft accepted provider-native realization for a managed dependen
 
 ## Publisher
 
-`dependency-resources.provision-postgres` after the `ResourceInstance` and realization attempt are
-durably persisted.
+`dependency-resources.provision-postgres`, and future `dependency-resources.provision-redis`, after
+the `ResourceInstance` and realization attempt are durably persisted.
 
 ## Payload
 

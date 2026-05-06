@@ -18,11 +18,11 @@ This matrix covers the Phase 7 dependency resource lifecycle baseline:
 - deployment snapshot safe binding reference capture for active Postgres and Redis Resource bindings
 - Redis dependency resource lifecycle
 - provider-native Postgres realization scenarios
+- provider-native Redis realization scenarios
 - dependency resource backup/restore scenarios
 
-It does not cover provider-native Redis provisioning or provider-native credential rotation,
-managed Redis binding admission, runtime cleanup, scheduled backup policies, backup prune/delete,
-or cross-resource restore.
+It does not cover provider-native credential rotation, runtime cleanup, scheduled backup policies,
+backup prune/delete, or cross-resource restore.
 
 ## Global References
 
@@ -34,6 +34,7 @@ or cross-resource restore.
 - [Postgres Provider-Native Realization](../specs/038-postgres-provider-native-realization/spec.md)
 - [Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md)
 - [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md)
+- [Redis Provider-Native Realization](../specs/049-redis-provider-native-realization/spec.md)
 - [ADR-040: Dependency Binding Runtime Injection Boundary](../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md)
 - [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
 - [dependency-resource-backup-requested](../events/dependency-resource-backup-requested.md)
@@ -113,6 +114,15 @@ or cross-resource restore.
 | DEP-RES-REDIS-DELETE-001 | `dependency-resources.delete` | Application | Delete imported external Redis resource with no blockers. | Tombstones Appaloft record only and does not imply external/provider Redis deletion. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
 | DEP-RES-REDIS-DELETE-002 | `dependency-resources.delete` | Application | Delete Redis resource with binding, backup, provider-managed unsafe, or retained snapshot/reference blockers. | Returns `dependency_resource_delete_blocked`, no mutation, no provider/runtime cleanup. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
 | DEP-RES-REDIS-ENTRY-001 | Operation catalog / CLI / oRPC / HTTP | Entrypoint | Redis dependency resource operations are public after Code Round. | Entrypoints dispatch explicit Redis provision/import messages, reuse schemas, and expose no generic update operation. | `packages/application/test/operation-catalog-boundary.test.ts`; `packages/adapters/cli/test/dependency-command.test.ts`; `packages/orpc/test/dependency-resource.http.test.ts` |
+| DEP-RES-REDIS-NATIVE-001 | `dependency-resources.provision-redis` | Core/application | Managed Redis provider realization is admitted. | Persists a `redis` `ResourceInstance` plus durable realization attempt, returns `ok({ id })`, and requests provider realization without leaking secrets. | planned: `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-REDIS-NATIVE-002 | provider realization result / `dependency-resources.show` | Core/application/read model | Provider creates a managed Redis instance successfully with safe endpoint metadata and resolvable connection ref. | Resource status becomes ready, safe provider handle and masked endpoint metadata are visible, binding readiness is ready, and `dependency-resource-realized` is emitted for the Redis resource. | planned: `packages/application/test/postgres-dependency-resource-lifecycle.test.ts`; `packages/persistence/pg/test/dependency-resource.pglite.test.ts`; `packages/contracts/test/dependency-resource-contract.test.ts` |
+| DEP-RES-REDIS-NATIVE-003 | provider realization result / `dependency-resources.show` | Application/read model | Provider realization fails after command admission. | Original provision command remains accepted; resource status becomes degraded, binding readiness is blocked, and safe failure code/category/phase are visible. | planned: `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-REDIS-NATIVE-004 | `resources.bind-dependency` | Application | Managed Redis is pending, failed, unsupported, deleted, or has an unresolved Appaloft-owned connection ref. | Bind returns structured blocked/not-found/conflict result and persists no `ResourceBinding`. | planned: `packages/application/test/dependency-resource-binding.test.ts` |
+| DEP-RES-REDIS-NATIVE-005 | `resources.bind-dependency`; `deployments.create`; runtime target execution | Application/runtime | Managed Redis is realized ready with a resolvable runtime connection ref. | Binding succeeds, deployment captures safe runtime injection metadata, and selected runtime targets receive `REDIS_URL` through existing dependency secret resolution without raw Redis material in snapshots, logs, or diagnostics. | planned: `packages/application/test/dependency-resource-binding.test.ts`; `packages/application/test/create-deployment.test.ts`; `packages/adapters/runtime/test/dependency-runtime-secrets.test.ts`; `packages/adapters/runtime/test/docker-swarm-runtime-intent.test.ts` |
+| DEP-RES-REDIS-NATIVE-006 | `dependency-resources.delete` | Application/provider | Realized managed Redis has no binding, backup, snapshot/reference, or provider blockers. | Provider cleanup is requested/applied and Appaloft tombstones the record only after cleanup state is durable. | planned: `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-REDIS-NATIVE-007 | `dependency-resources.delete` | Application | Realized managed Redis is protected by binding, backup, snapshot/reference, or provider safety blocker. | Returns `dependency_resource_delete_blocked`, no provider cleanup request is made. | planned: `packages/application/test/postgres-dependency-resource-lifecycle.test.ts`; `packages/application/test/dependency-resource-binding.test.ts` |
+| DEP-RES-REDIS-NATIVE-008 | `dependency-resources.provision-redis` | Application/provider | Selected provider lacks managed Redis capability. | Returns `provider_capability_unsupported`, phase `dependency-resource-realization-admission`, and no resource is persisted unless a later spec adds explicit metadata-only mode. | planned: `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-REDIS-NATIVE-009 | Operation catalog / CLI / oRPC / HTTP | Entrypoint/contract | Provider-native Redis realization upgrades existing provision/delete/bind behavior. | Entrypoints reuse or explicitly extend application schemas, dispatch command/query buses, and expose no provider SDK shape or raw secret field. | planned: `packages/application/test/operation-catalog-boundary.test.ts`; `packages/adapters/cli/test/dependency-command.test.ts`; `packages/orpc/test/dependency-resource.http.test.ts`; `packages/contracts/test/dependency-resource-contract.test.ts` |
 | DEP-RES-PG-NATIVE-001 | `dependency-resources.provision-postgres` | Core/application | Managed Postgres provider realization is admitted. | Persists a `postgres` `ResourceInstance` plus durable realization attempt, returns `ok({ id })`, and requests provider realization without leaking secrets. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
 | DEP-RES-PG-NATIVE-002 | provider realization result / `dependency-resources.show` | Core/application/read model | Provider creates a managed database successfully. | Resource status becomes ready, safe provider handle and masked endpoint metadata are visible, binding readiness is ready, and `dependency-resource-realized` is emitted. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts`; `packages/persistence/pg/test/dependency-resource.pglite.test.ts`; `packages/contracts/test/dependency-resource-contract.test.ts` |
 | DEP-RES-PG-NATIVE-003 | provider realization result / `dependency-resources.show` | Application/read model | Provider realization fails after command admission. | Original provision command remains accepted; resource status becomes degraded, binding readiness is blocked, and safe failure code/category/phase are visible. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
@@ -159,5 +169,7 @@ injection and store-backed secret value resolution are implemented for imported 
 Redis, managed Postgres Appaloft-owned refs, single-server runtimes, Docker Swarm, unresolved-ref
 deployment blocking, and retained rotated binding refs through
 [Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md).
-Provider-native Redis lifecycle, managed Redis binding admission, Web affordances, final
-Postgres/Redis closed-loop verification, and runtime cleanup remain future Phase 7 work.
+Provider-native Redis lifecycle and managed Redis binding admission are now positioned by
+[Redis Provider-Native Realization](../specs/049-redis-provider-native-realization/spec.md) with
+planned matrix rows and no Code Round automation yet. Web affordances, final Postgres/Redis
+closed-loop verification, and runtime cleanup remain future Phase 7 work.

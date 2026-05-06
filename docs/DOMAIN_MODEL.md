@@ -438,10 +438,16 @@ Current scope:
   [Redis Dependency Resource Lifecycle](./specs/037-redis-dependency-resource-lifecycle/spec.md)
 - Phase 7 provider-native Postgres realization baseline under
   [Postgres Provider-Native Realization](./specs/038-postgres-provider-native-realization/spec.md)
-- Phase 7 dependency resource backup/restore planned baseline under
+- Phase 7 dependency resource backup/restore baseline under
   [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md)
-- provider-native credential rotation, runtime env injection, and provider-native runtime
-  materialization are future Phase 7 work
+- Phase 7 dependency runtime injection and secret value resolution under
+  [Dependency Binding Runtime Injection](./specs/047-dependency-binding-runtime-injection/spec.md)
+  and
+  [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md)
+- Phase 7 provider-native Redis realization Spec Round under
+  [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md)
+- provider-native credential rotation, managed Redis realization Code Round, runtime cleanup, and
+  final closed-loop verification are future Phase 7 work
 
 ### Dependency Resource Backup
 
@@ -920,7 +926,8 @@ Current scope:
   references
 - `resources.rotate-dependency-binding-secret` updates the safe binding secret reference/version
   used by future deployments
-- runtime env injection remains deferred
+- runtime env injection is governed by ADR-040 and ADR-041; managed Redis binding remains blocked
+  until provider-native Redis realization is implemented and resolvable
 
 ### ResourceInstance
 
