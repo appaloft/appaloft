@@ -43,6 +43,7 @@ import {
   type PackagingMode,
   type PreviewEnvironment,
   type PreviewEnvironmentMutationSpec,
+  type PreviewEnvironmentProvider,
   type PreviewEnvironmentSelectionSpec,
   type PreviewEnvironmentStatus,
   type Project,
@@ -4518,6 +4519,30 @@ export interface PreviewFeedbackRecorder {
     input: { feedbackKey: string },
   ): Promise<PreviewFeedbackRecord | null>;
   record(context: RepositoryContext, record: PreviewFeedbackRecord): Promise<void>;
+}
+
+export interface PreviewEnvironmentCleanerInput {
+  previewEnvironmentId: string;
+  resourceId: string;
+  sourceBindingFingerprint: string;
+  provider: PreviewEnvironmentProvider;
+  repositoryFullName: string;
+  pullRequestNumber: number;
+}
+
+export interface PreviewEnvironmentCleanerResult {
+  cleanedRuntime: boolean;
+  removedRoute: boolean;
+  removedSourceLink: boolean;
+  removedProviderMetadata: boolean;
+  updatedFeedback: boolean;
+}
+
+export interface PreviewEnvironmentCleaner {
+  cleanup(
+    context: ExecutionContext,
+    input: PreviewEnvironmentCleanerInput,
+  ): Promise<Result<PreviewEnvironmentCleanerResult>>;
 }
 
 export interface SourceEventPolicyCandidate {

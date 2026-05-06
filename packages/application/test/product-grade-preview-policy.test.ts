@@ -16,6 +16,10 @@ import {
   CreateDeploymentSourceEventDispatcher,
   createExecutionContext,
   type ExecutionContext,
+  type PreviewEnvironmentCleaner,
+  type PreviewEnvironmentCleanerInput,
+  type PreviewEnvironmentCleanerResult,
+  PreviewEnvironmentCleanupService,
   type PreviewEnvironmentRepository,
   type PreviewFeedbackRecord,
   type PreviewFeedbackRecorder,
@@ -57,6 +61,7 @@ class FixedClock {
 class InMemoryPreviewEnvironmentRepository implements PreviewEnvironmentRepository {
   previewEnvironment: PreviewEnvironment | null = null;
   upsertCount = 0;
+  deleteCount = 0;
 
   async findOne(
     _context: RepositoryContext,
@@ -76,6 +81,26 @@ class InMemoryPreviewEnvironmentRepository implements PreviewEnvironmentReposito
 
   async delete(_context: RepositoryContext, _spec: PreviewEnvironmentMutationSpec): Promise<void> {
     this.previewEnvironment = null;
+    this.deleteCount += 1;
+  }
+}
+
+class CapturingPreviewEnvironmentCleaner implements PreviewEnvironmentCleaner {
+  inputs: PreviewEnvironmentCleanerInput[] = [];
+  result: PreviewEnvironmentCleanerResult = {
+    cleanedRuntime: true,
+    removedRoute: true,
+    removedSourceLink: true,
+    removedProviderMetadata: true,
+    updatedFeedback: true,
+  };
+
+  async cleanup(
+    _context: ExecutionContext,
+    input: PreviewEnvironmentCleanerInput,
+  ): Promise<Result<PreviewEnvironmentCleanerResult>> {
+    this.inputs.push(input);
+    return ok(this.result);
   }
 }
 
@@ -1029,5 +1054,93 @@ describe("PreviewFeedbackService", () => {
       retryable: true,
       updatedAt: "2026-05-06T04:35:00.000Z",
     });
+  });
+});
+
+describe("PreviewEnvironmentCleanupService", () => {
+  test("[PG-PREVIEW-CLEANUP-001] preserves preview environment history while removing cleanup-owned state", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const lifecycle = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      projection,
+      new FixedClock("2026-05-06T04:45:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const cleaner = new CapturingPreviewEnvironmentCleaner();
+    const cleanup = new PreviewEnvironmentCleanupService(
+      repository,
+      cleaner,
+      new FixedClock("2026-05-06T04:50:00.000Z"),
+    );
+    const context = createExecutionContext({
+      requestId: "req_preview_environment_cleanup_test",
+      entrypoint: "system",
+    });
+
+    const deployed = await lifecycle.deployFromPolicyEligibleEvent(context, {
+      sourceEventId: "sevt_preview_cleanup_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_cleanup",
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "opened",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "appaloft/demo",
+      pullRequestNumber: 50,
+      headSha: "abc1234",
+      baseRef: "main",
+      verified: true,
+    });
+    const cleanupResult = await cleanup.cleanup(context, {
+      previewEnvironmentId: "prenv_1",
+      resourceId: "res_preview_api",
+    });
+
+    expect(deployed.isOk()).toBe(true);
+    expect(cleanupResult.isOk()).toBe(true);
+    expect(cleanupResult._unsafeUnwrap()).toEqual({
+      status: "cleaned",
+      previewEnvironmentId: "prenv_1",
+      resourceId: "res_preview_api",
+      sourceBindingFingerprint: "srcfp_preview_cleanup",
+      previewEnvironmentStatus: "cleanup-requested",
+      cleanedRuntime: true,
+      removedRoute: true,
+      removedSourceLink: true,
+      removedProviderMetadata: true,
+      updatedFeedback: true,
+    });
+    expect(repository.deleteCount).toBe(0);
+    expect(repository.previewEnvironment?.toState()).toMatchObject({
+      id: { value: "prenv_1" },
+      resourceId: { value: "res_preview_api" },
+      status: { value: "cleanup-requested" },
+      updatedAt: { value: "2026-05-06T04:50:00.000Z" },
+      source: {
+        repositoryFullName: { value: "appaloft/demo" },
+        pullRequestNumber: { value: 50 },
+        sourceBindingFingerprint: { value: "srcfp_preview_cleanup" },
+      },
+    });
+    expect(cleaner.inputs).toEqual([
+      {
+        previewEnvironmentId: "prenv_1",
+        resourceId: "res_preview_api",
+        sourceBindingFingerprint: "srcfp_preview_cleanup",
+        provider: "github",
+        repositoryFullName: "appaloft/demo",
+        pullRequestNumber: 50,
+      },
+    ]);
+    expect(JSON.stringify(cleaner.inputs)).not.toContain("secret");
+    expect(JSON.stringify(cleaner.inputs)).not.toContain("token");
   });
 });

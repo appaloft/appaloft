@@ -1334,6 +1334,11 @@ Current verification notes:
   ids are reused for update-in-place, and retryable provider failures are recorded as safe feedback
   state without turning the accepted deployment path into `err`. Durable feedback persistence,
   GitHub App HTTP routes, cleanup retry, and active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview cleanup application slice added a service that marks durable preview
+  environment cleanup requested without deleting preview history, then delegates runtime, route,
+  source-link, provider metadata, and feedback cleanup to a safe source-scope port. Concrete
+  cleanup adapters, cleanup retry state, GitHub App HTTP routes, and active preview environment
+  entrypoints remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
