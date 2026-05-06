@@ -21,7 +21,7 @@
   matrix coverage.
 - [x] DEP-RES-REDIS-NATIVE-005: add application binding, deployment snapshot, and runtime-injection
   tests for realized ready managed Redis.
-- [ ] DEP-RES-REDIS-NATIVE-006 and DEP-RES-REDIS-NATIVE-007: add full managed delete safety and
+- [x] DEP-RES-REDIS-NATIVE-006 and DEP-RES-REDIS-NATIVE-007: add full managed delete safety and
   provider cleanup coverage.
 - [x] DEP-RES-REDIS-NATIVE-006: add managed Redis provider cleanup tests.
 - [x] DEP-RES-REDIS-NATIVE-008: add unsupported-provider tests.

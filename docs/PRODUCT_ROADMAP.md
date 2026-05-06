@@ -939,6 +939,10 @@ Current verification notes:
   single-server runtime resolver, Docker Swarm secret-handle, PGlite read-model, and contract tests
   for managed Redis safe realization metadata and `REDIS_URL` delivery. Final Redis observe and
   backup/restore-or-delete closed-loop verification remains open.
+- 2026-05-06 Phase 7 managed Redis delete safety coverage slice verified realized managed Redis
+  delete is blocked by active binding, backup retention, and retained deployment snapshot/reference
+  blockers before provider cleanup runs. Final Redis observe and closed-loop verification remains
+  open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider
