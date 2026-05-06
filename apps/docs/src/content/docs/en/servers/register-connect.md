@@ -113,10 +113,10 @@ Docker Swarm targets are registered as cluster-shaped deployment targets. Use
 Appaloft can reach through the selected transport.
 
 Current status: Appaloft can record Swarm target metadata, run non-mutating manager readiness
-checks through `server test` or `server doctor`, and reject unsupported Swarm-specific deployment
-fields before a deployment is created. Swarm execution is opt-in with
-`APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=true`; the default runtime backend does not execute Swarm
-deployments. Until a Swarm execution backend is enabled, deploying to a Swarm target should fail
+checks through `server test` or `server doctor`, reject unsupported Swarm-specific deployment
+fields before a deployment is created, and execute Swarm deployments through the default runtime
+backend. Set `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=false` only when an installation needs to
+disable Swarm execution explicitly; with that opt-out, deploying to a Swarm target should fail
 before acceptance with `runtime_target_unsupported`.
 
 Keep deployment requests ids-only. Do not add Swarm fields such as namespace, stack name, service
@@ -124,7 +124,7 @@ name, replicas, update policy, ingress, registry secret, or manifest directly to
 or `appaloft.config.*`. If a validation error names one of those fields, remove it and use the
 supported resource, environment, and server inputs for the current runtime target.
 
-Before Swarm execution is supported for a target, `server test`/`server doctor` checks:
+Before deploying to a Swarm target, `server test`/`server doctor` checks:
 
 - the manager address is reachable through SSH;
 - Docker is available on the manager;
@@ -139,10 +139,9 @@ Operators should also verify:
   deployment should use a network name other than `appaloft-edge`;
 - health checks and service logs can be read in a form Appaloft can normalize.
 
-When Swarm execution is active, rollout should preserve the previous service until verification
-passes, logs and health should be returned as Appaloft status shapes, and cleanup should stay scoped
-to the resource, deployment, destination, and target labels. Until then, use a supported
-single-server target for deployment execution.
+Swarm rollout preserves the previous service until verification passes, logs and health are
+returned as Appaloft status shapes, and cleanup stays scoped to the resource, deployment,
+destination, and target labels.
 
 ```bash title="Run connectivity test"
 appaloft server test srv_primary

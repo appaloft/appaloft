@@ -148,7 +148,7 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
     batchSize: 25,
   },
   dockerSwarmExecution: {
-    enabled: false,
+    enabled: true,
     commandTimeoutMs: 60_000,
     edgeNetworkName: defaultDockerSwarmEdgeNetworkName,
   },

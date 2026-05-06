@@ -241,10 +241,10 @@ Current code has the initial target backend shape, but it is still running throu
 
 - `RuntimePlanResolver` exists and currently emits `single-server` target descriptors.
 - `servers.register` can persist canonical `single-server` or `orchestrator-cluster` target kind
-  metadata; only `single-server` has active runtime target backends.
+  metadata; `single-server` and Docker Swarm cluster targets have active runtime target backends.
 - `packages/adapters/runtime` exposes a `docker-swarm` descriptor factory and registry selection
-  coverage for `orchestrator-cluster` targets, but the default runtime registry still does not
-  activate Swarm execution.
+  coverage for `orchestrator-cluster` targets, and shell composition activates Swarm execution in
+  the default runtime registry unless explicitly opted out.
 - `ExecutionBackend` exists and owns `execute`, `cancel`, and `rollback`, even though cancel and
   rollback are not public deployment operations under ADR-016.
 - `RuntimeTargetBackendRegistry` exists as an application port.

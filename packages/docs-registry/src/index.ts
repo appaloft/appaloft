@@ -255,7 +255,7 @@ export const publicDocsHelpTopics = {
     id: "server.docker-swarm-target",
     title: "Docker Swarm runtime target",
     description:
-      "How Docker Swarm cluster targets are registered, admitted, and recovered while Swarm execution is phased in.",
+      "How Docker Swarm cluster targets are registered, admitted, executed, observed, and recovered.",
     page: {
       "zh-CN": "servers/register-connect",
       "en-US": "en/servers/register-connect",
@@ -283,9 +283,7 @@ export const publicDocsHelpTopics = {
       "docs/workflows/deployment-runtime-target-abstraction.md",
       "docs/implementation/runtime-target-abstraction-plan.md",
     ],
-    webSurfaces: [
-      "apps/web server registration and deployment target help links; Swarm execution UI remains deferred.",
-    ],
+    webSurfaces: ["apps/web server registration and deployment target help links."],
   },
   "deployment.lifecycle": {
     id: "deployment.lifecycle",

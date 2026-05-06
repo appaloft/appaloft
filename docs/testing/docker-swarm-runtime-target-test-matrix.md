@@ -3,8 +3,8 @@
 ## Scope
 
 This matrix covers Docker Swarm as the first cluster runtime target backend behind existing
-deployment, log, health, proxy, diagnostic, and capacity surfaces. Early adapter-contract slices are
-implemented, but no Docker Swarm execution backend is active in the default runtime registry yet.
+deployment, log, health, proxy, diagnostic, and capacity surfaces. Docker Swarm execution is active
+in the default shell runtime registry unless explicitly opted out.
 
 ## Global References
 
@@ -88,9 +88,9 @@ implemented, but no Docker Swarm execution backend is active in the default runt
 - `SWARM-TARGET-APPLY-001` and `SWARM-TARGET-CLEAN-001` have initial command-runner coverage
   proving the opt-in shell runner executes bounded rendered commands, preserves stdout/stderr and
   nonzero exit codes, and reports timeout failures for backend handling. The default runtime target
-  registry can now accept an explicitly composed Docker Swarm backend, and shell configuration keeps
-  that backend disabled unless `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=true`. Local real Docker
-  Swarm smoke coverage is environment-gated and has passed outside default CI.
+  registry now composes the Docker Swarm backend by default, with
+  `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=false` available as an explicit opt-out. Local real
+  Docker Swarm smoke coverage is environment-gated and has passed outside default CI.
 - `SWARM-TARGET-APPLY-001`, `SWARM-TARGET-OBS-001`, and `SWARM-TARGET-OBS-002` have PGlite
   persistence/read-model coverage proving sanitized Swarm stack name, service name, and apply-plan
   schema version metadata round-trip through deployment execution metadata without raw command,
@@ -113,7 +113,7 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   smoke execution.
 - `SWARM-TARGET-ROUTE-001` has initial apply-plan coverage proving Traefik route labels are absent
   from candidate service creation and added only in the post-verification `promote-route-target`
-  step against the Swarm edge network. Adapter coverage now proves the opt-in execution backend can
+  step against the Swarm edge network. Adapter coverage now proves the execution backend can
   use `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` to target a configured overlay network for both service
   attachment and route labels. End-to-end route realization is covered by the opt-in real Swarm
   smoke, which starts a temporary Traefik Swarm service on the overlay network and verifies the
@@ -142,5 +142,6 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   HTTP `POST /servers`, and Web server registration provider help link to that anchor. Future MCP
   descriptors continue to expose `servers.register` from the operation catalog without adding a
   Swarm-specific tool.
-- Docker Swarm runtime target execution is disabled by default in shell configuration and requires
-  explicit opt-in before the default runtime registry includes the Swarm backend.
+- Docker Swarm runtime target execution is enabled by default in shell configuration and can be
+  disabled with `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=false` when an installation is not ready
+  to execute Swarm deployments.

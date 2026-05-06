@@ -58,11 +58,11 @@
 - [x] Add remote-manager SSH execution for Swarm service health inspection.
 - [x] Add post-verification Traefik route label promotion to the Swarm image apply plan.
 - [x] Redact Swarm command failure output before deployment logs/metadata capture.
-- [x] Add bounded shell command runner for the opt-in Swarm execution backend.
-- [x] Add disabled-by-default shell composition for the opt-in Swarm execution backend.
+- [x] Add bounded shell command runner for the Swarm execution backend.
+- [x] Add default-enabled shell composition for the Swarm execution backend with explicit opt-out.
 - [x] Add environment-gated real Swarm smoke harness for apply/route/secret/cleanup validation.
 - [x] Add a first-class `bun run smoke:swarm` command for opt-in real Swarm smoke execution.
-- [x] Add configurable Swarm edge network selection for opt-in execution and smoke runs.
+- [x] Add configurable Swarm edge network selection for default execution and smoke runs.
 - [x] Smoke-test real apply/verify/cleanup against a Swarm manager.
 - [x] Add sanitized target identity persistence/read-model support where required.
 - [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.

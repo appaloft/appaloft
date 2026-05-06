@@ -58,7 +58,7 @@ Current status:
   registered stub anchors for setup, signatures, dedupe, ignored events, and recovery before Code
   Round activation. Resource runtime controls now have registered stub anchors for runtime
   controls, restart versus redeploy, and blocked start before Code Round activation. Docker Swarm
-  runtime targets now have a registered server docs anchor before Swarm execution is active.
+  runtime targets now have a registered server docs anchor for default-active Swarm execution.
   Action-only pull request previews and future product-grade previews now have registered
   `deploy/previews` anchors that distinguish workflow-file previews from control-plane previews.
 - `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
