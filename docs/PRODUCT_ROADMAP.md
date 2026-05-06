@@ -197,8 +197,7 @@ Still blocking 1.0.0:
 - [ ] Dependency resources and bindings exist in core but lack provisioning, binding, backup, and
   deletion commands.
 - [ ] Framework coverage is narrower than the target product catalog.
-- [ ] Docker Swarm support is specified but not yet implemented as a supported `1.0.0` runtime
-  target backend.
+- [x] Docker Swarm support is specified and implemented as the first cluster runtime target backend.
 - [ ] Durable outbox/inbox, job state, process attempts, dead-letter/retry state, remote-state
   recovery, and audit visibility are not a complete operator surface.
 
@@ -1188,26 +1187,25 @@ Current verification notes:
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm
-  manager readiness and execution remain open.
+  manager readiness and execution were closed by later slices.
 - 2026-05-05 Phase 7 Docker Swarm backend selection slice added the adapter-owned `docker-swarm`
-  backend descriptor shape and `SWARM-TARGET-SELECT-001` registry coverage. The default registry
-  still does not activate Swarm execution; readiness, render/apply/observe/cleanup, and public help
-  remain open.
+  backend descriptor shape and `SWARM-TARGET-SELECT-001` registry coverage. Default activation,
+  readiness, render/apply/observe/cleanup, and public help were closed by later slices.
 - 2026-05-05 Phase 7 Docker Swarm unsupported-backend admission slice bound
   `SWARM-TARGET-ADM-002` to application coverage proving `deployments.create` returns
   `runtime_target_unsupported` before accepting a deployment when a Swarm target lacks required
   runtime backend capabilities.
 - 2026-05-05 Phase 7 Docker Swarm public help slice added the
   `server.docker-swarm-target` help topic and bilingual
-  `/docs/servers/register-connect/#docker-swarm-runtime-target` anchor. CLI/API descriptions and
-  Web help links remain open with Swarm readiness and execution.
+  `/docs/servers/register-connect/#docker-swarm-runtime-target` anchor. CLI/API descriptions, Web
+  help links, readiness, and execution were closed by later slices.
 - 2026-05-05 Phase 7 Docker Swarm help-link slice wired the Swarm target anchor into CLI
   `server register`, HTTP `POST /servers`, and Web server registration provider help. Swarm
-  manager readiness and execution remain open.
+  manager readiness and execution were closed by later slices.
 - 2026-05-05 Phase 7 Docker Swarm manager readiness slice bound `SWARM-TARGET-REG-002` to
   `servers.test-connectivity` adapter coverage for SSH reachability, Docker daemon availability,
   active manager state, overlay network support, and edge proxy compatibility without mutating
-  Swarm stacks, services, or networks. Swarm execution remains open.
+  Swarm stacks, services, or networks. Swarm execution was closed by later slices.
 - 2026-05-05 Phase 7 Docker Swarm render-intent slice bound `SWARM-TARGET-RENDER-001` and
   `SWARM-TARGET-RENDER-002` to adapter contract coverage for OCI image and Compose artifact render
   intent, including stack/service identity, runtime environment snapshots, health policy, access
@@ -1226,9 +1224,8 @@ Current verification notes:
   open for later slices.
 - 2026-05-06 Phase 7 Docker Swarm fake backend slice added an opt-in
   `DockerSwarmExecutionBackend` with injected command-runner acceptance coverage for image apply
-  and scoped cleanup. The backend is not registered in the default runtime registry; real Swarm
-  command execution, failed-rollout rollback behavior, logs, health, and read-model persistence
-  remained open for later slices.
+  and scoped cleanup. Default registry registration, real Swarm command execution, failed-rollout
+  rollback behavior, logs, health, and read-model persistence remained open for later slices.
 - 2026-05-06 Phase 7 Docker Swarm failed-candidate slice bound initial `SWARM-TARGET-APPLY-002`
   coverage to fake-runner verification failure: the backend records deployment failure metadata and
   runs only the deployment-scoped cleanup command for the failed candidate. Real Swarm rollback
@@ -1249,14 +1246,13 @@ Current verification notes:
   public workload host-port publication. Real edge-proxy route realization was closed by the later
   route smoke slice.
 - 2026-05-06 Phase 7 Docker Swarm failure-redaction slice bound initial
-  `SWARM-TARGET-SECRET-001` coverage to the opt-in Swarm execution backend: command failure output
+  `SWARM-TARGET-SECRET-001` coverage to the Swarm execution backend: command failure output
   is redacted before deployment logs and execution metadata capture common auth headers, cookies,
   key/value secrets, URL credentials, private-key blocks, or exact deployment snapshot secret
   values. Registry/pull-secret smoke coverage was closed by the later registry-auth smoke slice.
 - 2026-05-06 Phase 7 Docker Swarm shell-runner slice added `DockerSwarmShellCommandRunner` for the
   opt-in backend, with bounded command execution, stdout/stderr capture, nonzero exit preservation,
-  and timeout handling. The default registry still leaves Swarm unsupported until explicitly
-  composed; default activation remains open.
+  and timeout handling. Default composition was closed by the later default-activation slice.
 - 2026-05-06 Phase 7 Docker Swarm runtime-identity readback slice bound initial
   `SWARM-TARGET-APPLY-001` / `SWARM-TARGET-OBS-001` / `SWARM-TARGET-OBS-002` persistence coverage
   to PGlite deployment repository and read-model tests. Sanitized Swarm stack/service/schema
@@ -1266,20 +1262,20 @@ Current verification notes:
   covered by existing adapter and fake-backend tests: candidate services are created before
   verification, route promotion, and superseded-service cleanup; failed candidate verification
   records failure, skips superseded-service cleanup, and cleans only the deployment-scoped
-  candidate. Default activation remains open.
+  candidate. Default activation was closed by the later default-activation slice.
 - 2026-05-06 Phase 7 Docker Swarm display-command redaction slice added apply-plan display command
   redaction for non-secret runtime environment values while keeping executable runner commands
   intact. Registry/pull-secret smoke coverage was closed by the later registry-auth smoke slice;
-  default activation remains open.
+  default activation was closed by the later default-activation slice.
 - 2026-05-06 Phase 7 Docker Swarm registry-auth render slice made image apply plans honor internal
   registry-auth/pull-secret metadata with Docker's `--with-registry-auth` flag while keeping raw
   registry secret references out of rendered intent, executable command, and display command
   payloads. Registry-login/pull-secret smoke coverage was closed by the later registry-auth smoke
-  slice; default activation remains open.
+  slice; default activation was closed by the later default-activation slice.
 - 2026-05-06 Phase 7 Docker Swarm opt-in composition slice added disabled-by-default shell
   configuration for the real Swarm execution backend. `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED`
   composes the `DockerSwarmExecutionBackend` into the runtime target registry with bounded command
-  timeout configuration, while default-on activation remains open.
+  timeout configuration; default-on activation was closed by the later default-activation slice.
 - 2026-05-06 Phase 7 Docker Swarm real-smoke harness slice added an environment-gated adapter
   smoke test for real Swarm apply, post-verification route-label promotion, secret metadata
   redaction, and scoped cleanup through `DockerSwarmExecutionBackend` and
@@ -1288,7 +1284,7 @@ Current verification notes:
   network before mutating Docker state. `bun run smoke:swarm` is the first-class opt-in command for
   that harness; running it against a real manager remains environment-gated.
 - 2026-05-06 Phase 7 Docker Swarm edge-network config slice added
-  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` so opt-in Swarm execution and `bun run smoke:swarm` can
+  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` so Swarm execution and `bun run smoke:swarm` can
   target a prepared overlay network without colliding with an existing local bridge named
   `appaloft-edge`. The default remains `appaloft-edge`; running the real smoke still requires an
   active manager and overlay network.
@@ -1297,7 +1293,7 @@ Current verification notes:
   use an nginx-compatible health check. `bun run smoke:swarm` passed against a temporary local Swarm
   manager with `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to
   inactive Swarm state. Real edge-proxy route realization and registry-auth smoke coverage were
-  closed by later smoke slices; default activation remains open.
+  closed by later smoke slices; default activation was closed by the later default-activation slice.
 - 2026-05-06 Phase 7 Docker Swarm registry-auth smoke slice extended `bun run smoke:swarm` to
   provision a temporary authenticated registry, push a smoke image, deploy that private image
   through `DockerSwarmExecutionBackend` with `--with-registry-auth`, and assert registry secret
@@ -1305,14 +1301,18 @@ Current verification notes:
   The smoke passed against a temporary local Swarm manager with
   `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to inactive Swarm
   state. Real edge-proxy route realization was closed by the later route smoke slice; default
-  activation remains open.
+  activation was closed by the later default-activation slice.
 - 2026-05-06 Phase 7 Docker Swarm route-realization smoke slice extended `bun run smoke:swarm` to
   provision a temporary Traefik Swarm edge proxy on the smoke overlay network, deploy the nginx
   workload without publishing the workload service port, promote Appaloft Traefik route labels after
   candidate verification, and verify `Host: api.example.com` reaches nginx through the published
   proxy entrypoint. The smoke passed against a temporary local Swarm manager with
   `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to inactive Swarm
-  state. Default activation remains open.
+  state. Default activation was closed by the later default-activation slice.
+- 2026-05-06 Phase 7 Docker Swarm default-activation slice made shell composition register the
+  `DockerSwarmExecutionBackend` by default, kept bounded command timeout and edge-network
+  configuration, and retained `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=false` as the explicit
+  opt-out for installations that are not ready to execute Swarm deployments.
 - 2026-05-06 Phase 7 Docker Swarm remote-log observation slice made `resources.runtime-logs` execute
   Swarm service log reads through the resolved Swarm manager SSH target when available, while
   preserving the local Docker fallback for local smoke runs. Remote-manager health observation
@@ -1573,7 +1573,7 @@ Required:
 - [x] Complete the Docker Swarm Spec Round as the first cluster runtime target:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
   semantics, normalized read surfaces, and contract test matrix are specified.
-- [ ] Complete the Docker Swarm Code Round as the first cluster runtime target:
+- [x] Complete the Docker Swarm Code Round as the first cluster runtime target:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
   semantics, normalized read surfaces, public docs/help, and contract tests are implemented.
   Target-kind registration metadata, unsupported-backend admission, backend descriptor selection,
@@ -1581,11 +1581,11 @@ Required:
   label-scoped cleanup plan rendering, opt-in fake backend acceptance coverage, Swarm runtime-log
   observation, Swarm health observation, initial Traefik route label promotion, the public docs
   anchor, command-failure redaction, sanitized runtime identity readback, and CLI/API/Web help
-  links are implemented; opt-in shell composition and `bun run smoke:swarm` real smoke harness
+  links are implemented; default shell composition and `bun run smoke:swarm` real smoke harness
   exist, and the local real smoke passed against a temporary Swarm manager; Swarm service log and
   health reads can run through the resolved manager over SSH; registry-authenticated image pull is
   covered by the opt-in real smoke; real edge-proxy route realization is covered by the opt-in real
-  smoke. Default activation remains open.
+  smoke.
 
 Exit criteria:
 

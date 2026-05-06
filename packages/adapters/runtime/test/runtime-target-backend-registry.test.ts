@@ -242,7 +242,7 @@ describe("DefaultRuntimeTargetBackendRegistry", () => {
     });
   });
 
-  test("[SWARM-TARGET-ADM-002][SWARM-TARGET-SELECT-001] keeps default Swarm deployments unsupported until a backend is registered", async () => {
+  test("[SWARM-TARGET-ADM-002][SWARM-TARGET-SELECT-001] reports unsupported Swarm targets when no backend is registered", async () => {
     ensureReflectMetadata();
     const { createDefaultRuntimeTargetBackendRegistry } = await import("../src");
     const registry = createDefaultRuntimeTargetBackendRegistry({

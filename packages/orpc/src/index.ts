@@ -542,7 +542,7 @@ export const apiRouteDescriptions = {
   ),
   projectLifecycle: routeDescription("Read, rename, and archive projects.", "project.lifecycle"),
   registerServer: routeDescription(
-    "Registers a deployment target. Docker Swarm target metadata is accepted, but Swarm execution requires a matching runtime backend.",
+    "Registers a deployment target. Docker Swarm targets are accepted when the runtime backend is available.",
     "server.docker-swarm-target",
   ),
   showServer: routeDescription(

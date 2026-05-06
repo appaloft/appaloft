@@ -114,8 +114,8 @@ No new public operation key is accepted in this Spec Round.
   deployment creation; target/profile configuration fields for Swarm remain deferred until a
   governing Spec Round accepts them.
 - The runtime target adapter package exposes a `docker-swarm` backend descriptor shape and registry
-  selection coverage; the default runtime registry can include an explicitly composed Swarm backend
-  while keeping Swarm execution disabled by shell configuration by default.
+  selection coverage; shell composition includes the Swarm backend in the default runtime registry
+  unless `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=false` explicitly opts out.
 - The runtime adapter package now renders adapter-owned Docker Swarm runtime intent for OCI image
   and Compose artifact workloads. Render output derives stack/service identity from Appaloft
   resource, deployment, target, and destination context, maps runtime environment snapshots,
@@ -130,10 +130,10 @@ No new public operation key is accepted in this Spec Round.
 - The runtime adapter package also renders a label-scoped Swarm cleanup plan for services owned by
   the same Appaloft resource, deployment, target, destination, and runtime-target identity. The plan
   is wired only through the explicit fake-runner Swarm backend, not through default real execution.
-- An explicit `DockerSwarmExecutionBackend` now exists for fake-runner acceptance coverage. It can
-  execute the adapter-owned image apply plan and label-scoped cleanup plan through an injected
-  command runner, records sanitized Swarm runtime metadata on successful deployment completion, and
-  is not registered in the default runtime backend registry.
+- An explicit `DockerSwarmExecutionBackend` now exists for fake-runner acceptance coverage and
+  default shell composition. It can execute the adapter-owned image apply plan and label-scoped
+  cleanup plan through an injected command runner and records sanitized Swarm runtime metadata on
+  successful deployment completion.
 - Fake-runner failed verification now records deployment failure metadata, skips superseded-service
   cleanup, and runs the deployment-scoped cleanup plan for the failed candidate service without
   broad prune or volume commands.
@@ -151,7 +151,7 @@ No new public operation key is accepted in this Spec Round.
 - Swarm image apply planning now renders Traefik route labels into the `promote-route-target` step
   only. Candidate service creation remains un-routed; route labels are applied after candidate
   verification and target the Swarm edge network without public workload host-port publication.
-- Swarm command failure output captured by the opt-in execution backend is redacted before it is
+- Swarm command failure output captured by the execution backend is redacted before it is
   written to deployment logs or execution metadata. This covers common bearer/basic auth text,
   cookies, key/value secrets, URL credentials, private-key blocks, and exact deployment snapshot
   secret values.
@@ -162,10 +162,10 @@ No new public operation key is accepted in this Spec Round.
   Docker's `--with-registry-auth` flag for explicit execution. The rendered intent exposes only a
   redacted registry-auth marker; raw registry secret references or credential values are not
   serialized into the intent, executable command, or display command.
-- The opt-in Swarm execution backend now has a bounded shell command runner that can execute the
-  rendered apply, verify, promote, and cleanup commands and preserve stdout/stderr/exit-code
-  results for backend handling. Shell composition registers it only when
-  `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=true`, with
+- The Swarm execution backend now has a bounded shell command runner that can execute the rendered
+  apply, verify, promote, and cleanup commands and preserve stdout/stderr/exit-code results for
+  backend handling. Shell composition registers it by default and allows explicit opt-out with
+  `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=false`, with
   `APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS` controlling per-command timeout and
   `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` selecting the Swarm overlay network used for service
   attachment and route labels.
@@ -187,7 +187,7 @@ No new public operation key is accepted in this Spec Round.
   and then returned Docker to inactive Swarm state.
 - Application deployment admission rejects an `orchestrator-cluster` / `docker-swarm` target before
   acceptance when the runtime backend registry cannot satisfy required capabilities.
-- Default-on Swarm activation remains open.
+- Swarm execution is active in default shell composition.
 - No operation catalog changes are active for Swarm because this is an internal capability behind
   existing operations.
 - Public docs/help has a stable `server.docker-swarm-target` topic and

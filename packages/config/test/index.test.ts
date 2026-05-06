@@ -137,23 +137,23 @@ describe("resolveConfig", () => {
     expect(config.githubPreviewFeedbackToken).toBe("github-preview-worker-token");
   });
 
-  test("keeps Docker Swarm execution disabled by default and accepts explicit shell activation", () => {
+  test("enables Docker Swarm execution by default and accepts explicit shell opt-out", () => {
     const defaults = resolveConfig();
     const configured = resolveConfig({
       env: {
-        APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED: "true",
+        APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED: "false",
         APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS: "45000",
         APPALOFT_DOCKER_SWARM_EDGE_NETWORK: "appaloft-smoke-edge",
       },
     });
 
     expect(defaults.dockerSwarmExecution).toEqual({
-      enabled: false,
+      enabled: true,
       commandTimeoutMs: 60000,
       edgeNetworkName: "appaloft-edge",
     });
     expect(configured.dockerSwarmExecution).toEqual({
-      enabled: true,
+      enabled: false,
       commandTimeoutMs: 45000,
       edgeNetworkName: "appaloft-smoke-edge",
     });
