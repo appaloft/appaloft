@@ -6,9 +6,11 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  type MutationCoordinator,
+  type MutationCoordinatorRunExclusiveInput,
   type PreviewCleanupRetryScheduler,
 } from "@appaloft/application";
-import { ok } from "@appaloft/core";
+import { ok, type Result } from "@appaloft/core";
 
 import { createPreviewCleanupRetrySchedulerRunner } from "../src/preview-cleanup-retry-scheduler-runner";
 
@@ -98,6 +100,15 @@ class BlockingPreviewCleanupRetryScheduler implements Pick<PreviewCleanupRetrySc
   }
 }
 
+class CapturingMutationCoordinator implements Pick<MutationCoordinator, "runExclusive"> {
+  readonly calls: MutationCoordinatorRunExclusiveInput<unknown>[] = [];
+
+  async runExclusive<T>(input: MutationCoordinatorRunExclusiveInput<T>): Promise<Result<T>> {
+    this.calls.push(input as MutationCoordinatorRunExclusiveInput<unknown>);
+    return input.work();
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -149,6 +160,45 @@ describe("PreviewCleanupRetrySchedulerRunner", () => {
       },
     });
     expect(scheduler.calls[0]?.options).toEqual({ limit: 7 });
+  });
+
+  test("[PG-PREVIEW-CLEANUP-002] wraps scheduler ticks in a durable preview-lifecycle lease", async () => {
+    const scheduler = new CapturingPreviewCleanupRetryScheduler();
+    const mutationCoordinator = new CapturingMutationCoordinator();
+    const runner = createPreviewCleanupRetrySchedulerRunner({
+      config: {
+        enabled: true,
+        intervalSeconds: 60,
+        batchSize: 11,
+      },
+      scheduler,
+      mutationCoordinator,
+      executionContextFactory: new FixedExecutionContextFactory(),
+      logger: new CapturingLogger(),
+    });
+
+    runner.start();
+    await sleep(5);
+    runner.stop();
+
+    expect(scheduler.calls).toHaveLength(1);
+    expect(scheduler.calls[0]?.options).toEqual({ limit: 11 });
+    expect(mutationCoordinator.calls).toHaveLength(1);
+    expect(mutationCoordinator.calls[0]).toMatchObject({
+      policy: {
+        operationKey: "preview-cleanup-retry-scheduler",
+        scopeKind: "preview-lifecycle",
+        mode: "serialize-with-bounded-wait",
+      },
+      scope: {
+        kind: "preview-lifecycle",
+        key: "preview-cleanup-retry-scheduler",
+      },
+      owner: {
+        ownerId: "req_preview_cleanup_retry_runner",
+        label: "Preview cleanup retry scheduler",
+      },
+    });
   });
 
   test("[PG-PREVIEW-CLEANUP-002] skips overlapping ticks while one scheduler run is active", async () => {

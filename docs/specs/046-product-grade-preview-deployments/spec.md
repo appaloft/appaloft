@@ -268,8 +268,10 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   and dispatches retries through the cleanup service so every retry creates a new attempt id.
   The shell composition has a disabled-by-default `previewCleanupRetryScheduler` runner that can be
   explicitly enabled with the shell cleaner registered. The runner has an in-process non-overlap
-  guard so interval ticks do not run concurrently in one shell process. Durable cross-process
-  scheduler leases and terminal provider metadata cleanup remain future work.
+  guard so interval ticks do not run concurrently in one shell process, and enabled shell
+  composition wraps retry ticks in the existing durable mutation coordinator under the
+  `preview-lifecycle` coordination scope so multiple shell processes do not run the retry scan at
+  the same time. Terminal provider metadata cleanup remains future work.
 - Preview cleanup now updates existing PR-comment feedback through the preview feedback service.
   The feedback recorder can look up the latest feedback record by preview environment and channel,
   the shell cleaner publishes a cleanup completion body through the existing idempotent GitHub
@@ -294,8 +296,8 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   idempotent `github-deployment-status` feedback after ids-only deployment dispatch. Retryable
   deployment-status feedback failures are recorded as safe feedback state without changing the
   accepted deployment result to `err`.
-- No GitHub App installation/repository context mapper, scheduler leases, or terminal provider
-  metadata cleanup is implemented.
+- No GitHub App installation/repository context mapper or terminal provider metadata cleanup is
+  implemented.
 - Preview policy and preview environment operations currently expose CLI, HTTP/oRPC, and generated
   future MCP tool descriptors. Web exposes preview policy readback/configuration and the read-only
   preview environment list/detail/delete surface.

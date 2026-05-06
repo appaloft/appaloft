@@ -142,8 +142,9 @@ attempt id for the retry. `packages/config/test/index.test.ts` covers the disabl
 runner config and environment overrides for preview cleanup retry scheduling.
 `apps/shell/test/preview-cleanup-retry-scheduler-runner.test.ts` covers disabled runner behavior,
 system actor context, batch-size forwarding, and the in-process non-overlap guard that skips
-interval ticks while one scheduler run is active. Durable cross-process scheduler leases remain
-open.
+interval ticks while one scheduler run is active. It also proves enabled runner ticks execute under
+a durable `preview-lifecycle` mutation-coordinator lease keyed to the preview cleanup retry
+scheduler.
 `apps/shell/test/preview-environment-cleaner.test.ts` covers the shell cleaner adapter that maps
 product-grade preview environment cleanup to the existing source-fingerprint
 `deployments.cleanup-preview` primitive and preserves retryable failures with safe preview scope
@@ -201,8 +202,8 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-Scheduler leases, terminal provider metadata cleanup, repository/installation mapping, and active
-GitHub App preview worker transports remain open.
+Terminal provider metadata cleanup, repository/installation mapping, and active GitHub App preview
+worker transports remain open.
 Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 

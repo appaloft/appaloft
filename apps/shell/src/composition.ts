@@ -23,6 +23,7 @@ import {
   type IntegrationAuthPort,
   MarkServerAppliedRouteAppliedSpec,
   MarkServerAppliedRouteFailedSpec,
+  type MutationCoordinator,
   type PreviewCleanupRetryScheduler,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
@@ -417,6 +418,10 @@ export async function createAppComposition(
         scheduler: resolveToken<PreviewCleanupRetryScheduler>(
           childContainer,
           tokens.previewCleanupRetryScheduler,
+        ),
+        mutationCoordinator: resolveToken<MutationCoordinator>(
+          childContainer,
+          tokens.mutationCoordinator,
         ),
         executionContextFactory,
         logger,
