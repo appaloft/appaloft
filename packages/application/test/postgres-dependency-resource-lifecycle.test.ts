@@ -722,6 +722,65 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     expect(JSON.stringify(shown._unsafeUnwrap().dependencyResource)).not.toContain("super-secret");
   });
 
+  test("[DEP-RES-REDIS-NATIVE-002] stores provider-returned Redis connection value before readiness", async () => {
+    const {
+      context,
+      dependencyResourceSecretStore,
+      managedRedisProvider,
+      provisionRedis,
+      showDependencyResource,
+    } = await createHarness();
+    managedRedisProvider.setRealizationResult(
+      ok({
+        providerResourceHandle: "redis/rsi_0001",
+        endpoint: {
+          host: "main-cache.redis.internal",
+          port: 6379,
+          maskedConnection: "redis://:********@main-cache.redis.internal:6379/0",
+        },
+        connectionSecretValue: "redis://:super-secret@main-cache.redis.internal:6379/0",
+        realizedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    const result = await provisionRedis.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main Cache",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const dependencyResourceId = result._unsafeUnwrap().id;
+    const secretRef = `appaloft://dependency-resources/${dependencyResourceId}/connection`;
+    expect(dependencyResourceSecretStore.stored).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId,
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        kind: "redis",
+        purpose: "connection",
+        secretValue: "redis://:super-secret@main-cache.redis.internal:6379/0",
+      }),
+    );
+    const resolved = await dependencyResourceSecretStore.resolve(context, { secretRef });
+    expect(resolved._unsafeUnwrap().secretValue).toBe(
+      "redis://:super-secret@main-cache.redis.internal:6379/0",
+    );
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({ dependencyResourceId })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().dependencyResource).toMatchObject({
+      lifecycleStatus: "ready",
+      bindingReadiness: { status: "ready" },
+      connection: {
+        secretRef,
+        maskedConnection: "redis://:********@main-cache.redis.internal:6379/0",
+      },
+    });
+    expect(JSON.stringify(shown._unsafeUnwrap().dependencyResource)).not.toContain("super-secret");
+  });
+
   test("[DEP-RES-REDIS-NATIVE-003] provider realization failure keeps Redis provision accepted and blocks binding readiness", async () => {
     const { context, managedRedisProvider, provisionRedis, showDependencyResource } =
       await createHarness();

@@ -246,25 +246,55 @@ export class ProvisionRedisDependencyResourceUseCase {
         const providerResourceHandle = yield* DependencyResourceProviderResourceHandle.create(
           realization.value.providerResourceHandle,
         );
-        const connectionSecretRef = realization.value.secretRef
-          ? DependencyResourceSecretRef.create(realization.value.secretRef)
-          : undefined;
-        const bindingReadiness = await resolveManagedRedisBindingReadiness({
-          context,
-          dependencyResourceSecretStore,
-          ...(realization.value.secretRef ? { secretRef: realization.value.secretRef } : {}),
-          secretRefValid: connectionSecretRef ? connectionSecretRef.isOk() : false,
-        });
-        yield* dependencyResource.markProviderRealized({
-          attemptId: realizationAttemptId,
-          providerResourceHandle,
-          endpoint: realization.value.endpoint,
-          ...(connectionSecretRef?.isOk()
-            ? { connectionSecretRef: connectionSecretRef.value }
-            : {}),
-          bindingReadiness,
-          realizedAt,
-        });
+        let realizedSecretRef = realization.value.secretRef;
+        let secretStoreFailureMessage: string | undefined;
+        if (realization.value.connectionSecretValue) {
+          const storedConnection = await dependencyResourceSecretStore.storeConnection(context, {
+            dependencyResourceId: dependencyResourceId.value,
+            projectId: projectId.value,
+            environmentId: environmentId.value,
+            kind: "redis",
+            purpose: "connection",
+            secretValue: realization.value.connectionSecretValue,
+            storedAt: realizedAt.value,
+          });
+          if (storedConnection.isErr()) {
+            secretStoreFailureMessage = storedConnection.error.message;
+          } else {
+            realizedSecretRef = storedConnection.value.secretRef;
+          }
+        }
+        if (secretStoreFailureMessage) {
+          const failureCode = yield* DependencyResourceProviderFailureCode.create(
+            "dependency_secret_store_error",
+          );
+          yield* dependencyResource.markProviderRealizationFailed({
+            attemptId: realizationAttemptId,
+            failureCode,
+            failureMessage: DescriptionText.rehydrate(secretStoreFailureMessage),
+            failedAt: realizedAt,
+          });
+        } else {
+          const connectionSecretRef = realizedSecretRef
+            ? DependencyResourceSecretRef.create(realizedSecretRef)
+            : undefined;
+          const bindingReadiness = await resolveManagedRedisBindingReadiness({
+            context,
+            dependencyResourceSecretStore,
+            ...(realizedSecretRef ? { secretRef: realizedSecretRef } : {}),
+            secretRefValid: connectionSecretRef ? connectionSecretRef.isOk() : false,
+          });
+          yield* dependencyResource.markProviderRealized({
+            attemptId: realizationAttemptId,
+            providerResourceHandle,
+            endpoint: realization.value.endpoint,
+            ...(connectionSecretRef?.isOk()
+              ? { connectionSecretRef: connectionSecretRef.value }
+              : {}),
+            bindingReadiness,
+            realizedAt,
+          });
+        }
       } else {
         const failedAt = yield* OccurredAt.create(clock.now());
         const failureCode = yield* DependencyResourceProviderFailureCode.create(
