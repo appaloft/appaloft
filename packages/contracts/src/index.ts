@@ -1813,6 +1813,44 @@ export const deletePreviewEnvironmentResponseSchema = z.object({
   nextRetryAt: z.string().optional(),
 });
 
+export const previewPolicyScopeSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("project"),
+    projectId: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal("resource"),
+    projectId: z.string().min(1),
+    resourceId: z.string().min(1),
+  }),
+]);
+
+export const previewPolicySettingsSchema = z.object({
+  sameRepositoryPreviews: z.boolean(),
+  forkPreviews: z.enum(["disabled", "without-secrets", "with-secrets"]),
+  secretBackedPreviews: z.boolean(),
+  maxActivePreviews: z.number().int().positive().optional(),
+  previewTtlHours: z.number().int().positive().optional(),
+});
+
+export const previewPolicySummarySchema = z.object({
+  id: z.string().optional(),
+  scope: previewPolicyScopeSchema,
+  settings: previewPolicySettingsSchema,
+  source: z.enum(["default", "configured"]),
+  updatedAt: z.string().optional(),
+});
+
+export const configurePreviewPolicyResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const showPreviewPolicyResponseSchema = z.object({
+  schemaVersion: z.literal("preview-policies.show/v1"),
+  policy: previewPolicySummarySchema,
+  generatedAt: z.string(),
+});
+
 export const attachResourceStorageInputSchema = z.object({
   resourceId: z.string().min(1),
   storageVolumeId: z.string().min(1),
@@ -4164,6 +4202,11 @@ export type ShowPreviewEnvironmentResponse = z.infer<typeof showPreviewEnvironme
 export type DeletePreviewEnvironmentResponse = z.infer<
   typeof deletePreviewEnvironmentResponseSchema
 >;
+export type PreviewPolicyScope = z.infer<typeof previewPolicyScopeSchema>;
+export type PreviewPolicySettings = z.infer<typeof previewPolicySettingsSchema>;
+export type PreviewPolicySummary = z.infer<typeof previewPolicySummarySchema>;
+export type ConfigurePreviewPolicyResponse = z.infer<typeof configurePreviewPolicyResponseSchema>;
+export type ShowPreviewPolicyResponse = z.infer<typeof showPreviewPolicyResponseSchema>;
 export type AttachResourceStorageInput = z.infer<typeof attachResourceStorageInputSchema>;
 export type AttachResourceStorageResponse = z.infer<typeof attachResourceStorageResponseSchema>;
 export type DetachResourceStorageInput = z.infer<typeof detachResourceStorageInputSchema>;

@@ -99,6 +99,10 @@ describe("HTTP API docs help links", () => {
     expect(apiRouteDescriptions.showSourceEvent).toContain(
       apiDocsHrefs.sourceAutoDeployIgnoredEvents,
     );
+    expect(apiRouteDescriptions.configurePreviewPolicy).toContain(
+      apiDocsHrefs.productGradePreviews,
+    );
+    expect(apiRouteDescriptions.showPreviewPolicy).toContain(apiDocsHrefs.productGradePreviews);
     expect(apiRouteDescriptions.listPreviewEnvironments).toContain(
       apiDocsHrefs.productGradePreviews,
     );

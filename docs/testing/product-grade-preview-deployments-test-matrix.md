@@ -141,11 +141,13 @@ details.
 `PG-PREVIEW-SURFACE-001` has initial operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
-operation catalog entries with no active transports. It also covers the
+active HTTP/oRPC operation catalog entries. It also covers the
 `preview-environments.list` / `preview-environments.show` / `preview-environments.delete`
 contracts, safe list/show read-model output, cleanup-backed delete command input, and active
-HTTP/oRPC catalog entries. `packages/orpc/test/preview-environment.http.test.ts` covers the HTTP
-routes dispatching preview environment list/show/delete through `QueryBus` and `CommandBus`.
+HTTP/oRPC catalog entries. `packages/orpc/test/preview-policy.http.test.ts` covers HTTP routes
+dispatching preview policy configure/show through `CommandBus` and `QueryBus`.
+`packages/orpc/test/preview-environment.http.test.ts` covers the HTTP routes dispatching preview
+environment list/show/delete through `QueryBus` and `CommandBus`.
 `PG-PREVIEW-SURFACE-001` now also has Postgres/PGlite persistence coverage in
 `packages/persistence/pg/test/preview-policy.pglite.test.ts` for project/resource-scoped policy
 storage, configured/default safe summaries, idempotency-key retention on the write side, and

@@ -19,6 +19,7 @@ import {
   type CommandBus,
   ConfigureDefaultAccessDomainPolicyCommand,
   ConfigureDomainBindingRouteCommand,
+  ConfigurePreviewPolicyCommand,
   ConfigureResourceAccessCommand,
   ConfigureResourceAutoDeployCommand,
   ConfigureResourceHealthCommand,
@@ -44,6 +45,7 @@ import {
   cloneEnvironmentCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureDomainBindingRouteCommandInputSchema,
+  configurePreviewPolicyCommandInputSchema,
   configureResourceAccessCommandInputSchema,
   configureResourceAutoDeployCommandInputSchema,
   configureResourceHealthCommandInputSchema,
@@ -224,6 +226,7 @@ import {
   ShowEnvironmentQuery,
   ShowOperatorWorkQuery,
   ShowPreviewEnvironmentQuery,
+  ShowPreviewPolicyQuery,
   ShowProjectQuery,
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
@@ -251,6 +254,7 @@ import {
   showEnvironmentQueryInputSchema,
   showOperatorWorkQueryInputSchema,
   showPreviewEnvironmentQueryInputSchema,
+  showPreviewPolicyQueryInputSchema,
   showProjectQueryInputSchema,
   showResourceDependencyBindingQueryInputSchema,
   showResourceQueryInputSchema,
@@ -288,6 +292,7 @@ import {
   cloneEnvironmentResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
   configureDomainBindingRouteResponseSchema,
+  configurePreviewPolicyResponseSchema,
   configureResourceAccessResponseSchema,
   configureResourceAutoDeployResponseSchema,
   configureResourceHealthResponseSchema,
@@ -385,6 +390,7 @@ import {
   showDomainBindingResponseSchema,
   showOperatorWorkResponseSchema,
   showPreviewEnvironmentResponseSchema,
+  showPreviewPolicyResponseSchema,
   showProjectResponseSchema,
   showResourceDependencyBindingResponseSchema,
   showScheduledTaskResponseSchema,
@@ -906,6 +912,14 @@ export const apiRouteDescriptions = {
   showSourceEvent: routeDescription(
     "Reads one safe source event delivery with dedupe, policy, and dispatch details.",
     "source.auto-deploy-ignored-events",
+  ),
+  configurePreviewPolicy: routeDescription(
+    "Configures product-grade preview policy for a project or resource scope.",
+    "deployment.product-grade-previews",
+  ),
+  showPreviewPolicy: routeDescription(
+    "Reads effective product-grade preview policy for a project or resource scope.",
+    "deployment.product-grade-previews",
   ),
   listPreviewEnvironments: routeDescription(
     "Lists durable preview environments with source, ownership, status, and expiry summaries.",
@@ -2356,6 +2370,32 @@ export const showSourceEventProcedure = base
   .output(showSourceEventResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ShowSourceEventQuery.create(input)));
 
+export const configurePreviewPolicyProcedure = base
+  .route({
+    method: "POST",
+    path: "/preview-policies",
+    description: apiRouteDescriptions.configurePreviewPolicy,
+    successStatus: 200,
+  })
+  .input(configurePreviewPolicyCommandInputSchema)
+  .output(configurePreviewPolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigurePreviewPolicyCommand.create(input)),
+  );
+
+export const showPreviewPolicyProcedure = base
+  .route({
+    method: "POST",
+    path: "/preview-policies/show",
+    description: apiRouteDescriptions.showPreviewPolicy,
+    successStatus: 200,
+  })
+  .input(showPreviewPolicyQueryInputSchema)
+  .output(showPreviewPolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowPreviewPolicyQuery.create(input)),
+  );
+
 export const listPreviewEnvironmentsProcedure = base
   .route({
     method: "GET",
@@ -3292,6 +3332,10 @@ export const appaloftOrpcRouter = {
     list: listSourceEventsProcedure,
     show: showSourceEventProcedure,
   },
+  previewPolicies: {
+    configure: configurePreviewPolicyProcedure,
+    show: showPreviewPolicyProcedure,
+  },
   previewEnvironments: {
     list: listPreviewEnvironmentsProcedure,
     show: showPreviewEnvironmentProcedure,
@@ -3822,6 +3866,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/dependency-resources/:dependencyResourceId/rename",
     "/api/operator-work",
     "/api/operator-work/:workId",
+    "/api/preview-policies",
+    "/api/preview-policies/show",
     "/api/preview-environments",
     "/api/preview-environments/:previewEnvironmentId",
     "/api/providers",
