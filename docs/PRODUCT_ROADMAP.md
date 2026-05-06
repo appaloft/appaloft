@@ -929,6 +929,11 @@ Current verification notes:
   `dependency-resources.delete` for managed Redis realization, binding readiness, runtime secret
   resolvability, and provider cleanup. It does not implement the Code Round yet, so the Redis
   closed-loop exit criterion remains open.
+- 2026-05-06 Phase 7 Redis provider-native realization Code Round implemented application-level
+  managed Redis realization through a hermetic provider capability, including acceptance-first
+  provision, safe realization success/failure read models, realized-ready binding admission,
+  unsupported-provider rejection, and provider cleanup during delete. Persistence/contract/runtime
+  materialization coverage and final Redis closed-loop verification remain open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider

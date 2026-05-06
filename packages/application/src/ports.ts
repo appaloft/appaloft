@@ -5012,6 +5012,53 @@ export interface ManagedPostgresProviderPort {
   ): Promise<Result<ManagedPostgresDeleteResult, DomainError>>;
 }
 
+export interface ManagedRedisRealizationInput {
+  dependencyResourceId: string;
+  projectId: string;
+  environmentId: string;
+  providerKey: string;
+  name: string;
+  slug: string;
+  attemptId: string;
+  requestedAt: string;
+}
+
+export interface ManagedRedisRealizationResult {
+  providerResourceHandle: string;
+  endpoint: {
+    host: string;
+    port?: number;
+    databaseName?: string;
+    maskedConnection: string;
+  };
+  secretRef?: string;
+  realizedAt: string;
+}
+
+export interface ManagedRedisDeleteInput {
+  dependencyResourceId: string;
+  providerKey: string;
+  providerResourceHandle: string;
+  attemptId: string;
+  requestedAt: string;
+}
+
+export interface ManagedRedisDeleteResult {
+  deletedAt: string;
+}
+
+export interface ManagedRedisProviderPort {
+  supports(providerKey: string): boolean;
+  realize(
+    context: ExecutionContext,
+    input: ManagedRedisRealizationInput,
+  ): Promise<Result<ManagedRedisRealizationResult, DomainError>>;
+  delete(
+    context: ExecutionContext,
+    input: ManagedRedisDeleteInput,
+  ): Promise<Result<ManagedRedisDeleteResult, DomainError>>;
+}
+
 export interface DependencyResourceBackupProviderInput {
   backupId: string;
   dependencyResourceId: string;

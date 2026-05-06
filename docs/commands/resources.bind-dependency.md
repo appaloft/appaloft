@@ -12,9 +12,9 @@
 
 ## Purpose
 
-Bind a ready Postgres Dependency Resource or ready imported Redis Dependency Resource to an active
-Resource with safe target exposure metadata for future deployment snapshot materialization and
-runtime injection.
+Bind a ready Postgres Dependency Resource, ready imported Redis Dependency Resource, or realized
+ready Appaloft-managed Redis Dependency Resource to an active Resource with safe target exposure
+metadata for future deployment snapshot materialization and runtime injection.
 
 ## Input Model
 
@@ -32,7 +32,7 @@ runtime injection.
 | --- | --- | --- | --- |
 | Bind | Active Resource and ready bindable Dependency Resource share project/environment | Persist active ResourceBinding. | `ok({ id })` |
 | Managed Postgres not realized | Appaloft-managed Postgres realization is pending, failed, unsupported, or deleted | Reject before mutation. | `resource_dependency_binding_blocked` or structured lifecycle/conflict error |
-| Managed Redis not realized | Appaloft-managed Redis has no provider-native realization in current code, or realization is pending, failed, unsupported, deleted, or has an unresolved Appaloft-owned connection ref after the Redis provider-native Code Round | Reject before mutation. | `resource_dependency_binding_blocked` |
+| Managed Redis not realized | Appaloft-managed Redis realization is pending, failed, unsupported, deleted, or has an unresolved Appaloft-owned connection ref | Reject before mutation. | `resource_dependency_binding_blocked` |
 | Cross context | Resource and Dependency Resource differ by project/environment | Reject before mutation. | `resource_dependency_binding_context_mismatch` |
 | Duplicate target | Same active Resource/Dependency/target policy exists | Reject before mutation. | `conflict`, `phase = resource-dependency-binding` |
 | Inactive participant | Resource or Dependency Resource is missing, archived, deleted, or not bindable | Reject before mutation. | `not_found`, lifecycle error, or validation error |
@@ -50,8 +50,7 @@ The command does not write raw connection secrets, mutate historical deployment 
 runtime environment variables, create deployments, trigger redeploy/retry/rollback, create or
 delete provider-native databases or Redis instances, rotate secrets, or run backup/restore. After
 provider-native Postgres realization, binding admission requires a realized ready managed database.
-Managed Redis remains blocked until provider-native Redis realization is implemented.
-The governing Spec Round is
-[Redis Provider-Native Realization](../specs/049-redis-provider-native-realization/spec.md);
-managed Redis binding must stay blocked until its Code Round makes realized ready Redis resources
-resolvable through the dependency runtime secret store.
+Provider-native Redis realization applies the same requirement: managed Redis binding is allowed
+only after the Redis resource is realized ready and resolvable through the dependency runtime secret
+store. The governing spec is
+[Redis Provider-Native Realization](../specs/049-redis-provider-native-realization/spec.md).

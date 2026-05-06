@@ -56,6 +56,11 @@ import {
   type ManagedPostgresProviderPort,
   type ManagedPostgresRealizationInput,
   type ManagedPostgresRealizationResult,
+  type ManagedRedisDeleteInput,
+  type ManagedRedisDeleteResult,
+  type ManagedRedisProviderPort,
+  type ManagedRedisRealizationInput,
+  type ManagedRedisRealizationResult,
   type MutationCoordinator,
   type MutationCoordinatorRunExclusiveInput,
   type ProjectReadModel,
@@ -376,6 +381,63 @@ export class FakeManagedPostgresProvider implements ManagedPostgresProviderPort 
     context: ExecutionContext,
     input: ManagedPostgresDeleteInput,
   ): Promise<Result<ManagedPostgresDeleteResult, DomainError>> {
+    void context;
+    this.deleted.push(input);
+    return this.deleteResult ?? ok({ deletedAt: input.requestedAt });
+  }
+}
+
+export class FakeManagedRedisProvider implements ManagedRedisProviderPort {
+  readonly realized: ManagedRedisRealizationInput[] = [];
+  readonly deleted: ManagedRedisDeleteInput[] = [];
+  private supportedProviderKeys = new Set(["appaloft-managed-redis"]);
+
+  constructor(
+    private realizationResult?: Result<ManagedRedisRealizationResult, DomainError>,
+    private deleteResult?: Result<ManagedRedisDeleteResult, DomainError>,
+  ) {}
+
+  setSupportedProviderKeys(providerKeys: string[]): void {
+    this.supportedProviderKeys = new Set(providerKeys);
+  }
+
+  setRealizationResult(result: Result<ManagedRedisRealizationResult, DomainError>): void {
+    this.realizationResult = result;
+  }
+
+  setDeleteResult(result: Result<ManagedRedisDeleteResult, DomainError>): void {
+    this.deleteResult = result;
+  }
+
+  supports(providerKey: string): boolean {
+    return this.supportedProviderKeys.has(providerKey);
+  }
+
+  async realize(
+    context: ExecutionContext,
+    input: ManagedRedisRealizationInput,
+  ): Promise<Result<ManagedRedisRealizationResult, DomainError>> {
+    void context;
+    this.realized.push(input);
+    return (
+      this.realizationResult ??
+      ok({
+        providerResourceHandle: `redis/${input.dependencyResourceId}`,
+        endpoint: {
+          host: `${input.slug}.redis.internal`,
+          port: 6379,
+          maskedConnection: `redis://:********@${input.slug}.redis.internal:6379/0`,
+        },
+        secretRef: `secret://dependency/redis/${input.dependencyResourceId}`,
+        realizedAt: input.requestedAt,
+      })
+    );
+  }
+
+  async delete(
+    context: ExecutionContext,
+    input: ManagedRedisDeleteInput,
+  ): Promise<Result<ManagedRedisDeleteResult, DomainError>> {
     void context;
     this.deleted.push(input);
     return this.deleteResult ?? ok({ deletedAt: input.requestedAt });

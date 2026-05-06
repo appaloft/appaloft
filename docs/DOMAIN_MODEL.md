@@ -413,8 +413,8 @@ Meaning:
 
 Rules:
 - source mode is either `appaloft-managed` or `imported-external`
-- Appaloft-managed Postgres includes durable provider-native realization state and safe provider
-  handles without moving provider SDK concerns into core
+- Appaloft-managed Postgres and Redis include durable provider-native realization state and safe
+  provider handles without moving provider SDK concerns into core
 - imported external Postgres delete removes only the Appaloft control-plane record and must not
   imply external database deletion
 - connection read models expose only masked endpoint/connection metadata and secret references; raw
@@ -444,10 +444,10 @@ Current scope:
   [Dependency Binding Runtime Injection](./specs/047-dependency-binding-runtime-injection/spec.md)
   and
   [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md)
-- Phase 7 provider-native Redis realization Spec Round under
+- Phase 7 provider-native Redis realization under
   [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md)
-- provider-native credential rotation, managed Redis realization Code Round, runtime cleanup, and
-  final closed-loop verification are future Phase 7 work
+- provider-native credential rotation, managed Redis runtime materialization coverage, runtime
+  cleanup, and final closed-loop verification are future Phase 7 work
 
 ### Dependency Resource Backup
 
@@ -926,8 +926,8 @@ Current scope:
   references
 - `resources.rotate-dependency-binding-secret` updates the safe binding secret reference/version
   used by future deployments
-- runtime env injection is governed by ADR-040 and ADR-041; managed Redis binding remains blocked
-  until provider-native Redis realization is implemented and resolvable
+- runtime env injection is governed by ADR-040 and ADR-041; managed Redis binding requires
+  provider-native Redis realization and a resolvable connection reference
 
 ### ResourceInstance
 

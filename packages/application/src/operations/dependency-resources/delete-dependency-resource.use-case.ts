@@ -23,6 +23,7 @@ import {
   type EventBus,
   type IdGenerator,
   type ManagedPostgresProviderPort,
+  type ManagedRedisProviderPort,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
@@ -45,6 +46,8 @@ export class DeleteDependencyResourceUseCase {
     private readonly logger: AppLogger,
     @inject(tokens.managedPostgresProvider)
     private readonly managedPostgresProvider: ManagedPostgresProviderPort,
+    @inject(tokens.managedRedisProvider)
+    private readonly managedRedisProvider: ManagedRedisProviderPort,
   ) {}
 
   async execute(
@@ -60,6 +63,7 @@ export class DeleteDependencyResourceUseCase {
       idGenerator,
       logger,
       managedPostgresProvider,
+      managedRedisProvider,
     } = this;
 
     return safeTry(async function* () {
@@ -88,15 +92,15 @@ export class DeleteDependencyResourceUseCase {
         }),
       );
       const dependencyState = dependencyResource.toState();
-      const shouldDeleteProviderManagedPostgres =
+      const shouldDeleteProviderManagedDependency =
         dependencyState.providerManaged === true &&
-        dependencyState.kind.value === "postgres" &&
+        (dependencyState.kind.value === "postgres" || dependencyState.kind.value === "redis") &&
         dependencyState.sourceMode?.value === "appaloft-managed" &&
         blockers.length === 0 &&
         !dependencyState.backupRelationship?.retentionRequired;
 
       let allowProviderManaged = false;
-      if (shouldDeleteProviderManagedPostgres) {
+      if (shouldDeleteProviderManagedDependency) {
         const providerRealization = dependencyState.providerRealization;
         if (
           providerRealization?.status.value === "ready" &&
@@ -119,13 +123,22 @@ export class DeleteDependencyResourceUseCase {
             dependencyResource,
             undefined,
           );
-          const providerDelete = await managedPostgresProvider.delete(context, {
-            dependencyResourceId: dependencyResourceId.value,
-            providerKey: dependencyState.providerKey.value,
-            providerResourceHandle: providerRealization.providerResourceHandle.value,
-            attemptId: attemptId.value,
-            requestedAt: requestedAt.value,
-          });
+          const providerDelete =
+            dependencyState.kind.value === "postgres"
+              ? await managedPostgresProvider.delete(context, {
+                  dependencyResourceId: dependencyResourceId.value,
+                  providerKey: dependencyState.providerKey.value,
+                  providerResourceHandle: providerRealization.providerResourceHandle.value,
+                  attemptId: attemptId.value,
+                  requestedAt: requestedAt.value,
+                })
+              : await managedRedisProvider.delete(context, {
+                  dependencyResourceId: dependencyResourceId.value,
+                  providerKey: dependencyState.providerKey.value,
+                  providerResourceHandle: providerRealization.providerResourceHandle.value,
+                  attemptId: attemptId.value,
+                  requestedAt: requestedAt.value,
+                });
           if (providerDelete.isErr()) {
             return err(providerDelete.error);
           }

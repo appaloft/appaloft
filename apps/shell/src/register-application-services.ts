@@ -161,6 +161,11 @@ import {
   type ManagedPostgresProviderPort,
   type ManagedPostgresRealizationInput,
   type ManagedPostgresRealizationResult,
+  type ManagedRedisDeleteInput,
+  type ManagedRedisDeleteResult,
+  type ManagedRedisProviderPort,
+  type ManagedRedisRealizationInput,
+  type ManagedRedisRealizationResult,
   MarkDomainReadyOnCertificateImportedHandler,
   MarkDomainReadyOnCertificateIssuedHandler,
   MarkDomainReadyOnDeploymentFinishedHandler,
@@ -333,6 +338,37 @@ class ShellManagedPostgresProvider implements ManagedPostgresProviderPort {
   }
 }
 
+class ShellManagedRedisProvider implements ManagedRedisProviderPort {
+  supports(providerKey: string): boolean {
+    return providerKey === "appaloft-managed-redis";
+  }
+
+  async realize(
+    context: ExecutionContext,
+    input: ManagedRedisRealizationInput,
+  ): Promise<Result<ManagedRedisRealizationResult, DomainError>> {
+    void context;
+    return ok({
+      providerResourceHandle: `redis/${input.dependencyResourceId}`,
+      endpoint: {
+        host: `${input.slug}.redis.internal`,
+        port: 6379,
+        maskedConnection: `redis://:********@${input.slug}.redis.internal:6379/0`,
+      },
+      secretRef: `secret://dependency/redis/${input.dependencyResourceId}`,
+      realizedAt: input.requestedAt,
+    });
+  }
+
+  async delete(
+    context: ExecutionContext,
+    input: ManagedRedisDeleteInput,
+  ): Promise<Result<ManagedRedisDeleteResult, DomainError>> {
+    void context;
+    return ok({ deletedAt: input.requestedAt });
+  }
+}
+
 class ShellDependencyResourceBackupProvider implements DependencyResourceBackupProviderPort {
   supports(providerKey: string, dependencyKind: DependencyResourceKind): boolean {
     return (
@@ -480,6 +516,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     ShellCertificateProviderSelectionPolicy,
   );
   container.registerSingleton(tokens.managedPostgresProvider, ShellManagedPostgresProvider);
+  container.registerSingleton(tokens.managedRedisProvider, ShellManagedRedisProvider);
   container.registerSingleton(
     tokens.dependencyResourceBackupProvider,
     ShellDependencyResourceBackupProvider,

@@ -586,6 +586,7 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     providerManaged: boolean;
     endpoint?: DependencyResourceEndpointInput;
     connectionSecretRef?: DependencyResourceSecretRef;
+    providerRealization?: DependencyResourceProviderRealizationState;
     description?: DescriptionText;
     backupRelationship?: DependencyResourceBackupRelationshipState;
     createdAt: CreatedAt;
@@ -624,14 +625,24 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
       providerKey: input.providerKey,
       providerManaged: input.providerManaged,
       ...(input.connectionSecretRef ? { connectionSecretRef: input.connectionSecretRef } : {}),
+      ...(input.providerRealization
+        ? { providerRealization: cloneProviderRealization(input.providerRealization) }
+        : {}),
       ...(endpoint.value ? { redisEndpoint: endpoint.value } : {}),
       ...(input.backupRelationship
         ? { backupRelationship: cloneBackupRelationship(input.backupRelationship) }
         : { backupRelationship: { retentionRequired: false } }),
-      bindingReadiness: {
-        status: "not-implemented",
-      },
-      status: ResourceInstanceStatusValue.rehydrate("ready"),
+      bindingReadiness: input.providerRealization
+        ? {
+            status: "blocked",
+            reason: DescriptionText.rehydrate("Provider realization is pending"),
+          }
+        : {
+            status: "not-implemented",
+          },
+      status: input.providerRealization
+        ? ResourceInstanceStatusValue.provisioning()
+        : ResourceInstanceStatusValue.rehydrate("ready"),
       createdAt: input.createdAt,
     });
 
@@ -645,6 +656,13 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
       slug: slug.value.value,
       providerManaged: input.providerManaged,
     });
+    if (input.providerRealization) {
+      instance.recordDomainEvent("dependency-resource-realization-requested", input.createdAt, {
+        dependencyResourceId: input.id.value,
+        providerKey: input.providerKey.value,
+        attemptId: input.providerRealization.attemptId.value,
+      });
+    }
     return ok(instance);
   }
 
@@ -713,7 +731,11 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
       providerResourceHandle: input.providerResourceHandle,
       realizedAt: input.realizedAt,
     };
-    this.state.postgresEndpoint = endpoint.value;
+    if (this.state.kind.value === "redis") {
+      this.state.redisEndpoint = endpoint.value;
+    } else {
+      this.state.postgresEndpoint = endpoint.value;
+    }
     if (input.connectionSecretRef) {
       this.state.connectionSecretRef = input.connectionSecretRef;
     }
@@ -804,12 +826,11 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     }
     if (
       this.state.providerManaged &&
-      this.state.kind.value === "postgres" &&
       this.state.sourceMode?.value === "appaloft-managed" &&
       this.state.providerRealization?.status.value !== "ready"
     ) {
       return err(
-        domainError.dependencyResourceBackupBlocked("Managed Postgres is not realized", {
+        domainError.dependencyResourceBackupBlocked("Managed dependency resource is not realized", {
           phase: "dependency-resource-backup-admission",
           dependencyResourceId: this.state.id.value,
           currentStatus: this.state.providerRealization?.status.value ?? "missing",
@@ -846,16 +867,18 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     }
     if (
       this.state.providerManaged &&
-      this.state.kind.value === "postgres" &&
       this.state.sourceMode?.value === "appaloft-managed" &&
       this.state.providerRealization?.status.value !== "ready"
     ) {
       return err(
-        domainError.dependencyResourceRestoreBlocked("Managed Postgres is not realized", {
-          phase: "dependency-resource-restore-admission",
-          dependencyResourceId: this.state.id.value,
-          currentStatus: this.state.providerRealization?.status.value ?? "missing",
-        }),
+        domainError.dependencyResourceRestoreBlocked(
+          "Managed dependency resource is not realized",
+          {
+            phase: "dependency-resource-restore-admission",
+            dependencyResourceId: this.state.id.value,
+            currentStatus: this.state.providerRealization?.status.value ?? "missing",
+          },
+        ),
       );
     }
     return ok(undefined);
