@@ -1403,6 +1403,10 @@ Current verification notes:
   enabled so normal boot does not require the future concrete cleanup adapter. Concrete cleanup
   adapters, scheduler leases, GitHub App HTTP routes, and active preview environment entrypoints
   remain open.
+- 2026-05-06 Phase 7 preview cleanup retry runner coverage slice added shell runner tests for
+  disabled startup, system actor context, batch-size forwarding, and the in-process non-overlap
+  guard that skips interval ticks while a scheduler run is active. Durable cross-process scheduler
+  leases remain open.
 - 2026-05-06 Phase 7 preview environment surface-contract slice added inactive
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete`
   application contracts plus operation catalog entries. List/show read from the safe preview

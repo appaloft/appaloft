@@ -138,6 +138,10 @@ retry-scheduled attempt for a preview target. Application coverage also proves t
 reads due candidates and dispatches them through the cleanup service, creating a fresh cleanup
 attempt id for the retry. `packages/config/test/index.test.ts` covers the disabled-by-default shell
 runner config and environment overrides for preview cleanup retry scheduling.
+`apps/shell/test/preview-cleanup-retry-scheduler-runner.test.ts` covers disabled runner behavior,
+system actor context, batch-size forwarding, and the in-process non-overlap guard that skips
+interval ticks while one scheduler run is active. Durable cross-process scheduler leases remain
+open.
 `apps/shell/test/preview-environment-cleaner.test.ts` covers the shell cleaner adapter that maps
 product-grade preview environment cleanup to the existing source-fingerprint
 `deployments.cleanup-preview` primitive and preserves retryable failures with safe preview scope
