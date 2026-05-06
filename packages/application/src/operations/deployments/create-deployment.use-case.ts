@@ -24,6 +24,7 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import { createCoordinationOwner, mutationCoordinationPolicies } from "../../mutation-coordination";
 import {
   type AppLogger,
+  type DependencyResourceSecretStore,
   type DeploymentProgressReporter,
   type DeploymentRepository,
   type DomainRouteBindingCandidate,
@@ -51,6 +52,7 @@ import {
   dependencyRuntimeInjectionBackendReason,
   dependencyRuntimeInjectionBlockedError,
   dependencyRuntimeInjectionEnvironmentConflictReason,
+  dependencyRuntimeSecretResolutionReason,
 } from "./dependency-binding-snapshot-references";
 import { type DeploymentFactory } from "./deployment.factory";
 import { type DeploymentContextBootstrapService } from "./deployment-config-bootstrap.service";
@@ -506,6 +508,8 @@ export class CreateDeploymentUseCase {
     private readonly serverAppliedRouteStateRepository?: ServerAppliedRouteDesiredStateReader,
     @inject(tokens.resourceDependencyBindingReadModel)
     private readonly resourceDependencyBindingReadModel?: ResourceDependencyBindingReadModel,
+    @inject(tokens.dependencyResourceSecretStore)
+    private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
   ) {}
 
   private async persistDeployment(
@@ -654,6 +658,7 @@ export class CreateDeploymentUseCase {
       resourceDependencyBindingReadModel,
       runtimeTargetBackendRegistry,
       deploymentProgressReporter,
+      dependencyResourceSecretStore,
       runtimePlanResolutionInputBuilder,
       runtimePlanResolver,
       serverAppliedRouteStateRepository,
@@ -802,11 +807,20 @@ export class CreateDeploymentUseCase {
           }),
         );
       }
+      const unresolvedSecretReason = dependencyResourceSecretStore
+        ? await dependencyRuntimeSecretResolutionReason({
+            context,
+            dependencyResourceSecretStore,
+            references: dependencyBindingReferences,
+          })
+        : undefined;
       const runtimeInjectionReason =
         dependencyRuntimeInjectionEnvironmentConflictReason({
           environmentSnapshot: snapshot,
           references: dependencyBindingReferences,
-        }) ?? dependencyRuntimeInjectionBackendReason(runtimeTargetBackend.value);
+        }) ??
+        unresolvedSecretReason ??
+        dependencyRuntimeInjectionBackendReason(runtimeTargetBackend.value);
       const dependencyBindings = dependencyBindingSnapshotSummaryFromReferences(
         dependencyBindingReferences,
         runtimeInjectionReason ? { runtimeInjectionReason } : {},

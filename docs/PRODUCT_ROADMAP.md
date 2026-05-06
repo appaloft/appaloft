@@ -902,6 +902,11 @@ Current verification notes:
   readiness blocked with safe reason metadata. Deployment plan/create unresolved-ref blocking and
   runtime target value materialization remain open, so Postgres/Redis closed-loop exit criteria
   remain open.
+- 2026-05-06 Phase 7 dependency runtime unresolved-ref blocking Code Round slice now validates
+  captured Appaloft-owned dependency runtime refs during `deployments.plan` and
+  `deployments.create`, reports `dependency_runtime_secret_unresolved` safely in plan output, and
+  rejects create before deployment acceptance when resolution fails. Runtime target value
+  materialization remains open, so Postgres/Redis closed-loop exit criteria remain open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider

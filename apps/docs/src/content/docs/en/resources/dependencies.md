@@ -84,9 +84,9 @@ reference after later binding secret rotation.
 Plan and show output report dependency runtime injection as `ready`, `blocked`, or
 `not-applicable`. `blocked` means at least one active binding cannot be delivered safely for the
 selected runtime target. Common safe reasons include a not-ready dependency, missing safe secret
-reference, unsupported dependency kind, unsupported scope or injection mode, duplicate target name,
-an existing environment-variable conflict, or a runtime target that cannot deliver dependency
-secrets.
+reference, an unresolved stored dependency secret, unsupported dependency kind, unsupported scope or
+injection mode, duplicate target name, an existing environment-variable conflict, or a runtime
+target that cannot deliver dependency secrets.
 
 When `deployments.create` sees the same blocked state, it rejects the deployment before acceptance
 with `dependency_runtime_injection_blocked`. No deployment attempt is created, and the response does

@@ -16,7 +16,9 @@ import {
   type Result,
 } from "@appaloft/core";
 
+import { type ExecutionContext } from "../../execution-context";
 import {
+  type DependencyResourceSecretStore,
   type DeploymentDependencyBindingSnapshotReferenceSummary,
   type DeploymentDependencyBindingSnapshotSummary,
   type ResourceDependencyBindingSummary,
@@ -24,6 +26,7 @@ import {
 } from "../../ports";
 
 export const dependencyRuntimeSecretDeliveryCapability = "runtime.dependency-secrets" as const;
+const appaloftOwnedDependencySecretRefPrefix = "appaloft://dependency-resources/";
 
 function toDependencyBindingReferenceKind(
   kind: ResourceInstanceKindValue,
@@ -224,6 +227,30 @@ export function dependencyRuntimeInjectionBackendReason(
   return backend.descriptor.capabilities.includes(dependencyRuntimeSecretDeliveryCapability)
     ? undefined
     : "dependency_runtime_injection_target_backend_unsupported";
+}
+
+export async function dependencyRuntimeSecretResolutionReason(input: {
+  context: ExecutionContext;
+  dependencyResourceSecretStore: DependencyResourceSecretStore;
+  references: DeploymentDependencyBindingReferenceState[];
+}): Promise<string | undefined> {
+  for (const reference of input.references) {
+    if (reference.snapshotReadiness.value !== "ready") {
+      continue;
+    }
+    const secretRef = reference.runtimeSecretRef?.value;
+    if (!secretRef?.startsWith(appaloftOwnedDependencySecretRefPrefix)) {
+      continue;
+    }
+    const resolved = await input.dependencyResourceSecretStore.resolve(input.context, {
+      secretRef,
+    });
+    if (resolved.isErr()) {
+      return "dependency_runtime_secret_unresolved";
+    }
+  }
+
+  return undefined;
 }
 
 export function dependencyRuntimeInjectionEnvironmentConflictReason(input: {
