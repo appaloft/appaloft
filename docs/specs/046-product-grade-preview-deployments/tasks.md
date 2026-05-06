@@ -49,7 +49,7 @@
 - [x] Add core preview environment aggregate state.
 - [x] Add preview environment read models and persistence.
 - [x] Extend source event ingestion for GitHub App pull request preview events.
-- [ ] Add preview lifecycle process manager over policy, environment, deployment, and feedback
+- [x] Add preview lifecycle process manager over policy, environment, deployment, and feedback
   state.
 - [x] Add scoped preview config/secret resolution.
 - [x] Dispatch preview deployments through existing ids-only deployment admission.

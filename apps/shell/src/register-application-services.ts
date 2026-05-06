@@ -170,7 +170,9 @@ import {
   OpenTerminalSessionUseCase,
   OperatorWorkQueryService,
   PreviewCleanupRetryScheduler,
+  PreviewDeploymentProcessManager,
   PreviewEnvironmentCleanupService,
+  PreviewFeedbackService,
   PreviewLifecycleService,
   PromoteEnvironmentUseCase,
   ProvisionPostgresDependencyResourceCommandHandler,
@@ -532,6 +534,11 @@ export function registerApplicationServices(container: DependencyContainer): voi
     CreateDeploymentSourceEventDispatcher,
   );
   container.registerSingleton(tokens.previewLifecycleService, PreviewLifecycleService);
+  container.registerSingleton(tokens.previewFeedbackService, PreviewFeedbackService);
+  container.registerSingleton(
+    tokens.previewDeploymentProcessManager,
+    PreviewDeploymentProcessManager,
+  );
   container.registerSingleton(
     tokens.previewEnvironmentCleanupService,
     PreviewEnvironmentCleanupService,

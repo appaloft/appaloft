@@ -192,6 +192,11 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   policy-eligible pull-request event. It creates or updates the scoped `PreviewEnvironment`, then
   dispatches exactly one ids-only deployment request through the existing deployment dispatcher.
   Pull-request source facts stay in preview lifecycle state rather than `deployments.create`.
+- Preview lifecycle now has an application process manager over policy evaluation, preview
+  environment state, ids-only deployment dispatch, and PR-comment feedback. Accepted preview
+  deployments publish idempotent `github-pr-comment` feedback keyed by source event id, while
+  retryable feedback failures are recorded as safe feedback state without turning the accepted
+  deployment process into `err`.
 - Preview policy now has inactive application operation contracts for `preview-policies.configure`
   and `preview-policies.show`, including shared command/query schemas, handlers, repository/read
   model ports, and operation catalog entries without CLI/oRPC/Web transports.
@@ -214,8 +219,9 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
 - Preview lifecycle now dedupes by source event id using the safe policy decision projection before
   policy evaluation, preview environment mutation, or deployment dispatch. Duplicate deliveries
   return the existing blocked/dispatched/dispatch-failed outcome without creating another preview
-  environment update or ids-only deployment request. Feedback and cleanup idempotency remain tied
-  to their future process-state implementations.
+  environment update or ids-only deployment request. PR-comment feedback is keyed by source event id
+  and updated in place through provider feedback state; cleanup idempotency remains tied to its
+  future process-state implementation.
 - Preview scoped config now has an initial application resolver over the safe
   `resources.effective-config` read model. It materializes no variables, secret references, or
   durable routes by default; explicit preview selections may include non-secret variable values and
