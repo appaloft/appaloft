@@ -801,7 +801,7 @@ Target: `0.9.0` beta.
 
 Release rule:
 
-- [ ] Select `0.9.0` only when all required Phase 7 items, earlier phase items, and exit criteria
+- [x] Select `0.9.0` only when all required Phase 7 items, earlier phase items, and exit criteria
   are checked. If any Phase 7 item remains unchecked, release a `0.8.x` patch instead.
 
 Already done:
@@ -1635,6 +1635,9 @@ Current verification notes:
   proving resource config/secrets, storage, dependency resources/bindings/backups, auto-deploy
   diagnostics, deployment history, recovery-readiness, and rollback expose explicit CLI and
   HTTP/oRPC operations with shared schemas. This closes the no-server-file-edit exit criterion.
+- 2026-05-06 Phase 7 `0.9.0` release target selection is now checked after all required Phase 7
+  items, earlier phase release rules, and Phase 7 exit criteria are checked. This records roadmap
+  eligibility only; an actual release run remains governed by the release workflow.
 
 Required:
 
