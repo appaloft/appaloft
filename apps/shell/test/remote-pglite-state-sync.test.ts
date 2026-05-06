@@ -64,6 +64,10 @@ function testConfig(
       intervalSeconds: 300,
       batchSize: 25,
     },
+    dockerSwarmExecution: {
+      enabled: false,
+      commandTimeoutMs: 60000,
+    },
     scheduledTaskRunner: {
       enabled: false,
       intervalSeconds: 60,

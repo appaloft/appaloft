@@ -1289,6 +1289,7 @@ export function createDockerSwarmRuntimeTargetBackendDescriptor(input: {
 export function createDefaultRuntimeTargetBackendRegistry(input: {
   localBackend: ExecutionBackend;
   sshBackend: ExecutionBackend;
+  swarmBackend?: RuntimeTargetBackend;
 }): RuntimeTargetBackendRegistry {
   return new DefaultRuntimeTargetBackendRegistry([
     new ExecutionBackendRuntimeTargetAdapter(
@@ -1309,6 +1310,7 @@ export function createDefaultRuntimeTargetBackendRegistry(input: {
       },
       input.sshBackend,
     ),
+    ...(input.swarmBackend ? [input.swarmBackend] : []),
   ]);
 }
 

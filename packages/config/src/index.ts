@@ -45,6 +45,11 @@ export interface PreviewCleanupRetrySchedulerConfig {
   batchSize: number;
 }
 
+export interface DockerSwarmExecutionConfig {
+  enabled: boolean;
+  commandTimeoutMs: number;
+}
+
 export interface AppConfig {
   appName: string;
   appVersion: string;
@@ -81,6 +86,7 @@ export interface AppConfig {
   certificateProvider: CertificateProviderConfig;
   certificateRetryScheduler: CertificateRetrySchedulerConfig;
   previewCleanupRetryScheduler: PreviewCleanupRetrySchedulerConfig;
+  dockerSwarmExecution: DockerSwarmExecutionConfig;
   scheduledTaskRunner: ScheduledTaskRunnerConfig;
   enabledSystemPlugins: string[];
   configFilePath?: string;
@@ -136,6 +142,10 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
     enabled: false,
     intervalSeconds: 300,
     batchSize: 25,
+  },
+  dockerSwarmExecution: {
+    enabled: false,
+    commandTimeoutMs: 60_000,
   },
   scheduledTaskRunner: {
     enabled: false,
@@ -348,6 +358,10 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     source.flags?.scheduledTaskRunner ??
     fileConfig.scheduledTaskRunner ??
     defaults.scheduledTaskRunner;
+  const dockerSwarmExecution =
+    source.flags?.dockerSwarmExecution ??
+    fileConfig.dockerSwarmExecution ??
+    defaults.dockerSwarmExecution;
   const previewCleanupRetryScheduler =
     source.flags?.previewCleanupRetryScheduler ??
     fileConfig.previewCleanupRetryScheduler ??
@@ -373,6 +387,12 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(env.APPALOFT_SCHEDULED_TASK_RUNNER_BATCH_SIZE) ??
     parsePositiveInteger(scheduledTaskRunner.batchSize) ??
     defaults.scheduledTaskRunner.batchSize;
+  const dockerSwarmExecutionEnabled =
+    parseBoolean(env.APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED) ?? dockerSwarmExecution.enabled;
+  const dockerSwarmExecutionCommandTimeoutMs =
+    parsePositiveInteger(env.APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS) ??
+    parsePositiveInteger(dockerSwarmExecution.commandTimeoutMs) ??
+    defaults.dockerSwarmExecution.commandTimeoutMs;
   const resourceAccessFailureRendererUrl = normalizeHttpUrl(
     source.flags?.resourceAccessFailureRendererUrl ??
       env.APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL ??
@@ -604,6 +624,10 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       enabled: previewCleanupRetrySchedulerEnabled,
       intervalSeconds: previewCleanupRetrySchedulerIntervalSeconds,
       batchSize: previewCleanupRetrySchedulerBatchSize,
+    },
+    dockerSwarmExecution: {
+      enabled: dockerSwarmExecutionEnabled,
+      commandTimeoutMs: dockerSwarmExecutionCommandTimeoutMs,
     },
     scheduledTaskRunner: {
       enabled: scheduledTaskRunnerEnabled,

@@ -57,7 +57,8 @@
 - [x] Add post-verification Traefik route label promotion to the Swarm image apply plan.
 - [x] Redact Swarm command failure output before deployment logs/metadata capture.
 - [x] Add bounded shell command runner for the opt-in Swarm execution backend.
-- [ ] Activate and smoke-test real apply/verify/cleanup against a Swarm manager.
+- [x] Add disabled-by-default shell composition for the opt-in Swarm execution backend.
+- [ ] Smoke-test real apply/verify/cleanup against a Swarm manager.
 - [x] Add sanitized target identity persistence/read-model support where required.
 - [x] Add CLI/API/Web/future MCP descriptions through existing operation surfaces.
 

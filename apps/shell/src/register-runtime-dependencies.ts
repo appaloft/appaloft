@@ -9,6 +9,8 @@ import {
 import {
   createDefaultRuntimeTargetBackendRegistry,
   DefaultRuntimePlanResolver,
+  DockerSwarmExecutionBackend,
+  DockerSwarmShellCommandRunner,
   HermeticScheduledTaskRuntimePort,
   InMemoryExecutionBackend,
   LocalExecutionBackend,
@@ -1086,6 +1088,15 @@ export function registerRuntimeDependencies(
           input.resourceAccessFailureRenderer,
           dependencyContainer.resolve(tokens.deploymentExecutionGuard),
         ),
+        ...(input.config.dockerSwarmExecution.enabled
+          ? {
+              swarmBackend: new DockerSwarmExecutionBackend(
+                new DockerSwarmShellCommandRunner({
+                  timeoutMs: input.config.dockerSwarmExecution.commandTimeoutMs,
+                }),
+              ),
+            }
+          : {}),
       }),
     ),
   });

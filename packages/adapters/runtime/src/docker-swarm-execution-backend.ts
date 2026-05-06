@@ -188,6 +188,8 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
     capabilities: RuntimeTargetCapability[] = [
       "runtime.apply",
       "runtime.verify",
+      "runtime.logs",
+      "runtime.health",
       "runtime.cleanup",
       "proxy.route",
     ],

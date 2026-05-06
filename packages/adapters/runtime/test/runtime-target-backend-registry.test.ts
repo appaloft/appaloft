@@ -266,6 +266,35 @@ describe("DefaultRuntimeTargetBackendRegistry", () => {
       });
     }
   });
+
+  test("[SWARM-TARGET-SELECT-001] resolves an explicitly composed Docker Swarm backend", async () => {
+    ensureReflectMetadata();
+    const { createDefaultRuntimeTargetBackendRegistry, DockerSwarmExecutionBackend } = await import(
+      "../src"
+    );
+    const registry = createDefaultRuntimeTargetBackendRegistry({
+      localBackend: new RecordingExecutionBackend("local"),
+      sshBackend: new RecordingExecutionBackend("ssh"),
+      swarmBackend: new DockerSwarmExecutionBackend({
+        async run() {
+          return ok({ exitCode: 0 });
+        },
+      }),
+    });
+
+    const result = registry.find({
+      targetKind: "orchestrator-cluster",
+      providerKey: "docker-swarm",
+      requiredCapabilities: ["runtime.apply", "runtime.verify", "runtime.logs", "proxy.route"],
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().descriptor).toMatchObject({
+      key: "docker-swarm",
+      providerKey: "docker-swarm",
+      targetKinds: ["orchestrator-cluster"],
+    });
+  });
 });
 
 describe("RoutingExecutionBackend", () => {

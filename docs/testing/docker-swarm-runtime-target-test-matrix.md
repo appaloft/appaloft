@@ -85,8 +85,10 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   runtime metadata, and remain outside the default runtime backend registry.
 - `SWARM-TARGET-APPLY-001` and `SWARM-TARGET-CLEAN-001` have initial command-runner coverage
   proving the opt-in shell runner executes bounded rendered commands, preserves stdout/stderr and
-  nonzero exit codes, and reports timeout failures for backend handling. Real Docker Swarm smoke
-  coverage remains open.
+  nonzero exit codes, and reports timeout failures for backend handling. The default runtime target
+  registry can now accept an explicitly composed Docker Swarm backend, and shell configuration keeps
+  that backend disabled unless `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=true`. Real Docker Swarm
+  smoke coverage remains open.
 - `SWARM-TARGET-APPLY-001`, `SWARM-TARGET-OBS-001`, and `SWARM-TARGET-OBS-002` have PGlite
   persistence/read-model coverage proving sanitized Swarm stack name, service name, and apply-plan
   schema version metadata round-trip through deployment execution metadata without raw command,
@@ -115,4 +117,6 @@ implemented, but no Docker Swarm execution backend is active in the default runt
   HTTP `POST /servers`, and Web server registration provider help link to that anchor. Future MCP
   descriptors continue to expose `servers.register` from the operation catalog without adding a
   Swarm-specific tool.
-- No Docker Swarm runtime target execution backend is active in the default registry yet.
+- Docker Swarm runtime target execution is disabled by default in shell configuration and requires
+  explicit opt-in before the default runtime registry includes the Swarm backend. Real Swarm smoke
+  coverage remains open.
