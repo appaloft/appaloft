@@ -516,6 +516,9 @@ Boundary rule:
   fingerprint context, provider-neutral status, expiry, and cleanup-request state. It does not own
   source binding, production config, deployment admission input, provider comments/checks, or
   runtime cleanup execution.
+- Phase 7 Postgres/PGlite persistence for `PreviewEnvironment` stores safe list/show/delete
+  lifecycle state by scoped preview environment and Resource identity. Deployment dispatch,
+  feedback, and cleanup retry remain process/application work rather than aggregate state.
 
 ### Identity & Governance
 

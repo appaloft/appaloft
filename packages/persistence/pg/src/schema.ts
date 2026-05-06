@@ -427,6 +427,26 @@ export interface SourceEventsTable {
 
 type JsonRecord = Record<string, unknown>;
 
+export interface PreviewEnvironmentsTable {
+  id: string;
+  project_id: string;
+  environment_id: string;
+  resource_id: string;
+  server_id: string;
+  destination_id: string;
+  provider: string;
+  repository_full_name: string;
+  head_repository_full_name: string;
+  pull_request_number: number;
+  head_sha: string;
+  base_ref: string;
+  source_binding_fingerprint: string;
+  status: string;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+  expires_at: NullableUpdatableTimestampColumn;
+}
+
 export interface DefaultAccessDomainPoliciesTable {
   id: string;
   scope_key: string;
@@ -589,6 +609,7 @@ export interface Database {
   provider_job_logs: ProviderJobLogsTable;
   source_links: SourceLinksTable;
   source_events: SourceEventsTable;
+  preview_environments: PreviewEnvironmentsTable;
   default_access_domain_policies: DefaultAccessDomainPoliciesTable;
   server_applied_route_states: ServerAppliedRouteStatesTable;
   mutation_coordinations: MutationCoordinationsTable;

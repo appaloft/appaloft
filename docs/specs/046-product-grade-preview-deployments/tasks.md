@@ -27,7 +27,7 @@
   deployment, feedback, and cleanup state.
 - [x] `PG-PREVIEW-ENV-001A`: core preview environment create/update stores scoped identity and
   safe source-link context.
-- [ ] `PG-PREVIEW-ENV-001B`: preview environment persistence/read models list/show/delete scoped
+- [x] `PG-PREVIEW-ENV-001B`: preview environment persistence/read models list/show/delete scoped
   identity and latest lifecycle state.
 - [ ] `PG-PREVIEW-CONFIG-001`: scoped preview variables/secrets do not copy production secrets or
   routes by default.
@@ -46,7 +46,7 @@
 - [ ] Add preview policy command/query schemas, handlers, read models, and operation catalog
   entries.
 - [x] Add core preview environment aggregate state.
-- [ ] Add preview environment read models and persistence.
+- [x] Add preview environment read models and persistence.
 - [ ] Extend source event ingestion for GitHub App pull request preview events.
 - [ ] Add preview lifecycle process manager over policy, environment, deployment, and feedback
   state.
