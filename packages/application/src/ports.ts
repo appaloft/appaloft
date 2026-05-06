@@ -41,6 +41,10 @@ import {
   type ExecutionStrategyKind,
   type LogLevel,
   type PackagingMode,
+  type PreviewEnvironment,
+  type PreviewEnvironmentMutationSpec,
+  type PreviewEnvironmentSelectionSpec,
+  type PreviewEnvironmentStatus,
   type Project,
   type ProjectMutationSpec,
   type ProjectSelectionSpec,
@@ -410,6 +414,19 @@ export interface ScheduledTaskDefinitionRepository {
     spec: ScheduledTaskDefinitionMutationSpec,
   ): Promise<void>;
   delete(context: RepositoryContext, spec: ScheduledTaskDefinitionMutationSpec): Promise<void>;
+}
+
+export interface PreviewEnvironmentRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: PreviewEnvironmentSelectionSpec,
+  ): Promise<PreviewEnvironment | null>;
+  upsert(
+    context: RepositoryContext,
+    previewEnvironment: PreviewEnvironment,
+    spec: PreviewEnvironmentMutationSpec,
+  ): Promise<void>;
+  delete(context: RepositoryContext, spec: PreviewEnvironmentMutationSpec): Promise<void>;
 }
 
 export interface ScheduledTaskRunAttemptRepository {
@@ -4472,6 +4489,54 @@ export interface SourceEventReadModel {
     context: RepositoryContext,
     input: SourceEventShowInput,
   ): Promise<SourceEventDetail | null>;
+}
+
+export interface PreviewEnvironmentSourceSummary {
+  provider: "github";
+  repositoryFullName: string;
+  headRepositoryFullName: string;
+  pullRequestNumber: number;
+  baseRef: string;
+  headSha: string;
+  sourceBindingFingerprint: string;
+}
+
+export interface PreviewEnvironmentSummary {
+  previewEnvironmentId: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId: string;
+  source: PreviewEnvironmentSourceSummary;
+  status: PreviewEnvironmentStatus;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt?: string;
+}
+
+export interface PreviewEnvironmentReadModel {
+  list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      resourceId?: string;
+      status?: PreviewEnvironmentStatus;
+      repositoryFullName?: string;
+      pullRequestNumber?: number;
+      limit?: number;
+      cursor?: string;
+    },
+  ): Promise<{ items: PreviewEnvironmentSummary[]; nextCursor?: string }>;
+  findOne(
+    context: RepositoryContext,
+    input: {
+      previewEnvironmentId: string;
+      projectId?: string;
+      resourceId?: string;
+    },
+  ): Promise<PreviewEnvironmentSummary | null>;
 }
 
 export interface ProjectReadModel {

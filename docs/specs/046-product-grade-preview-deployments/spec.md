@@ -184,10 +184,14 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   identity. It stores scoped project/environment/resource/target placement, safe source fingerprint
   and pull-request context, active/cleanup-requested status, expiry, and cleanup-request state
   without adding preview fields to `deployments.create`.
+- Postgres/PGlite persistence now stores preview environment lifecycle state with safe list/show
+  read models and scoped delete by preview environment id plus Resource id. The read model exposes
+  provider-neutral project/environment/resource/server/destination placement, pull-request source
+  context, status, expiry, and timestamps without provider payloads or secret material.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
-- No preview policy aggregate/read model, preview environment persistence/read model, GitHub App
-  preview worker, feedback writer, cleanup scheduler, or cleanup retry state is implemented.
+- No preview policy aggregate/read model, GitHub App preview worker, feedback writer, cleanup
+  scheduler, or cleanup retry state is implemented.
 - No active operation catalog entries exist for `preview-policies.*` or `preview-environments.*`.
 - Product-grade preview public docs/help are not yet implemented.
 

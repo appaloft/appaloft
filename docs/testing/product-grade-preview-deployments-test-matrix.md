@@ -64,9 +64,14 @@ default fork blocking, secret-backed fork blocking, and opt-in fork previews wit
 identity creation, safe source context update, expiry checks, cleanup-request transition, and
 blocking source updates after cleanup is requested.
 
-Preview environment persistence/read models, deployment dispatch, blocked-event read models,
-GitHub App webhook normalization, feedback, cleanup retry, and active operation entrypoints remain
-open. Existing non-product-grade coverage belongs to Action-only PR previews and
+`PG-PREVIEW-ENV-001` now also has Postgres/PGlite persistence coverage in
+`packages/persistence/pg/test/preview-environment.pglite.test.ts`. The coverage proves scoped
+preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
+status readback, scoped delete, and owner Resource retention after delete.
+
+Deployment dispatch, blocked-event read models, GitHub App webhook normalization, feedback, cleanup
+retry, and active operation entrypoints remain open. Existing non-product-grade coverage belongs to
+Action-only PR previews and
 `deployments.cleanup-preview`.
 
 Future Code Rounds should bind the matrix rows to application/process-manager tests first, then add

@@ -58,6 +58,7 @@ import { serverTargetKindMigration } from "./migrations/050_server_target_kind";
 import { scheduledTaskDefinitionsMigration } from "./migrations/051_scheduled_task_definitions";
 import { scheduledTaskRunAttemptsMigration } from "./migrations/052_scheduled_task_run_attempts";
 import { scheduledTaskRunLogsMigration } from "./migrations/053_scheduled_task_run_logs";
+import { previewEnvironmentsMigration } from "./migrations/054_preview_environments";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -207,6 +208,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "051_scheduled_task_definitions": scheduledTaskDefinitionsMigration,
       "052_scheduled_task_run_attempts": scheduledTaskRunAttemptsMigration,
       "053_scheduled_task_run_logs": scheduledTaskRunLogsMigration,
+      "054_preview_environments": previewEnvironmentsMigration,
     };
   }
 }
