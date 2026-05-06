@@ -133,6 +133,10 @@ retry-scheduled attempt for a preview target. Application coverage also proves t
 reads due candidates and dispatches them through the cleanup service, creating a fresh cleanup
 attempt id for the retry. `packages/config/test/index.test.ts` covers the disabled-by-default shell
 runner config and environment overrides for preview cleanup retry scheduling.
+`apps/shell/test/preview-environment-cleaner.test.ts` covers the shell cleaner adapter that maps
+product-grade preview environment cleanup to the existing source-fingerprint
+`deployments.cleanup-preview` primitive and preserves retryable failures with safe preview scope
+details.
 `PG-PREVIEW-SURFACE-001` has initial inactive-operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
@@ -155,8 +159,9 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-GitHub App route wiring, GitHub deployment-status feedback, concrete cleanup adapters, scheduler
-leases, and active CLI/API/Web/future MCP transports remain open.
+GitHub App route wiring, GitHub deployment-status feedback, scheduler leases, terminal provider
+metadata cleanup, cleanup-side feedback updates, and active CLI/API/Web/future MCP transports remain
+open.
 Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 

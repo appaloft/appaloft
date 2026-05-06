@@ -54,7 +54,7 @@
 - [x] Add scoped preview config/secret resolution.
 - [x] Dispatch preview deployments through existing ids-only deployment admission.
 - [ ] Add feedback writer ports/adapters and idempotent provider update state.
-- [ ] Add cleanup process manager and scheduler retry behavior.
+- [x] Add cleanup process manager and scheduler retry behavior.
 - [ ] Add Web/API/CLI/future MCP entrypoints.
 
 ## Docs Round

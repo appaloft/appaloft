@@ -253,7 +253,8 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
 - Preview environment cleanup now has an initial application service that loads the durable preview
   environment, marks cleanup requested without deleting preview history, and delegates runtime,
   route, source-link, provider metadata, and feedback cleanup to a port with safe source-scope
-  input only. Scheduler retry state and concrete adapters remain future work.
+  input only. The shell registers a concrete cleaner that delegates runtime, server-applied route,
+  and source-link cleanup through the existing `deployments.cleanup-preview` primitive.
 - Preview cleanup retry now has initial application attempt state. Each cleanup run receives a new
   `pcln_*` attempt id, retryable cleaner failures are recorded as `retry-scheduled` with safe
   owner, phase, error code, and next retry time, and retry responses avoid provider error text.
@@ -262,8 +263,8 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   attempts, skips stale attempts after a newer cleanup attempt exists for the same preview target,
   and dispatches retries through the cleanup service so every retry creates a new attempt id.
   The shell composition has a disabled-by-default `previewCleanupRetryScheduler` runner that can be
-  explicitly enabled after a concrete cleanup adapter is present. Concrete cleanup adapters,
-  scheduler leases, and terminal provider metadata cleanup remain future work.
+  explicitly enabled with the shell cleaner registered. Scheduler leases, terminal provider
+  metadata cleanup, and cleanup-side feedback updates remain future work.
 - Preview environments now have inactive application operation contracts for
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete`.
   List/show read from the safe preview environment read model, delete dispatches through the
@@ -272,7 +273,7 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No GitHub App preview worker, GitHub deployment-status feedback writer, scheduler leases, or
-  concrete product-grade preview cleanup adapter is implemented.
+  terminal provider metadata cleanup is implemented.
 - No active operation catalog transports exist for `preview-policies.*` or
   `preview-environments.*`.
 - Product-grade preview public docs/help now map preview policy and preview environment operations
