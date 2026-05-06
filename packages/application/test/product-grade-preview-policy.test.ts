@@ -252,6 +252,7 @@ describe("PreviewPolicyEvaluator", () => {
       repository,
       dispatcher,
       projection,
+      projection,
       new FixedClock("2026-05-06T01:00:00.000Z"),
       new SequentialIdGenerator(),
     );
@@ -328,6 +329,7 @@ describe("PreviewPolicyEvaluator", () => {
       repository,
       dispatcher,
       projection,
+      projection,
       new FixedClock("2026-05-06T01:00:00.000Z"),
       new SequentialIdGenerator(),
     );
@@ -382,6 +384,7 @@ describe("PreviewPolicyEvaluator", () => {
     const service = new PreviewLifecycleService(
       repository,
       dispatcher,
+      projection,
       projection,
       new FixedClock("2026-05-06T01:05:00.000Z"),
       new SequentialIdGenerator(),
@@ -465,6 +468,68 @@ describe("PreviewPolicyEvaluator", () => {
     });
   });
 
+  test("[PG-PREVIEW-EVENT-002] returns existing preview decision for duplicate source events", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const service = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      projection,
+      new FixedClock("2026-05-06T01:10:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const context = createExecutionContext({
+      requestId: "req_preview_lifecycle_duplicate_test",
+      entrypoint: "system",
+    });
+    const input = {
+      sourceEventId: "sevt_preview_duplicate_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_42",
+      provider: "github" as const,
+      eventKind: "pull-request" as const,
+      eventAction: "synchronize" as const,
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "appaloft/demo",
+      pullRequestNumber: 42,
+      headSha: "abc1234",
+      baseRef: "main",
+      verified: true,
+    };
+
+    const first = await service.deployFromPolicyEligibleEvent(context, input);
+    const duplicate = await service.deployFromPolicyEligibleEvent(context, {
+      ...input,
+      headSha: "def5678",
+    });
+
+    expect(first.isOk()).toBe(true);
+    expect(duplicate.isOk()).toBe(true);
+    expect(duplicate._unsafeUnwrap()).toMatchObject({
+      status: "dispatched",
+      previewEnvironmentId: "prenv_1",
+      deploymentId: "dep_preview_1",
+    });
+    expect(repository.upsertCount).toBe(1);
+    expect(repository.previewEnvironment?.toState().source.headSha.value).toBe("abc1234");
+    expect(dispatcher.inputs).toEqual([
+      {
+        sourceEventId: "sevt_preview_duplicate_1",
+        projectId: "prj_preview",
+        environmentId: "env_preview",
+        resourceId: "res_preview_api",
+        serverId: "srv_preview",
+        destinationId: "dst_preview",
+      },
+    ]);
+  });
+
   test("[PG-PREVIEW-POLICY-002B] projects blocked fork policy decisions with safe details", async () => {
     const repository = new InMemoryPreviewEnvironmentRepository();
     const dispatcher = new CapturingPreviewDeploymentDispatcher();
@@ -472,6 +537,7 @@ describe("PreviewPolicyEvaluator", () => {
     const service = new PreviewLifecycleService(
       repository,
       dispatcher,
+      projection,
       projection,
       new FixedClock("2026-05-06T01:15:00.000Z"),
       new SequentialIdGenerator(),

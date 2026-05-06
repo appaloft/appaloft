@@ -211,6 +211,11 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   unsupported pull request actions, and emits only safe preview facts needed by policy/lifecycle
   evaluation: repository identities, pull request number, head SHA, base ref, delivery id, and
   received timestamp.
+- Preview lifecycle now dedupes by source event id using the safe policy decision projection before
+  policy evaluation, preview environment mutation, or deployment dispatch. Duplicate deliveries
+  return the existing blocked/dispatched/dispatch-failed outcome without creating another preview
+  environment update or ids-only deployment request. Feedback and cleanup idempotency remain tied
+  to their future process-state implementations.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
 - No GitHub App preview worker, feedback writer, cleanup scheduler, or cleanup retry state is

@@ -30,6 +30,7 @@ import {
   type IdGenerator,
   type PreviewEnvironmentRepository,
   type PreviewPolicyDecisionProjection,
+  type PreviewPolicyDecisionReadModel,
   type PreviewPolicyDecisionRecorder,
   type SourceEventDeploymentDispatcher,
 } from "../../ports";
@@ -48,6 +49,66 @@ function deriveExpiresAt(now: string, previewTtlHours: number | undefined): stri
   }
 
   return new Date(nowMs + previewTtlHours * 60 * 60 * 1000).toISOString();
+}
+
+function decisionFromProjection(
+  projection: PreviewPolicyDecisionProjection,
+): PreviewPolicyDecision {
+  return {
+    status: projection.status,
+    phase: projection.phase,
+    deploymentEligible: projection.deploymentEligible,
+    safeDetails: {
+      provider: projection.provider,
+      eventKind: projection.eventKind,
+      eventAction: projection.eventAction,
+      repositoryFullName: projection.repositoryFullName,
+      headRepositoryFullName: projection.headRepositoryFullName,
+      pullRequestNumber: projection.pullRequestNumber,
+      headSha: projection.headSha,
+      baseRef: projection.baseRef,
+      fork: projection.fork,
+      secretBacked: projection.secretBacked,
+      requestedSecretScopeCount: projection.requestedSecretScopeCount,
+      activePreviewCount: projection.activePreviewCount,
+      ...(projection.maxActivePreviews !== undefined
+        ? { maxActivePreviews: projection.maxActivePreviews }
+        : {}),
+    },
+    ...(projection.reasonCode ? { reasonCode: projection.reasonCode } : {}),
+  };
+}
+
+function resultFromProjection(
+  projection: PreviewPolicyDecisionProjection,
+): PreviewLifecycleDeployResult {
+  const policyDecision = decisionFromProjection(projection);
+
+  if (!projection.deploymentEligible) {
+    return {
+      status: "blocked",
+      policyDecision,
+    };
+  }
+
+  if (projection.deploymentId) {
+    return {
+      status: "dispatched",
+      policyDecision,
+      ...(projection.previewEnvironmentId
+        ? { previewEnvironmentId: projection.previewEnvironmentId }
+        : {}),
+      deploymentId: projection.deploymentId,
+    };
+  }
+
+  return {
+    status: "dispatch-failed",
+    policyDecision,
+    ...(projection.previewEnvironmentId
+      ? { previewEnvironmentId: projection.previewEnvironmentId }
+      : {}),
+  };
 }
 
 export interface PreviewLifecycleDeployInput extends PreviewPolicyEvaluationInput {
@@ -82,6 +143,8 @@ export class PreviewLifecycleService {
     private readonly sourceEventDeploymentDispatcher: SourceEventDeploymentDispatcher,
     @inject(tokens.previewPolicyDecisionRecorder)
     private readonly previewPolicyDecisionRecorder: PreviewPolicyDecisionRecorder,
+    @inject(tokens.previewPolicyDecisionReadModel)
+    private readonly previewPolicyDecisionReadModel: PreviewPolicyDecisionReadModel,
     @inject(tokens.clock)
     private readonly clock: Clock,
     @inject(tokens.idGenerator)
@@ -92,6 +155,14 @@ export class PreviewLifecycleService {
     context: ExecutionContext,
     input: PreviewLifecycleDeployInput,
   ): Promise<Result<PreviewLifecycleDeployResult>> {
+    const repositoryContext = toRepositoryContext(context);
+    const existingDecision = await this.previewPolicyDecisionReadModel.findOne(repositoryContext, {
+      sourceEventId: input.sourceEventId,
+    });
+    if (existingDecision) {
+      return ok(resultFromProjection(existingDecision));
+    }
+
     const policyDecision = this.previewPolicyEvaluator.evaluate(input);
     if (policyDecision.isErr()) {
       return err(policyDecision.error);
