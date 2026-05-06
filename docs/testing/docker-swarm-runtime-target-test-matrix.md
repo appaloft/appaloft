@@ -82,9 +82,10 @@ in the default shell runtime registry unless explicitly opted out.
   selectors include Appaloft managed, resource, deployment, target, destination, and runtime-target
   labels, and do not render broad Docker prune or volume commands. It also has fake-runner backend
   acceptance coverage proving `cancel` executes only the scoped cleanup command.
-- The opt-in `DockerSwarmExecutionBackend` has fake-runner acceptance coverage proving image apply
-  commands run in candidate-create, verify, route-promotion, cleanup order, record sanitized Swarm
-  runtime metadata, and remain outside the default runtime backend registry.
+- `DockerSwarmExecutionBackend` has fake-runner acceptance coverage proving image apply commands run
+  in candidate-create, verify, route-promotion, cleanup order and record sanitized Swarm runtime
+  metadata. Shell composition registers it by default, while explicit opt-out remains available for
+  installations that are not ready to execute Swarm deployments.
 - `SWARM-TARGET-APPLY-001` and `SWARM-TARGET-CLEAN-001` have initial command-runner coverage
   proving the opt-in shell runner executes bounded rendered commands, preserves stdout/stderr and
   nonzero exit codes, and reports timeout failures for backend handling. The default runtime target

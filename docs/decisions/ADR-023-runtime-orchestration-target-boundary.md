@@ -23,12 +23,12 @@ The accepted target model is:
 | Target model | Public operation state | Meaning |
 | --- | --- | --- |
 | Single-server Docker/Compose | Active v1 implementation target | A local or SSH-reached server runs Docker containers or Docker Compose projects. |
-| Docker Swarm cluster | Future target backend | A Docker-compatible cluster backend consumes the same OCI artifact and resource network/access contracts, then renders Swarm stack/service intent. |
+| Docker Swarm cluster | Active v1 cluster backend | A Docker-compatible cluster backend consumes the same OCI artifact and resource network/access contracts, then renders and applies Swarm stack/service intent. |
 | Kubernetes cluster | Future target backend | A Kubernetes backend consumes the same OCI artifact and resource network/access contracts, then renders and applies Kubernetes-owned workload, service, routing, health, log, and cleanup intent. |
 
-For product planning through `1.0.0`, Docker Swarm is the first cluster runtime target that must be
-specified and implemented. Kubernetes remains a later backend unless a future roadmap/ADR change
-reorders that priority.
+For product planning through `1.0.0`, Docker Swarm is the first cluster runtime target and is active
+behind the same `deployments.create` admission boundary as the single-server Docker/Compose path.
+Kubernetes remains a later backend unless a future roadmap/ADR change reorders that priority.
 
 `deployments.create` must not grow transport fields such as `kubernetesNamespace`, `helmChart`,
 `dockerSwarmService`, `replicas`, or provider-specific manifest fragments. Cluster placement,
@@ -186,22 +186,25 @@ Implementation work should move toward:
 
 ## Current Implementation Notes And Migration Gaps
 
-Current runtime execution is single-server oriented. `DefaultRuntimePlanResolver` produces a
-`single-server` target descriptor, and `RoutingExecutionBackend` routes by hardcoded provider keys
-for `local-shell` and `generic-ssh` before falling back to the in-memory backend.
+Current runtime execution covers single-server Docker/Compose plus Docker Swarm cluster targets.
+`DefaultRuntimePlanResolver` produces provider-neutral workload snapshots, and
+`RoutingExecutionBackend` selects registered target backends by target kind, provider key, and
+required capabilities before falling back to the in-memory compatibility backend.
 
 Current core target kinds use the canonical ADR-023 values `single-server` and
 `orchestrator-cluster`. Docker Swarm target metadata can now be registered as a cluster-shaped
-target, but Swarm readiness and execution backends are still not active.
+target, non-mutating Swarm manager readiness checks are active, and shell composition registers
+Swarm execution by default unless `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=false` opts out.
 
 Current `ExecutionBackend` includes `cancel` and `rollback` methods even though ADR-016 keeps those
 public operations out of the v1 surface. Those backend capabilities may remain internal, but target
 backend contracts must not imply public cancel or rollback until their own specs are accepted.
 
-Docker Swarm is specified as the first cluster runtime target, but the backend is not active yet.
-Kubernetes is not an active implementation target. This ADR fixes the direction and boundary so
-runtime target backends can be added without changing deployment admission; the current roadmap
-priority is to land Docker Swarm before `1.0.0`.
+Docker Swarm is active as the first cluster runtime target. The zero-to-SSH supported catalog
+harness proves the single-server Docker/Compose path keeps ids-only deployment admission, and the
+environment-gated real Swarm smoke proves Swarm apply, route realization, registry-authenticated
+image pull, secret-safe metadata, and scoped cleanup behind the same command boundary. Kubernetes
+is not an active implementation target.
 
 ## Open Questions
 

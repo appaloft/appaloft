@@ -2,7 +2,7 @@
 
 ## Status
 
-Spec Round: positioned; Code Round in partial slices.
+Spec Round: complete; Code Round active in the default shell runtime registry.
 
 ## Problem
 

@@ -689,8 +689,10 @@ Current boundary:
 - Docker/OCI is the workload artifact substrate, not a permanent single-node-only orchestration
   boundary. Runtime target backend selection is internal to `deployments.create` and is governed by
   [ADR-023: Runtime Orchestration Target Boundary](./decisions/ADR-023-runtime-orchestration-target-boundary.md).
-  The active v1 target backend is single-server Docker/Compose; Docker Swarm and Kubernetes remain
-  future backend targets that must not add provider-specific fields to deployment admission.
+  The active v1 runtime target backends are single-server Docker/Compose and Docker Swarm. Swarm
+  execution is selected by the registered `orchestrator-cluster`/`docker-swarm` target backend and
+  still must not add provider-specific fields to deployment admission. Kubernetes remains a future
+  backend behind the same command boundary.
 - `deployments.create` must not accept `sourceLocator`, `source`, `deploymentMethod`,
   install/build/start commands, port/internalPort, health-check path, `resource` bootstrap input,
   proxy, domains, path prefix, or TLS mode

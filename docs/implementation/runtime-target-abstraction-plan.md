@@ -36,9 +36,9 @@ ResourceSourceBinding + ResourceRuntimeProfile + ResourceNetworkProfile
   -> normalized deployment/resource read models
 ```
 
-Single-server Docker/Compose remains the first active backend. Docker Swarm is the first required
+Single-server Docker/Compose remains the first active backend. Docker Swarm is the first active
 cluster backend on the path to `1.0.0`, and Kubernetes remains a later backend implementation.
-Both must plug into the same target abstraction after their own Spec Rounds.
+Cluster backends must plug into the same target abstraction after their own Spec Rounds.
 
 ## Expected Code Shape
 
@@ -118,7 +118,7 @@ concerns:
 - single-server Docker local backend;
 - single-server Docker generic-SSH backend;
 - in-memory fake backend for tests and local demos;
-- future Docker Swarm backend after a Swarm Spec Round;
+- Docker Swarm backend;
 - future Kubernetes backend only if the implementation is adapter-local and does not leak
   Kubernetes client types into core/application.
 
@@ -159,26 +159,15 @@ normalized.
 
 ### Docker Swarm Backend
 
-The Spec Round is positioned in
+The Spec Round and Code Round are active through
 [Docker Swarm Runtime Target](../specs/045-docker-swarm-runtime-target/spec.md) and
 [Docker Swarm Runtime Target Test Matrix](../testing/docker-swarm-runtime-target-test-matrix.md).
 
-Before Code Round, the implementation must use those artifacts to:
-
-- add failing tests for target registration/readiness, ids-only deployment admission, registry
-  selection, render/apply/verify/log/health/cleanup, route realization, redaction, and capacity
-  diagnostics;
-- implement Swarm manager target readiness through provider-neutral `DeploymentTarget`/
-  `Destination` language and `docker-swarm` backend capabilities;
-- define destination placement and adapter-owned stack/network identity without storing raw Swarm
-  manifests or Docker API payloads as aggregate state;
-- define registry push/pull and secret handling with masked secret references only;
-- define service update, health, logs, diagnostics, cleanup, and rollback-candidate identity;
-- update deployment and resource health/log/proxy/public-doc surfaces only through normalized
-  Appaloft read models.
-
-This backend is required before `1.0.0`; the abstraction is not roadmap-complete until these Swarm
-contracts and the corresponding implementation/tests exist.
+The implementation uses those artifacts to keep Swarm manager readiness, ids-only deployment
+admission, registry selection, render/apply/verify/log/health/cleanup, route realization,
+redaction, and default shell activation behind adapter/application boundaries. Swarm destination
+placement and stack/service identity remain adapter-owned; public read models expose only
+sanitized Appaloft runtime identity and normalized log/health/access state.
 
 ### Kubernetes Backend
 
