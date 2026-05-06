@@ -917,6 +917,11 @@ Current verification notes:
   across core/application command handling, PG/PGlite metadata persistence, operation catalog,
   CLI, HTTP/oRPC, public docs, and Web recovery candidate actions gated by readiness output. The
   full `0.9.0` release rule remains blocked by auto-deploy, preview, and cluster runtime items.
+- 2026-05-06 Phase 7 deployment recovery rebuild-required sync closed the exposed recovery-command
+  exit criterion: `deployments.retry`, `deployments.redeploy`, and `deployments.rollback` are active
+  under ADR-034 with readiness, command specs, operation catalog, CLI, HTTP/oRPC, Web recovery
+  affordances, public docs/help, and targeted tests aligned. Cancel, deployment-scoped manual health
+  check, and write-side reattach remain rebuild-required because they are not exposed.
 - 2026-05-05 Phase 7 source binding and auto-deploy Spec Round created
   [Source Binding And Auto Deploy](./specs/042-source-binding-auto-deploy/spec.md). It positions
   `resources.configure-auto-deploy`, `source-events.ingest`, `source-events.list`, and
@@ -1600,7 +1605,7 @@ Exit criteria:
 - [ ] Redis has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
 - [x] Operators can deploy through both the single-server Docker/Compose path and the Docker Swarm
   cluster path without changing the public deployment admission surface.
-- [ ] Rollback/redeploy are no longer rebuild-required if they are exposed.
+- [x] Rollback/redeploy are no longer rebuild-required if they are exposed.
 
 ## Phase 8: Operator/Internal State Closure And Interface Parity
 

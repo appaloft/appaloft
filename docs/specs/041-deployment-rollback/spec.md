@@ -3,7 +3,7 @@
 ## Status
 
 - Round: Spec Round
-- Artifact state: planned for Code Round
+- Artifact state: Code Round active
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, additive recovery write command and public entrypoints
 - Decision state: governed by ADR-016 and ADR-034; no new ADR required for this slice because
@@ -115,13 +115,14 @@ target/destination ids, readiness reason codes, command name, phase, and safe st
 
 ## Current Implementation Notes And Migration Gaps
 
-- `deployments.recovery-readiness` already returns rollback candidate readiness and marks rollback
-  command inactive until this Code Round.
-- `Deployment` already has `triggerKind` and `sourceDeploymentId` metadata, but rollback Code Round
-  must add explicit `rollbackCandidateDeploymentId` state with value-object rules.
-- Current runtime plan snapshots may not yet expose a dedicated retained artifact identity field for
-  every backend. Code Round must either prove existing runtime plan identity is sufficient for the
-  hermetic backend or add a safe retained-artifact value object before activation.
-- Web currently renders rollback readiness status and reasons only. Code Round must add candidate
-  selection/action controls after CLI, HTTP/oRPC, operation catalog, tests, and public docs are
-  synchronized.
+- `deployments.recovery-readiness` returns rollback candidate readiness and exposes rollback as an
+  active command when a retained candidate is ready.
+- `Deployment` records `triggerKind`, `sourceDeploymentId`, and
+  `rollbackCandidateDeploymentId` metadata for accepted rollback attempts.
+- Current retained artifact identity is proven through the active recovery readiness and rollback
+  command tests for the supported hermetic/runtime plan paths; future backend-specific artifact
+  retention gaps should add explicit blocked readiness reasons rather than weakening rollback
+  admission.
+- Web recovery actions are wired to readiness output and dispatch rollback only when the selected
+  candidate is allowed and active. Some broader backend compatibility and pagination rows remain
+  deferred in the recovery test matrix.

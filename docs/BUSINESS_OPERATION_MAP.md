@@ -425,19 +425,23 @@ accepted request, a durable fact, or an async process outcome.
 
 ## Rebuild-Required Deployment Behaviors
 
-ADR-016 removes these from the public v1 deployment write surface:
+ADR-016 removed these from the public v1 deployment write surface until each behavior was rebuilt
+through source-of-truth specs and implementation plans:
 
 | Behavior | Former or expected operation | Required path before implementation |
 | --- | --- | --- |
 | Cancel deployment | `deployments.cancel` | Add/update ADR if lifecycle semantics change, update this map, then command/event/workflow/error/testing specs, implementation plan, and Code Round. |
 | Manual deployment health check | `deployments.check-health` | Superseded as a public target by resource-owned `resources.health`; do not implement deployment-scoped health until a later ADR defines an attempt-specific use case distinct from current resource health. |
-| Redeploy resource | `deployments.redeploy-resource` or future equivalent | Accepted candidate is now `deployments.redeploy` under [ADR-034](./decisions/ADR-034-deployment-recovery-readiness.md); implement only after readiness query, command spec, error spec, test matrix, implementation plan, public docs/help, `CORE_OPERATIONS.md`, and operation catalog are aligned. |
+| Redeploy resource | `deployments.redeploy` | Active under [ADR-034](./decisions/ADR-034-deployment-recovery-readiness.md); keep readiness query, command spec, error spec, test matrix, implementation plan, public docs/help, `CORE_OPERATIONS.md`, and operation catalog aligned. |
 | Reattach deployment | `deployments.stream-events` or transport reconnect over the same query | Treat reconnect as read-only observation over the active deployment event stream boundary; do not reintroduce it as a write command. |
-| Retry deployment | `deployments.retry` | Accepted candidate under [ADR-034](./decisions/ADR-034-deployment-recovery-readiness.md); implement only after readiness query, command spec, error spec, test matrix, implementation plan, public docs/help, `CORE_OPERATIONS.md`, and operation catalog are aligned. |
+| Retry deployment | `deployments.retry` | Active under [ADR-034](./decisions/ADR-034-deployment-recovery-readiness.md); keep readiness query, command spec, error spec, test matrix, implementation plan, public docs/help, `CORE_OPERATIONS.md`, and operation catalog aligned. |
 | Rollback deployment | `deployments.rollback` | Active under [ADR-034](./decisions/ADR-034-deployment-recovery-readiness.md); keep retained artifact/snapshot readiness, command spec, error spec, test matrix, implementation plan, public docs/help, `CORE_OPERATIONS.md`, and operation catalog aligned. |
 
-No Web/API/CLI/MCP entrypoint may expose these behaviors until their specs are accepted and the
-operation is re-added to `CORE_OPERATIONS.md` and `operation-catalog.ts`.
+Cancel, deployment-scoped manual health check, and write-side reattach remain rebuild-required. No
+Web/API/CLI/MCP entrypoint may expose those behaviors until their specs are accepted and the
+operation is re-added to `CORE_OPERATIONS.md` and `operation-catalog.ts`. Retry, redeploy, and
+rollback are active recovery operations and must stay synchronized with their ADR-034 readiness
+contracts.
 
 ## Adding Or Changing A Behavior
 
