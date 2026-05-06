@@ -86,6 +86,65 @@ describe("operation catalog aggregate mutation boundary", () => {
     }
   });
 
+  test("[PHASE7-DAY2-MGMT-001] day-two management exit operations expose CLI and HTTP/oRPC transports", () => {
+    const dayTwoManagementOperationKeys = [
+      "resources.configure-source",
+      "resources.configure-runtime",
+      "resources.configure-network",
+      "resources.configure-access",
+      "resources.configure-health",
+      "resources.set-variable",
+      "resources.import-variables",
+      "resources.unset-variable",
+      "resources.effective-config",
+      "storage-volumes.create",
+      "storage-volumes.list",
+      "storage-volumes.show",
+      "storage-volumes.rename",
+      "storage-volumes.delete",
+      "resources.attach-storage",
+      "resources.detach-storage",
+      "dependency-resources.provision-postgres",
+      "dependency-resources.import-postgres",
+      "dependency-resources.provision-redis",
+      "dependency-resources.import-redis",
+      "dependency-resources.list",
+      "dependency-resources.show",
+      "dependency-resources.rename",
+      "dependency-resources.delete",
+      "dependency-resources.create-backup",
+      "dependency-resources.list-backups",
+      "dependency-resources.show-backup",
+      "dependency-resources.restore-backup",
+      "resources.bind-dependency",
+      "resources.unbind-dependency",
+      "resources.rotate-dependency-binding-secret",
+      "resources.list-dependency-bindings",
+      "resources.show-dependency-binding",
+      "resources.configure-auto-deploy",
+      "source-events.list",
+      "source-events.show",
+      "deployments.list",
+      "deployments.show",
+      "deployments.logs",
+      "deployments.stream-events",
+      "deployments.recovery-readiness",
+      "deployments.rollback",
+    ];
+    const entriesByKey = new Map<string, OperationCatalogEntry>(
+      operationCatalog.map((entry) => [entry.key, entry]),
+    );
+
+    for (const key of dayTwoManagementOperationKeys) {
+      const entry = entriesByKey.get(key);
+
+      expect(entry, key).toBeDefined();
+      expect(entry?.inputSchema, key).toBeDefined();
+      expect(entry?.transports.cli, key).toBeTruthy();
+      expect(entry?.transports.orpc, key).toBeDefined();
+    }
+  });
+
   test("[WEB-CLI-API-ACCESS-001][WEB-CLI-API-ACCESS-002] route and access observation reads share catalog transports", () => {
     const observationOperationKeys = [
       "resources.show",
