@@ -203,6 +203,18 @@ function dockerEnvironmentFlags(environment: readonly DockerSwarmEnvironmentVari
     .join(" ");
 }
 
+function dockerEnvironmentDisplayFlags(
+  environment: readonly DockerSwarmEnvironmentVariableIntent[],
+): string {
+  return environment
+    .map((variable) =>
+      variable.secret
+        ? `--secret ${shellQuote(`source=${variable.name},target=${variable.name}`)}`
+        : `--env ${shellQuote(`${variable.name}=********`)}`,
+    )
+    .join(" ");
+}
+
 function dockerHealthFlags(health: DockerSwarmHealthIntent | undefined): string {
   if (!health?.enabled) {
     return "";
@@ -567,6 +579,15 @@ export function renderDockerSwarmApplyPlan(
     dockerHealthFlags(intent.health),
     shellQuote(intent.workload.image),
   ]);
+  const createDisplayCommand = commandParts([
+    "docker service create",
+    `--name ${shellQuote(intent.serviceName)}`,
+    dockerLabelFlags(intent.labels),
+    `--network ${shellQuote(primaryNetwork)}`,
+    dockerEnvironmentDisplayFlags(intent.environment),
+    dockerHealthFlags(intent.health),
+    shellQuote(intent.workload.image),
+  ]);
 
   const verifyCommand = commandParts([
     "docker service ps",
@@ -602,7 +623,7 @@ export function renderDockerSwarmApplyPlan(
       {
         step: "create-candidate-service",
         command: createCommand,
-        displayCommand: createCommand,
+        displayCommand: createDisplayCommand,
       },
       {
         step: "verify-candidate-service",
