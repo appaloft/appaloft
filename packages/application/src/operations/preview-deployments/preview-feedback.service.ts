@@ -4,7 +4,9 @@ import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
   type Clock,
+  type PreviewDeploymentStatusState,
   type PreviewFeedbackChannel,
+  type PreviewFeedbackRecord,
   type PreviewFeedbackRecorder,
   type PreviewFeedbackWriter,
 } from "../../ports";
@@ -19,6 +21,7 @@ export interface PublishPreviewFeedbackInput {
   pullRequestNumber: number;
   body: string;
   providerDeploymentId?: string;
+  deploymentStatusState?: PreviewDeploymentStatusState;
 }
 
 export type PublishPreviewFeedbackStatus = "created" | "updated" | "retryable-failed" | "failed";
@@ -43,6 +46,8 @@ export interface PublishPreviewCleanupFeedbackResult {
   providerFeedbackId?: string;
   errorCode?: string;
   retryable?: boolean;
+  updatedFeedback?: boolean;
+  removedProviderMetadata?: boolean;
 }
 
 @injectable()
@@ -116,12 +121,61 @@ export class PreviewFeedbackService {
     context: ExecutionContext,
     input: PublishPreviewCleanupFeedbackInput,
   ): Promise<Result<PublishPreviewCleanupFeedbackResult>> {
+    const comment = await this.publishCleanupChannel(context, input, "github-pr-comment");
+    if (comment.isErr()) {
+      return comment;
+    }
+    if (comment.value.status === "retryable-failed" || comment.value.status === "failed") {
+      return ok({
+        ...comment.value,
+        updatedFeedback: true,
+        removedProviderMetadata: false,
+      });
+    }
+
+    const deploymentStatus = await this.publishCleanupChannel(
+      context,
+      input,
+      "github-deployment-status",
+    );
+    if (deploymentStatus.isErr()) {
+      return deploymentStatus;
+    }
+    if (
+      deploymentStatus.value.status === "retryable-failed" ||
+      deploymentStatus.value.status === "failed"
+    ) {
+      return ok({
+        ...deploymentStatus.value,
+        updatedFeedback: comment.value.status !== "skipped",
+        removedProviderMetadata: false,
+      });
+    }
+
+    return ok({
+      status: cleanupUpdateStatus(comment.value, deploymentStatus.value),
+      ...((comment.value.providerFeedbackId ?? deploymentStatus.value.providerFeedbackId)
+        ? {
+            providerFeedbackId:
+              comment.value.providerFeedbackId ?? deploymentStatus.value.providerFeedbackId,
+          }
+        : {}),
+      updatedFeedback: comment.value.status !== "skipped",
+      removedProviderMetadata: deploymentStatus.value.status !== "skipped",
+    });
+  }
+
+  private async publishCleanupChannel(
+    context: ExecutionContext,
+    input: PublishPreviewCleanupFeedbackInput,
+    channel: PreviewFeedbackChannel,
+  ): Promise<Result<PublishPreviewCleanupFeedbackResult>> {
     const repositoryContext = toRepositoryContext(context);
     const existing = await this.previewFeedbackRecorder.findLatestForPreviewEnvironment(
       repositoryContext,
       {
         previewEnvironmentId: input.previewEnvironmentId,
-        channel: "github-pr-comment",
+        channel,
       },
     );
 
@@ -137,6 +191,21 @@ export class PreviewFeedbackService {
       repositoryFullName: input.repositoryFullName,
       pullRequestNumber: input.pullRequestNumber,
       body: input.body,
+      ...(isDeploymentStatusRecord(existing) ? { deploymentStatusState: "inactive" as const } : {}),
     });
   }
+}
+
+function isDeploymentStatusRecord(record: PreviewFeedbackRecord): boolean {
+  return record.channel === "github-deployment-status";
+}
+
+function cleanupUpdateStatus(
+  comment: PublishPreviewCleanupFeedbackResult,
+  deploymentStatus: PublishPreviewCleanupFeedbackResult,
+): PublishPreviewCleanupFeedbackStatus {
+  if (comment.status !== "skipped") {
+    return comment.status;
+  }
+  return deploymentStatus.status;
 }

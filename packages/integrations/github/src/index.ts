@@ -602,8 +602,11 @@ export class GitHubPreviewDeploymentStatusFeedbackWriter implements PreviewFeedb
             method: "POST",
             headers: githubJsonHeaders(this.accessToken),
             body: JSON.stringify({
-              state: "success",
-              description: "Appaloft preview deployment accepted",
+              state: input.deploymentStatusState ?? "success",
+              description:
+                input.deploymentStatusState === "inactive"
+                  ? "Appaloft preview cleanup completed"
+                  : "Appaloft preview deployment accepted",
               environment: "preview",
               auto_inactive: false,
             }),
