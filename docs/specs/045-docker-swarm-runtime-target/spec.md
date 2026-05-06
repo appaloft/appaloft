@@ -151,6 +151,9 @@ No new public operation key is accepted in this Spec Round.
   written to deployment logs or execution metadata. This covers common bearer/basic auth text,
   cookies, key/value secrets, URL credentials, private-key blocks, and exact deployment snapshot
   secret values.
+- Swarm apply-plan display commands redact non-secret runtime environment values while the
+  executable command retains the real value for the explicitly composed runner. Runtime secret
+  values remain represented as Docker secret references only.
 - The opt-in Swarm execution backend now has a bounded shell command runner that can execute the
   rendered apply, verify, promote, and cleanup commands and preserve stdout/stderr/exit-code
   results for backend handling. The runner is exported for explicit composition and is still not

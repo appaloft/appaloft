@@ -60,6 +60,8 @@ implemented, but no Docker Swarm execution backend is active in the default runt
 - `SWARM-TARGET-SECRET-001` has initial render-contract coverage proving runtime secret environment
   values are converted to safe references and omitted from serialized render intent. Registry pull
   credential and provider response redaction remain open with apply/log/diagnostic adapters.
+  Rendered Swarm apply-plan display commands now redact non-secret runtime environment values while
+  retaining the executable command internally for explicit execution.
 - `SWARM-TARGET-APPLY-001` has initial adapter contract coverage proving OCI image apply planning
   creates a deployment-specific candidate service before verification, route promotion, and
   superseded-service cleanup. The opt-in fake backend now executes that order, records sanitized

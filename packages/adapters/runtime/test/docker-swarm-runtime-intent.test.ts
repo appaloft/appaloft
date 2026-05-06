@@ -344,6 +344,7 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     ]);
 
     const createCommand = plan.steps[0]?.command ?? "";
+    const createDisplayCommand = plan.steps[0]?.displayCommand ?? "";
     expect(createCommand).toContain("docker service create");
     expect(createCommand).toContain("--name 'appaloft-res-api-dst-prod-dep-123_web'");
     expect(createCommand).toContain("--network 'appaloft-edge'");
@@ -355,6 +356,10 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(createCommand).not.toContain("-p ");
     expect(createCommand).not.toContain("postgres://secret-value");
     expect(createCommand).not.toContain("traefik.http.routers");
+    expect(createDisplayCommand).toContain("--env 'PUBLIC_FLAG=********'");
+    expect(createDisplayCommand).toContain("--secret 'source=DATABASE_URL,target=DATABASE_URL'");
+    expect(createDisplayCommand).not.toContain("PUBLIC_FLAG=enabled");
+    expect(createDisplayCommand).not.toContain("postgres://secret-value");
 
     const promoteCommand = plan.steps[2]?.command ?? "";
     expect(plan.routeLabels).toContain("traefik.enable=true");
