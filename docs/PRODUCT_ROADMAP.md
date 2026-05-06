@@ -1290,6 +1290,11 @@ Current verification notes:
   repository/read-model ports, operation catalog entries, and tests. Durable policy persistence,
   active transports, GitHub App ingestion, feedback, cleanup retry, and preview environment
   entrypoints remain open.
+- 2026-05-06 Phase 7 preview policy persistence slice added Postgres/PGlite storage and shell
+  wiring for inactive `preview-policies.configure` / `preview-policies.show` operation contracts.
+  Safe read models now return configured or default project/Resource policy summaries without
+  exposing idempotency keys, provider payloads, or secret material. Active transports, GitHub App
+  ingestion, feedback, cleanup retry, and preview environment entrypoints remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,

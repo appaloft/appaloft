@@ -45,6 +45,7 @@
   default fork-secret decisions.
 - [x] Add preview policy command/query schemas, handlers, read models, and operation catalog
   entries.
+- [x] Add preview policy persistence/read model adapter.
 - [x] Add core preview environment aggregate state.
 - [x] Add preview environment read models and persistence.
 - [ ] Extend source event ingestion for GitHub App pull request preview events.

@@ -195,10 +195,13 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
 - Preview policy now has inactive application operation contracts for `preview-policies.configure`
   and `preview-policies.show`, including shared command/query schemas, handlers, repository/read
   model ports, and operation catalog entries without CLI/oRPC/Web transports.
+- Postgres/PGlite persistence now stores configured preview policy records for project and Resource
+  scopes. The safe read model returns configured or default policy summaries without idempotency
+  keys, secret references, provider payloads, or active transport exposure.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
-- No durable preview policy persistence adapter, GitHub App preview worker, feedback writer,
-  cleanup scheduler, or cleanup retry state is implemented.
+- No GitHub App preview worker, feedback writer, cleanup scheduler, or cleanup retry state is
+  implemented.
 - No active operation catalog entries exist for `preview-policies.*` or `preview-environments.*`.
 - Product-grade preview public docs/help are not yet implemented.
 

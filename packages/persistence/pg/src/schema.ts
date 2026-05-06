@@ -447,6 +447,19 @@ export interface PreviewEnvironmentsTable {
   expires_at: NullableUpdatableTimestampColumn;
 }
 
+export interface PreviewPoliciesTable {
+  id: string;
+  scope_kind: string;
+  scope_key: string;
+  project_id: string;
+  resource_id: string | null;
+  same_repository_previews: boolean;
+  fork_previews: string;
+  secret_backed_previews: boolean;
+  last_idempotency_key: string | null;
+  updated_at: UpdatableTimestampColumn;
+}
+
 export interface DefaultAccessDomainPoliciesTable {
   id: string;
   scope_key: string;
@@ -610,6 +623,7 @@ export interface Database {
   source_links: SourceLinksTable;
   source_events: SourceEventsTable;
   preview_environments: PreviewEnvironmentsTable;
+  preview_policies: PreviewPoliciesTable;
   default_access_domain_policies: DefaultAccessDomainPoliciesTable;
   server_applied_route_states: ServerAppliedRouteStatesTable;
   mutation_coordinations: MutationCoordinationsTable;

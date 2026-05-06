@@ -511,6 +511,10 @@ Boundary rule:
 - public rollback is active under ADR-016/ADR-034, and rollback plans in the v1 model reference
   prior deployment snapshots and Docker/OCI runtime artifact identity rather than reconstructing
   host-process command state
+- `PreviewPolicy` is currently an application/persistence control-plane record, not a core
+  aggregate. It stores project- or Resource-scoped preview policy settings for same-repository
+  previews, fork preview mode, and secret-backed preview eligibility; durable read models expose
+  safe configured/default summaries without idempotency keys, provider payloads, or secret material.
 - `PreviewEnvironment` is the product-grade preview lifecycle identity for one preview scope, such
   as a GitHub pull request. It records project/environment/resource/target placement, safe source
   fingerprint context, provider-neutral status, expiry, and cleanup-request state. It does not own
