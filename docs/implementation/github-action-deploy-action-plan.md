@@ -424,12 +424,16 @@ The main repository now also contains a reference composite action under
   cleanup, PR preview flag mapping, CLI preview-output-file handling, preview cleanup command
   mapping, Marketplace README examples, no-config default behavior, and unsupported control-plane
   input rejection.
+- `scripts/export-deploy-action-wrapper.ts`, which mirrors the reference action metadata,
+  Marketplace README, and install/deploy scripts into a standalone directory with executable script
+  bits preserved for the future public `appaloft/deploy-action` repository. The wrapper test suite
+  verifies the exported repository layout matches the reference action.
 
 Missing pieces before public release:
 
 - create the `appaloft/deploy-action` repository;
-- promote or mirror the reference `action.yml`, Marketplace README, install scripts, and wrapper
-  tests into the public wrapper repository;
+- run the export script into the public wrapper repository and wire public wrapper CI to the
+  exported layout;
 - add a wrapper-level CI test that verifies exact-version install from a fixture or real release;
 - add control-plane mode inputs only after the CLI resolver/parser and structured unsupported
   errors exist;
