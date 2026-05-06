@@ -955,8 +955,17 @@ describe("PreviewPullRequestEventIngestService", () => {
       feedbackRecorder,
       new FixedClock("2026-05-06T04:21:00.000Z"),
     );
+    const cleaner = new CapturingPreviewEnvironmentCleaner();
+    const cleanupRecorder = new InMemoryPreviewCleanupAttemptRecorder();
+    const cleanup = new PreviewEnvironmentCleanupService(
+      repository,
+      cleaner,
+      cleanupRecorder,
+      new FixedClock("2026-05-06T04:22:00.000Z"),
+      new SequentialIdGenerator(),
+    );
     const processManager = new PreviewDeploymentProcessManager(lifecycle, feedbackService);
-    const ingest = new PreviewPullRequestEventIngestService(processManager);
+    const ingest = new PreviewPullRequestEventIngestService(processManager, repository, cleanup);
     const context = createExecutionContext({
       requestId: "req_preview_pull_request_ingest_test",
       entrypoint: "system",
@@ -1040,6 +1049,196 @@ describe("PreviewPullRequestEventIngestService", () => {
       status: "published",
       providerFeedbackId: "github_feedback_1",
       updatedAt: "2026-05-06T04:21:00.000Z",
+    });
+  });
+
+  test("[PG-PREVIEW-CLEANUP-001] routes closed pull request events into preview cleanup", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const lifecycle = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      projection,
+      new FixedClock("2026-05-06T04:25:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const feedbackService = new PreviewFeedbackService(
+      new CapturingPreviewFeedbackWriter(),
+      new InMemoryPreviewFeedbackRecorder(),
+      new FixedClock("2026-05-06T04:26:00.000Z"),
+    );
+    const cleaner = new CapturingPreviewEnvironmentCleaner();
+    const cleanupRecorder = new InMemoryPreviewCleanupAttemptRecorder();
+    const cleanup = new PreviewEnvironmentCleanupService(
+      repository,
+      cleaner,
+      cleanupRecorder,
+      new FixedClock("2026-05-06T04:30:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const ingest = new PreviewPullRequestEventIngestService(
+      new PreviewDeploymentProcessManager(lifecycle, feedbackService),
+      repository,
+      cleanup,
+    );
+    const context = createExecutionContext({
+      requestId: "req_preview_pull_request_closed_cleanup_test",
+      entrypoint: "system",
+    });
+
+    const opened = await ingest.ingest(context, {
+      sourceEventId: "sevt_preview_pull_request_closed_opened",
+      event: {
+        provider: "github",
+        eventKind: "pull-request",
+        eventAction: "opened",
+        repositoryFullName: "appaloft/demo",
+        headRepositoryFullName: "appaloft/demo",
+        pullRequestNumber: 49,
+        headSha: "abc1234",
+        baseRef: "main",
+        verified: true,
+        deliveryId: "delivery_preview_49_opened",
+      },
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_49",
+    });
+    const closed = await ingest.ingest(context, {
+      sourceEventId: "sevt_preview_pull_request_closed",
+      event: {
+        provider: "github",
+        eventKind: "pull-request",
+        eventAction: "closed",
+        repositoryFullName: "appaloft/demo",
+        headRepositoryFullName: "appaloft/demo",
+        pullRequestNumber: 49,
+        headSha: "abc1234",
+        baseRef: "main",
+        verified: true,
+        deliveryId: "delivery_preview_49_closed",
+      },
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_49",
+    });
+
+    expect(opened.isOk()).toBe(true);
+    expect(closed.isOk()).toBe(true);
+    expect(closed._unsafeUnwrap()).toEqual({
+      status: "cleanup-routed",
+      cleanupResult: {
+        status: "cleaned",
+        attemptId: "pcln_1",
+        previewEnvironmentId: "prenv_1",
+        resourceId: "res_preview_api",
+        sourceBindingFingerprint: "srcfp_preview_49",
+        previewEnvironmentStatus: "cleanup-requested",
+        cleanedRuntime: true,
+        removedRoute: true,
+        removedSourceLink: true,
+        removedProviderMetadata: true,
+        updatedFeedback: true,
+      },
+    });
+    expect(cleaner.inputs).toEqual([
+      {
+        previewEnvironmentId: "prenv_1",
+        resourceId: "res_preview_api",
+        sourceBindingFingerprint: "srcfp_preview_49",
+        provider: "github",
+        repositoryFullName: "appaloft/demo",
+        pullRequestNumber: 49,
+      },
+    ]);
+    expect(cleanupRecorder.records).toEqual([
+      {
+        attemptId: "pcln_1",
+        previewEnvironmentId: "prenv_1",
+        resourceId: "res_preview_api",
+        sourceBindingFingerprint: "srcfp_preview_49",
+        owner: "req_preview_pull_request_closed_cleanup_test",
+        status: "succeeded",
+        phase: "preview-cleanup",
+        attemptedAt: "2026-05-06T04:30:00.000Z",
+        updatedAt: "2026-05-06T04:30:00.000Z",
+      },
+    ]);
+    expect(repository.previewEnvironment?.toState()).toMatchObject({
+      id: { value: "prenv_1" },
+      status: { value: "cleanup-requested" },
+      updatedAt: { value: "2026-05-06T04:30:00.000Z" },
+    });
+  });
+
+  test("[PG-PREVIEW-CLEANUP-001] treats closed pull request cleanup as idempotent when no preview exists", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const cleanup = new PreviewEnvironmentCleanupService(
+      repository,
+      new CapturingPreviewEnvironmentCleaner(),
+      new InMemoryPreviewCleanupAttemptRecorder(),
+      new FixedClock("2026-05-06T04:35:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const ingest = new PreviewPullRequestEventIngestService(
+      new PreviewDeploymentProcessManager(
+        new PreviewLifecycleService(
+          repository,
+          new CapturingPreviewDeploymentDispatcher(),
+          new InMemoryPreviewPolicyDecisionProjection(),
+          new InMemoryPreviewPolicyDecisionProjection(),
+          new FixedClock("2026-05-06T04:35:00.000Z"),
+          new SequentialIdGenerator(),
+        ),
+        new PreviewFeedbackService(
+          new CapturingPreviewFeedbackWriter(),
+          new InMemoryPreviewFeedbackRecorder(),
+          new FixedClock("2026-05-06T04:35:00.000Z"),
+        ),
+      ),
+      repository,
+      cleanup,
+    );
+
+    const result = await ingest.ingest(
+      createExecutionContext({
+        requestId: "req_preview_pull_request_closed_missing_test",
+        entrypoint: "system",
+      }),
+      {
+        sourceEventId: "sevt_preview_pull_request_closed_missing",
+        event: {
+          provider: "github",
+          eventKind: "pull-request",
+          eventAction: "closed",
+          repositoryFullName: "appaloft/demo",
+          headRepositoryFullName: "appaloft/demo",
+          pullRequestNumber: 49,
+          headSha: "abc1234",
+          baseRef: "main",
+          verified: true,
+          deliveryId: "delivery_preview_49_closed_missing",
+        },
+        projectId: "prj_preview",
+        environmentId: "env_preview",
+        resourceId: "res_preview_api",
+        serverId: "srv_preview",
+        destinationId: "dst_preview",
+        sourceBindingFingerprint: "srcfp_preview_49",
+      },
+    );
+
+    expect(result._unsafeUnwrap()).toEqual({
+      status: "ignored",
+      reason: "preview-environment-not-found",
     });
   });
 });

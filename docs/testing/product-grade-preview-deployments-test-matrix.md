@@ -142,6 +142,10 @@ runner config and environment overrides for preview cleanup retry scheduling.
 product-grade preview environment cleanup to the existing source-fingerprint
 `deployments.cleanup-preview` primitive and preserves retryable failures with safe preview scope
 details.
+`packages/application/test/product-grade-preview-policy.test.ts` now also covers closed GitHub
+pull-request ingestion routing through source-scope preview environment lookup into the preview
+cleanup service, plus idempotent ignored results when a closed event has no durable preview
+environment.
 `PG-PREVIEW-SURFACE-001` has initial operation coverage in
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
@@ -185,9 +189,9 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-GitHub App route wiring, automatic process-manager deployment-status publication, scheduler leases,
-terminal provider metadata cleanup, cleanup-side feedback updates, and active GitHub App preview
-worker transports remain open.
+Automatic process-manager deployment-status publication, scheduler leases, terminal provider
+metadata cleanup, cleanup-side feedback updates, repository/installation mapping, and active GitHub
+App preview worker transports remain open.
 Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 

@@ -234,8 +234,9 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   pull request, branch, route, and source details stay in preview/source read-model state.
 - Preview pull-request event ingestion now has an application service that accepts safe normalized
   GitHub preview facts plus selected control-plane context, routes create/update actions into the
-  preview lifecycle service, and leaves closed-event cleanup as an explicit ignored outcome until
-  cleanup process state is implemented.
+  preview lifecycle service, and routes closed pull-request events through source-scope preview
+  environment lookup into the preview cleanup service. Closed events with no durable preview
+  environment return an idempotent ignored result instead of creating cleanup state.
 - Preview feedback now has initial application ports and service coverage for idempotent provider
   feedback updates. Existing provider feedback ids are reused for update-in-place, and retryable
   provider failures are recorded as safe feedback state while publish returns `ok`.
@@ -282,7 +283,8 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   `IngestPreviewPullRequestEventCommand` through `CommandBus`. Raw signatures, secrets, and
   provider payloads stay out of the command.
 - No GitHub App installation/repository context mapper, scheduler leases, terminal provider
-  metadata cleanup, or automatic process-manager deployment-status publication is implemented.
+  metadata cleanup, cleanup-side feedback update, or automatic process-manager deployment-status
+  publication is implemented.
 - Preview policy and preview environment operations currently expose CLI, HTTP/oRPC, and generated
   future MCP tool descriptors. Web exposes preview policy readback/configuration and the read-only
   preview environment list/detail/delete surface.

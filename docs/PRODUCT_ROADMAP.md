@@ -1334,9 +1334,9 @@ Current verification notes:
   environment entrypoints remain open.
 - 2026-05-06 Phase 7 preview pull-request ingestion slice added an application service that routes
   safe normalized GitHub pull-request preview facts into preview lifecycle using selected
-  control-plane context, while closed-event cleanup remains an ignored outcome until cleanup
-  process state exists. GitHub App HTTP routes, feedback, cleanup retry, and active preview
-  environment entrypoints remain open.
+  control-plane context. This initial slice left closed-event cleanup ignored until cleanup process
+  state existed. GitHub App HTTP routes, feedback, cleanup retry, and active preview environment
+  entrypoints remained open at that point.
 - 2026-05-06 Phase 7 preview deployment process-manager slice composed policy evaluation,
   preview environment state, ids-only deployment dispatch, and PR-comment feedback. Accepted
   preview deployments now publish idempotent source-event-keyed `github-pr-comment` feedback, and
@@ -1409,6 +1409,12 @@ Current verification notes:
   context headers for project/environment/Resource/server/destination/source-fingerprint selection.
   Repository or installation mapping, scheduler leases, terminal provider metadata cleanup, and
   automatic deployment-status publication remain open.
+- 2026-05-06 Phase 7 preview closed-event cleanup slice routed GitHub `pull_request.closed`
+  ingestion through source-scope preview environment lookup into the preview cleanup service.
+  Existing previews now preserve history while requesting runtime/route/source-link/provider/
+  feedback cleanup, and missing previews return an idempotent ignored result. Repository or
+  installation mapping, scheduler leases, terminal provider metadata cleanup, cleanup-side feedback
+  update, and automatic deployment-status publication remain open.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
   and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
@@ -1455,9 +1461,10 @@ Required:
   retries. Spec Round is positioned in
   [docs/specs/046-product-grade-preview-deployments](./specs/046-product-grade-preview-deployments/spec.md)
   with a dedicated test matrix; preview policy/environment operations, feedback, cleanup retry,
-  Web/API/CLI/future MCP surfaces, public docs, and an initial signed GitHub pull-request HTTP
-  route are implemented. Repository or installation mapping, scheduler leases, terminal provider
-  metadata cleanup, and automatic deployment-status publication remain open.
+  Web/API/CLI/future MCP surfaces, public docs, an initial signed GitHub pull-request HTTP route,
+  and close-event cleanup routing are implemented. Repository or installation mapping, scheduler
+  leases, terminal provider metadata cleanup, cleanup-side feedback update, and automatic
+  deployment-status publication remain open.
 - [x] Add scheduled task/cron resource shape with run history and logs after workload service
   semantics are specified. ADR-039/spec matrix now position ownership and target operations.
 - [x] Complete the Docker Swarm Spec Round as the first cluster runtime target:
