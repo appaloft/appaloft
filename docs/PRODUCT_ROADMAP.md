@@ -943,6 +943,10 @@ Current verification notes:
   delete is blocked by active binding, backup retention, and retained deployment snapshot/reference
   blockers before provider cleanup runs. Final Redis observe and closed-loop verification remains
   open.
+- 2026-05-06 Phase 7 managed Redis entrypoint contract coverage slice verified provider-native
+  Redis realization reuses the existing operation catalog entries, CLI commands, and HTTP/oRPC
+  routes for provision, bind, and delete without leaking provider SDK shapes or raw secret fields.
+  Final Redis observe and closed-loop verification remains open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider

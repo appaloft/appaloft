@@ -25,7 +25,7 @@
   provider cleanup coverage.
 - [x] DEP-RES-REDIS-NATIVE-006: add managed Redis provider cleanup tests.
 - [x] DEP-RES-REDIS-NATIVE-008: add unsupported-provider tests.
-- [ ] DEP-RES-REDIS-NATIVE-009: add operation catalog/contract/entrypoint tests if schemas change.
+- [x] DEP-RES-REDIS-NATIVE-009: add operation catalog/contract/entrypoint tests if schemas change.
 - [x] Add PG/PGlite persistence tests for Redis realization state and safe read models.
 
 ## Code Round
@@ -44,18 +44,18 @@
 
 ## Entrypoints And Docs
 
-- [ ] Reuse or extend CLI Redis provision/delete/bind commands.
-- [ ] Reuse or extend oRPC/HTTP Redis provision/delete/bind routes.
-- [ ] Keep operation catalog entries aligned with any schema changes.
-- [ ] Update public docs/help anchors or record explicit Web/public-docs migration gaps.
+- [x] Reuse CLI Redis provision/delete/bind commands.
+- [x] Reuse oRPC/HTTP Redis provision/delete/bind routes.
+- [x] Keep operation catalog entries aligned with schema reuse.
+- [x] Update public docs/help anchors or record explicit Web/public-docs migration gaps.
 
 ## Verification
 
 - [x] Run related application tests.
 - [x] Run PG/PGlite dependency resource tests.
 - [x] Run runtime adapter tests for `REDIS_URL` materialization if touched.
-- [ ] Run CLI/oRPC/HTTP tests touched by route/schema changes.
-- [ ] Run operation catalog boundary tests.
+- [x] Run CLI/oRPC/HTTP tests touched by route/schema changes.
+- [x] Run operation catalog boundary tests.
 - [ ] Run `bun run lint`.
 - [ ] Run `bun turbo run typecheck`.
 - [ ] Run `git diff --check`.
