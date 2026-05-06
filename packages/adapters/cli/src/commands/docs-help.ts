@@ -94,6 +94,22 @@ export const cliCommandDescriptions = {
     "Show effective product-grade preview policy for a project or resource",
     "deployment.product-grade-previews",
   ),
+  previewEnvironment: withDocs(
+    "Product-grade preview environment commands",
+    "deployment.product-grade-previews",
+  ),
+  previewEnvironmentList: withDocs(
+    "List product-grade preview environments",
+    "deployment.product-grade-previews",
+  ),
+  previewEnvironmentShow: withDocs(
+    "Show one product-grade preview environment",
+    "deployment.product-grade-previews",
+  ),
+  previewEnvironmentDelete: withDocs(
+    "Request cleanup for one product-grade preview environment",
+    "deployment.product-grade-previews",
+  ),
   sourceLinks: withDocs("Source fingerprint link operations", "deployment.source-relink"),
   sourceLinkRelink: withDocs(
     "Relink a source fingerprint to an explicit resource",

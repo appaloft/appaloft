@@ -109,6 +109,16 @@ describe("CLI docs help links", () => {
       cliDocsHrefs.productGradePreviews,
     );
     expect(cliCommandDescriptions.previewPolicyShow).toContain(cliDocsHrefs.productGradePreviews);
+    expect(cliCommandDescriptions.previewEnvironment).toContain(cliDocsHrefs.productGradePreviews);
+    expect(cliCommandDescriptions.previewEnvironmentList).toContain(
+      cliDocsHrefs.productGradePreviews,
+    );
+    expect(cliCommandDescriptions.previewEnvironmentShow).toContain(
+      cliDocsHrefs.productGradePreviews,
+    );
+    expect(cliCommandDescriptions.previewEnvironmentDelete).toContain(
+      cliDocsHrefs.productGradePreviews,
+    );
     expect(cliCommandDescriptions.deploymentPlan).toContain(cliDocsHrefs.deploymentPlanPreview);
     expect(cliCommandDescriptions.sourceLinkRelink).toContain(cliDocsHrefs.deploymentSourceRelink);
     expect(cliCommandDescriptions.remoteStateLockInspect).toContain(cliDocsHrefs.remoteStateLock);

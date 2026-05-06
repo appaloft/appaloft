@@ -295,7 +295,7 @@ describe("preview policy operations", () => {
     expect(JSON.stringify(shown._unsafeUnwrap())).not.toContain("token");
   });
 
-  test("[PG-PREVIEW-SURFACE-001] preview environment catalog entries expose HTTP API transports", () => {
+  test("[PG-PREVIEW-SURFACE-001] preview environment catalog entries expose CLI and HTTP API transports", () => {
     const list = operationCatalog.find((entry) => entry.key === "preview-environments.list");
     const show = operationCatalog.find((entry) => entry.key === "preview-environments.show");
     const remove = operationCatalog.find((entry) => entry.key === "preview-environments.delete");
@@ -307,6 +307,7 @@ describe("preview policy operations", () => {
       handlerName: "ListPreviewEnvironmentsQueryHandler",
       serviceName: "ListPreviewEnvironmentsQueryService",
       transports: {
+        cli: "appaloft preview environment list",
         orpc: { method: "GET", path: "/api/preview-environments" },
       },
     });
@@ -317,6 +318,7 @@ describe("preview policy operations", () => {
       handlerName: "ShowPreviewEnvironmentQueryHandler",
       serviceName: "ShowPreviewEnvironmentQueryService",
       transports: {
+        cli: "appaloft preview environment show",
         orpc: { method: "GET", path: "/api/preview-environments/{previewEnvironmentId}" },
       },
     });
@@ -327,6 +329,7 @@ describe("preview policy operations", () => {
       handlerName: "DeletePreviewEnvironmentCommandHandler",
       serviceName: "PreviewEnvironmentCleanupService",
       transports: {
+        cli: "appaloft preview environment delete",
         orpc: {
           method: "DELETE",
           path: "/api/resources/{resourceId}/preview-environments/{previewEnvironmentId}",
