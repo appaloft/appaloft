@@ -65,6 +65,10 @@ ids-only deployment request without copying pull-request source facts into deplo
 `packages/application/test/preview-policy-operations.test.ts` for shared
 `preview-policies.configure` / `preview-policies.show` schemas, handlers, read model output, and
 operation catalog entries with no active transports.
+`PG-PREVIEW-SURFACE-001` now also has Postgres/PGlite persistence coverage in
+`packages/persistence/pg/test/preview-policy.pglite.test.ts` for project/resource-scoped policy
+storage, configured/default safe summaries, idempotency-key retention on the write side, and
+read-model omission of idempotency keys or secret-shaped material.
 
 `PG-PREVIEW-ENV-001` and `PG-PREVIEW-CLEANUP-001` have initial core-domain coverage in
 `packages/core/test/preview-environment.test.ts`. The coverage proves scoped preview environment

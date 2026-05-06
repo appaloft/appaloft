@@ -29,6 +29,8 @@ import {
   ConfigureDefaultAccessDomainPolicyUseCase,
   ConfigureDomainBindingRouteCommandHandler,
   ConfigureDomainBindingRouteUseCase,
+  ConfigurePreviewPolicyCommandHandler,
+  ConfigurePreviewPolicyUseCase,
   ConfigureResourceAccessCommandHandler,
   ConfigureResourceAccessUseCase,
   ConfigureResourceAutoDeployCommandHandler,
@@ -164,6 +166,7 @@ import {
   MarkServerAppliedRouteStatusOnDeploymentFinishedHandler,
   OpenTerminalSessionUseCase,
   OperatorWorkQueryService,
+  PreviewLifecycleService,
   PromoteEnvironmentUseCase,
   ProvisionPostgresDependencyResourceCommandHandler,
   ProvisionPostgresDependencyResourceUseCase,
@@ -235,6 +238,8 @@ import {
   ShowDomainBindingQueryService,
   ShowEnvironmentQueryService,
   ShowOperatorWorkQueryHandler,
+  ShowPreviewPolicyQueryHandler,
+  ShowPreviewPolicyQueryService,
   ShowProjectQueryHandler,
   ShowProjectQueryService,
   ShowResourceDependencyBindingQueryHandler,
@@ -367,6 +372,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(CheckServerDeleteSafetyQueryHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
   container.registerSingleton(ConfigureDefaultAccessDomainPolicyCommandHandler);
+  container.registerSingleton(ConfigurePreviewPolicyCommandHandler);
+  container.registerSingleton(ShowPreviewPolicyQueryHandler);
   container.registerSingleton(ListDefaultAccessDomainPoliciesQueryHandler);
   container.registerSingleton(ShowDefaultAccessDomainPolicyQueryHandler);
   container.registerSingleton(ConfigureServerEdgeProxyCommandHandler);
@@ -481,6 +488,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.showDefaultAccessDomainPolicyQueryService,
     ShowDefaultAccessDomainPolicyQueryService,
   );
+  container.registerSingleton(tokens.configurePreviewPolicyUseCase, ConfigurePreviewPolicyUseCase);
+  container.registerSingleton(tokens.showPreviewPolicyQueryService, ShowPreviewPolicyQueryService);
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
   container.registerSingleton(tokens.archiveResourceUseCase, ArchiveResourceUseCase);
   container.registerSingleton(tokens.deleteResourceUseCase, DeleteResourceUseCase);
@@ -504,6 +513,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.sourceEventDeploymentDispatcher,
     CreateDeploymentSourceEventDispatcher,
   );
+  container.registerSingleton(tokens.previewLifecycleService, PreviewLifecycleService);
   container.registerSingleton(
     tokens.configureResourceHealthUseCase,
     ConfigureResourceHealthUseCase,
