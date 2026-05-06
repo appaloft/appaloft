@@ -907,6 +907,12 @@ Current verification notes:
   `deployments.create`, reports `dependency_runtime_secret_unresolved` safely in plan output, and
   rejects create before deployment acceptance when resolution fails. Runtime target value
   materialization remains open, so Postgres/Redis closed-loop exit criteria remain open.
+- 2026-05-06 Phase 7 single-server dependency runtime secret materialization Code Round slice now
+  resolves Appaloft-owned dependency refs into execution-only environment values for local-shell
+  and generic-SSH runtimes, includes dependency target env vars in Docker container launch specs,
+  and redacts resolved values in display/output paths. Docker Swarm secret materialization and
+  historical rotated-ref execution coverage remain open, so Postgres/Redis closed-loop exit
+  criteria remain open.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider

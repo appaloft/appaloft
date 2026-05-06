@@ -6,6 +6,7 @@ import {
   type AppLogger,
   type DeploymentExecutionGuard,
   type DeploymentProgressReporter,
+  type DependencyResourceSecretStore,
   type EdgeProxyProviderRegistry,
   type ExecutionBackend,
   type ExecutionContext,
@@ -64,6 +65,7 @@ import {
   renderRuntimeCommandString,
 } from "./runtime-commands";
 import { runStreamingProcess } from "./streaming-process";
+import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
 import { normalizeGeneratedDockerBuildAssetPath } from "./generated-docker-build-assets";
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 
@@ -408,38 +410,6 @@ function runSyncShell(input: {
   };
 }
 
-function deploymentEnv(deployment: Deployment, port?: number): NodeJS.ProcessEnv {
-  const state = deployment.toState();
-  const env = {
-    ...process.env,
-    APPALOFT_DEPLOYMENT_ID: state.id.value,
-    APPALOFT_PROJECT_ID: state.projectId.value,
-    APPALOFT_ENVIRONMENT_ID: state.environmentId.value,
-    APPALOFT_RESOURCE_ID: state.resourceId.value,
-    APPALOFT_DESTINATION_ID: state.destinationId.value,
-  } as NodeJS.ProcessEnv;
-
-  for (const variable of state.environmentSnapshot.variables) {
-    env[variable.key] = variable.value;
-  }
-  for (const reference of state.dependencyBindingReferences) {
-    if (
-      reference.runtimeSecretRef &&
-      reference.snapshotReadiness.isReady() &&
-      reference.scope.value === "runtime-only" &&
-      reference.injectionMode.value === "env"
-    ) {
-      env[reference.targetName.value] = reference.runtimeSecretRef.value;
-    }
-  }
-
-  if (port) {
-    env.PORT = String(port);
-  }
-
-  return env;
-}
-
 function supersededDeploymentIdsForCleanup(input: {
   supersedesDeploymentId?: { value: string };
 }): string[] {
@@ -471,6 +441,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     private readonly remoteRuntimeRoot = "/var/lib/appaloft/runtime",
     private readonly resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined,
     private readonly deploymentExecutionGuard?: DeploymentExecutionGuard,
+    private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
   ) {}
 
   private report(
@@ -850,12 +821,14 @@ export class SshExecutionBackend implements ExecutionBackend {
     command: string;
     cwd: string;
     env: NodeJS.ProcessEnv;
+    redactions?: readonly string[];
   }) {
     return runSyncProcess({
       command: "ssh",
       args: [...this.sshArgs(input.target), input.command],
       cwd: input.cwd,
       env: input.env,
+      ...(input.redactions ? { redactions: input.redactions } : {}),
     });
   }
 
@@ -1424,7 +1397,17 @@ export class SshExecutionBackend implements ExecutionBackend {
     const remoteRoot = this.remoteRuntimeDirectory(state.id.value);
 
     const port = state.runtimePlan.execution.port ?? 3000;
-    const env = deploymentEnv(deployment, port);
+    const packageEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      port,
+      includeDependencyRuntimeSecrets: false,
+    });
+    if (packageEnv.isErr()) {
+      return err(packageEnv.error);
+    }
+    const { env, redactions } = packageEnv.value;
     const logs: DeploymentLogEntry[] = [
       phaseLog("plan", `Using SSH docker-container execution on ${target.host}:${target.port}`),
     ];
@@ -1446,6 +1429,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         command: "docker version --format '{{.Server.Version}}'",
         cwd: runtimeDir,
         env,
+        redactions,
       });
 
       if (dockerVersion.failed) {
@@ -1840,13 +1824,28 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
+      const runtimeEnv = await resolveDependencyRuntimeEnvironment({
+        context,
+        deployment,
+        dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+        port,
+      });
+      if (runtimeEnv.isErr()) {
+        return err(runtimeEnv.error);
+      }
+      const {
+        env: runtimeExecutionEnv,
+        redactions: runtimeRedactions,
+        dependencyTargetNames,
+      } = runtimeEnv.value;
       const dockerCommandBuilder = RuntimeCommandBuilder.docker();
-      const dockerEnvVariables = Object.entries(env)
+      const dockerEnvVariables = Object.entries(runtimeExecutionEnv)
         .filter((entry): entry is [string, string] => typeof entry[1] === "string")
         .filter(
           ([key]) =>
             key === "PORT" ||
             key.startsWith("APPALOFT_") ||
+            dependencyTargetNames.has(key) ||
             state.environmentSnapshot.variables.some((variable) => variable.key === key),
         )
         .map(([name, value]) => {
@@ -1856,7 +1855,9 @@ export class SshExecutionBackend implements ExecutionBackend {
           return {
             name,
             value,
-            ...(snapshotVariable?.isSecret ? { redacted: true } : {}),
+            ...(snapshotVariable?.isSecret || dependencyTargetNames.has(name)
+              ? { redacted: true }
+              : {}),
           };
       });
       const labels = dockerLabelsFromAssignments([
@@ -1909,7 +1910,8 @@ export class SshExecutionBackend implements ExecutionBackend {
         target,
         command: runCommand,
         cwd: runtimeDir,
-        env,
+        env: runtimeExecutionEnv,
+        redactions: runtimeRedactions,
         onOutput: this.createStreamingOutputSink(logs, {
           context,
           deploymentId: state.id.value,
@@ -2359,7 +2361,17 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
     const target = targetResult._unsafeUnwrap();
     const remoteRoot = this.remoteRuntimeDirectory(state.id.value);
-    const env = deploymentEnv(deployment, state.runtimePlan.execution.port);
+    const packageEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      ...(state.runtimePlan.execution.port ? { port: state.runtimePlan.execution.port } : {}),
+      includeDependencyRuntimeSecrets: false,
+    });
+    if (packageEnv.isErr()) {
+      return err(packageEnv.error);
+    }
+    const { env, redactions } = packageEnv.value;
     const logs: DeploymentLogEntry[] = [
       phaseLog(
         "plan",
@@ -2391,6 +2403,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         command: "docker version --format '{{.Server.Version}}'",
         cwd: runtimeDir,
         env,
+        redactions,
       });
 
       if (dockerVersion.failed) {
@@ -2423,6 +2436,15 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (deployOwnershipResult.isErr()) {
         return deployOwnershipResult.map(() => ({ deployment }));
       }
+      const runtimeEnv = await resolveDependencyRuntimeEnvironment({
+        context,
+        deployment,
+        dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+        ...(state.runtimePlan.execution.port ? { port: state.runtimePlan.execution.port } : {}),
+      });
+      if (runtimeEnv.isErr()) {
+        return err(runtimeEnv.error);
+      }
       const upCommand = renderRuntimeCommandString(
         RuntimeCommandBuilder.docker().composeUp({
           composeFile: remoteComposeFile,
@@ -2443,7 +2465,8 @@ export class SshExecutionBackend implements ExecutionBackend {
         target,
         command: upCommand,
         cwd: runtimeDir,
-        env,
+        env: runtimeEnv.value.env,
+        redactions: runtimeEnv.value.redactions,
         onOutput: this.createStreamingOutputSink(logs, {
           context,
           deploymentId: state.id.value,
@@ -2529,7 +2552,16 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
 
     const target = targetResult._unsafeUnwrap();
-    const env = deploymentEnv(deployment);
+    const runtimeEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      includeDependencyRuntimeSecrets: false,
+    });
+    if (runtimeEnv.isErr()) {
+      return err(runtimeEnv.error);
+    }
+    const { env, redactions } = runtimeEnv.value;
     const runtimeInstanceNames = deriveRuntimeInstanceNames({
       deploymentId: state.id.value,
       metadata: state.runtimePlan.execution.metadata,
@@ -2545,6 +2577,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           command: `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
           cwd: runtimeDir,
           env,
+          redactions,
         });
       } else if (state.runtimePlan.execution.kind === "docker-compose-stack") {
         const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
@@ -2559,6 +2592,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             )} -f ${shellQuote(remoteComposeFile)} down`,
             cwd: runtimeDir,
             env,
+            redactions,
           });
         }
       }
@@ -2605,7 +2639,16 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     const target = targetResult._unsafeUnwrap();
     const logs: DeploymentLogEntry[] = [];
-    const env = deploymentEnv(deployment);
+    const runtimeEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      includeDependencyRuntimeSecrets: false,
+    });
+    if (runtimeEnv.isErr()) {
+      return err(runtimeEnv.error);
+    }
+    const { env, redactions } = runtimeEnv.value;
     const runtimeInstanceNames = deriveRuntimeInstanceNames({
       deploymentId: state.id.value,
       metadata: state.runtimePlan.execution.metadata,
@@ -2620,6 +2663,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           command: `docker rm -f ${shellQuote(metadata.containerName ?? runtimeInstanceNames.containerName)}`,
           cwd: runtimeDir,
           env,
+          redactions,
         });
       } else if (state.runtimePlan.execution.kind === "docker-compose-stack") {
         const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
@@ -2634,6 +2678,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             )} -f ${shellQuote(remoteComposeFile)} down`,
             cwd: runtimeDir,
             env,
+            redactions,
           });
         }
       }

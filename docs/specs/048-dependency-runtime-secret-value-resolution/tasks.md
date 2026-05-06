@@ -14,7 +14,7 @@
 - [x] Add provider-managed Postgres reference validation tests for
   `DEP-BIND-SECRET-RESOLVE-003`.
 - [x] Add deployment plan/create blocked-resolution tests for `DEP-BIND-SECRET-RESOLVE-004`.
-- [ ] Add runtime adapter tests for single-server resolution and redaction
+- [x] Add runtime adapter tests for single-server resolution and redaction
   `DEP-BIND-SECRET-RESOLVE-005`.
 - [ ] Add Swarm secret materialization tests for `DEP-BIND-SECRET-RESOLVE-006`.
 - [ ] Add historical rotation resolution tests for `DEP-BIND-SECRET-RESOLVE-007`.
@@ -27,7 +27,7 @@
 - [x] Validate managed Postgres realization refs before marking binding readiness ready.
 - [x] Block deployment plan/create on unresolved Appaloft-owned dependency secret refs.
 - [x] Add PG/PGlite persistence for dependency secret values and resolver lookup.
-- [ ] Inject resolved values through local-shell/generic-SSH single-server execution.
+- [x] Inject resolved values through local-shell/generic-SSH single-server execution.
 - [ ] Create/update Docker Swarm secrets from resolved dependency values.
 - [ ] Preserve historical rotated refs needed by retry/redeploy/rollback candidates.
 - [ ] Keep CLI/oRPC/Web surfaces schema-reused and secret-safe.
@@ -41,11 +41,11 @@
 
 - [x] Run targeted application tests.
 - [x] Run targeted PGlite persistence tests.
-- [ ] Run targeted runtime adapter tests.
+- [x] Run targeted runtime adapter tests.
 - [x] Run contracts/docs tests if reason-code or help output changes.
-- [ ] Run `bun run lint`.
-- [ ] Run `bun turbo run typecheck`.
-- [ ] Run `git diff --check`.
+- [x] Run `bun run lint`.
+- [x] Run `bun turbo run typecheck`.
+- [x] Run `git diff --check`.
 
 ## Post-Implementation Sync
 
