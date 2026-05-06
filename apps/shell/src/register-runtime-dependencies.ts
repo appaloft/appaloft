@@ -63,7 +63,7 @@ import { type AppConfig } from "@appaloft/config";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { InMemoryIntegrationRegistry } from "@appaloft/integration-core";
 import {
-  createGitHubPreviewPrCommentFeedbackWriter,
+  createGitHubPreviewFeedbackWriter,
   createGitHubRepositoryBrowser,
   createGitHubSourceEventWebhookVerifier,
   githubIntegration,
@@ -688,7 +688,7 @@ class RequestScopedGitHubPreviewFeedbackWriter implements PreviewFeedbackWriter 
       );
     }
 
-    return createGitHubPreviewPrCommentFeedbackWriter(accessToken).publish(context, input);
+    return createGitHubPreviewFeedbackWriter(accessToken).publish(context, input);
   }
 }
 
