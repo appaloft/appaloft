@@ -271,8 +271,8 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   transports yet.
 - `source-events.ingest` is active for generic signed events and GitHub push events, not GitHub App
   pull request preview lifecycle events.
-- No GitHub App preview worker, GitHub check/deployment-status feedback writers, cleanup scheduler,
-  or concrete product-grade preview cleanup adapter is implemented.
+- No GitHub App preview worker, GitHub deployment-status feedback writer, scheduler leases, or
+  concrete product-grade preview cleanup adapter is implemented.
 - No active operation catalog transports exist for `preview-policies.*` or
   `preview-environments.*`.
 - Product-grade preview public docs/help now map preview policy and preview environment operations

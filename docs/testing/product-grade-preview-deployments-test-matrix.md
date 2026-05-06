@@ -155,8 +155,8 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-GitHub App route wiring, GitHub check/deployment-status feedback writers, concrete cleanup
-adapters, scheduler retry dispatch, and active CLI/API/Web/future MCP transports remain open.
+GitHub App route wiring, GitHub deployment-status feedback, concrete cleanup adapters, scheduler
+leases, and active CLI/API/Web/future MCP transports remain open.
 Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 
