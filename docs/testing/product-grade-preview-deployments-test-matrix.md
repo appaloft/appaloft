@@ -109,8 +109,9 @@ secret-shaped values.
 `packages/integrations/github/test/github-feedback.test.ts`. The coverage proves PR comment
 feedback creates comments, updates existing comments by provider feedback id, creates check runs
 after resolving the pull-request head SHA, updates existing check runs by provider feedback id,
-returns safe retryable provider errors without response bodies/tokens, and explicitly leaves
-deployment-status feedback unsupported by the composite GitHub writer.
+creates deployment statuses when a provider deployment id is supplied, reuses that deployment id for
+later append-only status updates, returns safe retryable provider errors without response
+bodies/tokens, and routes all supported channels through the composite GitHub writer.
 Shell wiring registers a request-scoped GitHub preview feedback writer that obtains the GitHub
 access token through the existing integration auth port before delegating to the composite GitHub
 feedback writer.
@@ -159,9 +160,9 @@ blocking source updates after cleanup is requested.
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
 
-GitHub App route wiring, GitHub deployment-status feedback, scheduler leases, terminal provider
-metadata cleanup, cleanup-side feedback updates, and active CLI/API/Web/future MCP transports remain
-open.
+GitHub App route wiring, automatic process-manager deployment-status publication, scheduler leases,
+terminal provider metadata cleanup, cleanup-side feedback updates, and active CLI/API/Web/future MCP
+transports remain open.
 Existing non-product-grade coverage belongs to Action-only PR previews and
 `deployments.cleanup-preview`.
 

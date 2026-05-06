@@ -5,6 +5,7 @@ import { createExecutionContext } from "@appaloft/application";
 
 import {
   createGitHubPreviewCheckRunFeedbackWriter,
+  createGitHubPreviewDeploymentStatusFeedbackWriter,
   createGitHubPreviewFeedbackWriter,
   createGitHubPreviewPrCommentFeedbackWriter,
 } from "../src";
@@ -34,6 +35,19 @@ function checkInput(input?: { providerFeedbackId?: string }) {
     ...feedbackInput(input),
     feedbackKey: "feedback:sevt_preview_feedback_1:github-check",
     channel: "github-check" as const,
+  };
+}
+
+function deploymentStatusInput(input?: {
+  providerDeploymentId?: string;
+  providerFeedbackId?: string;
+}) {
+  return {
+    ...feedbackInput(),
+    feedbackKey: "feedback:sevt_preview_feedback_1:github-deployment-status",
+    channel: "github-deployment-status" as const,
+    ...(input?.providerDeploymentId ? { providerDeploymentId: input.providerDeploymentId } : {}),
+    ...(input?.providerFeedbackId ? { providerFeedbackId: input.providerFeedbackId } : {}),
   };
 }
 
@@ -293,7 +307,125 @@ describe("GitHub preview feedback writer", () => {
     expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("Preview feedback body");
   });
 
-  test("[PG-PREVIEW-FEEDBACK-001] routes comments and checks through the composite writer", async () => {
+  test("[PG-PREVIEW-FEEDBACK-001] creates a deployment status for preview feedback", async () => {
+    const requests: CapturedRequest[] = [];
+    const writer = createGitHubPreviewDeploymentStatusFeedbackWriter(
+      "github-token",
+      async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method ?? "GET",
+          authorization: new Headers(init?.headers).get("authorization"),
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return new Response(JSON.stringify({ id: 300 }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      },
+      "https://api.github.test",
+    );
+
+    const result = await writer.publish(
+      createExecutionContext({
+        entrypoint: "system",
+        requestId: "req_github_deployment_status_create",
+      }),
+      deploymentStatusInput({ providerDeploymentId: "github_deployment_300" }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ providerFeedbackId: "github_deployment_300" });
+    expect(requests).toEqual([
+      {
+        url: "https://api.github.test/repos/appaloft/demo/deployments/github_deployment_300/statuses",
+        method: "POST",
+        authorization: "Bearer github-token",
+        body: {
+          state: "success",
+          description: "Appaloft preview deployment accepted",
+          environment: "preview",
+          auto_inactive: false,
+        },
+      },
+    ]);
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("github-token");
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("Preview feedback body");
+  });
+
+  test("[PG-PREVIEW-FEEDBACK-001] reuses an existing deployment id for status updates", async () => {
+    const requests: CapturedRequest[] = [];
+    const writer = createGitHubPreviewDeploymentStatusFeedbackWriter(
+      "github-token",
+      async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method ?? "GET",
+          authorization: new Headers(init?.headers).get("authorization"),
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return new Response(JSON.stringify({ id: 301 }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      },
+      "https://api.github.test",
+    );
+
+    const result = await writer.publish(
+      createExecutionContext({
+        entrypoint: "system",
+        requestId: "req_github_deployment_status_update",
+      }),
+      deploymentStatusInput({ providerFeedbackId: "github_deployment_300" }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ providerFeedbackId: "github_deployment_300" });
+    expect(requests.map((request) => request.url)).toEqual([
+      "https://api.github.test/repos/appaloft/demo/deployments/github_deployment_300/statuses",
+    ]);
+  });
+
+  test("[PG-PREVIEW-FEEDBACK-001] returns safe retryable deployment status errors", async () => {
+    const writer = createGitHubPreviewDeploymentStatusFeedbackWriter(
+      "github-token",
+      async () =>
+        new Response(JSON.stringify({ message: "provider deployment status body" }), {
+          status: 503,
+          headers: { "content-type": "application/json" },
+        }),
+      "https://api.github.test",
+    );
+
+    const result = await writer.publish(
+      createExecutionContext({
+        entrypoint: "system",
+        requestId: "req_github_deployment_status_error",
+      }),
+      deploymentStatusInput({ providerDeploymentId: "github_deployment_300" }),
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "provider_error",
+      category: "provider",
+      retryable: true,
+      details: {
+        phase: "preview-feedback",
+        provider: "github",
+        channel: "github-deployment-status",
+        statusCode: 503,
+      },
+    });
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("github-token");
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain(
+      "provider deployment status body",
+    );
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("Preview feedback body");
+  });
+
+  test("[PG-PREVIEW-FEEDBACK-001] routes comments, checks, and deployment statuses through the composite writer", async () => {
     const requests: CapturedRequest[] = [];
     const writer = createGitHubPreviewFeedbackWriter(
       "github-token",
@@ -328,48 +460,27 @@ describe("GitHub preview feedback writer", () => {
       createExecutionContext({ entrypoint: "system", requestId: "req_github_composite_check" }),
       checkInput(),
     );
+    const deploymentStatus = await writer.publish(
+      createExecutionContext({
+        entrypoint: "system",
+        requestId: "req_github_composite_deployment_status",
+      }),
+      deploymentStatusInput({ providerDeploymentId: "github_deployment_300" }),
+    );
 
     expect(comment.isOk()).toBe(true);
     expect(check.isOk()).toBe(true);
+    expect(deploymentStatus.isOk()).toBe(true);
     expect(comment._unsafeUnwrap()).toEqual({ providerFeedbackId: "100" });
     expect(check._unsafeUnwrap()).toEqual({ providerFeedbackId: "200" });
+    expect(deploymentStatus._unsafeUnwrap()).toEqual({
+      providerFeedbackId: "github_deployment_300",
+    });
     expect(requests.map((request) => request.url)).toEqual([
       "https://api.github.test/repos/appaloft/demo/issues/42/comments",
       "https://api.github.test/repos/appaloft/demo/pulls/42",
       "https://api.github.test/repos/appaloft/demo/check-runs",
+      "https://api.github.test/repos/appaloft/demo/deployments/github_deployment_300/statuses",
     ]);
-  });
-
-  test("[PG-PREVIEW-FEEDBACK-001] leaves deployment statuses unsupported in the composite writer", async () => {
-    const writer = createGitHubPreviewFeedbackWriter(
-      "github-token",
-      async () => {
-        throw new Error("fetch should not be called");
-      },
-      "https://api.github.test",
-    );
-
-    const result = await writer.publish(
-      createExecutionContext({
-        entrypoint: "system",
-        requestId: "req_github_feedback_unsupported",
-      }),
-      {
-        ...feedbackInput(),
-        channel: "github-deployment-status",
-      },
-    );
-
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr()).toMatchObject({
-      code: "provider_capability_unsupported",
-      category: "provider",
-      retryable: false,
-      details: {
-        phase: "preview-feedback",
-        provider: "github",
-        channel: "github-deployment-status",
-      },
-    });
   });
 });

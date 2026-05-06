@@ -18,6 +18,7 @@ export interface PublishPreviewFeedbackInput {
   repositoryFullName: string;
   pullRequestNumber: number;
   body: string;
+  providerDeploymentId?: string;
 }
 
 export type PublishPreviewFeedbackStatus = "created" | "updated" | "retryable-failed" | "failed";
