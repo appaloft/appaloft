@@ -20,8 +20,8 @@ This matrix covers the Phase 7 dependency resource lifecycle baseline:
 - provider-native Postgres realization scenarios
 - dependency resource backup/restore scenarios
 
-It does not cover provider-native Redis provisioning or provider-native credential rotation, runtime
-env injection, runtime cleanup, redeploy, rollback, scheduled backup policies, backup prune/delete,
+It does not cover provider-native Redis provisioning or provider-native credential rotation,
+managed Redis binding admission, runtime cleanup, scheduled backup policies, backup prune/delete,
 or cross-resource restore.
 
 ## Global References
@@ -155,10 +155,9 @@ snapshot reference capture. Provider-native Postgres realization is implemented
 through a hermetic provider capability with safe realization state and managed delete cleanup.
 Backup/restore is implemented with hermetic provider capability, safe backup read models, restore
 attempt metadata, lifecycle events, and delete-safety blockers. Dependency binding runtime
-injection is implemented for safe runtime secret handles and readiness gating; store-backed secret
-value resolution is governed by
-[Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md)
-with imported Postgres/Redis connection storage now implemented. Managed Postgres reference
-validation, unresolved-ref deployment blocking, runtime materialization, provider-native Redis
-lifecycle, managed Redis binding admission, Web affordances, and runtime cleanup remain future
-Phase 7 work.
+injection and store-backed secret value resolution are implemented for imported Postgres, imported
+Redis, managed Postgres Appaloft-owned refs, single-server runtimes, Docker Swarm, unresolved-ref
+deployment blocking, and retained rotated binding refs through
+[Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md).
+Provider-native Redis lifecycle, managed Redis binding admission, Web affordances, final
+Postgres/Redis closed-loop verification, and runtime cleanup remain future Phase 7 work.
