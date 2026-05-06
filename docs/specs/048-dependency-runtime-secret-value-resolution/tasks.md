@@ -11,7 +11,7 @@
 
 - [x] Add failing import tests for `DEP-BIND-SECRET-RESOLVE-001` and
   `DEP-BIND-SECRET-RESOLVE-002`.
-- [ ] Add provider-managed Postgres reference validation tests for
+- [x] Add provider-managed Postgres reference validation tests for
   `DEP-BIND-SECRET-RESOLVE-003`.
 - [ ] Add deployment plan/create blocked-resolution tests for `DEP-BIND-SECRET-RESOLVE-004`.
 - [ ] Add runtime adapter tests for single-server resolution and redaction
@@ -24,7 +24,7 @@
 - [x] Add dependency secret-value storage and runtime resolver ports in `packages/application`.
 - [x] Store imported Postgres connection URLs through the dependency secret-value store.
 - [x] Store imported Redis connection URLs through the dependency secret-value store.
-- [ ] Validate managed Postgres realization refs before marking binding readiness ready.
+- [x] Validate managed Postgres realization refs before marking binding readiness ready.
 - [ ] Block deployment plan/create on unresolved Appaloft-owned dependency secret refs.
 - [x] Add PG/PGlite persistence for dependency secret values and resolver lookup.
 - [ ] Inject resolved values through local-shell/generic-SSH single-server execution.

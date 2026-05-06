@@ -691,6 +691,7 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     providerResourceHandle: DependencyResourceProviderResourceHandle;
     endpoint: DependencyResourceEndpointInput;
     connectionSecretRef?: DependencyResourceSecretRef;
+    bindingReadiness?: DependencyResourceBindingReadinessState;
     realizedAt: OccurredAt;
   }): Result<void> {
     if (!this.state.providerManaged || this.state.sourceMode?.value !== "appaloft-managed") {
@@ -716,7 +717,9 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     if (input.connectionSecretRef) {
       this.state.connectionSecretRef = input.connectionSecretRef;
     }
-    this.state.bindingReadiness = { status: "ready" };
+    this.state.bindingReadiness = input.bindingReadiness
+      ? cloneBindingReadiness(input.bindingReadiness)
+      : { status: "ready" };
     this.state.status = this.state.status.markReady();
     this.recordDomainEvent("dependency-resource-realized", input.realizedAt, {
       dependencyResourceId: this.state.id.value,
