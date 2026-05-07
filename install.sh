@@ -7,6 +7,7 @@ APPALOFT_HOME="${APPALOFT_HOME:-}"
 APPALOFT_HTTP_HOST="${APPALOFT_HTTP_HOST:-0.0.0.0}"
 APPALOFT_HTTP_PORT="${APPALOFT_HTTP_PORT:-3001}"
 APPALOFT_WEB_ORIGIN="${APPALOFT_WEB_ORIGIN:-}"
+APPALOFT_SELF_HOST_DATABASE="${APPALOFT_SELF_HOST_DATABASE:-postgres}"
 APPALOFT_POSTGRES_IMAGE="${APPALOFT_POSTGRES_IMAGE:-postgres:16}"
 APPALOFT_POSTGRES_PASSWORD="${APPALOFT_POSTGRES_PASSWORD:-}"
 APPALOFT_COMPOSE_PROJECT_NAME="${APPALOFT_COMPOSE_PROJECT_NAME:-appaloft}"
@@ -42,6 +43,7 @@ Options:
   --host <host>                    Host bind address. Defaults to 0.0.0.0.
   --port <port>                    Host HTTP port. Defaults to 3001.
   --web-origin <url>               Public console origin. Defaults to http://localhost:<port>.
+  --database <postgres|pglite>      Persistence backend. Defaults to postgres.
   --postgres-password <password>   PostgreSQL password. Existing installs reuse .env.
   --postgres-image <image>         PostgreSQL image. Defaults to postgres:16.
   --project-name <name>            Docker Compose project name. Defaults to appaloft.
@@ -56,6 +58,7 @@ Environment:
   APPALOFT_HTTP_HOST
   APPALOFT_HTTP_PORT
   APPALOFT_WEB_ORIGIN
+  APPALOFT_SELF_HOST_DATABASE=postgres|pglite
   APPALOFT_POSTGRES_IMAGE
   APPALOFT_POSTGRES_PASSWORD
   APPALOFT_COMPOSE_PROJECT_NAME
@@ -113,6 +116,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --web-origin=*)
       APPALOFT_WEB_ORIGIN="${1#--web-origin=}"
+      ;;
+    --database)
+      shift
+      [ "$#" -gt 0 ] || fail "--database requires a value"
+      APPALOFT_SELF_HOST_DATABASE="$1"
+      ;;
+    --database=*)
+      APPALOFT_SELF_HOST_DATABASE="${1#--database=}"
       ;;
     --postgres-password)
       shift
@@ -226,6 +237,15 @@ validate_port() {
   esac
 
   [ "$APPALOFT_HTTP_PORT" -gt 0 ] || fail "--port must be a positive integer"
+}
+
+validate_database() {
+  APPALOFT_SELF_HOST_DATABASE="$(printf '%s' "$APPALOFT_SELF_HOST_DATABASE" | tr '[:upper:]' '[:lower:]')"
+
+  case "$APPALOFT_SELF_HOST_DATABASE" in
+    postgres | pglite) return 0 ;;
+    *) fail "--database must be postgres or pglite" ;;
+  esac
 }
 
 run_as_root() {
@@ -366,6 +386,34 @@ read_existing_env_value() {
 write_compose_file() {
   destination="$1"
 
+  if [ "$APPALOFT_SELF_HOST_DATABASE" = "pglite" ]; then
+    cat >"$destination" <<'COMPOSE'
+services:
+  app:
+    image: ${APPALOFT_IMAGE_REF}
+    restart: unless-stopped
+    environment:
+      APPALOFT_APP_NAME: Appaloft
+      APPALOFT_APP_VERSION: ${APPALOFT_APP_VERSION}
+      APPALOFT_HTTP_HOST: 0.0.0.0
+      APPALOFT_HTTP_PORT: 3001
+      APPALOFT_WEB_STATIC_DIR: /app/web
+      APPALOFT_DOCS_STATIC_DIR: /app/docs
+      APPALOFT_DATABASE_DRIVER: pglite
+      APPALOFT_DATA_DIR: /appaloft-data
+      APPALOFT_PGLITE_DATA_DIR: /appaloft-data/pglite
+      APPALOFT_WEB_ORIGIN: ${APPALOFT_WEB_ORIGIN}
+    ports:
+      - "${APPALOFT_HTTP_HOST}:${APPALOFT_HTTP_PORT}:3001"
+    volumes:
+      - appaloft-data:/appaloft-data
+
+volumes:
+  appaloft-data:
+COMPOSE
+    return
+  fi
+
   cat >"$destination" <<'COMPOSE'
 services:
   app:
@@ -409,12 +457,25 @@ COMPOSE
 write_env_file() {
   destination="$1"
 
+  if [ "$APPALOFT_SELF_HOST_DATABASE" = "pglite" ]; then
+    cat >"$destination" <<ENV
+APPALOFT_IMAGE_REF=$appaloft_image_ref
+APPALOFT_APP_VERSION=$appaloft_version
+APPALOFT_HTTP_HOST=$APPALOFT_HTTP_HOST
+APPALOFT_HTTP_PORT=$APPALOFT_HTTP_PORT
+APPALOFT_WEB_ORIGIN=$appaloft_web_origin
+APPALOFT_SELF_HOST_DATABASE=pglite
+ENV
+    return
+  fi
+
   cat >"$destination" <<ENV
 APPALOFT_IMAGE_REF=$appaloft_image_ref
 APPALOFT_APP_VERSION=$appaloft_version
 APPALOFT_HTTP_HOST=$APPALOFT_HTTP_HOST
 APPALOFT_HTTP_PORT=$APPALOFT_HTTP_PORT
 APPALOFT_WEB_ORIGIN=$appaloft_web_origin
+APPALOFT_SELF_HOST_DATABASE=postgres
 APPALOFT_POSTGRES_IMAGE=$APPALOFT_POSTGRES_IMAGE
 POSTGRES_DB=appaloft
 POSTGRES_USER=appaloft
@@ -442,6 +503,7 @@ docker_compose() {
 }
 
 validate_port
+validate_database
 appaloft_version="$(normalize_version "$APPALOFT_VERSION")"
 appaloft_image_ref="$(image_ref "$appaloft_version")"
 appaloft_home="$(choose_home)"
@@ -457,6 +519,7 @@ if [ "$APPALOFT_INSTALL_DRY_RUN" = "1" ]; then
   say "compose file: $compose_file"
   say "bind: $APPALOFT_HTTP_HOST:$APPALOFT_HTTP_PORT"
   say "web origin: $appaloft_web_origin"
+  say "database: $APPALOFT_SELF_HOST_DATABASE"
   if truthy "$APPALOFT_SKIP_DOCKER_INSTALL"; then
     say "install docker: no"
   else
@@ -473,13 +536,15 @@ trap cleanup EXIT INT TERM
 
 ensure_docker
 
-existing_postgres_password="$(read_existing_env_value POSTGRES_PASSWORD "$env_file" || true)"
-if [ -n "$APPALOFT_POSTGRES_PASSWORD" ]; then
-  appaloft_postgres_password="$APPALOFT_POSTGRES_PASSWORD"
-elif [ -n "$existing_postgres_password" ]; then
-  appaloft_postgres_password="$existing_postgres_password"
-else
-  appaloft_postgres_password="$(generate_password)"
+if [ "$APPALOFT_SELF_HOST_DATABASE" = "postgres" ]; then
+  existing_postgres_password="$(read_existing_env_value POSTGRES_PASSWORD "$env_file" || true)"
+  if [ -n "$APPALOFT_POSTGRES_PASSWORD" ]; then
+    appaloft_postgres_password="$APPALOFT_POSTGRES_PASSWORD"
+  elif [ -n "$existing_postgres_password" ]; then
+    appaloft_postgres_password="$existing_postgres_password"
+  else
+    appaloft_postgres_password="$(generate_password)"
+  fi
 fi
 
 tmp_compose="$tmpdir/docker-compose.yml"
@@ -495,6 +560,7 @@ say "Installing Appaloft Docker stack"
 say "Home: $appaloft_home"
 say "Image: $appaloft_image_ref"
 say "HTTP: $appaloft_web_origin"
+say "Database: $APPALOFT_SELF_HOST_DATABASE"
 
 docker_compose pull
 docker_compose up -d

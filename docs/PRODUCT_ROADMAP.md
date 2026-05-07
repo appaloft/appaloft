@@ -1845,6 +1845,9 @@ work below before GA.
   rotation.
 - [ ] Action PR preview: deploy/update from a user-authored GitHub Actions workflow with generated
   or user-owned wildcard preview access.
+- [x] Self-hosted Action server API trigger: user-authored GitHub Actions workflow can call an
+  existing self-hosted Appaloft server with trusted project/environment/resource/server ids to
+  create a deployment without installing CLI, opening SSH, or mutating SSH-server PGlite state.
 - [ ] Product-grade preview deployment: create from PR event, list/show/update policy/delete on
   close, scoped env, GitHub App status/comments, and cleanup retries.
 - [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs. Spec Round

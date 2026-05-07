@@ -3,7 +3,7 @@ title: "Preview deployments"
 description: "Run pull request previews safely, clean them up, and understand when control-plane previews are needed."
 docType: task
 localeState:
-  zh-CN: complete
+  zh-CN: needs-update
   en-US: complete
 searchAliases:
   - "pull request preview"
@@ -49,7 +49,36 @@ appaloft deploy . \
 
 The preview flags select preview identity and route policy outside committed config. They do not add pull request, branch, source, route, or preview fields to `deployments.create`.
 
-The public Marketplace `appaloft/deploy-action` wrapper is still pending. Until it is published, use the CLI shape above or a repository-owned wrapper that maps trusted workflow inputs to the same CLI flags.
+The public `appaloft/deploy-action` wrapper maps trusted workflow inputs to the same preview flags. Use the CLI shape directly when you need local debugging or wrapper behavior that has not shipped yet.
+
+<h2 id="deployment-action-self-hosted-server-mode">Self-hosted server Action mode</h2>
+
+For normal deployments, `appaloft/deploy-action` can trigger an existing self-hosted Appaloft server instead of running CLI/SSH from the GitHub runner:
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  id: deploy
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
+    environment-id: ${{ secrets.APPALOFT_ENVIRONMENT_ID }}
+    resource-id: ${{ secrets.APPALOFT_RESOURCE_ID }}
+    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
+```
+
+This server API slice requires the project, environment, resource, and deployment target to already exist in the Appaloft server. The Action always calls the server source-link deployment route. When explicit ids are supplied, the server can bootstrap a missing source link; later runs can omit the ids and let the server resolve context from its source-link state using the GitHub repository, ref, config path, and source base directory fingerprint. It does not apply `appaloft.yml`, upload a source archive, create resources, run preview cleanup, open SSH, or mutate SSH-server PGlite state.
+
+The non-secret control-plane connection policy may also live in `appaloft.yml`:
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+```
+
+Keep project, environment, resource, server, token, SSH, and database identity out of committed config. Those values must come from trusted workflow inputs, variables, secrets, existing source links, or the Appaloft server.
 
 <h2 id="deployment-pr-preview-output">Preview URL output</h2>
 

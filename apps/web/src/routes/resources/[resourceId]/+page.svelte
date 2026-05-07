@@ -138,6 +138,7 @@
   type ConfigureScheduledTaskInput = Parameters<typeof orpcClient.scheduledTasks.configure>[0];
   type DeleteScheduledTaskInput = Parameters<typeof orpcClient.scheduledTasks.delete>[0];
   type RunScheduledTaskNowInput = Parameters<typeof orpcClient.scheduledTasks.runNow>[0];
+  type RelinkSourceLinkInput = Parameters<typeof orpcClient.sourceLinks.relink>[0];
   type DomainRouteMode = "serve" | "redirect";
   type RedirectStatusText = "301" | "302" | "307" | "308";
   type ResourceSettingsSection =
@@ -395,6 +396,15 @@
   let sourceImageName = $state("");
   let sourceImageTag = $state("");
   let sourceImageDigest = $state("");
+  let sourceLinkFormResourceId = $state("");
+  let sourceLinkFingerprint = $state("");
+  let sourceLinkServerId = $state("");
+  let sourceLinkDestinationId = $state("");
+  let sourceLinkFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
   let autoDeployFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -575,6 +585,9 @@
         sourceLocator.trim() &&
         (!sourceKindIsDockerImage || !(sourceImageTag.trim() && sourceImageDigest.trim())),
     ),
+  );
+  const canRelinkSourceLink = $derived(
+    Boolean(resource && !isResourceArchived && sourceLinkFingerprint.trim() && sourceLinkServerId),
   );
   const canConfigureAutoDeploy = $derived(
     Boolean(
@@ -841,6 +854,25 @@
       sourceFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.sourceProfileSaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const relinkSourceLinkMutation = createMutation(() => ({
+    mutationFn: (input: RelinkSourceLinkInput) => orpcClient.sourceLinks.relink(input),
+    onSuccess: (result) => {
+      sourceLinkFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.sourceLinkRelinked),
+        detail: result.sourceFingerprint,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+    },
+    onError: (error) => {
+      sourceLinkFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.sourceLinkRelinkFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -1576,6 +1608,30 @@
       return;
     }
 
+    if (sourceLinkFormResourceId === resource.id) {
+      return;
+    }
+
+    sourceLinkFormResourceId = resource.id;
+    sourceLinkFingerprint = "";
+    sourceLinkServerId = latestDeployment?.serverId ?? servers[0]?.id ?? "";
+    sourceLinkDestinationId = defaultDestinationId;
+    sourceLinkFeedback = null;
+  });
+
+  $effect(() => {
+    if (!browser || sourceLinkServerId || !resource) {
+      return;
+    }
+
+    sourceLinkServerId = latestDeployment?.serverId ?? servers[0]?.id ?? "";
+  });
+
+  $effect(() => {
+    if (!browser || !resource) {
+      return;
+    }
+
     const stateKey = [
       resource.id,
       resourceDetail?.source?.sourceBindingFingerprint ?? "no-source",
@@ -2029,6 +2085,26 @@
     configureResourceSourceMutation.mutate({
       resourceId: resource.id,
       source,
+    });
+  }
+
+  function relinkSourceLink(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canRelinkSourceLink || relinkSourceLinkMutation.isPending) {
+      return;
+    }
+
+    const destination = sourceLinkDestinationId.trim();
+    sourceLinkFeedback = null;
+    relinkSourceLinkMutation.mutate({
+      sourceFingerprint: sourceLinkFingerprint.trim(),
+      projectId: resource.projectId,
+      environmentId: resource.environmentId,
+      resourceId: resource.id,
+      serverId: sourceLinkServerId,
+      ...(destination ? { destinationId: destination } : {}),
+      reason: "web-console-source-link-relink",
     });
   }
 
@@ -3973,7 +4049,91 @@
                     >
                       {configureResourceSourceMutation.isPending
                         ? $t(i18nKeys.common.actions.saving)
-                        : $t(i18nKeys.common.actions.save)}
+                      : $t(i18nKeys.common.actions.save)}
+                    </Button>
+                  </div>
+                </form>
+
+                <form
+                  id="resource-source-link-form"
+                  class="rounded-md border bg-background p-4"
+                  onsubmit={relinkSourceLink}
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.sourceLinkTitle)}
+                        </h2>
+                        <DocsHelpLink
+                          href={webDocsHrefs.deploymentSource}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                        />
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.sourceLinkDescription)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-source-link-fingerprint">
+                      <span>{$t(i18nKeys.console.resources.sourceLinkFingerprint)}</span>
+                      <Input
+                        id="resource-source-link-fingerprint"
+                        bind:value={sourceLinkFingerprint}
+                        autocomplete="off"
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.resources.sourceLinkServer)}</span>
+                      <Select.Root bind:value={sourceLinkServerId} type="single">
+                        <Select.Trigger class="w-full">
+                          {findServer(servers, sourceLinkServerId)?.name ?? sourceLinkServerId}
+                        </Select.Trigger>
+                        <Select.Content>
+                          {#each servers as server (server.id)}
+                            <Select.Item value={server.id}>
+                              {server.name}
+                            </Select.Item>
+                          {/each}
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-source-link-destination">
+                      <span>{$t(i18nKeys.console.resources.sourceLinkDestination)}</span>
+                      <Input
+                        id="resource-source-link-destination"
+                        bind:value={sourceLinkDestinationId}
+                        autocomplete="off"
+                      />
+                    </label>
+                  </div>
+
+                  {#if sourceLinkFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        sourceLinkFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{sourceLinkFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{sourceLinkFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!canRelinkSourceLink || relinkSourceLinkMutation.isPending}
+                    >
+                      {relinkSourceLinkMutation.isPending
+                        ? $t(i18nKeys.common.actions.saving)
+                        : $t(i18nKeys.console.resources.sourceLinkRelink)}
                     </Button>
                   </div>
                 </form>

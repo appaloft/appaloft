@@ -121,17 +121,17 @@ export APPALOFT_GITHUB_CLIENT_SECRET=...
 
 Deployment control-plane selection is separate from execution ownership. A repository may continue
 to execute deploys from GitHub Actions while selecting no control plane, Appaloft Cloud, or a
-self-hosted Appaloft server as the state owner. Until the ADR-025 control-plane resolver is
-implemented, this is the target product contract rather than an available config field:
+self-hosted Appaloft server as the state owner. Non-secret mode and URL policy may be declared in
+repository config:
 
 ```yaml
 controlPlane:
   mode: none
 ```
 
-Future self-hosted/cloud-assisted deployments will select control-plane mode through repository
-config plus trusted CLI/action/env overrides. Tokens, database URLs, SSH keys, and Appaloft
-project/resource/server ids must stay outside committed config.
+Self-hosted/cloud-assisted deployments select control-plane mode through repository config plus
+trusted CLI/action/env overrides. Tokens, database URLs, SSH keys, and Appaloft project/resource/server
+ids must stay outside committed config.
 
 GitHub repository import uses a deferred OAuth flow. The operator can open the console without
 signing in, then authorize only after choosing a GitHub source in the deploy flow. Create a GitHub
@@ -209,6 +209,13 @@ The public `https://appaloft.com/install.sh` quick-start script is the Docker se
 It installs or verifies Docker Engine plus the compose plugin on Linux, writes the Compose stack and
 environment file under `/opt/appaloft`, and starts Appaloft with PostgreSQL.
 
+For a single-server Appaloft console that should keep embedded PGlite state in a durable Docker
+volume, pass:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite
+```
+
 `install.sh` is authored in the Appaloft main repository and published as a GitHub Release asset.
 The website route should redirect or proxy to
 `https://github.com/appaloft/appaloft/releases/latest/download/install.sh` rather than copying from a
@@ -226,6 +233,24 @@ To run the checked-in self-host Compose file directly:
 ```bash
 APPALOFT_IMAGE_REF=ghcr.io/appaloft/appaloft:latest docker compose -f docker-compose.selfhost.yml up -d
 ```
+
+## Console Deploy Workflow
+
+The checked-in `.github/workflows/deploy-console.yml` workflow installs or upgrades the self-hosted
+Appaloft console on an SSH server by copying the repository `install.sh` to the host and running it
+there.
+
+Configure:
+
+- repository variable `APPALOFT_CONSOLE_SSH_HOST`
+- repository secret `APPALOFT_CONSOLE_SSH_PRIVATE_KEY`
+- optional repository variable `APPALOFT_CONSOLE_SSH_USER`, default `root`
+- optional repository variable `APPALOFT_CONSOLE_SSH_PORT`, default `22`
+- optional repository variable `APPALOFT_CONSOLE_ORIGIN`, default `http://<host>:3001`
+
+The workflow defaults to `database=pglite`. Once the console is healthy, other repositories can set
+their `controlPlane.mode: self-hosted` and `controlPlane.url` to this origin, while keeping tokens,
+SSH keys, and resource identity in trusted Action inputs or the Appaloft server.
 
 ## PostgreSQL
 

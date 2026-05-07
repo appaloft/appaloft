@@ -83,6 +83,8 @@ Implement in ordered slices:
    - Apply plain `env` declarations as non-secret `plain-config` environment variables at
      environment scope before `deployments.create`; `PUBLIC_` and `VITE_` keys are build-time,
      other keys are runtime.
+   - Render `{preview_id}` and `{pr_number}` in non-secret config `env` values only after trusted PR
+     preview context is known; fail missing preview context before mutation.
    - Ensure errors, logs, diagnostics, and progress events never include raw values.
 
 6. Entrypoints
@@ -183,8 +185,9 @@ Implemented slices:
   It accepts source/runtime/network/health profile fields, non-secret `env` values, and secret
   references, while rejecting committed identity selectors, raw secret material, unknown fields, and
   unsupported CPU/memory/replica/restart/rollout fields.
-- `controlPlane.mode` and `controlPlane.url` are not implemented in the parser yet. Current
-  control-plane behavior is limited to environment/backend hints in the CLI state resolver.
+- `controlPlane.mode` and `controlPlane.url` are implemented as non-secret connection policy in the
+  parser. They do not select project/resource/server identity and do not carry tokens, database
+  URLs, SSH keys, or raw credential material.
 - `FileSystemDeploymentConfigReader` supports explicit config paths, Git-root discovery for nested
   local sources, YAML parsing, ambiguous-file rejection, and profile snapshot mapping.
 - CLI `appaloft init` writes a profile-only config and no longer writes project/resource/server
@@ -195,7 +198,8 @@ Implemented slices:
 - CLI config deploy maps non-secret `env` values to `plain-config` environment variables
   (`PUBLIC_`/`VITE_` as build-time, other keys as runtime) and resolves required
   `ci-env:<NAME>` references from the process environment into runtime secret variables before
-  deployment admission.
+  deployment admission. In PR preview mode, non-secret config `env` values may render
+  `{preview_id}` and `{pr_number}` from trusted entrypoint context.
 - CLI config deploy supports non-TTY GitHub Actions style bootstrap. SSH-targeted runs default to
   remote `ssh-pglite`; explicit `local-pglite` remains available for local-only, dry-run, no-SSH,
   and smoke-test modes.

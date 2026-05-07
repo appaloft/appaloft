@@ -260,8 +260,9 @@ coverage.
 
 `QUICK-DEPLOY-WF-056` and `QUICK-DEPLOY-ENTRY-012` are roadmap rows under
 [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md). Current implementation
-does not parse config `controlPlane` fields, run Cloud/self-hosted compatibility handshakes, or
-adopt SSH-server PGlite into a control plane.
+parses config `controlPlane` fields and supports an initial self-hosted deploy-action API
+handshake. Cloud handshakes, full adoption, and SSH-server PGlite adoption into a control plane
+remain roadmap work.
 
 Current Web and CLI do not yet expose all source variant fields as typed drafts. Initial tests may
 cover the parser/normalizer as a unit before full UI coverage, but the workflow contract requires

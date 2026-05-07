@@ -130,7 +130,7 @@ controlPlane:
   mode: none
 ```
 
-Future accepted fields:
+Accepted self-hosted endpoint shape:
 
 ```yaml
 controlPlane:
@@ -234,6 +234,26 @@ as supported:
 - `execution-mode` only when more than `github-action` is implemented
 
 When these inputs are absent, the action remains pure SSH/`none` by default.
+
+The first supported `self-hosted` Action slice is server API trigger mode for an existing resource
+profile:
+
+```text
+GitHub Action
+  -> resolve control-plane-mode self-hosted from trusted action input or non-secret config policy
+  -> require control-plane-url
+  -> call /api/version compatibility check
+  -> call POST /api/action/deployments/from-source-link with a derived source fingerprint for deploy
+  -> call POST /api/deployments/cleanup-preview with a preview source fingerprint for preview cleanup
+```
+
+In this slice the Action must not install or invoke the CLI, open SSH, select `state-backend`,
+create or configure resource profile state, upload source archives, or mutate SSH-server PGlite.
+The source-link API route may resolve project/environment/resource/server context from existing
+server-owned source-link state. If trusted ids are supplied by the Action for deploy, the server
+may bootstrap a missing source link; if ids are omitted and no link exists, deployment fails before
+mutation. Preview cleanup must resolve context from preview source-link state. Config bootstrap,
+source package, and broader preview workflow contracts remain later server-side work.
 
 ### Web
 

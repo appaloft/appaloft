@@ -38,8 +38,8 @@ The implemented coherent slice is:
    reads and writes through the selected Appaloft state backend.
 5. Extend `PgResourceDeletionBlockerReader` so `source_links.resource_id = resourceId` reports a
    `source-link` blocker.
-6. Keep API/oRPC and Web relink entrypoints deferred; this slice is persistence and blocker
-   closure, not a new surface.
+6. Keep Web review UX deferred for a later console slice. HTTP/oRPC may expose the same
+   `source-links.relink` command schema for hosted/self-hosted control planes.
 
 ## Tests
 
@@ -67,5 +67,5 @@ CLI SSH remote-state sync still transfers the selected PGlite state backend acro
 network boundary. The file-backed source-link store remains available for adapter-level or legacy
 explicit wiring, but it is not the shell runtime's authoritative source-link store.
 
-API/oRPC and Web surfaces for reviewing or relinking source links remain future work after this
-persistence slice.
+HTTP/oRPC relink is exposed through `POST /api/source-links/relink`. Web review UX for inspecting
+and relinking source links remains future work after this persistence slice.

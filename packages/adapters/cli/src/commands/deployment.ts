@@ -1334,7 +1334,18 @@ export const deployCommand = EffectCommand.make(
         }),
       );
       const configEnvironmentVariables = configResolution
-        ? yield* resultToEffect(deploymentEnvironmentVariablesFromConfig(configResolution.config))
+        ? yield* resultToEffect(
+            deploymentEnvironmentVariablesFromConfig(configResolution.config, {
+              ...(previewContext
+                ? {
+                    previewContext: {
+                      previewId: previewContext.previewId,
+                      pullRequestNumber: previewContext.pullRequestNumber,
+                    },
+                  }
+                : {}),
+            }),
+          )
         : [];
       const environmentVariables = [...configEnvironmentVariables, ...flagEnvironmentVariables];
       const deploymentMethod = requestedDeploymentMethod ?? configSeed.deploymentMethod;

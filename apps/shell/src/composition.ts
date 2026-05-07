@@ -466,6 +466,7 @@ export async function createAppComposition(
     resourceAccessFailureEvidenceRecorder,
     resourceAccessRouteContextLookup,
     resourceRepository,
+    sourceLinkRepository,
     sourceEventPolicyReader,
     sourceEventVerificationPort,
     githubSourceEventWebhookVerifier,
