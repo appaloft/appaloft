@@ -56,7 +56,7 @@ The public `appaloft/deploy-action` wrapper maps trusted workflow inputs to the 
 For normal deployments, `appaloft/deploy-action` can trigger an existing self-hosted Appaloft server instead of running CLI/SSH from the GitHub runner:
 
 ```yaml
-- uses: appaloft/deploy-action@v1
+- uses: appaloft/deploy-action@main
   id: deploy
   with:
     control-plane-mode: self-hosted
@@ -73,7 +73,7 @@ This server API slice requires the project, environment, resource, and deploymen
 Self-hosted server mode can also trigger PR preview deploys:
 
 ```yaml
-- uses: appaloft/deploy-action@v1
+- uses: appaloft/deploy-action@main
   id: deploy
   with:
     control-plane-mode: self-hosted

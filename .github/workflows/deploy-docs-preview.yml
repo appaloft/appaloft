@@ -153,6 +153,7 @@ jobs:
             --resource-name "$RESOURCE_NAME" \
             --resource-kind static-site \
             --runtime-name "$RESOURCE_NAME" \
+            --install "bun install --frozen-lockfile" \
             --build "$build_command" \
             --publish-dir apps/docs/dist \
             --port 80 \
@@ -194,10 +195,21 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
 
+      - name: Resolve Appaloft Control Plane
+        id: control-plane
+        shell: bash
+        env:
+          INPUT_CONFIG: appaloft.docs.yml
+          INPUT_CONTROL_PLANE_MODE: ${{ vars.APPALOFT_CONTROL_PLANE_MODE }}
+          INPUT_CONTROL_PLANE_URL: ${{ vars.APPALOFT_CONTROL_PLANE_URL }}
+        run: bash ./.github/actions/deploy-action/scripts/resolve-control-plane.sh
+
       - name: Set up Bun and caches
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         uses: ./.github/actions/setup-bun-turbo
 
       - name: Resolve Cleanup Settings
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         id: settings
         shell: bash
         env:
@@ -223,6 +235,7 @@ jobs:
           echo "ssh_user=${APPALOFT_SSH_USER:-root}" >> "$GITHUB_OUTPUT"
 
       - name: Remote Runtime Capacity Preflight
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         uses: ./.github/actions/remote-runtime-capacity-preflight
         with:
           ssh-host: ${{ vars.APPALOFT_SSH_HOST }}
@@ -230,13 +243,28 @@ jobs:
           ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
 
       - name: Remote State Lock Preflight
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         uses: ./.github/actions/remote-state-lock-preflight
         with:
           ssh-host: ${{ vars.APPALOFT_SSH_HOST }}
           ssh-user: ${{ steps.settings.outputs.ssh_user }}
           ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
 
+      - name: Cleanup Docs Preview Through Appaloft Server
+        if: ${{ steps.control-plane.outputs.control-plane-mode == 'self-hosted' }}
+        uses: ./.github/actions/deploy-action
+        with:
+          command: preview-cleanup
+          config: appaloft.docs.yml
+          source: .
+          control-plane-mode: ${{ steps.control-plane.outputs.control-plane-mode }}
+          control-plane-url: ${{ steps.control-plane.outputs.control-plane-url }}
+          appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+          preview: pull-request
+          preview-id: ${{ env.PREVIEW_ID }}
+
       - name: Cleanup Docs Preview
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         shell: bash
         env:
           APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
@@ -261,39 +289,68 @@ jobs:
       - name: Delete GitHub preview deployments
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.PREVIEW_CLEANUP_TOKEN || github.token }}
+          PREVIEW_CLEANUP_TOKEN: ${{ secrets.PREVIEW_CLEANUP_TOKEN }}
+          GITHUB_TOKEN_VALUE: ${{ github.token }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
-          deployment_ids="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/deployments?environment=${PREVIEW_ENVIRONMENT}&per_page=100" --jq '.[].id')"
+          gh_api() {
+            if [ -n "${PREVIEW_CLEANUP_TOKEN:-}" ]; then
+              if GH_TOKEN="$PREVIEW_CLEANUP_TOKEN" gh api "$@"; then
+                return 0
+              fi
+              echo "::warning::PREVIEW_CLEANUP_TOKEN could not call the GitHub deployments API; falling back to github.token." >&2
+            fi
+            GH_TOKEN="$GITHUB_TOKEN_VALUE" gh api "$@"
+          }
+
+          if ! deployment_ids="$(gh_api --paginate "repos/${GITHUB_REPOSITORY}/deployments?environment=${PREVIEW_ENVIRONMENT}&per_page=100" --jq '.[].id')"; then
+            echo "::warning::GitHub preview deployments could not be listed; continuing because Appaloft preview cleanup already ran."
+            exit 0
+          fi
           if [[ -z "$deployment_ids" ]]; then
             exit 0
           fi
 
           while IFS= read -r deployment_id; do
             [[ -n "$deployment_id" ]] || continue
-            gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" \
+            if ! gh_api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" \
               --method POST \
               -H "Accept: application/vnd.github+json" \
-              -f state=inactive >/dev/null
+              -f state=inactive >/dev/null; then
+              echo "::warning::GitHub preview deployment ${deployment_id} could not be marked inactive; continuing cleanup metadata deletion."
+            fi
           done <<<"$deployment_ids"
 
           while IFS= read -r deployment_id; do
             [[ -n "$deployment_id" ]] || continue
-            gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}" \
+            if ! gh_api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}" \
               --method DELETE \
-              -H "Accept: application/vnd.github+json"
+              -H "Accept: application/vnd.github+json"; then
+              echo "::warning::GitHub preview deployment ${deployment_id} could not be deleted; continuing because Appaloft preview cleanup already ran."
+            fi
           done <<<"$deployment_ids"
 
       - name: Delete GitHub preview environment
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.PREVIEW_CLEANUP_TOKEN || github.token }}
+          PREVIEW_CLEANUP_TOKEN: ${{ secrets.PREVIEW_CLEANUP_TOKEN }}
+          GITHUB_TOKEN_VALUE: ${{ github.token }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
-          if gh api "repos/${GITHUB_REPOSITORY}/environments/${PREVIEW_ENVIRONMENT}" >/dev/null 2>&1; then
-            if ! gh api "repos/${GITHUB_REPOSITORY}/environments/${PREVIEW_ENVIRONMENT}" \
+          gh_api() {
+            if [ -n "${PREVIEW_CLEANUP_TOKEN:-}" ]; then
+              if GH_TOKEN="$PREVIEW_CLEANUP_TOKEN" gh api "$@"; then
+                return 0
+              fi
+              echo "::warning::PREVIEW_CLEANUP_TOKEN could not call the GitHub environments API; falling back to github.token." >&2
+            fi
+            GH_TOKEN="$GITHUB_TOKEN_VALUE" gh api "$@"
+          }
+
+          if gh_api "repos/${GITHUB_REPOSITORY}/environments/${PREVIEW_ENVIRONMENT}" >/dev/null 2>&1; then
+            if ! gh_api "repos/${GITHUB_REPOSITORY}/environments/${PREVIEW_ENVIRONMENT}" \
               --method DELETE \
               -H "Accept: application/vnd.github+json"; then
               echo "::warning::GitHub preview environment could not be deleted; continuing because Appaloft preview cleanup already ran."

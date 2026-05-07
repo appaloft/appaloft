@@ -41,6 +41,9 @@ This matrix inherits:
 | CONTROL-PLANE-MODE-007 | integration | Control-plane identity fields rejected | Config contains project id, resource id, server id, credential id, org id, tenant id, or project slug under `controlPlane` | Workflow stops before mutation | `validation_error`, phase `control-plane-config` or `config-identity` | No write commands |
 | CONTROL-PLANE-MODE-008 | integration | Control-plane secret fields rejected | Config contains token, database URL, SSH key, certificate material, or raw credential under `controlPlane` | Workflow stops before mutation and diagnostics are sanitized | `validation_error`, phase `control-plane-config` or `config-secret-validation` | No write commands |
 | CONTROL-PLANE-MODE-009 | integration | Unsafe control-plane URL rejected | Config `controlPlane.url` is malformed, non-HTTPS when policy requires HTTPS, contains credentials, or contains path/query fragments not accepted by policy | Workflow stops before mutation | `validation_error`, phase `control-plane-config` | No write commands |
+| CONTROL-PLANE-MODE-010 | unit | Config accepts non-secret connection policy | Config declares `controlPlane.mode: self-hosted` and an HTTPS root URL without identity or secrets | Parser accepts the policy, normalizes the URL, and keeps identity unset | None | Config parse only |
+| CONTROL-PLANE-MODE-011 | unit | Config rejects identity and secret fields | Config declares `projectId`, `token`, or equivalent identity/secret fields under `controlPlane` | Parser rejects before workflow resolution | `validation_error`, phase `control-plane-config` | No write commands |
+| CONTROL-PLANE-MODE-012 | unit | Config rejects unsafe self-hosted endpoint shapes | Config declares a non-root or credential-bearing self-hosted URL | Parser rejects before workflow resolution | `validation_error`, phase `control-plane-config` | No write commands |
 
 ## Handshake Matrix
 
@@ -88,15 +91,22 @@ This matrix inherits:
 
 ## Current Implementation Notes And Migration Gaps
 
-Current implementation has no automated rows in this matrix yet.
+Current implementation has automated coverage for the first self-hosted Action server API slice:
 
-Existing tests in `deployment-state.test.ts` and `remote-pglite-state-sync.test.ts` partially cover
-the older `postgres-control-plane` backend selection branch. Those tests should be renamed or
-extended with the IDs above during Phase 1 Code Round.
+- `packages/deployment-config/test/appaloft-config.test.ts` covers `CONTROL-PLANE-MODE-010`,
+  `CONTROL-PLANE-MODE-011`, and `CONTROL-PLANE-MODE-012`;
+- `scripts/test/deploy-action-wrapper.test.ts` covers `CONTROL-PLANE-ENTRY-002`,
+  `CONTROL-PLANE-HANDSHAKE-011`, best-effort PR comments, and the self-hosted wrapper path that
+  calls server APIs instead of installing or invoking the CLI;
+- `packages/orpc/test/deployment-create.http.test.ts` covers `CONTROL-PLANE-HANDSHAKE-008` and
+  `CONTROL-PLANE-HANDSHAKE-010`, including source-link deployment, trusted-id bootstrap, missing
+  link rejection, and retarget rejection;
+- `scripts/test/deploy-console-workflow.test.ts` covers `CONTROL-PLANE-INSTALL-002` for the
+  repository workflow that installs a self-hosted Appaloft control plane over SSH.
 
-`remote-pglite-state-sync.test.ts` now also covers SSH `ssh-pglite` final upload refresh/merge
-behavior after remote revision conflict. That coverage belongs to the SSH state-backend path under
-mode `none`; it is not evidence of Cloud/self-hosted control-plane handshake or adoption behavior.
-
-Cloud/self-hosted rows remain target coverage until the handshake, adoption, and API mode contracts
-exist.
+Existing tests in `deployment-state.test.ts` and `remote-pglite-state-sync.test.ts` still cover the
+older `postgres-control-plane` backend selection branch and SSH `ssh-pglite` final upload
+refresh/merge behavior after remote revision conflict. That coverage belongs to the SSH
+state-backend path under mode `none`; it is not evidence of Cloud mode, adoption markers,
+break-glass direct mutation, OIDC exchange, Web selection, or full server-side config/source
+package execution.

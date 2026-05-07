@@ -57,7 +57,7 @@ appaloft deploy . \
 对于普通部署，`appaloft/deploy-action` 可以触发已有的 self-hosted Appaloft server，而不是在 GitHub runner 里运行 CLI/SSH：
 
 ```yaml
-- uses: appaloft/deploy-action@v1
+- uses: appaloft/deploy-action@main
   id: deploy
   with:
     control-plane-mode: self-hosted
@@ -74,7 +74,7 @@ appaloft deploy . \
 Self-hosted server mode 也可以触发 PR preview deploy：
 
 ```yaml
-- uses: appaloft/deploy-action@v1
+- uses: appaloft/deploy-action@main
   id: deploy
   with:
     control-plane-mode: self-hosted

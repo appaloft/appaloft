@@ -294,19 +294,26 @@ database URLs, or raw secret values.
 
 ## Current Implementation Notes And Migration Gaps
 
-Current implementation only has partial state-backend behavior:
+Current implementation has the first self-hosted Action server API slice:
 
-- `APPALOFT_CONTROL_PLANE_URL` or `APPALOFT_DATABASE_URL` selects `postgres-control-plane` in the
-  CLI state backend resolver;
-- remote SSH PGlite sync is skipped for that state backend;
-- no config `controlPlane` parser exists;
-- no Cloud/self-hosted handshake exists;
-- no adoption marker exists;
-- no control-plane API mode exists for deploy-action;
-- no Web selection surface exists.
+- repository config parsing accepts non-secret `controlPlane.mode` and `controlPlane.url`, while
+  rejecting identity selectors, raw secret fields, unsafe URL shapes, and endpoint URLs that carry
+  credentials, paths, queries, or fragments;
+- pure SSH CLI/Action mode still defaults to `none` plus SSH-server `ssh-pglite`;
+- the deploy-action wrapper resolves `controlPlane` from trusted action inputs or non-secret config
+  policy and supports `control-plane-mode: self-hosted`;
+- self-hosted server API mode performs `/api/version` compatibility probing and calls
+  `POST /api/action/deployments/from-source-link` for deployment trigger and
+  `POST /api/deployments/cleanup-preview` for preview cleanup;
+- self-hosted server API mode does not install or invoke the CLI, open SSH, select a state backend,
+  apply config/source/runtime profile changes, upload source archives, or mutate SSH-server
+  PGlite;
+- the HTTP/oRPC source-link deployment route can reuse an existing source link or bootstrap one
+  from trusted project/environment/resource/server ids, and rejects retargeting.
 
-Until Phase 1 is implemented, documentation and examples should describe Cloud/self-hosted
-control-plane mode as roadmap, not as available behavior.
+Cloud mode, `auto` adoption-marker selection, SSH-server PGlite adoption into a control plane,
+break-glass direct mutation after adoption, OIDC exchange, Web mode selection, and full
+server-side config/source package execution remain roadmap work.
 
 ## Open Questions
 

@@ -542,8 +542,8 @@ describe("deploy-action wrapper reference", () => {
   });
 
   test("[CONFIG-FILE-ENTRY-018][CONFIG-FILE-ENTRY-019] Marketplace README documents previews and cleanup safety", () => {
-    expect(readme).toContain("uses: appaloft/deploy-action@v1");
-    expect(readme).toContain("version: v0.9.0");
+    expect(readme).toContain("uses: appaloft/deploy-action@main");
+    expect(readme).toContain("version: v0.9.2");
     expect(readme).toContain("Minimal `appaloft.yml`");
     expect(readme).toContain("pull_request:");
     expect(readme).toContain(
