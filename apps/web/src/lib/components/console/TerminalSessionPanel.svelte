@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { FitAddon } from "@xterm/addon-fit";
-  import { Terminal } from "@xterm/xterm";
-  import "@xterm/xterm/css/xterm.css";
+  import { WTerm } from "@wterm/dom";
+  import "@wterm/dom/css";
   import type { TerminalSessionDescriptor, TerminalSessionFrame } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -39,8 +38,7 @@
   } = $props();
 
   let terminalElement = $state<HTMLDivElement | null>(null);
-  let terminal = $state<Terminal | null>(null);
-  let fitAddon = $state<FitAddon | null>(null);
+  let terminal = $state<WTerm | null>(null);
   let socket = $state<WebSocket | null>(null);
   let descriptor = $state<TerminalSessionDescriptor | null>(null);
   let status = $state<TerminalStatus>("idle");
@@ -49,6 +47,9 @@
   let visibilityObserver: IntersectionObserver | null = null;
   let pendingInput = "";
   let inputFlushTimer: ReturnType<typeof setTimeout> | undefined;
+  let terminalRows = 24;
+  let terminalCols = 80;
+  let isTerminalMounted = false;
 
   const panelTitle = $derived(title ?? $t(i18nKeys.console.terminal.title));
   const panelDescription = $derived(description ?? $t(i18nKeys.console.terminal.description));
@@ -101,20 +102,15 @@
   }
 
   function sendResize(): void {
-    if (!socket || socket.readyState !== WebSocket.OPEN || !fitAddon) {
-      return;
-    }
-
-    const dimensions = fitAddon.proposeDimensions();
-    if (!dimensions) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
       return;
     }
 
     socket.send(
       JSON.stringify({
         kind: "resize",
-        rows: dimensions.rows,
-        cols: dimensions.cols,
+        rows: terminalRows,
+        cols: terminalCols,
       }),
     );
   }
@@ -154,9 +150,8 @@
     inputFlushTimer ??= setTimeout(flushTerminalInput, 8);
   }
 
-  function fitTerminal(): void {
-    fitAddon?.fit();
-    sendResize();
+  function clearTerminal(): void {
+    terminal?.write("\x1b[3J\x1b[2J\x1b[H");
   }
 
   function compactPath(path: string): string {
@@ -171,7 +166,6 @@
   function focusTerminal(): void {
     const focusInput = () => {
       terminal?.focus();
-      terminalElement?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
     };
 
     if (typeof window === "undefined") {
@@ -199,7 +193,7 @@
       case "error":
         status = "failed";
         errorMessage = frame.error.message;
-        terminal?.writeln(`\r\n${frame.error.message}`);
+        terminal?.write(`\r\n${frame.error.message}\r\n`);
         socket = null;
         break;
     }
@@ -222,22 +216,22 @@
     }
 
     closeTerminal();
-    terminal.clear();
+    clearTerminal();
     status = "connecting";
     errorMessage = "";
 
     try {
       const opened = await orpcClient.terminalSessions.open({
         scope,
-        initialRows: 24,
-        initialCols: 80,
+        initialRows: terminalRows,
+        initialCols: terminalCols,
       });
       const ws = new WebSocket(terminalSocketUrl(opened.transport.path));
       descriptor = opened;
       socket = ws;
 
       ws.onopen = () => {
-        fitTerminal();
+        sendResize();
         focusTerminal();
       };
       ws.onmessage = (event) => {
@@ -311,28 +305,44 @@
   }
 
   onMount(() => {
-    const term = new Terminal({
-      cursorBlink: true,
-      convertEol: true,
-      fontFamily: "'IBM Plex Mono', monospace",
-      fontSize: 13,
-      rows: 24,
-      cols: 80,
-      theme: {
-        background: "#111827",
-        foreground: "#f8fafc",
-        cursor: "#f8fafc",
-        selectionBackground: "#334155",
-      },
-    });
-    const addon = new FitAddon();
-    terminal = term;
-    fitAddon = addon;
-    term.loadAddon(addon);
+    isTerminalMounted = true;
+    const initializeTerminal = async () => {
+      if (!terminalElement) {
+        return;
+      }
 
-    if (terminalElement) {
-      term.open(terminalElement);
-      fitTerminal();
+      const term = new WTerm(terminalElement, {
+        autoResize: true,
+        cursorBlink: true,
+        rows: terminalRows,
+        cols: terminalCols,
+        onData: queueTerminalInput,
+        onResize: (cols, rows) => {
+          terminalCols = cols;
+          terminalRows = rows;
+          sendResize();
+        },
+      });
+      terminal = term;
+
+      try {
+        await term.init();
+      } catch (error) {
+        if (!isTerminalMounted) {
+          term.destroy();
+          return;
+        }
+        terminal = null;
+        status = "failed";
+        errorMessage = readErrorMessage(error);
+        return;
+      }
+
+      if (!isTerminalMounted) {
+        term.destroy();
+        return;
+      }
+
       visibilityObserver = new IntersectionObserver((entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           maybeAutoOpen();
@@ -340,25 +350,19 @@
       });
       visibilityObserver.observe(terminalElement);
       window.requestAnimationFrame(maybeAutoOpen);
-    }
+    };
 
-    term.onData((data) => {
-      queueTerminalInput(data);
-    });
-
-    window.addEventListener("resize", fitTerminal);
+    void initializeTerminal();
   });
 
   onDestroy(() => {
-    if (typeof window !== "undefined") {
-      window.removeEventListener("resize", fitTerminal);
-    }
+    isTerminalMounted = false;
     visibilityObserver?.disconnect();
     if (inputFlushTimer) {
       clearTimeout(inputFlushTimer);
     }
     closeTerminal();
-    terminal?.dispose();
+    terminal?.destroy();
   });
 </script>
 
@@ -390,7 +394,7 @@
 
   <div
     bind:this={terminalElement}
-    class="min-h-[28rem] overflow-hidden rounded-md border border-zinc-800 bg-[#111827] p-2 shadow-inner"
+    class="terminal-shell min-h-[28rem] overflow-hidden rounded-md border border-zinc-800 bg-[#111827] p-2 shadow-inner"
     role="button"
     tabindex="0"
     aria-label={panelTitle}
@@ -402,3 +406,16 @@
     <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.terminal.startHint)}</p>
   {/if}
 </section>
+
+<style>
+  .terminal-shell:global(.wterm) {
+    --term-bg: #111827;
+    --term-fg: #f8fafc;
+    --term-cursor: #f8fafc;
+    --term-font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --term-font-size: 13px;
+    min-height: 28rem;
+    border-radius: 0.375rem;
+    box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+  }
+</style>
