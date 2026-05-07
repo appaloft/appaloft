@@ -63,7 +63,7 @@ Recommended handling:
 Recommended handling:
 
 1. Inspect safe details such as `lockOwner`, `correlationId`, `lockHeartbeatAt`, `staleAfterSeconds`, and `waitedSeconds`.
-2. Appaloft deploy and cleanup commands already use bounded waiting and stale-only lock recovery when the heartbeat has aged past the stale window.
+2. Appaloft deploy and cleanup commands already use bounded waiting and stale-only lock recovery when the heartbeat has aged past the stale window. Current clients may cap older lock metadata to the shorter state-root maintenance stale window before recovery.
 3. If the heartbeat is still updating, wait for the active deployment or retry later.
 4. If the error repeats, run `appaloft remote-state lock inspect --server-host <host>` with the same SSH target options to inspect remote lock owner metadata without entering the deployment mutation path.
 5. Run `appaloft remote-state lock recover-stale --server-host <host>` only when diagnostics show the heartbeat is older than the stale window. This archives stale lock metadata and does not force-delete active locks.

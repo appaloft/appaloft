@@ -209,6 +209,9 @@ Recovery requirements:
   `remote-state-lock` error for an active lock;
 - abandoned locks must be visible through diagnostics and recoverable by a deliberate operator
   action or a safe stale-lock policy that records the recovered lock metadata before continuing;
+- state-root maintenance locks protect short ensure/download/upload work, so current clients may
+  cap older recorded stale windows to their configured maintenance stale window before stale-only
+  recovery when heartbeat metadata is no longer fresh;
 - incomplete state-root lock directories that never wrote owner/heartbeat metadata are not valid
   active leases and may use a shorter incomplete-lock stale window before stale-only recovery;
 - out-of-band remote-state diagnostics and stale recovery must run without acquiring the same

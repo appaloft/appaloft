@@ -193,6 +193,7 @@ function remotePrepareCommand(input: {
     '    recorded_stale_after="$(sed -n \'s/.*"staleAfterSeconds"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p\' "$owner_file" | head -n 1 || true)"',
     "  fi",
     '  [ -n "$recorded_stale_after" ] || recorded_stale_after="$stale_after_seconds"',
+    '  if [ "$recorded_stale_after" -gt "$stale_after_seconds" ]; then recorded_stale_after="$stale_after_seconds"; fi',
     '  if [ "$owner_file_present" != true ] && [ "$recorded_stale_after" -gt 30 ]; then recorded_stale_after=30; fi',
     '  if [ -n "$last_heartbeat" ]; then',
     '    heartbeat_epoch="$(date -u -d "$last_heartbeat" +%s 2>/dev/null || date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$last_heartbeat" +%s 2>/dev/null || true)"',
