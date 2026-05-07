@@ -6,13 +6,21 @@ export function deploymentResourceRuntimeScope(input: {
   server: Server;
   destination: Destination;
 }): CoordinationScope {
+  return deploymentResourceRuntimeScopeForIds({
+    resourceId: input.resource.toState().id.value,
+    serverId: input.server.toState().id.value,
+    destinationId: input.destination.toState().id.value,
+  });
+}
+
+export function deploymentResourceRuntimeScopeForIds(input: {
+  resourceId: string;
+  serverId: string;
+  destinationId: string;
+}): CoordinationScope {
   return {
     kind: "resource-runtime",
-    key: [
-      input.resource.toState().id.value,
-      input.server.toState().id.value,
-      input.destination.toState().id.value,
-    ].join(":"),
+    key: [input.resourceId, input.serverId, input.destinationId].join(":"),
   };
 }
 

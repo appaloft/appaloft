@@ -8,11 +8,14 @@ import {
   type CloneEnvironmentCommandInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
   type ConfigureDomainBindingRouteCommandInput,
+  type ConfigurePreviewPolicyCommandInput,
   type ConfigureResourceAccessCommandInput,
+  type ConfigureResourceAutoDeployCommandInput,
   type ConfigureResourceHealthCommandInput,
   type ConfigureResourceNetworkCommandInput,
   type ConfigureResourceRuntimeCommandInput,
   type ConfigureResourceSourceCommandInput,
+  type ConfigureScheduledTaskCommandInput,
   type ConfigureServerCredentialCommandInput,
   type ConfigureServerEdgeProxyCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
@@ -21,11 +24,14 @@ import {
   type CreateEnvironmentCommandInput,
   type CreateProjectCommandInput,
   type CreateResourceCommandInput,
+  type CreateScheduledTaskCommandInput,
   type CreateSshCredentialCommandInput,
   type DeactivateServerCommandInput,
   type DeleteCertificateCommandInput,
   type DeleteDomainBindingCommandInput,
+  type DeletePreviewEnvironmentCommandInput,
   type DeleteResourceCommandInput,
+  type DeleteScheduledTaskCommandInput,
   type DeleteServerCommandInput,
   type DeleteSshCredentialCommandInput,
   type DeploymentLogsQueryInput,
@@ -43,11 +49,16 @@ import {
   type ListEnvironmentsQueryInput,
   type ListGitHubRepositoriesQueryInput,
   type ListOperatorWorkQueryInput,
+  type ListPreviewEnvironmentsQueryInput,
   type ListResourcesQueryInput,
+  type ListScheduledTaskRunsQueryInput,
+  type ListScheduledTasksQueryInput,
+  type ListSourceEventsQueryInput,
   type ListSshCredentialsQueryInput,
   type LockEnvironmentCommandInput,
   type OpenTerminalSessionCommandInput,
   type PromoteEnvironmentCommandInput,
+  type RedeployDeploymentCommandInput,
   type RegisterServerCommandInput,
   type RenameEnvironmentCommandInput,
   type RenameProjectCommandInput,
@@ -58,10 +69,15 @@ import {
   type ResourceHealthQueryInput,
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
+  type RestartResourceRuntimeCommandInput,
   type RetryCertificateCommandInput,
+  type RetryDeploymentCommandInput,
   type RetryDomainBindingVerificationCommandInput,
   type RevokeCertificateCommandInput,
+  type RollbackDeploymentCommandInput,
   type RotateSshCredentialCommandInput,
+  type RunScheduledTaskNowCommandInput,
+  type ScheduledTaskRunLogsQueryInput,
   type SetEnvironmentVariableCommandInput,
   type SetResourceVariableCommandInput,
   type ShowCertificateQueryInput,
@@ -70,10 +86,17 @@ import {
   type ShowDomainBindingQueryInput,
   type ShowEnvironmentQueryInput,
   type ShowOperatorWorkQueryInput,
+  type ShowPreviewEnvironmentQueryInput,
+  type ShowPreviewPolicyQueryInput,
   type ShowProjectQueryInput,
   type ShowResourceQueryInput,
+  type ShowScheduledTaskQueryInput,
+  type ShowScheduledTaskRunQueryInput,
   type ShowServerQueryInput,
+  type ShowSourceEventQueryInput,
   type ShowSshCredentialQueryInput,
+  type StartResourceRuntimeCommandInput,
+  type StopResourceRuntimeCommandInput,
   type StreamDeploymentEventsQueryInput,
   type TestDraftServerConnectivityCommandInput,
   type TestRegisteredServerConnectivityCommandInput,
@@ -91,7 +114,9 @@ import {
   type CloneEnvironmentResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
   type ConfigureDomainBindingRouteResponse,
+  type ConfigurePreviewPolicyResponse,
   type ConfigureResourceAccessResponse,
+  type ConfigureResourceAutoDeployResponse,
   type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkResponse,
   type ConfigureResourceRuntimeResponse,
@@ -107,7 +132,9 @@ import {
   type DeactivateServerResponse,
   type DeleteCertificateResponse,
   type DeleteDomainBindingResponse,
+  type DeletePreviewEnvironmentResponse,
   type DeleteResourceResponse,
+  type DeleteScheduledTaskResponse,
   type DeleteServerResponse,
   type DeleteSshCredentialResponse,
   type DeploymentEventStreamEnvelope,
@@ -131,14 +158,19 @@ import {
   type ListGitHubRepositoriesResponse,
   type ListOperatorWorkResponse,
   type ListPluginsResponse,
+  type ListPreviewEnvironmentsResponse,
   type ListProjectsResponse,
   type ListProvidersResponse,
   type ListResourcesResponse,
+  type ListScheduledTaskRunsResponse,
+  type ListScheduledTasksResponse,
   type ListServersResponse,
+  type ListSourceEventsResponse,
   type ListSshCredentialsResponse,
   type LockEnvironmentResponse,
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
+  type RedeployDeploymentResponse,
   type RegisterServerResponse,
   type RenameEnvironmentResponse,
   type RenameProjectResponse,
@@ -151,19 +183,32 @@ import {
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
+  type RestartResourceRuntimeResponse,
   type RetryCertificateResponse,
+  type RetryDeploymentResponse,
   type RetryDomainBindingVerificationResponse,
   type RevokeCertificateResponse,
+  type RollbackDeploymentResponse,
   type RotateSshCredentialResponse,
+  type RunScheduledTaskNowResponse,
+  type ScheduledTaskCommandResponse,
+  type ScheduledTaskRunLogsResponse,
   type SetResourceVariableResponse,
   type ShowCertificateResponse,
   type ShowDefaultAccessDomainPolicyResponse,
   type ShowDeploymentResponse,
   type ShowDomainBindingResponse,
   type ShowOperatorWorkResponse,
+  type ShowPreviewEnvironmentResponse,
+  type ShowPreviewPolicyResponse,
   type ShowProjectResponse,
+  type ShowScheduledTaskResponse,
+  type ShowScheduledTaskRunResponse,
   type ShowServerResponse,
+  type ShowSourceEventResponse,
   type ShowSshCredentialResponse,
+  type StartResourceRuntimeResponse,
+  type StopResourceRuntimeResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
   type UnlockEnvironmentResponse,
@@ -454,6 +499,12 @@ export type AppaloftOrpcClientContract = {
       ConfigureResourceAccessResponse,
       AppaloftClientError
     >;
+    configureAutoDeploy: Client<
+      AppaloftClientContext,
+      ConfigureResourceAutoDeployCommandInput,
+      ConfigureResourceAutoDeployResponse,
+      AppaloftClientError
+    >;
     configureRuntime: Client<
       AppaloftClientContext,
       ConfigureResourceRuntimeCommandInput,
@@ -526,6 +577,84 @@ export type AppaloftOrpcClientContract = {
       AsyncIteratorClass<ResourceRuntimeLogEvent, ResourceRuntimeLogsStreamResponse, void>,
       AppaloftClientError
     >;
+    runtime: {
+      stop: Client<
+        AppaloftClientContext,
+        StopResourceRuntimeCommandInput,
+        StopResourceRuntimeResponse,
+        AppaloftClientError
+      >;
+      start: Client<
+        AppaloftClientContext,
+        StartResourceRuntimeCommandInput,
+        StartResourceRuntimeResponse,
+        AppaloftClientError
+      >;
+      restart: Client<
+        AppaloftClientContext,
+        RestartResourceRuntimeCommandInput,
+        RestartResourceRuntimeResponse,
+        AppaloftClientError
+      >;
+    };
+  };
+  scheduledTasks: {
+    list: Client<
+      AppaloftClientContext,
+      ListScheduledTasksQueryInput,
+      ListScheduledTasksResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowScheduledTaskQueryInput,
+      ShowScheduledTaskResponse,
+      AppaloftClientError
+    >;
+    create: Client<
+      AppaloftClientContext,
+      CreateScheduledTaskCommandInput,
+      ScheduledTaskCommandResponse,
+      AppaloftClientError
+    >;
+    configure: Client<
+      AppaloftClientContext,
+      ConfigureScheduledTaskCommandInput,
+      ScheduledTaskCommandResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeleteScheduledTaskCommandInput,
+      DeleteScheduledTaskResponse,
+      AppaloftClientError
+    >;
+    runNow: Client<
+      AppaloftClientContext,
+      RunScheduledTaskNowCommandInput,
+      RunScheduledTaskNowResponse,
+      AppaloftClientError
+    >;
+    runs: {
+      list: Client<
+        AppaloftClientContext,
+        ListScheduledTaskRunsQueryInput,
+        ListScheduledTaskRunsResponse,
+        AppaloftClientError
+      >;
+      show: Client<
+        AppaloftClientContext,
+        ShowScheduledTaskRunQueryInput,
+        ShowScheduledTaskRunResponse,
+        AppaloftClientError
+      >;
+      logs: Client<
+        AppaloftClientContext,
+        ScheduledTaskRunLogsQueryInput,
+        ScheduledTaskRunLogsResponse,
+        AppaloftClientError
+      >;
+    };
   };
   terminalSessions: {
     open: Client<
@@ -660,6 +789,24 @@ export type AppaloftOrpcClientContract = {
       CreateDeploymentResponse,
       AppaloftClientError
     >;
+    retry: Client<
+      AppaloftClientContext,
+      RetryDeploymentCommandInput,
+      RetryDeploymentResponse,
+      AppaloftClientError
+    >;
+    redeploy: Client<
+      AppaloftClientContext,
+      RedeployDeploymentCommandInput,
+      RedeployDeploymentResponse,
+      AppaloftClientError
+    >;
+    rollback: Client<
+      AppaloftClientContext,
+      RollbackDeploymentCommandInput,
+      RollbackDeploymentResponse,
+      AppaloftClientError
+    >;
     createStream: Client<
       AppaloftClientContext,
       CreateDeploymentCommandInput,
@@ -696,6 +843,54 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ShowOperatorWorkQueryInput,
       ShowOperatorWorkResponse,
+      AppaloftClientError
+    >;
+  };
+  sourceEvents: {
+    list: Client<
+      AppaloftClientContext,
+      ListSourceEventsQueryInput,
+      ListSourceEventsResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowSourceEventQueryInput,
+      ShowSourceEventResponse,
+      AppaloftClientError
+    >;
+  };
+  previewPolicies: {
+    configure: Client<
+      AppaloftClientContext,
+      ConfigurePreviewPolicyCommandInput,
+      ConfigurePreviewPolicyResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowPreviewPolicyQueryInput,
+      ShowPreviewPolicyResponse,
+      AppaloftClientError
+    >;
+  };
+  previewEnvironments: {
+    list: Client<
+      AppaloftClientContext,
+      ListPreviewEnvironmentsQueryInput,
+      ListPreviewEnvironmentsResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowPreviewEnvironmentQueryInput,
+      ShowPreviewEnvironmentResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeletePreviewEnvironmentCommandInput,
+      DeletePreviewEnvironmentResponse,
       AppaloftClientError
     >;
   };

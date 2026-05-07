@@ -67,10 +67,21 @@ import {
 } from "../shared/text-values";
 import { ScalarValueObject } from "../shared/value-object";
 import {
+  cloneResourceAutoDeployPolicyState,
+  ResourceAutoDeployPolicy,
+  type ResourceAutoDeployPolicyState,
+  type ResourceAutoDeploySecretRef,
+  type ResourceAutoDeployTriggerKindValue,
+  type SourceEventDedupeWindowSeconds,
+  type SourceEventKindValue,
+} from "./auto-deploy-policy";
+import {
   cloneResourceSourceBindingState,
   type DeploymentSourceDescriptorState,
+  type GitRefText,
   ResourceSourceBinding,
   type ResourceSourceBindingState,
+  type SourceBindingFingerprint,
 } from "./source-binding";
 import { type ResourceStorageMountModeValue, type StorageDestinationPath } from "./storage-volume";
 
@@ -431,6 +442,7 @@ export interface ResourceState {
   kind: ResourceKindValue;
   services: ResourceServiceState[];
   sourceBinding?: ResourceSourceBindingState;
+  autoDeployPolicy?: ResourceAutoDeployPolicyState;
   runtimeProfile?: ResourceRuntimeProfileState;
   networkProfile?: ResourceNetworkProfileState;
   accessProfile?: ResourceAccessProfileState;
@@ -481,6 +493,36 @@ function cloneResourceStorageAttachmentState(
   attachment: ResourceStorageAttachmentState,
 ): ResourceStorageAttachmentState {
   return { ...attachment };
+}
+
+function resourceAutoDeploySourceMissingError(input: {
+  resourceId: ResourceId;
+  sourceKind?: string;
+}) {
+  return domainError.resourceAutoDeploySourceMissing(
+    "Auto-deploy requires a compatible Resource source binding",
+    {
+      phase: "auto-deploy-policy-admission",
+      resourceId: input.resourceId.value,
+      requiredSourceKind: "git",
+      ...(input.sourceKind ? { sourceKind: input.sourceKind } : {}),
+    },
+  );
+}
+
+function resourceAutoDeployPolicyBlockedError(input: {
+  resourceId: ResourceId;
+  blockedReason: string;
+  sourceBindingFingerprint?: string;
+}) {
+  return domainError.resourceAutoDeployPolicyBlocked("Auto-deploy policy is blocked", {
+    phase: "auto-deploy-policy-admission",
+    resourceId: input.resourceId.value,
+    blockedReason: input.blockedReason,
+    ...(input.sourceBindingFingerprint
+      ? { sourceBindingFingerprint: input.sourceBindingFingerprint }
+      : {}),
+  });
 }
 
 export type ResourceVariableState = ReturnType<EnvironmentConfigSet["toState"]>[number];
@@ -881,6 +923,9 @@ export class Resource extends AggregateRoot<ResourceState> {
               ...cloneResourceSourceBindingState(state.sourceBinding),
             },
           }
+        : {}),
+      ...(state.autoDeployPolicy
+        ? { autoDeployPolicy: cloneResourceAutoDeployPolicyState(state.autoDeployPolicy) }
         : {}),
       ...(state.runtimeProfile
         ? { runtimeProfile: cloneResourceRuntimeProfileState(state.runtimeProfile) }
@@ -1567,6 +1612,15 @@ export class Resource extends AggregateRoot<ResourceState> {
 
     const normalizedSourceBinding = sourceBinding.value.toState();
     this.state.sourceBinding = cloneResourceSourceBindingState(normalizedSourceBinding);
+    if (this.state.autoDeployPolicy) {
+      const policy = ResourceAutoDeployPolicy.rehydrate(
+        this.state.autoDeployPolicy,
+      ).blockIfSourceBindingChanged({
+        currentSourceBindingFingerprint: sourceBinding.value.fingerprint(),
+        changedAt: input.configuredAt,
+      });
+      this.state.autoDeployPolicy = policy.toState();
+    }
 
     this.recordDomainEvent("resource-source-configured", input.configuredAt, {
       resourceId: this.state.id.value,
@@ -1578,6 +1632,150 @@ export class Resource extends AggregateRoot<ResourceState> {
     });
 
     return ok(undefined);
+  }
+
+  configureAutoDeployPolicy(input: {
+    triggerKind: ResourceAutoDeployTriggerKindValue;
+    refs: readonly GitRefText[];
+    eventKinds: readonly SourceEventKindValue[];
+    configuredAt: UpdatedAt;
+    genericWebhookSecretRef?: ResourceAutoDeploySecretRef;
+    dedupeWindowSeconds?: SourceEventDedupeWindowSeconds;
+  }): Result<ResourceAutoDeployPolicyState> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-auto-deploy");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    if (!this.state.sourceBinding) {
+      return err(resourceAutoDeploySourceMissingError({ resourceId: this.state.id }));
+    }
+
+    const sourceBinding = ResourceSourceBinding.rehydrate(this.state.sourceBinding);
+    if (!sourceBinding.supportsAutoDeployPolicy()) {
+      return err(
+        resourceAutoDeploySourceMissingError({
+          resourceId: this.state.id,
+          sourceKind: this.state.sourceBinding.kind.value,
+        }),
+      );
+    }
+
+    const policy = ResourceAutoDeployPolicy.create({
+      triggerKind: input.triggerKind,
+      refs: input.refs,
+      eventKinds: input.eventKinds,
+      sourceBindingFingerprint: sourceBinding.fingerprint(),
+      updatedAt: input.configuredAt,
+      ...(input.genericWebhookSecretRef
+        ? { genericWebhookSecretRef: input.genericWebhookSecretRef }
+        : {}),
+      ...(input.dedupeWindowSeconds ? { dedupeWindowSeconds: input.dedupeWindowSeconds } : {}),
+    });
+    if (policy.isErr()) {
+      return err(policy.error);
+    }
+
+    this.state.autoDeployPolicy = policy.value.toState();
+
+    this.recordDomainEvent("resource-auto-deploy-policy-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      status: this.state.autoDeployPolicy.status.value,
+      triggerKind: this.state.autoDeployPolicy.triggerKind.value,
+      refs: this.state.autoDeployPolicy.refs.map((ref) => ref.value),
+      eventKinds: this.state.autoDeployPolicy.eventKinds.map((eventKind) => eventKind.value),
+      sourceBindingFingerprint: this.state.autoDeployPolicy.sourceBindingFingerprint.value,
+      configuredAt: input.configuredAt.value,
+    });
+
+    return ok(cloneResourceAutoDeployPolicyState(this.state.autoDeployPolicy));
+  }
+
+  disableAutoDeployPolicy(input: { disabledAt: UpdatedAt }): Result<{ status: "disabled" }> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-auto-deploy");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    delete this.state.autoDeployPolicy;
+    this.recordDomainEvent("resource-auto-deploy-policy-disabled", input.disabledAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      status: "disabled",
+      disabledAt: input.disabledAt.value,
+    });
+
+    return ok({ status: "disabled" });
+  }
+
+  acknowledgeAutoDeploySourceBinding(input: {
+    sourceBindingFingerprint: SourceBindingFingerprint;
+    acknowledgedAt: UpdatedAt;
+  }): Result<ResourceAutoDeployPolicyState> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-auto-deploy");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    if (!this.state.autoDeployPolicy) {
+      return err(
+        resourceAutoDeployPolicyBlockedError({
+          resourceId: this.state.id,
+          blockedReason: "policy-missing",
+        }),
+      );
+    }
+
+    if (!this.state.sourceBinding) {
+      return err(resourceAutoDeploySourceMissingError({ resourceId: this.state.id }));
+    }
+
+    const sourceBinding = ResourceSourceBinding.rehydrate(this.state.sourceBinding);
+    if (!sourceBinding.supportsAutoDeployPolicy()) {
+      return err(
+        resourceAutoDeploySourceMissingError({
+          resourceId: this.state.id,
+          sourceKind: this.state.sourceBinding.kind.value,
+        }),
+      );
+    }
+
+    const currentFingerprint = sourceBinding.fingerprint();
+    if (!currentFingerprint.equals(input.sourceBindingFingerprint)) {
+      return err(
+        resourceAutoDeployPolicyBlockedError({
+          resourceId: this.state.id,
+          blockedReason: "source-binding-fingerprint-mismatch",
+          sourceBindingFingerprint: input.sourceBindingFingerprint.value,
+        }),
+      );
+    }
+
+    const policy = ResourceAutoDeployPolicy.rehydrate(
+      this.state.autoDeployPolicy,
+    ).acknowledgeSourceBinding({
+      currentSourceBindingFingerprint: currentFingerprint,
+      acknowledgedAt: input.acknowledgedAt,
+    });
+    this.state.autoDeployPolicy = policy.toState();
+
+    this.recordDomainEvent(
+      "resource-auto-deploy-policy-source-binding-acknowledged",
+      input.acknowledgedAt,
+      {
+        resourceId: this.state.id.value,
+        projectId: this.state.projectId.value,
+        environmentId: this.state.environmentId.value,
+        status: this.state.autoDeployPolicy.status.value,
+        sourceBindingFingerprint: this.state.autoDeployPolicy.sourceBindingFingerprint.value,
+        acknowledgedAt: input.acknowledgedAt.value,
+      },
+    );
+
+    return ok(cloneResourceAutoDeployPolicyState(this.state.autoDeployPolicy));
   }
 
   accept<TContext, TResult>(
@@ -1597,6 +1795,9 @@ export class Resource extends AggregateRoot<ResourceState> {
               ...cloneResourceSourceBindingState(this.state.sourceBinding),
             },
           }
+        : {}),
+      ...(this.state.autoDeployPolicy
+        ? { autoDeployPolicy: cloneResourceAutoDeployPolicyState(this.state.autoDeployPolicy) }
         : {}),
       ...(this.state.runtimeProfile
         ? { runtimeProfile: cloneResourceRuntimeProfileState(this.state.runtimeProfile) }

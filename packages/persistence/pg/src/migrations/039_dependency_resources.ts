@@ -18,6 +18,7 @@ export const dependencyResourcesMigration = {
         description TEXT,
         endpoint JSONB,
         connection_secret_ref TEXT,
+        provider_realization JSONB,
         backup_relationship JSONB,
         binding_readiness JSONB,
         lifecycle_status TEXT NOT NULL,

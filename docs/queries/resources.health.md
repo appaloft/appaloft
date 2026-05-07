@@ -33,10 +33,14 @@ This query inherits:
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
+- [ADR-038: Resource Runtime Control Ownership](../decisions/ADR-038-resource-runtime-control-ownership.md)
 - [Resource Health Observation Workflow](../workflows/resource-health-observation.md)
+- [Resource Runtime Controls](../specs/043-resource-runtime-controls/spec.md)
 - [Resource Access Failure Diagnostics Workflow](../workflows/resource-access-failure-diagnostics.md)
 - [Resource Health Error Spec](../errors/resources.health.md)
+- [Resource Runtime Controls Error Spec](../errors/resource-runtime-controls.md)
 - [Resource Health Test Matrix](../testing/resource-health-test-matrix.md)
+- [Resource Runtime Controls Test Matrix](../testing/resource-runtime-controls-test-matrix.md)
 - [Resource Health Implementation Plan](../implementation/resource-health-plan.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -79,6 +83,7 @@ type ResourceHealthSummary = {
   overall: ResourceHealthOverall;
   latestDeployment?: ResourceHealthDeploymentContext;
   runtime: ResourceRuntimeHealthSection;
+  latestRuntimeControl?: ResourceRuntimeControlSummary;
   healthPolicy: ResourceHealthPolicySection;
   publicAccess: ResourcePublicAccessHealthSection;
   proxy: ResourceProxyHealthSection;
@@ -139,12 +144,55 @@ type ResourceHealthCheck = {
 };
 ```
 
+Runtime-control readback:
+
+```ts
+type ResourceRuntimeControlSummary = {
+  runtimeControlAttemptId: string;
+  operation: "stop" | "start" | "restart";
+  status: "accepted" | "running" | "succeeded" | "failed" | "blocked";
+  startedAt: string;
+  completedAt?: string;
+  runtimeState:
+    | "starting"
+    | "running"
+    | "restarting"
+    | "stopping"
+    | "stopped"
+    | "unknown";
+  blockedReason?: ResourceRuntimeControlBlockedReason;
+  errorCode?: string;
+  phases?: readonly ResourceRuntimeControlPhaseSummary[];
+};
+
+type ResourceRuntimeControlPhaseSummary = {
+  phase: "stop" | "start";
+  status: "pending" | "running" | "succeeded" | "failed" | "skipped";
+  errorCode?: string;
+};
+
+type ResourceRuntimeControlBlockedReason =
+  | "resource-archived"
+  | "resource-deleted"
+  | "runtime-not-found"
+  | "runtime-metadata-stale"
+  | "runtime-already-running"
+  | "runtime-already-stopped"
+  | "runtime-control-in-progress"
+  | "deployment-in-progress"
+  | "profile-acknowledgement-required"
+  | "adapter-unsupported";
+```
+
 Required top-level behavior:
 
 - `overall` is the user-facing resource status, not latest deployment status.
 - `latestDeployment` may include id, status, finished time, and last structured error as context.
 - `runtime` reports current runtime lifecycle and health, including container/process health when
   available.
+- `latestRuntimeControl` reports the most recent Resource-owned runtime stop/start/restart attempt
+  when the candidate runtime-control operations become active. It is readback only and must not
+  imply retry, redeploy, rollback, source refresh, or profile application.
 - `healthPolicy` reports whether a health check is enabled, missing, or unsupported.
 - `publicAccess` reports the current resource URL being checked. Durable resource domain bindings
   take precedence over server-applied config domains, and server-applied config domains take
@@ -172,6 +220,26 @@ The query must resolve overall status using these rules:
 | Observation source is unavailable but no failing fact is known | `unknown` |
 
 `deployment.status = "succeeded"` is not a status-resolution override.
+
+## Runtime-Control Readback
+
+`resources.health` is the first runtime-control status readback surface for Phase 7.
+
+The query may include `latestRuntimeControl` after `resources.runtime.stop`,
+`resources.runtime.start`, or `resources.runtime.restart` is accepted and records an attempt. The
+field is optional when no runtime-control attempt exists or the implementation slice has not
+activated runtime controls.
+
+Runtime-control readback must:
+
+- report only safe Resource-scoped attempt status and blocked reason details;
+- keep restart phase details bounded to stop/start status and stable error codes;
+- never expose raw container ids, shell commands, provider payloads, environment values, secret
+  values, private source paths, or credential-bearing diagnostics;
+- avoid changing `overall` by itself unless runtime observation also proves the corresponding
+  lifecycle state;
+- guide users to `deployments.redeploy`, `deployments.retry`, `deployments.rollback`, or
+  `deployments.recovery-readiness` when a new Deployment attempt is the correct recovery path.
 
 ## Health Policy Semantics
 
@@ -251,9 +319,13 @@ deployment context, runtime lifecycle from latest deployment state, resource acc
 route status, and bounded live HTTP/public probes when `mode = "live"` can resolve a safe URL. It
 does not mark a successful deployment as healthy without a configured/current health observation.
 
-Provider-native runtime inspection, Docker health-state inspection, command health checks, and
-scheduled health summary persistence are still future work. Unsupported live inspection sources
-are reported as source errors inside `ok(ResourceHealthSummary)`.
+Provider-native runtime inspection has initial Docker Swarm service-task coverage: when
+`mode = "live"` and `includeRuntimeProbe = true`, a Swarm-backed Docker container deployment with
+sanitized `swarm.serviceName` metadata can return normalized runtime health/check fields from
+`docker service ps` task state. Docker health-state inspection for single-container/Compose
+runtimes, command health checks, remote-manager Swarm probing, and scheduled health summary
+persistence are still future work. Unsupported live inspection sources are reported as source
+errors inside `ok(ResourceHealthSummary)`.
 
 Runtime deployment verification still checks local loopback or Docker container reachability during
 `deployments.create` execution and records deployment success/failure. That remains
@@ -261,6 +333,12 @@ attempt-scoped and is not the long-lived resource health model.
 
 The Web resource header, resource detail health panel, sidebar, project list, and project resource
 list now use `ResourceHealthSummary.overall` rather than `lastDeploymentStatus`.
+
+Resource runtime-control readback is specified but not implemented. The first Code Round for
+`resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart` should embed
+the latest safe attempt summary in `latestRuntimeControl` rather than adding a separate history
+query. A separate runtime-control query remains deferred until attempt history, pagination, or audit
+needs require it.
 
 ## Open Questions
 

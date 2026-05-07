@@ -59,8 +59,8 @@ Historical alignment notes:
   deploys, and Web runtime profile editing is merged on `origin/main`, and the current preview
   runtime-name template variables on `main` are `{preview_id}` and `{pr_number}`.
 - [x] On 2026-04-22, Action/CLI PR preview deploy profile flag support and explicit preview cleanup
-  command support are implemented in the CLI/config bootstrap path, but the public
-  deploy-action wrapper and product-grade GitHub App preview lifecycle remain incomplete.
+  command support are implemented in the CLI/config bootstrap path. The public deploy-action
+  wrapper is now published; product-grade GitHub App preview lifecycle work is tracked separately.
 - [x] On 2026-04-23, `deployments.stream-events` is active in the operation catalog, application
   query slice, HTTP/oRPC replay and stream routes, CLI events command, shell observer, and Web
   deployment detail timeline. Remaining work is reconnect/gap/CLI test hardening, not first-class
@@ -71,7 +71,7 @@ Historical alignment notes:
   after deployment.
 - [x] On 2026-04-24, the main repository has a docs PR preview workflow that uses the Appaloft CLI
   preview path for same-repository docs changes and runs explicit preview cleanup when the PR is
-  closed; the public `appaloft/deploy-action` wrapper remains separate roadmap work.
+  closed; the public `appaloft/deploy-action` wrapper is now published from the reference export.
 - [x] Release Please keeps pre-`1.0.0` feature and minor bumps on the current patch line by
   default; the `release_as` workflow input is required only when the roadmap gate allows a target
   minor or explicit hotfix version.
@@ -119,7 +119,7 @@ The 1.0.0 product is ready only when all of these are checked:
 - [ ] Every long-running internal state has list/show plus retry/cancel/prune/recovery where it can
   block or confuse operators.
 - [ ] Web, CLI, and HTTP/oRPC all dispatch the same command/query schemas.
-- [ ] Future MCP/tool contracts can be generated from the same operation catalog without inventing
+- [x] Future MCP/tool contracts can be generated from the same operation catalog without inventing
   parallel behavior.
 - [ ] Framework/runtime detection covers the mainstream self-hosted web catalog with deterministic
   planners or explicit fallback errors.
@@ -181,8 +181,8 @@ Still blocking 1.0.0:
 - [ ] Top-level resource CRUD/lifecycle is uneven across projects, servers, credentials, resources,
   deployments, domain bindings, certificates, default access policy, dependency resources, storage,
   webhooks, and internal process state.
-- [ ] Resource profile drift handling and remaining non-resource lifecycle gaps are still major
-  horizontal work. Resource detail/profile editing affordances are Phase 4 closure work.
+- [ ] Remaining non-resource lifecycle gaps are still major horizontal work. Resource profile drift
+  visibility is active; configuration drift redaction remains a focused follow-up.
 - [ ] Retry/redeploy, cancel, and rollback are not public operations. `deployments.show` and
   `deployments.stream-events` are already active.
 - [ ] `deployments.create` progress stream is still create-time observation; standalone replay/follow
@@ -197,8 +197,7 @@ Still blocking 1.0.0:
 - [ ] Dependency resources and bindings exist in core but lack provisioning, binding, backup, and
   deletion commands.
 - [ ] Framework coverage is narrower than the target product catalog.
-- [ ] Docker Swarm support is not yet specified and implemented as a supported `1.0.0` runtime target
-  backend.
+- [x] Docker Swarm support is specified and implemented as the first cluster runtime target backend.
 - [ ] Durable outbox/inbox, job state, process attempts, dead-letter/retry state, remote-state
   recovery, and audit visibility are not a complete operator surface.
 
@@ -456,8 +455,8 @@ Phase 4 resource profile editing verification notes from 2026-04-27:
 - CLI, HTTP/oRPC, Web help, and future MCP/tool naming all point at the existing operation keys,
   command/query schemas, and docs-registry topics for source/runtime/network/access/health/
   configuration profile editing. No generic `resources.update` surface is introduced.
-- Resource profile drift visibility remains a later resource/internal-state ledger item; it is not
-  part of this Phase 4 resource detail/profile editing closure.
+- Resource profile drift visibility was deferred from this Phase 4 resource detail/profile editing
+  closure and is now tracked by the Phase 7 profile-drift entries below.
 
 Exit criteria:
 
@@ -802,7 +801,7 @@ Target: `0.9.0` beta.
 
 Release rule:
 
-- [ ] Select `0.9.0` only when all required Phase 7 items, earlier phase items, and exit criteria
+- [x] Select `0.9.0` only when all required Phase 7 items, earlier phase items, and exit criteria
   are checked. If any Phase 7 item remains unchecked, release a `0.8.x` patch instead.
 
 Already done:
@@ -843,11 +842,807 @@ Current verification notes:
   injection remains deferred. This still does not satisfy the full `0.9.0` release rule while
   secret rotation, runtime injection, provider-native database realization, Redis, backup/restore,
   recovery, auto-deploy, preview, and cluster runtime items remain open.
+- 2026-05-05 Phase 7 dependency binding secret rotation Spec Round positioned
+  `resources.rotate-dependency-binding-secret` as the next ResourceBinding lifecycle candidate,
+  with stable matrix rows for safe rotation metadata, snapshot immutability, and entrypoint
+  dispatch. It does not implement the command yet, so the full `0.9.0` release rule remains
+  blocked by binding secret rotation Code Round, runtime injection, provider-native database
+  realization, Redis, backup/restore, recovery, auto-deploy, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 dependency binding secret rotation Code Round implemented
+  `resources.rotate-dependency-binding-secret` across core `ResourceBinding`, application command
+  handling, PG/PGlite persistence, CLI/oRPC/HTTP dispatch, contract schemas, and safe read-model
+  metadata. It rotates only binding-scoped safe secret references for future deployment snapshots;
+  runtime injection, provider-native database realization, Redis, backup/restore, recovery,
+  auto-deploy, preview, and cluster runtime items remain open for the full `0.9.0` release rule.
+- 2026-05-05 Phase 7 Redis dependency resource lifecycle Spec Round positioned
+  `dependency-resources.provision-redis` and `dependency-resources.import-redis` as accepted
+  candidates, with matrix rows for safe Redis metadata, secret masking, list/show/rename/delete
+  inclusion, and CLI/oRPC/HTTP dispatch. It does not implement the Redis Code Round yet, so the
+  full `0.9.0` release rule remains blocked by Redis, provider-native database realization,
+  backup/restore, recovery, auto-deploy, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 Redis dependency resource lifecycle Code Round implemented
+  provider-neutral Redis provision/import plus list/show/rename/delete inclusion across core,
+  application, PG/PGlite persistence, contracts, CLI, and oRPC/HTTP dispatch. It does not create
+  provider-native Redis infrastructure or materialize Redis runtime environment injection yet, so
+  the full `0.9.0` release rule remains blocked by provider-native database realization,
+  backup/restore, recovery, auto-deploy, preview, and cluster runtime items.
+- 2026-05-06 Phase 7 Redis dependency binding safe snapshot reference Code Round allowed ready
+  imported Redis dependency resources to bind to Resources and appear in safe deployment snapshot
+  references with kind `redis`. Managed Redis binding, provider-native Redis infrastructure, and
+  store-backed runtime secret value resolution remain open, so the Redis closed loop exit criterion
+  remains open.
+- 2026-05-06 Phase 7 dependency binding runtime injection Spec Round added ADR-040 plus
+  `docs/specs/047-dependency-binding-runtime-injection` to govern how active ready Postgres and
+  imported Redis bindings become runtime environment inputs through `deployments.plan`,
+  `deployments.create`, and runtime target adapters.
+- 2026-05-06 Phase 7 dependency binding runtime injection Code Round slice materialized safe
+  runtime secret references into deployment snapshots, changed plan/show contracts to
+  `ready | blocked | not-applicable`, rejected active non-injectable bindings before deployment
+  acceptance with `dependency_runtime_injection_blocked`, and routed safe dependency secret handles
+  through single-server and Swarm adapters. Store-backed resolution of Appaloft secret references
+  into raw dependency connection values and public docs remain open, so Postgres/Redis closed loop
+  exit criteria remain open.
+- 2026-05-06 Phase 7 dependency runtime secret value resolution Spec Round added
+  [ADR-041](./decisions/ADR-041-dependency-runtime-secret-value-resolution.md) plus
+  [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md)
+  to govern imported Postgres/Redis connection value storage, managed Postgres reference
+  validation, deployment blocked readiness for unresolved refs, single-server runtime env
+  resolution, and Docker Swarm secret materialization. It does not implement the Code Round yet, so
+  Postgres/Redis closed-loop exit criteria remain open.
+- 2026-05-06 Phase 7 dependency secret value storage Code Round slice added a
+  `DependencyResourceSecretStore` application port, PG/PGlite-backed `dependency_resource_secrets`
+  storage/resolution, shell DI wiring, and import use-case integration so imported Postgres and
+  Redis connection URLs are stored behind safe `appaloft://dependency-resources/.../connection`
+  refs. Deployment unresolved-ref blocking, managed Postgres reference validation, and runtime
+  target value materialization remain open, so Postgres/Redis closed-loop exit criteria remain
+  open.
+- 2026-05-06 Phase 7 managed Postgres secret reference validation Code Round slice now validates
+  Appaloft-owned provider realization refs through the dependency resource secret store before
+  marking binding readiness ready; unresolved refs keep provider realization ready but binding
+  readiness blocked with safe reason metadata. Deployment plan/create unresolved-ref blocking and
+  runtime target value materialization remain open, so Postgres/Redis closed-loop exit criteria
+  remain open.
+- 2026-05-06 Phase 7 dependency runtime unresolved-ref blocking Code Round slice now validates
+  captured Appaloft-owned dependency runtime refs during `deployments.plan` and
+  `deployments.create`, reports `dependency_runtime_secret_unresolved` safely in plan output, and
+  rejects create before deployment acceptance when resolution fails. Runtime target value
+  materialization remains open, so Postgres/Redis closed-loop exit criteria remain open.
+- 2026-05-06 Phase 7 single-server dependency runtime secret materialization Code Round slice now
+  resolves Appaloft-owned dependency refs into execution-only environment values for local-shell
+  and generic-SSH runtimes, includes dependency target env vars in Docker container launch specs,
+  and redacts resolved values in display/output paths. At that point, Docker Swarm secret
+  materialization and historical rotated-ref execution coverage remained open, so Postgres/Redis
+  closed-loop exit criteria remained open.
+- 2026-05-06 Phase 7 Docker Swarm dependency runtime secret materialization Code Round slice now
+  resolves Appaloft-owned dependency refs into deployment-scoped Docker secrets before Swarm
+  service update and keeps sanitized service intent on Docker secret handles. Historical
+  rotated-ref execution coverage remains open, so Postgres/Redis closed-loop exit criteria remain
+  open.
+- 2026-05-06 Phase 7 historical rotated dependency ref resolution Code Round slice now resolves
+  retained `appaloft+pg://resource-binding/...` binding secret refs through the runtime resolver,
+  keeps old deployment snapshots on their captured refs, and verifies new deployments can use a
+  rotated ref only after it is resolvable. Final Postgres/Redis closed-loop exit verification
+  remains open.
+- 2026-05-06 Phase 7 Redis provider-native realization Spec Round added
+  [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md) to
+  position `dependency-resources.provision-redis`, `resources.bind-dependency`, and
+  `dependency-resources.delete` for managed Redis realization, binding readiness, runtime secret
+  resolvability, and provider cleanup. It does not implement the Code Round yet, so the Redis
+  closed-loop exit criterion remains open.
+- 2026-05-06 Phase 7 Redis provider-native realization Code Round implemented application-level
+  managed Redis realization through a hermetic provider capability, including acceptance-first
+  provision, safe realization success/failure read models, realized-ready binding admission,
+  unsupported-provider rejection, and provider cleanup during delete. Persistence/contract/runtime
+  materialization coverage and final Redis closed-loop verification remain open.
+- 2026-05-06 Phase 7 managed Redis runtime materialization coverage slice removed the old
+  deployment-snapshot source-mode block for realized managed Redis, added deployment snapshot,
+  single-server runtime resolver, Docker Swarm secret-handle, PGlite read-model, and contract tests
+  for managed Redis safe realization metadata and `REDIS_URL` delivery. Final Redis observe and
+  backup/restore-or-delete closed-loop verification remains open.
+- 2026-05-06 Phase 7 managed Redis delete safety coverage slice verified realized managed Redis
+  delete is blocked by active binding, backup retention, and retained deployment snapshot/reference
+  blockers before provider cleanup runs. Final Redis observe and closed-loop verification remains
+  open.
+- 2026-05-06 Phase 7 managed Redis entrypoint contract coverage slice verified provider-native
+  Redis realization reuses the existing operation catalog entries, CLI commands, and HTTP/oRPC
+  routes for provision, bind, and delete without leaking provider SDK shapes or raw secret fields.
+  Final Redis observe and closed-loop verification remains open.
+- 2026-05-06 Phase 7 managed Redis bind blocker coverage slice verified pending, failed, deleted,
+  and unresolved Appaloft-owned connection-ref managed Redis resources cannot create
+  `REDIS_URL` bindings. Final Redis observe and closed-loop verification remains open.
+- 2026-05-06 Phase 7 managed Redis secret-value storage slice stores provider-returned raw Redis
+  connection values through `DependencyResourceSecretStore` before marking binding readiness ready.
+  Final Redis observe and closed-loop verification remains open.
+- 2026-05-06 Phase 7 managed Redis closed-loop verification slice proved provision -> bind ->
+  deploy -> observe logs/status -> backup/restore for a store-backed Appaloft-owned Redis
+  connection ref without exposing raw Redis material. The Redis closed-loop exit criterion is now
+  closed; the Postgres closed-loop exit criterion remains open.
+- 2026-05-06 Phase 7 managed Postgres closed-loop verification slice proved provision -> bind ->
+  deploy -> observe logs/status -> backup/restore for managed Postgres without exposing raw
+  Postgres material. The Postgres closed-loop exit criterion is now closed.
+- 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
+  `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
+  `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider
+  cleanup semantics. It does not implement the Code Round yet, so the full `0.9.0` release rule
+  remains blocked by provider-native database realization, backup/restore, recovery, auto-deploy,
+  preview, and cluster runtime items.
+- 2026-05-05 Phase 7 Postgres provider-native realization Code Round implemented durable
+  realization state, hermetic managed Postgres provider capability, safe provider handles and
+  masked endpoint read models, bind readiness admission for managed Postgres, and managed provider
+  cleanup before delete tombstone. Backup/restore remains a separate required slice, so the full
+  `0.9.0` release rule remains blocked by backup/restore, recovery, auto-deploy, preview, and
+  cluster runtime items.
+- 2026-05-05 Phase 7 dependency resource backup/restore Spec Round positioned
+  `dependency-resources.create-backup`, `dependency-resources.restore-backup`,
+  `dependency-resources.list-backups`, and `dependency-resources.show-backup` under ADR-036 with
+  safe restore point metadata, in-place restore acknowledgements, provider capability boundaries,
+  delete-safety retention blockers, and lifecycle event specs. It does not implement the Code
+  Round yet, so the full `0.9.0` release rule remains blocked by backup/restore Code Round,
+  recovery, auto-deploy, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 dependency resource backup/restore Code Round implemented
+  `DependencyResourceBackup` state, hermetic backup/restore provider capability, safe backup
+  list/show read models, CLI and oRPC/HTTP entrypoints, lifecycle events, restore acknowledgements,
+  and delete-safety blockers for retained backups. Web affordances and provider-native Redis remain
+  separate gaps, so the full `0.9.0` release rule remains blocked by recovery, auto-deploy, preview,
+  and cluster runtime items.
+- 2026-05-05 Phase 7 deployment retry/redeploy Spec Round created
+  [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md) to activate
+  `deployments.retry` and `deployments.redeploy` under ADR-016/ADR-034. It narrows the next Code
+  Round to new deployment attempts from retained snapshot intent or current Resource profile,
+  shared deployment orchestration, recovery trigger metadata, resource-runtime coordination,
+  explicit CLI/oRPC/HTTP/Web surfaces, and rollback remaining inactive. It does not implement the
+  commands yet, so the full `0.9.0` release rule remains blocked by retry/redeploy Code Round,
+  rollback, auto-deploy, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 deployment retry/redeploy Code Round implemented active
+  `deployments.retry` and `deployments.redeploy` commands across core trigger/source metadata,
+  application handlers/use cases, resource-runtime coordination, PG/PGlite metadata persistence,
+  CLI, HTTP/oRPC, public docs, and Web recovery actions gated by readiness output. Rollback remains
+  inactive, so the full `0.9.0` release rule remains blocked by rollback, auto-deploy, preview, and
+  cluster runtime items.
+- 2026-05-05 Phase 7 deployment rollback Spec Round created
+  [Deployment Rollback](./specs/041-deployment-rollback/spec.md) to activate
+  `deployments.rollback` under ADR-016/ADR-034. It narrows the next Code Round to a new deployment
+  attempt from a selected retained successful candidate, explicit rollback trigger/source/candidate
+  metadata, runtime artifact identity checks, resource-runtime coordination, CLI/oRPC/HTTP/Web
+  surfaces, and no stateful data rollback. It does not implement the command yet, so the full
+  `0.9.0` release rule remains blocked by rollback Code Round, auto-deploy, preview, and cluster
+  runtime items.
+- 2026-05-05 Phase 7 deployment rollback Code Round implemented active `deployments.rollback`
+  across core/application command handling, PG/PGlite metadata persistence, operation catalog,
+  CLI, HTTP/oRPC, public docs, and Web recovery candidate actions gated by readiness output. The
+  full `0.9.0` release rule remains blocked by auto-deploy, preview, and cluster runtime items.
+- 2026-05-06 Phase 7 deployment recovery rebuild-required sync closed the exposed recovery-command
+  exit criterion: `deployments.retry`, `deployments.redeploy`, and `deployments.rollback` are active
+  under ADR-034 with readiness, command specs, operation catalog, CLI, HTTP/oRPC, Web recovery
+  affordances, public docs/help, and targeted tests aligned. Cancel, deployment-scoped manual health
+  check, and write-side reattach remain rebuild-required because they are not exposed.
+- 2026-05-05 Phase 7 source binding and auto-deploy Spec Round created
+  [Source Binding And Auto Deploy](./specs/042-source-binding-auto-deploy/spec.md). It positions
+  `resources.configure-auto-deploy`, `source-events.ingest`, `source-events.list`, and
+  `source-events.show` as accepted candidates over existing Resource source binding and
+  `deployments.create` admission semantics. It does not implement code yet, so the full `0.9.0`
+  release rule remains blocked by auto-deploy Code Round, preview, and cluster runtime items.
+- 2026-05-05 Phase 7 source event auto-deploy decision closure added
+  [ADR-037](./decisions/ADR-037-source-event-auto-deploy-ownership.md), selecting Resource-owned
+  auto-deploy policy, project/resource-scoped source event read models, Resource-scoped generic
+  webhook secret references, and a Phase 7 durable source-event record plus synchronous dispatch
+  baseline before Phase 8 outbox/inbox work.
+- 2026-05-05 Phase 7 source auto-deploy local specs added command/query/error contracts and public
+  docs/help anchors for setup, signatures, dedupe, ignored events, and recovery. The work remains in
+  Test-First/Code Round preparation until matrix rows have automation bindings and the operations
+  are activated in `CORE_OPERATIONS.md` and the operation catalog.
+- 2026-05-05 Phase 7 public documentation sync added stable storage volume and dependency resource
+  pages, and closed docs-registry coverage for active storage, dependency, backup/restore,
+  dependency-binding, retry, redeploy, and rollback operations.
+- 2026-05-05 Phase 7 resource runtime controls Spec Round added
+  [ADR-038](./decisions/ADR-038-resource-runtime-control-ownership.md) and
+  [Resource Runtime Controls](./specs/043-resource-runtime-controls/spec.md), positioning
+  `resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart` as accepted
+  candidates. Code Round remains blocked until local command/error/readback specs, tests, public
+  docs/help, `CORE_OPERATIONS.md`, and the operation catalog are aligned.
+- 2026-05-05 Phase 7 resource runtime controls local specs added stop/start/restart command
+  contracts, runtime-control error vocabulary, `resources.health.latestRuntimeControl` readback,
+  and public docs/help anchors. Code Round remains blocked until Test-First automation, command
+  schemas/handlers, adapter ports, entrypoints, `CORE_OPERATIONS.md`, and the operation catalog are
+  aligned.
+- 2026-05-05 Phase 7 resource runtime controls Test-First slice bound
+  `RUNTIME-CTRL-READ-001` to `resources.health.latestRuntimeControl` contract coverage and
+  `RUNTIME-CTRL-DOCS-001` to docs-registry anchor coverage. Runtime stop/start/restart command
+  activation remains blocked by command/use-case, coordination, adapter, CLI/HTTP/Web, and catalog
+  slices.
+- 2026-05-05 Phase 7 resource runtime controls application Code Round slice added
+  stop/start/restart command schemas, handlers, shared use case orchestration, `resource-runtime`
+  coordination policies, provider-neutral runtime target and attempt recorder ports, and
+  command/use-case tests for `RUNTIME-CTRL-STOP-001`, `RUNTIME-CTRL-START-001`,
+  `RUNTIME-CTRL-RESTART-001`, `RUNTIME-CTRL-BLOCK-001`, and `RUNTIME-CTRL-COORD-001`. The
+  operations remain inactive until durable attempt persistence, real runtime adapters,
+  CLI/HTTP/Web entrypoints, `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
+- 2026-05-05 Phase 7 resource runtime controls persistence Code Round slice added PG/PGlite
+  runtime-control attempt storage, recorder upsert behavior, and `PgResourceReadModel` projection
+  into `ResourceSummary.latestRuntimeControl`, with `RUNTIME-CTRL-READ-001` PGlite coverage. The
+  operations remain inactive until real runtime adapters, CLI/HTTP/Web entrypoints,
+  `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
+- 2026-05-05 Phase 7 resource runtime controls adapter Code Round slice added provider-neutral
+  Docker container and Docker Compose stop/start/restart command mapping with retained runtime
+  metadata, target service scoping, sanitized blocked results, and injected executor boundaries.
+  The operations remain inactive until local/generic-SSH executor wiring, CLI/HTTP/Web
+  entrypoints, `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
+- 2026-05-05 Phase 7 resource runtime controls executor Code Round slice added bounded
+  local-shell and generic-SSH command execution behind the runtime-control target, sanitized
+  command failure details, and shell-internal DI registration for the target port, attempt
+  recorder, use case, and handlers. The operations remain inactive until CLI/HTTP/Web
+  entrypoints, `CORE_OPERATIONS.md`, and operation catalog activation are aligned.
+- 2026-05-05 Phase 7 resource runtime controls activation Code Round slice activated
+  `resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart` in
+  `CORE_OPERATIONS.md`, the operation catalog, HTTP/oRPC, CLI, and Web Resource detail controls
+  with public docs links and `RUNTIME-CTRL-SURFACE-001` HTTP coverage. Future MCP/tool descriptors
+  remain deferred until the tool surface exists.
+- 2026-05-05 Phase 7 source auto-deploy policy Code Round slice added Resource-owned
+  auto-deploy policy state, source binding fingerprint binding, missing-source admission blockers,
+  and source-binding-change blocking semantics with `SRC-AUTO-POLICY-001` through
+  `SRC-AUTO-POLICY-003` core coverage. The operations remain inactive until application commands,
+  durable source event ingestion/dedupe/read models, and CLI/HTTP/Web surfaces are aligned.
+- 2026-05-05 Phase 7 source auto-deploy policy application/persistence slice added inactive
+  `resources.configure-auto-deploy` command schema, handler, use case, and Resource repository
+  persistence for policy JSON with application and PGlite coverage. The operation remains inactive
+  until source event ingestion/dedupe/read models and CLI/HTTP/Web surfaces are aligned.
+- 2026-05-05 Phase 7 source event application/persistence slice added inactive
+  `source-events.ingest`, `source-events.list`, and `source-events.show` command/query schemas,
+  handlers, use/query services, source event recorder/read-model ports, and PGlite-backed durable
+  dedupe/read-model persistence. The operations remain inactive until provider verification,
+  deployment dispatch, operation catalog/Core Operations, and CLI/HTTP/Web surfaces are aligned.
+- 2026-05-05 Phase 7 source event verification slice added a provider-neutral verification port
+  shape and generic signed HMAC verifier with `SRC-AUTO-EVENT-004` invalid-signature coverage. Git
+  provider adapters, source event deployment dispatch, operation catalog/Core Operations, and
+  CLI/HTTP/Web surfaces remain inactive.
+- 2026-05-05 Phase 7 source event policy matching slice added Resource policy candidate lookup and
+  ignored ref/disabled/blocked/no-match outcome evaluation with `SRC-AUTO-EVENT-003` application
+  and PGlite coverage. Matching deployment dispatch, operation catalog/Core Operations, and
+  CLI/HTTP/Web surfaces remain inactive.
+- 2026-05-05 Phase 7 source event deployment dispatch slice added an application dispatcher that
+  invokes existing `deployments.create` admission for matching source events and records dispatched
+  or dispatch-failed source event outcomes with `SRC-AUTO-EVENT-001` application coverage.
+  Operation catalog/Core Operations, provider ingestion routes, and CLI/HTTP/Web surfaces remain
+  inactive.
+- 2026-05-05 Phase 7 resource auto-deploy entrypoint slice activated
+  `resources.configure-auto-deploy` in `CORE_OPERATIONS.md`, the operation catalog, shell DI,
+  CLI, and HTTP/oRPC with `SRC-AUTO-ENTRY-001` catalog coverage. Web settings UI, provider
+  ingestion routes, Web source event diagnostics, and future MCP/tool descriptors remain deferred.
+- 2026-05-05 Phase 7 source event read surface slice activated `source-events.list` and
+  `source-events.show` in `CORE_OPERATIONS.md`, the operation catalog, shell DI, CLI, and
+  HTTP/oRPC with `SRC-AUTO-QUERY-001`/`SRC-AUTO-QUERY-002` catalog coverage. Provider ingestion
+  routes, Web diagnostics, and future MCP/tool descriptors remain deferred.
+- 2026-05-05 Phase 7 source event ingestion shell wiring slice registered the inactive
+  `source-events.ingest` command handler/use case, generic signed verifier, source-event
+  recorder/policy reader/read model, and deployment dispatcher in the shell composition root.
+  Provider webhook routes, secret-value resolution for generic signed verification, Web
+  diagnostics, and future MCP/tool descriptors remain deferred.
+- 2026-05-05 Phase 7 generic signed webhook secret-resolution Spec Round fixed the
+  `resource-secret:<KEY>` reference format, Resource-scoped generic signed route shape, and
+  `scopeResourceId` matching requirement for `source-events.ingest`; the following route slice
+  implements that contract.
+- 2026-05-05 Phase 7 generic signed webhook route slice activated
+  `POST /api/resources/{resourceId}/source-events/generic-signed` with Resource-scoped
+  `resource-secret:<KEY>` resolution, `X-Appaloft-Signature` HMAC verification, scoped source-event
+  ingestion, and `SRC-AUTO-ENTRY-002`/`SRC-AUTO-EVENT-006` automation. At that point Web
+  diagnostics, provider Git ingestion, and future MCP/tool descriptors remained deferred.
+- 2026-05-05 Phase 7 source-event coverage slice closed the remaining event matrix rows for
+  dispatch dedupe, multi-Resource provider-signed fanout, and invalid generic signed HTTP
+  signatures. At that point Web diagnostics, provider Git route adapters, and future MCP/tool
+  descriptors remained deferred.
+- 2026-05-05 Phase 7 source auto-deploy public help slice exposed setup, signatures, dedupe,
+  ignored-event, and recovery anchors through API, CLI, and Web help registries with
+  `SRC-AUTO-SURFACE-003` automation. At that point Web diagnostics, provider Git route adapters,
+  and future MCP/tool descriptors remained deferred.
+- 2026-05-05 Phase 7 source auto-deploy Web diagnostics slice added Resource detail source-event
+  diagnostics backed by `source-events.list`, including safe created-deployment links, dedupe
+  visibility, ignored-policy reasons, and `SRC-AUTO-ENTRY-003` Web automation. Provider Git route
+  adapters and future MCP/tool descriptors remain deferred.
+- 2026-05-05 Phase 7 GitHub push webhook Spec Round extended ADR-037 and source-event specs with
+  the first provider Git route, `POST /api/integrations/github/source-events`, using
+  `APPALOFT_GITHUB_WEBHOOK_SECRET`, `X-Hub-Signature-256`, `X-GitHub-Delivery`, and planned
+  `SRC-AUTO-EVENT-007`/`SRC-AUTO-EVENT-008`/`SRC-AUTO-ENTRY-004` automation.
+- 2026-05-05 Phase 7 GitHub push webhook route slice activated
+  `POST /api/integrations/github/source-events` with provider signature verification,
+  normalization of safe GitHub push facts, delivery id dedupe input, no-op `ping`, shell config
+  wiring, and `SRC-AUTO-EVENT-007`/`SRC-AUTO-EVENT-008`/`SRC-AUTO-ENTRY-004` automation. The full
+  source auto-deploy row remains unchecked until the `SRC-AUTO-ENTRY-001` Web settings/tool
+  metadata gap is closed. The full `0.9.0` release rule remains blocked by that gap, preview,
+  future MCP/tool descriptors, and cluster runtime items.
+- 2026-05-05 Phase 7 source auto-deploy Web settings slice exposed the safe Resource detail
+  auto-deploy policy summary and source binding fingerprint, added Web configure/disable/
+  acknowledge actions through `resources.configure-auto-deploy`, and moved `SRC-AUTO-ENTRY-001` to
+  Passing. Future MCP/tool descriptor generation remains governed by the operation catalog and the
+  global future tool-surface milestone, not by a source auto-deploy transport-specific shape. The
+  full `0.9.0` release rule remains blocked by the deploy-action wrapper, preview, and cluster
+  runtime items.
+- 2026-05-05 Phase 7 source auto-deploy public docs operation-coverage sync mapped
+  `resources.configure-auto-deploy`, `source-events.ingest`, `source-events.list`, and
+  `source-events.show` to their stable public docs topics in `@appaloft/docs-registry`.
+- 2026-05-05 Phase 7 deploy-action reference wrapper slice added
+  `.github/actions/deploy-action` with composite action metadata, release-archive install/checksum
+  verification script, deploy invocation script, SSH private-key temp-file handling, PR preview flag
+  mapping, and `scripts/test/deploy-action-wrapper.test.ts` coverage. The reference is now
+  promoted to the public `appaloft/deploy-action` repository with Marketplace docs/examples, public
+  wrapper CI, and cleanup examples.
+- 2026-05-05 Phase 7 deploy-action preview-output slice added CLI `--preview-output-file`
+  handling and wrapper temp-file parsing so Action PR previews can publish generated/default or
+  custom `preview-url` values from deployment read models instead of deriving only from templates.
+  Public `appaloft/deploy-action` promotion is now complete.
+- 2026-05-05 Phase 7 existing-resource profile-drift help slice closed the stable public
+  `resource.profile-drift` help topic, Web Resource diagnostics help link, CLI `resource show`
+  help target, HTTP route description, docs traceability, and matrix/task sync. Default
+  existing-resource drift remains fail-before-deploy; effective configuration drift redaction is
+  retained as a focused follow-up under `RES-PROFILE-DRIFT-003`.
+- 2026-05-05 Phase 7 generated MCP/tool descriptor slice replaced the stale hand-maintained
+  `@appaloft/ai-mcp` tool list with descriptors generated from
+  `packages/application/src/operation-catalog.ts`. `MCP-TOOL-DESC-001` through
+  `MCP-TOOL-DESC-003` assert one descriptor per operation key, stable operation-key tool names,
+  serializable CLI/API metadata, and high-value deployment/resource/source-event mappings.
+- 2026-05-05 Phase 7 scheduled task resource Spec Round added ADR-039 and
+  `docs/specs/044-scheduled-task-resource-shape` to position Resource-owned scheduled task
+  definitions, run attempts, task-run logs, scheduler admission, and deployment-boundary separation.
+  The roadmap row remains open until operation catalog entries, persistence, scheduler/runtime
+  execution, entrypoints, and public docs are implemented.
+- 2026-05-05 Phase 7 scheduled task core-domain slice added Resource-owned scheduled task
+  definition value objects and state for schedule, timezone, command intent, timeout, retry, and
+  lifecycle status, plus `forbid` concurrency validation. Run attempts, persistence,
+  scheduler/runtime execution, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task run-attempt core slice added Resource/task-owned run attempt
+  state with manual/scheduled trigger kind, accepted/running/succeeded/failed/skipped transitions,
+  safe exit/failure details, and no Deployment id. Application run admission, persistence,
+  scheduler/runtime execution, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task application-contract slice added inactive command/query
+  schemas, messages, result DTOs, and read-model ports for scheduled task definitions, run-now,
+  run history, and run logs while keeping operation catalog entries inactive. Application handlers,
+  use cases, persistence, scheduler/runtime execution, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task run-now admission slice added the inactive application
+  handler/use case and repository ports to accept manual task runs as accepted run attempts without
+  synchronous execution, including disabled-task and archived-Resource admission blockers.
+  Remaining handlers/use cases, persistence, scheduler/runtime execution, entrypoints, and public
+  docs remain open.
+- 2026-05-05 Phase 7 scheduled task create admission slice added the inactive application
+  handler/use case and definition repository upsert contract to validate and store Resource-owned
+  task definitions, including archived-Resource and unsafe-command blockers. Update/delete/list/show
+  handlers, persistence/read models, scheduler/runtime execution, entrypoints, and public docs
+  remain open.
+- 2026-05-05 Phase 7 scheduled task read-query slice added inactive task list/show, run list/show,
+  and run-log query handlers/services over scheduled-task read-model ports with stable envelopes.
+  Update/delete handlers, persistence/read models, scheduler/runtime execution, entrypoints, and
+  public docs remain open.
+- 2026-05-05 Phase 7 scheduled task configure admission slice added the inactive application
+  handler/use case plus core VO-based definition patching to validate and store Resource-owned task
+  configures, including archived-Resource and unsafe-command blockers. Delete handler, persistence/read
+  models, scheduler/runtime execution, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task delete admission slice added the inactive application
+  handler/use case and explicit definition delete mutation spec to remove Resource-owned task
+  definitions after ownership checks. Persistence/read models, scheduler/runtime execution,
+  entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task definition persistence slice added Postgres/PGlite storage and
+  read models for Resource-owned task definitions, including find/upsert/delete repository specs and
+  project/environment/Resource/status read filters. Run-attempt/log persistence,
+  scheduler/runtime execution, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task run-attempt persistence slice added Postgres/PGlite storage
+  and read models for accepted/running/terminal task runs, plus latest-run summaries on task
+  readbacks. Run-log persistence, scheduler/runtime execution, entrypoints, and public docs remain
+  open.
+- 2026-05-05 Phase 7 scheduled task run-log persistence slice added Postgres/PGlite storage and
+  a run-scoped read model for scheduled task output with secret-looking message masking. Scheduler
+  dispatch, runtime execution, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task scheduler admission slice added an inactive application
+  scheduler process manager, due-candidate reader port, and shared run admission service so due
+  scheduled tasks record `scheduled` trigger run attempts through the same checks as run-now.
+  Due-candidate persistence, shell runner, runtime execution, entrypoints, and public docs remain
+  open.
+- 2026-05-05 Phase 7 scheduled task runtime adapter slice added an inactive application
+  scheduled-task runtime port and hermetic runtime adapter for one-off task command execution
+  results, run-scoped stdout/stderr logs, exit codes, timestamps, and secret-looking output masking.
+  Accepted-run worker wiring, due-candidate persistence, shell runner, entrypoints, and public docs
+  remain open.
+- 2026-05-05 Phase 7 scheduled task accepted-run worker slice added inactive application worker
+  orchestration, run-attempt lookup, run-log recording, and Postgres/PGlite recorder support so
+  accepted runs can transition through running to terminal state after runtime execution. Automatic
+  shell/background runner wiring, due-candidate persistence, entrypoints, and public docs remain
+  open.
+- 2026-05-05 Phase 7 scheduled task due-candidate read-model slice added Postgres/PGlite
+  scheduler candidate scanning for enabled tasks, timezone-aware current-minute schedule matching,
+  and same-minute duplicate scheduled-run suppression. Automatic shell/background runner wiring,
+  entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task shell composition slice registered the inactive scheduled-task
+  repositories, read models, due-candidate reader, run-log recorder, runtime port, command/query
+  handlers, use cases, scheduler, and accepted-run worker in the shell DI root. Automatic
+  shell/background runner wiring, entrypoints, and public docs remain open.
+- 2026-05-05 Phase 7 scheduled task shell runner slice added opt-in scheduled task runner config
+  and long-running shell process wiring so enabled runners scan due tasks, admit scheduled runs,
+  and drain admitted runs through the worker. Operation catalog entries, entrypoints, public docs,
+  and broader secret masking coverage remain open.
+- 2026-05-05 Phase 7 scheduled task operation entrypoint slice activated
+  `scheduled-tasks.*` and `scheduled-task-runs.*` in `CORE_OPERATIONS.md`, the operation catalog,
+  and HTTP/oRPC routes with `SCHED-TASK-CATALOG-001`/`SCHED-TASK-ENTRY-001` coverage. CLI commands,
+  Web controls, public docs/help, generated MCP descriptor verification, and broader secret masking
+  coverage remain open.
+- 2026-05-05 Phase 7 scheduled task CLI entrypoint slice added the `appaloft scheduled-task`
+  command group for create/list/show/configure/delete/run and run-history list/show/logs. CLI,
+  HTTP/oRPC, operation catalog, and generated MCP descriptor paths are active; Web controls, public
+  docs/help, and broader secret masking coverage remain open.
+- 2026-05-05 Phase 7 scheduled task public docs/help slice added
+  `/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle`, registered
+  `scheduled-task.resource-lifecycle`, and wired CLI/HTTP descriptions to the stable scheduled-task
+  anchor. Web controls and broader secret masking coverage remain open.
+- 2026-05-05 Phase 7 scheduled task secret redaction slice added shared scheduled-task secret
+  detection/redaction for command intent, failure summaries, runtime output, runtime errors,
+  persisted read models, and generated tool descriptors. Web controls remained open for the next
+  scheduled-task entrypoint slice.
+- 2026-05-05 Phase 7 scheduled task Web controls slice added Resource detail controls for
+  scheduled-task list/create, run-now, enable/disable, delete, recent run history, run-scoped logs,
+  and the stable scheduled-task public help anchor. Phase 7 remains open for Docker Swarm,
+  preview/cluster runtime, and any remaining roadmap exit criteria.
+- 2026-05-05 Phase 7 scheduled task roadmap sync marked the scheduled-task Code Round implemented
+  after active operation catalog, HTTP/oRPC, CLI, Web, generated MCP descriptor, public docs/help,
+  persistence, scheduler, worker, runtime, run history, logs, and secret-redaction coverage landed.
+  The scheduled-task runner remains opt-in for long-running shell processes.
+- 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
+  command schema, public contract schema, HTTP route, repository config parser, and CLI
+  config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm
+  manager readiness and execution were closed by later slices.
+- 2026-05-05 Phase 7 Docker Swarm backend selection slice added the adapter-owned `docker-swarm`
+  backend descriptor shape and `SWARM-TARGET-SELECT-001` registry coverage. Default activation,
+  readiness, render/apply/observe/cleanup, and public help were closed by later slices.
+- 2026-05-05 Phase 7 Docker Swarm unsupported-backend admission slice bound
+  `SWARM-TARGET-ADM-002` to application coverage proving `deployments.create` returns
+  `runtime_target_unsupported` before accepting a deployment when a Swarm target lacks required
+  runtime backend capabilities.
+- 2026-05-05 Phase 7 Docker Swarm public help slice added the
+  `server.docker-swarm-target` help topic and bilingual
+  `/docs/servers/register-connect/#docker-swarm-runtime-target` anchor. CLI/API descriptions, Web
+  help links, readiness, and execution were closed by later slices.
+- 2026-05-05 Phase 7 Docker Swarm help-link slice wired the Swarm target anchor into CLI
+  `server register`, HTTP `POST /servers`, and Web server registration provider help. Swarm
+  manager readiness and execution were closed by later slices.
+- 2026-05-05 Phase 7 Docker Swarm manager readiness slice bound `SWARM-TARGET-REG-002` to
+  `servers.test-connectivity` adapter coverage for SSH reachability, Docker daemon availability,
+  active manager state, overlay network support, and edge proxy compatibility without mutating
+  Swarm stacks, services, or networks. Swarm execution was closed by later slices.
+- 2026-05-05 Phase 7 Docker Swarm render-intent slice bound `SWARM-TARGET-RENDER-001` and
+  `SWARM-TARGET-RENDER-002` to adapter contract coverage for OCI image and Compose artifact render
+  intent, including stack/service identity, runtime environment snapshots, health policy, access
+  routes, Compose target-service disambiguation, and initial runtime secret masking. Swarm
+  apply/verify/log/health/cleanup execution remains open.
+- 2026-05-05 Phase 7 Docker Swarm cleanup-plan slice bound initial `SWARM-TARGET-CLEAN-001`
+  coverage to adapter-owned service cleanup selectors scoped by Appaloft managed, resource,
+  deployment, target, destination, and runtime-target labels. Active Swarm cleanup execution remains
+  open with the backend.
+- 2026-05-06 Phase 7 Docker Swarm image apply-plan slice made Swarm candidate service identity
+  deployment-specific and bound initial `SWARM-TARGET-APPLY-001` / `SWARM-TARGET-ROUTE-001`
+  coverage to an adapter-owned OCI image apply plan. The plan creates a candidate service on the
+  Swarm network without public host-port publication, orders verification before route promotion and
+  superseded-service cleanup, and keeps runtime secrets as Docker secret references. Active Swarm
+  execution, failed-rollout rollback, persistence/read-model updates, logs, and health remained
+  open for later slices.
+- 2026-05-06 Phase 7 Docker Swarm fake backend slice added an opt-in
+  `DockerSwarmExecutionBackend` with injected command-runner acceptance coverage for image apply
+  and scoped cleanup. Default registry registration, real Swarm command execution, failed-rollout
+  rollback behavior, logs, health, and read-model persistence remained open for later slices.
+- 2026-05-06 Phase 7 Docker Swarm failed-candidate slice bound initial `SWARM-TARGET-APPLY-002`
+  coverage to fake-runner verification failure: the backend records deployment failure metadata and
+  runs only the deployment-scoped cleanup command for the failed candidate. Real Swarm rollback
+  command behavior remains open.
+- 2026-05-06 Phase 7 Docker Swarm logs slice bound initial `SWARM-TARGET-OBS-001` coverage to
+  `resources.runtime-logs`: Swarm-backed OCI image deployments read `docker service logs` through
+  sanitized `swarm.serviceName` metadata and return normalized redacted Appaloft runtime log lines.
+  Swarm health observation remained open until the following health slice.
+- 2026-05-06 Phase 7 Docker Swarm health slice bound initial `SWARM-TARGET-OBS-002` coverage to
+  `resources.health`: Swarm-backed OCI image deployments can request opt-in live runtime inspection
+  from sanitized `swarm.serviceName` metadata, and the runtime adapter normalizes `docker service
+  ps` task state into Appaloft runtime health/check fields without exposing raw Docker payloads.
+  Remote-manager probing remained open until the later remote-health observation slice; local real
+  Swarm smoke coverage was added by a later slice.
+- 2026-05-06 Phase 7 Docker Swarm route-label slice bound initial `SWARM-TARGET-ROUTE-001`
+  coverage to image apply planning: Traefik route labels are absent from candidate service
+  creation, promoted only after candidate verification, and target the Swarm edge network without
+  public workload host-port publication. Real edge-proxy route realization was closed by the later
+  route smoke slice.
+- 2026-05-06 Phase 7 Docker Swarm failure-redaction slice bound initial
+  `SWARM-TARGET-SECRET-001` coverage to the Swarm execution backend: command failure output
+  is redacted before deployment logs and execution metadata capture common auth headers, cookies,
+  key/value secrets, URL credentials, private-key blocks, or exact deployment snapshot secret
+  values. Registry/pull-secret smoke coverage was closed by the later registry-auth smoke slice.
+- 2026-05-06 Phase 7 Docker Swarm shell-runner slice added `DockerSwarmShellCommandRunner` for the
+  opt-in backend, with bounded command execution, stdout/stderr capture, nonzero exit preservation,
+  and timeout handling. Default composition was closed by the later default-activation slice.
+- 2026-05-06 Phase 7 Docker Swarm runtime-identity readback slice bound initial
+  `SWARM-TARGET-APPLY-001` / `SWARM-TARGET-OBS-001` / `SWARM-TARGET-OBS-002` persistence coverage
+  to PGlite deployment repository and read-model tests. Sanitized Swarm stack/service/schema
+  metadata now round-trips through execution metadata; raw commands, provider payloads, and
+  registry-secret fields remain outside the readback contract.
+- 2026-05-06 Phase 7 Docker Swarm rollout-preservation sync marked `SWARM-TARGET-APPLY-001`
+  covered by existing adapter and fake-backend tests: candidate services are created before
+  verification, route promotion, and superseded-service cleanup; failed candidate verification
+  records failure, skips superseded-service cleanup, and cleans only the deployment-scoped
+  candidate. Default activation was closed by the later default-activation slice.
+- 2026-05-06 Phase 7 Docker Swarm display-command redaction slice added apply-plan display command
+  redaction for non-secret runtime environment values while keeping executable runner commands
+  intact. Registry/pull-secret smoke coverage was closed by the later registry-auth smoke slice;
+  default activation was closed by the later default-activation slice.
+- 2026-05-06 Phase 7 Docker Swarm registry-auth render slice made image apply plans honor internal
+  registry-auth/pull-secret metadata with Docker's `--with-registry-auth` flag while keeping raw
+  registry secret references out of rendered intent, executable command, and display command
+  payloads. Registry-login/pull-secret smoke coverage was closed by the later registry-auth smoke
+  slice; default activation was closed by the later default-activation slice.
+- 2026-05-06 Phase 7 Docker Swarm opt-in composition slice added disabled-by-default shell
+  configuration for the real Swarm execution backend. `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED`
+  composes the `DockerSwarmExecutionBackend` into the runtime target registry with bounded command
+  timeout configuration; default-on activation was closed by the later default-activation slice.
+- 2026-05-06 Phase 7 Docker Swarm real-smoke harness slice added an environment-gated adapter
+  smoke test for real Swarm apply, post-verification route-label promotion, secret metadata
+  redaction, and scoped cleanup through `DockerSwarmExecutionBackend` and
+  `DockerSwarmShellCommandRunner`. The smoke is skipped by default and requires
+  `APPALOFT_DOCKER_SWARM_SMOKE=1`, an active local Swarm manager, and an `appaloft-edge` overlay
+  network before mutating Docker state. `bun run smoke:swarm` is the first-class opt-in command for
+  that harness; running it against a real manager remains environment-gated.
+- 2026-05-06 Phase 7 Docker Swarm edge-network config slice added
+  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` so Swarm execution and `bun run smoke:swarm` can
+  target a prepared overlay network without colliding with an existing local bridge named
+  `appaloft-edge`. The default remains `appaloft-edge`; running the real smoke still requires an
+  active manager and overlay network.
+- 2026-05-06 Phase 7 Docker Swarm real-smoke slice fixed generated superseded-service cleanup shell
+  separators and made the opt-in real smoke provision a smoke-specific Docker secret reference and
+  use an nginx-compatible health check. `bun run smoke:swarm` passed against a temporary local Swarm
+  manager with `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to
+  inactive Swarm state. Real edge-proxy route realization and registry-auth smoke coverage were
+  closed by later smoke slices; default activation was closed by the later default-activation slice.
+- 2026-05-06 Phase 7 Docker Swarm registry-auth smoke slice extended `bun run smoke:swarm` to
+  provision a temporary authenticated registry, push a smoke image, deploy that private image
+  through `DockerSwarmExecutionBackend` with `--with-registry-auth`, and assert registry secret
+  material, secret references, and runtime env secret values stay out of deployment logs/metadata.
+  The smoke passed against a temporary local Swarm manager with
+  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to inactive Swarm
+  state. Real edge-proxy route realization was closed by the later route smoke slice; default
+  activation was closed by the later default-activation slice.
+- 2026-05-06 Phase 7 Docker Swarm route-realization smoke slice extended `bun run smoke:swarm` to
+  provision a temporary Traefik Swarm edge proxy on the smoke overlay network, deploy the nginx
+  workload without publishing the workload service port, promote Appaloft Traefik route labels after
+  candidate verification, and verify `Host: api.example.com` reaches nginx through the published
+  proxy entrypoint. The smoke passed against a temporary local Swarm manager with
+  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK=appaloft-smoke-edge`, then returned Docker to inactive Swarm
+  state. Default activation was closed by the later default-activation slice.
+- 2026-05-06 Phase 7 Docker Swarm default-activation slice made shell composition register the
+  `DockerSwarmExecutionBackend` by default, kept bounded command timeout and edge-network
+  configuration, and retained `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=false` as the explicit
+  opt-out for installations that are not ready to execute Swarm deployments.
+- 2026-05-06 Phase 7 Docker Swarm remote-log observation slice made `resources.runtime-logs` execute
+  Swarm service log reads through the resolved Swarm manager SSH target when available, while
+  preserving the local Docker fallback for local smoke runs. Remote-manager health observation
+  remained open until the following slice.
+- 2026-05-06 Phase 7 Docker Swarm remote-health observation slice passed the deployment target
+  server id into Swarm runtime health inspection and made `resources.health` execute
+  `docker service ps` through the resolved Swarm manager SSH target when available, while preserving
+  the local Docker fallback for local smoke runs.
+- 2026-05-06 Phase 7 deployment target parity sync closed the target-surface exit criterion:
+  single-server Docker/Compose remains covered by the zero-to-SSH supported catalog harness, and
+  the Docker Swarm backend is active by default with real smoke evidence for apply, route
+  realization, registry-authenticated image pull, secret-safe metadata, and scoped cleanup. Both
+  paths use the same ids-only `deployments.create` admission boundary.
+- 2026-05-05 Phase 7 product-grade preview deployment Spec Round positioned GitHub
+  App/control-plane previews as a separate workflow from Action-only previews, with
+  `docs/specs/046-product-grade-preview-deployments` and
+  `docs/testing/product-grade-preview-deployments-test-matrix.md` covering preview policy,
+  environment identity, scoped preview config, ids-only deployment dispatch, feedback,
+  cleanup retries, quotas, and public-surface requirements. Code Round remains open.
+- 2026-05-06 Phase 7 product-grade preview policy evaluator slice added initial normalized
+  GitHub pull-request policy evaluation for verified same-repository events, unverified events,
+  default fork blocking, secret-backed fork blocking, and opt-in fork previews without secrets.
+  Preview environment state, deployment dispatch, read models, GitHub App ingestion, feedback,
+  cleanup retry, and entrypoints remain open.
+- 2026-05-06 Phase 7 product-grade preview environment domain slice added foundational core
+  `PreviewEnvironment` state for scoped project/environment/resource/target placement, safe source
+  fingerprint and pull-request context, expiry checks, and cleanup-request transition. Persistence,
+  read models, deployment dispatch, GitHub App ingestion, feedback, cleanup retry, and entrypoints
+  remain open.
+- 2026-05-06 Phase 7 product-grade preview environment persistence slice added Postgres/PGlite
+  preview environment storage, lookup by id/source scope, safe list/show read models, lifecycle
+  status readback, and scoped delete while retaining owner Resource state. Deployment dispatch,
+  GitHub App ingestion, feedback, cleanup retry, and entrypoints remain open.
+- 2026-05-06 Phase 7 product-grade preview lifecycle application slice added initial
+  `PreviewLifecycleService` coverage for eligible pull-request policy results creating/updating
+  preview environments and dispatching one ids-only deployment request. GitHub App ingestion,
+  blocked-event read models, feedback, cleanup retry, and entrypoints remain open.
+- 2026-05-06 Phase 7 preview policy operation-contract slice added inactive
+  `preview-policies.configure` and `preview-policies.show` command/query schemas, handlers,
+  repository/read-model ports, operation catalog entries, and tests. Durable policy persistence,
+  active transports, GitHub App ingestion, feedback, cleanup retry, and preview environment
+  entrypoints remain open.
+- 2026-05-06 Phase 7 preview policy persistence slice added Postgres/PGlite storage and shell
+  wiring for inactive `preview-policies.configure` / `preview-policies.show` operation contracts.
+  Safe read models now return configured or default project/Resource policy summaries without
+  exposing idempotency keys, provider payloads, or secret material. Active transports, GitHub App
+  ingestion, feedback, cleanup retry, and preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview blocked-policy projection slice added application and Postgres/PGlite
+  projection of blocked preview policy decisions by source event id. Fork policy blocks now expose
+  safe reason/readback details and requested secret scope counts without dispatching deployments or
+  storing secret names/provider tokens. GitHub App ingestion, feedback, cleanup retry, and active
+  preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview policy quota/TTL slice added active preview quota settings,
+  `preview_quota_exceeded` blocking, preview TTL-derived environment expiry, and Postgres/PGlite
+  readback for safe quota/expiry policy decision details. Scheduler cleanup for expired previews,
+  GitHub App ingestion, feedback, cleanup retry, and active preview environment entrypoints remain
+  open.
+- 2026-05-06 Phase 7 preview GitHub pull-request event slice added an integration-boundary
+  verifier/normalizer for signed `pull_request` webhooks. It emits only safe preview lifecycle
+  facts, rejects invalid signatures, unsupported actions, and unsafe payloads, and keeps actual
+  GitHub App route wiring, dedupe/idempotency, feedback, cleanup retry, and active preview
+  environment entrypoints open.
+- 2026-05-06 Phase 7 preview duplicate-event slice added source-event-id dedupe to the preview
+  lifecycle service. Duplicate deliveries now return the stored preview policy decision without
+  mutating preview environment state or dispatching another ids-only deployment request. Feedback
+  and cleanup idempotency remain tied to their future process-state slices.
+- 2026-05-06 Phase 7 preview scoped-config slice added an application resolver over
+  `resources.effective-config` that defaults to copying no production secrets or durable routes,
+  resolves only explicit preview variables/secret references, and keeps raw or masked secret values
+  out of preview resolution output. Full lifecycle process-manager wiring, GitHub App routes,
+  feedback, cleanup retry, and active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview deployment-dispatch slice bound preview dispatch to the existing
+  `deployments.create` admission adapter and added explicit `PG-PREVIEW-DEPLOY-001` coverage that
+  only ids cross the deployment boundary. Pull-request/source/route/preview details remain
+  read-model or process context. GitHub App routes, feedback, cleanup retry, and active preview
+  environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview pull-request ingestion slice added an application service that routes
+  safe normalized GitHub pull-request preview facts into preview lifecycle using selected
+  control-plane context. This initial slice left closed-event cleanup ignored until cleanup process
+  state existed. GitHub App HTTP routes, feedback, cleanup retry, and active preview environment
+  entrypoints remained open at that point.
+- 2026-05-06 Phase 7 preview deployment process-manager slice composed policy evaluation,
+  preview environment state, ids-only deployment dispatch, and PR-comment feedback. Accepted
+  preview deployments now publish idempotent source-event-keyed `github-pr-comment` feedback, and
+  retryable feedback failures preserve the accepted deployment result while recording safe feedback
+  state. GitHub check/deployment-status writers, GitHub App HTTP routes, cleanup adapters, and
+  active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview feedback application slice added initial feedback writer/recorder
+  ports and a service for idempotent PR comment/check/status updates. Existing provider feedback
+  ids are reused for update-in-place, and retryable provider failures are recorded as safe feedback
+  state without turning the accepted deployment path into `err`. Durable feedback persistence,
+  GitHub App HTTP routes, cleanup retry, and active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview feedback persistence slice added Postgres/PGlite storage and shell
+  wiring for idempotent provider feedback state keyed by feedback key. The record keeps provider
+  feedback ids, channel/status, safe error codes, retryable state, and update timestamps without
+  persisting feedback body text, provider payloads, tokens, or secret-shaped values. GitHub
+  feedback writer adapters, GitHub App HTTP routes, cleanup retry, and active preview environment
+  entrypoints remain open.
+- 2026-05-06 Phase 7 preview GitHub PR comment feedback slice added a hermetic GitHub integration
+  writer for product-grade preview PR comments. It creates comments, updates existing comments by
+  provider feedback id, classifies retryable provider failures safely, and omits response bodies,
+  tokens, and feedback body text from returned errors. Check/deployment-status writers, shell
+  wiring, GitHub App HTTP routes, cleanup retry, and active preview environment entrypoints remain
+  open.
+- 2026-05-06 Phase 7 preview GitHub check-run feedback slice added a hermetic GitHub integration
+  writer for product-grade preview check runs plus composite GitHub feedback routing for comments
+  and checks. It resolves pull-request head SHA safely, creates check runs, updates existing check
+  runs by provider feedback id, and keeps deployment-status feedback unsupported until the feedback
+  input carries the required provider deployment identity. GitHub App HTTP routes, cleanup adapters,
+  and active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview feedback shell-wiring slice registered a request-scoped GitHub
+  preview feedback writer in the shell composition. It obtains the GitHub token through the
+  existing integration auth port per publish call, returns a safe validation error when GitHub is
+  not connected, and delegates supported PR comment/check feedback to the GitHub integration
+  writer. Deployment-status feedback, GitHub App HTTP routes, cleanup retry, and active preview
+  environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview cleanup application slice added a service that marks durable preview
+  environment cleanup requested without deleting preview history, then delegates runtime, route,
+  source-link, provider metadata, and feedback cleanup to a safe source-scope port. Concrete
+  cleanup adapters, cleanup retry state, GitHub App HTTP routes, and active preview environment
+  entrypoints remain open.
+- 2026-05-06 Phase 7 preview cleanup retry slice added application attempt state for cleanup
+  retries. Each cleanup run gets a fresh `pcln_*` attempt id, retryable provider/adapter failures
+  record safe owner, phase, error code, and next retry time, and responses omit provider error text.
+  Durable cleanup attempt persistence, scheduler dispatch, concrete cleanup adapters, GitHub App
+  HTTP routes, and active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview cleanup attempt persistence slice added Postgres/PGlite storage and
+  shell wiring for durable cleanup retry records keyed by `pcln_*` attempt id. Stored state keeps
+  preview environment id, Resource id, source fingerprint, owner, status, phase, retry timing, and
+  safe error code without provider error text, tokens, or secret-shaped values. Scheduler dispatch,
+  concrete cleanup adapters, GitHub App HTTP routes, and active preview environment entrypoints
+  remain open.
+- 2026-05-06 Phase 7 preview cleanup retry scheduler slice added an application scheduler and
+  durable due-candidate reader for `preview_cleanup_attempts`. The reader returns latest due
+  `retry-scheduled` attempts only, and the scheduler dispatches them through the cleanup service so
+  retries create fresh `pcln_*` attempt ids. Concrete cleanup adapters, GitHub App HTTP routes, and
+  active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview cleanup retry runner slice added a disabled-by-default shell runner
+  and config block for `previewCleanupRetryScheduler`. The runner is only resolved when explicitly
+  enabled so normal boot does not require the future concrete cleanup adapter. Concrete cleanup
+  adapters, GitHub App HTTP routes, and active preview environment entrypoints remain open.
+- 2026-05-06 Phase 7 preview cleanup retry runner coverage slice added shell runner tests for
+  disabled startup, system actor context, batch-size forwarding, and the in-process non-overlap
+  guard that skips interval ticks while a scheduler run is active.
+- 2026-05-06 Phase 7 preview environment surface-contract slice added inactive
+  `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete`
+  application contracts plus operation catalog entries. List/show read from the safe preview
+  environment read model, delete uses cleanup-service input, and CLI/API/Web/future MCP transports
+  remain inactive until the product-grade control-plane route is wired.
+- 2026-05-06 Phase 7 preview GitHub pull-request HTTP route slice wired signed
+  `pull_request` deliveries on `/api/integrations/github/source-events` to
+  `IngestPreviewPullRequestEventCommand` through `CommandBus`, using trusted Appaloft preview
+  context headers for project/environment/Resource/server/destination/source-fingerprint selection.
+  Follow-up repository and installation mapping was still required before active GitHub App worker
+  transports.
+- 2026-05-06 Phase 7 preview closed-event cleanup slice routed GitHub `pull_request.closed`
+  ingestion through source-scope preview environment lookup into the preview cleanup service.
+  Existing previews now preserve history while requesting runtime/route/source-link/provider/
+  feedback cleanup, and missing previews return an idempotent ignored result. Active GitHub App
+  preview worker transports remained open.
+- 2026-05-06 Phase 7 preview cleanup feedback slice added latest-feedback lookup by preview
+  environment/channel, cleanup-side PR-comment updates through the existing idempotent feedback
+  writer path, skipped cleanup feedback when no prior feedback exists, and safe retryable failure
+  propagation into cleanup retry handling. Active GitHub App preview worker transports remained
+  open.
+- 2026-05-06 Phase 7 preview deployment-status publication slice made the preview deployment
+  process manager publish idempotent `github-deployment-status` feedback after accepted ids-only
+  deployment dispatch. The GitHub feedback writer now creates a transient GitHub preview deployment
+  from the pull-request head SHA when automatic feedback has no provider deployment id yet, records
+  that deployment id for later append-only status updates, and keeps retryable provider failures in
+  safe feedback state without rewriting the accepted deployment result. Active GitHub App preview
+  worker transports remained open.
+- 2026-05-06 Phase 7 preview cleanup scheduler lease slice wrapped enabled shell
+  `previewCleanupRetryScheduler` ticks in the existing durable mutation coordinator under the
+  `preview-lifecycle` coordination scope. Multiple shell processes now share a bounded lease for
+  cleanup retry scans while the in-process non-overlap guard remains as local protection.
+  Active GitHub App preview worker transports remained open.
+- 2026-05-06 Phase 7 preview terminal metadata cleanup slice made cleanup-side feedback mark the
+  latest GitHub deployment-status feedback `inactive` when a provider deployment record exists.
+  The shell cleaner now reports that inactive status append as provider metadata removal while
+  retaining retryable provider failures in safe cleanup retry state. Active GitHub App preview
+  worker transports remained open.
+- 2026-05-06 Phase 7 preview GitHub repository-context mapping slice made the signed
+  `pull_request` HTTP route resolve preview context from the source-event policy reader when trusted
+  Appaloft headers are absent. The route maps GitHub repository full name/provider repository id and
+  base ref to project/environment/Resource/server/destination/source-fingerprint context, carries
+  GitHub installation id only as safe verification detail, and still rejects ambiguous or missing
+  policy matches before command dispatch. Active GitHub App preview worker transports remain open.
+- 2026-05-06 Phase 7 preview GitHub safe-metadata propagation slice ensured the
+  `IngestPreviewPullRequestEventCommandHandler` preserves safe provider repository id and
+  installation id facts when handing signed GitHub preview events to the application ingest service.
+  Active GitHub App preview worker transports remain open.
+- 2026-05-06 Phase 7 preview worker feedback transport slice added an explicit
+  `APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN` runtime configuration path for webhook and cleanup
+  scheduler contexts where no request-scoped GitHub OAuth token exists. The shell feedback writer
+  still prefers request-scoped GitHub auth when present, falls back to the worker token for system
+  contexts, and returns safe `preview-feedback` validation errors when neither token source exists.
+  Full GitHub App installation-token onboarding and provider smoke tests remain future public
+  enablement work rather than a Phase 7 Code Round blocker.
+- 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
+  `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
+  and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
+  Marketplace README, and public wrapper CI are now published.
+- 2026-05-05 Phase 7 deploy-action wrapper cleanup/README slice added `command:
+  preview-cleanup` to the reference composite action, a Marketplace-facing README with deploy, PR
+  preview, close-event cleanup, fork-safety, minimal config, and reserved control-plane examples,
+  plus wrapper tests for cleanup mapping and README safety examples. The public
+  `appaloft/deploy-action` repository and public wrapper CI/layout tests are now published.
+- 2026-05-06 Phase 7 deploy-action wrapper export slice added a deterministic export script for
+  mirroring the reference `action.yml`, Marketplace README, and install/deploy scripts into the
+  public `appaloft/deploy-action` repository, with a layout test proving exported files match the
+  reference and shell scripts keep executable bits.
+- 2026-05-06 Phase 7 deploy-action public CI export slice added the wrapper repository CI workflow
+  to the exported layout. The workflow validates shell syntax, dry-run PR preview mapping and
+  outputs, and an opt-in exact-version install smoke controlled by the public repository's
+  `APPALOFT_INSTALL_SMOKE_VERSION` variable.
+- 2026-05-06 Phase 7 deploy-action public repository publication slice merged
+  `appaloft/deploy-action#1`, making the public `main` branch match the deterministic reference
+  export plus the repository license. Public wrapper CI `validate` passed before merge, and
+  post-merge comparison confirmed the exported `README.md`, `action.yml`, install/deploy scripts,
+  and `.github/workflows/ci.yml` match byte-for-byte.
+- 2026-05-06 Phase 7 day-two management exit audit added `PHASE7-DAY2-MGMT-001` catalog coverage
+  proving resource config/secrets, storage, dependency resources/bindings/backups, auto-deploy
+  diagnostics, deployment history, recovery-readiness, and rollback expose explicit CLI and
+  HTTP/oRPC operations with shared schemas. This closes the no-server-file-edit exit criterion.
+- 2026-05-06 Phase 7 `0.9.0` release target selection is now checked after all required Phase 7
+  items, earlier phase release rules, and Phase 7 exit criteria are checked. This records roadmap
+  eligibility only; an actual release run remains governed by the release workflow.
 
 Required:
 
-- [ ] Add resource-scoped environment variable operations.
-- [ ] Add secret operations with build/runtime exposure rules, masking, `.env` import/paste, and
+- [x] Add resource-scoped environment variable operations.
+- [x] Add secret operations with build/runtime exposure rules, masking, `.env` import/paste, and
   effective config queries.
 - [x] Add storage/volume create/list/show/update/delete.
 - [x] Add storage attach/detach, bind mount versus named volume, destination path validation, and
@@ -856,40 +1651,63 @@ Required:
   baseline.
 - [x] Add provider-neutral Postgres dependency resource bind/unbind/list/show binding metadata
   baseline.
-- [ ] Add provider-native Postgres database realization and closed bind/backup/delete lifecycle.
-- [ ] Add Redis provisioning/import/list/show/update/delete.
-- [ ] Add dependency bind/unbind and binding secret rotation.
-- [ ] Add backup/restore for the minimum useful dependency-resource loop.
+- [x] Add provider-native Postgres database realization and closed bind/backup/delete lifecycle.
+- [x] Add Redis provisioning/import/list/show/update/delete.
+- [x] Add dependency bind/unbind and binding secret rotation.
+- [x] Add backup/restore for the minimum useful dependency-resource loop.
 - [x] Rebuild deployment show as a first-class query.
 - [x] Rebuild deployment stream-events as a first-class query.
-- [ ] Rebuild deployment retry/redeploy under ADR-016.
-- [ ] Rebuild rollback under ADR-016 with retained artifacts, rollback candidates, lifecycle
+- [x] Rebuild deployment retry/redeploy under ADR-016.
+- [x] Rebuild rollback under ADR-016 with retained artifacts, rollback candidates, lifecycle
   transitions, events, errors, Web/API/CLI affordances, and tests.
-- [ ] Add resource restart/stop/start only after runtime ownership and state semantics are
+- [x] Add resource restart/stop/start only after runtime ownership and state semantics are
   specified.
-- [ ] Add source binding and auto-deploy.
-- [ ] Add push webhook and generic signed deploy webhook.
-- [ ] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
-  GitHub Actions workflow.
-- [ ] Add existing-resource profile-drift handling.
-- [ ] Add product-grade preview deployments after source binding and webhook ingestion are durable,
+- [x] Add source binding and auto-deploy.
+- [x] Add push webhook and generic signed deploy webhook.
+- [x] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
+  GitHub Actions workflow. Public docs now distinguish Action-only workflow-file previews from
+  future product-grade control-plane previews; the public `appaloft/deploy-action` repository is
+  published from the deterministic reference export with Marketplace README examples, preview
+  cleanup mapping, and public wrapper CI.
+- [x] Add existing-resource profile-drift handling.
+- [x] Add product-grade preview deployments after source binding and webhook ingestion are durable,
   including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
-  retries.
-- [ ] Add scheduled task/cron resource shape with run history and logs after workload service
-  semantics are specified.
-- [ ] Complete the Docker Swarm Spec Round and Code Round as the first cluster runtime target:
+  retries. Spec Round is positioned in
+  [docs/specs/046-product-grade-preview-deployments](./specs/046-product-grade-preview-deployments/spec.md)
+  with a dedicated test matrix; preview policy/environment operations, feedback, cleanup retry,
+  Web/API/CLI/future MCP surfaces, public docs, an initial signed GitHub pull-request HTTP route,
+  close-event cleanup routing, cleanup-side feedback update, and automatic deployment-status
+  feedback publication, plus repository-context mapping from signed GitHub events and
+  request-or-worker-token GitHub feedback transport, are implemented. Full GitHub App installation
+  onboarding and provider smoke tests remain outside this Phase 7 Code Round.
+- [x] Add scheduled task/cron resource shape with run history and logs after workload service
+  semantics are specified. ADR-039/spec matrix now position ownership and target operations.
+- [x] Complete the Docker Swarm Spec Round as the first cluster runtime target:
   target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
-  semantics, normalized read surfaces, and contract tests.
+  semantics, normalized read surfaces, and contract test matrix are specified.
+- [x] Complete the Docker Swarm Code Round as the first cluster runtime target:
+  target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
+  semantics, normalized read surfaces, public docs/help, and contract tests are implemented.
+  Target-kind registration metadata, unsupported-backend admission, backend descriptor selection,
+  Swarm manager readiness, adapter-owned OCI/Compose render intent, OCI image apply-plan rendering,
+  label-scoped cleanup plan rendering, opt-in fake backend acceptance coverage, Swarm runtime-log
+  observation, Swarm health observation, initial Traefik route label promotion, the public docs
+  anchor, command-failure redaction, sanitized runtime identity readback, and CLI/API/Web help
+  links are implemented; default shell composition and `bun run smoke:swarm` real smoke harness
+  exist, and the local real smoke passed against a temporary Swarm manager; Swarm service log and
+  health reads can run through the resolved manager over SSH; registry-authenticated image pull is
+  covered by the opt-in real smoke; real edge-proxy route realization is covered by the opt-in real
+  smoke.
 
 Exit criteria:
 
-- [ ] A user can manage config, secrets, storage, dependencies, auto-deploy, deployment history, and
+- [x] A user can manage config, secrets, storage, dependencies, auto-deploy, deployment history, and
   rollback candidates without editing files on the server.
-- [ ] Postgres has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
-- [ ] Redis has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
-- [ ] Operators can deploy through both the single-server Docker/Compose path and the Docker Swarm
+- [x] Postgres has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
+- [x] Redis has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
+- [x] Operators can deploy through both the single-server Docker/Compose path and the Docker Swarm
   cluster path without changing the public deployment admission surface.
-- [ ] Rollback/redeploy are no longer rebuild-required if they are exposed.
+- [x] Rollback/redeploy are no longer rebuild-required if they are exposed.
 
 ## Phase 8: Operator/Internal State Closure And Interface Parity
 
@@ -927,7 +1745,7 @@ Required:
 - [ ] Add terminal session list/show/attach/close/expire if terminal sessions remain public.
 - [ ] Ensure provider/plugin/system operations expose capability details and configuration
   diagnostics without leaking provider SDK types or secrets.
-- [ ] Verify CLI, HTTP/oRPC, Web, and generated MCP/tool contracts against `operation-catalog.ts`.
+- [x] Verify CLI, HTTP/oRPC, Web, and generated MCP/tool contracts against `operation-catalog.ts`.
 - [ ] Harden install/upgrade/release: migrations, backup/recovery, all-in-one packaging, binary
   release, static console asset serving, and smoke tests.
 
@@ -991,7 +1809,7 @@ work below before GA.
   effective config, health, logs, proxy preview, diagnostics, archive/delete, and Web detail
   observation.
 - [x] Resource: reusable access-profile mutation semantics where specs require separate commands.
-- [ ] Resource: profile drift visibility.
+- [x] Resource: profile drift visibility.
 - [x] Source link: relink through CLI.
 - [ ] Source link: list/show/delete or archive, PostgreSQL/control-plane persistence before API/Web.
 - [x] Deployment attempt: create/list/show/logs.
@@ -1029,7 +1847,8 @@ work below before GA.
   or user-owned wildcard preview access.
 - [ ] Product-grade preview deployment: create from PR event, list/show/update policy/delete on
   close, scoped env, GitHub App status/comments, and cleanup retries.
-- [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs.
+- [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs. Spec Round
+  positioned by ADR-039 and `docs/specs/044-scheduled-task-resource-shape`.
 - [x] Terminal session: open.
 - [ ] Terminal session: list/show/attach/close/expire, audit and redaction.
 - [ ] Outbox/inbox/job/process state: list/show/retry/cancel/dead-letter/prune, attempt ownership.
@@ -1119,11 +1938,11 @@ External baseline research points to this practical minimum:
 
 Recommended next Spec Rounds before broad Code Rounds:
 
-- [ ] Resource profile lifecycle: remaining profile drift visibility, reset/delete policy
-  semantics, and test matrix coverage after source/runtime/network/access profile configuration.
-  Resource profile drift visibility now has a Spec Round artifact at
+- [ ] Resource profile lifecycle: reset/delete policy semantics and remaining profile/config drift
+  redaction coverage after source/runtime/network/access profile configuration. Resource profile
+  drift visibility now has a Spec Round artifact at
   [docs/specs/011-resource-profile-drift-visibility](./specs/011-resource-profile-drift-visibility/spec.md);
-  Code Round, public docs/help, and reset/delete policy semantics remain unchecked.
+  Code Round and public docs/help are active, while reset/delete policy semantics remain unchecked.
 - [x] SSH credential lifecycle: `credentials.show` masked detail and usage visibility plus
   `credentials.delete-ssh` delete-when-unused safety across CLI, API, and Web typed confirmation.
 - [x] Framework support tier matrix: fixed-version detector/planner fixtures cover the current

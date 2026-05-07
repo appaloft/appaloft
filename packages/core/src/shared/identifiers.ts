@@ -148,6 +148,27 @@ export class DeploymentId extends IdentifierValue {
   }
 }
 
+const previewEnvironmentIdBrand: unique symbol = Symbol("PreviewEnvironmentId");
+export class PreviewEnvironmentId extends IdentifierValue {
+  private [previewEnvironmentIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<PreviewEnvironmentId> {
+    return createIdentifierValue(
+      value,
+      "Preview environment ID",
+      (normalized) => new PreviewEnvironmentId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): PreviewEnvironmentId {
+    return new PreviewEnvironmentId(value.trim());
+  }
+}
+
 const releaseIdBrand: unique symbol = Symbol("ReleaseId");
 export class ReleaseId extends IdentifierValue {
   private [releaseIdBrand]!: void;
@@ -217,6 +238,48 @@ export class StorageVolumeId extends IdentifierValue {
 
   static rehydrate(value: string): StorageVolumeId {
     return new StorageVolumeId(value.trim());
+  }
+}
+
+const scheduledTaskIdBrand: unique symbol = Symbol("ScheduledTaskId");
+export class ScheduledTaskId extends IdentifierValue {
+  private [scheduledTaskIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ScheduledTaskId> {
+    return createIdentifierValue(
+      value,
+      "Scheduled task ID",
+      (normalized) => new ScheduledTaskId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): ScheduledTaskId {
+    return new ScheduledTaskId(value.trim());
+  }
+}
+
+const scheduledTaskRunIdBrand: unique symbol = Symbol("ScheduledTaskRunId");
+export class ScheduledTaskRunId extends IdentifierValue {
+  private [scheduledTaskRunIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ScheduledTaskRunId> {
+    return createIdentifierValue(
+      value,
+      "Scheduled task run ID",
+      (normalized) => new ScheduledTaskRunId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): ScheduledTaskRunId {
+    return new ScheduledTaskRunId(value.trim());
   }
 }
 

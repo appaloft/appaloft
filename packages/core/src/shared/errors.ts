@@ -50,6 +50,11 @@ export const domainError = {
     details?: DomainErrorDetails,
   ): DomainError =>
     createError("resource_dependency_binding_context_mismatch", "user", message, details),
+  resourceDependencyBindingRotationBlocked: (
+    message: string,
+    details?: DomainErrorDetails,
+  ): DomainError =>
+    createError("resource_dependency_binding_rotation_blocked", "user", message, details),
   resourceRuntimeLogsContextMismatch: (
     message: string,
     details?: DomainErrorDetails,
@@ -147,6 +152,58 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("resource_archived", "user", message, details),
+  resourceAutoDeploySourceMissing: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_auto_deploy_source_missing", "user", message, details),
+  resourceAutoDeployPolicyBlocked: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_auto_deploy_policy_blocked", "user", message, details),
+  resourceAutoDeploySecretRequired: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_auto_deploy_secret_required", "user", message, details),
+  resourceAutoDeploySecretUnavailable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = false,
+  ): DomainError =>
+    createError("resource_auto_deploy_secret_unavailable", "infra", message, details, retryable),
+  sourceEventScopeRequired: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("source_event_scope_required", "user", message, details),
+  sourceEventNotFound: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("source_event_not_found", "user", message, details),
+  sourceEventReadUnavailable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("source_event_read_unavailable", "infra", message, details, retryable),
+  sourceEventSignatureInvalid: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("source_event_signature_invalid", "user", message, details),
+  sourceEventProviderWebhookNotConfigured: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError(
+      "source_event_provider_webhook_not_configured",
+      "infra",
+      message,
+      details,
+      retryable,
+    ),
+  sourceEventUnsupportedKind: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("source_event_unsupported_kind", "user", message, details),
   serverInactive: (
     message: string,
     details?: Record<string, string | number | boolean | null>,
@@ -173,10 +230,33 @@ export const domainError = {
     createError("resource_delete_blocked", "user", message, details),
   dependencyResourceDeleteBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
     createError("dependency_resource_delete_blocked", "user", message, details),
+  dependencyResourceBackupBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("dependency_resource_backup_blocked", "user", message, details),
+  dependencyResourceRestoreBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("dependency_resource_restore_blocked", "user", message, details),
+  dependencyRuntimeInjectionBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("dependency_runtime_injection_blocked", "user", message, details),
   deploymentNotRedeployable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("deployment_not_redeployable", "user", message, details),
+  deploymentNotRetryable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("deployment_not_retryable", "user", message, details),
+  deploymentNotRollbackReady: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("deployment_not_rollback_ready", "user", message, details),
+  deploymentRollbackCandidateNotFound: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError =>
+    createError("deployment_rollback_candidate_not_found", "user", message, details),
+  deploymentRecoveryStateStale: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("deployment_recovery_state_stale", "user", message, details),
   domainBindingProxyRequired: (
     details?: Record<string, string | number | boolean | null>,
   ): DomainError =>
@@ -320,6 +400,22 @@ export const domainError = {
     details?: Record<string, string | number | boolean | null>,
     retryable = false,
   ): DomainError => createError("provider_error", "provider", message, details, retryable),
+  providerCapabilityUnsupported: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("provider_capability_unsupported", "provider", message, details),
+  dependencyResourceProviderDeleteFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError(
+      "dependency_resource_provider_delete_failed",
+      "provider",
+      message,
+      details,
+      retryable,
+    ),
   retryable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

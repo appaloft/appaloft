@@ -9,10 +9,15 @@ import {
 import {
   createDefaultRuntimeTargetBackendRegistry,
   DefaultRuntimePlanResolver,
+  DockerSwarmExecutionBackend,
+  DockerSwarmShellCommandRunner,
+  HermeticScheduledTaskRuntimePort,
   InMemoryExecutionBackend,
   LocalExecutionBackend,
   RoutingExecutionBackend,
+  RuntimeControlShellCommandExecutor,
   RuntimeResourceHealthProbeRunner,
+  RuntimeResourceRuntimeControlTarget,
   RuntimeResourceRuntimeLogReader,
   RuntimeServerConnectivityChecker,
   RuntimeServerEdgeProxyBootstrapper,
@@ -41,6 +46,9 @@ import {
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
   type MutationCoordinator,
+  type PreviewFeedbackWriter,
+  type PreviewFeedbackWriterInput,
+  type PreviewFeedbackWriterResult,
   QueryBus,
   RepositoryBackedDeploymentExecutionGuard,
   type ResourceAccessFailureRendererTarget,
@@ -56,7 +64,13 @@ import { type AuthRuntime } from "@appaloft/auth-better";
 import { type AppConfig } from "@appaloft/config";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { InMemoryIntegrationRegistry } from "@appaloft/integration-core";
-import { createGitHubRepositoryBrowser, githubIntegration } from "@appaloft/integration-github";
+import {
+  createGitHubPreviewFeedbackWriter,
+  createGitHubPreviewPullRequestWebhookVerifier,
+  createGitHubRepositoryBrowser,
+  createGitHubSourceEventWebhookVerifier,
+  githubIntegration,
+} from "@appaloft/integration-github";
 import { gitlabIntegration } from "@appaloft/integration-gitlab";
 import {
   type DatabaseConnection,
@@ -65,9 +79,13 @@ import {
   PgCertificateRetryCandidateReader,
   PgCertificateSecretStore,
   PgDefaultAccessDomainPolicyRepository,
+  PgDependencyBindingSecretStore,
+  PgDependencyResourceBackupReadModel,
+  PgDependencyResourceBackupRepository,
   PgDependencyResourceDeleteSafetyReader,
   PgDependencyResourceReadModel,
   PgDependencyResourceRepository,
+  PgDependencyResourceSecretStore,
   PgDeploymentReadModel,
   PgDeploymentRepository,
   PgDestinationRepository,
@@ -79,6 +97,13 @@ import {
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
   PgMutationCoordinator,
+  PgPreviewCleanupAttemptRecorder,
+  PgPreviewCleanupRetryCandidateReader,
+  PgPreviewEnvironmentReadModel,
+  PgPreviewEnvironmentRepository,
+  PgPreviewFeedbackRecorder,
+  PgPreviewPolicyDecisionProjection,
+  PgPreviewPolicyRepository,
   PgProcessAttemptJournal,
   PgProjectReadModel,
   PgProjectRepository,
@@ -88,9 +113,18 @@ import {
   PgResourceDependencyBindingRepository,
   PgResourceReadModel,
   PgResourceRepository,
+  PgResourceRuntimeControlAttemptRecorder,
+  PgScheduledTaskDefinitionRepository,
+  PgScheduledTaskDueCandidateReader,
+  PgScheduledTaskReadModel,
+  PgScheduledTaskRunAttemptRepository,
+  PgScheduledTaskRunLogReadModel,
+  PgScheduledTaskRunLogRecorder,
+  PgScheduledTaskRunReadModel,
   PgServerDeletionBlockerReader,
   PgServerReadModel,
   PgServerRepository,
+  PgSourceEventRepository,
   PgSshCredentialReadModel,
   PgSshCredentialRepository,
   PgSshCredentialUsageReader,
@@ -641,6 +675,44 @@ class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   }
 }
 
+export class ShellGitHubPreviewFeedbackWriter implements PreviewFeedbackWriter {
+  constructor(
+    private readonly integrationAuthPort: IntegrationAuthPort,
+    private readonly workerAccessToken?: string,
+    private readonly writerFactory: (accessToken: string) => PreviewFeedbackWriter = (
+      accessToken,
+    ) => createGitHubPreviewFeedbackWriter(accessToken),
+  ) {}
+
+  async publish(
+    context: ExecutionContext,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<PreviewFeedbackWriterResult>> {
+    const requestAccessToken = await this.integrationAuthPort.getProviderAccessToken(
+      context,
+      "github",
+    );
+    const accessToken = requestAccessToken?.trim()
+      ? requestAccessToken
+      : this.workerAccessToken?.trim()
+        ? this.workerAccessToken
+        : undefined;
+    if (!accessToken) {
+      return err(
+        domainError.validation(
+          "GitHub account or preview feedback worker token is not configured",
+          {
+            phase: "preview-feedback",
+            provider: "github",
+          },
+        ),
+      );
+    }
+
+    return this.writerFactory(accessToken).publish(context, input);
+  }
+}
+
 export interface RegisterRuntimeDependenciesInput {
   config: AppConfig;
   logger: AppLogger;
@@ -738,8 +810,67 @@ export function registerRuntimeDependencies(
   container.register(tokens.resourceRepository, {
     useFactory: instanceCachingFactory(() => new PgResourceRepository(input.database.db)),
   });
+  container.register(tokens.previewEnvironmentRepository, {
+    useFactory: instanceCachingFactory(() => new PgPreviewEnvironmentRepository(input.database.db)),
+  });
+  container.register(tokens.previewEnvironmentReadModel, {
+    useFactory: instanceCachingFactory(() => new PgPreviewEnvironmentReadModel(input.database.db)),
+  });
+  container.register(tokens.previewPolicyRepository, {
+    useFactory: instanceCachingFactory(() => new PgPreviewPolicyRepository(input.database.db)),
+  });
+  container.register(tokens.previewPolicyDecisionRecorder, {
+    useFactory: instanceCachingFactory(
+      () => new PgPreviewPolicyDecisionProjection(input.database.db),
+    ),
+  });
+  container.register(tokens.previewFeedbackRecorder, {
+    useFactory: instanceCachingFactory(() => new PgPreviewFeedbackRecorder(input.database.db)),
+  });
+  container.register(tokens.previewFeedbackWriter, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new ShellGitHubPreviewFeedbackWriter(
+          dependencyContainer.resolve(tokens.integrationAuthPort),
+          input.config.githubPreviewFeedbackToken,
+        ),
+    ),
+  });
+  container.register(tokens.previewCleanupAttemptRecorder, {
+    useFactory: instanceCachingFactory(
+      () => new PgPreviewCleanupAttemptRecorder(input.database.db),
+    ),
+  });
+  container.register(tokens.previewCleanupRetryCandidateReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgPreviewCleanupRetryCandidateReader(input.database.db),
+    ),
+  });
+  container.register(tokens.scheduledTaskDefinitionRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgScheduledTaskDefinitionRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.scheduledTaskRunAttemptRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgScheduledTaskRunAttemptRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.scheduledTaskRunLogRecorder, {
+    useFactory: instanceCachingFactory(() => new PgScheduledTaskRunLogRecorder(input.database.db)),
+  });
+  container.register(tokens.scheduledTaskDueCandidateReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgScheduledTaskDueCandidateReader(input.database.db),
+    ),
+  });
   container.register(tokens.dependencyResourceRepository, {
     useFactory: instanceCachingFactory(() => new PgDependencyResourceRepository(input.database.db)),
+  });
+  container.register(tokens.dependencyResourceBackupRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgDependencyResourceBackupRepository(input.database.db),
+    ),
   });
   container.register(tokens.resourceDependencyBindingRepository, {
     useFactory: instanceCachingFactory(
@@ -758,6 +889,15 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       () => new PgResourceDeletionBlockerReader(input.database.db),
     ),
+  });
+  container.register(tokens.sourceEventReadModel, {
+    useFactory: instanceCachingFactory(() => new PgSourceEventRepository(input.database.db)),
+  });
+  container.register(tokens.sourceEventRecorder, {
+    useFactory: instanceCachingFactory(() => new PgSourceEventRepository(input.database.db)),
+  });
+  container.register(tokens.sourceEventPolicyReader, {
+    useFactory: instanceCachingFactory(() => new PgSourceEventRepository(input.database.db)),
   });
   container.register(tokens.deploymentRepository, {
     useFactory: instanceCachingFactory(() => new PgDeploymentRepository(input.database.db)),
@@ -791,6 +931,14 @@ export function registerRuntimeDependencies(
           input.database.db,
           dependencyContainer.resolve<Clock>(tokens.clock),
         ),
+    ),
+  });
+  container.register(tokens.dependencyBindingSecretStore, {
+    useFactory: instanceCachingFactory(() => new PgDependencyBindingSecretStore(input.database.db)),
+  });
+  container.register(tokens.dependencyResourceSecretStore, {
+    useFactory: instanceCachingFactory(
+      () => new PgDependencyResourceSecretStore(input.database.db),
     ),
   });
   container.register(tokens.certificateHttpChallengeTokenStore, {
@@ -848,6 +996,23 @@ export function registerRuntimeDependencies(
   container.register(tokens.resourceReadModel, {
     useFactory: instanceCachingFactory(() => new PgResourceReadModel(input.database.db)),
   });
+  container.register(tokens.previewPolicyReadModel, {
+    useFactory: instanceCachingFactory(() => new PgPreviewPolicyRepository(input.database.db)),
+  });
+  container.register(tokens.previewPolicyDecisionReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgPreviewPolicyDecisionProjection(input.database.db),
+    ),
+  });
+  container.register(tokens.scheduledTaskReadModel, {
+    useFactory: instanceCachingFactory(() => new PgScheduledTaskReadModel(input.database.db)),
+  });
+  container.register(tokens.scheduledTaskRunReadModel, {
+    useFactory: instanceCachingFactory(() => new PgScheduledTaskRunReadModel(input.database.db)),
+  });
+  container.register(tokens.scheduledTaskRunLogReadModel, {
+    useFactory: instanceCachingFactory(() => new PgScheduledTaskRunLogReadModel(input.database.db)),
+  });
   container.register(tokens.dependencyResourceReadModel, {
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
@@ -855,6 +1020,11 @@ export function registerRuntimeDependencies(
           input.database.db,
           dependencyContainer.resolve(tokens.dependencyResourceDeleteSafetyReader),
         ),
+    ),
+  });
+  container.register(tokens.dependencyResourceBackupReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgDependencyResourceBackupReadModel(input.database.db),
     ),
   });
   container.register(tokens.resourceDependencyBindingReadModel, {
@@ -930,6 +1100,7 @@ export function registerRuntimeDependencies(
           dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
           input.resourceAccessFailureRenderer,
           dependencyContainer.resolve(tokens.deploymentExecutionGuard),
+          dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
         ),
         sshBackend: new SshExecutionBackend(
           join(input.config.dataDir, "runtime"),
@@ -941,7 +1112,24 @@ export function registerRuntimeDependencies(
           input.config.remoteRuntimeRoot,
           input.resourceAccessFailureRenderer,
           dependencyContainer.resolve(tokens.deploymentExecutionGuard),
+          dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
         ),
+        ...(input.config.dockerSwarmExecution.enabled
+          ? {
+              swarmBackend: new DockerSwarmExecutionBackend(
+                new DockerSwarmShellCommandRunner({
+                  timeoutMs: input.config.dockerSwarmExecution.commandTimeoutMs,
+                }),
+                undefined,
+                {
+                  ...(input.config.dockerSwarmExecution.edgeNetworkName
+                    ? { edgeNetworkName: input.config.dockerSwarmExecution.edgeNetworkName }
+                    : {}),
+                },
+                dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
+              ),
+            }
+          : {}),
       }),
     ),
   });
@@ -962,8 +1150,32 @@ export function registerRuntimeDependencies(
         new RuntimeResourceRuntimeLogReader(dependencyContainer.resolve(tokens.serverRepository)),
     ),
   });
+  container.register(tokens.resourceRuntimeControlTargetPort, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RuntimeResourceRuntimeControlTarget(
+          new RuntimeControlShellCommandExecutor({
+            serverRepository: dependencyContainer.resolve(tokens.serverRepository),
+          }),
+        ),
+    ),
+  });
+  container.register(tokens.scheduledTaskRuntimePort, {
+    useFactory: instanceCachingFactory(() => new HermeticScheduledTaskRuntimePort()),
+  });
+  container.register(tokens.resourceRuntimeControlAttemptRecorder, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceRuntimeControlAttemptRecorder(input.database.db),
+    ),
+  });
   container.register(tokens.resourceHealthProbeRunner, {
-    useFactory: instanceCachingFactory(() => new RuntimeResourceHealthProbeRunner()),
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RuntimeResourceHealthProbeRunner(
+          undefined,
+          dependencyContainer.resolve(tokens.serverRepository),
+        ),
+    ),
   });
   container.register(tokens.terminalSessionGateway, {
     useFactory: instanceCachingFactory(
@@ -1022,6 +1234,12 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.githubRepositoryBrowser, {
     useFactory: instanceCachingFactory(() => createGitHubRepositoryBrowser()),
+  });
+  container.register(tokens.githubSourceEventWebhookVerifier, {
+    useFactory: instanceCachingFactory(() => createGitHubSourceEventWebhookVerifier()),
+  });
+  container.register(tokens.githubPreviewPullRequestWebhookVerifier, {
+    useFactory: instanceCachingFactory(() => createGitHubPreviewPullRequestWebhookVerifier()),
   });
   container.register(tokens.diagnostics, {
     useFactory: instanceCachingFactory(

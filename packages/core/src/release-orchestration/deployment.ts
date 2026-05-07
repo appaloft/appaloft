@@ -19,6 +19,7 @@ import {
   type StartedAt,
 } from "../shared/temporal";
 import { PlanStepText } from "../shared/text-values";
+import { ScalarValueObject } from "../shared/value-object";
 import { type DeploymentDependencyBindingReferenceState } from "./dependency-binding-snapshot-reference";
 import {
   type DeploymentLogEntry,
@@ -26,6 +27,56 @@ import {
   RollbackPlan,
   type RuntimePlan,
 } from "./runtime-plan";
+
+export type DeploymentTriggerKind = "create" | "retry" | "redeploy" | "rollback";
+
+const deploymentTriggerKindBrand: unique symbol = Symbol("DeploymentTriggerKindValue");
+export class DeploymentTriggerKindValue extends ScalarValueObject<DeploymentTriggerKind> {
+  private [deploymentTriggerKindBrand]!: void;
+
+  private constructor(value: DeploymentTriggerKind) {
+    super(value);
+  }
+
+  static create(value: string): Result<DeploymentTriggerKindValue> {
+    switch (value) {
+      case "create":
+      case "retry":
+      case "redeploy":
+      case "rollback":
+        return ok(new DeploymentTriggerKindValue(value));
+      default:
+        return err(
+          domainError.validation(
+            "Deployment trigger kind must be one of create, retry, redeploy, rollback",
+            {
+              value,
+            },
+          ),
+        );
+    }
+  }
+
+  static rehydrate(value: DeploymentTriggerKind): DeploymentTriggerKindValue {
+    return new DeploymentTriggerKindValue(value);
+  }
+
+  static createDefault(): DeploymentTriggerKindValue {
+    return new DeploymentTriggerKindValue("create");
+  }
+
+  static retry(): DeploymentTriggerKindValue {
+    return new DeploymentTriggerKindValue("retry");
+  }
+
+  static redeploy(): DeploymentTriggerKindValue {
+    return new DeploymentTriggerKindValue("redeploy");
+  }
+
+  static rollback(): DeploymentTriggerKindValue {
+    return new DeploymentTriggerKindValue("rollback");
+  }
+}
 
 export interface DeploymentState {
   id: DeploymentId;
@@ -42,6 +93,9 @@ export interface DeploymentState {
   createdAt: CreatedAt;
   startedAt?: StartedAt;
   finishedAt?: FinishedAt;
+  triggerKind: DeploymentTriggerKindValue;
+  sourceDeploymentId?: DeploymentId;
+  rollbackCandidateDeploymentId?: DeploymentId;
   rollbackOfDeploymentId?: DeploymentId;
   supersedesDeploymentId?: DeploymentId;
   supersededByDeploymentId?: DeploymentId;
@@ -72,6 +126,9 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     environmentSnapshot: EnvironmentSnapshot;
     dependencyBindingReferences?: DeploymentDependencyBindingReferenceState[];
     createdAt: CreatedAt;
+    triggerKind?: DeploymentTriggerKindValue;
+    sourceDeploymentId?: DeploymentId;
+    rollbackCandidateDeploymentId?: DeploymentId;
     rollbackOfDeploymentId?: DeploymentId;
     supersedesDeploymentId?: DeploymentId;
     supersededByDeploymentId?: DeploymentId;
@@ -94,6 +151,11 @@ export class Deployment extends AggregateRoot<DeploymentState> {
         dependencyBindingReferences: [...(input.dependencyBindingReferences ?? [])],
         logs: [],
         createdAt: input.createdAt,
+        triggerKind: input.triggerKind ?? DeploymentTriggerKindValue.createDefault(),
+        ...(input.sourceDeploymentId ? { sourceDeploymentId: input.sourceDeploymentId } : {}),
+        ...(input.rollbackCandidateDeploymentId
+          ? { rollbackCandidateDeploymentId: input.rollbackCandidateDeploymentId }
+          : {}),
         ...(input.rollbackOfDeploymentId
           ? { rollbackOfDeploymentId: input.rollbackOfDeploymentId }
           : {}),
@@ -110,6 +172,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
   static rehydrate(state: DeploymentState): Deployment {
     return new Deployment({
       ...state,
+      triggerKind: state.triggerKind ?? DeploymentTriggerKindValue.createDefault(),
       dependencyBindingReferences: [...(state.dependencyBindingReferences ?? [])],
       logs: [...state.logs],
     });
@@ -125,7 +188,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
   markPlanning(at: StartedAt): Result<void> {
     return this.state.status.markPlanning().map((nextStatus) => {
       this.state.status = nextStatus;
-      this.recordDomainEvent("deployment.planning_started", at, {});
+      this.recordDomainEvent("deployment.planning_started", at, this.recoveryEventPayload());
       return undefined;
     });
   }
@@ -133,7 +196,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
   markPlanned(at: StartedAt): Result<void> {
     return this.state.status.markPlanned().map((nextStatus) => {
       this.state.status = nextStatus;
-      this.recordDomainEvent("deployment.planned", at, {});
+      this.recordDomainEvent("deployment.planned", at, this.recoveryEventPayload());
       return undefined;
     });
   }
@@ -142,7 +205,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     return this.state.status.start().map((nextStatus) => {
       this.state.status = nextStatus;
       this.state.startedAt = at;
-      this.recordDomainEvent("deployment.started", at, {});
+      this.recordDomainEvent("deployment.started", at, this.recoveryEventPayload());
       return undefined;
     });
   }
@@ -183,6 +246,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
           : {}),
       });
       this.recordDomainEvent("deployment.finished", at, {
+        ...this.recoveryEventPayload(),
         status: this.state.status.value,
         ...(input?.supersededByDeploymentId
           ? { supersededByDeploymentId: input.supersededByDeploymentId.value }
@@ -216,6 +280,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
       const errorMessage = resultState.metadata?.message;
 
       this.recordDomainEvent("deployment.finished", at, {
+        ...this.recoveryEventPayload(),
         status: this.state.status.value,
         exitCode: resultState.exitCode.value,
         retryable: resultState.retryable,
@@ -250,6 +315,10 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     return this.state.status.canStartNewDeployment();
   }
 
+  canRetryRecovery(): boolean {
+    return this.state.status.canRetryRecovery();
+  }
+
   resolveExecutionContinuation(): DeploymentExecutionContinuation {
     const allowed =
       this.state.status.allowsExecutionContinuation() && !this.state.supersededByDeploymentId;
@@ -271,6 +340,22 @@ export class Deployment extends AggregateRoot<DeploymentState> {
       ...this.state,
       dependencyBindingReferences: [...this.state.dependencyBindingReferences],
       logs: [...this.state.logs],
+    };
+  }
+
+  private recoveryEventPayload(): {
+    triggerKind: DeploymentTriggerKind;
+    sourceDeploymentId?: string;
+    rollbackCandidateDeploymentId?: string;
+  } {
+    return {
+      triggerKind: this.state.triggerKind.value,
+      ...(this.state.sourceDeploymentId
+        ? { sourceDeploymentId: this.state.sourceDeploymentId.value }
+        : {}),
+      ...(this.state.rollbackCandidateDeploymentId
+        ? { rollbackCandidateDeploymentId: this.state.rollbackCandidateDeploymentId.value }
+        : {}),
     };
   }
 }

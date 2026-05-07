@@ -82,8 +82,8 @@ RuntimeTargetBackendRegistry
   -> backend.cleanup(...)
 ```
 
-The active v1 implementation may still route `local-shell` and `generic-ssh` through the current
-runtime adapter as a migration gap. New target backends must not expand hardcoded provider switches
+The active v1 implementation routes `local-shell`, `generic-ssh`, and `docker-swarm` through the
+runtime target backend registry. New target backends must not expand hardcoded provider switches
 inside application use cases or transports.
 
 ## Target Backend Capabilities
@@ -189,21 +189,36 @@ Operator-facing surfaces should expose this without making deployment admission 
 
 ## Docker Swarm Target
 
-Docker Swarm is a future runtime target backend, not a separate deployment command.
+Docker Swarm is an active runtime target backend, not a separate deployment command.
 
-It is the first cluster runtime target that must be completed on the path to `1.0.0`.
+It is the first cluster runtime target on the path to `1.0.0`.
+
+The governing Swarm contract and implementation status are tracked in
+[Docker Swarm Runtime Target](../specs/045-docker-swarm-runtime-target/spec.md) and its
+[test matrix](../testing/docker-swarm-runtime-target-test-matrix.md).
 
 A Swarm backend must consume the same workload artifact, environment snapshot, resource network
-profile, and access-route snapshot, then render Swarm stack/service intent inside the adapter
-boundary.
+profile, health policy, and access-route snapshot, then render Swarm stack/service intent inside
+the adapter boundary.
 
-Before implementation, a Spec Round must define:
+Swarm-specific rules:
 
-- target registration and readiness rules for a Swarm manager target;
-- destination placement and isolation semantics;
-- registry push/pull requirements and secret masking;
-- service update strategy, rollback candidate identity, logs, health, and cleanup semantics;
-- how edge proxy route realization maps to Swarm services and networks.
+- target registration and readiness use provider-neutral `DeploymentTarget`/`Destination`
+  language, with `orchestrator-cluster` as target kind and `docker-swarm` as provider key;
+- `deployments.create` remains ids-only and must reject stack, service, replica, update-policy,
+  registry-secret, ingress, manifest, or similar Swarm fields at the command/config boundary;
+- destination placement maps to adapter-owned stack/network isolation; sanitized target,
+  destination, resource, deployment, and runtime identity may be stored only when needed for
+  observation, diagnostics, cleanup, and rollback-candidate support;
+- registry credentials, pull secrets, environment secret values, rendered command output, and raw
+  Docker provider payloads must be masked before logs, diagnostics, errors, or read models expose
+  them;
+- rollout must preserve or restore the previous same-resource service until required apply, health,
+  route, and public verification gates pass;
+- `resources.runtime-logs`, `resources.health`, proxy/diagnostic summaries, and capacity
+  diagnostics must return normalized Appaloft shapes rather than Docker service API objects;
+- cleanup is scoped by resource, deployment, target, destination, and adapter-owned labels, and it
+  must not prune volumes, unrelated services, or Appaloft state roots.
 
 ## Kubernetes Target
 
@@ -276,18 +291,22 @@ exclusive host port makes candidate-first verification impossible.
 
 ## Current Implementation Notes And Migration Gaps
 
-Current implementation is single-server oriented:
+Current implementation covers single-server Docker/Compose and Docker Swarm:
 
 - `DefaultRuntimePlanResolver` creates a `single-server` target descriptor.
 - `RuntimeTargetBackendRegistry` is an application port, and `packages/adapters/runtime` registers
   local-shell and generic-SSH as `single-server` runtime target backends with runtime capability
   descriptors.
+- `packages/adapters/runtime` exposes a `docker-swarm` backend descriptor shape and registry
+  selection coverage, and shell composition activates Swarm execution in the default runtime
+  registry unless explicitly opted out.
 - `RoutingExecutionBackend` selects the execution backend through the registry, with the in-memory
   backend retained as a compatibility fallback for unknown providers.
 - Local and SSH Docker/Compose code already lives in `packages/adapters/runtime`.
-- Runtime logs, health, terminal sessions, and proxy configuration are being normalized through
-  application ports and read/query services, but only execution/cancel/rollback selection is backed
-  by the runtime target backend registry so far.
+- Runtime execution uses the registry for single-server and Swarm targets; runtime logs and health
+  can read Swarm-backed deployments through the resolved Swarm manager over SSH when target
+  metadata is available, while terminal sessions and proxy configuration remain normalized
+  read/query surfaces with backend-specific behavior kept behind adapter boundaries.
 - Generic SSH execution currently materializes deployment-scoped source workspaces and builds
   deployment-scoped Docker images on the target. Preview cleanup stops selected runtime instances
   and route/link state, but it does not yet prune unused Docker images, BuildKit/build cache, or

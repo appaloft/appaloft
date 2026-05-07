@@ -16,10 +16,13 @@ permission failure, and read-model failures that prevent safe summary constructi
 This spec inherits:
 
 - [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
+- [ADR-038: Resource Runtime Control Ownership](../decisions/ADR-038-resource-runtime-control-ownership.md)
 - [resources.health Query Spec](../queries/resources.health.md)
 - [Resource Health Observation Workflow Spec](../workflows/resource-health-observation.md)
 - [Resource Access Failure Diagnostics Error Spec](./resource-access-failure-diagnostics.md)
+- [Resource Runtime Controls Error Spec](./resource-runtime-controls.md)
 - [Resource Health Test Matrix](../testing/resource-health-test-matrix.md)
+- [Resource Runtime Controls Test Matrix](../testing/resource-runtime-controls-test-matrix.md)
 - [Resource Health Implementation Plan](../implementation/resource-health-plan.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
@@ -40,6 +43,7 @@ type ResourceHealthErrorDetails = {
     | "health-check-execution"
     | "proxy-route-observation"
     | "public-access-observation"
+    | "runtime-control-readback"
     | "edge-request-routing"
     | "upstream-connection"
     | "upstream-response"
@@ -60,6 +64,7 @@ type ResourceHealthErrorDetails = {
     | "destination"
     | "deployment-target"
     | "domain-binding"
+    | "runtime-control"
     | "proxy-route";
   relatedState?: string;
   correlationId?: string;
@@ -96,7 +101,8 @@ type ResourceHealthSourceError = {
     | "health-check"
     | "proxy"
     | "public-access"
-    | "domain-binding";
+    | "domain-binding"
+    | "runtime-control";
   code: string;
   category: string;
   phase: string;
@@ -134,6 +140,7 @@ Typical source errors:
 | `proxy` | `resource_access_route_unavailable` | `proxy-route-observation` | Edge request matched a route that is not applied, ready, or current. |
 | `proxy` | `resource_access_edge_error` | `diagnostic-page-render` | The edge diagnostic service failed while handling a gateway error. |
 | `domain-binding` | `resource_domain_binding_not_ready` | `public-access-observation` | Durable domain binding exists but is not ready for traffic. |
+| `runtime-control` | `resource_runtime_control_readback_unavailable` | `runtime-control-readback` | Latest runtime-control attempt state cannot be loaded safely. |
 
 Source errors must reuse stable codes from the owning query/spec when a source already has one.
 

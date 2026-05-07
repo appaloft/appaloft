@@ -49,30 +49,16 @@ function recoveryReadiness(): DeploymentRecoveryReadinessResponse {
     rollbackReady: false,
     rollbackCandidateCount: 0,
     retry: {
-      allowed: false,
-      commandActive: false,
+      allowed: true,
+      commandActive: true,
       targetOperation: "deployments.retry",
-      reasons: [
-        {
-          code: "recovery-command-not-active",
-          category: "blocked",
-          phase: "operation-catalog",
-          retriable: false,
-        },
-      ],
+      reasons: [],
     },
     redeploy: {
-      allowed: false,
-      commandActive: false,
+      allowed: true,
+      commandActive: true,
       targetOperation: "deployments.redeploy",
-      reasons: [
-        {
-          code: "recovery-command-not-active",
-          category: "blocked",
-          phase: "operation-catalog",
-          retriable: false,
-        },
-      ],
+      reasons: [],
     },
     rollback: {
       allowed: false,

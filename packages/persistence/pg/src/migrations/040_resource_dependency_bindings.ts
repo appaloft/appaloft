@@ -14,6 +14,9 @@ export const resourceDependencyBindingsMigration = {
         target_name TEXT NOT NULL,
         scope TEXT NOT NULL,
         injection_mode TEXT NOT NULL,
+        secret_ref TEXT,
+        secret_version TEXT,
+        secret_rotated_at TIMESTAMPTZ,
         lifecycle_status TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL,
         removed_at TIMESTAMPTZ

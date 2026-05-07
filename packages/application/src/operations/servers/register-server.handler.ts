@@ -21,6 +21,7 @@ export class RegisterServerCommandHandler
       name: command.name,
       host: command.host,
       providerKey: command.providerKey,
+      targetKind: command.targetKind,
       ...(typeof command.port === "number" ? { port: command.port } : {}),
       proxyKind: command.proxyKind,
     });

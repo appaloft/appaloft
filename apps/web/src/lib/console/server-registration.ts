@@ -15,6 +15,7 @@ export type ServerRegistrationDraft = {
   host: string;
   port: string;
   providerKey: string;
+  targetKind: RegisterServerInput["targetKind"];
   credentialKind: ServerCredentialKind;
   credentialUsername: string;
   credentialPublicKey: string;
@@ -59,6 +60,7 @@ export function createServerRegistrationDraft(
     host: "127.0.0.1",
     port: "22",
     providerKey: "generic-ssh",
+    targetKind: "single-server",
     credentialKind: "ssh-private-key",
     credentialUsername: "",
     credentialPublicKey: "",
@@ -204,6 +206,7 @@ export function createRegisterServerInput(
     name,
     host,
     providerKey: draft.providerKey,
+    targetKind: draft.targetKind,
     proxyKind: "traefik",
     port,
   };

@@ -9,6 +9,8 @@ searchAliases:
   - "server"
   - "connectivity"
   - "ssh test"
+  - "docker swarm"
+  - "orchestrator cluster"
 relatedOperations:
   - servers.register
   - servers.show
@@ -96,8 +98,50 @@ appaloft server register \
   --host 203.0.113.10 \
   --port 22 \
   --provider generic-ssh \
+  --target-kind single-server \
   --proxy-kind traefik
 ```
+
+`--target-kind orchestrator-cluster` records a cluster-shaped deployment target for future
+cluster backends such as Docker Swarm. It does not by itself make the target ready for deployments;
+readiness still depends on the registered runtime backend capabilities and connectivity checks.
+
+<h2 id="docker-swarm-runtime-target">Docker Swarm runtime target</h2>
+
+Docker Swarm targets are registered as cluster-shaped deployment targets. Use
+`--target-kind orchestrator-cluster --provider docker-swarm` only for a Swarm manager endpoint that
+Appaloft can reach through the selected transport.
+
+Current status: Appaloft can record Swarm target metadata, run non-mutating manager readiness
+checks through `server test` or `server doctor`, reject unsupported Swarm-specific deployment
+fields before a deployment is created, and execute Swarm deployments through the default runtime
+backend. Set `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=false` only when an installation needs to
+disable Swarm execution explicitly; with that opt-out, deploying to a Swarm target should fail
+before acceptance with `runtime_target_unsupported`.
+
+Keep deployment requests ids-only. Do not add Swarm fields such as namespace, stack name, service
+name, replicas, update policy, ingress, registry secret, or manifest directly to `deployments.create`
+or `appaloft.config.*`. If a validation error names one of those fields, remove it and use the
+supported resource, environment, and server inputs for the current runtime target.
+
+Before deploying to a Swarm target, `server test`/`server doctor` checks:
+
+- the manager address is reachable through SSH;
+- Docker is available on the manager;
+- the endpoint reports an active Swarm manager control plane;
+- the overlay network driver is available;
+- the configured edge proxy is compatible with the Swarm target.
+
+Operators should also verify:
+
+- image registry access is configured without exposing secret values;
+- the Swarm edge network is an overlay network; set `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` when the
+  deployment should use a network name other than `appaloft-edge`;
+- health checks and service logs can be read in a form Appaloft can normalize.
+
+Swarm rollout preserves the previous service until verification passes, logs and health are
+returned as Appaloft status shapes, and cleanup stays scoped to the resource, deployment,
+destination, and target labels.
 
 ```bash title="Run connectivity test"
 appaloft server test srv_primary

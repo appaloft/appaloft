@@ -51,6 +51,7 @@ If only one public command exists in a transitional implementation, the source-o
 | `name` | Required | Human-readable deployment target name. |
 | `host` | Required | Host or address used by runtime providers. |
 | `providerKey` | Required | Provider/runtime adapter key such as local shell or generic SSH. |
+| `targetKind` | Optional | Target shape. Defaults to `single-server`. `orchestrator-cluster` is accepted for future cluster runtime targets such as Docker Swarm, but runtime readiness and deployment support still depend on the registered backend capabilities. |
 | `port` | Optional | Provider connection port. Defaults to provider policy, typically SSH port `22`. |
 | `edgeProxyMode` | Optional | `disabled` or `provider`. Defaults to configured platform policy. |
 | `edgeProxyProviderKey` | Conditional | Required when `edgeProxyMode = provider` and no server/default provider can be resolved. Opaque provider registry key. |
@@ -233,7 +234,10 @@ attempt id for public repair calls, publishes canonical `proxy-bootstrap-request
 `proxy-installed` or `proxy-install-failed` events, and executes the existing provider-backed proxy
 bootstrapper synchronously during the command.
 
-Current `servers.register` persists a `DeploymentTarget` and emits `deployment_target.registered`. When `proxyKind` is omitted, it defaults to `traefik`.
+Current `servers.register` persists a `DeploymentTarget`, stores canonical target kind
+`single-server` or `orchestrator-cluster`, and emits `deployment_target.registered`. When
+`targetKind` is omitted, it defaults to `single-server`. When `proxyKind` is omitted, it defaults to
+`traefik`.
 
 Current proxy bootstrap is driven by `BootstrapServerEdgeProxyOnTargetRegisteredHandler`, which consumes `deployment_target.registered`. It marks edge proxy status `starting`, calls the runtime bootstrapper, then marks proxy `ready` or `failed`.
 

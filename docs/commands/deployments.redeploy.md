@@ -2,9 +2,11 @@
 
 ## Status
 
-Accepted candidate. Do not expose this command until `deployments.recovery-readiness`, this command
-spec, the error spec, test matrix, implementation plan, public docs/help, `CORE_OPERATIONS.md`, and
-`operation-catalog.ts` are aligned in a Code Round.
+Accepted candidate. The Code Round is scoped by
+[Deployment Retry And Redeploy](../specs/040-deployment-retry-redeploy/spec.md). Do not expose this
+command until `deployments.recovery-readiness`, this command spec, the error spec, test matrix,
+implementation plan, public docs/help, `CORE_OPERATIONS.md`, and `operation-catalog.ts` are aligned
+in that Code Round.
 
 ## Governing Sources
 
@@ -14,6 +16,7 @@ spec, the error spec, test matrix, implementation plan, public docs/help, `CORE_
 - [ADR-034: Deployment Recovery Readiness](../decisions/ADR-034-deployment-recovery-readiness.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 - [Deployment Recovery Readiness Spec](../specs/012-deployment-recovery-readiness/spec.md)
+- [Deployment Retry And Redeploy](../specs/040-deployment-retry-redeploy/spec.md)
 - [deployments.create Command Spec](./deployments.create.md)
 - [deployments.recovery-readiness Query Spec](../queries/deployments.recovery-readiness.md)
 - [Deployment Recovery Readiness Error Spec](../errors/deployment-recovery-readiness.md)

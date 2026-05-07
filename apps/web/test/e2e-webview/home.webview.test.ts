@@ -925,6 +925,155 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         id: "res_demo",
       },
     },
+    "/api/rpc/scheduledTasks/list": {
+      json: {
+        schemaVersion: "scheduled-tasks.list/v1",
+        items: [
+          {
+            taskId: "tsk_demo_migrate",
+            resourceId: "res_demo",
+            schedule: "0 2 * * *",
+            timezone: "UTC",
+            commandIntent: "bun run db:migrate",
+            timeoutSeconds: 300,
+            retryLimit: 1,
+            concurrencyPolicy: "forbid",
+            status: "enabled",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            latestRun: {
+              runId: "str_demo_latest",
+              taskId: "tsk_demo_migrate",
+              resourceId: "res_demo",
+              triggerKind: "scheduled",
+              status: "succeeded",
+              createdAt: "2026-01-01T02:00:00.000Z",
+              startedAt: "2026-01-01T02:00:01.000Z",
+              finishedAt: "2026-01-01T02:00:03.000Z",
+              exitCode: 0,
+            },
+          },
+        ],
+        generatedAt: "2026-01-01T02:00:04.000Z",
+      },
+    },
+    "/api/rpc/scheduledTasks/create": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        resourceId?: string;
+        commandIntent?: string;
+      } | null;
+      return {
+        json: {
+          schemaVersion: "scheduled-tasks.command/v1",
+          task: {
+            taskId: "tsk_created",
+            resourceId: input?.resourceId ?? "res_demo",
+            schedule: "*/5 * * * *",
+            timezone: "UTC",
+            commandIntent: input?.commandIntent ?? "bun run db:migrate",
+            timeoutSeconds: 300,
+            retryLimit: 0,
+            concurrencyPolicy: "forbid",
+            status: "enabled",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        },
+      };
+    },
+    "/api/rpc/scheduledTasks/configure": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        taskId?: string;
+        resourceId?: string;
+        status?: "enabled" | "disabled";
+      } | null;
+      return {
+        json: {
+          schemaVersion: "scheduled-tasks.command/v1",
+          task: {
+            taskId: input?.taskId ?? "tsk_demo_migrate",
+            resourceId: input?.resourceId ?? "res_demo",
+            schedule: "0 2 * * *",
+            timezone: "UTC",
+            commandIntent: "bun run db:migrate",
+            timeoutSeconds: 300,
+            retryLimit: 1,
+            concurrencyPolicy: "forbid",
+            status: input?.status ?? "disabled",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:05:00.000Z",
+          },
+        },
+      };
+    },
+    "/api/rpc/scheduledTasks/delete": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { taskId?: string; resourceId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "scheduled-tasks.delete/v1",
+          taskId: input?.taskId ?? "tsk_demo_migrate",
+          resourceId: input?.resourceId ?? "res_demo",
+          status: "deleted",
+          deletedAt: "2026-01-01T00:06:00.000Z",
+        },
+      };
+    },
+    "/api/rpc/scheduledTasks/runNow": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { taskId?: string; resourceId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "scheduled-tasks.run-now/v1",
+          run: {
+            runId: "str_manual_now",
+            taskId: input?.taskId ?? "tsk_demo_migrate",
+            resourceId: input?.resourceId ?? "res_demo",
+            triggerKind: "manual",
+            status: "accepted",
+            createdAt: "2026-01-01T00:10:00.000Z",
+          },
+        },
+      };
+    },
+    "/api/rpc/scheduledTasks/runs/list": {
+      json: {
+        schemaVersion: "scheduled-task-runs.list/v1",
+        items: [
+          {
+            runId: "str_demo_latest",
+            taskId: "tsk_demo_migrate",
+            resourceId: "res_demo",
+            triggerKind: "scheduled",
+            status: "succeeded",
+            createdAt: "2026-01-01T02:00:00.000Z",
+            startedAt: "2026-01-01T02:00:01.000Z",
+            finishedAt: "2026-01-01T02:00:03.000Z",
+            exitCode: 0,
+          },
+        ],
+        generatedAt: "2026-01-01T02:00:04.000Z",
+      },
+    },
+    "/api/rpc/scheduledTasks/runs/logs": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        runId?: string;
+        taskId?: string;
+        resourceId?: string;
+      } | null;
+      return {
+        json: {
+          schemaVersion: "scheduled-task-runs.logs/v1",
+          runId: input?.runId ?? "str_demo_latest",
+          taskId: input?.taskId ?? "tsk_demo_migrate",
+          resourceId: input?.resourceId ?? "res_demo",
+          entries: [
+            {
+              timestamp: "2026-01-01T02:00:02.000Z",
+              stream: "stdout",
+              message: "migration complete",
+            },
+          ],
+          generatedAt: "2026-01-01T02:00:04.000Z",
+        },
+      };
+    },
     "/api/rpc/domainBindings/list": {
       json: {
         items: [],
@@ -1921,6 +2070,71 @@ describe("console e2e with Bun.WebView", () => {
       includeLatestDeployment: true,
       includeAccessSummary: true,
       includeProfileDiagnostics: true,
+    });
+  }, 15_000);
+
+  test("[SCHED-TASK-ENTRY-001] resource detail exposes scheduled task Web controls", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=scheduled-tasks`);
+
+    await expectAnyText(view, ["Scheduled tasks", "定时任务"]);
+    await expectText(view, "bun run db:migrate");
+
+    const listRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/list");
+    expect(readOrpcJsonPayload(listRequest.body)).toEqual({
+      resourceId: "res_demo",
+      limit: 25,
+    });
+
+    await setInputValue(view, "#scheduled-task-command-intent", "bun run cache:warm");
+    await clickButtonByAnyText(view, ["Create task", "创建任务"]);
+
+    const createRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/create");
+    expect(readOrpcJsonPayload(createRequest.body)).toEqual({
+      resourceId: "res_demo",
+      schedule: "*/5 * * * *",
+      timezone: "UTC",
+      commandIntent: "bun run cache:warm",
+      timeoutSeconds: 300,
+      retryLimit: 0,
+      concurrencyPolicy: "forbid",
+      status: "enabled",
+    });
+
+    await clickButtonByAnyText(view, ["Run now", "立即运行"]);
+
+    const runRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/runNow");
+    expect(readOrpcJsonPayload(runRequest.body)).toEqual({
+      taskId: "tsk_demo_migrate",
+      resourceId: "res_demo",
+    });
+
+    await waitFor(
+      () =>
+        view.evaluate<boolean>(
+          `(() => {
+            const button = document.querySelector("#scheduled-task-run-logs-str_demo_latest");
+            if (!(button instanceof HTMLButtonElement)) {
+              return false;
+            }
+            button.click();
+            return true;
+          })()`,
+        ),
+      Boolean,
+      "Expected scheduled task run logs button",
+    );
+    await expectText(view, "migration complete");
+
+    const logsRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/runs/logs");
+    expect(readOrpcJsonPayload(logsRequest.body)).toEqual({
+      runId: "str_demo_latest",
+      taskId: "tsk_demo_migrate",
+      resourceId: "res_demo",
+      limit: 100,
     });
   }, 15_000);
 

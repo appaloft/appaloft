@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/deploy-docs.yml
       - .github/actions/remote-state-lock-preflight/**
+      - .github/actions/remote-runtime-capacity-preflight/**
       - appaloft.docs.yml
       - apps/docs/**
       - apps/shell/**
@@ -116,6 +117,13 @@ jobs:
         run: |
           set -euo pipefail
           bun install --frozen-lockfile
+
+      - name: Remote Runtime Capacity Preflight
+        uses: ./.github/actions/remote-runtime-capacity-preflight
+        with:
+          ssh-host: ${{ vars.APPALOFT_SSH_HOST }}
+          ssh-user: ${{ steps.settings.outputs.ssh_user }}
+          ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
 
       - name: Remote State Lock Preflight
         uses: ./.github/actions/remote-state-lock-preflight

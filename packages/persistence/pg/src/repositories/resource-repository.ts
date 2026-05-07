@@ -23,6 +23,7 @@ import {
   rehydrateResourceRow,
   resolveRepositoryExecutor,
   type SerializedResourceAccessProfile,
+  type SerializedResourceAutoDeployPolicy,
   type SerializedResourceNetworkProfile,
   type SerializedResourceRuntimeProfile,
   type SerializedResourceSourceBinding,
@@ -160,6 +161,27 @@ class KyselyResourceMutationVisitor
           pathPrefix: spec.state.accessProfile.pathPrefix.value,
         } satisfies SerializedResourceAccessProfile)
       : null;
+    const autoDeployPolicy = spec.state.autoDeployPolicy
+      ? ({
+          status: spec.state.autoDeployPolicy.status.value,
+          triggerKind: spec.state.autoDeployPolicy.triggerKind.value,
+          refs: spec.state.autoDeployPolicy.refs.map((ref) => ref.value),
+          eventKinds: spec.state.autoDeployPolicy.eventKinds.map((eventKind) => eventKind.value),
+          sourceBindingFingerprint: spec.state.autoDeployPolicy.sourceBindingFingerprint.value,
+          updatedAt: spec.state.autoDeployPolicy.updatedAt.value,
+          ...(spec.state.autoDeployPolicy.blockedReason
+            ? { blockedReason: spec.state.autoDeployPolicy.blockedReason.value }
+            : {}),
+          ...(spec.state.autoDeployPolicy.genericWebhookSecretRef
+            ? {
+                genericWebhookSecretRef: spec.state.autoDeployPolicy.genericWebhookSecretRef.value,
+              }
+            : {}),
+          ...(spec.state.autoDeployPolicy.dedupeWindowSeconds
+            ? { dedupeWindowSeconds: spec.state.autoDeployPolicy.dedupeWindowSeconds.value }
+            : {}),
+        } satisfies SerializedResourceAutoDeployPolicy)
+      : null;
 
     return {
       resource: {
@@ -176,6 +198,7 @@ class KyselyResourceMutationVisitor
         runtime_profile: runtimeProfile,
         network_profile: networkProfile,
         access_profile: accessProfile,
+        auto_deploy_policy: autoDeployPolicy,
         lifecycle_status: spec.state.lifecycleStatus.value,
         archived_at: spec.state.archivedAt?.value ?? null,
         archive_reason: spec.state.archiveReason?.value ?? null,
@@ -240,6 +263,7 @@ export class PgResourceRepository implements ResourceRepository {
                 runtime_profile: mutation.resource.runtime_profile,
                 network_profile: mutation.resource.network_profile,
                 access_profile: mutation.resource.access_profile,
+                auto_deploy_policy: mutation.resource.auto_deploy_policy,
                 lifecycle_status: mutation.resource.lifecycle_status,
                 archived_at: mutation.resource.archived_at ?? null,
                 archive_reason: mutation.resource.archive_reason ?? null,

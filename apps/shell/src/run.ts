@@ -1,5 +1,8 @@
-import { type DomainError } from "@appaloft/core";
-import { createAppComposition, type ShellRuntimeOptions } from "./composition";
+import { existsSync } from "node:fs";
+import { mkdir, rename, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import { type AppComposition, createAppComposition, type ShellRuntimeOptions } from "./composition";
 import {
   prepareRemotePgliteStateSync,
   type RemotePgliteStateSyncSession,
@@ -10,14 +13,33 @@ function formatDetailValue(value: unknown): string | null {
     return null;
   }
 
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+  if (typeof value === "string") {
+    return value.replace(/\s+/g, " ").trim() || null;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
 
   return null;
 }
 
-function formatDomainError(error: DomainError): string {
+function formatDetailLine(
+  label: string,
+  error: DomainError,
+  keys: readonly string[],
+): string | null {
+  const details = keys
+    .map((key) => {
+      const value = formatDetailValue(error.details?.[key]);
+      return value ? `${key}=${value}` : null;
+    })
+    .filter((value): value is string => value !== null);
+
+  return details.length > 0 ? `${label}: ${details.join(" ")}` : null;
+}
+
+export function formatDomainError(error: DomainError): string {
   const phase = typeof error.details?.phase === "string" ? error.details.phase : undefined;
   const details = [
     `code=${error.code}`,
@@ -28,7 +50,10 @@ function formatDomainError(error: DomainError): string {
   const lines = [error.message, details.join(" ")];
 
   if (phase === "remote-state-lock") {
-    const lockDetails = [
+    const lockLine = formatDetailLine("lock", error, [
+      "stateBackend",
+      "host",
+      "port",
       "lockOwner",
       "correlationId",
       "lockStartedAt",
@@ -38,15 +63,24 @@ function formatDomainError(error: DomainError): string {
       "lockAcquireTimeoutSeconds",
       "retryAfterSeconds",
       "stderr",
-    ]
-      .map((key) => {
-        const value = formatDetailValue(error.details?.[key]);
-        return value ? `${key}=${value}` : null;
-      })
-      .filter((value): value is string => value !== null);
+    ]);
 
-    if (lockDetails.length > 0) {
-      lines.push(`lock: ${lockDetails.join(" ")}`);
+    if (lockLine) {
+      lines.push(lockLine);
+    }
+  } else if (phase?.startsWith("remote-state-")) {
+    const remoteStateLine = formatDetailLine("details", error, [
+      "stateBackend",
+      "host",
+      "port",
+      "exitCode",
+      "reason",
+      "stderr",
+      "message",
+    ]);
+
+    if (remoteStateLine) {
+      lines.push(remoteStateLine);
     }
   }
 
@@ -66,6 +100,120 @@ function formatDomainError(error: DomainError): string {
 
 function writeDomainError(error: DomainError): void {
   process.stderr.write(formatDomainError(error));
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isPgliteInitializationFailure(error: unknown): boolean {
+  return errorMessage(error).includes("PGlite failed to initialize properly");
+}
+
+export async function quarantineRemotePgliteMirror(
+  session: RemotePgliteStateSyncSession,
+  cause: unknown,
+): Promise<Result<void>> {
+  const pgliteDataDir = session.localPgliteDataDir;
+  const localDataRoot = dirname(pgliteDataDir);
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const quarantineDir = `${pgliteDataDir}.incompatible-${stamp}`;
+  const recoveryDir = join(localDataRoot, "recovery");
+  const recoveryFile = join(recoveryDir, `pglite-incompatible-${stamp}.json`);
+
+  try {
+    if (existsSync(pgliteDataDir)) {
+      await rename(pgliteDataDir, quarantineDir);
+    }
+    await mkdir(pgliteDataDir, { recursive: true });
+    await mkdir(recoveryDir, { recursive: true });
+    await writeFile(
+      recoveryFile,
+      `${JSON.stringify(
+        {
+          phase: "remote-state-sync-download",
+          reason: "remote_pglite_incompatible",
+          recoveredAt: new Date().toISOString(),
+          stateBackend: "ssh-pglite",
+          host: session.target.host,
+          port: String(session.target.port ?? 22),
+          localQuarantineDir: quarantineDir,
+          message: errorMessage(cause),
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    return ok(undefined);
+  } catch (error) {
+    return err(
+      domainError.infra("SSH remote PGlite incompatible local mirror could not be quarantined", {
+        phase: "remote-state-sync-download",
+        stateBackend: "ssh-pglite",
+        host: session.target.host,
+        port: String(session.target.port ?? 22),
+        reason: "remote_pglite_incompatible",
+        message: errorMessage(error),
+      }),
+    );
+  }
+}
+
+async function createShellComposition(
+  options: ShellRuntimeOptions | undefined,
+  remotePgliteStateSyncSession: RemotePgliteStateSyncSession | undefined,
+): Promise<Result<AppComposition>> {
+  try {
+    return ok(
+      await createAppComposition(undefined, {
+        ...options,
+        ...(remotePgliteStateSyncSession ? { remotePgliteStateSyncSession } : {}),
+      }),
+    );
+  } catch (error) {
+    if (!remotePgliteStateSyncSession) {
+      throw error;
+    }
+
+    if (!isPgliteInitializationFailure(error)) {
+      return err(
+        domainError.infra("SSH remote PGlite command composition could not be created", {
+          phase: "remote-state-sync-download",
+          stateBackend: "ssh-pglite",
+          host: remotePgliteStateSyncSession.target.host,
+          port: String(remotePgliteStateSyncSession.target.port ?? 22),
+          reason: "remote_pglite_composition_failed",
+          message: errorMessage(error),
+        }),
+      );
+    }
+
+    const quarantined = await quarantineRemotePgliteMirror(remotePgliteStateSyncSession, error);
+    if (quarantined.isErr()) {
+      return err(quarantined.error);
+    }
+
+    try {
+      return ok(
+        await createAppComposition(undefined, {
+          ...options,
+          remotePgliteStateSyncSession,
+        }),
+      );
+    } catch (retryError) {
+      return err(
+        domainError.infra("SSH remote PGlite state could not be opened after recovery", {
+          phase: "remote-state-sync-download",
+          stateBackend: "ssh-pglite",
+          host: remotePgliteStateSyncSession.target.host,
+          port: String(remotePgliteStateSyncSession.target.port ?? 22),
+          reason: "remote_pglite_incompatible",
+          message: errorMessage(retryError),
+        }),
+      );
+    }
+  }
 }
 
 function readExitCode(): number {
@@ -89,10 +237,19 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
     process.env.APPALOFT_PGLITE_DATA_DIR = remotePgliteStateSyncSession.localPgliteDataDir;
   }
 
-  const app = await createAppComposition(undefined, {
-    ...options,
-    ...(remotePgliteStateSyncSession ? { remotePgliteStateSyncSession } : {}),
-  });
+  const appResult = await createShellComposition(options, remotePgliteStateSyncSession);
+  if (appResult.isErr()) {
+    writeDomainError(appResult.error);
+    if (remotePgliteStateSyncSession) {
+      const released = await remotePgliteStateSyncSession.releaseForCliRuntime();
+      if (released.isErr()) {
+        writeDomainError(released.error);
+      }
+    }
+    process.exit(1);
+  }
+
+  const app = appResult.value;
   let exitCode = 0;
 
   try {

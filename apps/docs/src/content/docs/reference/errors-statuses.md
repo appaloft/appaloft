@@ -46,6 +46,17 @@ appaloft work show <workId>
 
 这个入口不会 retry、cancel、recover、dead-letter、delete 或 prune。恢复、清理和重试能力会通过独立的显式命令暴露，避免用户在查看状态时意外改变运行时或远端 SSH 状态。
 
+<h2 id="remote-state-resolution">SSH remote state resolution</h2>
+
+`infra_error` + `remote-state-resolution` 表示 Appaloft 已经到达 SSH 目标机，但在部署身份解析之前，无法准备这台服务器拥有的 `ssh-pglite` 状态根。常见原因包括磁盘或 inode 容量不足、文件系统只读、配置的 runtime root 没有写权限、升级前部署留下的旧版不兼容 PGlite 状态目录，或远端 shell 在创建 state、lock、backup、journal 目录时失败。
+
+处理顺序：
+
+1. 查看 CLI 打印的错误 details，尤其是 `stateBackend`、`host`、`port`、`exitCode`、`reason` 和 `stderr`。
+2. 如果 `stderr` 提到 no space、quota、read-only filesystem、permission denied 或 PGlite initialization failure，先修复 SSH 目标机上配置 runtime root 的容量/权限，或者让当前 Appaloft 运行隔离不兼容的本地 mirror，并在成功 sync 时替换远端状态。
+3. 当错误指向目标机容量时，先运行 `appaloft server capacity inspect` 或等价的 SSH 诊断命令，再重试。
+4. 目标机能够创建并写入 Appaloft 状态目录后，再重新执行部署。
+
 <h2 id="remote-state-lock">SSH remote state lock</h2>
 
 `infra_error` + `remote-state-lock` 表示 SSH `ssh-pglite` 状态根正在被另一个 Appaloft 进程保护，或者前一次被取消的进程留下了仍未过期的 lock。它通常是 operator 可诊断的 infrastructure error，不代表部署请求本身的业务输入无效。
@@ -53,7 +64,7 @@ appaloft work show <workId>
 处理顺序：
 
 1. 查看错误 details 里的 `lockOwner`、`correlationId`、`lockHeartbeatAt`、`staleAfterSeconds`、`waitedSeconds`。
-2. Appaloft deploy 和 cleanup 命令本身会做 bounded wait；当 heartbeat 已超过 stale window 时，也会走 stale-only lock recovery。
+2. Appaloft deploy 和 cleanup 命令本身会做 bounded wait；当 heartbeat 已超过 stale window 时，也会走 stale-only lock recovery。当前版本可以把旧 lock metadata 里的较长 stale window 限制到更短的 state-root maintenance stale window 后再恢复。
 3. 如果 heartbeat 仍在更新，等待当前部署完成或稍后重试。
 4. 如果错误持续出现，运行 `appaloft remote-state lock inspect --server-host <host>`，并带上同一次部署使用的 SSH 目标参数，只读查看远端 lock owner metadata。这个命令不会进入部署 mutation path。
 5. 只有诊断确认 heartbeat 已超过 stale window 后，才运行 `appaloft remote-state lock recover-stale --server-host <host>`。这个命令会归档 stale lock metadata，不会 force 删除 active lock。

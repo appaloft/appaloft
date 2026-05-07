@@ -17,16 +17,25 @@ import {
   type CertificateRetryScheduler,
   type CommandBus,
   type ExecutionContext,
+  type GitHubPreviewPullRequestWebhookVerifier,
+  type GitHubSourceEventWebhookVerifier,
   type IdGenerator,
   type IntegrationAuthPort,
   MarkServerAppliedRouteAppliedSpec,
   MarkServerAppliedRouteFailedSpec,
+  type MutationCoordinator,
+  type PreviewCleanupRetryScheduler,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
+  type ResourceRepository,
+  type ScheduledTaskRunWorker,
+  type ScheduledTaskScheduler,
   ServerAppliedRouteStateByRouteSetIdSpec,
   ServerAppliedRouteStateBySourceFingerprintSpec,
   ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
+  type SourceEventPolicyReader,
+  type SourceEventVerificationPort,
   SourceLinkBySourceFingerprintSpec,
   type SourceLinkRecord,
   type SourceLinkRepository,
@@ -54,11 +63,16 @@ import { container, type DependencyContainer } from "tsyringe";
 import { createCertificateRetrySchedulerRunner } from "./certificate-retry-scheduler-runner";
 import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
 import { adoptLegacyPgliteState } from "./legacy-pglite-state-adoption";
+import {
+  createDisabledPreviewCleanupRetrySchedulerRunner,
+  createPreviewCleanupRetrySchedulerRunner,
+} from "./preview-cleanup-retry-scheduler-runner";
 import { registerApplicationServices } from "./register-application-services";
 import { registerRuntimeDependencies } from "./register-runtime-dependencies";
 import { createReloadableDatabase } from "./reloadable-database";
 import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
 import { resourceAccessFailureRendererTargetForStartedServer } from "./resource-access-failure-renderer-target";
+import { createScheduledTaskRunner } from "./scheduled-task-runner";
 
 export interface AppComposition {
   config: AppConfig;
@@ -347,6 +361,27 @@ export async function createAppComposition(
   const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
   const commandBus = resolveToken<CommandBus>(childContainer, tokens.commandBus);
   const queryBus = resolveToken<QueryBus>(childContainer, tokens.queryBus);
+  const resourceRepository = resolveToken<ResourceRepository>(
+    childContainer,
+    tokens.resourceRepository,
+  );
+  const sourceEventVerificationPort = resolveToken<SourceEventVerificationPort>(
+    childContainer,
+    tokens.sourceEventVerificationPort,
+  );
+  const sourceEventPolicyReader = resolveToken<SourceEventPolicyReader>(
+    childContainer,
+    tokens.sourceEventPolicyReader,
+  );
+  const githubSourceEventWebhookVerifier = resolveToken<GitHubSourceEventWebhookVerifier>(
+    childContainer,
+    tokens.githubSourceEventWebhookVerifier,
+  );
+  const githubPreviewPullRequestWebhookVerifier =
+    resolveToken<GitHubPreviewPullRequestWebhookVerifier>(
+      childContainer,
+      tokens.githubPreviewPullRequestWebhookVerifier,
+    );
   const executionContextFactory = createExecutionContextFactory({
     idGenerator,
     tracer: telemetry.tracer,
@@ -382,6 +417,36 @@ export async function createAppComposition(
     executionContextFactory,
     logger,
   });
+  const previewCleanupRetrySchedulerRunner = config.previewCleanupRetryScheduler.enabled
+    ? createPreviewCleanupRetrySchedulerRunner({
+        config: config.previewCleanupRetryScheduler,
+        scheduler: resolveToken<PreviewCleanupRetryScheduler>(
+          childContainer,
+          tokens.previewCleanupRetryScheduler,
+        ),
+        mutationCoordinator: resolveToken<MutationCoordinator>(
+          childContainer,
+          tokens.mutationCoordinator,
+        ),
+        executionContextFactory,
+        logger,
+      })
+    : createDisabledPreviewCleanupRetrySchedulerRunner();
+  const scheduledTaskScheduler = resolveToken<ScheduledTaskScheduler>(
+    childContainer,
+    tokens.scheduledTaskScheduler,
+  );
+  const scheduledTaskRunWorker = resolveToken<ScheduledTaskRunWorker>(
+    childContainer,
+    tokens.scheduledTaskRunWorker,
+  );
+  const scheduledTaskRunner = createScheduledTaskRunner({
+    config: config.scheduledTaskRunner,
+    scheduler: scheduledTaskScheduler,
+    worker: scheduledTaskRunWorker,
+    executionContextFactory,
+    logger,
+  });
   const webStaticDir = await resolveWebStaticDir(config, options);
   const docsStaticDir = await resolveDocsStaticDir(config, options);
 
@@ -400,6 +465,11 @@ export async function createAppComposition(
     certificateHttpChallengeTokenStore,
     resourceAccessFailureEvidenceRecorder,
     resourceAccessRouteContextLookup,
+    resourceRepository,
+    sourceEventPolicyReader,
+    sourceEventVerificationPort,
+    githubSourceEventWebhookVerifier,
+    githubPreviewPullRequestWebhookVerifier,
     pluginRuntime,
     authRuntime,
     requestContextRunner,
@@ -432,6 +502,8 @@ export async function createAppComposition(
     });
 
     certificateRetrySchedulerRunner.start();
+    previewCleanupRetrySchedulerRunner.start();
+    scheduledTaskRunner.start();
   };
 
   const cliProgram = createCliProgram({
@@ -483,6 +555,8 @@ export async function createAppComposition(
     startServer,
     async shutdown(): Promise<void> {
       certificateRetrySchedulerRunner.stop();
+      previewCleanupRetrySchedulerRunner.stop();
+      scheduledTaskRunner.stop();
       serverHandle?.stop?.();
       await telemetry.shutdown();
       await database.close();

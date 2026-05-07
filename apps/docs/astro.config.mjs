@@ -106,7 +106,11 @@ const sidebar = [
       },
       {
         label: "Lifecycle",
-        items: [{ slug: "deploy/lifecycle" }, { slug: "deploy/recovery" }],
+        items: [
+          { slug: "deploy/lifecycle" },
+          { slug: "deploy/previews" },
+          { slug: "deploy/recovery" },
+        ],
       },
     ],
   },
@@ -116,7 +120,7 @@ const sidebar = [
       { slug: "resources/overview" },
       {
         label: "Model",
-        items: [{ slug: "resources/projects" }],
+        items: [{ slug: "resources/projects" }, { slug: "resources/scheduled-tasks" }],
       },
       {
         label: "Profiles",

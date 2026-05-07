@@ -123,6 +123,7 @@ export const serverSummarySchema = z.object({
   host: z.string(),
   port: z.number(),
   providerKey: z.string(),
+  targetKind: z.enum(["single-server", "orchestrator-cluster"]),
   lifecycleStatus: z.enum(["active", "inactive"]),
   deactivatedAt: z.string().optional(),
   deactivationReason: z.string().optional(),
@@ -154,6 +155,7 @@ export const registerServerInputSchema = z.object({
   host: z.string().min(1),
   port: z.number().int().positive().optional(),
   providerKey: z.string().min(1),
+  targetKind: z.enum(["single-server", "orchestrator-cluster"]).optional().default("single-server"),
   proxyKind: z.enum(["none", "traefik", "caddy"]).default("traefik"),
 });
 
@@ -821,6 +823,7 @@ export const resourceHealthSourceErrorSchema = z.object({
     "proxy",
     "public-access",
     "domain-binding",
+    "runtime-control",
   ]),
   code: z.string(),
   category: z.string(),
@@ -873,6 +876,39 @@ export const resourceHealthDeploymentContextSchema = z.object({
     .optional(),
 });
 
+export const resourceRuntimeControlSummarySchema = z.object({
+  runtimeControlAttemptId: z.string(),
+  operation: z.enum(["stop", "start", "restart"]),
+  status: z.enum(["accepted", "running", "succeeded", "failed", "blocked"]),
+  startedAt: z.string(),
+  completedAt: z.string().optional(),
+  runtimeState: z.enum(["starting", "running", "restarting", "stopping", "stopped", "unknown"]),
+  blockedReason: z
+    .enum([
+      "resource-archived",
+      "resource-deleted",
+      "runtime-not-found",
+      "runtime-metadata-stale",
+      "runtime-already-running",
+      "runtime-already-stopped",
+      "runtime-control-in-progress",
+      "deployment-in-progress",
+      "profile-acknowledgement-required",
+      "adapter-unsupported",
+    ])
+    .optional(),
+  errorCode: z.string().optional(),
+  phases: z
+    .array(
+      z.object({
+        phase: z.enum(["stop", "start"]),
+        status: z.enum(["pending", "running", "succeeded", "failed", "skipped"]),
+        errorCode: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
 export const resourceHealthSummarySchema = z.object({
   schemaVersion: z.literal("resources.health/v1"),
   resourceId: z.string(),
@@ -897,6 +933,7 @@ export const resourceHealthSummarySchema = z.object({
     reasonCode: z.string().optional(),
     message: z.string().optional(),
   }),
+  latestRuntimeControl: resourceRuntimeControlSummarySchema.optional(),
   healthPolicy: z.object({
     status: z.enum(["configured", "not-configured", "unsupported"]),
     enabled: z.boolean(),
@@ -968,6 +1005,7 @@ export const resourceSummarySchema = z.object({
       "rolled-back",
     ])
     .optional(),
+  latestRuntimeControl: resourceRuntimeControlSummarySchema.optional(),
   accessSummary: resourceAccessSummarySchema.optional(),
 });
 
@@ -1023,6 +1061,17 @@ export const dependencyResourceConnectionSummarySchema = z.object({
   secretRef: z.string().optional(),
 });
 
+export const dependencyResourceProviderRealizationSummarySchema = z.object({
+  status: z.enum(["pending", "ready", "failed", "delete-pending", "deleted"]),
+  attemptId: z.string(),
+  attemptedAt: z.string(),
+  providerResourceHandle: z.string().optional(),
+  realizedAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  failureCode: z.string().optional(),
+  failureMessage: z.string().optional(),
+});
+
 export const dependencyResourceBindingReadinessSummarySchema = z.object({
   status: z.enum(["ready", "blocked", "not-implemented"]),
   reason: z.string().optional(),
@@ -1037,6 +1086,7 @@ export const dependencyResourceDeleteBlockerSchema = z.object({
   kind: z.enum([
     "resource-binding",
     "backup-relationship",
+    "dependency-resource-backup",
     "provider-managed-unsafe",
     "deployment-snapshot-reference",
   ]),
@@ -1051,13 +1101,14 @@ export const dependencyResourceSummarySchema = z.object({
   environmentId: z.string(),
   name: z.string(),
   slug: z.string(),
-  kind: z.literal("postgres"),
+  kind: z.enum(["postgres", "redis"]),
   sourceMode: z.enum(["appaloft-managed", "imported-external"]),
   providerKey: z.string(),
   providerManaged: z.boolean(),
   description: z.string().optional(),
   lifecycleStatus: z.enum(["provisioning", "ready", "degraded", "deleted"]),
   connection: dependencyResourceConnectionSummarySchema.optional(),
+  providerRealization: dependencyResourceProviderRealizationSummarySchema.optional(),
   bindingReadiness: dependencyResourceBindingReadinessSummarySchema,
   backupRelationship: dependencyResourceBackupRelationshipSchema.optional(),
   deleteSafety: z
@@ -1077,7 +1128,7 @@ export const resourceDependencyBindingSummarySchema = z.object({
   dependencyResourceId: z.string(),
   dependencyResourceName: z.string().optional(),
   dependencyResourceSlug: z.string().optional(),
-  kind: z.literal("postgres"),
+  kind: z.enum(["postgres", "redis"]),
   sourceMode: z.enum(["appaloft-managed", "imported-external"]),
   providerKey: z.string(),
   providerManaged: z.boolean(),
@@ -1088,6 +1139,14 @@ export const resourceDependencyBindingSummarySchema = z.object({
     injectionMode: z.enum(["env", "file", "reference"]),
     secretRef: z.string().optional(),
   }),
+  secretRotation: z
+    .object({
+      secretRef: z.string().optional(),
+      secretVersion: z.string(),
+      rotatedAt: z.string(),
+      previousSecretVersion: z.string().optional(),
+    })
+    .optional(),
   connection: dependencyResourceConnectionSummarySchema.optional(),
   bindingReadiness: dependencyResourceBindingReadinessSummarySchema,
   snapshotReadiness: z.object({
@@ -1236,6 +1295,7 @@ export const resourceDetailSourceProfileSchema = z.object({
   ]),
   locator: z.string(),
   displayName: z.string(),
+  sourceBindingFingerprint: z.string(),
   gitRef: z.string().optional(),
   commitSha: z.string().optional(),
   baseDirectory: z.string().optional(),
@@ -1247,6 +1307,18 @@ export const resourceDetailSourceProfileSchema = z.object({
   imageTag: z.string().optional(),
   imageDigest: z.string().optional(),
   metadata: z.record(z.string(), z.string()).optional(),
+});
+
+export const resourceAutoDeployPolicySummarySchema = z.object({
+  status: z.enum(["enabled", "disabled", "blocked"]),
+  triggerKind: z.enum(["git-push", "generic-signed-webhook"]),
+  refs: z.array(z.string()),
+  eventKinds: z.array(z.enum(["push", "tag"])),
+  sourceBindingFingerprint: z.string(),
+  blockedReason: z.enum(["source-binding-changed"]).optional(),
+  genericWebhookSecretRef: z.string().optional(),
+  dedupeWindowSeconds: z.number().int().positive().optional(),
+  updatedAt: z.string(),
 });
 
 export const resourceSourceBindingInputSchema = z.object({
@@ -1371,6 +1443,7 @@ export const resourceDetailSchema = z.object({
   schemaVersion: z.literal("resources.show/v1"),
   resource: resourceDetailIdentitySchema,
   source: resourceDetailSourceProfileSchema.optional(),
+  autoDeployPolicy: resourceAutoDeployPolicySummarySchema.optional(),
   runtimeProfile: resourceDetailRuntimeProfileSchema.optional(),
   networkProfile: resourceNetworkProfileSchema.optional(),
   accessProfile: resourceAccessProfileSchema.optional(),
@@ -1553,6 +1626,231 @@ export const configureResourceAccessResponseSchema = z.object({
   id: z.string(),
 });
 
+export const configureResourceAutoDeployInputSchema = z.object({
+  resourceId: z.string().min(1),
+  mode: z.enum(["enable", "disable", "replace", "acknowledge-source-binding"]),
+  sourceBindingFingerprint: z.string().min(1).optional(),
+  policy: z
+    .object({
+      triggerKind: z.enum(["git-push", "generic-signed-webhook"]),
+      refs: z.array(z.string().min(1)).min(1),
+      eventKinds: z.array(z.enum(["push", "tag"])).min(1),
+      genericWebhookSecretRef: z.string().min(1).optional(),
+      dedupeWindowSeconds: z.number().int().positive().optional(),
+    })
+    .optional(),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const configureResourceAutoDeployResponseSchema = z.object({
+  resourceId: z.string(),
+  status: z.enum(["enabled", "disabled", "blocked"]),
+  triggerKind: z.enum(["git-push", "generic-signed-webhook"]).optional(),
+  refs: z.array(z.string()).optional(),
+  eventKinds: z.array(z.enum(["push", "tag"])).optional(),
+  sourceBindingFingerprint: z.string().optional(),
+  blockedReason: z.enum(["source-binding-changed"]).optional(),
+});
+
+export const sourceEventSourceKindSchema = z.enum(["github", "gitlab", "generic-signed"]);
+export const sourceEventKindSchema = z.enum(["push", "tag"]);
+export const sourceEventStatusSchema = z.enum([
+  "accepted",
+  "deduped",
+  "ignored",
+  "blocked",
+  "dispatched",
+  "failed",
+]);
+export const sourceEventDedupeStatusSchema = z.enum(["new", "duplicate"]);
+export const sourceEventIgnoredReasonSchema = z.enum([
+  "no-matching-policy",
+  "ref-not-matched",
+  "policy-disabled",
+  "policy-blocked",
+]);
+export const sourceEventPolicyResultStatusSchema = z.enum([
+  "matched",
+  "ignored",
+  "blocked",
+  "dispatch-failed",
+  "dispatched",
+]);
+export const sourceEventPolicyResultReasonSchema = z.enum([
+  "ref-not-matched",
+  "policy-disabled",
+  "policy-blocked",
+  "dispatch-failed",
+]);
+
+export const listSourceEventsInputSchema = z.object({
+  projectId: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  status: sourceEventStatusSchema.optional(),
+  sourceKind: sourceEventSourceKindSchema.optional(),
+  limit: z.number().int().positive().max(100).optional(),
+  cursor: z.string().min(1).optional(),
+});
+
+export const showSourceEventInputSchema = z.object({
+  sourceEventId: z.string().min(1),
+  projectId: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+});
+
+export const sourceEventListItemSchema = z.object({
+  sourceEventId: z.string(),
+  projectId: z.string().optional(),
+  resourceIds: z.array(z.string()),
+  sourceKind: sourceEventSourceKindSchema,
+  eventKind: sourceEventKindSchema,
+  ref: z.string(),
+  revision: z.string(),
+  status: sourceEventStatusSchema,
+  dedupeStatus: sourceEventDedupeStatusSchema,
+  ignoredReasons: z.array(sourceEventIgnoredReasonSchema),
+  createdDeploymentIds: z.array(z.string()),
+  receivedAt: z.string(),
+});
+
+export const listSourceEventsResponseSchema = z.object({
+  items: z.array(sourceEventListItemSchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const sourceEventIdentitySchema = z.object({
+  locator: z.string(),
+  providerRepositoryId: z.string().optional(),
+  repositoryFullName: z.string().optional(),
+});
+
+export const sourceEventVerificationSummarySchema = z.object({
+  status: z.enum(["verified", "rejected"]),
+  method: z.enum(["provider-signature", "generic-hmac"]).optional(),
+  keyVersion: z.string().optional(),
+});
+
+export const sourceEventPolicyResultSchema = z.object({
+  resourceId: z.string(),
+  status: sourceEventPolicyResultStatusSchema,
+  reason: sourceEventPolicyResultReasonSchema.optional(),
+  deploymentId: z.string().optional(),
+  errorCode: z.string().optional(),
+});
+
+export const showSourceEventResponseSchema = z.object({
+  sourceEventId: z.string(),
+  projectId: z.string().optional(),
+  matchedResourceIds: z.array(z.string()),
+  sourceKind: sourceEventSourceKindSchema,
+  eventKind: sourceEventKindSchema,
+  sourceIdentity: sourceEventIdentitySchema,
+  ref: z.string(),
+  revision: z.string(),
+  verification: sourceEventVerificationSummarySchema,
+  status: sourceEventStatusSchema,
+  dedupeOfSourceEventId: z.string().optional(),
+  policyResults: z.array(sourceEventPolicyResultSchema),
+  createdDeploymentIds: z.array(z.string()),
+  receivedAt: z.string(),
+});
+
+export const previewEnvironmentStatusSchema = z.enum(["active", "cleanup-requested"]);
+
+export const previewEnvironmentSourceSummarySchema = z.object({
+  provider: z.literal("github"),
+  repositoryFullName: z.string(),
+  headRepositoryFullName: z.string(),
+  pullRequestNumber: z.number().int().positive(),
+  baseRef: z.string(),
+  headSha: z.string(),
+  sourceBindingFingerprint: z.string(),
+});
+
+export const previewEnvironmentSummarySchema = z.object({
+  previewEnvironmentId: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  resourceId: z.string(),
+  serverId: z.string(),
+  destinationId: z.string(),
+  source: previewEnvironmentSourceSummarySchema,
+  status: previewEnvironmentStatusSchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  expiresAt: z.string().optional(),
+});
+
+export const listPreviewEnvironmentsResponseSchema = z.object({
+  schemaVersion: z.literal("preview-environments.list/v1"),
+  items: z.array(previewEnvironmentSummarySchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const showPreviewEnvironmentResponseSchema = z.object({
+  schemaVersion: z.literal("preview-environments.show/v1"),
+  previewEnvironment: previewEnvironmentSummarySchema,
+  generatedAt: z.string(),
+});
+
+export const deletePreviewEnvironmentResponseSchema = z.object({
+  status: z.enum(["cleaned", "already-clean", "retry-scheduled", "failed"]),
+  attemptId: z.string(),
+  previewEnvironmentId: z.string(),
+  resourceId: z.string(),
+  sourceBindingFingerprint: z.string(),
+  previewEnvironmentStatus: z.literal("cleanup-requested"),
+  cleanedRuntime: z.boolean(),
+  removedRoute: z.boolean(),
+  removedSourceLink: z.boolean(),
+  removedProviderMetadata: z.boolean(),
+  updatedFeedback: z.boolean(),
+  errorCode: z.string().optional(),
+  retryable: z.boolean().optional(),
+  failurePhase: z.string().optional(),
+  nextRetryAt: z.string().optional(),
+});
+
+export const previewPolicyScopeSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("project"),
+    projectId: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal("resource"),
+    projectId: z.string().min(1),
+    resourceId: z.string().min(1),
+  }),
+]);
+
+export const previewPolicySettingsSchema = z.object({
+  sameRepositoryPreviews: z.boolean(),
+  forkPreviews: z.enum(["disabled", "without-secrets", "with-secrets"]),
+  secretBackedPreviews: z.boolean(),
+  maxActivePreviews: z.number().int().positive().optional(),
+  previewTtlHours: z.number().int().positive().optional(),
+});
+
+export const previewPolicySummarySchema = z.object({
+  id: z.string().optional(),
+  scope: previewPolicyScopeSchema,
+  settings: previewPolicySettingsSchema,
+  source: z.enum(["default", "configured"]),
+  updatedAt: z.string().optional(),
+});
+
+export const configurePreviewPolicyResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const showPreviewPolicyResponseSchema = z.object({
+  schemaVersion: z.literal("preview-policies.show/v1"),
+  policy: previewPolicySummarySchema,
+  generatedAt: z.string(),
+});
+
 export const attachResourceStorageInputSchema = z.object({
   resourceId: z.string().min(1),
   storageVolumeId: z.string().min(1),
@@ -1681,12 +1979,60 @@ export const showDependencyResourceResponseSchema = z.object({
   generatedAt: z.string(),
 });
 
+export const dependencyResourceRestoreAttemptSummarySchema = z.object({
+  attemptId: z.string(),
+  status: z.enum(["pending", "completed", "failed"]),
+  requestedAt: z.string(),
+  completedAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  failureCode: z.string().optional(),
+  failureMessage: z.string().optional(),
+});
+
+export const dependencyResourceBackupSummarySchema = z.object({
+  id: z.string(),
+  dependencyResourceId: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  dependencyKind: z.enum(["postgres", "redis"]),
+  providerKey: z.string(),
+  status: z.enum(["pending", "ready", "failed"]),
+  attemptId: z.string(),
+  requestedAt: z.string(),
+  retentionStatus: z.enum(["retained", "none"]),
+  providerArtifactHandle: z.string().optional(),
+  completedAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  failureCode: z.string().optional(),
+  failureMessage: z.string().optional(),
+  latestRestoreAttempt: dependencyResourceRestoreAttemptSummarySchema.optional(),
+  createdAt: z.string(),
+});
+
+export const listDependencyResourceBackupsResponseSchema = z.object({
+  schemaVersion: z.literal("dependency-resources.backups.list/v1"),
+  items: z.array(dependencyResourceBackupSummarySchema),
+  generatedAt: z.string(),
+});
+
+export const showDependencyResourceBackupResponseSchema = z.object({
+  schemaVersion: z.literal("dependency-resources.backups.show/v1"),
+  backup: dependencyResourceBackupSummarySchema,
+  generatedAt: z.string(),
+});
+
 export const bindResourceDependencyResponseSchema = z.object({
   id: z.string(),
 });
 
 export const unbindResourceDependencyResponseSchema = z.object({
   id: z.string(),
+});
+
+export const rotateResourceDependencyBindingSecretResponseSchema = z.object({
+  id: z.string(),
+  rotatedAt: z.string(),
+  secretVersion: z.string(),
 });
 
 export const listResourceDependencyBindingsResponseSchema = z.object({
@@ -2481,7 +2827,7 @@ export const runtimePlanSchema = z.object({
     metadata: z.record(z.string(), z.string()).optional(),
   }),
   target: z.object({
-    kind: z.enum(["single-server", "future-multi-server", "future-k8s"]),
+    kind: z.enum(["single-server", "orchestrator-cluster"]),
     providerKey: z.string(),
     serverIds: z.array(z.string()),
     metadata: z.record(z.string(), z.string()).optional(),
@@ -2509,6 +2855,9 @@ export const deploymentSummarySchema = z.object({
     "canceled",
     "rolled-back",
   ]),
+  triggerKind: z.enum(["create", "retry", "redeploy", "rollback"]).optional(),
+  sourceDeploymentId: z.string().optional(),
+  rollbackCandidateDeploymentId: z.string().optional(),
   sourceCommitSha: z.string().optional(),
   runtimePlan: runtimePlanSchema,
   environmentSnapshot: z.object({
@@ -2523,7 +2872,7 @@ export const deploymentSummarySchema = z.object({
       z.object({
         bindingId: z.string(),
         dependencyResourceId: z.string(),
-        kind: z.literal("postgres"),
+        kind: z.enum(["postgres", "redis"]),
         targetName: z.string(),
         scope: z.enum(["environment", "release", "build-only", "runtime-only"]),
         injectionMode: z.enum(["env", "file", "reference"]),
@@ -2555,6 +2904,53 @@ export const createDeploymentInputSchema = z
 export const createDeploymentResponseSchema = z.object({
   id: z.string(),
 });
+
+export const retryDeploymentInputSchema = z.object({
+  deploymentId: z.string().min(1),
+  resourceId: z.string().min(1).optional(),
+  readinessGeneratedAt: z.string().optional(),
+});
+
+export const redeployDeploymentInputSchema = z.object({
+  resourceId: z.string().min(1),
+  projectId: z.string().min(1).optional(),
+  environmentId: z.string().min(1).optional(),
+  serverId: z.string().min(1).optional(),
+  destinationId: z.string().min(1).optional(),
+  sourceDeploymentId: z.string().min(1).optional(),
+  readinessGeneratedAt: z.string().optional(),
+});
+
+export const rollbackDeploymentInputSchema = z.object({
+  deploymentId: z.string().min(1),
+  rollbackCandidateDeploymentId: z.string().min(1),
+  resourceId: z.string().min(1).optional(),
+  readinessGeneratedAt: z.string().optional(),
+});
+
+export const retryDeploymentResponseSchema = createDeploymentResponseSchema;
+export const redeployDeploymentResponseSchema = createDeploymentResponseSchema;
+export const rollbackDeploymentResponseSchema = createDeploymentResponseSchema;
+
+export const stopResourceRuntimeInputSchema = z.object({
+  resourceId: z.string().min(1),
+  deploymentId: z.string().min(1).optional(),
+  reason: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const startResourceRuntimeInputSchema = stopResourceRuntimeInputSchema.extend({
+  acknowledgeRetainedRuntimeMetadata: z.boolean().optional(),
+});
+
+export const restartResourceRuntimeInputSchema = stopResourceRuntimeInputSchema.extend({
+  acknowledgeRetainedRuntimeMetadata: z.boolean().optional(),
+});
+
+export const resourceRuntimeControlResponseSchema = resourceRuntimeControlSummarySchema;
+export const stopResourceRuntimeResponseSchema = resourceRuntimeControlResponseSchema;
+export const startResourceRuntimeResponseSchema = resourceRuntimeControlResponseSchema;
+export const restartResourceRuntimeResponseSchema = resourceRuntimeControlResponseSchema;
 
 export const listDeploymentsResponseSchema = z.object({
   items: z.array(deploymentSummarySchema),
@@ -2714,8 +3110,8 @@ export const deploymentAttemptSnapshotSchema = z.object({
       status: z.enum(["ready", "blocked", "not-applicable"]),
       references: deploymentSummarySchema.shape.dependencyBindingReferences.unwrap(),
       runtimeInjection: z.object({
-        status: z.literal("deferred"),
-        reason: z.string(),
+        status: z.enum(["ready", "blocked", "not-applicable"]),
+        reason: z.string().optional(),
       }),
     })
     .optional(),
@@ -2874,7 +3270,7 @@ export const deploymentPlanResponseSchema = z.object({
     ]),
     buildStrategy: runtimePlanSchema.shape.buildStrategy,
     packagingMode: runtimePlanSchema.shape.packagingMode,
-    targetKind: z.enum(["single-server", "future-multi-server", "future-k8s"]),
+    targetKind: z.enum(["single-server", "orchestrator-cluster"]),
     targetProviderKey: z.string(),
   }),
   buildpack: z
@@ -2963,8 +3359,8 @@ export const deploymentPlanResponseSchema = z.object({
       status: z.enum(["ready", "blocked", "not-applicable"]),
       references: deploymentSummarySchema.shape.dependencyBindingReferences.unwrap(),
       runtimeInjection: z.object({
-        status: z.literal("deferred"),
-        reason: z.string(),
+        status: z.enum(["ready", "blocked", "not-applicable"]),
+        reason: z.string().optional(),
       }),
     })
     .optional(),
@@ -3104,6 +3500,105 @@ export const showDeploymentResponseSchema = z.object({
 export const deploymentLogsResponseSchema = z.object({
   deploymentId: z.string(),
   logs: z.array(deploymentLogEntrySchema),
+});
+
+export const scheduledTaskRunStatusSchema = z.enum([
+  "accepted",
+  "running",
+  "succeeded",
+  "failed",
+  "skipped",
+]);
+
+export const scheduledTaskRunTriggerKindSchema = z.enum(["manual", "scheduled"]);
+
+export const scheduledTaskRunSummarySchema = z.object({
+  runId: z.string(),
+  taskId: z.string(),
+  resourceId: z.string(),
+  triggerKind: scheduledTaskRunTriggerKindSchema,
+  status: scheduledTaskRunStatusSchema,
+  createdAt: z.string(),
+  startedAt: z.string().optional(),
+  finishedAt: z.string().optional(),
+  exitCode: z.number().optional(),
+  failureSummary: z.string().optional(),
+  skippedReason: z.enum(["concurrency-forbidden", "resource-archived", "task-disabled"]).optional(),
+});
+
+export const scheduledTaskDefinitionSummarySchema = z.object({
+  taskId: z.string(),
+  resourceId: z.string(),
+  schedule: z.string(),
+  timezone: z.string(),
+  commandIntent: z.string(),
+  timeoutSeconds: z.number(),
+  retryLimit: z.number(),
+  concurrencyPolicy: z.enum(["forbid"]),
+  status: z.enum(["enabled", "disabled"]),
+  createdAt: z.string(),
+  updatedAt: z.string().optional(),
+  latestRun: scheduledTaskRunSummarySchema.optional(),
+});
+
+export const scheduledTaskCommandResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-tasks.command/v1"),
+  task: scheduledTaskDefinitionSummarySchema,
+});
+
+export const deleteScheduledTaskResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-tasks.delete/v1"),
+  taskId: z.string(),
+  resourceId: z.string(),
+  status: z.literal("deleted"),
+  deletedAt: z.string(),
+});
+
+export const runScheduledTaskNowResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-tasks.run-now/v1"),
+  run: scheduledTaskRunSummarySchema,
+});
+
+export const listScheduledTasksResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-tasks.list/v1"),
+  items: z.array(scheduledTaskDefinitionSummarySchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const showScheduledTaskResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-tasks.show/v1"),
+  task: scheduledTaskDefinitionSummarySchema,
+  generatedAt: z.string(),
+});
+
+export const listScheduledTaskRunsResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-task-runs.list/v1"),
+  items: z.array(scheduledTaskRunSummarySchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const showScheduledTaskRunResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-task-runs.show/v1"),
+  run: scheduledTaskRunSummarySchema,
+  generatedAt: z.string(),
+});
+
+export const scheduledTaskRunLogEntrySchema = z.object({
+  timestamp: z.string(),
+  stream: z.enum(["stdout", "stderr", "system"]),
+  message: z.string(),
+});
+
+export const scheduledTaskRunLogsResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-task-runs.logs/v1"),
+  runId: z.string(),
+  taskId: z.string(),
+  resourceId: z.string(),
+  entries: z.array(scheduledTaskRunLogEntrySchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
 });
 
 export const deploymentObservedEventSchema = z.object({
@@ -3343,7 +3838,7 @@ export const resourceDiagnosticContextSchema = z.object({
       "optional-future-binary",
     ])
     .optional(),
-  targetKind: z.enum(["single-server", "future-multi-server", "future-k8s"]).optional(),
+  targetKind: z.enum(["single-server", "orchestrator-cluster"]).optional(),
   targetProviderKey: z.string().optional(),
   services: z.array(resourceServiceSummarySchema),
   networkProfile: resourceNetworkProfileSchema.optional(),
@@ -3657,6 +4152,10 @@ export type DependencyResourceBackupRelationship = z.infer<
 >;
 export type DependencyResourceDeleteBlocker = z.infer<typeof dependencyResourceDeleteBlockerSchema>;
 export type DependencyResourceSummary = z.infer<typeof dependencyResourceSummarySchema>;
+export type DependencyResourceRestoreAttemptSummary = z.infer<
+  typeof dependencyResourceRestoreAttemptSummarySchema
+>;
+export type DependencyResourceBackupSummary = z.infer<typeof dependencyResourceBackupSummarySchema>;
 export type ResourceDependencyBindingSummary = z.infer<
   typeof resourceDependencyBindingSummarySchema
 >;
@@ -3681,6 +4180,33 @@ export type ConfigureResourceNetworkResponse = z.infer<
 >;
 export type ConfigureResourceAccessInput = z.infer<typeof configureResourceAccessInputSchema>;
 export type ConfigureResourceAccessResponse = z.infer<typeof configureResourceAccessResponseSchema>;
+export type ConfigureResourceAutoDeployInput = z.infer<
+  typeof configureResourceAutoDeployInputSchema
+>;
+export type ConfigureResourceAutoDeployResponse = z.infer<
+  typeof configureResourceAutoDeployResponseSchema
+>;
+export type SourceEventListItem = z.infer<typeof sourceEventListItemSchema>;
+export type ListSourceEventsInput = z.infer<typeof listSourceEventsInputSchema>;
+export type ListSourceEventsResponse = z.infer<typeof listSourceEventsResponseSchema>;
+export type SourceEventIdentity = z.infer<typeof sourceEventIdentitySchema>;
+export type SourceEventVerificationSummary = z.infer<typeof sourceEventVerificationSummarySchema>;
+export type SourceEventPolicyResult = z.infer<typeof sourceEventPolicyResultSchema>;
+export type ShowSourceEventInput = z.infer<typeof showSourceEventInputSchema>;
+export type ShowSourceEventResponse = z.infer<typeof showSourceEventResponseSchema>;
+export type PreviewEnvironmentStatus = z.infer<typeof previewEnvironmentStatusSchema>;
+export type PreviewEnvironmentSourceSummary = z.infer<typeof previewEnvironmentSourceSummarySchema>;
+export type PreviewEnvironmentSummary = z.infer<typeof previewEnvironmentSummarySchema>;
+export type ListPreviewEnvironmentsResponse = z.infer<typeof listPreviewEnvironmentsResponseSchema>;
+export type ShowPreviewEnvironmentResponse = z.infer<typeof showPreviewEnvironmentResponseSchema>;
+export type DeletePreviewEnvironmentResponse = z.infer<
+  typeof deletePreviewEnvironmentResponseSchema
+>;
+export type PreviewPolicyScope = z.infer<typeof previewPolicyScopeSchema>;
+export type PreviewPolicySettings = z.infer<typeof previewPolicySettingsSchema>;
+export type PreviewPolicySummary = z.infer<typeof previewPolicySummarySchema>;
+export type ConfigurePreviewPolicyResponse = z.infer<typeof configurePreviewPolicyResponseSchema>;
+export type ShowPreviewPolicyResponse = z.infer<typeof showPreviewPolicyResponseSchema>;
 export type AttachResourceStorageInput = z.infer<typeof attachResourceStorageInputSchema>;
 export type AttachResourceStorageResponse = z.infer<typeof attachResourceStorageResponseSchema>;
 export type DetachResourceStorageInput = z.infer<typeof detachResourceStorageInputSchema>;
@@ -3744,9 +4270,18 @@ export type DeleteStorageVolumeResponse = z.infer<typeof deleteStorageVolumeResp
 export type DependencyResourceResponse = z.infer<typeof dependencyResourceResponseSchema>;
 export type ListDependencyResourcesResponse = z.infer<typeof listDependencyResourcesResponseSchema>;
 export type ShowDependencyResourceResponse = z.infer<typeof showDependencyResourceResponseSchema>;
+export type ListDependencyResourceBackupsResponse = z.infer<
+  typeof listDependencyResourceBackupsResponseSchema
+>;
+export type ShowDependencyResourceBackupResponse = z.infer<
+  typeof showDependencyResourceBackupResponseSchema
+>;
 export type BindResourceDependencyResponse = z.infer<typeof bindResourceDependencyResponseSchema>;
 export type UnbindResourceDependencyResponse = z.infer<
   typeof unbindResourceDependencyResponseSchema
+>;
+export type RotateResourceDependencyBindingSecretResponse = z.infer<
+  typeof rotateResourceDependencyBindingSecretResponseSchema
 >;
 export type ListResourceDependencyBindingsResponse = z.infer<
   typeof listResourceDependencyBindingsResponseSchema
@@ -3811,6 +4346,18 @@ export type DeploymentProgressEvent = z.infer<typeof deploymentProgressEventSche
 export type DeploymentResourceInput = z.infer<typeof deploymentResourceInputSchema>;
 export type CreateDeploymentInput = z.infer<typeof createDeploymentInputSchema>;
 export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
+export type RetryDeploymentInput = z.infer<typeof retryDeploymentInputSchema>;
+export type RetryDeploymentResponse = z.infer<typeof retryDeploymentResponseSchema>;
+export type RedeployDeploymentInput = z.infer<typeof redeployDeploymentInputSchema>;
+export type RedeployDeploymentResponse = z.infer<typeof redeployDeploymentResponseSchema>;
+export type RollbackDeploymentInput = z.infer<typeof rollbackDeploymentInputSchema>;
+export type RollbackDeploymentResponse = z.infer<typeof rollbackDeploymentResponseSchema>;
+export type StopResourceRuntimeInput = z.infer<typeof stopResourceRuntimeInputSchema>;
+export type StopResourceRuntimeResponse = z.infer<typeof stopResourceRuntimeResponseSchema>;
+export type StartResourceRuntimeInput = z.infer<typeof startResourceRuntimeInputSchema>;
+export type StartResourceRuntimeResponse = z.infer<typeof startResourceRuntimeResponseSchema>;
+export type RestartResourceRuntimeInput = z.infer<typeof restartResourceRuntimeInputSchema>;
+export type RestartResourceRuntimeResponse = z.infer<typeof restartResourceRuntimeResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
 export type OperatorWorkKind = z.infer<typeof operatorWorkKindSchema>;
 export type OperatorWorkStatus = z.infer<typeof operatorWorkStatusSchema>;
@@ -3852,6 +4399,19 @@ export type DeploymentAttemptRecoverySummary = z.infer<
 export type ShowDeploymentInput = z.infer<typeof showDeploymentInputSchema>;
 export type ShowDeploymentResponse = z.infer<typeof showDeploymentResponseSchema>;
 export type DeploymentLogsResponse = z.infer<typeof deploymentLogsResponseSchema>;
+export type ScheduledTaskRunStatus = z.infer<typeof scheduledTaskRunStatusSchema>;
+export type ScheduledTaskRunTriggerKind = z.infer<typeof scheduledTaskRunTriggerKindSchema>;
+export type ScheduledTaskRunSummary = z.infer<typeof scheduledTaskRunSummarySchema>;
+export type ScheduledTaskDefinitionSummary = z.infer<typeof scheduledTaskDefinitionSummarySchema>;
+export type ScheduledTaskCommandResponse = z.infer<typeof scheduledTaskCommandResponseSchema>;
+export type DeleteScheduledTaskResponse = z.infer<typeof deleteScheduledTaskResponseSchema>;
+export type RunScheduledTaskNowResponse = z.infer<typeof runScheduledTaskNowResponseSchema>;
+export type ListScheduledTasksResponse = z.infer<typeof listScheduledTasksResponseSchema>;
+export type ShowScheduledTaskResponse = z.infer<typeof showScheduledTaskResponseSchema>;
+export type ListScheduledTaskRunsResponse = z.infer<typeof listScheduledTaskRunsResponseSchema>;
+export type ShowScheduledTaskRunResponse = z.infer<typeof showScheduledTaskRunResponseSchema>;
+export type ScheduledTaskRunLogEntry = z.infer<typeof scheduledTaskRunLogEntrySchema>;
+export type ScheduledTaskRunLogsResponse = z.infer<typeof scheduledTaskRunLogsResponseSchema>;
 export type DeploymentObservedEvent = z.infer<typeof deploymentObservedEventSchema>;
 export type DeploymentEventStreamGap = z.infer<typeof deploymentEventStreamGapSchema>;
 export type DeploymentEventStreamEnvelope = z.infer<typeof deploymentEventStreamEnvelopeSchema>;

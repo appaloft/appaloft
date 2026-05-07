@@ -89,7 +89,55 @@ import { resolveWorkspaceRuntimePlan } from "./workspace-planners";
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
 export { RuntimeResourceHealthProbeRunner } from "./resource-health-probes";
+export {
+  dockerComposeRuntimeControlCommand,
+  dockerContainerRuntimeControlCommand,
+  planResourceRuntimeControlCommand,
+  RuntimeControlShellCommandExecutor,
+  RuntimeResourceRuntimeControlTarget,
+  type RuntimeControlCommandExecution,
+  type RuntimeControlCommandExecutor,
+  type RuntimeControlCommandPlan,
+  type RuntimeControlSpawn,
+  type RuntimeControlSpawnOptions,
+  type RuntimeControlSpawnResult,
+} from "./resource-runtime-control-target";
 export { RuntimeResourceRuntimeLogReader } from "./resource-runtime-logs";
+export {
+  renderDockerSwarmApplyPlan,
+  renderDockerSwarmCleanupPlan,
+  renderDockerSwarmDependencySecretName,
+  renderDockerSwarmRuntimeIntent,
+  type DockerSwarmApplyPlan,
+  type DockerSwarmApplyPlanStep,
+  type DockerSwarmApplyPlanStepName,
+  type DockerSwarmCleanupCommand,
+  type DockerSwarmCleanupPlan,
+  type DockerSwarmComposeWorkloadIntent,
+  type DockerSwarmEnvironmentVariableIntent,
+  type DockerSwarmHealthIntent,
+  type DockerSwarmImageWorkloadIntent,
+  type DockerSwarmRouteIntent,
+  type DockerSwarmRuntimeIdentityInput,
+  type DockerSwarmRuntimeIntent,
+  type DockerSwarmRuntimeIntentInput,
+  type DockerSwarmWorkloadIntent,
+} from "./docker-swarm-runtime-intent";
+export {
+  DockerSwarmExecutionBackend,
+  DockerSwarmShellCommandRunner,
+  type DockerSwarmCommandRunner,
+  type DockerSwarmCommandRunnerInput,
+  type DockerSwarmCommandRunnerResult,
+  type DockerSwarmShellCommandRunnerOptions,
+} from "./docker-swarm-execution-backend";
+export {
+  HermeticScheduledTaskRuntimePort,
+  type HermeticScheduledTaskRuntimeOptions,
+  type ScheduledTaskCommandRunner,
+  type ScheduledTaskCommandRunnerInput,
+  type ScheduledTaskCommandRunnerResult,
+} from "./scheduled-task-runtime";
 export {
   parseDockerSizeToBytes,
   parseRuntimeTargetCapacityOutput,
@@ -1221,6 +1269,7 @@ export class DefaultRuntimeTargetBackendRegistry implements RuntimeTargetBackend
 const singleServerDockerCapabilities: RuntimeTargetCapability[] = [
   "runtime.apply",
   "runtime.verify",
+  "runtime.dependency-secrets",
   "runtime.logs",
   "runtime.health",
   "runtime.cleanup",
@@ -1228,9 +1277,21 @@ const singleServerDockerCapabilities: RuntimeTargetCapability[] = [
   "proxy.route",
 ];
 
+export function createDockerSwarmRuntimeTargetBackendDescriptor(input: {
+  capabilities: RuntimeTargetCapability[];
+}): RuntimeTargetBackendDescriptor {
+  return {
+    key: "docker-swarm",
+    providerKey: "docker-swarm",
+    targetKinds: ["orchestrator-cluster"],
+    capabilities: [...input.capabilities],
+  };
+}
+
 export function createDefaultRuntimeTargetBackendRegistry(input: {
   localBackend: ExecutionBackend;
   sshBackend: ExecutionBackend;
+  swarmBackend?: RuntimeTargetBackend;
 }): RuntimeTargetBackendRegistry {
   return new DefaultRuntimeTargetBackendRegistry([
     new ExecutionBackendRuntimeTargetAdapter(
@@ -1251,6 +1312,7 @@ export function createDefaultRuntimeTargetBackendRegistry(input: {
       },
       input.sshBackend,
     ),
+    ...(input.swarmBackend ? [input.swarmBackend] : []),
   ]);
 }
 

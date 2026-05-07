@@ -1,0 +1,80 @@
+# Source Binding And Auto Deploy Implementation Plan
+
+## Status
+
+Spec Round placeholder for Phase 7 / `0.9.0`.
+
+The plan records implementation slices for the accepted candidate behavior in
+[Source Binding And Auto Deploy](../specs/042-source-binding-auto-deploy/spec.md). It is not Code
+Round authorization.
+
+## Slices
+
+### 1. Decision Closure
+
+- ADR-037 decides source event ownership and durable retry boundaries.
+- ADR-037 decides generic signed webhook secret custody and rotation baseline.
+- ADR-037 decides source-binding-change behavior for existing auto-deploy policies.
+- Local command/query/error specs and public help anchors are available for the first Test-First
+  Round.
+- Remaining ADR work is required only if Code Round expands beyond ADR-037.
+
+### 2. Policy Model
+
+- Add Resource-owned auto-deploy policy value objects.
+- Add `resources.configure-auto-deploy` command schema, handler, use case, and operation catalog
+  entry from `docs/commands/resources.configure-auto-deploy.md` after tests exist.
+- Persist policy and expose safe Resource detail/read-model summaries.
+
+### 3. Source Event Ingestion
+
+- Add provider-neutral `source-events.ingest` command schema. `Status: generic signed route
+  activation implemented with Resource-scoped `scopeResourceId` admission; GitHub push route
+  activation implemented without `scopeResourceId` so matching can fan out.`
+- Add signature verification/normalization ports for Git provider and generic signed events.
+  `Status: generic signed source-event verification port implemented; generic signed
+  `resource-secret:<KEY>` resolution is active; GitHub push verification and normalization use
+  `APPALOFT_GITHUB_WEBHOOK_SECRET`, `X-Hub-Signature-256`, `X-GitHub-Delivery`, and no-op `ping`
+  handling.`
+- Add durable source event records with dedupe keys, normalized facts, policy match results, ignored
+  reasons, and created deployment ids. `Status: durable dedupe/read-model persistence baseline
+  implemented; ignored policy-match outcomes are populated for non-matching refs; deployment ids are
+  populated by later dispatch slices.`
+- Store project/resource scoped read-model facts first; global operator source-event rollups remain
+  future. `Status: project/resource scoped read-model filters implemented.`
+- Implement `source-events.list` and `source-events.show` from the local query specs. `Status:
+  application query baseline, durable persistence, CLI, HTTP/oRPC, operation catalog, and
+  CORE_OPERATIONS activation implemented; Web Resource detail source-event diagnostics are active.`
+
+### 4. Deployment Dispatch
+
+- Evaluate enabled policies in application logic. `Status: policy candidate lookup and ignored
+  ref/disabled/blocked/no-match outcome evaluation implemented; Resource-scoped generic signed
+  matching restricts candidates to `scopeResourceId`.`
+- Dispatch matching policies through existing deployment admission and `resource-runtime`
+  coordination. `Status: application dispatcher invokes existing deployments.create admission and
+  records dispatched or dispatch-failed source event outcomes; shell DI wiring is present; generic
+  signed and GitHub push HTTP routes are active.`
+- Preserve async acceptance, deployment snapshots, logs, recovery, and rollback semantics.
+
+### 5. Entrypoints And Docs
+
+- Add CLI, HTTP/oRPC, and Web surfaces only after application behavior and persistence pass.
+  `Status: resources.configure-auto-deploy and source-events.list/show have CLI and HTTP/oRPC
+  surfaces; source-events.ingest has the Resource-scoped generic signed HTTP route and the GitHub
+  push HTTP route; Web Resource detail auto-deploy settings and source-event diagnostics are
+  active.`
+- Add public docs for setup, signatures, dedupe, ignored events, and manual recovery.
+- Add future MCP/tool descriptor mapping from operation catalog metadata. `Status: deferred until
+  the tool surface exists; source auto-deploy active entrypoints already share the operation catalog
+  entry and schemas.`
+
+## Verification Gate
+
+Minimum before Code Round completion:
+
+- source auto-deploy test matrix rows have automation bindings;
+- operation map, `CORE_OPERATIONS.md`, operation catalog, public docs/help, and contracts are in
+  sync;
+- `bun run typecheck`, `bun run lint`, and targeted source auto-deploy tests pass;
+- remaining gaps or explicit deferred exceptions are recorded under the source spec and roadmap.

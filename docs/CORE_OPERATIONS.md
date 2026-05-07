@@ -272,6 +272,7 @@ Implemented operations:
 | Configure resource runtime profile | Command | `resources.configure-runtime` | `ConfigureResourceRuntimeCommand` | `ConfigureResourceRuntimeCommandInput` | `appaloft resource configure-runtime <resourceId>` | `POST /api/resources/{resourceId}/runtime-profile` |
 | Configure resource network profile | Command | `resources.configure-network` | `ConfigureResourceNetworkCommand` | `ConfigureResourceNetworkCommandInput` | `appaloft resource configure-network <resourceId>` | `POST /api/resources/{resourceId}/network-profile` |
 | Configure resource access profile | Command | `resources.configure-access` | `ConfigureResourceAccessCommand` | `ConfigureResourceAccessCommandInput` | `appaloft resource configure-access <resourceId>` | `POST /api/resources/{resourceId}/access-profile` |
+| Configure resource auto-deploy policy | Command | `resources.configure-auto-deploy` | `ConfigureResourceAutoDeployCommand` | `ConfigureResourceAutoDeployCommandInput` | `appaloft resource auto-deploy <resourceId>` | `POST /api/resources/{resourceId}/auto-deploy` |
 | Set resource variable | Command | `resources.set-variable` | `SetResourceVariableCommand` | `SetResourceVariableCommandInput` | `appaloft resource set-variable <resourceId> <key> <value>` | `POST /api/resources/{resourceId}/variables` |
 | Import resource variables | Command | `resources.import-variables` | `ImportResourceVariablesCommand` | `ImportResourceVariablesCommandInput` | `appaloft resource import-variables <resourceId> --content <dotenv>` | `POST /api/resources/{resourceId}/variables/import` |
 | Unset resource variable | Command | `resources.unset-variable` | `UnsetResourceVariableCommand` | `UnsetResourceVariableCommandInput` | `appaloft resource unset-variable <resourceId> <key>` | `DELETE /api/resources/{resourceId}/variables/{key}` |
@@ -281,6 +282,9 @@ Implemented operations:
 | Show resource profile | Query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
 | Read resource effective configuration | Query | `resources.effective-config` | `ResourceEffectiveConfigQuery` | `ResourceEffectiveConfigQueryInput` | `appaloft resource effective-config <resourceId>` | `GET /api/resources/{resourceId}/effective-config` |
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
+| Stop resource runtime | Command | `resources.runtime.stop` | `StopResourceRuntimeCommand` | `StopResourceRuntimeCommandInput` | `appaloft resource runtime stop <resourceId>` | `POST /api/resources/{resourceId}/runtime/stop` |
+| Start resource runtime | Command | `resources.runtime.start` | `StartResourceRuntimeCommand` | `StartResourceRuntimeCommandInput` | `appaloft resource runtime start <resourceId>` | `POST /api/resources/{resourceId}/runtime/start` |
+| Restart resource runtime | Command | `resources.runtime.restart` | `RestartResourceRuntimeCommand` | `RestartResourceRuntimeCommandInput` | `appaloft resource runtime restart <resourceId>` | `POST /api/resources/{resourceId}/runtime/restart` |
 | Preview resource proxy configuration | Query | `resources.proxy-configuration.preview` | `ResourceProxyConfigurationPreviewQuery` | `ResourceProxyConfigurationPreviewQueryInput` | `appaloft resource proxy-config <resourceId>` | `GET /api/resources/{resourceId}/proxy-configuration` |
 | Read resource diagnostic summary | Query | `resources.diagnostic-summary` | `ResourceDiagnosticSummaryQuery` | `ResourceDiagnosticSummaryQueryInput` | `appaloft resource diagnose <resourceId>` | `GET /api/resources/{resourceId}/diagnostic-summary` |
 | Lookup resource access failure evidence | Query | `resources.access-failure-evidence.lookup` | `ResourceAccessFailureEvidenceLookupQuery` | `ResourceAccessFailureEvidenceLookupQueryInput` | `appaloft resource access-failure <requestId>` | `GET /api/resource-access-failures/{requestId}` |
@@ -299,18 +303,39 @@ Phase 7 storage operations:
 | Attach storage to resource | Command | `resources.attach-storage` | `AttachResourceStorageCommand` | `AttachResourceStorageCommandInput` | `appaloft resource storage attach <resourceId> <storageVolumeId> --destination-path <path>` | `POST /api/resources/{resourceId}/storage-attachments` |
 | Detach storage from resource | Command | `resources.detach-storage` | `DetachResourceStorageCommand` | `DetachResourceStorageCommandInput` | `appaloft resource storage detach <resourceId> <attachmentId>` | `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` |
 
-Phase 7 Postgres dependency resource operations:
+Phase 7 scheduled task operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| Create scheduled task | Command | `scheduled-tasks.create` | `CreateScheduledTaskCommand` | `CreateScheduledTaskCommandInput` | `appaloft scheduled-task create <resourceId>` | `POST /api/scheduled-tasks` |
+| List scheduled tasks | Query | `scheduled-tasks.list` | `ListScheduledTasksQuery` | `ListScheduledTasksQueryInput` | `appaloft scheduled-task list` | `GET /api/scheduled-tasks` |
+| Show scheduled task | Query | `scheduled-tasks.show` | `ShowScheduledTaskQuery` | `ShowScheduledTaskQueryInput` | `appaloft scheduled-task show <taskId>` | `GET /api/scheduled-tasks/{taskId}` |
+| Configure scheduled task | Command | `scheduled-tasks.configure` | `ConfigureScheduledTaskCommand` | `ConfigureScheduledTaskCommandInput` | `appaloft scheduled-task configure <taskId>` | `POST /api/scheduled-tasks/{taskId}` |
+| Delete scheduled task | Command | `scheduled-tasks.delete` | `DeleteScheduledTaskCommand` | `DeleteScheduledTaskCommandInput` | `appaloft scheduled-task delete <taskId>` | `DELETE /api/scheduled-tasks/{taskId}` |
+| Run scheduled task now | Command | `scheduled-tasks.run-now` | `RunScheduledTaskNowCommand` | `RunScheduledTaskNowCommandInput` | `appaloft scheduled-task run <taskId>` | `POST /api/scheduled-tasks/{taskId}/runs` |
+| List scheduled task runs | Query | `scheduled-task-runs.list` | `ListScheduledTaskRunsQuery` | `ListScheduledTaskRunsQueryInput` | `appaloft scheduled-task runs list` | `GET /api/scheduled-task-runs` |
+| Show scheduled task run | Query | `scheduled-task-runs.show` | `ShowScheduledTaskRunQuery` | `ShowScheduledTaskRunQueryInput` | `appaloft scheduled-task runs show <runId>` | `GET /api/scheduled-task-runs/{runId}` |
+| Read scheduled task run logs | Query | `scheduled-task-runs.logs` | `ScheduledTaskRunLogsQuery` | `ScheduledTaskRunLogsQueryInput` | `appaloft scheduled-task runs logs <runId>` | `GET /api/scheduled-task-runs/{runId}/logs` |
+
+Phase 7 dependency resource operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Provision Postgres dependency resource | Command | `dependency-resources.provision-postgres` | `ProvisionPostgresDependencyResourceCommand` | `ProvisionPostgresDependencyResourceCommandInput` | `appaloft dependency postgres provision` | `POST /api/dependency-resources/postgres/provision` |
 | Import Postgres dependency resource | Command | `dependency-resources.import-postgres` | `ImportPostgresDependencyResourceCommand` | `ImportPostgresDependencyResourceCommandInput` | `appaloft dependency postgres import` | `POST /api/dependency-resources/postgres/import` |
+| Provision Redis dependency resource | Command | `dependency-resources.provision-redis` | `ProvisionRedisDependencyResourceCommand` | `ProvisionRedisDependencyResourceCommandInput` | `appaloft dependency redis provision` | `POST /api/dependency-resources/redis/provision` |
+| Import Redis dependency resource | Command | `dependency-resources.import-redis` | `ImportRedisDependencyResourceCommand` | `ImportRedisDependencyResourceCommandInput` | `appaloft dependency redis import` | `POST /api/dependency-resources/redis/import` |
 | List dependency resources | Query | `dependency-resources.list` | `ListDependencyResourcesQuery` | `ListDependencyResourcesQueryInput` | `appaloft dependency list` | `GET /api/dependency-resources` |
 | Show dependency resource | Query | `dependency-resources.show` | `ShowDependencyResourceQuery` | `ShowDependencyResourceQueryInput` | `appaloft dependency show <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}` |
 | Rename dependency resource | Command | `dependency-resources.rename` | `RenameDependencyResourceCommand` | `RenameDependencyResourceCommandInput` | `appaloft dependency rename <dependencyResourceId> --name <name>` | `POST /api/dependency-resources/{dependencyResourceId}/rename` |
 | Delete dependency resource | Command | `dependency-resources.delete` | `DeleteDependencyResourceCommand` | `DeleteDependencyResourceCommandInput` | `appaloft dependency delete <dependencyResourceId>` | `DELETE /api/dependency-resources/{dependencyResourceId}` |
+| Create dependency resource backup | Command | `dependency-resources.create-backup` | `CreateDependencyResourceBackupCommand` | `CreateDependencyResourceBackupCommandInput` | `appaloft dependency backup create <dependencyResourceId>` | `POST /api/dependency-resources/{dependencyResourceId}/backups` |
+| List dependency resource backups | Query | `dependency-resources.list-backups` | `ListDependencyResourceBackupsQuery` | `ListDependencyResourceBackupsQueryInput` | `appaloft dependency backup list <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}/backups` |
+| Show dependency resource backup | Query | `dependency-resources.show-backup` | `ShowDependencyResourceBackupQuery` | `ShowDependencyResourceBackupQueryInput` | `appaloft dependency backup show <backupId>` | `GET /api/dependency-resources/backups/{backupId}` |
+| Restore dependency resource backup | Command | `dependency-resources.restore-backup` | `RestoreDependencyResourceBackupCommand` | `RestoreDependencyResourceBackupCommandInput` | `appaloft dependency backup restore <backupId>` | `POST /api/dependency-resources/backups/{backupId}/restore` |
 | Bind dependency to resource | Command | `resources.bind-dependency` | `BindResourceDependencyCommand` | `BindResourceDependencyCommandInput` | `appaloft resource dependency bind <resourceId>` | `POST /api/resources/{resourceId}/dependency-bindings` |
 | Unbind dependency from resource | Command | `resources.unbind-dependency` | `UnbindResourceDependencyCommand` | `UnbindResourceDependencyCommandInput` | `appaloft resource dependency unbind <resourceId> <bindingId>` | `DELETE /api/resources/{resourceId}/dependency-bindings/{bindingId}` |
+| Rotate resource dependency binding secret | Command | `resources.rotate-dependency-binding-secret` | `RotateResourceDependencyBindingSecretCommand` | `RotateResourceDependencyBindingSecretCommandInput` | `appaloft resource dependency rotate-secret <resourceId> <bindingId>` | `POST /api/resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations` |
 | List resource dependency bindings | Query | `resources.list-dependency-bindings` | `ListResourceDependencyBindingsQuery` | `ListResourceDependencyBindingsQueryInput` | `appaloft resource dependency list <resourceId>` | `GET /api/resources/{resourceId}/dependency-bindings` |
 | Show resource dependency binding | Query | `resources.show-dependency-binding` | `ShowResourceDependencyBindingQuery` | `ShowResourceDependencyBindingQueryInput` | `appaloft resource dependency show <resourceId> <bindingId>` | `GET /api/resources/{resourceId}/dependency-bindings/{bindingId}` |
 
@@ -320,15 +345,58 @@ Current boundary:
   deployment record
 - provider-backed dependency resources remain `ResourceInstance`; they are not the same aggregate
   as project resources
-- Postgres dependency resources are provider-neutral `ResourceInstance` records in this slice.
-  Appaloft-managed Postgres records do not create provider-native databases yet, imported external
-  Postgres delete removes only Appaloft's record, and list/show output masks connection secrets.
+- Postgres dependency resources are `ResourceInstance` records. Appaloft-managed Postgres records
+  now carry provider-native realization state through a hermetic provider capability, imported
+  external Postgres delete removes only Appaloft's record, and list/show output masks connection
+  secrets.
+- Provider-native Postgres realization is implemented through the existing
+  `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
+  `dependency-resources.delete` boundaries. It is governed by
+  [Postgres Provider-Native Realization](./specs/038-postgres-provider-native-realization/spec.md)
+  and must keep provider SDK types and raw secrets out of core, contracts, CLI, Web, events, and
+  read models.
+- Provider-native Redis realization is implemented at the application boundary by
+  [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md) for
+  the existing `dependency-resources.provision-redis`, `resources.bind-dependency`, and
+  `dependency-resources.delete` boundaries. It uses a hermetic managed Redis provider capability,
+  safe realization state, ready binding admission, unsupported-provider admission rejection, and
+  managed Redis provider cleanup on delete. Persistence/contract/runtime materialization coverage
+  is implemented for safe realization metadata, deployment snapshots, single-server secret
+  resolution, and Swarm secret handle rendering.
 - Resource dependency bindings are provider-neutral `ResourceBinding` records in this slice. Bind
   requires matching project/environment ownership, stores only safe target metadata and secret
-  reference pointers, and reports safe deployment snapshot-reference readiness while runtime env
-  injection remains deferred. Unbind removes only the binding association; it does not delete the
-  dependency resource, external/provider database, runtime state, backup data, or historical
-  snapshots.
+  reference pointers, and reports safe deployment snapshot-reference readiness. Unbind removes only
+  the binding association; it does not delete the dependency resource, external/provider database,
+  runtime state, backup data, or historical snapshots.
+- Dependency binding runtime injection is governed by
+  [ADR-040](./decisions/ADR-040-dependency-binding-runtime-injection-boundary.md) and
+  [Dependency Binding Runtime Injection](./specs/047-dependency-binding-runtime-injection/spec.md).
+  The accepted target keeps `deployments.create` ids-only, materializes active ready dependency
+  bindings into immutable safe runtime injection snapshots, gates deployment admission on
+  injectable bindings, and lets runtime target adapters deliver safe dependency secret handles
+  without exposing raw connection values. Store-backed secret value resolution is governed by
+  [ADR-041](./decisions/ADR-041-dependency-runtime-secret-value-resolution.md) and
+  [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md);
+  its Code Round is implemented for imported Postgres, imported Redis, managed Postgres
+  Appaloft-owned refs, managed Redis refs, single-server runtimes, Docker Swarm, and retained
+  rotated binding refs. Managed Postgres and Redis closed loops have end-to-end
+  application/read-model verification.
+- `resources.rotate-dependency-binding-secret` rotates only the binding-scoped safe secret
+  reference/version for future deployment snapshot references. It requires explicit acknowledgement
+  that historical snapshots remain unchanged, and it does not rotate provider-native database
+  credentials, inject runtime environment variables, schedule redeploy, or rewrite historical
+  deployment snapshots.
+- Redis dependency resources are `ResourceInstance` records. Appaloft-managed Redis now carries
+  provider-native realization state through a hermetic provider capability, imported external Redis
+  delete removes only Appaloft's record, list/show output masks Redis connection secrets, and ready
+  imported or realized managed Redis records can be bound as safe dependency references. Runtime
+  materialization coverage for managed Redis remains open.
+- Dependency resource backup/restore is governed by
+  [ADR-036](./decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md) and
+  [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md).
+  The active operations create safe restore points and restore them in place through provider
+  capabilities without exposing raw dumps, restarting workloads, redeploying Resources, or rewriting
+  deployment snapshots.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).
@@ -374,6 +442,11 @@ Current boundary:
   [ADR-018: Resource Runtime Log Observation](./decisions/ADR-018-resource-runtime-log-observation.md);
   `resources.runtime-logs` is the active bounded and stream-capable query surface for runtime
   stdout/stderr observation through an injected runtime log reader
+- resource runtime controls are resource-owned runtime operations governed by
+  [ADR-038: Resource Runtime Control Ownership](./decisions/ADR-038-resource-runtime-control-ownership.md).
+  `resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart` coordinate
+  through `resource-runtime`, persist runtime-control attempts, and dispatch normalized target
+  requests without creating new Deployment attempts.
 - edge proxy provider behavior is resource-observable through
   `resources.proxy-configuration.preview`, governed by
   [ADR-019: Edge Proxy Provider And Observable Configuration](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md);
@@ -518,6 +591,38 @@ Current boundary:
   `resources.delete` source-link blocker checks. API/oRPC and Web relink surfaces remain future
   work until the review UX exists.
 
+## Source Events
+
+Business meaning:
+- source event records are safe, provider-neutral diagnostics for trusted source deliveries
+- source events may dispatch ordinary deployment attempts only through Resource-owned
+  auto-deploy policy and existing `deployments.create` admission
+- read surfaces expose dedupe, ignored/blocked, policy, and created deployment ids without raw
+  webhook payloads, signatures, provider tokens, or secret values
+
+Implemented operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| Ingest source event | Command | `source-events.ingest` | `IngestSourceEventCommand` | `IngestSourceEventCommandInput` | Not exposed | `POST /api/resources/{resourceId}/source-events/generic-signed`<br>`POST /api/integrations/github/source-events` |
+| List source events | Query | `source-events.list` | `ListSourceEventsQuery` | `ListSourceEventsQueryInput` | `appaloft source-event list --resource <resourceId>` | `GET /api/source-events` |
+| Show source event | Query | `source-events.show` | `ShowSourceEventQuery` | `ShowSourceEventQueryInput` | `appaloft source-event show <sourceEventId> --resource <resourceId>` | `GET /api/source-events/{sourceEventId}` |
+
+Current boundary:
+- `source-events.ingest` is active for the Resource-scoped generic signed HTTP route and the
+  system-scoped GitHub push webhook route. Generic signed ingestion resolves the Resource policy's
+  `resource-secret:<KEY>` reference and verifies `X-Appaloft-Signature`; GitHub ingestion verifies
+  `X-Hub-Signature-256` with `APPALOFT_GITHUB_WEBHOOK_SECRET`, treats `ping` as a no-op, and
+  dispatches push events without `scopeResourceId` so policy matching can fan out. Neither route
+  persists raw payloads, signatures, or secret values.
+- `source-events.list` and `source-events.show` are read-only diagnostics over persisted source
+  event records. They require project or Resource scope and must not replay events, retry failed
+  dispatch, mutate auto-deploy policy, or create deployments.
+- Additional provider-specific Git webhook ingestion remains deferred until provider payload
+  parsing and signature extraction are specified and tested.
+- Web Resource detail source-event diagnostics consume `source-events.list`; CLI and HTTP/oRPC
+  read surfaces are active for operator diagnostics and API consumers.
+
 ## Deployments
 
 Business meaning:
@@ -535,6 +640,9 @@ Implemented operations:
 | List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
 | Show deployment detail | Query | `deployments.show` | `ShowDeploymentQuery` | `ShowDeploymentQueryInput` | `appaloft deployments show <deploymentId>` | `GET /api/deployments/{deploymentId}` |
 | Read deployment recovery readiness | Query | `deployments.recovery-readiness` | `DeploymentRecoveryReadinessQuery` | `DeploymentRecoveryReadinessQueryInput` | `appaloft deployments recovery-readiness <deploymentId>` | `GET /api/deployments/{deploymentId}/recovery-readiness` |
+| Retry deployment attempt | Command | `deployments.retry` | `RetryDeploymentCommand` | `RetryDeploymentCommandInput` | `appaloft deployments retry <deploymentId>` | `POST /api/deployments/{deploymentId}/retry` |
+| Redeploy current resource profile | Command | `deployments.redeploy` | `RedeployDeploymentCommand` | `RedeployDeploymentCommandInput` | `appaloft deployments redeploy <resourceId>` | `POST /api/resources/{resourceId}/redeploy` |
+| Roll back deployment | Command | `deployments.rollback` | `RollbackDeploymentCommand` | `RollbackDeploymentCommandInput` | `appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>` | `POST /api/deployments/{deploymentId}/rollback` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `appaloft logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
 | Stream deployment events | Query | `deployments.stream-events` | `StreamDeploymentEventsQuery` | `StreamDeploymentEventsQueryInput` | `appaloft deployments events <deploymentId>` | `GET /api/deployments/{deploymentId}/events` and `GET /api/deployments/{deploymentId}/events/stream` |
 
@@ -586,9 +694,8 @@ Current boundary:
   logs on `deployments.logs`, or reintroduce `deployments.reattach` as a write command.
 - `deployments.recovery-readiness` is the active read-only recovery decision surface. It returns
   retry, redeploy, rollback, rollback-candidate, blocked-reason, and recommended-action facts for
-  Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. It does not execute recovery and marks
-  `deployments.retry`, `deployments.redeploy`, and `deployments.rollback` as not active until their
-  own Code Rounds.
+  Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. Retry, redeploy, and rollback are active write
+  commands that must use its freshness marker when callers have one.
 - mutation coordination is scope-based, not whole-server based:
   `deployments.create` coordinates by logical resource-runtime scope and
   `deployments.cleanup-preview` coordinates by logical preview-lifecycle scope. Low-level SSH
@@ -604,8 +711,10 @@ Current boundary:
 - Docker/OCI is the workload artifact substrate, not a permanent single-node-only orchestration
   boundary. Runtime target backend selection is internal to `deployments.create` and is governed by
   [ADR-023: Runtime Orchestration Target Boundary](./decisions/ADR-023-runtime-orchestration-target-boundary.md).
-  The active v1 target backend is single-server Docker/Compose; Docker Swarm and Kubernetes remain
-  future backend targets that must not add provider-specific fields to deployment admission.
+  The active v1 runtime target backends are single-server Docker/Compose and Docker Swarm. Swarm
+  execution is selected by the registered `orchestrator-cluster`/`docker-swarm` target backend and
+  still must not add provider-specific fields to deployment admission. Kubernetes remains a future
+  backend behind the same command boundary.
 - `deployments.create` must not accept `sourceLocator`, `source`, `deploymentMethod`,
   install/build/start commands, port/internalPort, health-check path, `resource` bootstrap input,
   proxy, domains, path prefix, or TLS mode
@@ -704,7 +813,33 @@ Current boundary:
   Product-grade preview environments with GitHub App webhooks, comments/checks, policy, cleanup
   retries, audit, and managed domain lifecycle still require Appaloft Cloud or a self-hosted
   control plane. That future product line must still reuse repository config and explicit
-  operations rather than adding preview fields to `deployments.create`.
+  operations rather than adding preview fields to `deployments.create`. The governing Spec Round is
+  [Product-Grade Preview Deployments](./specs/046-product-grade-preview-deployments/spec.md).
+  `preview-policies.configure` and `preview-policies.show` now expose CLI and HTTP/oRPC routes
+  backed by durable Postgres/PGlite policy storage and safe default or configured read-model
+  summaries, including same-repository, fork, secret-backed, active preview quota, and preview TTL
+  settings.
+  `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete` now
+  expose CLI and HTTP/oRPC routes over safe preview environment read models and cleanup-service
+  input. Future MCP tool contracts are generated from the operation catalog for these preview
+  operations. Web now exposes `/preview-policies` controls for policy readback/configuration and a
+  `/preview-environments` console surface backed by preview environment list/show/delete
+  operations. The GitHub source-event HTTP route now accepts verified `pull_request` deliveries for
+  the first product-grade preview slice when trusted Appaloft project/environment/resource/server/
+  destination/source-fingerprint context headers are supplied; repository or installation mapping
+  remains future control-plane work. Managed domain lifecycle and scheduler leases remain future
+  control-plane work.
+
+Product-grade preview policy operations:
+
+| Name | Kind | Operation key | Command/query | Input | CLI | HTTP/oRPC |
+| --- | --- | --- | --- | --- | --- | --- |
+| Configure preview policy | Command | `preview-policies.configure` | `ConfigurePreviewPolicyCommand` | `ConfigurePreviewPolicyCommandInput` | `appaloft preview policy configure` | `POST /api/preview-policies` |
+| Show preview policy | Query | `preview-policies.show` | `ShowPreviewPolicyQuery` | `ShowPreviewPolicyQueryInput` | `appaloft preview policy show` | `POST /api/preview-policies/show` |
+| List preview environments | Query | `preview-environments.list` | `ListPreviewEnvironmentsQuery` | `ListPreviewEnvironmentsQueryInput` | `appaloft preview environment list` | `GET /api/preview-environments` |
+| Show preview environment | Query | `preview-environments.show` | `ShowPreviewEnvironmentQuery` | `ShowPreviewEnvironmentQueryInput` | `appaloft preview environment show` | `GET /api/preview-environments/{previewEnvironmentId}` |
+| Delete preview environment | Command | `preview-environments.delete` | `DeletePreviewEnvironmentCommand` | `DeletePreviewEnvironmentCommandInput` | `appaloft preview environment delete` | `DELETE /api/resources/{resourceId}/preview-environments/{previewEnvironmentId}` |
+
 - `APPALOFT_PROJECT_ID`, `APPALOFT_RESOURCE_ID`, `APPALOFT_SERVER_ID`, and similar ids are optional
   trusted selection overrides for CLI/Action mode. They are required only when the operator wants to
   select existing control-plane identity explicitly; pure SSH CLI mode may reuse or create identity
@@ -723,7 +858,7 @@ Current boundary:
   evidence and a planner registry. Mainstream web framework support is a workload-planner concern:
   planners choose base image, package manager/build tool commands, static output or packaged
   artifacts, and start commands while keeping Web/API/CLI command schemas provider-neutral.
-- cancel, manual deployment health check, redeploy, reattach, and rollback are not public
+- cancel, manual deployment health check, and reattach are not public
   operations in the v1 surface. They must be reintroduced only after new source-of-truth specs,
   test matrices, implementation plans, and Web/API/CLI contracts are accepted.
 - Deployment recovery readiness is active under
@@ -731,15 +866,19 @@ Current boundary:
   The `deployments.recovery-readiness` query is the shared read-only source for retry, redeploy,
   rollback candidate, and rollback readiness across Web, CLI, HTTP/oRPC, and future MCP/tool
   surfaces.
-- Future `deployments.retry` creates a new deployment attempt from a failed/interrupted/canceled/
+- `deployments.retry` creates a new deployment attempt from a failed/interrupted/canceled/
   superseded attempt's immutable snapshot intent. It does not replay old events and does not mutate
-  the old attempt.
-- Future `deployments.redeploy` creates a new deployment attempt from the current Resource profile,
+  the old attempt. Its command implementation is scoped by
+  [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md).
+- `deployments.redeploy` creates a new deployment attempt from the current Resource profile,
   effective configuration, target, and destination at admission time. It is the "deploy current
-  desired state again" operation, not a retry of an old snapshot.
-- Future `deployments.rollback` creates a new rollback deployment attempt from a retained successful
+  desired state again" operation, not a retry of an old snapshot. Its command implementation is scoped by
+  [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md).
+- `deployments.rollback` creates a new rollback deployment attempt from a retained successful
   candidate's immutable snapshot and Docker/OCI artifact identity. It does not re-plan from the
-  current Resource profile and does not roll back databases, volumes, or external dependencies.
+  current Resource profile and does not roll back databases, volumes, or external dependencies. Its
+  command implementation is scoped by
+  [Deployment Rollback](./specs/041-deployment-rollback/spec.md).
 - Quick Deploy is an entry workflow over explicit operations, not a separate domain command or
   operation-catalog entry. Web QuickDeploy and CLI interactive `appaloft deploy` must create/select
   context through existing commands and queries, then dispatch `deployments.create`. See
@@ -969,8 +1108,11 @@ Web:
 - it must not hide business rules in components
 
 Future MCP / AI tools:
-- tools such as `create_project`, `create_environment`, `plan_deployment`, and
-  `deploy_release` must map back to these operations or to future operations added here
+- `@appaloft/ai-mcp` generates one serializable tool descriptor per operation catalog key
+- generated tool names are operation-key based, for example `projects_create`,
+  `environments_create`, `deployments_plan`, and `deployments_create`
+- future MCP server handlers must dispatch through the same command/query messages and input schemas,
+  not through a separate tool-only operation list
 
 ## Authoring Checklist For New Business Capabilities
 

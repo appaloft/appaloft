@@ -11,6 +11,7 @@ import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
+  type DependencyResourceSecretStore,
   type DeploymentPlanPreview,
   type DeploymentPlanReason,
   type DeploymentPlanReasonCode,
@@ -31,6 +32,9 @@ import { tokens } from "../../tokens";
 import {
   createDependencyBindingSnapshotReferences,
   dependencyBindingSnapshotSummaryFromReferences,
+  dependencyRuntimeInjectionBackendReason,
+  dependencyRuntimeInjectionEnvironmentConflictReason,
+  dependencyRuntimeSecretResolutionReason,
 } from "./dependency-binding-snapshot-references";
 import { type DeploymentContextResolver } from "./deployment-context.resolver";
 import { type DeploymentPlanQuery } from "./deployment-plan.query";
@@ -566,6 +570,8 @@ export class DeploymentPlanQueryService {
     private readonly serverAppliedRouteStateRepository?: ServerAppliedRouteDesiredStateReader,
     @inject(tokens.resourceDependencyBindingReadModel)
     private readonly resourceDependencyBindingReadModel?: ResourceDependencyBindingReadModel,
+    @inject(tokens.dependencyResourceSecretStore)
+    private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
   ) {}
 
   static contextMetadata(input: DeploymentPlanRuntimeContext): Record<string, string> {
@@ -598,6 +604,7 @@ export class DeploymentPlanQueryService {
     const {
       deploymentContextResolver,
       deploymentSnapshotFactory,
+      dependencyResourceSecretStore,
       domainRouteBindingReader,
       resourceDependencyBindingReadModel,
       runtimePlanResolutionInputBuilder,
@@ -625,7 +632,7 @@ export class DeploymentPlanQueryService {
       const dependencyBindingReferences = yield* createDependencyBindingSnapshotReferences(
         dependencyBindingSummaries,
       );
-      const dependencyBindings = dependencyBindingSnapshotSummaryFromReferences(
+      let dependencyBindings = dependencyBindingSnapshotSummaryFromReferences(
         dependencyBindingReferences,
       );
 
@@ -722,6 +729,14 @@ export class DeploymentPlanQueryService {
         requiredCapabilities: requiredRuntimeTargetCapabilities(runtimePlan),
       });
       if (runtimeTargetBackend.isErr()) {
+        const runtimeInjectionReason =
+          dependencyBindingReferences.length > 0
+            ? "dependency_runtime_injection_target_backend_unsupported"
+            : undefined;
+        dependencyBindings = dependencyBindingSnapshotSummaryFromReferences(
+          dependencyBindingReferences,
+          runtimeInjectionReason ? { runtimeInjectionReason } : {},
+        );
         return ok(
           deploymentPlanPreview({
             destination,
@@ -753,6 +768,24 @@ export class DeploymentPlanQueryService {
           }),
         );
       }
+      const unresolvedSecretReason = dependencyResourceSecretStore
+        ? await dependencyRuntimeSecretResolutionReason({
+            context,
+            dependencyResourceSecretStore,
+            references: dependencyBindingReferences,
+          })
+        : undefined;
+      const runtimeInjectionReason =
+        dependencyRuntimeInjectionEnvironmentConflictReason({
+          environmentSnapshot: snapshot,
+          references: dependencyBindingReferences,
+        }) ??
+        unresolvedSecretReason ??
+        dependencyRuntimeInjectionBackendReason(runtimeTargetBackend.value);
+      dependencyBindings = dependencyBindingSnapshotSummaryFromReferences(
+        dependencyBindingReferences,
+        runtimeInjectionReason ? { runtimeInjectionReason } : {},
+      );
 
       return ok(
         deploymentPlanPreview({

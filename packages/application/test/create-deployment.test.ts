@@ -10,10 +10,14 @@ import {
   ConfigValueText,
   CreatedAt,
   DeactivatedAt,
+  DependencyResourceProviderRealizationAttemptId,
+  DependencyResourceProviderRealizationStatusValue,
+  DependencyResourceProviderResourceHandle,
   DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
   Deployment,
   DeploymentByIdSpec,
+  DeploymentDependencyRuntimeSecretRef,
   DeploymentId,
   DeploymentLogEntry,
   DeploymentPhaseValue,
@@ -62,6 +66,8 @@ import {
   ResourceBinding,
   ResourceBindingId,
   ResourceBindingScopeValue,
+  ResourceBindingSecretRef,
+  ResourceBindingSecretVersion,
   ResourceBindingTargetName,
   ResourceByIdSpec,
   ResourceExposureModeValue,
@@ -105,8 +111,14 @@ import {
 } from "@appaloft/core";
 import {
   CapturedEventBus,
+  FakeDependencyResourceBackupProvider,
+  FakeDependencyResourceSecretStore,
+  FakeManagedPostgresProvider,
+  FakeManagedRedisProvider,
   FixedClock,
+  MemoryDependencyResourceBackupRepository,
   MemoryDependencyResourceRepository,
+  MemoryDeploymentReadModel,
   MemoryDeploymentRepository,
   MemoryDestinationRepository,
   MemoryEnvironmentRepository,
@@ -149,6 +161,8 @@ import {
   type SourceDetector,
 } from "../src/ports";
 import {
+  BindResourceDependencyUseCase,
+  CreateDependencyResourceBackupUseCase,
   CreateDeploymentUseCase,
   DefaultAccessDomainRuntimePlanResolver,
   DeploymentContextBootstrapService,
@@ -156,7 +170,11 @@ import {
   DeploymentContextResolver,
   DeploymentFactory,
   DeploymentLifecycleService,
+  DeploymentLogsQueryService,
   DeploymentSnapshotFactory,
+  ProvisionPostgresDependencyResourceUseCase,
+  ProvisionRedisDependencyResourceUseCase,
+  RestoreDependencyResourceBackupUseCase,
   RuntimePlanResolutionInputBuilder,
 } from "../src/use-cases";
 
@@ -188,7 +206,7 @@ class StaticRuntimePlanResolver implements RuntimePlanResolver {
         port: PortNumber.rehydrate(3000),
       }),
       target: DeploymentTargetDescriptor.rehydrate({
-        kind: TargetKindValue.rehydrate("single-server"),
+        kind: input.server.targetKind,
         providerKey: input.server.providerKey,
         serverIds: [input.server.id],
         metadata: {
@@ -340,27 +358,40 @@ class HermeticRuntimeTargetBackend
   extends HermeticExecutionBackend
   implements RuntimeTargetBackend
 {
-  readonly descriptor = {
-    key: "single-server-generic-ssh",
-    providerKey: "generic-ssh",
-    targetKinds: ["single-server" as const],
-    capabilities: [
+  readonly descriptor: RuntimeTargetBackend["descriptor"];
+
+  constructor(
+    capabilities: RuntimeTargetCapability[] = [
       "runtime.apply",
       "runtime.verify",
+      "runtime.dependency-secrets",
       "runtime.logs",
       "runtime.health",
       "runtime.cleanup",
       "proxy.route",
-    ] satisfies RuntimeTargetCapability[],
-  };
+    ],
+  ) {
+    super();
+    this.descriptor = {
+      key: "single-server-generic-ssh",
+      providerKey: "generic-ssh",
+      targetKinds: ["single-server" as const],
+      capabilities,
+    };
+  }
 }
 
 class StaticRuntimeTargetBackendRegistry implements RuntimeTargetBackendRegistry {
-  private readonly backend = new HermeticRuntimeTargetBackend();
+  private readonly backend: HermeticRuntimeTargetBackend;
 
-  constructor(private readonly supported = true) {}
+  constructor(
+    private readonly supported = true,
+    capabilities?: RuntimeTargetCapability[],
+  ) {
+    this.backend = new HermeticRuntimeTargetBackend(capabilities);
+  }
 
-  find(): Result<RuntimeTargetBackend> {
+  find(input: Parameters<RuntimeTargetBackendRegistry["find"]>[0]): Result<RuntimeTargetBackend> {
     if (this.supported) {
       return ok(this.backend);
     }
@@ -368,9 +399,9 @@ class StaticRuntimeTargetBackendRegistry implements RuntimeTargetBackendRegistry
     return err(
       domainError.runtimeTargetUnsupported("Runtime target backend is not registered", {
         phase: "runtime-target-resolution",
-        targetKind: "single-server",
-        providerKey: "generic-ssh",
-        missingCapability: "runtime.apply",
+        targetKind: input.targetKind,
+        providerKey: input.providerKey,
+        missingCapability: input.requiredCapabilities?.[0] ?? "runtime.apply",
       }),
     );
   }
@@ -548,6 +579,8 @@ async function createDeploymentFixture(
     executionBackend?: ExecutionBackend;
     runtimeTargetBackendRegistry?: RuntimeTargetBackendRegistry;
     edgeProxyKind?: "traefik" | "caddy";
+    serverProviderKey?: string;
+    serverTargetKind?: "single-server" | "orchestrator-cluster";
     domainRouteBindingReader?: DomainRouteBindingReader;
     serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader;
   } = {},
@@ -558,8 +591,14 @@ async function createDeploymentFixture(
   const environments = new MemoryEnvironmentRepository();
   const resources = new MemoryResourceRepository();
   const deployments = new MemoryDeploymentRepository();
+  const deploymentReadModel = new MemoryDeploymentReadModel(deployments);
   const dependencyResources = new MemoryDependencyResourceRepository();
+  const dependencyResourceSecretStore = new FakeDependencyResourceSecretStore();
   const dependencyBindings = new MemoryResourceDependencyBindingRepository();
+  const dependencyResourceBackups = new MemoryDependencyResourceBackupRepository();
+  const dependencyResourceBackupProvider = new FakeDependencyResourceBackupProvider();
+  const managedPostgresProvider = new FakeManagedPostgresProvider();
+  const managedRedisProvider = new FakeManagedRedisProvider();
   const dependencyBindingReadModel = new MemoryResourceDependencyBindingReadModel(
     dependencyBindings,
     dependencyResources,
@@ -581,7 +620,8 @@ async function createDeploymentFixture(
     name: DeploymentTargetName.rehydrate("demo-server"),
     host: HostAddress.rehydrate("127.0.0.1"),
     port: PortNumber.rehydrate(22),
-    providerKey: ProviderKey.rehydrate("generic-ssh"),
+    providerKey: ProviderKey.rehydrate(options.serverProviderKey ?? "generic-ssh"),
+    targetKind: TargetKindValue.rehydrate(options.serverTargetKind ?? "single-server"),
     ...(options.edgeProxyKind
       ? { edgeProxyKind: EdgeProxyKindValue.rehydrate(options.edgeProxyKind) }
       : {}),
@@ -681,18 +721,78 @@ async function createDeploymentFixture(
     options.domainRouteBindingReader,
     options.serverAppliedRouteDesiredStateReader,
     dependencyBindingReadModel,
+    dependencyResourceSecretStore,
   );
   return {
+    bindDependency: new BindResourceDependencyUseCase(
+      resources,
+      dependencyResources,
+      dependencyBindings,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+    ),
+    createBackup: new CreateDependencyResourceBackupUseCase(
+      dependencyResources,
+      dependencyResourceBackups,
+      dependencyResourceBackupProvider,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+    ),
     clock,
     context,
     createDeploymentUseCase,
+    deploymentLogs: new DeploymentLogsQueryService(deploymentReadModel),
+    deploymentReadModel,
     dependencyBindings,
     dependencyBindingReadModel,
+    dependencyResourceBackupProvider,
+    dependencyResourceBackups,
+    dependencyResourceSecretStore,
     dependencyResources,
     deployments,
+    environment,
+    environments,
     eventBus,
+    managedPostgresProvider,
+    managedRedisProvider,
+    provisionPostgres: new ProvisionPostgresDependencyResourceUseCase(
+      projects,
+      environments,
+      dependencyResources,
+      dependencyResourceSecretStore,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+      managedPostgresProvider,
+    ),
+    provisionRedis: new ProvisionRedisDependencyResourceUseCase(
+      projects,
+      environments,
+      dependencyResources,
+      dependencyResourceSecretStore,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+      managedRedisProvider,
+    ),
     logger,
+    projects,
     repositoryContext,
+    restoreBackup: new RestoreDependencyResourceBackupUseCase(
+      dependencyResources,
+      dependencyResourceBackups,
+      dependencyResourceBackupProvider,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+    ),
     resources,
     servers,
     createDeploymentInput: {
@@ -709,6 +809,8 @@ async function createActivePostgresBinding(input: {
   dependencyResources: MemoryDependencyResourceRepository;
   dependencyBindings: MemoryResourceDependencyBindingRepository;
   repositoryContext: ReturnType<typeof toRepositoryContext>;
+  dependencyResourceSecretStore?: FakeDependencyResourceSecretStore;
+  context?: ExecutionContext;
   bindingId?: string;
   dependencyResourceId?: string;
   status?: "active" | "removed";
@@ -727,7 +829,9 @@ async function createActivePostgresBinding(input: {
       databaseName: "app",
       maskedConnection: "postgres://app:********@db.example.com:5432/app",
     },
-    connectionSecretRef: DependencyResourceSecretRef.rehydrate("secret://postgres/super-secret"),
+    connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+      "appaloft://dependency-resources/rsi_pg/connection",
+    ),
     providerManaged: false,
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   })._unsafeUnwrap();
@@ -736,6 +840,17 @@ async function createActivePostgresBinding(input: {
     dependencyResource,
     UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
   );
+  if (input.dependencyResourceSecretStore && input.context) {
+    await input.dependencyResourceSecretStore.storeConnection(input.context, {
+      dependencyResourceId: input.dependencyResourceId ?? "rsi_pg",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      kind: "postgres",
+      purpose: "connection",
+      secretValue: "postgres://app:super-secret@db.example.com:5432/app",
+      storedAt: "2026-01-01T00:00:00.000Z",
+    });
+  }
 
   const binding = ResourceBinding.create({
     id: ResourceBindingId.rehydrate(input.bindingId ?? "rbd_pg"),
@@ -751,6 +866,145 @@ async function createActivePostgresBinding(input: {
   if (input.status === "removed") {
     binding.unbind({ removedAt: UpdatedAt.rehydrate("2026-01-01T00:01:00.000Z") });
   }
+
+  await input.dependencyBindings.upsert(
+    input.repositoryContext,
+    binding,
+    UpsertResourceBindingSpec.fromResourceBinding(binding),
+  );
+}
+
+async function createActiveRedisBinding(input: {
+  dependencyResources: MemoryDependencyResourceRepository;
+  dependencyBindings: MemoryResourceDependencyBindingRepository;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  dependencyResourceSecretStore?: FakeDependencyResourceSecretStore;
+  context?: ExecutionContext;
+}) {
+  const dependencyResource = ResourceInstance.createRedisDependencyResource({
+    id: ResourceInstanceId.rehydrate("rsi_redis"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    name: ResourceInstanceName.rehydrate("External Redis"),
+    kind: ResourceInstanceKindValue.rehydrate("redis"),
+    sourceMode: DependencyResourceSourceModeValue.rehydrate("imported-external"),
+    providerKey: ProviderKey.rehydrate("external-redis"),
+    endpoint: {
+      host: "redis.example.com",
+      port: 6379,
+      databaseName: "0",
+      maskedConnection: "redis://:********@redis.example.com:6379/0",
+    },
+    connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+      "appaloft://dependency-resources/rsi_redis/connection",
+    ),
+    providerManaged: false,
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
+  await input.dependencyResources.upsert(
+    input.repositoryContext,
+    dependencyResource,
+    UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
+  );
+  if (input.dependencyResourceSecretStore && input.context) {
+    await input.dependencyResourceSecretStore.storeConnection(input.context, {
+      dependencyResourceId: "rsi_redis",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      kind: "redis",
+      purpose: "connection",
+      secretValue: "redis://:super-secret@redis.example.com:6379/0",
+      storedAt: "2026-01-01T00:00:00.000Z",
+    });
+  }
+
+  const binding = ResourceBinding.create({
+    id: ResourceBindingId.rehydrate("rbd_redis"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    resourceId: ResourceId.rehydrate("res_demo"),
+    resourceInstanceId: ResourceInstanceId.rehydrate("rsi_redis"),
+    targetName: ResourceBindingTargetName.rehydrate("REDIS_URL"),
+    scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+    injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
+
+  await input.dependencyBindings.upsert(
+    input.repositoryContext,
+    binding,
+    UpsertResourceBindingSpec.fromResourceBinding(binding),
+  );
+}
+
+async function createActiveManagedRedisBinding(input: {
+  dependencyResources: MemoryDependencyResourceRepository;
+  dependencyBindings: MemoryResourceDependencyBindingRepository;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  dependencyResourceSecretStore?: FakeDependencyResourceSecretStore;
+  context?: ExecutionContext;
+}) {
+  const dependencyResource = ResourceInstance.createRedisDependencyResource({
+    id: ResourceInstanceId.rehydrate("rsi_managed_redis"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    name: ResourceInstanceName.rehydrate("Managed Redis"),
+    kind: ResourceInstanceKindValue.rehydrate("redis"),
+    sourceMode: DependencyResourceSourceModeValue.rehydrate("appaloft-managed"),
+    providerKey: ProviderKey.rehydrate("appaloft-managed-redis"),
+    providerManaged: true,
+    providerRealization: {
+      status: DependencyResourceProviderRealizationStatusValue.pending(),
+      attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_managed_redis"),
+      attemptedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    },
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
+  dependencyResource
+    .markProviderRealized({
+      attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_managed_redis"),
+      providerResourceHandle:
+        DependencyResourceProviderResourceHandle.rehydrate("redis/rsi_managed_redis"),
+      endpoint: {
+        host: "managed-redis.redis.internal",
+        port: 6379,
+        databaseName: "0",
+        maskedConnection: "redis://:********@managed-redis.redis.internal:6379/0",
+      },
+      connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+        "appaloft://dependency-resources/rsi_managed_redis/connection",
+      ),
+      realizedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })
+    ._unsafeUnwrap();
+  await input.dependencyResources.upsert(
+    input.repositoryContext,
+    dependencyResource,
+    UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
+  );
+  if (input.dependencyResourceSecretStore && input.context) {
+    await input.dependencyResourceSecretStore.storeConnection(input.context, {
+      dependencyResourceId: "rsi_managed_redis",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      kind: "redis",
+      purpose: "connection",
+      secretValue: "redis://:super-secret@managed-redis.redis.internal:6379/0",
+      storedAt: "2026-01-01T00:00:00.000Z",
+    });
+  }
+
+  const binding = ResourceBinding.create({
+    id: ResourceBindingId.rehydrate("rbd_managed_redis"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    resourceId: ResourceId.rehydrate("res_demo"),
+    resourceInstanceId: ResourceInstanceId.rehydrate("rsi_managed_redis"),
+    targetName: ResourceBindingTargetName.rehydrate("REDIS_URL"),
+    scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+    injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
 
   await input.dependencyBindings.upsert(
     input.repositoryContext,
@@ -1014,6 +1268,27 @@ describe("CreateDeploymentUseCase", () => {
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
   });
 
+  test("[SWARM-TARGET-ADM-001] rejects Swarm deployment fields at command schema boundary", () => {
+    const command = CreateDeploymentCommand.create({
+      projectId: "prj_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      namespace: "prod",
+      stack: "web",
+      service: "api",
+      replicas: 3,
+      updatePolicy: "start-first",
+      registrySecret: "resource-secret:REGISTRY_TOKEN",
+      ingress: { host: "www.example.com" },
+      manifest: { services: {} },
+    } as never);
+
+    expect(command.isErr()).toBe(true);
+    expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+
   test("adds runtime context metadata for workload diagnostics", async () => {
     const runtimePlanResolver = new CapturingRuntimePlanResolver();
     const { context, createDeploymentInput, createDeploymentUseCase } =
@@ -1050,13 +1325,16 @@ describe("CreateDeploymentUseCase", () => {
       createDeploymentInput,
       createDeploymentUseCase,
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
       deployments,
       repositoryContext,
     } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
     await createActivePostgresBinding({
       dependencyBindings,
+      dependencyResourceSecretStore,
       dependencyResources,
+      context,
       repositoryContext,
     });
 
@@ -1072,6 +1350,9 @@ describe("CreateDeploymentUseCase", () => {
       targetName: ResourceBindingTargetName.rehydrate("DATABASE_URL"),
       scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
       injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+      runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+        "appaloft://dependency-resources/rsi_pg/connection",
+      ),
     });
     const serializedReferences = JSON.stringify(
       deployment?.toState().dependencyBindingReferences ?? [],
@@ -1079,10 +1360,370 @@ describe("CreateDeploymentUseCase", () => {
     expect(serializedReferences).not.toContain("super-secret");
     expect(serializedReferences).not.toContain("db.example.com");
     expect(serializedReferences).not.toContain("postgres://");
-    expect(serializedReferences).not.toContain("secret://");
   });
 
-  test("[DEP-BIND-SNAP-REF-003] omits removed bindings from new deployment snapshots", async () => {
+  test("[DEP-BIND-REDIS-SNAPSHOT-001] captures active Redis binding safe references without secrets", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActiveRedisBinding({
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      context,
+      repositoryContext,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const created = unwrapDeploymentCreateResult(result);
+
+    const deployment = deployments.items.get(created.id);
+    expect(deployment?.toState().dependencyBindingReferences).toHaveLength(1);
+    expect(deployment?.toState().dependencyBindingReferences[0]).toMatchObject({
+      bindingId: ResourceBindingId.rehydrate("rbd_redis"),
+      dependencyResourceId: ResourceInstanceId.rehydrate("rsi_redis"),
+      kind: ResourceInstanceKindValue.rehydrate("redis"),
+      targetName: ResourceBindingTargetName.rehydrate("REDIS_URL"),
+      scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+      injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+      runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+        "appaloft://dependency-resources/rsi_redis/connection",
+      ),
+    });
+    const serializedReferences = JSON.stringify(
+      deployment?.toState().dependencyBindingReferences ?? [],
+    );
+    expect(serializedReferences).not.toContain("super-secret");
+    expect(serializedReferences).not.toContain("redis.example.com");
+    expect(serializedReferences).not.toContain("redis://");
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-005] captures realized managed Redis binding runtime references without secrets", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActiveManagedRedisBinding({
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      context,
+      repositoryContext,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const created = unwrapDeploymentCreateResult(result);
+
+    const deployment = deployments.items.get(created.id);
+    expect(deployment?.toState().dependencyBindingReferences).toHaveLength(1);
+    expect(deployment?.toState().dependencyBindingReferences[0]).toMatchObject({
+      bindingId: ResourceBindingId.rehydrate("rbd_managed_redis"),
+      dependencyResourceId: ResourceInstanceId.rehydrate("rsi_managed_redis"),
+      kind: ResourceInstanceKindValue.rehydrate("redis"),
+      targetName: ResourceBindingTargetName.rehydrate("REDIS_URL"),
+      scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+      injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+      runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+        "appaloft://dependency-resources/rsi_managed_redis/connection",
+      ),
+    });
+    const serializedReferences = JSON.stringify(
+      deployment?.toState().dependencyBindingReferences ?? [],
+    );
+    expect(serializedReferences).not.toContain("super-secret");
+    expect(serializedReferences).not.toContain("managed-redis.redis.internal");
+    expect(serializedReferences).not.toContain("redis://");
+  });
+
+  test("[DEP-RES-PG-CLOSED-LOOP-001] verifies managed Postgres provision bind deploy observe backup restore loop", async () => {
+    const {
+      bindDependency,
+      context,
+      createBackup,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deploymentLogs,
+      deploymentReadModel,
+      dependencyResourceBackupProvider,
+      provisionPostgres,
+      repositoryContext,
+      restoreBackup,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+
+    const provisioned = await provisionPostgres.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main DB",
+    });
+    expect(provisioned.isOk()).toBe(true);
+    const dependencyResourceId = provisioned._unsafeUnwrap().id;
+
+    const bound = await bindDependency.execute(context, {
+      resourceId: "res_demo",
+      dependencyResourceId,
+      targetName: "DATABASE_URL",
+    });
+    expect(bound.isOk()).toBe(true);
+
+    const deployed = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const createdDeployment = unwrapDeploymentCreateResult(deployed);
+    const observed = await deploymentReadModel.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(createdDeployment.id)),
+    );
+    const observedLogs = await deploymentLogs.execute(context, createdDeployment.id);
+
+    expect(observed).toMatchObject({
+      id: createdDeployment.id,
+      status: "succeeded",
+      dependencyBindingReferences: [
+        expect.objectContaining({
+          dependencyResourceId,
+          kind: "postgres",
+          targetName: "DATABASE_URL",
+        }),
+      ],
+    });
+    expect(observedLogs.logs).toContainEqual(
+      expect.objectContaining({
+        level: "info",
+        message: "Hermetic execution backend applied runtime plan",
+      }),
+    );
+    expect(JSON.stringify(observed)).not.toContain("super-secret");
+    expect(JSON.stringify(observed)).not.toContain("postgres://app:");
+
+    const backup = await createBackup.execute(context, { dependencyResourceId });
+    expect(backup.isOk()).toBe(true);
+    const restored = await restoreBackup.execute(context, {
+      backupId: backup._unsafeUnwrap().id,
+      acknowledgeDataOverwrite: true,
+      acknowledgeRuntimeNotRestarted: true,
+    });
+
+    expect(restored.isOk()).toBe(true);
+    expect(dependencyResourceBackupProvider.backups).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId,
+        providerKey: "appaloft-managed-postgres",
+        dependencyKind: "postgres",
+      }),
+    );
+    expect(dependencyResourceBackupProvider.restores).toContainEqual(
+      expect.objectContaining({
+        backupId: backup._unsafeUnwrap().id,
+        dependencyResourceId,
+      }),
+    );
+  });
+
+  test("[DEP-RES-REDIS-CLOSED-LOOP-001] verifies managed Redis provision bind deploy observe backup restore loop", async () => {
+    const {
+      bindDependency,
+      context,
+      createBackup,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deploymentLogs,
+      deploymentReadModel,
+      dependencyResourceBackupProvider,
+      dependencyResourceSecretStore,
+      managedRedisProvider,
+      provisionRedis,
+      repositoryContext,
+      restoreBackup,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    dependencyResourceBackupProvider.setSupported(["appaloft-managed-redis:redis"]);
+    managedRedisProvider.setRealizationResult(
+      ok({
+        providerResourceHandle: "redis/rsi_0001",
+        endpoint: {
+          host: "main-cache.redis.internal",
+          port: 6379,
+          databaseName: "0",
+          maskedConnection: "redis://:********@main-cache.redis.internal:6379/0",
+        },
+        connectionSecretValue: "redis://:super-secret@main-cache.redis.internal:6379/0",
+        realizedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    const provisioned = await provisionRedis.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main Cache",
+    });
+    expect(provisioned.isOk()).toBe(true);
+    const dependencyResourceId = provisioned._unsafeUnwrap().id;
+    const secretRef = `appaloft://dependency-resources/${dependencyResourceId}/connection`;
+
+    const bound = await bindDependency.execute(context, {
+      resourceId: "res_demo",
+      dependencyResourceId,
+      targetName: "REDIS_URL",
+    });
+    expect(bound.isOk()).toBe(true);
+
+    const deployed = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const createdDeployment = unwrapDeploymentCreateResult(deployed);
+    const observed = await deploymentReadModel.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(createdDeployment.id)),
+    );
+    const observedLogs = await deploymentLogs.execute(context, createdDeployment.id);
+
+    expect(observed).toMatchObject({
+      id: createdDeployment.id,
+      status: "succeeded",
+      dependencyBindingReferences: [
+        expect.objectContaining({
+          dependencyResourceId,
+          kind: "redis",
+          targetName: "REDIS_URL",
+        }),
+      ],
+    });
+    expect(observedLogs.logs).toContainEqual(
+      expect.objectContaining({
+        level: "info",
+        message: "Hermetic execution backend applied runtime plan",
+      }),
+    );
+    expect(JSON.stringify(observed)).not.toContain("super-secret");
+    expect(JSON.stringify(observed)).not.toContain("redis://:super-secret");
+    const resolvedSecret = await dependencyResourceSecretStore.resolve(context, {
+      secretRef,
+    });
+    expect(resolvedSecret.isOk()).toBe(true);
+    expect(resolvedSecret._unsafeUnwrap()).toEqual({
+      secretRef,
+      secretValue: "redis://:super-secret@main-cache.redis.internal:6379/0",
+    });
+
+    const backup = await createBackup.execute(context, { dependencyResourceId });
+    expect(backup.isOk()).toBe(true);
+    const restored = await restoreBackup.execute(context, {
+      backupId: backup._unsafeUnwrap().id,
+      acknowledgeDataOverwrite: true,
+      acknowledgeRuntimeNotRestarted: true,
+    });
+
+    expect(restored.isOk()).toBe(true);
+    expect(dependencyResourceBackupProvider.backups).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId,
+        providerKey: "appaloft-managed-redis",
+        dependencyKind: "redis",
+      }),
+    );
+    expect(dependencyResourceBackupProvider.restores).toContainEqual(
+      expect.objectContaining({
+        backupId: backup._unsafeUnwrap().id,
+        dependencyResourceId,
+      }),
+    );
+  });
+
+  test("[DEP-BIND-RUNTIME-INJECT-004] rejects active dependency binding when the runtime target name conflicts", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      deployments,
+      environment,
+      environments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      context,
+      repositoryContext,
+    });
+    environment
+      .setVariable({
+        key: ConfigKey.rehydrate("DATABASE_URL"),
+        value: ConfigValueText.rehydrate("existing-configured-value"),
+        kind: VariableKindValue.rehydrate("secret"),
+        exposure: VariableExposureValue.rehydrate("runtime"),
+        updatedAt: UpdatedAt.rehydrate("2026-01-01T00:00:01.000Z"),
+      })
+      ._unsafeUnwrap();
+    await environments.upsert(
+      repositoryContext,
+      environment,
+      UpsertEnvironmentSpec.fromEnvironment(environment),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "dependency_runtime_injection_blocked",
+      details: {
+        reason: "dependency_runtime_injection_target_conflict",
+        bindingCount: 1,
+      },
+    });
+    expect(deployments.items.size).toBe(0);
+  });
+
+  test("[DEP-BIND-RUNTIME-INJECT-004] rejects active dependency binding when the runtime target cannot deliver dependency secrets", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      runtimeTargetBackendRegistry: new StaticRuntimeTargetBackendRegistry(true, [
+        "runtime.apply",
+        "runtime.verify",
+        "runtime.logs",
+      ]),
+    });
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      context,
+      repositoryContext,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "dependency_runtime_injection_blocked",
+      details: {
+        reason: "dependency_runtime_injection_target_backend_unsupported",
+        bindingCount: 1,
+      },
+    });
+    expect(deployments.items.size).toBe(0);
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-004] rejects active dependency binding with unresolved Appaloft-owned runtime secret ref", async () => {
     const {
       context,
       createDeploymentInput,
@@ -1096,6 +1737,40 @@ describe("CreateDeploymentUseCase", () => {
       dependencyBindings,
       dependencyResources,
       repositoryContext,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "dependency_runtime_injection_blocked",
+      details: {
+        reason: "dependency_runtime_secret_unresolved",
+        bindingCount: 1,
+      },
+    });
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("super-secret");
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("postgres://");
+    expect(deployments.items.size).toBe(0);
+  });
+
+  test("[DEP-BIND-SNAP-REF-003] omits removed bindings from new deployment snapshots", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      context,
+      repositoryContext,
       status: "removed",
     });
 
@@ -1105,6 +1780,128 @@ describe("CreateDeploymentUseCase", () => {
     expect(
       deployments.items.get(result._unsafeUnwrap().id)?.toState().dependencyBindingReferences,
     ).toEqual([]);
+  });
+
+  test("[DEP-BIND-ROTATE-004] preserves historical deployment snapshot references after binding secret rotation", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      context,
+      repositoryContext,
+    });
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const created = unwrapDeploymentCreateResult(result);
+    const deployment = deployments.items.get(created.id);
+    const capturedReferences = deployment?.toState().dependencyBindingReferences ?? [];
+    const binding = dependencyBindings.items.get("rbd_pg");
+
+    expect(binding).toBeDefined();
+    binding
+      ?.rotateSecret({
+        secretRef: ResourceBindingSecretRef.rehydrate("secret://dependency-binding/rbd_pg/current"),
+        secretVersion: ResourceBindingSecretVersion.rehydrate("rbsv_0001"),
+        rotatedAt: UpdatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
+      })
+      ._unsafeUnwrap();
+    if (binding) {
+      await dependencyBindings.upsert(
+        repositoryContext,
+        binding,
+        UpsertResourceBindingSpec.fromResourceBinding(binding),
+      );
+    }
+
+    expect(deployment?.toState().dependencyBindingReferences).toEqual(capturedReferences);
+    expect(JSON.stringify(deployment?.toState().dependencyBindingReferences ?? [])).not.toContain(
+      "secret://dependency-binding/rbd_pg/current",
+    );
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-007] keeps historical and rotated dependency refs resolvable for deployment snapshots", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    await createActivePostgresBinding({
+      dependencyBindings,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      context,
+      repositoryContext,
+    });
+
+    const firstResult = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const firstCreated = unwrapDeploymentCreateResult(firstResult);
+    const firstDeployment = deployments.items.get(firstCreated.id);
+    const firstReference = firstDeployment?.toState().dependencyBindingReferences[0];
+    const rotatedSecretRef = "appaloft+pg://resource-binding/rbd_pg/rbsv_0001";
+    const rotatedSecretValue = "postgres://app:rotated-secret@db.example.com:5432/app";
+
+    const binding = dependencyBindings.items.get("rbd_pg");
+    expect(binding).toBeDefined();
+    binding
+      ?.rotateSecret({
+        secretRef: ResourceBindingSecretRef.rehydrate(rotatedSecretRef),
+        secretVersion: ResourceBindingSecretVersion.rehydrate("rbsv_0001"),
+        rotatedAt: UpdatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
+      })
+      ._unsafeUnwrap();
+    if (binding) {
+      await dependencyBindings.upsert(
+        repositoryContext,
+        binding,
+        UpsertResourceBindingSpec.fromResourceBinding(binding),
+      );
+    }
+
+    const unresolvedResult = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    expect(unresolvedResult.isErr()).toBe(true);
+    expect(unresolvedResult._unsafeUnwrapErr()).toMatchObject({
+      code: "dependency_runtime_injection_blocked",
+      details: { reason: "dependency_runtime_secret_unresolved" },
+    });
+
+    dependencyResourceSecretStore.setResolvedValue(rotatedSecretRef, rotatedSecretValue);
+    const secondResult = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const secondCreated = unwrapDeploymentCreateResult(secondResult);
+    const secondDeployment = deployments.items.get(secondCreated.id);
+    const secondReference = secondDeployment?.toState().dependencyBindingReferences[0];
+    const firstResolved = await dependencyResourceSecretStore.resolve(context, {
+      secretRef: firstReference?.runtimeSecretRef?.value ?? "",
+    });
+    const secondResolved = await dependencyResourceSecretStore.resolve(context, {
+      secretRef: secondReference?.runtimeSecretRef?.value ?? "",
+    });
+
+    expect(firstReference?.runtimeSecretRef?.value).toBe(
+      "appaloft://dependency-resources/rsi_pg/connection",
+    );
+    expect(secondReference?.runtimeSecretRef?.value).toBe(rotatedSecretRef);
+    expect(firstResolved.isOk()).toBe(true);
+    expect(secondResolved._unsafeUnwrap()).toEqual({
+      secretRef: rotatedSecretRef,
+      secretValue: rotatedSecretValue,
+    });
+    expect(firstDeployment?.toState().dependencyBindingReferences[0]?.runtimeSecretRef?.value).toBe(
+      "appaloft://dependency-resources/rsi_pg/connection",
+    );
   });
 
   test("[RES-PROFILE-ACCESS-003] resource access path prefix reaches generated route planning input", async () => {
@@ -2633,6 +3430,35 @@ describe("CreateDeploymentUseCase", () => {
       runtimePlanStrategy: "auto",
       targetKind: "single-server",
       targetProviderKey: "generic-ssh",
+    });
+    expect(deployments.items.size).toBe(0);
+  });
+
+  test("[SWARM-TARGET-ADM-002] rejects unsupported Swarm target backend before acceptance", async () => {
+    const { context, createDeploymentInput, createDeploymentUseCase, deployments } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        serverProviderKey: "docker-swarm",
+        serverTargetKind: "orchestrator-cluster",
+        runtimeTargetBackendRegistry: new StaticRuntimeTargetBackendRegistry(false),
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("runtime_target_unsupported");
+    expect(error.details).toMatchObject({
+      commandName: "deployments.create",
+      phase: "runtime-target-resolution",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      runtimePlanStrategy: "auto",
+      targetKind: "orchestrator-cluster",
+      targetProviderKey: "docker-swarm",
+      providerKey: "docker-swarm",
     });
     expect(deployments.items.size).toBe(0);
   });

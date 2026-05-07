@@ -15,6 +15,19 @@ import {
   proxyBootstrapOptionsFromEnv,
 } from "./edge-proxy-plans";
 
+interface CommandRunnerResult {
+  status: number | null;
+  stdout?: string | Buffer;
+  stderr?: string | Buffer;
+  error?: Error;
+}
+
+type CommandRunner = (
+  command: string,
+  args: string[],
+  timeoutMs: number,
+) => CommandRunnerResult;
+
 interface ProcessCheckInput {
   name: string;
   command: string;
@@ -23,6 +36,7 @@ interface ProcessCheckInput {
   successMessage: string;
   failureMessage: string;
   metadata?: Record<string, string>;
+  runner: CommandRunner;
 }
 
 interface PreparedSshArgs {
@@ -45,10 +59,7 @@ function trimOutput(stdout: string | Buffer | undefined, stderr: string | Buffer
 
 function processCheck(input: ProcessCheckInput): ServerConnectivityCheck {
   const startedAt = Date.now();
-  const result = spawnSync(input.command, input.args, {
-    encoding: "utf8",
-    timeout: input.timeoutMs,
-  });
+  const result = input.runner(input.command, input.args, input.timeoutMs);
   const durationMs = Date.now() - startedAt;
   const details = trimOutput(result.stdout, result.stderr);
 
@@ -208,6 +219,17 @@ function shellProcessCheck(
   });
 }
 
+function defaultCommandRunner(
+  command: string,
+  args: string[],
+  timeoutMs: number,
+): CommandRunnerResult {
+  return spawnSync(command, args, {
+    encoding: "utf8",
+    timeout: timeoutMs,
+  });
+}
+
 function withProxyRepairMetadata(
   server: DeploymentTargetState,
   check: ServerConnectivityCheck,
@@ -226,7 +248,10 @@ function withProxyRepairMetadata(
 }
 
 export class RuntimeServerConnectivityChecker implements ServerConnectivityChecker {
-  constructor(private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry) {}
+  constructor(
+    private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry,
+    private readonly commandRunner: CommandRunner = defaultCommandRunner,
+  ) {}
 
   private async edgeProxyChecks(
     context: ExecutionContext,
@@ -325,6 +350,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
           proxyKind,
           ...check.metadata,
         },
+        runner: this.commandRunner,
       };
 
       const result =
@@ -334,6 +360,93 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
 
       return withProxyRepairMetadata(server, result);
     });
+  }
+
+  private dockerSwarmManagerChecks(server: DeploymentTargetState): ServerConnectivityCheck[] {
+    const metadata = {
+      host: server.host.value,
+      port: String(server.port.value),
+      providerKey: server.providerKey.value,
+      targetKind: server.targetKind.value,
+    };
+    const checks: ServerConnectivityCheck[] = [];
+
+    checks.push(
+      sshProcessCheck(server, "printf appaloft-swarm-connectivity", {
+        name: "ssh",
+        timeoutMs: 8000,
+        successMessage: "SSH connection to the Swarm manager succeeded",
+        failureMessage: "SSH connection to the Swarm manager failed",
+        metadata,
+        runner: this.commandRunner,
+      }),
+    );
+    checks.push(
+      sshProcessCheck(server, "docker version --format '{{.Server.Version}}'", {
+        name: "docker",
+        timeoutMs: 8000,
+        successMessage: "Swarm manager Docker daemon is available",
+        failureMessage: "Swarm manager Docker daemon is not available",
+        metadata,
+        runner: this.commandRunner,
+      }),
+    );
+    checks.push(
+      sshProcessCheck(
+        server,
+        "state=$(docker info --format '{{.Swarm.LocalNodeState}} {{.Swarm.ControlAvailable}}'); test \"$state\" = 'active true' && printf '%s' \"$state\"",
+        {
+          name: "swarm-manager",
+          timeoutMs: 8000,
+          successMessage: "Docker Swarm manager control plane is active",
+          failureMessage: "Docker Swarm manager control plane is not active",
+          metadata,
+          runner: this.commandRunner,
+        },
+      ),
+    );
+    checks.push(
+      sshProcessCheck(
+        server,
+        "docker info --format '{{range .Plugins.Network}}{{println .}}{{end}}' | grep -Fx overlay",
+        {
+          name: "swarm-overlay-network",
+          timeoutMs: 8000,
+          successMessage: "Docker overlay network driver is available",
+          failureMessage: "Docker overlay network driver is not available",
+          metadata,
+          runner: this.commandRunner,
+        },
+      ),
+    );
+
+    const proxyKind = server.edgeProxy?.kind.value;
+    checks.push(
+      proxyKind && proxyKind !== "none"
+        ? {
+            name: "swarm-edge-proxy",
+            status: "failed",
+            message: `No Docker Swarm edge proxy readiness executor is registered for ${proxyKind}`,
+            durationMs: 0,
+            metadata: {
+              providerKey: server.providerKey.value,
+              proxyKind,
+              targetKind: server.targetKind.value,
+            },
+          }
+        : {
+            name: "swarm-edge-proxy",
+            status: "skipped",
+            message: "Edge proxy is disabled for this Swarm target",
+            durationMs: 0,
+            metadata: {
+              providerKey: server.providerKey.value,
+              targetKind: server.targetKind.value,
+            },
+          },
+    );
+
+    return checks;
   }
 
   async test(
@@ -360,6 +473,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
           timeoutMs: 8000,
           successMessage: "Docker daemon is available",
           failureMessage: "Docker daemon is not available",
+          runner: this.commandRunner,
         }),
       );
     } else if (server.providerKey.value === "generic-ssh") {
@@ -373,6 +487,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
             host: server.host.value,
             port: String(server.port.value),
           },
+          runner: this.commandRunner,
         }),
       );
       checks.push(
@@ -385,8 +500,11 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
             host: server.host.value,
             port: String(server.port.value),
           },
+          runner: this.commandRunner,
         }),
       );
+    } else if (server.providerKey.value === "docker-swarm") {
+      checks.push(...this.dockerSwarmManagerChecks(server));
     } else {
       checks.push(
         await tcpCheck({
@@ -403,7 +521,9 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
       });
     }
 
-    checks.push(...(await this.edgeProxyChecks(context, server)));
+    if (server.providerKey.value !== "docker-swarm") {
+      checks.push(...(await this.edgeProxyChecks(context, server)));
+    }
 
     return ok({
       serverId: server.id.value,

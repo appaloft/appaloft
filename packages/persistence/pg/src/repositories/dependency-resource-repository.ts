@@ -15,11 +15,16 @@ import {
   DependencyResourceDatabaseName,
   DependencyResourceEndpointHost,
   DependencyResourceEndpointPort,
+  DependencyResourceProviderFailureCode,
+  DependencyResourceProviderRealizationAttemptId,
+  DependencyResourceProviderRealizationStatusValue,
+  DependencyResourceProviderResourceHandle,
   DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
   DescriptionText,
   EnvironmentId,
   MaskedDependencyConnection,
+  OccurredAt,
   OwnerId,
   OwnerScopeValue,
   ok,
@@ -69,6 +74,17 @@ interface SerializedDependencyBindingReadiness extends Record<string, unknown> {
   reason?: string;
 }
 
+interface SerializedDependencyProviderRealization extends Record<string, unknown> {
+  status: "pending" | "ready" | "failed" | "delete-pending" | "deleted";
+  attemptId: string;
+  attemptedAt: string;
+  providerResourceHandle?: string;
+  realizedAt?: string;
+  failedAt?: string;
+  failureCode?: string;
+  failureMessage?: string;
+}
+
 class KyselyResourceInstanceSelectionVisitor
   implements ResourceInstanceSelectionSpecVisitor<DependencyResourceSelectionQuery>
 {
@@ -99,14 +115,15 @@ class KyselyResourceInstanceMutationVisitor
 {
   visitUpsertResourceInstance(spec: UpsertResourceInstanceSpec) {
     const state = spec.state;
-    const endpoint = state.postgresEndpoint
+    const dependencyEndpoint = state.postgresEndpoint ?? state.redisEndpoint;
+    const endpoint = dependencyEndpoint
       ? ({
-          host: state.postgresEndpoint.host.value,
-          ...(state.postgresEndpoint.port ? { port: state.postgresEndpoint.port.value } : {}),
-          ...(state.postgresEndpoint.databaseName
-            ? { databaseName: state.postgresEndpoint.databaseName.value }
+          host: dependencyEndpoint.host.value,
+          ...(dependencyEndpoint.port ? { port: dependencyEndpoint.port.value } : {}),
+          ...(dependencyEndpoint.databaseName
+            ? { databaseName: dependencyEndpoint.databaseName.value }
             : {}),
-          maskedConnection: state.postgresEndpoint.maskedConnection.value,
+          maskedConnection: dependencyEndpoint.maskedConnection.value,
         } satisfies SerializedDependencyEndpoint)
       : null;
     const backupRelationship = state.backupRelationship
@@ -123,6 +140,30 @@ class KyselyResourceInstanceMutationVisitor
           ...(state.bindingReadiness.reason ? { reason: state.bindingReadiness.reason.value } : {}),
         } satisfies SerializedDependencyBindingReadiness)
       : null;
+    const providerRealization = state.providerRealization
+      ? ({
+          status: state.providerRealization.status.value,
+          attemptId: state.providerRealization.attemptId.value,
+          attemptedAt: state.providerRealization.attemptedAt.value,
+          ...(state.providerRealization.providerResourceHandle
+            ? {
+                providerResourceHandle: state.providerRealization.providerResourceHandle.value,
+              }
+            : {}),
+          ...(state.providerRealization.realizedAt
+            ? { realizedAt: state.providerRealization.realizedAt.value }
+            : {}),
+          ...(state.providerRealization.failedAt
+            ? { failedAt: state.providerRealization.failedAt.value }
+            : {}),
+          ...(state.providerRealization.failureCode
+            ? { failureCode: state.providerRealization.failureCode.value }
+            : {}),
+          ...(state.providerRealization.failureMessage
+            ? { failureMessage: state.providerRealization.failureMessage.value }
+            : {}),
+        } satisfies SerializedDependencyProviderRealization)
+      : null;
 
     return {
       dependencyResource: {
@@ -138,6 +179,7 @@ class KyselyResourceInstanceMutationVisitor
         description: state.description?.value ?? null,
         endpoint,
         connection_secret_ref: state.connectionSecretRef?.value ?? null,
+        provider_realization: providerRealization,
         backup_relationship: backupRelationship,
         binding_readiness: bindingReadiness,
         lifecycle_status: state.status.value,
@@ -165,6 +207,9 @@ function rehydrateResourceInstance(row: DependencyResourceRow): ResourceInstance
   const bindingReadiness = row.binding_readiness
     ? (row.binding_readiness as SerializedDependencyBindingReadiness)
     : undefined;
+  const providerRealization = row.provider_realization
+    ? (row.provider_realization as SerializedDependencyProviderRealization)
+    : undefined;
 
   return ResourceInstance.rehydrate({
     id: ResourceInstanceId.rehydrate(row.id),
@@ -183,9 +228,9 @@ function rehydrateResourceInstance(row: DependencyResourceRow): ResourceInstance
     providerKey: ProviderKey.rehydrate(row.provider_key),
     providerManaged: row.provider_managed,
     ...(row.description ? { description: DescriptionText.rehydrate(row.description) } : {}),
-    ...(endpoint
+    ...(endpoint && row.kind === "redis"
       ? {
-          postgresEndpoint: {
+          redisEndpoint: {
             host: DependencyResourceEndpointHost.rehydrate(endpoint.host),
             ...(endpoint.port
               ? { port: DependencyResourceEndpointPort.rehydrate(endpoint.port) }
@@ -196,9 +241,58 @@ function rehydrateResourceInstance(row: DependencyResourceRow): ResourceInstance
             maskedConnection: MaskedDependencyConnection.rehydrate(endpoint.maskedConnection),
           },
         }
-      : {}),
+      : endpoint
+        ? {
+            postgresEndpoint: {
+              host: DependencyResourceEndpointHost.rehydrate(endpoint.host),
+              ...(endpoint.port
+                ? { port: DependencyResourceEndpointPort.rehydrate(endpoint.port) }
+                : {}),
+              ...(endpoint.databaseName
+                ? { databaseName: DependencyResourceDatabaseName.rehydrate(endpoint.databaseName) }
+                : {}),
+              maskedConnection: MaskedDependencyConnection.rehydrate(endpoint.maskedConnection),
+            },
+          }
+        : {}),
     ...(row.connection_secret_ref
       ? { connectionSecretRef: DependencyResourceSecretRef.rehydrate(row.connection_secret_ref) }
+      : {}),
+    ...(providerRealization
+      ? {
+          providerRealization: {
+            status: DependencyResourceProviderRealizationStatusValue.rehydrate(
+              providerRealization.status,
+            ),
+            attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate(
+              providerRealization.attemptId,
+            ),
+            attemptedAt: OccurredAt.rehydrate(providerRealization.attemptedAt),
+            ...(providerRealization.providerResourceHandle
+              ? {
+                  providerResourceHandle: DependencyResourceProviderResourceHandle.rehydrate(
+                    providerRealization.providerResourceHandle,
+                  ),
+                }
+              : {}),
+            ...(providerRealization.realizedAt
+              ? { realizedAt: OccurredAt.rehydrate(providerRealization.realizedAt) }
+              : {}),
+            ...(providerRealization.failedAt
+              ? { failedAt: OccurredAt.rehydrate(providerRealization.failedAt) }
+              : {}),
+            ...(providerRealization.failureCode
+              ? {
+                  failureCode: DependencyResourceProviderFailureCode.rehydrate(
+                    providerRealization.failureCode,
+                  ),
+                }
+              : {}),
+            ...(providerRealization.failureMessage
+              ? { failureMessage: DescriptionText.rehydrate(providerRealization.failureMessage) }
+              : {}),
+          },
+        }
       : {}),
     ...(backupRelationship
       ? {
@@ -241,6 +335,9 @@ function toDependencyResourceSummary(
   const bindingReadiness = row.binding_readiness
     ? (row.binding_readiness as SerializedDependencyBindingReadiness)
     : undefined;
+  const providerRealization = row.provider_realization
+    ? (row.provider_realization as SerializedDependencyProviderRealization)
+    : undefined;
   return {
     id: row.id,
     projectId: row.project_id,
@@ -261,6 +358,28 @@ function toDependencyResourceSummary(
             ...(endpoint.databaseName ? { databaseName: endpoint.databaseName } : {}),
             maskedConnection: endpoint.maskedConnection,
             ...(row.connection_secret_ref ? { secretRef: row.connection_secret_ref } : {}),
+          },
+        }
+      : {}),
+    ...(providerRealization
+      ? {
+          providerRealization: {
+            status: providerRealization.status,
+            attemptId: providerRealization.attemptId,
+            attemptedAt: providerRealization.attemptedAt,
+            ...(providerRealization.providerResourceHandle
+              ? { providerResourceHandle: providerRealization.providerResourceHandle }
+              : {}),
+            ...(providerRealization.realizedAt
+              ? { realizedAt: providerRealization.realizedAt }
+              : {}),
+            ...(providerRealization.failedAt ? { failedAt: providerRealization.failedAt } : {}),
+            ...(providerRealization.failureCode
+              ? { failureCode: providerRealization.failureCode }
+              : {}),
+            ...(providerRealization.failureMessage
+              ? { failureMessage: providerRealization.failureMessage }
+              : {}),
           },
         }
       : {}),
@@ -339,6 +458,7 @@ export class PgDependencyResourceRepository implements DependencyResourceReposit
                 description: mutation.dependencyResource.description,
                 endpoint: mutation.dependencyResource.endpoint,
                 connection_secret_ref: mutation.dependencyResource.connection_secret_ref,
+                provider_realization: mutation.dependencyResource.provider_realization,
                 backup_relationship: mutation.dependencyResource.backup_relationship,
                 binding_readiness: mutation.dependencyResource.binding_readiness,
                 lifecycle_status: mutation.dependencyResource.lifecycle_status,
@@ -369,7 +489,30 @@ export class PgDependencyResourceDeleteSafetyReader
       .where("lifecycle_status", "=", "active")
       .executeTakeFirst();
     const count = Number(row?.count ?? 0);
-    return ok(count > 0 ? [{ kind: "resource-binding", count }] : []);
+    const backupRow = await executor
+      .selectFrom("dependency_resource_backups")
+      .select((expressionBuilder) => [expressionBuilder.fn.count<number>("id").as("count")])
+      .where("dependency_resource_id", "=", input.dependencyResourceId)
+      .where((expressionBuilder) =>
+        expressionBuilder.or([
+          expressionBuilder("status", "=", "pending"),
+          expressionBuilder("retention_status", "=", "retained"),
+        ]),
+      )
+      .executeTakeFirst();
+    const backupCount = Number(backupRow?.count ?? 0);
+    return ok([
+      ...(count > 0 ? [{ kind: "resource-binding" as const, count }] : []),
+      ...(backupCount > 0
+        ? [
+            {
+              kind: "dependency-resource-backup" as const,
+              relatedEntityType: "dependency_resource_backup",
+              count: backupCount,
+            },
+          ]
+        : []),
+    ]);
   }
 }
 
@@ -383,7 +526,7 @@ export class PgDependencyResourceReadModel implements DependencyResourceReadMode
 
   async list(
     context: RepositoryContext,
-    input?: { projectId?: string; environmentId?: string; kind?: "postgres" },
+    input?: { projectId?: string; environmentId?: string; kind?: "postgres" | "redis" },
   ): Promise<DependencyResourceSummary[]> {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(

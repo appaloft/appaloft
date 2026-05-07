@@ -25,6 +25,7 @@ export interface ServersTable {
   host: string;
   port: number;
   provider_key: string;
+  target_kind: ColumnType<string, string | undefined, string>;
   lifecycle_status: ColumnType<string, string | undefined, string>;
   deactivated_at: ColumnType<string | null, string | null | undefined, string | null>;
   deactivation_reason: ColumnType<string | null, string | null | undefined, string | null>;
@@ -110,6 +111,11 @@ export interface ResourcesTable {
     Record<string, unknown> | null,
     Record<string, unknown> | null
   >;
+  auto_deploy_policy: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null | undefined,
+    Record<string, unknown> | null
+  >;
   lifecycle_status: string;
   archived_at: string | null;
   archive_reason: string | null;
@@ -177,6 +183,11 @@ export interface DependencyResourcesTable {
     Record<string, unknown> | null
   >;
   connection_secret_ref: string | null;
+  provider_realization: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
   backup_relationship: ColumnType<
     Record<string, unknown> | null,
     Record<string, unknown> | null,
@@ -190,6 +201,30 @@ export interface DependencyResourcesTable {
   lifecycle_status: string;
   created_at: TimestampColumn;
   deleted_at: NullableUpdatableTimestampColumn;
+}
+
+export interface DependencyResourceBackupsTable {
+  id: string;
+  dependency_resource_id: string;
+  project_id: string;
+  environment_id: string;
+  dependency_kind: string;
+  provider_key: string;
+  status: string;
+  attempt_id: string;
+  requested_at: TimestampColumn;
+  retention_status: string;
+  provider_artifact_handle: string | null;
+  completed_at: NullableUpdatableTimestampColumn;
+  failed_at: NullableUpdatableTimestampColumn;
+  failure_code: string | null;
+  failure_message: string | null;
+  latest_restore_attempt: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
+  created_at: TimestampColumn;
 }
 
 export interface ResourceStorageAttachmentsTable {
@@ -210,9 +245,34 @@ export interface ResourceDependencyBindingsTable {
   target_name: string;
   scope: string;
   injection_mode: string;
+  secret_ref: string | null;
+  secret_version: string | null;
+  secret_rotated_at: NullableUpdatableTimestampColumn;
   lifecycle_status: string;
   created_at: TimestampColumn;
   removed_at: NullableUpdatableTimestampColumn;
+}
+
+export interface DependencyBindingSecretsTable {
+  ref: string;
+  binding_id: string;
+  resource_id: string;
+  secret_version: string;
+  payload: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  metadata: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  created_at: TimestampColumn;
+}
+
+export interface DependencyResourceSecretsTable {
+  ref: string;
+  dependency_resource_id: string;
+  project_id: string;
+  environment_id: string;
+  kind: string;
+  purpose: string;
+  payload: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  metadata: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  created_at: TimestampColumn;
 }
 
 export interface DeploymentsTable {
@@ -242,6 +302,9 @@ export interface DeploymentsTable {
   created_at: TimestampColumn;
   started_at: string | null;
   finished_at: string | null;
+  trigger_kind: ColumnType<string, string | undefined, string>;
+  source_deployment_id: string | null;
+  rollback_candidate_deployment_id: string | null;
   rollback_of_deployment_id: string | null;
   supersedes_deployment_id: string | null;
   superseded_by_deployment_id: string | null;
@@ -352,7 +415,119 @@ export interface SourceLinksTable {
   metadata: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
 }
 
+export interface SourceEventsTable {
+  id: string;
+  project_id: string | null;
+  source_kind: string;
+  event_kind: string;
+  source_identity: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  ref: string;
+  revision: string;
+  delivery_id: string | null;
+  idempotency_key: string | null;
+  dedupe_key: string;
+  dedupe_status: string;
+  dedupe_of_source_event_id: string | null;
+  verification: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  status: string;
+  matched_resource_ids: ColumnType<string[], string[] | undefined, string[]>;
+  ignored_reasons: ColumnType<string[], string[] | undefined, string[]>;
+  policy_results: ColumnType<JsonRecord[], JsonRecord[] | undefined, JsonRecord[]>;
+  created_deployment_ids: ColumnType<string[], string[] | undefined, string[]>;
+  received_at: string;
+}
+
 type JsonRecord = Record<string, unknown>;
+
+export interface PreviewEnvironmentsTable {
+  id: string;
+  project_id: string;
+  environment_id: string;
+  resource_id: string;
+  server_id: string;
+  destination_id: string;
+  provider: string;
+  repository_full_name: string;
+  head_repository_full_name: string;
+  pull_request_number: number;
+  head_sha: string;
+  base_ref: string;
+  source_binding_fingerprint: string;
+  status: string;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+  expires_at: NullableUpdatableTimestampColumn;
+}
+
+export interface PreviewPoliciesTable {
+  id: string;
+  scope_kind: string;
+  scope_key: string;
+  project_id: string;
+  resource_id: string | null;
+  same_repository_previews: boolean;
+  fork_previews: string;
+  secret_backed_previews: boolean;
+  max_active_previews: number | null;
+  preview_ttl_hours: number | null;
+  last_idempotency_key: string | null;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface PreviewPolicyDecisionsTable {
+  source_event_id: string;
+  project_id: string;
+  environment_id: string;
+  resource_id: string;
+  provider: string;
+  event_kind: string;
+  event_action: string;
+  repository_full_name: string;
+  head_repository_full_name: string;
+  pull_request_number: number;
+  head_sha: string;
+  base_ref: string;
+  fork: boolean;
+  secret_backed: boolean;
+  requested_secret_scope_count: number;
+  active_preview_count: number;
+  status: string;
+  phase: string;
+  deployment_eligible: boolean;
+  reason_code: string | null;
+  max_active_previews: number | null;
+  preview_environment_id: string | null;
+  preview_expires_at: NullableUpdatableTimestampColumn;
+  deployment_id: string | null;
+  evaluated_at: UpdatableTimestampColumn;
+}
+
+export interface PreviewFeedbackRecordsTable {
+  feedback_key: string;
+  source_event_id: string;
+  preview_environment_id: string;
+  channel: string;
+  status: string;
+  provider_feedback_id: string | null;
+  error_code: string | null;
+  retryable: boolean | null;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface PreviewCleanupAttemptsTable {
+  attempt_id: string;
+  preview_environment_id: string;
+  resource_id: string;
+  source_binding_fingerprint: string;
+  owner: string;
+  status: string;
+  phase: string;
+  attempted_at: UpdatableTimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+  error_code: string | null;
+  retryable: boolean | null;
+  next_retry_at: NullableUpdatableTimestampColumn;
+}
 
 export interface DefaultAccessDomainPoliciesTable {
   id: string;
@@ -437,6 +612,62 @@ export interface ResourceAccessFailureEvidenceTable {
   expires_at: UpdatableTimestampColumn;
 }
 
+export interface ResourceRuntimeControlAttemptsTable {
+  id: string;
+  resource_id: string;
+  deployment_id: string | null;
+  server_id: string;
+  destination_id: string;
+  operation: string;
+  status: string;
+  runtime_state: string;
+  blocked_reason: string | null;
+  error_code: string | null;
+  phases: ColumnType<JsonRecord[], JsonRecord[] | undefined, JsonRecord[]>;
+  reason: string | null;
+  idempotency_key: string | null;
+  started_at: string;
+  completed_at: string | null;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface ScheduledTaskDefinitionsTable {
+  id: string;
+  resource_id: string;
+  schedule: string;
+  timezone: string;
+  command_intent: string;
+  timeout_seconds: number;
+  retry_limit: number;
+  concurrency_policy: string;
+  status: string;
+  created_at: TimestampColumn;
+}
+
+export interface ScheduledTaskRunAttemptsTable {
+  id: string;
+  task_id: string;
+  resource_id: string;
+  trigger_kind: string;
+  status: string;
+  created_at: TimestampColumn;
+  started_at: NullableUpdatableTimestampColumn;
+  finished_at: NullableUpdatableTimestampColumn;
+  exit_code: ColumnType<number | null, number | null | undefined, number | null>;
+  failure_summary: ColumnType<string | null, string | null | undefined, string | null>;
+  skipped_reason: ColumnType<string | null, string | null | undefined, string | null>;
+}
+
+export interface ScheduledTaskRunLogsTable {
+  id: string;
+  run_id: string;
+  task_id: string;
+  resource_id: string;
+  logged_at: TimestampColumn;
+  stream: string;
+  message: string;
+}
+
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
@@ -447,7 +678,10 @@ export interface Database {
   environment_variables: EnvironmentVariablesTable;
   resource_variables: ResourceVariablesTable;
   dependency_resources: DependencyResourcesTable;
+  dependency_resource_backups: DependencyResourceBackupsTable;
   resource_dependency_bindings: ResourceDependencyBindingsTable;
+  dependency_binding_secrets: DependencyBindingSecretsTable;
+  dependency_resource_secrets: DependencyResourceSecretsTable;
   storage_volumes: StorageVolumesTable;
   resource_storage_attachments: ResourceStorageAttachmentsTable;
   deployments: DeploymentsTable;
@@ -457,9 +691,19 @@ export interface Database {
   audit_logs: AuditLogsTable;
   provider_job_logs: ProviderJobLogsTable;
   source_links: SourceLinksTable;
+  source_events: SourceEventsTable;
+  preview_environments: PreviewEnvironmentsTable;
+  preview_policies: PreviewPoliciesTable;
+  preview_policy_decisions: PreviewPolicyDecisionsTable;
+  preview_feedback_records: PreviewFeedbackRecordsTable;
+  preview_cleanup_attempts: PreviewCleanupAttemptsTable;
   default_access_domain_policies: DefaultAccessDomainPoliciesTable;
   server_applied_route_states: ServerAppliedRouteStatesTable;
   mutation_coordinations: MutationCoordinationsTable;
   process_attempt_journal: ProcessAttemptJournalTable;
   resource_access_failure_evidence: ResourceAccessFailureEvidenceTable;
+  resource_runtime_control_attempts: ResourceRuntimeControlAttemptsTable;
+  scheduled_task_definitions: ScheduledTaskDefinitionsTable;
+  scheduled_task_run_attempts: ScheduledTaskRunAttemptsTable;
+  scheduled_task_run_logs: ScheduledTaskRunLogsTable;
 }

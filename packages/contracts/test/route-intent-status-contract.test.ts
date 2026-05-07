@@ -285,6 +285,58 @@ describe("route intent/status contract", () => {
     expect(diagnostic.access.latestAccessFailure?.route?.domainBindingId).toBe("dbnd_web");
   });
 
+  test("[RUNTIME-CTRL-READ-001] resource health schema accepts runtime-control readback", () => {
+    const health = resourceHealthSummarySchema.parse({
+      schemaVersion: "resources.health/v1",
+      resourceId: "res_web",
+      generatedAt: "2026-01-01T00:00:10.000Z",
+      overall: "stopped",
+      runtime: {
+        lifecycle: "stopped",
+        health: "unknown",
+      },
+      latestRuntimeControl: {
+        runtimeControlAttemptId: "rtc_0001",
+        operation: "restart",
+        status: "blocked",
+        startedAt: "2026-01-01T00:00:06.000Z",
+        completedAt: "2026-01-01T00:00:07.000Z",
+        runtimeState: "stopped",
+        blockedReason: "runtime-metadata-stale",
+        errorCode: "resource_runtime_control_blocked",
+        phases: [
+          {
+            phase: "stop",
+            status: "skipped",
+          },
+        ],
+      },
+      healthPolicy: {
+        status: "not-configured",
+        enabled: false,
+      },
+      publicAccess: {
+        status: "unknown",
+      },
+      proxy: {
+        status: "unknown",
+      },
+      checks: [],
+      sourceErrors: [
+        {
+          source: "runtime-control",
+          code: "resource_runtime_control_readback_unavailable",
+          category: "infra",
+          phase: "runtime-control-readback",
+          retriable: true,
+        },
+      ],
+    });
+
+    expect(health.latestRuntimeControl?.blockedReason).toBe("runtime-metadata-stale");
+    expect(health.sourceErrors[0]?.source).toBe("runtime-control");
+  });
+
   test("[RES-ACCESS-DIAG-EVIDENCE-001][RES-ACCESS-DIAG-EVIDENCE-004] validates request-id evidence lookup contract", () => {
     const lookup = resourceAccessFailureEvidenceLookupSchema.parse({
       schemaVersion: "resources.access-failure-evidence.lookup/v1",

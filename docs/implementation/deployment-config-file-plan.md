@@ -230,16 +230,17 @@ Remaining gaps:
   runtime planner mapping own those paths explicitly.
 - Stored Appaloft/external secret adapters beyond the headless `ci-env:` resolver are not wired into
   the config-file entry workflow yet.
-- Public GitHub Action wrapper install UX is not implemented yet. The main repository publishes
-  CLI release archives, the static Docker self-host installer, checksums, release manifest, and
-  release notes, but `appaloft/deploy-action` still needs its own repository, action metadata,
-  install/checksum scripts, README examples, and wrapper-level tests.
+- The main repository now has a reference `.github/actions/deploy-action` wrapper with action
+  metadata, Marketplace-facing README examples, install/checksum script, SSH secret temp-key
+  handling, PR preview flag mapping, preview cleanup command mapping, wrapper-level tests, and a
+  deterministic export script with local public-layout coverage. The public
+  `appaloft/deploy-action` install UX still needs its own repository and public wrapper CI.
 - Action PR preview deploy is specified as an entry workflow in
   [GitHub Action PR Preview Deploy](../workflows/github-action-pr-preview-deploy.md). The CLI now
   supports preview-scoped source fingerprints, non-interactive preview environment selection,
-  explicit preview config paths, `preview-domain-template` route intent, and implicit root-domain
-  skipping. The CLI preview cleanup command is also active, but the public wrapper inputs/examples
-  and stable `preview-url` output are not implemented yet.
+  explicit preview config paths, `preview-domain-template` route intent, implicit root-domain
+  skipping, and action-safe preview output files for `preview-url`. The CLI preview cleanup command
+  is also active, but public wrapper inputs/examples are not implemented yet.
 - CLI config deploy now resolves state backend selection, defaults trusted SSH-targeted config
   deploys to `ssh-pglite`, invokes a remote-state lifecycle hook before identity queries/mutations,
   and uses SSH remote-state lifecycle and mirror sync in shell-built CLI programs.

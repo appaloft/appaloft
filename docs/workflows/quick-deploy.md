@@ -638,9 +638,10 @@ and resource diagnostics.
 Canonical redirect aliases now flow through config parsing, SSH server-applied route state,
 deployment planning, provider route rendering, and proxy configuration queries. Real external
 HTTP/HTTPS redirect verification remains opt-in SSH e2e follow-up.
-The public `appaloft/deploy-action` wrapper is not implemented yet; current tests cover the
-underlying binary process boundary but not release download, checksum verification, action inputs,
-or SSH secret temp-key handling.
+The main repository includes a reference `.github/actions/deploy-action` wrapper that covers
+release download/checksum verification shape, action input mapping, and SSH secret temp-key
+handling. The public `appaloft/deploy-action` repository is published from that reference export
+with Marketplace docs, pull-request preview examples, preview cleanup examples, and wrapper CI.
 Profile-drift visibility is specified in
 [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md): entry
 workflows should reuse `resources.show` diagnostics and must fail before deployment admission when an

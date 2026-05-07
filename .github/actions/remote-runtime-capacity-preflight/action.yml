@@ -1,0 +1,122 @@
+name: Remote Runtime Capacity Preflight
+description: Reclaim stale Appaloft SSH deployment staging directories before state-lock work.
+
+inputs:
+  ssh-host:
+    description: SSH host that owns the shared Appaloft runtime root.
+    required: true
+  ssh-user:
+    description: SSH username.
+    required: true
+  ssh-private-key:
+    description: SSH private key material.
+    required: true
+  remote-runtime-root:
+    description: Remote Appaloft runtime root.
+    required: false
+    default: /var/lib/appaloft/runtime
+  stale-after-minutes:
+    description: Minimum age for attempt-scoped SSH deployment staging directories.
+    required: false
+    default: "5"
+
+runs:
+  using: composite
+  steps:
+    - name: Reclaim Stale SSH Deployment Staging
+      shell: bash
+      env:
+        APPALOFT_SSH_HOST: ${{ inputs.ssh-host }}
+        APPALOFT_SSH_USER: ${{ inputs.ssh-user }}
+        APPALOFT_SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+        REMOTE_RUNTIME_ROOT: ${{ inputs.remote-runtime-root }}
+        STALE_AFTER_MINUTES: ${{ inputs.stale-after-minutes }}
+      run: |
+        set -euo pipefail
+
+        key_file="$RUNNER_TEMP/appaloft-runtime-capacity-preflight.key"
+        output_file="$RUNNER_TEMP/appaloft-runtime-capacity-preflight.txt"
+        printf '%s\n' "$APPALOFT_SSH_PRIVATE_KEY" > "$key_file"
+        chmod 600 "$key_file"
+
+        ssh -p 22 \
+          -i "$key_file" \
+          -o IdentitiesOnly=yes \
+          -o BatchMode=yes \
+          -o StrictHostKeyChecking=accept-new \
+          "${APPALOFT_SSH_USER}@${APPALOFT_SSH_HOST}" \
+          "REMOTE_RUNTIME_ROOT='$REMOTE_RUNTIME_ROOT' STALE_AFTER_MINUTES='$STALE_AFTER_MINUTES' sh -s" > "$output_file" <<'REMOTE_SCRIPT'
+        set -eu
+
+        runtime_root="${REMOTE_RUNTIME_ROOT%/}"
+        stale_after_minutes="${STALE_AFTER_MINUTES:-5}"
+        case "$stale_after_minutes" in
+          ''|*[!0-9]*)
+            stale_after_minutes=5
+            ;;
+        esac
+
+        staging_root="$runtime_root/ssh-deployments"
+        before_available_kb="$(df -Pk "$runtime_root" 2>/dev/null | awk 'NR == 2 { print $4 }' || true)"
+        reclaimed_count=0
+
+        if [ -d "$staging_root" ]; then
+          while IFS= read -r stale_dir; do
+            [ -n "$stale_dir" ] || continue
+            rm -rf "$stale_dir"
+            reclaimed_count=$((reclaimed_count + 1))
+          done <<EOF
+        $(find "$staging_root" -mindepth 1 -maxdepth 1 -type d -name 'dep_*' -mmin +"$stale_after_minutes" -print 2>/dev/null || true)
+        EOF
+        fi
+
+        after_available_kb="$(df -Pk "$runtime_root" 2>/dev/null | awk 'NR == 2 { print $4 }' || true)"
+        printf '{"phase":"remote-runtime-capacity-preflight","runtimeRoot":"%s","stagingRoot":"%s","staleAfterMinutes":%s,"reclaimedCount":%s,"availableKbBefore":%s,"availableKbAfter":%s}\n' \
+          "$runtime_root" \
+          "$staging_root" \
+          "$stale_after_minutes" \
+          "$reclaimed_count" \
+          "${before_available_kb:-null}" \
+          "${after_available_kb:-null}"
+        REMOTE_SCRIPT
+
+        {
+          printf 'remote-runtime-capacity-preflight='
+          cat "$output_file"
+        } | sed 's/`/\\`/g'
+
+        STATUS_FILE="$output_file" bun --eval '
+          const fs = require("node:fs");
+          const outputPath = process.env.STATUS_FILE;
+          const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+          let status = {};
+          try {
+            const text = fs.readFileSync(outputPath, "utf8").trim();
+            status = text ? JSON.parse(text) : {};
+          } catch {
+            status = { phase: "remote-runtime-capacity-preflight", status: "unavailable" };
+          }
+          const value = (key) => {
+            const current = status[key];
+            return current === undefined || current === null || current === "" ? "n/a" : String(current);
+          };
+          const rows = [
+            ["runtimeRoot", value("runtimeRoot")],
+            ["stagingRoot", value("stagingRoot")],
+            ["staleAfterMinutes", value("staleAfterMinutes")],
+            ["reclaimedCount", value("reclaimedCount")],
+            ["availableKbBefore", value("availableKbBefore")],
+            ["availableKbAfter", value("availableKbAfter")],
+          ];
+          fs.appendFileSync(
+            summaryPath,
+            [
+              "### SSH runtime capacity preflight",
+              "",
+              "| Field | Value |",
+              "| --- | --- |",
+              ...rows.map(([field, current]) => `| ${field} | \`${current.replaceAll("`", "\\`")}\` |`),
+              "",
+            ].join("\n"),
+          );
+        '

@@ -29,8 +29,12 @@ import {
   ConfigureDefaultAccessDomainPolicyUseCase,
   ConfigureDomainBindingRouteCommandHandler,
   ConfigureDomainBindingRouteUseCase,
+  ConfigurePreviewPolicyCommandHandler,
+  ConfigurePreviewPolicyUseCase,
   ConfigureResourceAccessCommandHandler,
   ConfigureResourceAccessUseCase,
+  ConfigureResourceAutoDeployCommandHandler,
+  ConfigureResourceAutoDeployUseCase,
   ConfigureResourceHealthCommandHandler,
   ConfigureResourceHealthUseCase,
   ConfigureResourceNetworkCommandHandler,
@@ -39,15 +43,22 @@ import {
   ConfigureResourceRuntimeUseCase,
   ConfigureResourceSourceCommandHandler,
   ConfigureResourceSourceUseCase,
+  ConfigureScheduledTaskCommandHandler,
+  ConfigureScheduledTaskUseCase,
   ConfigureServerCredentialUseCase,
   ConfigureServerEdgeProxyCommandHandler,
   ConfigureServerEdgeProxyUseCase,
   ConfirmDomainBindingOwnershipUseCase,
+  CreateDependencyResourceBackupCommandHandler,
+  CreateDependencyResourceBackupUseCase,
+  CreateDeploymentSourceEventDispatcher,
   CreateDeploymentUseCase,
   CreateDomainBindingUseCase,
   CreateEnvironmentUseCase,
   CreateProjectUseCase,
   CreateResourceUseCase,
+  CreateScheduledTaskCommandHandler,
+  CreateScheduledTaskUseCase,
   CreateSshCredentialUseCase,
   CreateStorageVolumeCommandHandler,
   CreateStorageVolumeUseCase,
@@ -61,14 +72,23 @@ import {
   DeleteDependencyResourceUseCase,
   DeleteDomainBindingCommandHandler,
   DeleteDomainBindingUseCase,
+  DeletePreviewEnvironmentCommandHandler,
   DeleteResourceCommandHandler,
   DeleteResourceUseCase,
+  DeleteScheduledTaskCommandHandler,
+  DeleteScheduledTaskUseCase,
   DeleteServerCommandHandler,
   DeleteServerUseCase,
   DeleteSshCredentialCommandHandler,
   DeleteSshCredentialUseCase,
   DeleteStorageVolumeCommandHandler,
   DeleteStorageVolumeUseCase,
+  type DependencyResourceBackupProviderInput,
+  type DependencyResourceBackupProviderPort,
+  type DependencyResourceBackupProviderResult,
+  type DependencyResourceKind,
+  type DependencyResourceRestoreProviderInput,
+  type DependencyResourceRestoreProviderResult,
   DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
   DeploymentContextResolver,
@@ -87,12 +107,17 @@ import {
   EnvironmentEffectivePrecedenceQueryHandler,
   EnvironmentEffectivePrecedenceQueryService,
   type ExecutionContext,
+  GenericSignedSourceEventVerifier,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
   ImportPostgresDependencyResourceCommandHandler,
   ImportPostgresDependencyResourceUseCase,
+  ImportRedisDependencyResourceCommandHandler,
+  ImportRedisDependencyResourceUseCase,
   ImportResourceVariablesCommandHandler,
   ImportResourceVariablesUseCase,
+  IngestSourceEventCommandHandler,
+  IngestSourceEventUseCase,
   InspectServerCapacityQueryHandler,
   InspectServerCapacityQueryService,
   IssueCertificateOnCertificateRequestedHandler,
@@ -102,6 +127,8 @@ import {
   ListCertificatesQueryService,
   ListDefaultAccessDomainPoliciesQueryHandler,
   ListDefaultAccessDomainPoliciesQueryService,
+  ListDependencyResourceBackupsQueryHandler,
+  ListDependencyResourceBackupsQueryService,
   ListDependencyResourcesQueryHandler,
   ListDependencyResourcesQueryService,
   ListDeploymentsQueryService,
@@ -110,17 +137,35 @@ import {
   ListGitHubRepositoriesQueryService,
   ListOperatorWorkQueryHandler,
   ListPluginsQueryService,
+  ListPreviewEnvironmentsQueryHandler,
+  ListPreviewEnvironmentsQueryService,
   ListProjectsQueryService,
   ListProvidersQueryService,
   ListResourceDependencyBindingsQueryHandler,
   ListResourceDependencyBindingsQueryService,
   ListResourcesQueryService,
+  ListScheduledTaskRunsQueryHandler,
+  ListScheduledTaskRunsQueryService,
+  ListScheduledTasksQueryHandler,
+  ListScheduledTasksQueryService,
   ListServersQueryService,
+  ListSourceEventsQueryHandler,
+  ListSourceEventsQueryService,
   ListSshCredentialsQueryService,
   ListStorageVolumesQueryHandler,
   ListStorageVolumesQueryService,
   LockEnvironmentCommandHandler,
   LockEnvironmentUseCase,
+  type ManagedPostgresDeleteInput,
+  type ManagedPostgresDeleteResult,
+  type ManagedPostgresProviderPort,
+  type ManagedPostgresRealizationInput,
+  type ManagedPostgresRealizationResult,
+  type ManagedRedisDeleteInput,
+  type ManagedRedisDeleteResult,
+  type ManagedRedisProviderPort,
+  type ManagedRedisRealizationInput,
+  type ManagedRedisRealizationResult,
   MarkDomainReadyOnCertificateImportedHandler,
   MarkDomainReadyOnCertificateIssuedHandler,
   MarkDomainReadyOnDeploymentFinishedHandler,
@@ -129,9 +174,19 @@ import {
   MarkServerAppliedRouteStatusOnDeploymentFinishedHandler,
   OpenTerminalSessionUseCase,
   OperatorWorkQueryService,
+  PreviewCleanupRetryScheduler,
+  PreviewDeploymentProcessManager,
+  PreviewEnvironmentCleanupService,
+  PreviewFeedbackService,
+  PreviewLifecycleService,
+  PreviewPullRequestEventIngestService,
   PromoteEnvironmentUseCase,
   ProvisionPostgresDependencyResourceCommandHandler,
   ProvisionPostgresDependencyResourceUseCase,
+  ProvisionRedisDependencyResourceCommandHandler,
+  ProvisionRedisDependencyResourceUseCase,
+  RedeployDeploymentCommandHandler,
+  RedeployDeploymentUseCase,
   RegisterServerUseCase,
   RelinkSourceLinkCommandHandler,
   RelinkSourceLinkUseCase,
@@ -152,16 +207,33 @@ import {
   ResourceEffectiveConfigQueryService,
   ResourceHealthQueryService,
   ResourceProxyConfigurationPreviewQueryService,
+  ResourceRuntimeControlUseCase,
   ResourceRuntimeLogsQueryService,
+  RestartResourceRuntimeCommandHandler,
+  RestoreDependencyResourceBackupCommandHandler,
+  RestoreDependencyResourceBackupUseCase,
   RetryCertificateCommandHandler,
   RetryCertificateUseCase,
+  RetryDeploymentCommandHandler,
+  RetryDeploymentUseCase,
   RetryDomainBindingVerificationCommandHandler,
   RetryDomainBindingVerificationUseCase,
   RevokeCertificateCommandHandler,
   RevokeCertificateUseCase,
+  RollbackDeploymentCommandHandler,
+  RollbackDeploymentUseCase,
+  RotateResourceDependencyBindingSecretCommandHandler,
+  RotateResourceDependencyBindingSecretUseCase,
   RotateSshCredentialCommandHandler,
   RotateSshCredentialUseCase,
+  RunScheduledTaskNowCommandHandler,
+  RunScheduledTaskNowUseCase,
   RuntimePlanResolutionInputBuilder,
+  ScheduledTaskRunAdmissionService,
+  ScheduledTaskRunLogsQueryHandler,
+  ScheduledTaskRunLogsQueryService,
+  ScheduledTaskRunWorker,
+  ScheduledTaskScheduler,
   SetEnvironmentVariableUseCase,
   SetResourceVariableCommandHandler,
   SetResourceVariableUseCase,
@@ -169,6 +241,8 @@ import {
   ShowCertificateQueryService,
   ShowDefaultAccessDomainPolicyQueryHandler,
   ShowDefaultAccessDomainPolicyQueryService,
+  ShowDependencyResourceBackupQueryHandler,
+  ShowDependencyResourceBackupQueryService,
   ShowDependencyResourceQueryHandler,
   ShowDependencyResourceQueryService,
   ShowDeploymentQueryHandler,
@@ -177,17 +251,29 @@ import {
   ShowDomainBindingQueryService,
   ShowEnvironmentQueryService,
   ShowOperatorWorkQueryHandler,
+  ShowPreviewEnvironmentQueryHandler,
+  ShowPreviewEnvironmentQueryService,
+  ShowPreviewPolicyQueryHandler,
+  ShowPreviewPolicyQueryService,
   ShowProjectQueryHandler,
   ShowProjectQueryService,
   ShowResourceDependencyBindingQueryHandler,
   ShowResourceDependencyBindingQueryService,
   ShowResourceQueryHandler,
   ShowResourceQueryService,
+  ShowScheduledTaskQueryHandler,
+  ShowScheduledTaskQueryService,
+  ShowScheduledTaskRunQueryHandler,
+  ShowScheduledTaskRunQueryService,
   ShowServerQueryService,
+  ShowSourceEventQueryHandler,
+  ShowSourceEventQueryService,
   ShowSshCredentialQueryHandler,
   ShowSshCredentialQueryService,
   ShowStorageVolumeQueryHandler,
   ShowStorageVolumeQueryService,
+  StartResourceRuntimeCommandHandler,
+  StopResourceRuntimeCommandHandler,
   StreamDeploymentEventsQueryHandler,
   StreamDeploymentEventsQueryService,
   TestServerConnectivityUseCase,
@@ -204,6 +290,7 @@ import { type DomainError, ok, type Result } from "@appaloft/core";
 import { type DependencyContainer } from "tsyringe";
 import { ShellDeploymentEventObserver } from "./deployment-event-observer";
 import { PublicDnsDomainOwnershipVerifier } from "./domain-ownership-verifier";
+import { ShellPreviewEnvironmentCleaner } from "./preview-environment-cleaner";
 
 class ShellCertificateProviderSelectionPolicy implements CertificateProviderSelectionPolicy {
   async select(
@@ -215,6 +302,100 @@ class ShellCertificateProviderSelectionPolicy implements CertificateProviderSele
       providerKey: input.providerKey ?? "acme",
       challengeType: input.challengeType ?? "http-01",
     });
+  }
+}
+
+class ShellManagedPostgresProvider implements ManagedPostgresProviderPort {
+  supports(providerKey: string): boolean {
+    return providerKey === "appaloft-managed-postgres";
+  }
+
+  async realize(
+    context: ExecutionContext,
+    input: ManagedPostgresRealizationInput,
+  ): Promise<Result<ManagedPostgresRealizationResult, DomainError>> {
+    void context;
+    const databaseName = input.slug.replaceAll("-", "_");
+    return ok({
+      providerResourceHandle: `pg/${input.dependencyResourceId}`,
+      endpoint: {
+        host: `${input.slug}.postgres.internal`,
+        port: 5432,
+        databaseName,
+        maskedConnection: `postgres://app:********@${input.slug}.postgres.internal:5432/${databaseName}`,
+      },
+      secretRef: `secret://dependency/postgres/${input.dependencyResourceId}`,
+      realizedAt: input.requestedAt,
+    });
+  }
+
+  async delete(
+    context: ExecutionContext,
+    input: ManagedPostgresDeleteInput,
+  ): Promise<Result<ManagedPostgresDeleteResult, DomainError>> {
+    void context;
+    return ok({ deletedAt: input.requestedAt });
+  }
+}
+
+class ShellManagedRedisProvider implements ManagedRedisProviderPort {
+  supports(providerKey: string): boolean {
+    return providerKey === "appaloft-managed-redis";
+  }
+
+  async realize(
+    context: ExecutionContext,
+    input: ManagedRedisRealizationInput,
+  ): Promise<Result<ManagedRedisRealizationResult, DomainError>> {
+    void context;
+    return ok({
+      providerResourceHandle: `redis/${input.dependencyResourceId}`,
+      endpoint: {
+        host: `${input.slug}.redis.internal`,
+        port: 6379,
+        maskedConnection: `redis://:********@${input.slug}.redis.internal:6379/0`,
+      },
+      secretRef: `secret://dependency/redis/${input.dependencyResourceId}`,
+      realizedAt: input.requestedAt,
+    });
+  }
+
+  async delete(
+    context: ExecutionContext,
+    input: ManagedRedisDeleteInput,
+  ): Promise<Result<ManagedRedisDeleteResult, DomainError>> {
+    void context;
+    return ok({ deletedAt: input.requestedAt });
+  }
+}
+
+class ShellDependencyResourceBackupProvider implements DependencyResourceBackupProviderPort {
+  supports(providerKey: string, dependencyKind: DependencyResourceKind): boolean {
+    return (
+      (providerKey === "appaloft-managed-postgres" && dependencyKind === "postgres") ||
+      (providerKey === "external-postgres" && dependencyKind === "postgres") ||
+      (providerKey === "external-redis" && dependencyKind === "redis")
+    );
+  }
+
+  async createBackup(
+    context: ExecutionContext,
+    input: DependencyResourceBackupProviderInput,
+  ): Promise<Result<DependencyResourceBackupProviderResult, DomainError>> {
+    void context;
+    return ok({
+      providerArtifactHandle: `backup/${input.dependencyResourceId}/${input.backupId}`,
+      completedAt: input.requestedAt,
+      retentionStatus: "retained",
+    });
+  }
+
+  async restoreBackup(
+    context: ExecutionContext,
+    input: DependencyResourceRestoreProviderInput,
+  ): Promise<Result<DependencyResourceRestoreProviderResult, DomainError>> {
+    void context;
+    return ok({ completedAt: input.requestedAt });
   }
 }
 
@@ -238,15 +419,31 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(CheckServerDeleteSafetyQueryHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
   container.registerSingleton(ConfigureDefaultAccessDomainPolicyCommandHandler);
+  container.registerSingleton(ConfigurePreviewPolicyCommandHandler);
+  container.registerSingleton(DeletePreviewEnvironmentCommandHandler);
+  container.registerSingleton(ListPreviewEnvironmentsQueryHandler);
+  container.registerSingleton(ShowPreviewEnvironmentQueryHandler);
+  container.registerSingleton(ShowPreviewPolicyQueryHandler);
   container.registerSingleton(ListDefaultAccessDomainPoliciesQueryHandler);
   container.registerSingleton(ShowDefaultAccessDomainPolicyQueryHandler);
   container.registerSingleton(ConfigureServerEdgeProxyCommandHandler);
   container.registerSingleton(ConfigureDomainBindingRouteCommandHandler);
   container.registerSingleton(ConfigureResourceAccessCommandHandler);
+  container.registerSingleton(ConfigureResourceAutoDeployCommandHandler);
+  container.registerSingleton(IngestSourceEventCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
   container.registerSingleton(ConfigureResourceSourceCommandHandler);
+  container.registerSingleton(CreateScheduledTaskCommandHandler);
+  container.registerSingleton(ConfigureScheduledTaskCommandHandler);
+  container.registerSingleton(DeleteScheduledTaskCommandHandler);
+  container.registerSingleton(RunScheduledTaskNowCommandHandler);
+  container.registerSingleton(ListScheduledTasksQueryHandler);
+  container.registerSingleton(ShowScheduledTaskQueryHandler);
+  container.registerSingleton(ListScheduledTaskRunsQueryHandler);
+  container.registerSingleton(ShowScheduledTaskRunQueryHandler);
+  container.registerSingleton(ScheduledTaskRunLogsQueryHandler);
   container.registerSingleton(AttachResourceStorageCommandHandler);
   container.registerSingleton(DetachResourceStorageCommandHandler);
   container.registerSingleton(SetResourceVariableCommandHandler);
@@ -267,6 +464,12 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ShowDeploymentQueryHandler);
   container.registerSingleton(DeploymentPlanQueryHandler);
   container.registerSingleton(DeploymentRecoveryReadinessQueryHandler);
+  container.registerSingleton(RetryDeploymentCommandHandler);
+  container.registerSingleton(RedeployDeploymentCommandHandler);
+  container.registerSingleton(RollbackDeploymentCommandHandler);
+  container.registerSingleton(StopResourceRuntimeCommandHandler);
+  container.registerSingleton(StartResourceRuntimeCommandHandler);
+  container.registerSingleton(RestartResourceRuntimeCommandHandler);
   container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
@@ -287,14 +490,23 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(CreateStorageVolumeCommandHandler);
   container.registerSingleton(BindResourceDependencyCommandHandler);
   container.registerSingleton(UnbindResourceDependencyCommandHandler);
+  container.registerSingleton(RotateResourceDependencyBindingSecretCommandHandler);
   container.registerSingleton(ListResourceDependencyBindingsQueryHandler);
   container.registerSingleton(ShowResourceDependencyBindingQueryHandler);
+  container.registerSingleton(ListSourceEventsQueryHandler);
+  container.registerSingleton(ShowSourceEventQueryHandler);
   container.registerSingleton(ProvisionPostgresDependencyResourceCommandHandler);
   container.registerSingleton(ImportPostgresDependencyResourceCommandHandler);
+  container.registerSingleton(ProvisionRedisDependencyResourceCommandHandler);
+  container.registerSingleton(ImportRedisDependencyResourceCommandHandler);
   container.registerSingleton(RenameDependencyResourceCommandHandler);
   container.registerSingleton(DeleteDependencyResourceCommandHandler);
+  container.registerSingleton(CreateDependencyResourceBackupCommandHandler);
+  container.registerSingleton(RestoreDependencyResourceBackupCommandHandler);
   container.registerSingleton(ListDependencyResourcesQueryHandler);
   container.registerSingleton(ShowDependencyResourceQueryHandler);
+  container.registerSingleton(ListDependencyResourceBackupsQueryHandler);
+  container.registerSingleton(ShowDependencyResourceBackupQueryHandler);
   container.registerSingleton(RenameStorageVolumeCommandHandler);
   container.registerSingleton(DeleteStorageVolumeCommandHandler);
   container.registerSingleton(ListStorageVolumesQueryHandler);
@@ -302,6 +514,12 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.certificateProviderSelectionPolicy,
     ShellCertificateProviderSelectionPolicy,
+  );
+  container.registerSingleton(tokens.managedPostgresProvider, ShellManagedPostgresProvider);
+  container.registerSingleton(tokens.managedRedisProvider, ShellManagedRedisProvider);
+  container.registerSingleton(
+    tokens.dependencyResourceBackupProvider,
+    ShellDependencyResourceBackupProvider,
   );
   container.registerSingleton(tokens.domainOwnershipVerifier, PublicDnsDomainOwnershipVerifier);
   container.registerSingleton(tokens.archiveProjectUseCase, ArchiveProjectUseCase);
@@ -321,6 +539,16 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.showDefaultAccessDomainPolicyQueryService,
     ShowDefaultAccessDomainPolicyQueryService,
   );
+  container.registerSingleton(tokens.configurePreviewPolicyUseCase, ConfigurePreviewPolicyUseCase);
+  container.registerSingleton(tokens.showPreviewPolicyQueryService, ShowPreviewPolicyQueryService);
+  container.registerSingleton(
+    tokens.listPreviewEnvironmentsQueryService,
+    ListPreviewEnvironmentsQueryService,
+  );
+  container.registerSingleton(
+    tokens.showPreviewEnvironmentQueryService,
+    ShowPreviewEnvironmentQueryService,
+  );
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
   container.registerSingleton(tokens.archiveResourceUseCase, ArchiveResourceUseCase);
   container.registerSingleton(tokens.deleteResourceUseCase, DeleteResourceUseCase);
@@ -335,6 +563,32 @@ export function registerApplicationServices(container: DependencyContainer): voi
     ConfigureResourceAccessUseCase,
   );
   container.registerSingleton(
+    tokens.configureResourceAutoDeployUseCase,
+    ConfigureResourceAutoDeployUseCase,
+  );
+  container.registerSingleton(tokens.ingestSourceEventUseCase, IngestSourceEventUseCase);
+  container.registerSingleton(tokens.sourceEventVerificationPort, GenericSignedSourceEventVerifier);
+  container.registerSingleton(
+    tokens.sourceEventDeploymentDispatcher,
+    CreateDeploymentSourceEventDispatcher,
+  );
+  container.registerSingleton(tokens.previewLifecycleService, PreviewLifecycleService);
+  container.registerSingleton(tokens.previewFeedbackService, PreviewFeedbackService);
+  container.registerSingleton(
+    tokens.previewDeploymentProcessManager,
+    PreviewDeploymentProcessManager,
+  );
+  container.registerSingleton(
+    tokens.previewPullRequestEventIngestService,
+    PreviewPullRequestEventIngestService,
+  );
+  container.registerSingleton(
+    tokens.previewEnvironmentCleanupService,
+    PreviewEnvironmentCleanupService,
+  );
+  container.registerSingleton(tokens.previewEnvironmentCleaner, ShellPreviewEnvironmentCleaner);
+  container.registerSingleton(tokens.previewCleanupRetryScheduler, PreviewCleanupRetryScheduler);
+  container.registerSingleton(
     tokens.configureResourceHealthUseCase,
     ConfigureResourceHealthUseCase,
   );
@@ -346,6 +600,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.configureResourceRuntimeUseCase,
     ConfigureResourceRuntimeUseCase,
   );
+  container.registerSingleton(tokens.resourceRuntimeControlUseCase, ResourceRuntimeControlUseCase);
   container.registerSingleton(
     tokens.importResourceVariablesUseCase,
     ImportResourceVariablesUseCase,
@@ -354,6 +609,33 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.unsetResourceVariableUseCase, UnsetResourceVariableUseCase);
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.showResourceQueryService, ShowResourceQueryService);
+  container.registerSingleton(tokens.createScheduledTaskUseCase, CreateScheduledTaskUseCase);
+  container.registerSingleton(tokens.configureScheduledTaskUseCase, ConfigureScheduledTaskUseCase);
+  container.registerSingleton(tokens.deleteScheduledTaskUseCase, DeleteScheduledTaskUseCase);
+  container.registerSingleton(tokens.runScheduledTaskNowUseCase, RunScheduledTaskNowUseCase);
+  container.registerSingleton(
+    tokens.scheduledTaskRunAdmissionService,
+    ScheduledTaskRunAdmissionService,
+  );
+  container.registerSingleton(tokens.scheduledTaskRunWorker, ScheduledTaskRunWorker);
+  container.registerSingleton(tokens.scheduledTaskScheduler, ScheduledTaskScheduler);
+  container.registerSingleton(
+    tokens.listScheduledTasksQueryService,
+    ListScheduledTasksQueryService,
+  );
+  container.registerSingleton(tokens.showScheduledTaskQueryService, ShowScheduledTaskQueryService);
+  container.registerSingleton(
+    tokens.listScheduledTaskRunsQueryService,
+    ListScheduledTaskRunsQueryService,
+  );
+  container.registerSingleton(
+    tokens.showScheduledTaskRunQueryService,
+    ShowScheduledTaskRunQueryService,
+  );
+  container.registerSingleton(
+    tokens.scheduledTaskRunLogsQueryService,
+    ScheduledTaskRunLogsQueryService,
+  );
   container.registerSingleton(
     tokens.provisionPostgresDependencyResourceUseCase,
     ProvisionPostgresDependencyResourceUseCase,
@@ -361,6 +643,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.importPostgresDependencyResourceUseCase,
     ImportPostgresDependencyResourceUseCase,
+  );
+  container.registerSingleton(
+    tokens.provisionRedisDependencyResourceUseCase,
+    ProvisionRedisDependencyResourceUseCase,
+  );
+  container.registerSingleton(
+    tokens.importRedisDependencyResourceUseCase,
+    ImportRedisDependencyResourceUseCase,
   );
   container.registerSingleton(
     tokens.renameDependencyResourceUseCase,
@@ -378,10 +668,30 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.showDependencyResourceQueryService,
     ShowDependencyResourceQueryService,
   );
+  container.registerSingleton(
+    tokens.createDependencyResourceBackupUseCase,
+    CreateDependencyResourceBackupUseCase,
+  );
+  container.registerSingleton(
+    tokens.restoreDependencyResourceBackupUseCase,
+    RestoreDependencyResourceBackupUseCase,
+  );
+  container.registerSingleton(
+    tokens.listDependencyResourceBackupsQueryService,
+    ListDependencyResourceBackupsQueryService,
+  );
+  container.registerSingleton(
+    tokens.showDependencyResourceBackupQueryService,
+    ShowDependencyResourceBackupQueryService,
+  );
   container.registerSingleton(tokens.bindResourceDependencyUseCase, BindResourceDependencyUseCase);
   container.registerSingleton(
     tokens.unbindResourceDependencyUseCase,
     UnbindResourceDependencyUseCase,
+  );
+  container.registerSingleton(
+    tokens.rotateResourceDependencyBindingSecretUseCase,
+    RotateResourceDependencyBindingSecretUseCase,
   );
   container.registerSingleton(
     tokens.listResourceDependencyBindingsQueryService,
@@ -391,6 +701,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.showResourceDependencyBindingQueryService,
     ShowResourceDependencyBindingQueryService,
   );
+  container.registerSingleton(tokens.listSourceEventsQueryService, ListSourceEventsQueryService);
+  container.registerSingleton(tokens.showSourceEventQueryService, ShowSourceEventQueryService);
   container.registerSingleton(tokens.createStorageVolumeUseCase, CreateStorageVolumeUseCase);
   container.registerSingleton(tokens.renameStorageVolumeUseCase, RenameStorageVolumeUseCase);
   container.registerSingleton(tokens.deleteStorageVolumeUseCase, DeleteStorageVolumeUseCase);
@@ -471,6 +783,9 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.deploymentFactory, DeploymentFactory);
   container.registerSingleton(tokens.deploymentLifecycleService, DeploymentLifecycleService);
   container.registerSingleton(tokens.createDeploymentUseCase, CreateDeploymentUseCase);
+  container.registerSingleton(tokens.retryDeploymentUseCase, RetryDeploymentUseCase);
+  container.registerSingleton(tokens.redeployDeploymentUseCase, RedeployDeploymentUseCase);
+  container.registerSingleton(tokens.rollbackDeploymentUseCase, RollbackDeploymentUseCase);
   container.registerSingleton(tokens.cleanupPreviewUseCase, CleanupPreviewUseCase);
   container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);
   container.registerSingleton(

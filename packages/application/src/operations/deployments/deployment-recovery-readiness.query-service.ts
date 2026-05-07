@@ -36,9 +36,9 @@ const activeDeploymentStatuses = new Set<DeploymentStatus>([
 ]);
 const retryableDeploymentStatuses = new Set<DeploymentStatus>(["failed", "canceled"]);
 const recoveryCommandActive = {
-  retry: false,
-  redeploy: false,
-  rollback: false,
+  retry: true,
+  redeploy: true,
+  rollback: true,
 } as const;
 
 function reason(
@@ -220,8 +220,8 @@ function recommendedActions(input: {
       targetOperation: "deployments.retry",
       label: "Retry the deployment attempt",
       safeByDefault: false,
-      blockedReasonCode: "recovery-command-not-active",
       commandActive: recoveryCommandActive.retry,
+      ...(recoveryCommandActive.retry ? {} : { blockedReasonCode: "recovery-command-not-active" }),
     });
   }
 
@@ -231,8 +231,10 @@ function recommendedActions(input: {
       targetOperation: "deployments.redeploy",
       label: "Redeploy the current resource profile",
       safeByDefault: false,
-      blockedReasonCode: "recovery-command-not-active",
       commandActive: recoveryCommandActive.redeploy,
+      ...(recoveryCommandActive.redeploy
+        ? {}
+        : { blockedReasonCode: "recovery-command-not-active" }),
     });
   }
 
@@ -242,8 +244,10 @@ function recommendedActions(input: {
       targetOperation: "deployments.rollback",
       label: "Roll back to a retained successful deployment",
       safeByDefault: false,
-      blockedReasonCode: "recovery-command-not-active",
       commandActive: recoveryCommandActive.rollback,
+      ...(recoveryCommandActive.rollback
+        ? {}
+        : { blockedReasonCode: "recovery-command-not-active" }),
     });
   }
 
@@ -410,7 +414,7 @@ export class DeploymentRecoveryReadinessQueryService {
           commandActive: recoveryCommandActive.rollback,
           reasons: [
             ...rollbackReasons,
-            ...(rollbackReady
+            ...(rollbackReady && !recoveryCommandActive.rollback
               ? [
                   reason("recovery-command-not-active", {
                     phase: "operation-catalog",

@@ -69,6 +69,7 @@ export interface PrepareRemotePgliteStateSyncInput {
 
 const explicitLocalStateBackends = new Set(["local-pglite", "postgres-control-plane"]);
 const remoteStateRevisionConflictExitCode = 76;
+const remotePgliteMaintenanceLockStaleAfterMs = 3 * 60_000;
 
 function shellQuote(input: string): string {
   return `'${input.replaceAll("'", "'\\''")}'`;
@@ -613,6 +614,7 @@ export async function prepareRemotePgliteStateSync(
     dataRoot: planValue.dataRoot,
     owner: "appaloft-cli",
     correlationId: `remote_state_shell_${process.pid}_${Date.now().toString(36)}`,
+    staleAfterMs: remotePgliteMaintenanceLockStaleAfterMs,
     ...(lifecycleRunner ? { runner: lifecycleRunner } : {}),
   });
   const prepared = await lifecycle.prepare();
@@ -689,6 +691,7 @@ export async function prepareRemotePgliteStateSync(
       dataRoot: planValue.dataRoot,
       owner: "appaloft-cli",
       correlationId: `remote_state_shell_resume_${process.pid}_${Date.now().toString(36)}`,
+      staleAfterMs: remotePgliteMaintenanceLockStaleAfterMs,
       ...(lifecycleRunner ? { runner: lifecycleRunner } : {}),
     }).prepare();
     if (resumed.isErr()) {

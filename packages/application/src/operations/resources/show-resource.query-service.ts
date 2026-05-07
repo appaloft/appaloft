@@ -4,6 +4,7 @@ import {
   err,
   ok,
   type ResourceAccessProfileState,
+  type ResourceAutoDeployPolicyState,
   ResourceByIdSpec,
   type ResourceHealthCheckPolicyState,
   ResourceId,
@@ -12,6 +13,7 @@ import {
   type ResourceSourceBindingState,
   type ResourceState,
   type Result,
+  SourceBindingFingerprint,
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
@@ -24,6 +26,7 @@ import {
   type ResourceAccessProfile,
   type ResourceAccessSummary,
   type ResourceDetail,
+  type ResourceDetailAutoDeployPolicy,
   type ResourceDetailDeploymentContext,
   type ResourceDetailIdentity,
   type ResourceDetailNetworkProfile,
@@ -99,6 +102,7 @@ function sourceProfileFromState(
     kind: source.kind.value,
     locator: source.locator.value,
     displayName: source.displayName.value,
+    sourceBindingFingerprint: SourceBindingFingerprint.fromSourceBindingState(source).value,
     ...(source.gitRef ? { gitRef: source.gitRef.value } : {}),
     ...(source.commitSha ? { commitSha: source.commitSha.value } : {}),
     ...(source.baseDirectory ? { baseDirectory: source.baseDirectory.value } : {}),
@@ -110,6 +114,30 @@ function sourceProfileFromState(
     ...(source.imageTag ? { imageTag: source.imageTag.value } : {}),
     ...(source.imageDigest ? { imageDigest: source.imageDigest.value } : {}),
     ...(metadata ? { metadata } : {}),
+  };
+}
+
+function autoDeployPolicyFromState(
+  policy: ResourceAutoDeployPolicyState | undefined,
+): ResourceDetailAutoDeployPolicy | undefined {
+  if (!policy) {
+    return undefined;
+  }
+
+  return {
+    status: policy.status.value,
+    triggerKind: policy.triggerKind.value,
+    refs: policy.refs.map((ref) => ref.value),
+    eventKinds: policy.eventKinds.map((eventKind) => eventKind.value),
+    sourceBindingFingerprint: policy.sourceBindingFingerprint.value,
+    ...(policy.blockedReason ? { blockedReason: policy.blockedReason.value } : {}),
+    ...(policy.genericWebhookSecretRef
+      ? { genericWebhookSecretRef: policy.genericWebhookSecretRef.value }
+      : {}),
+    ...(policy.dedupeWindowSeconds
+      ? { dedupeWindowSeconds: policy.dedupeWindowSeconds.value }
+      : {}),
+    updatedAt: policy.updatedAt.value,
   };
 }
 
@@ -378,6 +406,7 @@ export class ShowResourceQueryService {
         : [];
       const deployment = latestDeployment(deployments);
       const source = sourceProfileFromState(state.sourceBinding);
+      const autoDeployPolicy = autoDeployPolicyFromState(state.autoDeployPolicy);
       const runtimeProfile = runtimeProfileFromState(state.runtimeProfile);
       const networkProfile = networkProfileFromState(state.networkProfile);
       const accessProfile = accessProfileFromState(state.accessProfile);
@@ -391,6 +420,7 @@ export class ShowResourceQueryService {
         schemaVersion: "resources.show/v1",
         resource: identityFromState(state, summary, deployment),
         ...(source ? { source } : {}),
+        ...(autoDeployPolicy ? { autoDeployPolicy } : {}),
         ...(runtimeProfile ? { runtimeProfile } : {}),
         ...(networkProfile ? { networkProfile } : {}),
         ...(accessProfile ? { accessProfile } : {}),

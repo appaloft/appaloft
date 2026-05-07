@@ -8,12 +8,13 @@
 - Handler: `BindResourceDependencyCommandHandler`
 - Use case: `BindResourceDependencyUseCase`
 - Domain / bounded context: Dependency Resources / Resource binding
-- Current status: proposed for Phase 7 Code Round
+- Current status: active Phase 7 Code Round
 
 ## Purpose
 
-Bind a ready Postgres Dependency Resource to an active Resource with safe target exposure metadata
-for future deployment snapshot materialization and runtime injection.
+Bind a ready Postgres Dependency Resource, ready imported Redis Dependency Resource, or realized
+ready Appaloft-managed Redis Dependency Resource to an active Resource with safe target exposure
+metadata for future deployment snapshot materialization and runtime injection.
 
 ## Input Model
 
@@ -21,7 +22,7 @@ for future deployment snapshot materialization and runtime injection.
 | --- | --- | --- |
 | `resourceId` | Yes | Resource receiving the dependency binding. |
 | `dependencyResourceId` | Yes | Dependency Resource being bound. |
-| `targetName` | Yes | Safe variable/profile label for the binding target, for example `DATABASE_URL`. |
+| `targetName` | Yes | Safe variable/profile label for the binding target, for example `DATABASE_URL` or `REDIS_URL`. |
 | `scope` | No | Binding scope; defaults to `runtime-only` in this slice. |
 | `injectionMode` | No | Binding injection mode; defaults to `env` in this slice. |
 
@@ -29,7 +30,9 @@ for future deployment snapshot materialization and runtime injection.
 
 | Branch | Condition | Behavior | Result |
 | --- | --- | --- | --- |
-| Bind | Active Resource and ready Postgres Dependency Resource share project/environment | Persist active ResourceBinding. | `ok({ id })` |
+| Bind | Active Resource and ready bindable Dependency Resource share project/environment | Persist active ResourceBinding. | `ok({ id })` |
+| Managed Postgres not realized | Appaloft-managed Postgres realization is pending, failed, unsupported, or deleted | Reject before mutation. | `resource_dependency_binding_blocked` or structured lifecycle/conflict error |
+| Managed Redis not realized | Appaloft-managed Redis realization is pending, failed, unsupported, deleted, or has an unresolved Appaloft-owned connection ref | Reject before mutation. | `resource_dependency_binding_blocked` |
 | Cross context | Resource and Dependency Resource differ by project/environment | Reject before mutation. | `resource_dependency_binding_context_mismatch` |
 | Duplicate target | Same active Resource/Dependency/target policy exists | Reject before mutation. | `conflict`, `phase = resource-dependency-binding` |
 | Inactive participant | Resource or Dependency Resource is missing, archived, deleted, or not bindable | Reject before mutation. | `not_found`, lifecycle error, or validation error |
@@ -45,4 +48,9 @@ for future deployment snapshot materialization and runtime injection.
 
 The command does not write raw connection secrets, mutate historical deployment snapshots, inject
 runtime environment variables, create deployments, trigger redeploy/retry/rollback, create or
-delete provider-native databases, rotate secrets, or run backup/restore.
+delete provider-native databases or Redis instances, rotate secrets, or run backup/restore. After
+provider-native Postgres realization, binding admission requires a realized ready managed database.
+Provider-native Redis realization applies the same requirement: managed Redis binding is allowed
+only after the Redis resource is realized ready and resolvable through the dependency runtime secret
+store. The governing spec is
+[Redis Provider-Native Realization](../specs/049-redis-provider-native-realization/spec.md).

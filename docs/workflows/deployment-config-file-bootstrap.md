@@ -209,6 +209,9 @@ Recovery requirements:
   `remote-state-lock` error for an active lock;
 - abandoned locks must be visible through diagnostics and recoverable by a deliberate operator
   action or a safe stale-lock policy that records the recovered lock metadata before continuing;
+- state-root maintenance locks protect short ensure/download/upload work, so current clients may
+  cap older recorded stale windows to their configured maintenance stale window before stale-only
+  recovery when heartbeat metadata is no longer fresh;
 - incomplete state-root lock directories that never wrote owner/heartbeat metadata are not valid
   active leases and may use a shorter incomplete-lock stale window before stale-only recovery;
 - out-of-band remote-state diagnostics and stale recovery must run without acquiring the same
@@ -216,6 +219,9 @@ Recovery requirements:
 - repository-owned docs production/preview maintenance uses the `Remote State Maintenance`
   workflow, which shares the docs remote-state concurrency group, runs `inspect` or stale-only
   `recover-stale`, and reports safe lock metadata in the GitHub step summary;
+- repository-owned docs production/preview deploys may run a narrow SSH runtime-capacity preflight
+  before state-root locking to remove stale attempt-scoped `ssh-deployments/dep_*` staging
+  directories when previous failed uploads exhausted the remote runtime filesystem;
 - releasing a lock must be owner-aware so an older workflow cannot delete a newer lock after
   recovery or superseding takeover;
 - failed migrations must leave either the previous state readable or an explicit recovery marker
@@ -667,7 +673,7 @@ Config-file errors use stable codes and phases:
 | `control_plane_unsupported` | `control-plane-capability` | No | Selected control-plane behavior is not implemented or the endpoint lacks the requested capability. |
 | `control_plane_adoption_required` | `control-plane-resolution` | No | A server adoption marker indicates control-plane ownership, but the entrypoint attempted uncoordinated direct SSH state mutation. |
 | `validation_error` | `config-profile-resolution` | No | Profile field cannot map safely to resource/environment commands. |
-| `validation_error` | `remote-state-resolution` | Conditional | SSH-targeted entrypoint could not resolve or initialize the remote Appaloft state backend. |
+| `infra_error` | `remote-state-resolution` | Conditional | SSH-targeted entrypoint could not resolve or initialize the remote Appaloft state backend; safe details should include target host/port, exit code, and remote stderr when available. |
 | `infra_error` | `remote-state-lock` | Yes | Remote state mutation lock could not be acquired or was interrupted. |
 | `infra_error` | `remote-state-migration` | Conditional | Remote state migration failed before workflow commands were dispatched. |
 | `coordination_timeout` | `operation-coordination` | Yes | A dispatched command could not acquire its logical mutation scope within the bounded wait window. |

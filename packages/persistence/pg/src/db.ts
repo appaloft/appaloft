@@ -46,6 +46,25 @@ import { storageVolumesMigration } from "./migrations/038_storage_volumes";
 import { dependencyResourcesMigration } from "./migrations/039_dependency_resources";
 import { resourceDependencyBindingsMigration } from "./migrations/040_resource_dependency_bindings";
 import { deploymentDependencyBindingReferencesMigration } from "./migrations/041_deployment_dependency_binding_references";
+import { dependencyBindingSecretRotationMigration } from "./migrations/042_dependency_binding_secret_rotation";
+import { dependencyResourceProviderRealizationMigration } from "./migrations/043_dependency_resource_provider_realization";
+import { dependencyResourceBackupsMigration } from "./migrations/044_dependency_resource_backups";
+import { deploymentRecoveryMetadataMigration } from "./migrations/045_deployment_recovery_metadata";
+import { deploymentRollbackMetadataMigration } from "./migrations/046_deployment_rollback_metadata";
+import { resourceRuntimeControlAttemptsMigration } from "./migrations/047_resource_runtime_control_attempts";
+import { resourceAutoDeployPolicyMigration } from "./migrations/048_resource_auto_deploy_policy";
+import { sourceEventsMigration } from "./migrations/049_source_events";
+import { serverTargetKindMigration } from "./migrations/050_server_target_kind";
+import { scheduledTaskDefinitionsMigration } from "./migrations/051_scheduled_task_definitions";
+import { scheduledTaskRunAttemptsMigration } from "./migrations/052_scheduled_task_run_attempts";
+import { scheduledTaskRunLogsMigration } from "./migrations/053_scheduled_task_run_logs";
+import { previewEnvironmentsMigration } from "./migrations/054_preview_environments";
+import { previewPoliciesMigration } from "./migrations/055_preview_policies";
+import { previewPolicyDecisionsMigration } from "./migrations/056_preview_policy_decisions";
+import { previewPolicyQuotaExpiryMigration } from "./migrations/057_preview_policy_quota_expiry";
+import { previewFeedbackRecordsMigration } from "./migrations/058_preview_feedback_records";
+import { previewCleanupAttemptsMigration } from "./migrations/059_preview_cleanup_attempts";
+import { dependencyResourceSecretsMigration } from "./migrations/060_dependency_resource_secrets";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -182,6 +201,26 @@ class StaticMigrationProvider implements MigrationProvider {
       "040_resource_dependency_bindings": resourceDependencyBindingsMigration,
       "041_deployment_dependency_binding_references":
         deploymentDependencyBindingReferencesMigration,
+      "042_dependency_binding_secret_rotation": dependencyBindingSecretRotationMigration,
+      "043_dependency_resource_provider_realization":
+        dependencyResourceProviderRealizationMigration,
+      "044_dependency_resource_backups": dependencyResourceBackupsMigration,
+      "045_deployment_recovery_metadata": deploymentRecoveryMetadataMigration,
+      "046_deployment_rollback_metadata": deploymentRollbackMetadataMigration,
+      "047_resource_runtime_control_attempts": resourceRuntimeControlAttemptsMigration,
+      "048_resource_auto_deploy_policy": resourceAutoDeployPolicyMigration,
+      "049_source_events": sourceEventsMigration,
+      "050_server_target_kind": serverTargetKindMigration,
+      "051_scheduled_task_definitions": scheduledTaskDefinitionsMigration,
+      "052_scheduled_task_run_attempts": scheduledTaskRunAttemptsMigration,
+      "053_scheduled_task_run_logs": scheduledTaskRunLogsMigration,
+      "054_preview_environments": previewEnvironmentsMigration,
+      "055_preview_policies": previewPoliciesMigration,
+      "056_preview_policy_decisions": previewPolicyDecisionsMigration,
+      "057_preview_policy_quota_expiry": previewPolicyQuotaExpiryMigration,
+      "058_preview_feedback_records": previewFeedbackRecordsMigration,
+      "059_preview_cleanup_attempts": previewCleanupAttemptsMigration,
+      "060_dependency_resource_secrets": dependencyResourceSecretsMigration,
     };
   }
 }

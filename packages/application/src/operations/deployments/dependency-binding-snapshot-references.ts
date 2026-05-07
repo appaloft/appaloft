@@ -1,7 +1,10 @@
 import {
   type DeploymentDependencyBindingReferenceState,
   DeploymentDependencyBindingSnapshotReadinessValue,
+  DeploymentDependencyRuntimeSecretRef,
   DescriptionText,
+  domainError,
+  type EnvironmentSnapshot,
   err,
   ok,
   ResourceBindingId,
@@ -13,15 +16,52 @@ import {
   type Result,
 } from "@appaloft/core";
 
+import { type ExecutionContext } from "../../execution-context";
 import {
-  type DependencyResourceKind,
+  type DependencyResourceSecretStore,
   type DeploymentDependencyBindingSnapshotReferenceSummary,
   type DeploymentDependencyBindingSnapshotSummary,
   type ResourceDependencyBindingSummary,
+  type RuntimeTargetBackend,
 } from "../../ports";
 
-const runtimeInjectionDeferredReason =
-  "runtime dependency environment injection is deferred for this slice";
+export const dependencyRuntimeSecretDeliveryCapability = "runtime.dependency-secrets" as const;
+const appaloftOwnedDependencySecretRefPrefixes = [
+  "appaloft://dependency-resources/",
+  "appaloft+pg://resource-binding/",
+];
+
+function toDependencyBindingReferenceKind(
+  kind: ResourceInstanceKindValue,
+): DeploymentDependencyBindingSnapshotReferenceSummary["kind"] {
+  if (kind.value === "postgres" || kind.value === "redis") {
+    return kind.value;
+  }
+
+  throw new Error(`Deployment dependency binding reference kind ${kind.value} is not supported`);
+}
+
+function runtimeInjectionBlockReason(
+  binding: ResourceDependencyBindingSummary,
+): string | undefined {
+  if (binding.kind !== "postgres" && binding.kind !== "redis") {
+    return "dependency_runtime_injection_kind_unsupported";
+  }
+
+  if (binding.target.scope !== "runtime-only") {
+    return "dependency_runtime_injection_scope_unsupported";
+  }
+
+  if (binding.target.injectionMode !== "env") {
+    return "dependency_runtime_injection_mode_unsupported";
+  }
+
+  if (!binding.target.secretRef && !binding.connection?.secretRef) {
+    return "dependency_runtime_injection_secret_ref_missing";
+  }
+
+  return undefined;
+}
 
 function snapshotReadiness(input: ResourceDependencyBindingSummary): {
   value: DeploymentDependencyBindingSnapshotReadinessValue;
@@ -32,6 +72,14 @@ function snapshotReadiness(input: ResourceDependencyBindingSummary): {
     input.bindingReadiness.status === "ready" &&
     input.snapshotReadiness.status === "ready"
   ) {
+    const runtimeBlockReason = runtimeInjectionBlockReason(input);
+    if (runtimeBlockReason) {
+      return {
+        value: DeploymentDependencyBindingSnapshotReadinessValue.blocked(),
+        reason: DescriptionText.rehydrate(runtimeBlockReason),
+      };
+    }
+
     return {
       value: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
     };
@@ -69,6 +117,13 @@ export function createDependencyBindingSnapshotReferences(
     if (injectionMode.isErr()) {
       return err(injectionMode.error);
     }
+    const runtimeSecretRefValue = binding.target.secretRef ?? binding.connection?.secretRef;
+    const runtimeSecretRef = runtimeSecretRefValue
+      ? DeploymentDependencyRuntimeSecretRef.create(runtimeSecretRefValue)
+      : undefined;
+    if (runtimeSecretRef?.isErr()) {
+      return err(runtimeSecretRef.error);
+    }
 
     const readiness = snapshotReadiness(binding);
     references.push({
@@ -78,6 +133,7 @@ export function createDependencyBindingSnapshotReferences(
       targetName: targetName.value,
       scope: scope.value,
       injectionMode: injectionMode.value,
+      ...(runtimeSecretRef?.isOk() ? { runtimeSecretRef: runtimeSecretRef.value } : {}),
       snapshotReadiness: readiness.value,
       ...(readiness.reason ? { snapshotReadinessReason: readiness.reason } : {}),
     });
@@ -89,11 +145,10 @@ export function createDependencyBindingSnapshotReferences(
 export function dependencyBindingReferenceSummary(
   reference: DeploymentDependencyBindingReferenceState,
 ): DeploymentDependencyBindingSnapshotReferenceSummary {
-  const kind: DependencyResourceKind = "postgres";
   return {
     bindingId: reference.bindingId.value,
     dependencyResourceId: reference.dependencyResourceId.value,
-    kind,
+    kind: toDependencyBindingReferenceKind(reference.kind),
     targetName: reference.targetName.value,
     scope: reference.scope.value,
     injectionMode: reference.injectionMode.value,
@@ -108,26 +163,110 @@ export function dependencyBindingReferenceSummary(
 
 export function dependencyBindingSnapshotSummaryFromReferences(
   references: DeploymentDependencyBindingReferenceState[],
+  input: { runtimeInjectionReason?: string } = {},
 ): DeploymentDependencyBindingSnapshotSummary {
   return dependencyBindingSnapshotSummaryFromReferenceSummaries(
     references.map(dependencyBindingReferenceSummary),
+    input,
   );
+}
+
+function duplicateRuntimeTargetName(
+  summaries: DeploymentDependencyBindingSnapshotReferenceSummary[],
+) {
+  const seen = new Set<string>();
+  for (const summary of summaries) {
+    if (seen.has(summary.targetName)) {
+      return summary.targetName;
+    }
+    seen.add(summary.targetName);
+  }
+
+  return undefined;
 }
 
 export function dependencyBindingSnapshotSummaryFromReferenceSummaries(
   summaries: DeploymentDependencyBindingSnapshotReferenceSummary[],
+  input: { runtimeInjectionReason?: string } = {},
 ): DeploymentDependencyBindingSnapshotSummary {
+  const blockedReason =
+    input.runtimeInjectionReason ??
+    summaries.find((reference) => reference.snapshotReadiness.status === "blocked")
+      ?.snapshotReadiness.reason ??
+    (duplicateRuntimeTargetName(summaries)
+      ? "dependency_runtime_injection_duplicate_target"
+      : undefined);
+  const status = summaries.length === 0 ? "not-applicable" : blockedReason ? "blocked" : "ready";
+
   return {
-    status:
-      summaries.length === 0
-        ? "not-applicable"
-        : summaries.some((reference) => reference.snapshotReadiness.status === "blocked")
-          ? "blocked"
-          : "ready",
+    status,
     references: summaries,
     runtimeInjection: {
-      status: "deferred",
-      reason: runtimeInjectionDeferredReason,
+      status,
+      ...(blockedReason ? { reason: blockedReason } : {}),
     },
   };
+}
+
+export function dependencyRuntimeInjectionBlockedError(
+  summary: DeploymentDependencyBindingSnapshotSummary,
+) {
+  return domainError.dependencyRuntimeInjectionBlocked(
+    "Dependency runtime injection is blocked for this deployment",
+    {
+      reason: summary.runtimeInjection.reason ?? "dependency_runtime_injection_blocked",
+      bindingCount: summary.references.length,
+    },
+  );
+}
+
+export function dependencyRuntimeInjectionBackendReason(
+  backend: RuntimeTargetBackend,
+): string | undefined {
+  return backend.descriptor.capabilities.includes(dependencyRuntimeSecretDeliveryCapability)
+    ? undefined
+    : "dependency_runtime_injection_target_backend_unsupported";
+}
+
+export async function dependencyRuntimeSecretResolutionReason(input: {
+  context: ExecutionContext;
+  dependencyResourceSecretStore: DependencyResourceSecretStore;
+  references: DeploymentDependencyBindingReferenceState[];
+}): Promise<string | undefined> {
+  for (const reference of input.references) {
+    if (reference.snapshotReadiness.value !== "ready") {
+      continue;
+    }
+    const secretRef = reference.runtimeSecretRef?.value;
+    if (
+      !secretRef ||
+      !appaloftOwnedDependencySecretRefPrefixes.some((prefix) => secretRef.startsWith(prefix))
+    ) {
+      continue;
+    }
+    const resolved = await input.dependencyResourceSecretStore.resolve(input.context, {
+      secretRef,
+    });
+    if (resolved.isErr()) {
+      return "dependency_runtime_secret_unresolved";
+    }
+  }
+
+  return undefined;
+}
+
+export function dependencyRuntimeInjectionEnvironmentConflictReason(input: {
+  environmentSnapshot: EnvironmentSnapshot;
+  references: DeploymentDependencyBindingReferenceState[];
+}): string | undefined {
+  const runtimeVariables = new Set(
+    input.environmentSnapshot
+      .toState()
+      .variables.filter((variable) => variable.exposure.value === "runtime")
+      .map((variable) => variable.key.value),
+  );
+
+  return input.references.some((reference) => runtimeVariables.has(reference.targetName.value))
+    ? "dependency_runtime_injection_target_conflict"
+    : undefined;
 }

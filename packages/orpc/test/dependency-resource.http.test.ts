@@ -6,16 +6,23 @@ import {
   BindResourceDependencyCommand,
   type Command,
   type CommandBus,
+  CreateDependencyResourceBackupCommand,
   createExecutionContext,
   DeleteDependencyResourceCommand,
   type ExecutionContext,
   type ExecutionContextFactory,
   ImportPostgresDependencyResourceCommand,
+  ImportRedisDependencyResourceCommand,
+  ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
   ListResourceDependencyBindingsQuery,
   ProvisionPostgresDependencyResourceCommand,
+  ProvisionRedisDependencyResourceCommand,
   type Query,
   type QueryBus,
+  RestoreDependencyResourceBackupCommand,
+  RotateResourceDependencyBindingSecretCommand,
+  ShowDependencyResourceBackupQuery,
   ShowDependencyResourceQuery,
   ShowResourceDependencyBindingQuery,
   UnbindResourceDependencyCommand,
@@ -49,6 +56,13 @@ function createHarness() {
   const commandBus = {
     execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
       commands.push(command as Command<unknown>);
+      if (command instanceof RotateResourceDependencyBindingSecretCommand) {
+        return ok({
+          id: "rbd_pg",
+          rotatedAt: "2026-01-01T00:00:00.000Z",
+          secretVersion: "rbsv_0001",
+        } as T);
+      }
       return ok({ id: "rsi_pg" } as T);
     },
   } as CommandBus;
@@ -70,6 +84,34 @@ function createHarness() {
             providerManaged: false,
             lifecycleStatus: "ready",
             bindingReadiness: { status: "not-implemented" },
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+          generatedAt: "2026-01-01T00:00:00.000Z",
+        } as T);
+      }
+      if (query instanceof ListDependencyResourceBackupsQuery) {
+        return ok({
+          schemaVersion: "dependency-resources.backups.list/v1",
+          items: [],
+          generatedAt: "2026-01-01T00:00:00.000Z",
+        } as T);
+      }
+      if (query instanceof ShowDependencyResourceBackupQuery) {
+        return ok({
+          schemaVersion: "dependency-resources.backups.show/v1",
+          backup: {
+            id: "drb_1",
+            dependencyResourceId: "rsi_pg",
+            projectId: "prj_demo",
+            environmentId: "env_demo",
+            dependencyKind: "postgres",
+            providerKey: "appaloft-managed-postgres",
+            status: "ready",
+            attemptId: "dba_1",
+            requestedAt: "2026-01-01T00:00:00.000Z",
+            retentionStatus: "retained",
+            providerArtifactHandle: "backup/rsi_pg/drb_1",
+            completedAt: "2026-01-01T00:00:01.000Z",
             createdAt: "2026-01-01T00:00:00.000Z",
           },
           generatedAt: "2026-01-01T00:00:00.000Z",
@@ -171,6 +213,39 @@ describe("dependency resource HTTP routes", () => {
     expect(commands[1]).toBeInstanceOf(ImportPostgresDependencyResourceCommand);
   });
 
+  test("[DEP-RES-REDIS-ENTRY-001] dispatches Redis provision and import through HTTP", async () => {
+    const { app, commands } = createHarness();
+
+    const provisionResponse = await app.handle(
+      new Request("http://localhost/api/dependency-resources/redis/provision", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          name: "Main Cache",
+        }),
+      }),
+    );
+    const importResponse = await app.handle(
+      new Request("http://localhost/api/dependency-resources/redis/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          name: "External Cache",
+          connectionUrl: "redis://default:secret@cache.example.com:6379/0",
+        }),
+      }),
+    );
+
+    expect(provisionResponse.status).toBe(201);
+    expect(importResponse.status).toBe(201);
+    expect(commands[0]).toBeInstanceOf(ProvisionRedisDependencyResourceCommand);
+    expect(commands[1]).toBeInstanceOf(ImportRedisDependencyResourceCommand);
+  });
+
   test("[DEP-RES-PG-ENTRY-002] dispatches list/show/delete through HTTP", async () => {
     const { app, commands, queries } = createHarness();
 
@@ -194,6 +269,47 @@ describe("dependency resource HTTP routes", () => {
     expect(queries[0]).toBeInstanceOf(ListDependencyResourcesQuery);
     expect(queries[1]).toBeInstanceOf(ShowDependencyResourceQuery);
     expect(commands[0]).toBeInstanceOf(DeleteDependencyResourceCommand);
+  });
+
+  test("[DEP-RES-BACKUP-012] dispatches backup and restore routes through HTTP", async () => {
+    const { app, commands, queries } = createHarness();
+
+    const createResponse = await app.handle(
+      new Request("http://localhost/api/dependency-resources/rsi_pg/backups", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          dependencyResourceId: "rsi_pg",
+          description: "pre deploy",
+        }),
+      }),
+    );
+    const listResponse = await app.handle(
+      new Request("http://localhost/api/dependency-resources/rsi_pg/backups"),
+    );
+    const showResponse = await app.handle(
+      new Request("http://localhost/api/dependency-resources/backups/drb_1"),
+    );
+    const restoreResponse = await app.handle(
+      new Request("http://localhost/api/dependency-resources/backups/drb_1/restore", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          backupId: "drb_1",
+          acknowledgeDataOverwrite: true,
+          acknowledgeRuntimeNotRestarted: true,
+        }),
+      }),
+    );
+
+    expect(createResponse.status).toBe(201);
+    expect(listResponse.status).toBe(200);
+    expect(showResponse.status).toBe(200);
+    expect(restoreResponse.status).toBe(202);
+    expect(commands[0]).toBeInstanceOf(CreateDependencyResourceBackupCommand);
+    expect(commands[1]).toBeInstanceOf(RestoreDependencyResourceBackupCommand);
+    expect(queries[0]).toBeInstanceOf(ListDependencyResourceBackupsQuery);
+    expect(queries[1]).toBeInstanceOf(ShowDependencyResourceBackupQuery);
   });
 
   test("[DEP-BIND-PG-ENTRY-001] dispatches resource dependency binding routes through HTTP", async () => {
@@ -223,13 +339,30 @@ describe("dependency resource HTTP routes", () => {
         body: JSON.stringify({ resourceId: "res_api", bindingId: "rbd_pg" }),
       }),
     );
+    const rotateResponse = await app.handle(
+      new Request(
+        "http://localhost/api/resources/res_api/dependency-bindings/rbd_pg/secret-rotations",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            resourceId: "res_api",
+            bindingId: "rbd_pg",
+            secretRef: "secret://dependency-binding/rbd_pg/current",
+            confirmHistoricalSnapshotsRemainUnchanged: true,
+          }),
+        },
+      ),
+    );
 
     expect(bindResponse.status).toBe(201);
     expect(listResponse.status).toBe(200);
     expect(showResponse.status).toBe(200);
     expect(unbindResponse.status).toBe(200);
+    expect(rotateResponse.status).toBe(200);
     expect(commands[0]).toBeInstanceOf(BindResourceDependencyCommand);
     expect(commands[1]).toBeInstanceOf(UnbindResourceDependencyCommand);
+    expect(commands[2]).toBeInstanceOf(RotateResourceDependencyBindingSecretCommand);
     expect(queries[0]).toBeInstanceOf(ListResourceDependencyBindingsQuery);
     expect(queries[1]).toBeInstanceOf(ShowResourceDependencyBindingQuery);
   });

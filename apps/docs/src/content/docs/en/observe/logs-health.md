@@ -12,6 +12,9 @@ searchAliases:
 relatedOperations:
   - resources.runtime-logs
   - resources.health
+  - resources.runtime.stop
+  - resources.runtime.start
+  - resources.runtime.restart
 sidebar:
   label: "Logs and health"
   order: 3
@@ -41,10 +44,39 @@ Health summaries should include:
 
 - Latest deployment status and failed phase.
 - Runtime process state.
+- Latest runtime-control attempt status when the planned Phase 7 controls are active.
 - Health profile and latest check result.
 - Network profile and proxy target.
 - Generated access status.
 - Custom domain and TLS readiness summary.
+
+<h2 id="resource-runtime-controls">Runtime controls</h2>
+
+Runtime controls are a planned Phase 7 capability for stopping, starting, or restarting the current runtime instance for one resource. They only affect current process or container state. They do not delete resources, deployment history, storage, dependency bindings, routes, certificates, logs, or audit data.
+
+When runtime controls are available, Web, CLI, and HTTP API surfaces should use the same resource-level operations:
+
+- `resources.runtime.stop`: stop the current runtime instance.
+- `resources.runtime.start`: start the last stopped instance from retained safe runtime metadata.
+- `resources.runtime.restart`: stop and then start the current runtime.
+
+The latest runtime-control attempt status belongs in the health summary. If there is no runtime-control attempt, or the feature is not active yet, the health summary should omit that section.
+
+<h2 id="runtime-restart-vs-redeploy">Restart is not redeploy</h2>
+
+Restart does not re-run detect, plan, build, pull a new artifact, refresh source, refresh configuration or secrets, apply resource profile changes, attach storage, bind dependencies, update domains, or issue certificates.
+
+After changing source, environment variables, secrets, runtime profile, network profile, access profile, health profile, storage, or dependency bindings, use redeploy, retry, rollback, or recovery readiness instead of restart.
+
+<h2 id="runtime-control-blocked-start">When start is blocked</h2>
+
+Start can only use retained safe runtime metadata for the same resource. It is blocked when runtime metadata is missing, stale, or unsafe, the resource is archived or deleted, another deployment is mutating the same resource-runtime scope, or current profile drift needs acknowledgement.
+
+When start is blocked, inspect the health summary blocked reason, then choose one of:
+
+- Run redeploy so the latest source, config, and profiles produce a new deployment.
+- Check recovery readiness to decide whether retry, redeploy, or rollback is safer.
+- Inspect runtime logs for diagnostics left by the previous runtime.
 
 <h2 id="observe-log-health-surfaces">Entrypoints</h2>
 

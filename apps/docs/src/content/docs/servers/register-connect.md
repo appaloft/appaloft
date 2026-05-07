@@ -10,6 +10,8 @@ searchAliases:
   - "connectivity"
   - "ssh test"
   - "服务器"
+  - "docker swarm"
+  - "orchestrator cluster"
 relatedOperations:
   - servers.register
   - servers.show
@@ -97,8 +99,46 @@ appaloft server register \
   --host 203.0.113.10 \
   --port 22 \
   --provider generic-ssh \
+  --target-kind single-server \
   --proxy-kind traefik
 ```
+
+`--target-kind orchestrator-cluster` 会记录一个集群形态的部署目标，用于未来的 Docker Swarm
+等集群 backend。它本身不会让目标可用于部署；是否就绪仍取决于已注册的 runtime backend 能力和连接检查。
+
+<h2 id="docker-swarm-runtime-target">Docker Swarm runtime target</h2>
+
+Docker Swarm 目标应注册为集群形态的部署目标。只有当目标是 Appaloft 能通过所选连接方式访问的
+Swarm manager endpoint 时，才使用 `--target-kind orchestrator-cluster --provider docker-swarm`。
+
+当前状态：Appaloft 可以记录 Swarm 目标 metadata，通过 `server test` 或 `server doctor` 运行不会
+修改集群的 manager readiness 检查，在创建部署前拒绝不受支持的 Swarm 专用部署字段，并通过默认
+runtime backend 执行 Swarm 部署。只有当安装环境需要显式关闭 Swarm 执行时，才设置
+`APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED=false`；在该 opt-out 下，部署到 Swarm 目标应在
+acceptance 之前返回 `runtime_target_unsupported`。
+
+部署请求仍应只传 resource、environment、server 等 id。不要把 namespace、stack name、service name、
+replicas、update policy、ingress、registry secret 或 manifest 直接写入 `deployments.create` 或
+`appaloft.config.*`。如果 validation error 指向这些字段，应移除它们，并使用当前 runtime target
+已经支持的资源、环境和服务器输入。
+
+部署到 Swarm 目标前，`server test`/`server doctor` 会检查：
+
+- manager 地址可通过 SSH 访问；
+- manager 上 Docker 可用；
+- endpoint 报告 active Swarm manager control plane；
+- overlay network driver 可用；
+- 配置的 edge proxy 与 Swarm target 兼容。
+
+operator 还应确认：
+
+- image registry access 已配置，并且不会暴露 secret value；
+- Swarm edge network 是 overlay network；如果部署应使用 `appaloft-edge` 以外的网络名，请设置
+  `APPALOFT_DOCKER_SWARM_EDGE_NETWORK`；
+- health check 与 service log 能以 Appaloft 可标准化的形态读取。
+
+Swarm rollout 会在 verification 通过前保留上一版 service，logs 和 health 会返回 Appaloft status
+shape，cleanup 会只按 resource、deployment、destination 和 target labels 限定范围。
 
 ```bash title="运行连接测试"
 appaloft server test srv_primary

@@ -239,7 +239,7 @@
             <div class="console-field-label">
               {$t(i18nKeys.common.domain.provider)}
               <DocsHelpLink
-                href={webDocsHrefs.serverDeploymentTarget}
+                href={webDocsHrefs.serverDockerSwarmTarget}
                 ariaLabel={$t(i18nKeys.common.actions.openDocs)}
                 className="size-4 border-0 bg-transparent shadow-none"
               />
