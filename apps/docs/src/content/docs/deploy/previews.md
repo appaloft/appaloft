@@ -50,7 +50,55 @@ appaloft deploy . \
 
 这些 preview flags 在 committed config 之外选择预览身份和路由策略。它们不会把 pull request、branch、source、route 或 preview 字段加入 `deployments.create`。
 
-公开 Marketplace 的 `appaloft/deploy-action` wrapper 仍在推进中。在它发布前，可以直接使用上面的 CLI 形状，或使用仓库自有 wrapper，把可信 workflow 输入映射到同一组 CLI flags。
+公开 `appaloft/deploy-action` wrapper 会把可信 workflow 输入映射到同一组 preview flags。需要本地调试或使用尚未发布的 wrapper 行为时，可以直接使用上面的 CLI 形状。
+
+<h2 id="deployment-action-self-hosted-server-mode">Self-hosted server Action mode</h2>
+
+对于普通部署，`appaloft/deploy-action` 可以触发已有的 self-hosted Appaloft server，而不是在 GitHub runner 里运行 CLI/SSH：
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  id: deploy
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
+    environment-id: ${{ secrets.APPALOFT_ENVIRONMENT_ID }}
+    resource-id: ${{ secrets.APPALOFT_RESOURCE_ID }}
+    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
+```
+
+这个 server API slice 要求 project、environment、resource 和 deployment target 已经存在于 Appaloft server。Action 会调用 server 的 source-link deployment route。提供显式 ids 时，server 可以 bootstrap 缺失的 source link；之后的运行可以省略 ids，让 server 通过 GitHub repository、ref、config path 和 source base directory fingerprint 从已有 source-link state 解析上下文。它不会应用 `appaloft.yml`、上传 source archive、创建 resource、打开 SSH，或修改 SSH-server PGlite state。
+
+Self-hosted server mode 也可以触发 PR preview deploy：
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  id: deploy
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    preview: pull-request
+    preview-id: pr-${{ github.event.pull_request.number }}
+    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
+    environment-id: ${{ secrets.APPALOFT_PREVIEW_ENVIRONMENT_ID }}
+    resource-id: ${{ secrets.APPALOFT_PREVIEW_RESOURCE_ID }}
+    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
+```
+
+Server mode 的 preview deploy 会使用 preview-scoped source fingerprint，并输出 `preview-id`、`deployment-id` 和 `console-url`。它不会应用 `preview-domain-template`、`preview-tls-mode`、`require-preview-url`、`runtime-name`、`environment-variables` 或 `secret-variables`；这些策略需要等 server 端拥有后再进入这个路径。
+
+非 secret 的 control-plane connection policy 也可以写在 `appaloft.yml`：
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+```
+
+Project、environment、resource、server、token、SSH 和 database identity 不要写进 committed config。它们必须来自可信 workflow inputs、variables、secrets、已有 source links 或 Appaloft server。
 
 <h2 id="deployment-pr-preview-output">Preview URL output</h2>
 

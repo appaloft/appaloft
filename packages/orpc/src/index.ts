@@ -4089,7 +4089,13 @@ async function handleActionSourceLinkDeploymentRoute(input: {
     }
   }
 
-  return Response.json(result.value, { status: 202 });
+  return Response.json(
+    {
+      ...result.value,
+      deploymentHref: `/deployments/${result.value.id}`,
+    },
+    { status: 202 },
+  );
 }
 
 async function handleGitHubPreviewPullRequestRoute(input: {

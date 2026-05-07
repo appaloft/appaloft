@@ -62,6 +62,7 @@ describe("deploy-action wrapper reference", () => {
     expect(actionYaml).toContain("appaloft-version");
     expect(actionYaml).toContain("preview-url");
     expect(actionYaml).toContain("preview-cleanup-status");
+    expect(actionYaml).toContain("deployment-url");
     expect(actionYaml).toContain("pr-comment");
     expect(actionYaml).toContain("github-token");
     expect(actionYaml).not.toContain("project:");
@@ -109,6 +110,11 @@ describe("deploy-action wrapper reference", () => {
     expect(publicCiWorkflow).toContain("APPALOFT_DEPLOY_ACTION_DRY_RUN");
     expect(publicCiWorkflow).toContain("INPUT_PREVIEW: pull-request");
     expect(publicCiWorkflow).toContain('grep -q -- "--preview-output-file"');
+    expect(publicCiWorkflow).toContain("Validate dry-run self-hosted preview deploy");
+    expect(publicCiWorkflow).toContain("INPUT_CONTROL_PLANE_MODE: self-hosted");
+    expect(publicCiWorkflow).toContain(
+      "POST https://console.example.com/api/action/deployments/from-source-link",
+    );
     expect(publicCiWorkflow).toContain("Opt-in exact-version install smoke");
     expect(publicCiWorkflow).toContain("APPALOFT_INSTALL_SMOKE_VERSION");
     expect(publicCiWorkflow).not.toContain("APPALOFT_SSH_PRIVATE_KEY");
@@ -315,6 +321,116 @@ describe("deploy-action wrapper reference", () => {
       ]);
       expect(result.output).toContain("console-url=https://console.example.com");
       expect(result.output).toContain("preview-id=pr-42");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-012] self-hosted preview deploy calls the server deployment API", () => {
+    const result = runDeploy({
+      INPUT_CONFIG: "appaloft.preview.yml",
+      INPUT_CONTROL_PLANE_MODE: "self-hosted",
+      INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+      INPUT_PREVIEW: "pull-request",
+      INPUT_PREVIEW_ID: "pr-42",
+      INPUT_PROJECT_ID: "prj_console",
+      INPUT_ENVIRONMENT_ID: "env_preview",
+      INPUT_RESOURCE_ID: "res_preview",
+      INPUT_SERVER_ID: "srv_prod",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv).toEqual([
+        "GET https://console.example.com/api/version",
+        "POST https://console.example.com/api/action/deployments/from-source-link",
+      ]);
+      expect(result.output).toContain("console-url=https://console.example.com");
+      expect(result.output).toContain("preview-id=pr-42");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-012] self-hosted deploy outputs the console deployment URL", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-output-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'case "$*" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1"}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-source-link"*)',
+        '    printf \'{"id":"dep_server_mode","deploymentHref":"/deployments/dep_server_mode"}\'',
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.preview.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_PREVIEW: "pull-request",
+        INPUT_PREVIEW_ID: "pr-42",
+        INPUT_PROJECT_ID: "prj_console",
+        INPUT_ENVIRONMENT_ID: "env_preview",
+        INPUT_RESOURCE_ID: "res_preview",
+        INPUT_SERVER_ID: "srv_prod",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const output = readFileSync(outputPath, "utf8");
+      expect(output).toContain("deployment-id=dep_server_mode");
+      expect(output).toContain("console-url=https://console.example.com");
+      expect(output).toContain(
+        "deployment-url=https://console.example.com/deployments/dep_server_mode",
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-009] self-hosted preview deploy rejects route/profile inputs", () => {
+    const result = runDeploy({
+      INPUT_CONFIG: "appaloft.preview.yml",
+      INPUT_CONTROL_PLANE_MODE: "self-hosted",
+      INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+      INPUT_PREVIEW: "pull-request",
+      INPUT_PREVIEW_ID: "pr-42",
+      INPUT_PREVIEW_DOMAIN_TEMPLATE: "pr-42.preview.example.com",
+      INPUT_PROJECT_ID: "prj_console",
+      INPUT_ENVIRONMENT_ID: "env_preview",
+      INPUT_RESOURCE_ID: "res_preview",
+      INPUT_SERVER_ID: "srv_prod",
+    });
+
+    try {
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("preview route inputs are not applied");
     } finally {
       rmSync(result.workspace, { recursive: true, force: true });
     }

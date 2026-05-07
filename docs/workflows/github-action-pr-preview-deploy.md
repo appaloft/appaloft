@@ -465,18 +465,26 @@ The main Appaloft repository now includes `.github/workflows/deploy-docs-preview
 repository-authored docs preview workflow over the same CLI path. It classifies PRs whose changed
 files affect docs content or docs build inputs, skips fork PR preview deploys, checks out the PR
 head for same-repository preview deploy, passes trusted PR context through `--preview pull-request`
-and `--preview-id pr-<number>`, renders `docs-pr-<number>.preview.appaloft.com` as a trusted custom
+and `--preview-id pr-<number>`, passes static build/publish/network profile flags instead of the
+production docs config file, renders `docs-pr-<number>.preview.appaloft.com` as a trusted custom
 preview host with TLS disabled, requires the preview URL to be observable, and runs `appaloft
 preview cleanup` on `pull_request.closed` before deleting the matching GitHub preview deployments
 and `docs-preview-pr-<number>` environment metadata. This workflow is an internal use of the CLI
 preview feature; it does not replace the public `appaloft/deploy-action` wrapper gap below.
 
-Missing pieces before Action PR preview can be documented as supported:
+The reference `appaloft/deploy-action` wrapper supports a first self-hosted server-mode preview
+deploy trigger. With `control-plane-mode: self-hosted`, `preview: pull-request`, and `preview-id`,
+the wrapper derives a preview-scoped source fingerprint and calls the server source-link deployment
+API. It writes `preview-id`, `deployment-id`, and `console-url` outputs. This slice intentionally
+does not apply runner-side preview route/profile inputs such as `preview-domain-template`,
+`preview-tls-mode`, `require-preview-url`, `runtime-name`, `environment-variables`, or
+`secret-variables`; those remain CLI/SSH Action-only behavior until server-side policy owns them.
 
-- `appaloft/deploy-action` wrapper repository;
-- running the reference export into that repository and wiring public wrapper CI;
-- wrapper tests for fixture or real-release install and GitHub deployment/environment metadata
-  cleanup behavior in the public wrapper repository.
+Missing pieces before the public Action preview path is fully stable:
+
+- promoting the public `appaloft/deploy-action` stable tag after server-mode behavior is exported;
+- public wrapper CI coverage for fixture or real-release install;
+- GitHub deployment/environment metadata cleanup behavior in the public wrapper repository.
 
 The public docs now distinguish Action-only preview deploy from product-grade GitHub App previews
 under `/docs/deploy/previews/#deployment-pr-preview-action-workflow` and
