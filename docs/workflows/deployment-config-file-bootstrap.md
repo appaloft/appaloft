@@ -219,6 +219,9 @@ Recovery requirements:
 - repository-owned docs production/preview maintenance uses the `Remote State Maintenance`
   workflow, which shares the docs remote-state concurrency group, runs `inspect` or stale-only
   `recover-stale`, and reports safe lock metadata in the GitHub step summary;
+- repository-owned docs production/preview deploys may run a narrow SSH runtime-capacity preflight
+  before state-root locking to remove stale attempt-scoped `ssh-deployments/dep_*` staging
+  directories when previous failed uploads exhausted the remote runtime filesystem;
 - releasing a lock must be owner-aware so an older workflow cannot delete a newer lock after
   recovery or superseding takeover;
 - failed migrations must leave either the previous state readable or an explicit recovery marker
