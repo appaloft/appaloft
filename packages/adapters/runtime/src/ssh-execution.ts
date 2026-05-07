@@ -193,6 +193,75 @@ function isLocalWorkspaceSourceKind(kind: string): boolean {
   return kind === "local-folder" || kind === "local-git" || kind === "compose";
 }
 
+const localWorkspaceUploadExcludePatterns = [
+  ".git",
+  ".turbo",
+  "node_modules",
+  ".svelte-kit",
+  ".next/cache",
+  "coverage",
+] as const;
+
+export function buildLocalWorkspaceUploadTarExcludeArgs(): string[] {
+  return localWorkspaceUploadExcludePatterns.flatMap((pattern) => ["--exclude", pattern]);
+}
+
+export function buildLocalWorkspaceUploadCommand(input: {
+  localWorkdir: string;
+  remotePrepareCommand: string;
+  sshArgs: readonly string[];
+}): string {
+  const fallbackTarCommand = [
+    "tar",
+    "-czf",
+    "-",
+    ...buildLocalWorkspaceUploadTarExcludeArgs().map((arg) => shellQuote(arg)),
+    "-C",
+    shellQuote(input.localWorkdir),
+    ".",
+  ].join(" ");
+  const gitAwareTarCommand = [
+    "if",
+    "git",
+    "-C",
+    shellQuote(input.localWorkdir),
+    "rev-parse",
+    "--is-inside-work-tree",
+    ">/dev/null",
+    "2>&1;",
+    "then",
+    "git",
+    "-C",
+    shellQuote(input.localWorkdir),
+    "ls-files",
+    "-z",
+    "--cached",
+    "--others",
+    "--exclude-standard",
+    "|",
+    "tar",
+    "--null",
+    "-czf",
+    "-",
+    "-C",
+    shellQuote(input.localWorkdir),
+    "--files-from",
+    "-;",
+    "else",
+    fallbackTarCommand,
+    ";",
+    "fi",
+  ].join(" ");
+
+  return [
+    gitAwareTarCommand,
+    "|",
+    "ssh",
+    ...input.sshArgs.map((arg) => shellQuote(arg)),
+    shellQuote(input.remotePrepareCommand),
+  ].join(" ");
+}
+
 function sourceBaseDirectory(metadata?: Record<string, string>): string | undefined {
   const baseDirectory = metadata?.baseDirectory?.replace(/^\/+/, "").replace(/\/+$/, "");
   return baseDirectory ? baseDirectory : undefined;
@@ -1300,18 +1369,11 @@ export class SshExecutionBackend implements ExecutionBackend {
       message: "Upload source workspace over SSH",
     });
     const remotePrepareCommand = `rm -rf ${shellQuote(remoteWorkdir)} && mkdir -p ${shellQuote(remoteWorkdir)} && tar -xzf - -C ${shellQuote(remoteWorkdir)}`;
-    const uploadCommand = [
-      "tar",
-      "-czf",
-      "-",
-      "-C",
-      shellQuote(localWorkdir),
-      ".",
-      "|",
-      "ssh",
-      ...this.sshArgs(input.target).map((arg) => shellQuote(arg)),
-      shellQuote(remotePrepareCommand),
-    ].join(" ");
+    const uploadCommand = buildLocalWorkspaceUploadCommand({
+      localWorkdir,
+      remotePrepareCommand,
+      sshArgs: this.sshArgs(input.target),
+    });
     const upload = runSyncShell({
       command: uploadCommand,
       cwd: input.runtimeDir,
@@ -1331,6 +1393,12 @@ export class SshExecutionBackend implements ExecutionBackend {
         ? `Source upload failed: ${upload.reason}`
         : `Source upload failed with exit code ${upload.exitCode}`;
       logs.push(phaseLog("package", message, "error"));
+      this.runRemoteCommand({
+        target: input.target,
+        command: `rm -rf ${shellQuote(remoteWorkdir)}`,
+        cwd: input.runtimeDir,
+        env: input.env,
+      });
       return {
         prepared: false,
         deployment: this.applyFailure(deployment, {
