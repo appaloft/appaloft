@@ -63,6 +63,13 @@ describe("CLI SSH remote-state lock commands", () => {
       ),
       "utf8",
     );
+    const capacityPreflightAction = readFileSync(
+      resolve(
+        import.meta.dir,
+        "../../../../.github/actions/remote-runtime-capacity-preflight/action.yml",
+      ),
+      "utf8",
+    );
     const githubExpressionOpen = "$" + "{{";
 
     expect(maintenanceWorkflow).toContain("workflow_dispatch:");
@@ -77,7 +84,11 @@ describe("CLI SSH remote-state lock commands", () => {
     );
     expect(maintenanceWorkflow).toContain('remote-state lock "$MAINTENANCE_ACTION"');
     expect(deployDocsWorkflow).toContain("uses: ./.github/actions/remote-state-lock-preflight");
+    expect(deployDocsWorkflow).toContain(
+      "uses: ./.github/actions/remote-runtime-capacity-preflight",
+    );
     expect(deployDocsPreviewWorkflow.match(/Remote State Lock Preflight/g)?.length).toBe(2);
+    expect(deployDocsPreviewWorkflow.match(/Remote Runtime Capacity Preflight/g)?.length).toBe(2);
     expect(preflightAction).toContain("remote-state lock recover-stale");
     expect(preflightAction).toContain("stale-after-seconds");
     expect(preflightAction).toContain('--stale-after-seconds "$STALE_AFTER_SECONDS"');
@@ -88,6 +99,12 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(preflightAction).toContain("lockAgeSeconds");
     expect(preflightAction).toContain("staleAfterSeconds");
     expect(preflightAction).toContain("recoveredPath");
+    expect(capacityPreflightAction).toContain("ssh-deployments");
+    expect(capacityPreflightAction).toContain("-name 'dep_*'");
+    expect(capacityPreflightAction).toContain("-mmin +");
+    expect(capacityPreflightAction).toContain("remote-runtime-capacity-preflight=");
+    expect(capacityPreflightAction).toContain("reclaimedCount");
+    expect(capacityPreflightAction).toContain("availableKbAfter");
     expect(`${maintenanceWorkflow}\n${preflightAction}`).not.toContain("force");
   });
 });
