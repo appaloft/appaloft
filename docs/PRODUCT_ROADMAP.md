@@ -43,11 +43,11 @@ Version selection rules:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-05-04, the latest public release is `v0.7.0`; root package
-  and Release Please manifest on `main` are `0.7.0`; the release PR target is
-  `0.8.0`.
-- [x] On 2026-05-04, the roadmap gate allows `Release-As: 0.8.0` because
-  Phase 0 through Phase 6 release rules, required items, and exit criteria are checked.
+- [x] On 2026-05-07, the latest public release is `v0.8.0`; root package
+  and Release Please manifest on `main` are `0.8.0`; the release PR target is
+  `0.9.0`.
+- [x] On 2026-05-07, the roadmap gate allows `Release-As: 0.9.0` because
+  Phase 0 through Phase 7 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
 Historical alignment notes:

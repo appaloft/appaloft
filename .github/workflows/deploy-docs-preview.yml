@@ -52,7 +52,7 @@ jobs:
   preview:
     name: Preview
     needs: changes
-    if: ${{ needs.changes.outputs.docs_preview_required == 'true' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ needs.changes.outputs.docs_preview_required == 'true' && github.event.pull_request.head.repo.full_name == github.repository && !startsWith(github.event.pull_request.head.ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Preview deploys share the same remote-state root as production docs deploys.
