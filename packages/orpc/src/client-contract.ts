@@ -5,6 +5,7 @@ import {
   type BootstrapServerProxyCommandInput,
   type CheckDomainBindingDeleteSafetyQueryInput,
   type CheckServerDeleteSafetyQueryInput,
+  type CleanupPreviewCommandInput,
   type CloneEnvironmentCommandInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
   type ConfigureDomainBindingRouteCommandInput,
@@ -60,6 +61,7 @@ import {
   type PromoteEnvironmentCommandInput,
   type RedeployDeploymentCommandInput,
   type RegisterServerCommandInput,
+  type RelinkSourceLinkCommandInput,
   type RenameEnvironmentCommandInput,
   type RenameProjectCommandInput,
   type RenameServerCommandInput,
@@ -111,6 +113,7 @@ import {
   type BootstrapServerProxyResponse,
   type CheckDomainBindingDeleteSafetyResponse,
   type CheckServerDeleteSafetyResponse,
+  type CleanupPreviewResponse,
   type CloneEnvironmentResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
   type ConfigureDomainBindingRouteResponse,
@@ -218,6 +221,14 @@ import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/clie
 
 type AppaloftClientContext = Record<never, never>;
 type AppaloftClientError = ORPCError<string, unknown>;
+export interface RelinkSourceLinkResponse {
+  sourceFingerprint: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId?: string;
+  destinationId?: string;
+}
 
 export type AppaloftOrpcClientContract = {
   projects: {
@@ -789,6 +800,12 @@ export type AppaloftOrpcClientContract = {
       CreateDeploymentResponse,
       AppaloftClientError
     >;
+    cleanupPreview: Client<
+      AppaloftClientContext,
+      CleanupPreviewCommandInput,
+      CleanupPreviewResponse,
+      AppaloftClientError
+    >;
     retry: Client<
       AppaloftClientContext,
       RetryDeploymentCommandInput,
@@ -857,6 +874,14 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ShowSourceEventQueryInput,
       ShowSourceEventResponse,
+      AppaloftClientError
+    >;
+  };
+  sourceLinks: {
+    relink: Client<
+      AppaloftClientContext,
+      RelinkSourceLinkCommandInput,
+      RelinkSourceLinkResponse,
       AppaloftClientError
     >;
   };

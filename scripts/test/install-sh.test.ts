@@ -72,6 +72,7 @@ test("install.sh dry-run reports the selected Docker stack", async () => {
   expect(result.stdout).toContain(`home: ${home}`);
   expect(result.stdout).toContain(`compose file: ${join(home, "docker-compose.yml")}`);
   expect(result.stdout).toContain("bind: 0.0.0.0:3001");
+  expect(result.stdout).toContain("database: postgres");
   expect(result.stdout).toContain("install docker: yes");
 });
 
@@ -146,6 +147,54 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     const dockerLog = await Bun.file(logPath).text();
     expect(dockerLog).toContain("compose --env-file");
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} pull`);
+    expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh writes a PGlite self-host stack with durable app data", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--database",
+        "pglite",
+        "--web-origin",
+        "https://console.appaloft.example.test",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+    expect(install.stdout).toContain("Database: pglite");
+
+    const compose = await Bun.file(join(home, "docker-compose.yml")).text();
+    expect(compose).toContain("APPALOFT_DATABASE_DRIVER: pglite");
+    expect(compose).toContain("APPALOFT_DATA_DIR: /appaloft-data");
+    expect(compose).toContain("APPALOFT_PGLITE_DATA_DIR: /appaloft-data/pglite");
+    expect(compose).toContain("appaloft-data:/appaloft-data");
+    expect(compose).not.toContain("APPALOFT_DATABASE_URL");
+    expect(compose).not.toContain("postgres:");
+
+    const env = await Bun.file(join(home, ".env")).text();
+    expect(env).toContain("APPALOFT_SELF_HOST_DATABASE=pglite");
+    expect(env).not.toContain("POSTGRES_PASSWORD");
+
+    const dockerLog = await Bun.file(logPath).text();
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });

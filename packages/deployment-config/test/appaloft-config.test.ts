@@ -77,6 +77,76 @@ describe("Appaloft deployment config schema", () => {
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.yaml");
   });
 
+  test("[CONTROL-PLANE-MODE-010] accepts non-secret control-plane connection policy", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "controlPlane:",
+        "  mode: self-hosted",
+        "  url: https://console.example.com/",
+        "runtime:",
+        "  strategy: static",
+      ].join("\n"),
+      "appaloft.yml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.controlPlane).toEqual({
+        mode: "self-hosted",
+        url: "https://console.example.com",
+      });
+    }
+  });
+
+  test("[CONTROL-PLANE-MODE-011] rejects control-plane identity and secret fields", () => {
+    const identity = parseAppaloftDeploymentConfig({
+      controlPlane: {
+        mode: "self-hosted",
+        url: "https://console.example.com",
+        projectId: "prj_1",
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["controlPlane", "projectId"]);
+    }
+
+    const token = parseAppaloftDeploymentConfig({
+      controlPlane: {
+        mode: "self-hosted",
+        url: "https://console.example.com",
+        token: "secret-token",
+      },
+    });
+
+    expect(token.success).toBe(false);
+    if (!token.success) {
+      expect(token.error.issues[0]?.message).toContain("raw_secret_config_field");
+      expect(token.error.issues[0]?.path).toEqual(["controlPlane", "token"]);
+    }
+  });
+
+  test("[CONTROL-PLANE-MODE-012] rejects unsafe control-plane URL shapes", () => {
+    for (const url of [
+      "ssh://console.example.com",
+      "https://user:pass@console.example.com",
+      "https://console.example.com/api",
+      "https://console.example.com?token=secret",
+      "https://console.example.com#fragment",
+    ]) {
+      const parsed = parseAppaloftDeploymentConfig({
+        controlPlane: {
+          mode: "self-hosted",
+          url,
+        },
+      });
+
+      expect(parsed.success, url).toBe(false);
+    }
+  });
+
   test("[CONFIG-FILE-PROFILE-001A] accepts runtime.name templates and renders preview values", () => {
     const parsed = parseAppaloftDeploymentConfig({
       runtime: {

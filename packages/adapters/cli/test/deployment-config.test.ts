@@ -416,6 +416,66 @@ describe("CLI deployment config entry workflow", () => {
     ]);
   });
 
+  test("[CONFIG-FILE-SEC-006] config env values can render trusted preview context", async () => {
+    ensureReflectMetadata();
+    const { deploymentEnvironmentVariablesFromConfig } = await import(
+      "../src/commands/deployment-interaction"
+    );
+
+    const result = deploymentEnvironmentVariablesFromConfig(
+      {
+        env: {
+          APP_URL: "http://{pr_number}.preview.example.com",
+          PREVIEW_ID: "{preview_id}",
+        },
+      },
+      {
+        previewContext: {
+          previewId: "pr-42",
+          pullRequestNumber: 42,
+        },
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) {
+      throw new Error(result.error.message);
+    }
+    expect(result.value).toEqual([
+      expect.objectContaining({
+        key: "APP_URL",
+        value: "http://42.preview.example.com",
+      }),
+      expect.objectContaining({
+        key: "PREVIEW_ID",
+        value: "pr-42",
+      }),
+    ]);
+  });
+
+  test("[CONFIG-FILE-SEC-006] config env preview templates require preview context", async () => {
+    ensureReflectMetadata();
+    const { deploymentEnvironmentVariablesFromConfig } = await import(
+      "../src/commands/deployment-interaction"
+    );
+
+    const result = deploymentEnvironmentVariablesFromConfig({
+      env: {
+        APP_URL: "http://{pr_number}.preview.example.com",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) {
+      throw new Error("Expected preview template without preview context to fail");
+    }
+    expect(result.error.details).toMatchObject({
+      phase: "config-template-resolution",
+      field: "env.APP_URL",
+      variable: "pr_number",
+    });
+  });
+
   test("[CONFIG-FILE-SEC-003] required ci-env secret references become secret variables", async () => {
     ensureReflectMetadata();
     const { deploymentEnvironmentVariablesFromConfig } = await import(

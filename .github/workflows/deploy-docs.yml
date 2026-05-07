@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - .github/workflows/deploy-docs.yml
+      - .github/actions/deploy-action/**
       - .github/actions/remote-state-lock-preflight/**
       - .github/actions/remote-runtime-capacity-preflight/**
       - appaloft.docs.yml
@@ -79,17 +80,29 @@ jobs:
         with:
           ref: ${{ steps.source.outputs.ref }}
 
+      - name: Resolve Appaloft Control Plane
+        id: control-plane
+        shell: bash
+        env:
+          INPUT_CONFIG: appaloft.docs.yml
+          INPUT_CONTROL_PLANE_MODE: ${{ vars.APPALOFT_CONTROL_PLANE_MODE }}
+          INPUT_CONTROL_PLANE_URL: ${{ vars.APPALOFT_CONTROL_PLANE_URL }}
+        run: bash ./.github/actions/deploy-action/scripts/resolve-control-plane.sh
+
       - name: Set Up Node
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         uses: actions/setup-node@v4
         with:
           node-version: 24
 
       - name: Set Up Bun
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.13"
 
       - name: Validate Deployment Settings
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         id: settings
         shell: bash
         env:
@@ -112,13 +125,33 @@ jobs:
           fi
           echo "ssh_user=${APPALOFT_SSH_USER:-root}" >> "$GITHUB_OUTPUT"
 
+      - name: Validate Appaloft Server Settings
+        if: ${{ steps.control-plane.outputs.control-plane-mode == 'self-hosted' }}
+        shell: bash
+        env:
+          APPALOFT_CONTROL_PLANE_URL: ${{ steps.control-plane.outputs.control-plane-url }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in APPALOFT_CONTROL_PLANE_URL; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing repository variable ${name} for self-hosted Appaloft server deployment."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
       - name: Install Source Dependencies
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         shell: bash
         run: |
           set -euo pipefail
           bun install --frozen-lockfile
 
       - name: Remote Runtime Capacity Preflight
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         uses: ./.github/actions/remote-runtime-capacity-preflight
         with:
           ssh-host: ${{ vars.APPALOFT_SSH_HOST }}
@@ -126,13 +159,29 @@ jobs:
           ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
 
       - name: Remote State Lock Preflight
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         uses: ./.github/actions/remote-state-lock-preflight
         with:
           ssh-host: ${{ vars.APPALOFT_SSH_HOST }}
           ssh-user: ${{ steps.settings.outputs.ssh_user }}
           ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
 
+      - name: Deploy Docs Through Appaloft Server
+        if: ${{ steps.control-plane.outputs.control-plane-mode == 'self-hosted' }}
+        id: deploy-server
+        uses: ./.github/actions/deploy-action
+        with:
+          config: appaloft.docs.yml
+          control-plane-mode: ${{ steps.control-plane.outputs.control-plane-mode }}
+          control-plane-url: ${{ steps.control-plane.outputs.control-plane-url }}
+          appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+          project-id: ${{ vars.APPALOFT_PROJECT_ID }}
+          environment-id: ${{ vars.APPALOFT_ENVIRONMENT_ID }}
+          resource-id: ${{ vars.APPALOFT_DOCS_RESOURCE_ID }}
+          server-id: ${{ vars.APPALOFT_SERVER_ID }}
+
       - name: Deploy Docs
+        if: ${{ steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}
         shell: bash
         env:
           APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
