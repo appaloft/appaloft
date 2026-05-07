@@ -10,14 +10,33 @@ function formatDetailValue(value: unknown): string | null {
     return null;
   }
 
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+  if (typeof value === "string") {
+    return value.replace(/\s+/g, " ").trim() || null;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
 
   return null;
 }
 
-function formatDomainError(error: DomainError): string {
+function formatDetailLine(
+  label: string,
+  error: DomainError,
+  keys: readonly string[],
+): string | null {
+  const details = keys
+    .map((key) => {
+      const value = formatDetailValue(error.details?.[key]);
+      return value ? `${key}=${value}` : null;
+    })
+    .filter((value): value is string => value !== null);
+
+  return details.length > 0 ? `${label}: ${details.join(" ")}` : null;
+}
+
+export function formatDomainError(error: DomainError): string {
   const phase = typeof error.details?.phase === "string" ? error.details.phase : undefined;
   const details = [
     `code=${error.code}`,
@@ -28,7 +47,10 @@ function formatDomainError(error: DomainError): string {
   const lines = [error.message, details.join(" ")];
 
   if (phase === "remote-state-lock") {
-    const lockDetails = [
+    const lockLine = formatDetailLine("lock", error, [
+      "stateBackend",
+      "host",
+      "port",
       "lockOwner",
       "correlationId",
       "lockStartedAt",
@@ -38,15 +60,24 @@ function formatDomainError(error: DomainError): string {
       "lockAcquireTimeoutSeconds",
       "retryAfterSeconds",
       "stderr",
-    ]
-      .map((key) => {
-        const value = formatDetailValue(error.details?.[key]);
-        return value ? `${key}=${value}` : null;
-      })
-      .filter((value): value is string => value !== null);
+    ]);
 
-    if (lockDetails.length > 0) {
-      lines.push(`lock: ${lockDetails.join(" ")}`);
+    if (lockLine) {
+      lines.push(lockLine);
+    }
+  } else if (phase?.startsWith("remote-state-")) {
+    const remoteStateLine = formatDetailLine("details", error, [
+      "stateBackend",
+      "host",
+      "port",
+      "exitCode",
+      "reason",
+      "stderr",
+      "message",
+    ]);
+
+    if (remoteStateLine) {
+      lines.push(remoteStateLine);
     }
   }
 

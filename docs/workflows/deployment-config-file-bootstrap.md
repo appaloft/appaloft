@@ -667,7 +667,7 @@ Config-file errors use stable codes and phases:
 | `control_plane_unsupported` | `control-plane-capability` | No | Selected control-plane behavior is not implemented or the endpoint lacks the requested capability. |
 | `control_plane_adoption_required` | `control-plane-resolution` | No | A server adoption marker indicates control-plane ownership, but the entrypoint attempted uncoordinated direct SSH state mutation. |
 | `validation_error` | `config-profile-resolution` | No | Profile field cannot map safely to resource/environment commands. |
-| `validation_error` | `remote-state-resolution` | Conditional | SSH-targeted entrypoint could not resolve or initialize the remote Appaloft state backend. |
+| `infra_error` | `remote-state-resolution` | Conditional | SSH-targeted entrypoint could not resolve or initialize the remote Appaloft state backend; safe details should include target host/port, exit code, and remote stderr when available. |
 | `infra_error` | `remote-state-lock` | Yes | Remote state mutation lock could not be acquired or was interrupted. |
 | `infra_error` | `remote-state-migration` | Conditional | Remote state migration failed before workflow commands were dispatched. |
 | `coordination_timeout` | `operation-coordination` | Yes | A dispatched command could not acquire its logical mutation scope within the bounded wait window. |

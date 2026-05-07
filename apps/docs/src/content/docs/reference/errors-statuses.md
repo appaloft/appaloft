@@ -46,6 +46,17 @@ appaloft work show <workId>
 
 这个入口不会 retry、cancel、recover、dead-letter、delete 或 prune。恢复、清理和重试能力会通过独立的显式命令暴露，避免用户在查看状态时意外改变运行时或远端 SSH 状态。
 
+<h2 id="remote-state-resolution">SSH remote state resolution</h2>
+
+`infra_error` + `remote-state-resolution` 表示 Appaloft 已经到达 SSH 目标机，但在部署身份解析之前，无法准备这台服务器拥有的 `ssh-pglite` 状态根。常见原因包括磁盘或 inode 容量不足、文件系统只读、配置的 runtime root 没有写权限，或远端 shell 在创建 state、lock、backup、journal 目录时失败。
+
+处理顺序：
+
+1. 查看 CLI 打印的错误 details，尤其是 `stateBackend`、`host`、`port`、`exitCode`、`reason` 和 `stderr`。
+2. 如果 `stderr` 提到 no space、quota、read-only filesystem 或 permission denied，先修复 SSH 目标机上配置 runtime root 的容量或权限，通常是 `/var/lib/appaloft/runtime/state`。
+3. 当错误指向目标机容量时，先运行 `appaloft server capacity inspect` 或等价的 SSH 诊断命令，再重试。
+4. 目标机能够创建并写入 Appaloft 状态目录后，再重新执行部署。
+
 <h2 id="remote-state-lock">SSH remote state lock</h2>
 
 `infra_error` + `remote-state-lock` 表示 SSH `ssh-pglite` 状态根正在被另一个 Appaloft 进程保护，或者前一次被取消的进程留下了仍未过期的 lock。它通常是 operator 可诊断的 infrastructure error，不代表部署请求本身的业务输入无效。
