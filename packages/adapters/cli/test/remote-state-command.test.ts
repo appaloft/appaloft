@@ -17,6 +17,7 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(command).toContain("lastHeartbeatAt");
     expect(command).toContain("lockAgeSeconds");
     expect(command).toContain("owner_file_present");
+    expect(command).toContain('recorded_stale_after" -gt "$stale_after_seconds"');
     expect(command).toContain("recorded_stale_after=30");
     expect(command).toContain('date -j -u -f "%Y-%m-%dT%H:%M:%SZ"');
     expect(command).toContain('stat -f %m "$lock_dir"');
@@ -36,6 +37,7 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(command).toContain('mv "$lock_dir" "$recovered_path"');
     expect(command).toContain("recovered.json");
     expect(command).toContain("owner_file_present");
+    expect(command).toContain('recorded_stale_after" -gt "$stale_after_seconds"');
     expect(command).toContain("recorded_stale_after=30");
     expect(command).toContain("appaloft-cli-test");
     expect(command).not.toContain("OPENSSH PRIVATE KEY");
@@ -77,6 +79,8 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(deployDocsWorkflow).toContain("uses: ./.github/actions/remote-state-lock-preflight");
     expect(deployDocsPreviewWorkflow.match(/Remote State Lock Preflight/g)?.length).toBe(2);
     expect(preflightAction).toContain("remote-state lock recover-stale");
+    expect(preflightAction).toContain("stale-after-seconds");
+    expect(preflightAction).toContain('--stale-after-seconds "$STALE_AFTER_SECONDS"');
     expect(preflightAction).toContain("remote-state-lock-preflight=");
     expect(preflightAction).toContain("owner");
     expect(preflightAction).toContain("correlationId");

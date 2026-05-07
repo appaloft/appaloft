@@ -64,7 +64,7 @@ appaloft work show <workId>
 处理顺序：
 
 1. 查看错误 details 里的 `lockOwner`、`correlationId`、`lockHeartbeatAt`、`staleAfterSeconds`、`waitedSeconds`。
-2. Appaloft deploy 和 cleanup 命令本身会做 bounded wait；当 heartbeat 已超过 stale window 时，也会走 stale-only lock recovery。
+2. Appaloft deploy 和 cleanup 命令本身会做 bounded wait；当 heartbeat 已超过 stale window 时，也会走 stale-only lock recovery。当前版本可以把旧 lock metadata 里的较长 stale window 限制到更短的 state-root maintenance stale window 后再恢复。
 3. 如果 heartbeat 仍在更新，等待当前部署完成或稍后重试。
 4. 如果错误持续出现，运行 `appaloft remote-state lock inspect --server-host <host>`，并带上同一次部署使用的 SSH 目标参数，只读查看远端 lock owner metadata。这个命令不会进入部署 mutation path。
 5. 只有诊断确认 heartbeat 已超过 stale window 后，才运行 `appaloft remote-state lock recover-stale --server-host <host>`。这个命令会归档 stale lock metadata，不会 force 删除 active lock。

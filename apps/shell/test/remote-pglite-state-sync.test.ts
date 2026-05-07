@@ -507,10 +507,12 @@ describe("remote PGlite state sync", () => {
         .map((call) => call.args.join(" "));
       expect(sshCommands).toHaveLength(7);
       expect(sshCommands[0]).toContain("mutation.lock");
+      expect(sshCommands[0]).toContain("180");
       expect(sshCommands[1]).toContain("tar -czf - pglite source-links server-applied-routes");
       expect(sshCommands[2]).toContain("sync-revision.txt");
       expect(sshCommands[3]).toContain('rm -rf "$data_root/locks/mutation.lock"');
       expect(sshCommands[4]).toContain("mutation.lock");
+      expect(sshCommands[4]).toContain("180");
       expect(sshCommands[5]).toContain("expected_revision");
       expect(sshCommands[5]).toContain("next_revision");
       expect(sshCommands[6]).toContain('rm -rf "$data_root/locks/mutation.lock"');
