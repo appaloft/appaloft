@@ -143,11 +143,38 @@ jobs:
           key_file="$RUNNER_TEMP/appaloft-docs-deploy.key"
           printf '%s\n' "$APPALOFT_SSH_PRIVATE_KEY" > "$key_file"
           chmod 600 "$key_file"
+          set +e
           bun run apps/shell/src/index.ts deploy . \
             --config appaloft.docs.yml \
             --method static \
             --resource-name appaloft-docs \
             --resource-kind static-site \
+            --app-log-lines 8 \
+            --server-host "$APPALOFT_SSH_HOST" \
+            --server-provider generic-ssh \
+            --server-proxy-kind traefik \
+            --server-ssh-username "$APPALOFT_SSH_USER" \
+            --server-ssh-private-key-file "$key_file" \
+            --state-backend ssh-pglite
+          deploy_status=$?
+          set -e
+          if [ "$deploy_status" -eq 0 ]; then
+            exit 0
+          fi
+
+          echo "::warning::Config-backed docs deploy failed; retrying with explicit docs profile flags."
+          bun run apps/shell/src/index.ts deploy . \
+            --method static \
+            --resource-name appaloft-docs \
+            --resource-kind static-site \
+            --install "bun install --frozen-lockfile" \
+            --build "APPALOFT_DOCS_BASE=/ APPALOFT_DOCS_SITE=https://docs.appaloft.com bun run --cwd apps/docs build" \
+            --publish-dir apps/docs/dist \
+            --runtime-name appaloft-docs \
+            --port 80 \
+            --upstream-protocol http \
+            --exposure-mode reverse-proxy \
+            --health-path / \
             --app-log-lines 8 \
             --server-host "$APPALOFT_SSH_HOST" \
             --server-provider generic-ssh \
