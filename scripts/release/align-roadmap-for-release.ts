@@ -82,7 +82,7 @@ function parsePhases(roadmap: string): PhaseSection[] {
     }
 
     const targetLine = sectionLines.find((line) => line.startsWith("Target: "));
-    const targetMatch = targetLine ? /Target: `(?<target>[^`]+)`\./u.exec(targetLine) : undefined;
+    const targetMatch = targetLine ? /Target: `(?<target>[^`]+)`/u.exec(targetLine) : undefined;
 
     return {
       number: Number.parseInt(phaseNumber, 10),
