@@ -347,8 +347,9 @@ failure staging, and remote-state prepare/release around the preview cleanup com
 
 The main repository also has `.github/workflows/deploy-docs-preview.yml` as a repository-authored
 workflow example that exercises the direct CLI shape for docs previews: it skips fork PR preview
-deploys, uses trusted PR preview context, supplies a custom preview domain template, requires a
-public preview URL, runs explicit preview cleanup on PR close, and deletes matching GitHub preview
+deploys, uses trusted PR preview context, supplies static build/publish/network profile flags rather
+than the production docs config file, supplies a custom preview domain template, requires a public
+preview URL, runs explicit preview cleanup on PR close, and deletes matching GitHub preview
 deployments/environment metadata. This workflow is not a substitute for the public action wrapper
 tests because it runs the source checkout directly instead of installing a released
 `appaloft/deploy-action` wrapper.
@@ -358,13 +359,15 @@ The main repository now includes a reference composite wrapper at
 `scripts/test/deploy-action-wrapper.test.ts` coverage for `CONFIG-FILE-ENTRY-009`,
 `CONFIG-FILE-ENTRY-010`, `CONFIG-FILE-ENTRY-012`, `CONFIG-FILE-ENTRY-015`,
 `CONFIG-FILE-ENTRY-026`, and the current fail-before-mutation baseline for
-`CONFIG-FILE-ENTRY-027` plus `CONTROL-PLANE-ENTRY-002`. This proves wrapper metadata,
+`CONFIG-FILE-ENTRY-027` plus `CONTROL-PLANE-ENTRY-002`, `CONTROL-PLANE-HANDSHAKE-011`,
+and `CONTROL-PLANE-HANDSHAKE-012`. This proves wrapper metadata,
 version/target install contract shape,
 SSH secret temp-key command mapping, PR preview flag mapping, CLI preview-output-file handling,
 preview cleanup command mapping, trusted multiline Action `environment-variables`/`secret-variables`
 pass-through to CLI `--env`/`--secret`, optional marker-based PR comment feedback, Marketplace README
-fork-safety/cleanup examples, no-config default behavior, and unsupported control-plane input
-rejection in this repository.
+fork-safety/cleanup examples, no-config default behavior, unsupported control-plane input rejection,
+self-hosted preview cleanup API routing, and self-hosted preview deploy API routing in this
+repository.
 
 Public `appaloft/deploy-action` release coverage is not complete yet. The main repository release
 workflow already produces CLI archives, the static Docker self-host installer, `checksums.txt`,
