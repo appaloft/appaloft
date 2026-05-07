@@ -238,6 +238,10 @@ workflow maps GitHub secrets into runner environment variables, and the Appaloft
 them with `ci-env:<NAME>`. Other CI systems may provide equivalent environment variables without
 changing the repository config contract.
 
+Non-secret `env` values may use `{preview_id}` and `{pr_number}` placeholders only when the
+entrypoint has already established trusted pull request preview context. Missing preview context
+fails during `config-template-resolution` before environment variable commands are dispatched.
+
 ## Current Implementation Notes And Migration Gaps
 
 Current SSH `ssh-pglite` execution still relies on coarse backend locking for more than brief
@@ -480,7 +484,7 @@ deployment admission.
 | Install/build/start commands | `ResourceRuntimeProfile` | User-authored shell leaves; adapters render typed runtime commands at execution. |
 | `internalPort`, upstream protocol, exposure mode, target service | `ResourceNetworkProfile` | Must become resource network state; never a deployment command field. |
 | Health policy | `ResourceRuntimeProfile` / health policy command | Must be reusable resource configuration. |
-| Plain environment values | `Environment` variable commands | Only for non-secret values; `PUBLIC_` and `VITE_` keys map to build-time `plain-config`, other keys map to runtime `plain-config`, all at `environment` scope unless a future schema adds explicit kind/exposure/scope fields. |
+| Plain environment values | `Environment` variable commands | Only for non-secret values; `PUBLIC_` and `VITE_` keys map to build-time `plain-config`, other keys map to runtime `plain-config`, all at `environment` scope unless a future schema adds explicit kind/exposure/scope fields. In PR preview context, `{preview_id}` and `{pr_number}` render from trusted entrypoint context before variables are applied. |
 | Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. |
 | `access.domains[]` | Server-applied route state in SSH CLI mode; managed `DomainBinding` or managed route intent in control-plane mode | Accepted values describe provider-neutral host/path/TLS route intent and optional canonical redirect aliases. They never enter `deployments.create`, never select identity or credentials, and never contain raw certificate material. |
 | `controlPlane.mode` / `controlPlane.url` | Entry workflow mode resolver | Selects connection policy and non-secret endpoint metadata only. It never enters `deployments.create`, never selects durable identity, and never stores tokens or database URLs. |
@@ -688,10 +692,11 @@ Config-file errors use stable codes and phases:
 Current code has a deployment-config package and JSON schema for the supported JSON/YAML target
 names listed above.
 
-Current config parsing does not accept `controlPlane.mode` or `controlPlane.url` yet. The CLI
-state backend resolver can observe `APPALOFT_CONTROL_PLANE_URL` and `APPALOFT_DATABASE_URL` as a
-partial backend selection hint, but Cloud/self-hosted mode parsing, compatibility handshake,
-adoption markers, and API-mode deploy execution are future Phase 1+ work under ADR-025.
+Current config parsing accepts `controlPlane.mode` and non-secret `controlPlane.url`, while rejecting
+identity and secret fields under `controlPlane`. The CLI state backend resolver can observe
+`APPALOFT_CONTROL_PLANE_URL` and `APPALOFT_DATABASE_URL` as a partial backend selection hint.
+Cloud-assisted mode, adoption markers, and full API-mode deploy execution remain Phase 1+ work under
+ADR-025.
 
 Current CLI `init` writes only profile fields under `runtime` and `network`; it does not write
 project/resource/server identity or target bootstrap data.

@@ -2905,6 +2905,21 @@ export const createDeploymentResponseSchema = z.object({
   id: z.string(),
 });
 
+export const cleanupPreviewResponseSchema = z.object({
+  sourceFingerprint: z.string(),
+  status: z.enum(["cleaned", "already-clean"]),
+  cleanedRuntime: z.boolean(),
+  cleanedArtifacts: z.boolean().optional(),
+  removedServerAppliedRoute: z.boolean(),
+  removedSourceLink: z.boolean(),
+  projectId: z.string().optional(),
+  environmentId: z.string().optional(),
+  resourceId: z.string().optional(),
+  serverId: z.string().optional(),
+  destinationId: z.string().optional(),
+  deploymentId: z.string().optional(),
+});
+
 export const retryDeploymentInputSchema = z.object({
   deploymentId: z.string().min(1),
   resourceId: z.string().min(1).optional(),
@@ -4346,6 +4361,7 @@ export type DeploymentProgressEvent = z.infer<typeof deploymentProgressEventSche
 export type DeploymentResourceInput = z.infer<typeof deploymentResourceInputSchema>;
 export type CreateDeploymentInput = z.infer<typeof createDeploymentInputSchema>;
 export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
+export type CleanupPreviewResponse = z.infer<typeof cleanupPreviewResponseSchema>;
 export type RetryDeploymentInput = z.infer<typeof retryDeploymentInputSchema>;
 export type RetryDeploymentResponse = z.infer<typeof retryDeploymentResponseSchema>;
 export type RedeployDeploymentInput = z.infer<typeof redeployDeploymentInputSchema>;

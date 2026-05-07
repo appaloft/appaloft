@@ -218,8 +218,10 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-021 | integration | Deploy action PR preview avoids production root domains | With preview mode selected and an implicitly discovered root config that contains production `access.domains[]`, the action/CLI must not render those hosts as PR preview URLs; preview access comes from generated/default access, trusted `preview-domain-template`, explicitly selected preview config, or future selected preview overlay. |
 | CONFIG-FILE-ENTRY-022 | integration | Deploy action PR preview overlay boundary | Future preview config overlays apply only after trusted PR entrypoint context selects the preview environment; a committed overlay cannot select environment/project/resource/server/destination identity or credentials and cannot retarget an existing preview source link. |
 | CONFIG-FILE-ENTRY-023 | integration | Deploy action PR preview profile flag parity | Trusted CLI/Action flags provide or override runtime commands, network profile, health path, non-secret env values, `ci-env:` secret references, preview domain template, and preview TLS mode; the workflow persists env and route state through the same commands as config bootstrap and dispatches ids-only `deployments.create`. |
+| CONFIG-FILE-ENTRY-023A | integration | Config PR preview env templates | Selected preview config declares non-secret env values with `{preview_id}` or `{pr_number}` placeholders, and trusted PR preview context is present | CLI renders placeholders from trusted preview context before applying `plain-config` variables; without preview context, admission fails in `config-template-resolution` before mutation | None | Preview context resolution -> config template resolution -> environment variable commands |
 | CONFIG-FILE-ENTRY-024 | integration | Deploy action PR preview URL required | With `require-preview-url=true`, the CLI/action fails the workflow when the created deployment read model cannot expose a public route or the deployment finished failed during preview route verification; without the flag, the deployment may be accepted with diagnostics and no `preview-url`. |
 | CONFIG-FILE-ENTRY-026 | integration | Deploy action PR preview output file | When preview mode is selected, the CLI can write an action-safe preview output file with schema version, deployment id, resource id, preview id, deployment status, and resolved public preview URL; the wrapper passes a temp file and publishes `preview-url` from that file to GitHub outputs. |
+| CONFIG-FILE-ENTRY-027 | contract | Deploy action optional PR comment | With `pr-comment=true`, trusted PR context, and an explicit GitHub token, the wrapper posts or updates one marker-based PR comment with available preview URL, console URL, deployment id, or cleanup status; without `pr-comment`, no GitHub comment permission is required. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -315,10 +317,10 @@ The durable table, PG adapter, shell wiring, and `resources.delete` blocker cove
 `SERVER-APPLIED-ROUTE-STATE-001` through `SERVER-APPLIED-ROUTE-STATE-005` in the edge proxy test
 matrix and now have PG/PGlite integration coverage.
 
-Control-plane policy rows `CONFIG-FILE-CONTROL-001` through `CONFIG-FILE-CONTROL-007` are roadmap
-coverage under ADR-025. Current config schema does not accept `controlPlane` yet; existing
-`postgres/control-plane` resolver tests only prove the older backend-selection branch and must be
-extended or renamed during Phase 1.
+Control-plane policy rows `CONFIG-FILE-CONTROL-001` through `CONFIG-FILE-CONTROL-007` are ADR-025
+coverage. Current config schema accepts non-secret `controlPlane` policy and rejects identity or
+secret fields; existing `postgres/control-plane` resolver tests still only prove the older
+backend-selection branch and must be extended or renamed during later control-plane resolver work.
 
 Canonical redirect rows `CONFIG-FILE-DOMAIN-007` and `CONFIG-FILE-DOMAIN-008` now have parser,
 remote-state, deployment planning, provider rendering, and proxy-configuration query coverage for
@@ -356,10 +358,13 @@ The main repository now includes a reference composite wrapper at
 `scripts/test/deploy-action-wrapper.test.ts` coverage for `CONFIG-FILE-ENTRY-009`,
 `CONFIG-FILE-ENTRY-010`, `CONFIG-FILE-ENTRY-012`, `CONFIG-FILE-ENTRY-015`,
 `CONFIG-FILE-ENTRY-026`, and the current fail-before-mutation baseline for
-`CONTROL-PLANE-ENTRY-002`. This proves wrapper metadata, version/target install contract shape,
+`CONFIG-FILE-ENTRY-027` plus `CONTROL-PLANE-ENTRY-002`. This proves wrapper metadata,
+version/target install contract shape,
 SSH secret temp-key command mapping, PR preview flag mapping, CLI preview-output-file handling,
-preview cleanup command mapping, Marketplace README fork-safety/cleanup examples, no-config default
-behavior, and unsupported control-plane input rejection in this repository.
+preview cleanup command mapping, trusted multiline Action `environment-variables`/`secret-variables`
+pass-through to CLI `--env`/`--secret`, optional marker-based PR comment feedback, Marketplace README
+fork-safety/cleanup examples, no-config default behavior, and unsupported control-plane input
+rejection in this repository.
 
 Public `appaloft/deploy-action` release coverage is not complete yet. The main repository release
 workflow already produces CLI archives, the static Docker self-host installer, `checksums.txt`,

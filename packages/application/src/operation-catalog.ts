@@ -1544,6 +1544,7 @@ export const operationCatalog = [
     serviceToken: tokens.cleanupPreviewUseCase,
     transports: {
       cli: "appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123",
+      orpc: { method: "POST", path: "/api/deployments/cleanup-preview" },
     },
   },
   {
@@ -1769,6 +1770,7 @@ export const operationCatalog = [
     serviceToken: tokens.relinkSourceLinkUseCase,
     transports: {
       cli: "appaloft source-links relink",
+      orpc: { method: "POST", path: "/api/source-links/relink" },
     },
   },
   {

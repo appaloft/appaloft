@@ -46,6 +46,8 @@ const domainPathPrefixError =
   "config_domain_resolution: access.domains[].pathPrefix must start with / and must not include query, fragment, control characters, or parent traversal";
 const domainRedirectToError =
   "config_domain_resolution: access.domains[].redirectTo must be a domain name without scheme, port, path, or wildcard";
+const controlPlaneUrlError =
+  "control_plane_config: controlPlane.url must be an http(s) URL without credentials, query, or fragment";
 
 const identityConfigFields = new Set([
   "organization",
@@ -439,9 +441,54 @@ export const appaloftDeploymentSecretReferenceSchema = z
   })
   .strict();
 
+function isSafeControlPlaneUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return false;
+    }
+
+    if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+      return false;
+    }
+
+    return parsed.pathname === "" || parsed.pathname === "/";
+  } catch {
+    return false;
+  }
+}
+
+export const appaloftDeploymentControlPlaneConfigSchema = z
+  .object({
+    mode: z.enum(["none", "auto", "cloud", "self-hosted"]),
+    url: nonEmptyStringSchema.refine(isSafeControlPlaneUrl, controlPlaneUrlError).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.mode === "self-hosted" && !value.url) {
+      context.addIssue({
+        code: "custom",
+        path: ["url"],
+        message: "control_plane_config: controlPlane.url is required when mode is self-hosted",
+      });
+    }
+
+    if ((value.mode === "none" || value.mode === "auto") && value.url) {
+      context.addIssue({
+        code: "custom",
+        path: ["url"],
+        message: "control_plane_config: controlPlane.url requires mode self-hosted or cloud",
+      });
+    }
+  })
+  .describe(
+    "Non-secret control-plane connection policy. Identity and secrets stay outside config.",
+  );
+
 export const appaloftDeploymentConfigSchema = z
   .object({
     $schema: z.string().trim().min(1).optional(),
+    controlPlane: appaloftDeploymentControlPlaneConfigSchema.optional(),
     source: appaloftDeploymentSourceConfigSchema.optional(),
     runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
     network: appaloftDeploymentNetworkConfigSchema.optional(),
@@ -459,6 +506,14 @@ export type AppaloftDeploymentConfig = z.output<typeof appaloftDeploymentConfigS
 function normalizeDeploymentConfig(config: AppaloftDeploymentConfig): AppaloftDeploymentConfig {
   return {
     ...config,
+    ...(config.controlPlane?.url
+      ? {
+          controlPlane: {
+            ...config.controlPlane,
+            url: config.controlPlane.url.replace(/\/+$/, ""),
+          },
+        }
+      : {}),
     ...(config.runtime?.name
       ? {
           runtime: {
@@ -509,7 +564,8 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
     root === "deployment" ||
     root === "network" ||
     root === "source" ||
-    root === "access"
+    root === "access" ||
+    root === "controlPlane"
   );
 }
 

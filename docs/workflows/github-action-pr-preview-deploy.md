@@ -341,8 +341,8 @@ by default. A preview workflow may choose separate GitHub environment names such
 
 ## GitHub Status And Comments
 
-The first Action-only implementation should emit action outputs instead of requiring GitHub App
-permissions:
+The first Action-only implementation emits action outputs instead of requiring GitHub App
+permissions by default:
 
 | Output | Meaning |
 | --- | --- |
@@ -352,9 +352,12 @@ permissions:
 | `resource-id` | Preview resource id when machine-readable CLI output supports it. |
 | `diagnostic-path` | Optional sanitized diagnostic artifact path. |
 
-GitHub's `environment.url` can display `preview-url` in the PR checks UI. A repository may add a
-separate `actions/github-script` step to comment the URL, but bot comments are not required for the
-first Appaloft Action contract.
+GitHub's `environment.url` can display `preview-url` or `console-url` in the PR checks UI. A
+repository may set `pr-comment: true` and pass `github-token: ${{ github.token }}` to let the
+wrapper post or update one marker-based PR comment with the preview URL, console URL, deployment id,
+or cleanup status. That path requires explicit workflow permission such as `pull-requests: write`
+or `issues: write`. Bot comments remain optional and are not required for the first Appaloft Action
+contract.
 
 Action-only preview workflows may also own GitHub deployment/environment metadata cleanup when the
 repository uses workflow `environment:` records and grants `deployments: write` to the close-event

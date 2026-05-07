@@ -575,7 +575,7 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Relink source fingerprint | Command | `source-links.relink` | `RelinkSourceLinkCommand` | `RelinkSourceLinkCommandInput` | `appaloft source-links relink <sourceFingerprint>` | Not exposed |
+| Relink source fingerprint | Command | `source-links.relink` | `RelinkSourceLinkCommand` | `RelinkSourceLinkCommandInput` | `appaloft source-links relink <sourceFingerprint>` | `POST /api/source-links/relink` |
 
 Current boundary:
 - `source-links.relink` updates source link mapping only. It does not mutate resource profiles,
@@ -588,8 +588,8 @@ Current boundary:
   [ADR-028: Command Coordination Scope And Mutation Admission](./decisions/ADR-028-command-coordination-scope-and-mutation-admission.md).
 - PostgreSQL/PGlite source-link storage is implemented for hosted/self-hosted and embedded state
   backends through the dedicated `packages/persistence/pg` adapter. That same durable state feeds
-  `resources.delete` source-link blocker checks. API/oRPC and Web relink surfaces remain future
-  work until the review UX exists.
+  `resources.delete` source-link blocker checks. HTTP/oRPC relink is exposed for hosted/self-hosted
+  control planes; Web review UX remains future work.
 
 ## Source Events
 
@@ -635,7 +635,7 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `appaloft deploy [path-or-source]` or ids-only flags | `POST /api/deployments` |
-| Cleanup preview deployment | Command | `deployments.cleanup-preview` | `CleanupPreviewCommand` | `CleanupPreviewCommandInput` | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` | - |
+| Cleanup preview deployment | Command | `deployments.cleanup-preview` | `CleanupPreviewCommand` | `CleanupPreviewCommandInput` | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` | `POST /api/deployments/cleanup-preview` |
 | Preview deployment plan | Query | `deployments.plan` | `DeploymentPlanQuery` | `DeploymentPlanQueryInput` | `appaloft deployments plan --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` | `GET /api/deployments/plan` |
 | List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
 | Show deployment detail | Query | `deployments.show` | `ShowDeploymentQuery` | `ShowDeploymentQueryInput` | `appaloft deployments show <deploymentId>` | `GET /api/deployments/{deploymentId}` |
@@ -786,6 +786,15 @@ Current boundary:
   to CLI flags, writes SSH private key input to a temporary key file, and invokes the same
   repository config deploy workflow. It is not a new operation, not a hidden Quick Deploy API, and
   not a hosted control plane.
+- In `control-plane-mode: self-hosted`, the deploy action uses server API trigger mode for the
+  first 0.9.x slice: it does not install or invoke the CLI, open SSH, select a state backend, or
+  mutate SSH-server PGlite. It calls the self-hosted server's `/api/version` endpoint, then uses
+  `POST /api/action/deployments/from-source-link` for `command: deploy` and
+  `POST /api/deployments/cleanup-preview` for `command: preview-cleanup`, both with derived source
+  fingerprints. Trusted project/environment/resource/server ids supplied by the workflow may
+  bootstrap a missing source link for deploy; later runs may omit those ids so the server resolves
+  context from existing source-link state. Preview cleanup always resolves context from the preview
+  source link.
 - GitHub Action PR preview deploy is also an entry workflow over the same commands, not a new
   operation. A repository must add a workflow with `on.pull_request` before GitHub will attempt a
   preview deploy. The action may use trusted GitHub event context, such as PR number and head SHA,
@@ -808,8 +817,10 @@ Current boundary:
   wildcard DNS to the selected server and provide the preview host template as trusted action or
   installation policy. Appaloft does not mutate public DNS in `controlPlane.mode: none`.
 - Action-only PR close cleanup is supported only when a repository adds a user-authored
-  `pull_request.closed` workflow that dispatches `deployments.cleanup-preview`, typically through
-  `appaloft preview cleanup ...`. The command is idempotent when preview state is already absent.
+  `pull_request.closed` workflow that dispatches `deployments.cleanup-preview`, either through
+  `appaloft preview cleanup ...` in pure SSH CLI mode or through
+  `POST /api/deployments/cleanup-preview` in self-hosted server API mode. The command is idempotent
+  when preview state is already absent.
   Product-grade preview environments with GitHub App webhooks, comments/checks, policy, cleanup
   retries, audit, and managed domain lifecycle still require Appaloft Cloud or a self-hosted
   control plane. That future product line must still reuse repository config and explicit

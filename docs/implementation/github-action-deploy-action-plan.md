@@ -3,13 +3,25 @@
 ## Goal
 
 Make repository-driven GitHub Actions deployment a release-ready product entrypoint for pure CLI
-SSH deployments.
+SSH deployments and the first self-hosted server API deployment trigger.
 
 The first public shape is a thin `appaloft/deploy-action` wrapper around the released Appaloft CLI
 binary. The wrapper installs a selected CLI release, verifies the artifact, maps trusted GitHub
 Secrets into runner-local files or environment variables, and invokes the existing
 `appaloft deploy` config workflow. It must not introduce a new deployment command, hidden hosted
 service requirement, or parallel config schema.
+
+The first self-hosted server API slice is narrower: the wrapper does not install or invoke the CLI,
+does not open SSH, and does not read or write SSH-server PGlite state. It performs a lightweight
+`/api/version` compatibility check against the self-hosted Appaloft server and calls
+`POST /api/action/deployments/from-source-link` for deploy or
+`POST /api/deployments/cleanup-preview` for PR close cleanup with a derived source fingerprint.
+Trusted project/environment/resource/server ids supplied by the workflow may bootstrap a missing
+source link for deploy. Preview cleanup resolves context from existing preview source-link state.
+The non-secret connection policy may come from
+`controlPlane.mode/url` in repository config; identity and secrets still come from trusted workflow
+inputs, variables, secrets, or server-side source links. When ids are omitted, the self-hosted
+server owns context resolution from existing source-link state.
 
 ## Product Boundary
 
@@ -31,6 +43,11 @@ It must follow these boundaries:
 - control-plane mode selection follows ADR-025: GitHub Actions may remain the execution owner even
   when Appaloft Cloud or a self-hosted Appaloft server owns state, locks, source links, policy, and
   managed domain workflow state.
+- `control-plane-mode: self-hosted` in the 0.9.x server API slice means the Appaloft server owns
+  state and execution. The Action is only a trigger and must reject SSH credentials and state
+  backend selection. Deploy may pass explicit trusted ids or ask the server to resolve an existing
+  source link by source fingerprint; preview cleanup must resolve context from preview source-link
+  state and must not accept deployment target ids.
 
 The action wrapper may live in a separate public repository because its release cadence and
 Marketplace metadata are different from the main Appaloft repository. The wrapper should remain
@@ -166,8 +183,10 @@ container/project name.
 
 The first preview mode creates or reuses preview-scoped source link state and dispatches the same
 ids-only `deployments.create` command. Explicit PR close cleanup now runs through
-`deployments.cleanup-preview` from a user-authored close-event workflow, but pure Action mode still
-has no retry/scheduler if that workflow never runs or fails.
+`deployments.cleanup-preview` from a user-authored close-event workflow. In pure SSH CLI mode the
+wrapper invokes `appaloft preview cleanup`; in self-hosted server API mode it calls
+`POST /api/deployments/cleanup-preview`. Neither mode has retry/scheduler if the user-authored
+workflow never runs or fails.
 
 Preview URL behavior:
 
@@ -200,10 +219,15 @@ Initial inputs:
 | `ssh-private-key-file` | No | Existing runner-local private key path; mutually exclusive with `ssh-private-key`. |
 | `server-proxy-kind` | No | Trusted proxy selection such as `traefik` or `caddy`, mapped to `--server-proxy-kind`. |
 | `state-backend` | No | Optional explicit backend: `ssh-pglite`, `local-pglite`, or `postgres-control-plane`. |
-| `control-plane-mode` | No | Future explicit mode: `none`, `auto`, `cloud`, or `self-hosted`. Defaults to `none` when absent. |
-| `control-plane-url` | No | Future trusted endpoint for self-hosted/private control planes, mapped to CLI/env outside committed config. |
-| `appaloft-token` | No | Future secret token for Cloud/self-hosted API mode; must never be logged or written to config. |
+| `control-plane-mode` | No | Explicit mode: `none` for pure SSH CLI mode or `self-hosted` for the first server API trigger slice. `auto` and `cloud` remain future and must fail before mutation. |
+| `control-plane-url` | Required for `self-hosted` | Trusted endpoint for the self-hosted Appaloft server, mapped outside committed config. |
+| `appaloft-token` | No | Optional bearer token for self-hosted API mode; must never be logged or written to config. |
 | `use-oidc` | No | Future boolean for GitHub OIDC exchange when the Cloud auth ADR accepts it. |
+| `project-id` | Optional | Trusted project id for source-link bootstrap; must be supplied by workflow input or secrets, not committed config. Required only when any explicit deployment id is supplied. |
+| `environment-id` | Optional | Trusted environment id for source-link bootstrap. Required only when any explicit deployment id is supplied. |
+| `resource-id` | Optional | Trusted resource id for source-link bootstrap. Required only when any explicit deployment id is supplied. |
+| `server-id` | Optional | Trusted deployment target id for source-link bootstrap. Required only when any explicit deployment id is supplied. |
+| `destination-id` | No | Optional trusted destination id for source-link bootstrap. |
 | `preview` | No | Accepted value `pull-request` enables preview-scoped source link and environment/resource identity behavior. |
 | `preview-id` | Required when `preview=pull-request` | Trusted preview scope such as `pr-123`; examples derive it from `github.event.pull_request.number`. |
 | `preview-domain-template` | No | Trusted preview hostname template rendered by the workflow/action, for example `pr-123.preview.example.com`; requires user-owned DNS in Action-only mode. |

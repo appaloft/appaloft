@@ -16,6 +16,7 @@ export * from "./operations/dependency-resources/provision-postgres-dependency-r
 export * from "./operations/dependency-resources/provision-redis-dependency-resource.schema";
 export * from "./operations/dependency-resources/rename-dependency-resource.schema";
 export * from "./operations/dependency-resources/show-dependency-resource.schema";
+export * from "./operations/deployments/cleanup-preview.schema";
 export * from "./operations/deployments/create-deployment.schema";
 export * from "./operations/deployments/deployment-logs.schema";
 export * from "./operations/deployments/deployment-plan.schema";
@@ -116,5 +117,6 @@ export * from "./operations/servers/show-ssh-credential.schema";
 export * from "./operations/servers/test-server-connectivity.schema";
 export * from "./operations/source-events/list-source-events.schema";
 export * from "./operations/source-events/show-source-event.schema";
+export * from "./operations/source-links/relink-source-link.schema";
 export * from "./operations/system/list-github-repositories.schema";
 export * from "./operations/terminal-sessions/open-terminal-session.schema";

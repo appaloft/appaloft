@@ -63,6 +63,10 @@ Current status:
   `deploy/previews` anchors that distinguish workflow-file previews from control-plane previews.
   Dependency runtime injection now has a registered dependency docs anchor for plan/show blocked
   readiness and safe bind-to-deploy behavior.
+  Self-hosted Docker install docs now describe the `install.sh --database pglite` option under the
+  stable `self-hosting/install#self-hosting-install-docker` anchor.
+  Repository config docs now describe `controlPlane.mode` and safe `controlPlane.url` usage under
+  `environments/reference/config-file#environment-config-file-control-plane`.
 - `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
   a dedicated automated link checker does not exist yet.
 - `PUB-DOCS-005` is covered for registered help topics by tests that resolve each locale page and

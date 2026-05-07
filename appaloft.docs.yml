@@ -1,3 +1,6 @@
+controlPlane:
+  mode: none
+
 runtime:
   strategy: static
   name: appaloft-docs

@@ -1029,6 +1029,15 @@ export const enUS = {
       sourceProfileSaveFailed: "Source profile was not saved",
       sourceProfileSaved: "Source profile saved",
       sourceProfileTitle: "Source profile",
+      sourceLinkDescription:
+        "Bind a GitHub Actions source fingerprint to this resource so server-mode deployments can resolve context from the console.",
+      sourceLinkDestination: "Destination id",
+      sourceLinkFingerprint: "Source fingerprint",
+      sourceLinkRelink: "Relink source",
+      sourceLinkRelinkFailed: "Source link was not relinked",
+      sourceLinkRelinked: "Source link relinked",
+      sourceLinkServer: "Deployment target",
+      sourceLinkTitle: "Action source link",
       targetServiceName: "Target service",
       workerProfileDescription:
         "Worker resources focus on background execution and deployment state, not public entry.",

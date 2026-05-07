@@ -348,14 +348,14 @@ This decision governs:
 
 Current implementation has a state backend resolver that treats `APPALOFT_CONTROL_PLANE_URL` or
 `APPALOFT_DATABASE_URL` as a `postgres-control-plane` backend and skips SSH remote PGlite sync.
-That is a partial state-backend implementation, not the full control-plane mode contract described
-here.
+That remains a partial state-backend implementation for CLI execution.
 
-The config parser does not yet accept `controlPlane.mode` or `controlPlane.url`.
+The config parser accepts `controlPlane.mode` and non-secret `controlPlane.url`, rejects identity and
+secret fields under `controlPlane`, and normalizes safe self-hosted URLs.
 
-The deploy-action wrapper can install a selected CLI version and run pure SSH deployments, but it
-does not yet expose control-plane mode inputs, OIDC/token handling, or Cloud/self-hosted API
-handshake behavior.
+The deploy-action wrapper can run pure SSH deployments or the initial self-hosted Action-to-server
+API deploy slice. OIDC/token exchange semantics, Cloud-assisted API mode, and full adoption remain
+roadmap work.
 
 No Cloud-assisted Action API, self-hosted adoption marker, source-link import, managed config
 domain mapping, or control-plane-owned execution runner is implemented yet.

@@ -170,7 +170,7 @@ The command must not:
 | --- | --- |
 | CLI | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` derives the preview fingerprint from trusted source/config/preview context, resolves the selected state backend, and dispatches this command. |
 | GitHub Actions | A user-authored `pull_request.closed` workflow may run the same CLI path directly or through a thin wrapper that maps trusted preview inputs to the same CLI command. |
-| API/oRPC | Future control-plane endpoint may expose the same command schema after preview lifecycle read/write contracts are accepted. |
+| API/oRPC | `POST /api/deployments/cleanup-preview` accepts the same command schema for hosted/self-hosted control planes and returns the cleanup result. |
 | Web | Future preview management UI may call the same command after showing the selected preview state and cleanup impact. |
 
 ## Error Contract
@@ -200,10 +200,12 @@ At minimum, Test-First and Code Round coverage must prove:
 
 ## Current Implementation Notes And Migration Gaps
 
-`deployments.cleanup-preview` is active in the application operation catalog and CLI surface. The
-CLI derives the preview-scoped source fingerprint from the same source/config/preview context used
-by preview deploy, resolves remote state when SSH-targeted state is selected, and dispatches the
-command through the application command bus.
+`deployments.cleanup-preview` is active in the application operation catalog, CLI surface, and
+HTTP/oRPC surface. The CLI derives the preview-scoped source fingerprint from the same
+source/config/preview context used by preview deploy, resolves remote state when SSH-targeted state
+is selected, and dispatches the command through the application command bus. The HTTP/oRPC surface
+accepts an already-derived source fingerprint so self-hosted server API mode remains the state
+owner.
 
 Current implementation cleans preview runtime state through the injected execution backend, sweeps
 additional stale preview deployments in the same linked project/environment scope when their runtime
