@@ -77,7 +77,9 @@ inputs. It invokes:
 
 ```bash
 appaloft deploy . \
-  --config appaloft.docs.yml \
+  --method static \
+  --publish-dir apps/docs/dist \
+  --port 80 \
   --preview pull-request \
   --preview-id pr-<number> \
   --preview-domain-template docs-pr-<number>.preview.appaloft.com \

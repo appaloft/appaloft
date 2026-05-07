@@ -3,7 +3,7 @@ title: "Preview deployments"
 description: "Run pull request previews safely, clean them up, and understand when control-plane previews are needed."
 docType: task
 localeState:
-  zh-CN: needs-update
+  zh-CN: complete
   en-US: complete
 searchAliases:
   - "pull request preview"
@@ -68,7 +68,26 @@ For normal deployments, `appaloft/deploy-action` can trigger an existing self-ho
     server-id: ${{ secrets.APPALOFT_SERVER_ID }}
 ```
 
-This server API slice requires the project, environment, resource, and deployment target to already exist in the Appaloft server. The Action always calls the server source-link deployment route. When explicit ids are supplied, the server can bootstrap a missing source link; later runs can omit the ids and let the server resolve context from its source-link state using the GitHub repository, ref, config path, and source base directory fingerprint. It does not apply `appaloft.yml`, upload a source archive, create resources, run preview cleanup, open SSH, or mutate SSH-server PGlite state.
+This server API slice requires the project, environment, resource, and deployment target to already exist in the Appaloft server. The Action always calls the server source-link deployment route. When explicit ids are supplied, the server can bootstrap a missing source link; later runs can omit the ids and let the server resolve context from its source-link state using the GitHub repository, ref, config path, and source base directory fingerprint. It does not apply `appaloft.yml`, upload a source archive, create resources, open SSH, or mutate SSH-server PGlite state.
+
+Self-hosted server mode can also trigger PR preview deploys:
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  id: deploy
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    preview: pull-request
+    preview-id: pr-${{ github.event.pull_request.number }}
+    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
+    environment-id: ${{ secrets.APPALOFT_PREVIEW_ENVIRONMENT_ID }}
+    resource-id: ${{ secrets.APPALOFT_PREVIEW_RESOURCE_ID }}
+    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
+```
+
+Server-mode preview deploys use a preview-scoped source fingerprint and write `preview-id`, `deployment-id`, and `console-url` outputs. They do not apply `preview-domain-template`, `preview-tls-mode`, `require-preview-url`, `runtime-name`, `environment-variables`, or `secret-variables`; those policies need server-side ownership before they move into this path.
 
 The non-secret control-plane connection policy may also live in `appaloft.yml`:
 

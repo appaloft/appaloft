@@ -190,7 +190,10 @@ describe("deployment create HTTP route", () => {
     );
 
     expect(response.status).toBe(202);
-    expect(await response.json()).toEqual({ id: "dep_from_source_link" });
+    expect(await response.json()).toEqual({
+      id: "dep_from_source_link",
+      deploymentHref: "/deployments/dep_from_source_link",
+    });
     expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
     expect(capturedCommand).toMatchObject({
       projectId: "prj_console",
@@ -249,7 +252,10 @@ describe("deployment create HTTP route", () => {
     );
 
     expect(response.status).toBe(202);
-    expect(await response.json()).toEqual({ id: "dep_bootstrap_source_link" });
+    expect(await response.json()).toEqual({
+      id: "dep_bootstrap_source_link",
+      deploymentHref: "/deployments/dep_bootstrap_source_link",
+    });
     expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
     expect(capturedCommand).toMatchObject({
       projectId: "prj_console",

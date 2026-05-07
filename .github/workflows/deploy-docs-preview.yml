@@ -149,12 +149,15 @@ jobs:
           build_command="APPALOFT_DOCS_BASE=/ APPALOFT_DOCS_SITE=$PREVIEW_URL bun run --cwd apps/docs build"
 
           bun run apps/shell/src/index.ts deploy . \
-            --config appaloft.docs.yml \
             --method static \
             --resource-name "$RESOURCE_NAME" \
             --resource-kind static-site \
             --runtime-name "$RESOURCE_NAME" \
             --build "$build_command" \
+            --publish-dir apps/docs/dist \
+            --port 80 \
+            --upstream-protocol http \
+            --exposure-mode reverse-proxy \
             --preview pull-request \
             --preview-id "pr-${PR_NUMBER}" \
             --preview-domain-template "$PREVIEW_HOST" \
@@ -247,7 +250,6 @@ jobs:
           chmod 600 "$key_file"
 
           bun run apps/shell/src/index.ts preview cleanup . \
-            --config appaloft.docs.yml \
             --preview pull-request \
             --preview-id "$PREVIEW_ID" \
             --server-host "$APPALOFT_SSH_HOST" \
