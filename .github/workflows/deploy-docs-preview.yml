@@ -291,7 +291,9 @@ jobs:
           set -euo pipefail
 
           if gh api "repos/${GITHUB_REPOSITORY}/environments/${PREVIEW_ENVIRONMENT}" >/dev/null 2>&1; then
-            gh api "repos/${GITHUB_REPOSITORY}/environments/${PREVIEW_ENVIRONMENT}" \
+            if ! gh api "repos/${GITHUB_REPOSITORY}/environments/${PREVIEW_ENVIRONMENT}" \
               --method DELETE \
-              -H "Accept: application/vnd.github+json"
+              -H "Accept: application/vnd.github+json"; then
+              echo "::warning::GitHub preview environment could not be deleted; continuing because Appaloft preview cleanup already ran."
+            fi
           fi
