@@ -45,6 +45,17 @@ The work ledger is read-only. It summarizes attempt kind, status, phase, related
 
 This entrypoint does not retry, cancel, recover, dead-letter, delete, or prune anything. Recovery, cleanup, and retry capabilities are exposed through separate explicit commands so viewing status cannot accidentally mutate runtime or remote SSH state.
 
+<h2 id="remote-state-resolution">SSH remote state resolution</h2>
+
+`infra_error` + `remote-state-resolution` means Appaloft reached the SSH target but could not prepare the server-owned `ssh-pglite` state root before deployment identity resolution. Common causes are insufficient disk or inode capacity, a read-only filesystem, missing write permission for the configured runtime root, or a remote shell command failure while creating the state, lock, backup, or journal directories.
+
+Recommended handling:
+
+1. Inspect the error details printed by the CLI, especially `stateBackend`, `host`, `port`, `exitCode`, `reason`, and `stderr`.
+2. If `stderr` mentions no space, quota, read-only filesystem, or permission denied, fix the SSH target capacity or permissions for the configured runtime root, usually `/var/lib/appaloft/runtime/state`.
+3. Run `appaloft server capacity inspect` or an equivalent SSH diagnostic before retrying when the error points at target capacity.
+4. Retry the deploy after the target can create and write the Appaloft state directories.
+
 <h2 id="remote-state-lock">SSH remote state lock</h2>
 
 `infra_error` + `remote-state-lock` means the SSH `ssh-pglite` state root is protected by another Appaloft process, or a previously cancelled process left a lock that has not aged past its stale window. It is usually an operator-diagnosable infrastructure error, not invalid deployment input.
