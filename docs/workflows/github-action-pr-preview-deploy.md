@@ -462,14 +462,16 @@ into a standalone repository layout, but the public `appaloft/deploy-action` rep
 created.
 
 The main Appaloft repository now includes `.github/workflows/deploy-docs-preview.yml` as a
-repository-authored docs preview workflow over the same CLI path. It classifies PRs whose changed
-files affect docs content or docs build inputs, skips fork PR preview deploys, checks out the PR
-head for same-repository preview deploy, passes trusted PR context through `--preview pull-request`
-and `--preview-id pr-<number>`, renders `docs-pr-<number>.preview.appaloft.com` as a trusted custom
-preview host with TLS disabled, requires the preview URL to be observable, and runs `appaloft
-preview cleanup` on `pull_request.closed` before deleting the matching GitHub preview deployments
-and `docs-preview-pr-<number>` environment metadata. This workflow is an internal use of the CLI
-preview feature; it does not replace the public `appaloft/deploy-action` wrapper gap below.
+repository-authored docs preview workflow. It classifies PRs whose changed files affect docs content
+or docs build inputs, skips fork PR preview deploys, checks out the PR head for same-repository
+preview deploy, passes trusted PR context through `--preview pull-request` and
+`--preview-id pr-<number>`, renders `docs-pr-<number>.preview.appaloft.com` as a trusted custom
+preview host with TLS disabled, and requires the preview URL to be observable. Preview deploy still
+uses the CLI/SSH path because the first self-hosted Action server API slice does not accept preview
+profile inputs. On `pull_request.closed`, cleanup resolves the selected control-plane mode: in
+`self-hosted` mode it calls the local deploy-action server API cleanup path, and otherwise it runs
+`appaloft preview cleanup` over SSH before deleting the matching GitHub preview deployments and
+`docs-preview-pr-<number>` environment metadata.
 
 Missing pieces before Action PR preview can be documented as supported:
 

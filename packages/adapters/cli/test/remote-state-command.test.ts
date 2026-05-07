@@ -87,6 +87,17 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(deployDocsWorkflow).toContain(
       "uses: ./.github/actions/remote-runtime-capacity-preflight",
     );
+    expect(deployDocsPreviewWorkflow).toContain("Resolve Appaloft Control Plane");
+    expect(deployDocsPreviewWorkflow).toContain("Cleanup Docs Preview Through Appaloft Server");
+    expect(deployDocsPreviewWorkflow).toContain(
+      `control-plane-mode: ${githubExpressionOpen} steps.control-plane.outputs.control-plane-mode }}`,
+    );
+    expect(deployDocsPreviewWorkflow).toContain(
+      `control-plane-url: ${githubExpressionOpen} steps.control-plane.outputs.control-plane-url }}`,
+    );
+    expect(deployDocsPreviewWorkflow).toContain(
+      `if: ${githubExpressionOpen} steps.control-plane.outputs.control-plane-mode != 'self-hosted' }}`,
+    );
     expect(deployDocsPreviewWorkflow.match(/Remote State Lock Preflight/g)?.length).toBe(2);
     expect(deployDocsPreviewWorkflow.match(/Remote Runtime Capacity Preflight/g)?.length).toBe(2);
     expect(preflightAction).toContain("remote-state lock recover-stale");

@@ -348,10 +348,11 @@ failure staging, and remote-state prepare/release around the preview cleanup com
 The main repository also has `.github/workflows/deploy-docs-preview.yml` as a repository-authored
 workflow example that exercises the direct CLI shape for docs previews: it skips fork PR preview
 deploys, uses trusted PR preview context, supplies a custom preview domain template, requires a
-public preview URL, runs explicit preview cleanup on PR close, and deletes matching GitHub preview
+public preview URL, resolves control-plane mode on PR close, runs self-hosted server API cleanup
+when configured or explicit CLI preview cleanup otherwise, and deletes matching GitHub preview
 deployments/environment metadata. This workflow is not a substitute for the public action wrapper
-tests because it runs the source checkout directly instead of installing a released
-`appaloft/deploy-action` wrapper.
+tests because preview deploy still runs the source checkout directly instead of installing a
+released `appaloft/deploy-action` wrapper.
 
 The main repository now includes a reference composite wrapper at
 `.github/actions/deploy-action` with `action.yml`, Marketplace-facing README, install/checksum script, deploy script, and
