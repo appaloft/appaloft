@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.2](https://github.com/appaloft/appaloft/compare/v0.9.1...v0.9.2) (2026-05-07)
+
+
+### Features
+
+* **action:** allow self-hosted preview deploy trigger ([#181](https://github.com/appaloft/appaloft/issues/181)) ([ea51ef9](https://github.com/appaloft/appaloft/commit/ea51ef97dc691a392baf1fe0485b105a324b8669))
+* **web:** switch terminal panel to wterm ([aa7d588](https://github.com/appaloft/appaloft/commit/aa7d5889ce45b688d49f0e7720df47bb5cebd682))
+* **web:** switch terminal panel to wterm ([ae079e4](https://github.com/appaloft/appaloft/commit/ae079e400e18afc32e677a40c69048569344b945))
+
 ## [0.9.1](https://github.com/appaloft/appaloft/compare/v0.9.0...v0.9.1) (2026-05-07)
 
 
