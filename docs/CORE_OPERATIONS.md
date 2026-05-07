@@ -773,14 +773,17 @@ Current boundary:
   locks, identity, audit, and managed domain workflow state.
 - Repository config may declare non-secret control-plane connection policy such as
   `controlPlane.mode: none|auto|cloud|self-hosted` and optional self-host/private endpoint URL
-  metadata after the config schema implements it. It must not contain Cloud tokens, database URLs,
+  metadata. It must not contain Cloud tokens, database URLs,
   project ids, resource ids, server ids, destination ids, credential ids, organization ids, tenant
   ids, or raw credential material. Control-plane identity comes from trusted entrypoint input,
   authenticated token/OIDC/login scope, GitHub repository identity, source link state, or explicit
   relink/adoption operations outside committed config.
 - Cloud and self-hosted control-plane modes require a compatibility handshake before any
-  project/resource/domain/deployment mutation. Until that handshake exists, mode selection may be
-  documented as roadmap and must fail before mutation when selected.
+  project/resource/domain/deployment mutation. The first self-hosted deploy-action slice performs a
+  `/api/version` compatibility check and may call the server source-link deployment or preview
+  cleanup API. Cloud mode, automatic adoption, and full server-side config/source package execution
+  remain roadmap work and must fail before mutation when selected by an entrypoint that does not
+  implement them.
 - The public GitHub Actions install UX is a thin `appaloft/deploy-action` wrapper around the
   released Appaloft CLI binary. It downloads and verifies release assets, maps trusted action inputs
   to CLI flags, writes SSH private key input to a temporary key file, and invokes the same

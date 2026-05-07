@@ -3,7 +3,7 @@ title: "Preview deployments"
 description: "Run pull request previews safely, clean them up, and understand when control-plane previews are needed."
 docType: task
 localeState:
-  zh-CN: needs-update
+  zh-CN: complete
   en-US: complete
 searchAliases:
   - "pull request preview"
@@ -56,7 +56,7 @@ The public `appaloft/deploy-action` wrapper maps trusted workflow inputs to the 
 For normal deployments, `appaloft/deploy-action` can trigger an existing self-hosted Appaloft server instead of running CLI/SSH from the GitHub runner:
 
 ```yaml
-- uses: appaloft/deploy-action@v1
+- uses: appaloft/deploy-action@main
   id: deploy
   with:
     control-plane-mode: self-hosted

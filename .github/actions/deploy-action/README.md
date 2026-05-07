@@ -25,9 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: appaloft/deploy-action@v1
+      - uses: appaloft/deploy-action@main
         with:
-          version: v0.9.0
+          version: v0.9.1
           config: appaloft.yml
           ssh-host: ${{ secrets.APPALOFT_SSH_HOST }}
           ssh-user: ${{ secrets.APPALOFT_SSH_USER }}
@@ -84,10 +84,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - uses: appaloft/deploy-action@v1
+      - uses: appaloft/deploy-action@main
         id: deploy
         with:
-          version: v0.9.0
+          version: v0.9.1
           config: appaloft.preview.yml
           preview: pull-request
           preview-id: pr-${{ github.event.pull_request.number }}
@@ -135,10 +135,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: appaloft/deploy-action@v1
+      - uses: appaloft/deploy-action@main
         with:
           command: preview-cleanup
-          version: v0.9.0
+          version: v0.9.1
           config: appaloft.preview.yml
           preview: pull-request
           preview-id: pr-${{ github.event.pull_request.number }}
@@ -176,7 +176,7 @@ jobs:
       name: production
       url: ${{ steps.deploy.outputs.console-url }}
     steps:
-      - uses: appaloft/deploy-action@v1
+      - uses: appaloft/deploy-action@main
         id: deploy
         with:
           control-plane-mode: self-hosted
@@ -228,7 +228,7 @@ source-link state, or the Appaloft server, not from committed config.
 | Input | Default | Purpose |
 | --- | --- | --- |
 | `command` | `deploy` | `deploy` or `preview-cleanup`. |
-| `version` | `latest` | Appaloft CLI release tag such as `v0.9.0`. |
+| `version` | `latest` | Appaloft CLI release tag such as `v0.9.1`. |
 | `config` | empty | Optional Appaloft config path. If omitted, `appaloft.yml` is used only when present. |
 | `source` | `.` | Source path or locator passed to the CLI. |
 | `runtime-name` | empty | Trusted runtime name override for deploy. |
@@ -292,4 +292,5 @@ source-link state, or the Appaloft server, not from committed config.
 
 This action supports workflow-file previews. Product-grade previews with GitHub App webhooks,
 preview policy, comments/checks, cleanup retries, quotas, audit, and managed domain lifecycle are
-future Appaloft Cloud or self-hosted control-plane features.
+Appaloft Cloud or self-hosted control-plane workflows that reuse the same operation catalog instead
+of adding preview fields to `deployments.create`.

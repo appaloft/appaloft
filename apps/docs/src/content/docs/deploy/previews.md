@@ -50,7 +50,36 @@ appaloft deploy . \
 
 这些 preview flags 在 committed config 之外选择预览身份和路由策略。它们不会把 pull request、branch、source、route 或 preview 字段加入 `deployments.create`。
 
-公开 Marketplace 的 `appaloft/deploy-action` wrapper 仍在推进中。在它发布前，可以直接使用上面的 CLI 形状，或使用仓库自有 wrapper，把可信 workflow 输入映射到同一组 CLI flags。
+公开的 `appaloft/deploy-action` wrapper 会把可信 workflow 输入映射到同一组 preview flags。需要本地调试或临时绕过 wrapper 行为时，可以直接使用上面的 CLI 形状。
+
+<h2 id="deployment-action-self-hosted-server-mode">Self-hosted server Action mode</h2>
+
+对于普通部署，`appaloft/deploy-action` 可以触发已有的 self-hosted Appaloft server，而不是在 GitHub runner 中运行 CLI/SSH：
+
+```yaml
+- uses: appaloft/deploy-action@main
+  id: deploy
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
+    environment-id: ${{ secrets.APPALOFT_ENVIRONMENT_ID }}
+    resource-id: ${{ secrets.APPALOFT_RESOURCE_ID }}
+    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
+```
+
+这个 server API slice 要求 Appaloft server 中已经存在 project、environment、resource 和 deployment target。Action 会调用 server 的 source-link deployment route。显式 ids 存在时，server 可以 bootstrap 缺失的 source link；之后可以省略 ids，让 server 根据 GitHub repository、ref、config path 和 source base directory fingerprint 从 source-link state 解析上下文。它不会应用 `appaloft.yml`、上传 source archive、创建 resource、打开 SSH，或修改 SSH-server PGlite state。
+
+非 secret 的控制平面连接策略也可以写在 `appaloft.yml`：
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+```
+
+不要把 project、environment、resource、server、token、SSH 或 database identity 写进 committed config。这些值必须来自可信 workflow inputs、variables、secrets、已有 source links 或 Appaloft server。
 
 <h2 id="deployment-pr-preview-output">Preview URL output</h2>
 
