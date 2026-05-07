@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.1](https://github.com/appaloft/appaloft/compare/v0.9.0...v0.9.1) (2026-05-07)
+
+
+### Features
+
+* add self-hosted action control plane mode ([c0b3be6](https://github.com/appaloft/appaloft/commit/c0b3be6fddbeb921bb7050eba676d09114fe6cea))
+* add self-hosted action control plane mode ([cb3f67f](https://github.com/appaloft/appaloft/commit/cb3f67f70b5a32c2ba6bf8c0111e1dde22216223))
+
 ## [0.9.0](https://github.com/appaloft/appaloft/compare/v0.8.0...v0.9.0) (2026-05-07)
 
 
