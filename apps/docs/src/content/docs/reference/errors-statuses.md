@@ -48,12 +48,12 @@ appaloft work show <workId>
 
 <h2 id="remote-state-resolution">SSH remote state resolution</h2>
 
-`infra_error` + `remote-state-resolution` 表示 Appaloft 已经到达 SSH 目标机，但在部署身份解析之前，无法准备这台服务器拥有的 `ssh-pglite` 状态根。常见原因包括磁盘或 inode 容量不足、文件系统只读、配置的 runtime root 没有写权限，或远端 shell 在创建 state、lock、backup、journal 目录时失败。
+`infra_error` + `remote-state-resolution` 表示 Appaloft 已经到达 SSH 目标机，但在部署身份解析之前，无法准备这台服务器拥有的 `ssh-pglite` 状态根。常见原因包括磁盘或 inode 容量不足、文件系统只读、配置的 runtime root 没有写权限、升级前部署留下的旧版不兼容 PGlite 状态目录，或远端 shell 在创建 state、lock、backup、journal 目录时失败。
 
 处理顺序：
 
 1. 查看 CLI 打印的错误 details，尤其是 `stateBackend`、`host`、`port`、`exitCode`、`reason` 和 `stderr`。
-2. 如果 `stderr` 提到 no space、quota、read-only filesystem 或 permission denied，先修复 SSH 目标机上配置 runtime root 的容量或权限，通常是 `/var/lib/appaloft/runtime/state`。
+2. 如果 `stderr` 提到 no space、quota、read-only filesystem、permission denied 或 PGlite initialization failure，先修复 SSH 目标机上配置 runtime root 的容量/权限，或者让当前 Appaloft 运行隔离不兼容的本地 mirror，并在成功 sync 时替换远端状态。
 3. 当错误指向目标机容量时，先运行 `appaloft server capacity inspect` 或等价的 SSH 诊断命令，再重试。
 4. 目标机能够创建并写入 Appaloft 状态目录后，再重新执行部署。
 

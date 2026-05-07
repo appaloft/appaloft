@@ -47,12 +47,12 @@ This entrypoint does not retry, cancel, recover, dead-letter, delete, or prune a
 
 <h2 id="remote-state-resolution">SSH remote state resolution</h2>
 
-`infra_error` + `remote-state-resolution` means Appaloft reached the SSH target but could not prepare the server-owned `ssh-pglite` state root before deployment identity resolution. Common causes are insufficient disk or inode capacity, a read-only filesystem, missing write permission for the configured runtime root, or a remote shell command failure while creating the state, lock, backup, or journal directories.
+`infra_error` + `remote-state-resolution` means Appaloft reached the SSH target but could not prepare the server-owned `ssh-pglite` state root before deployment identity resolution. Common causes are insufficient disk or inode capacity, a read-only filesystem, missing write permission for the configured runtime root, an older incompatible PGlite state directory from a pre-upgrade deployment, or a remote shell command failure while creating the state, lock, backup, or journal directories.
 
 Recommended handling:
 
 1. Inspect the error details printed by the CLI, especially `stateBackend`, `host`, `port`, `exitCode`, `reason`, and `stderr`.
-2. If `stderr` mentions no space, quota, read-only filesystem, or permission denied, fix the SSH target capacity or permissions for the configured runtime root, usually `/var/lib/appaloft/runtime/state`.
+2. If `stderr` mentions no space, quota, read-only filesystem, permission denied, or PGlite initialization failure, fix the SSH target capacity/permissions or let the current Appaloft run quarantine the incompatible local mirror and replace it on successful sync.
 3. Run `appaloft server capacity inspect` or an equivalent SSH diagnostic before retrying when the error points at target capacity.
 4. Retry the deploy after the target can create and write the Appaloft state directories.
 
