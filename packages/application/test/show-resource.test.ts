@@ -25,6 +25,7 @@ import {
   PortNumber,
   ProjectId,
   Resource,
+  ResourceAutoDeployTriggerKindValue,
   ResourceExposureModeValue,
   ResourceGeneratedAccessModeValue,
   ResourceId,
@@ -40,8 +41,10 @@ import {
   RoutePathPrefix,
   RuntimePlanStrategyValue,
   SourceBaseDirectory,
+  SourceEventKindValue,
   SourceKindValue,
   SourceLocator,
+  UpdatedAt,
 } from "@appaloft/core";
 
 import { createExecutionContext, type ExecutionContext, type toRepositoryContext } from "../src";
@@ -164,7 +167,7 @@ function createTestContext(): ExecutionContext {
 }
 
 function detailedResource(): Resource {
-  return Resource.rehydrate({
+  const resource = Resource.rehydrate({
     id: ResourceId.rehydrate("res_web"),
     projectId: ProjectId.rehydrate("prj_demo"),
     environmentId: EnvironmentId.rehydrate("env_demo"),
@@ -224,6 +227,17 @@ function detailedResource(): Resource {
     },
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   });
+
+  resource
+    .configureAutoDeployPolicy({
+      triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate("git-push"),
+      refs: [GitRefText.rehydrate("main")],
+      eventKinds: [SourceEventKindValue.rehydrate("push")],
+      configuredAt: UpdatedAt.rehydrate("2026-01-01T00:00:02.000Z"),
+    })
+    ._unsafeUnwrap();
+
+  return resource;
 }
 
 function incompleteResource(): Resource {
@@ -401,6 +415,7 @@ describe("ShowResourceQueryService", () => {
     expect(detail.source).toMatchObject({
       kind: "git-public",
       locator: "https://github.com/acme/web.git",
+      sourceBindingFingerprint: expect.stringMatching(/^srcfp_[a-f0-9]{8}$/),
       gitRef: "main",
       commitSha: "abcdef1",
       baseDirectory: "/apps/web",
@@ -408,6 +423,14 @@ describe("ShowResourceQueryService", () => {
         branch: "main",
         accessToken: "********",
       },
+    });
+    expect(detail.autoDeployPolicy).toMatchObject({
+      status: "enabled",
+      triggerKind: "git-push",
+      refs: ["main"],
+      eventKinds: ["push"],
+      sourceBindingFingerprint: detail.source?.sourceBindingFingerprint,
+      updatedAt: "2026-01-01T00:00:02.000Z",
     });
     expect(detail.runtimeProfile).toMatchObject({
       strategy: "workspace-commands",

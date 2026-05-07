@@ -12,6 +12,9 @@ searchAliases:
   - "rollback"
 relatedOperations:
   - deployments.recovery-readiness
+  - deployments.retry
+  - deployments.redeploy
+  - deployments.rollback
   - source-links.relink
   - deployments.cleanup-preview
 sidebar:
@@ -53,13 +56,13 @@ This query is read-only. It returns:
 - rollback candidates and whether a candidate is missing artifact or snapshot data;
 - safe next actions such as opening detail, logs, the event stream, or a diagnostic summary.
 
-The `retry`, `redeploy`, and `rollback` write commands are not active yet. Even when readiness shows an action is technically possible, `recovery-command-not-active` explains that the command is still unavailable.
+The `retry`, `redeploy`, and `rollback` write commands are active. A command is still blocked when readiness reports missing snapshots, missing artifacts, stale readiness, an active runtime operation, or an incompatible candidate.
 
 <h2 id="deployment-recovery-retry">Retry</h2>
 
 Retry means creating a new deployment attempt from the failed deployment's immutable snapshot intent. It does not replay old events and does not resume a failed phase inside the old attempt.
 
-Until the retry command is active, readiness only tells you whether the retained snapshot and runtime inputs are enough for a same-intent retry.
+Run `appaloft deployments retry <deploymentId>` or call `POST /api/deployments/{deploymentId}/retry` after checking readiness.
 
 <h2 id="deployment-recovery-redeploy">Redeploy</h2>
 
@@ -67,9 +70,13 @@ Redeploy means deploying the current Resource profile again. It reads the curren
 
 If the current Resource profile is missing, drifted, or no longer admissible, readiness marks redeploy as blocked.
 
+Run `appaloft deployments redeploy <resourceId>` or call `POST /api/resources/{resourceId}/redeploy` after checking readiness.
+
 <h2 id="deployment-recovery-rollback">Rollback</h2>
 
 Rollback means creating a new rollback attempt from a historical successful deployment snapshot and Docker/OCI artifact. It does not re-plan from the current Resource profile and does not restore databases, volumes, queues, or external dependency state.
+
+Run `appaloft deployments rollback <deploymentId> --candidate <candidateDeploymentId>` or call `POST /api/deployments/{deploymentId}/rollback` after checking readiness and selecting a rollback-ready candidate.
 
 <h2 id="deployment-recovery-rollback-candidates">Rollback candidates</h2>
 
@@ -99,6 +106,6 @@ Recommended decisions:
 
 <h2 id="deployment-recovery-surfaces">Entrypoint differences</h2>
 
-The Web console should place recovery actions near resource, deployment, or access status. The CLI fits preview cleanup, source relink, and retry. The HTTP API should expose machine-readable status, error codes, and recovery hints.
+The Web console places recovery actions near deployment status. The CLI fits preview cleanup, source relink, retry, redeploy, and rollback. The HTTP API exposes machine-readable status, error codes, and recovery hints.
 
 Recovery should not require direct database edits or manual runtime state deletion.

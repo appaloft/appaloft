@@ -33,6 +33,36 @@ export const mutationCoordinationPolicies = {
     scopeKind: "resource-runtime",
     mode: "supersede-active",
   }),
+  retryDeployment: policy({
+    operationKey: "deployments.retry",
+    scopeKind: "resource-runtime",
+    mode: "serialize-with-bounded-wait",
+  }),
+  redeployDeployment: policy({
+    operationKey: "deployments.redeploy",
+    scopeKind: "resource-runtime",
+    mode: "supersede-active",
+  }),
+  rollbackDeployment: policy({
+    operationKey: "deployments.rollback",
+    scopeKind: "resource-runtime",
+    mode: "serialize-with-bounded-wait",
+  }),
+  stopResourceRuntime: policy({
+    operationKey: "resources.runtime.stop",
+    scopeKind: "resource-runtime",
+    mode: "serialize-with-bounded-wait",
+  }),
+  startResourceRuntime: policy({
+    operationKey: "resources.runtime.start",
+    scopeKind: "resource-runtime",
+    mode: "serialize-with-bounded-wait",
+  }),
+  restartResourceRuntime: policy({
+    operationKey: "resources.runtime.restart",
+    scopeKind: "resource-runtime",
+    mode: "serialize-with-bounded-wait",
+  }),
   cleanupPreview: policy({
     operationKey: "deployments.cleanup-preview",
     scopeKind: "preview-lifecycle",

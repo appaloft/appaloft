@@ -56,6 +56,7 @@ describe("CLI SSH remote state lifecycle", () => {
     expect(commands[0]?.command).toContain("lastHeartbeatAt");
     expect(commands[0]?.command).toContain("staleAfterSeconds");
     expect(commands[0]?.command).toContain("owner_file_present");
+    expect(commands[0]?.command).toContain('recorded_stale_after" -gt "$stale_after_seconds"');
     expect(commands[0]?.command).toContain("recorded_stale_after=30");
     expect(commands[0]?.command).toContain('date -j -u -f "%Y-%m-%dT%H:%M:%SZ"');
     expect(commands[0]?.command).toContain('stat -f %m "$lock_dir"');

@@ -60,6 +60,12 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-033: Error Knowledge Contract](./ADR-033-error-knowledge-contract.md) | Accepted | Defines how structured errors link to human docs, agent-readable guides, responsibility, actionability, and remedies. |
 | [ADR-034: Deployment Recovery Readiness](./ADR-034-deployment-recovery-readiness.md) | Accepted | Defines shared readiness, retry, redeploy, rollback candidate, rollback, event, and error semantics before ADR-016 recovery operations become public again. |
 | [ADR-035: Certificate Lifecycle Closure](./ADR-035-certificate-lifecycle-closure.md) | Accepted | Defines certificate show, retry, revoke, and delete semantics, durable revoked/deleted states, and provider/imported behavior differences. |
+| [ADR-036: Dependency Resource Backup And Restore Lifecycle](./ADR-036-dependency-resource-backup-restore-lifecycle.md) | Accepted | Defines dependency resource backup restore points, in-place restore attempts, safe provider artifact handles, and delete-safety retention blockers. |
+| [ADR-037: Source Event Auto Deploy Ownership](./ADR-037-source-event-auto-deploy-ownership.md) | Accepted | Defines Resource-owned auto-deploy policy, source event ingestion/dedupe/read-model ownership, generic webhook secret scope, and Phase 7 process-state baseline. |
+| [ADR-038: Resource Runtime Control Ownership](./ADR-038-resource-runtime-control-ownership.md) | Accepted | Defines Resource runtime stop/start/restart ownership, process-state baseline, coordination, and restart-versus-redeploy semantics. |
+| [ADR-039: Scheduled Task Resource Ownership](./ADR-039-scheduled-task-resource-ownership.md) | Accepted | Defines Resource-owned scheduled tasks, run attempts, logs, scheduler admission, and deployment-boundary separation. |
+| [ADR-040: Dependency Binding Runtime Injection Boundary](./ADR-040-dependency-binding-runtime-injection-boundary.md) | Accepted | Defines how Resource dependency bindings become runtime inputs through deployment admission and runtime target adapters without adding dependency fields to `deployments.create`. |
+| [ADR-041: Dependency Runtime Secret Value Resolution](./ADR-041-dependency-runtime-secret-value-resolution.md) | Accepted | Defines store-backed dependency connection value storage, runtime resolution, and runtime target materialization for injected dependencies. |
 
 ## Authoring Rules
 

@@ -9,6 +9,7 @@ import {
   DeploymentStatusValue,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
+  DeploymentTriggerKindValue,
   DestinationId,
   DetectSummary,
   DisplayNameText,
@@ -93,6 +94,7 @@ function deployment(input: {
     dependencyBindingReferences: [],
     logs: [],
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    triggerKind: DeploymentTriggerKindValue.createDefault(),
     ...(input.supersededByDeploymentId
       ? { supersededByDeploymentId: DeploymentId.rehydrate(input.supersededByDeploymentId) }
       : {}),
@@ -169,6 +171,84 @@ describe("Deployment", () => {
       base: "image",
       phase: "execute",
     });
+  });
+
+  test("[DEP-RETRY-001] records recovery trigger metadata on lifecycle events", () => {
+    const sourceDeploymentId = DeploymentId.rehydrate("dep_source");
+    const deployment = Deployment.create({
+      id: DeploymentId.rehydrate("dep_retry"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      resourceId: ResourceId.rehydrate("res_demo"),
+      serverId: DeploymentTargetId.rehydrate("srv_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+      runtimePlan: runtimePlan(),
+      environmentSnapshot: snapshot(),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      triggerKind: DeploymentTriggerKindValue.retry(),
+      sourceDeploymentId,
+    })._unsafeUnwrap();
+
+    deployment.markPlanning(StartedAt.rehydrate("2026-01-01T00:00:01.000Z"));
+    deployment.markPlanned(StartedAt.rehydrate("2026-01-01T00:00:02.000Z"));
+    deployment.start(StartedAt.rehydrate("2026-01-01T00:00:03.000Z"));
+
+    expect(deployment.toState()).toMatchObject({
+      triggerKind: DeploymentTriggerKindValue.retry(),
+      sourceDeploymentId,
+    });
+    expect(deployment.pullDomainEvents()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "deployment.started",
+          payload: {
+            triggerKind: "retry",
+            sourceDeploymentId: "dep_source",
+          },
+        }),
+      ]),
+    );
+  });
+
+  test("[DEP-ROLLBACK-001] records rollback source and candidate metadata on lifecycle events", () => {
+    const sourceDeploymentId = DeploymentId.rehydrate("dep_failed");
+    const rollbackCandidateDeploymentId = DeploymentId.rehydrate("dep_success");
+    const deployment = Deployment.create({
+      id: DeploymentId.rehydrate("dep_rollback"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      resourceId: ResourceId.rehydrate("res_demo"),
+      serverId: DeploymentTargetId.rehydrate("srv_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+      runtimePlan: runtimePlan(),
+      environmentSnapshot: snapshot(),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      triggerKind: DeploymentTriggerKindValue.rollback(),
+      sourceDeploymentId,
+      rollbackCandidateDeploymentId,
+    })._unsafeUnwrap();
+
+    deployment.markPlanning(StartedAt.rehydrate("2026-01-01T00:00:01.000Z"));
+    deployment.markPlanned(StartedAt.rehydrate("2026-01-01T00:00:02.000Z"));
+    deployment.start(StartedAt.rehydrate("2026-01-01T00:00:03.000Z"));
+
+    expect(deployment.toState()).toMatchObject({
+      triggerKind: DeploymentTriggerKindValue.rollback(),
+      sourceDeploymentId,
+      rollbackCandidateDeploymentId,
+    });
+    expect(deployment.pullDomainEvents()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "deployment.started",
+          payload: {
+            triggerKind: "rollback",
+            sourceDeploymentId: "dep_failed",
+            rollbackCandidateDeploymentId: "dep_success",
+          },
+        }),
+      ]),
+    );
   });
 
   test("[DEP-BIND-SNAP-REF-001] stores dependency binding safe references on the deployment snapshot", () => {

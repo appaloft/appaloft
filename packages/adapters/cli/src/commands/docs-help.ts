@@ -8,10 +8,12 @@ export const cliDocsHrefs = {
   deploymentSource: resolvePublicDocsHelpHref("deployment.source"),
   deploymentPlanPreview: resolvePublicDocsHelpHref("deployment.plan-preview"),
   deploymentPreviewCleanup: resolvePublicDocsHelpHref("deployment.preview-cleanup"),
+  productGradePreviews: resolvePublicDocsHelpHref("deployment.product-grade-previews"),
   deploymentSourceRelink: resolvePublicDocsHelpHref("deployment.source-relink"),
   deploymentRecoveryReadiness: resolvePublicDocsHelpHref("deployment.recovery-readiness"),
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
+  serverDockerSwarmTarget: resolvePublicDocsHelpHref("server.docker-swarm-target"),
   serverSshCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
   serverConnectivityTest: resolvePublicDocsHelpHref("server.connectivity-test"),
   serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),
@@ -19,10 +21,13 @@ export const cliDocsHrefs = {
   resourceConcept: resolvePublicDocsHelpHref("resource.concept"),
   resourceSourceProfile: resolvePublicDocsHelpHref("resource.source-profile"),
   resourceRuntimeProfile: resolvePublicDocsHelpHref("resource.runtime-profile"),
+  resourceProfileDrift: resolvePublicDocsHelpHref("resource.profile-drift"),
   resourceHealthProfile: resolvePublicDocsHelpHref("resource.health-profile"),
   resourceNetworkProfile: resolvePublicDocsHelpHref("resource.network-profile"),
   resourceAccessProfile: resolvePublicDocsHelpHref("resource.access-profile"),
   storageVolumeLifecycle: resolvePublicDocsHelpHref("storage.volume-lifecycle"),
+  dependencyResourceLifecycle: resolvePublicDocsHelpHref("dependency.resource-lifecycle"),
+  dependencyRuntimeInjection: resolvePublicDocsHelpHref("dependency.runtime-injection"),
   environmentConcept: resolvePublicDocsHelpHref("environment.concept"),
   environmentLifecycle: resolvePublicDocsHelpHref("environment.lifecycle"),
   environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
@@ -42,6 +47,12 @@ export const cliDocsHrefs = {
   ),
   operatorWorkLedger: resolvePublicDocsHelpHref("operator.work-ledger"),
   remoteStateLock: resolvePublicDocsHelpHref("errors.remote-state-lock"),
+  sourceAutoDeploySetup: resolvePublicDocsHelpHref("source.auto-deploy-setup"),
+  sourceAutoDeploySignatures: resolvePublicDocsHelpHref("source.auto-deploy-signatures"),
+  sourceAutoDeployDedupe: resolvePublicDocsHelpHref("source.auto-deploy-dedupe"),
+  sourceAutoDeployIgnoredEvents: resolvePublicDocsHelpHref("source.auto-deploy-ignored-events"),
+  sourceAutoDeployRecovery: resolvePublicDocsHelpHref("source.auto-deploy-recovery"),
+  scheduledTaskLifecycle: resolvePublicDocsHelpHref("scheduled-task.resource-lifecycle"),
 } as const;
 
 export const cliCommandDescriptions = {
@@ -54,6 +65,18 @@ export const cliCommandDescriptions = {
     "Show retry, redeploy, and rollback readiness for a deployment",
     "deployment.recovery-readiness",
   ),
+  deploymentRetry: withDocs(
+    "Retry a failed or canceled deployment attempt",
+    "deployment.recovery-readiness",
+  ),
+  deploymentRedeploy: withDocs(
+    "Redeploy the current resource profile",
+    "deployment.recovery-readiness",
+  ),
+  deploymentRollback: withDocs(
+    "Roll back to a retained successful deployment candidate",
+    "deployment.recovery-readiness",
+  ),
   deploymentEvents: withDocs(
     "Replay or follow deployment lifecycle events",
     "deployment.lifecycle",
@@ -61,11 +84,45 @@ export const cliCommandDescriptions = {
   deployments: withDocs("Deployment queries", "deployment.lifecycle"),
   preview: withDocs("Preview deployment commands", "deployment.preview-cleanup"),
   previewCleanup: withDocs("Clean up a preview deployment context", "deployment.preview-cleanup"),
+  previewPolicy: withDocs(
+    "Product-grade preview policy commands",
+    "deployment.product-grade-previews",
+  ),
+  previewPolicyConfigure: withDocs(
+    "Configure product-grade preview policy for a project or resource",
+    "deployment.product-grade-previews",
+  ),
+  previewPolicyShow: withDocs(
+    "Show effective product-grade preview policy for a project or resource",
+    "deployment.product-grade-previews",
+  ),
+  previewEnvironment: withDocs(
+    "Product-grade preview environment commands",
+    "deployment.product-grade-previews",
+  ),
+  previewEnvironmentList: withDocs(
+    "List product-grade preview environments",
+    "deployment.product-grade-previews",
+  ),
+  previewEnvironmentShow: withDocs(
+    "Show one product-grade preview environment",
+    "deployment.product-grade-previews",
+  ),
+  previewEnvironmentDelete: withDocs(
+    "Request cleanup for one product-grade preview environment",
+    "deployment.product-grade-previews",
+  ),
   sourceLinks: withDocs("Source fingerprint link operations", "deployment.source-relink"),
   sourceLinkRelink: withDocs(
     "Relink a source fingerprint to an explicit resource",
     "deployment.source-relink",
   ),
+  sourceEvent: withDocs("Source event diagnostics", "source.auto-deploy-setup"),
+  sourceEventList: withDocs(
+    "List source event deliveries for a project or resource",
+    "source.auto-deploy-dedupe",
+  ),
+  sourceEventShow: withDocs("Show one source event delivery", "source.auto-deploy-ignored-events"),
   remoteState: withDocs("Remote state diagnostics", "errors.remote-state-lock"),
   remoteStateLock: withDocs("SSH remote-state lock diagnostics", "errors.remote-state-lock"),
   remoteStateLockInspect: withDocs(
@@ -92,7 +149,10 @@ export const cliCommandDescriptions = {
   projectRename: withDocs("Rename a project", "project.lifecycle"),
   projectArchive: withDocs("Archive a project", "project.lifecycle"),
   server: withDocs("Server operations", "server.deployment-target"),
-  serverRegister: withDocs("Register a server", "server.deployment-target"),
+  serverRegister: withDocs(
+    "Register a single-server or Docker Swarm deployment target",
+    "server.docker-swarm-target",
+  ),
   serverList: withDocs("List servers", "server.deployment-target"),
   serverShow: withDocs("Show server detail", "server.deployment-target"),
   serverRename: withDocs("Rename a server deployment target", "server.deployment-target"),
@@ -143,11 +203,21 @@ export const cliCommandDescriptions = {
   resource: withDocs("Resource operations", "resource.concept"),
   resourceCreate: withDocs("Create a resource", "resource.concept"),
   resourceList: withDocs("List resources", "resource.concept"),
-  resourceShow: withDocs("Show resource profile", "resource.concept"),
+  resourceShow: withDocs("Show resource profile and diagnostics", "resource.profile-drift"),
   resourceArchive: withDocs("Archive a resource", "resource.concept"),
   resourceDelete: withDocs("Delete an archived resource", "resource.concept"),
   resourceTerminal: withDocs("Open a resource terminal session", "server.terminal-session"),
   resourceLogs: withDocs("Show resource runtime logs", "observability.runtime-logs"),
+  resourceRuntime: withDocs("Resource runtime control operations", "resource.runtime-controls"),
+  resourceRuntimeStop: withDocs("Stop the current resource runtime", "resource.runtime-controls"),
+  resourceRuntimeStart: withDocs(
+    "Start the last stopped resource runtime",
+    "resource.runtime-controls",
+  ),
+  resourceRuntimeRestart: withDocs(
+    "Restart the current resource runtime without redeploying",
+    "resource.runtime-controls",
+  ),
   resourceHealth: withDocs("Show current resource health", "observability.health-summary"),
   resourceConfigureSource: withDocs("Configure resource source profile", "resource.source-profile"),
   resourceConfigureRuntime: withDocs(
@@ -163,6 +233,10 @@ export const cliCommandDescriptions = {
     "Configure resource generated access profile",
     "resource.access-profile",
   ),
+  resourceConfigureAutoDeploy: withDocs(
+    "Configure resource auto-deploy policy",
+    "source.auto-deploy-setup",
+  ),
   resourceStorage: withDocs("Resource storage attachment operations", "storage.volume-lifecycle"),
   resourceAttachStorage: withDocs(
     "Attach storage to a resource at a destination path",
@@ -172,14 +246,56 @@ export const cliCommandDescriptions = {
     "Detach storage from a resource without deleting the volume",
     "storage.volume-lifecycle",
   ),
-  resourceDependency: withDocs("Resource dependency binding operations", "resource.concept"),
-  resourceDependencyBind: withDocs("Bind a dependency resource to a resource", "resource.concept"),
+  resourceDependency: withDocs(
+    "Resource dependency binding operations",
+    "dependency.resource-lifecycle",
+  ),
+  resourceDependencyBind: withDocs(
+    "Bind a dependency resource to a resource",
+    "dependency.resource-lifecycle",
+  ),
   resourceDependencyUnbind: withDocs(
     "Unbind a dependency resource without deleting it",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
-  resourceDependencyList: withDocs("List resource dependency bindings", "resource.concept"),
-  resourceDependencyShow: withDocs("Show one resource dependency binding", "resource.concept"),
+  resourceDependencyRotateSecret: withDocs(
+    "Rotate a resource dependency binding secret reference",
+    "dependency.resource-lifecycle",
+  ),
+  resourceDependencyList: withDocs(
+    "List resource dependency bindings",
+    "dependency.resource-lifecycle",
+  ),
+  resourceDependencyShow: withDocs(
+    "Show one resource dependency binding",
+    "dependency.resource-lifecycle",
+  ),
+  scheduledTask: withDocs("Scheduled task operations", "scheduled-task.resource-lifecycle"),
+  scheduledTaskCreate: withDocs(
+    "Create a Resource-owned scheduled task",
+    "scheduled-task.resource-lifecycle",
+  ),
+  scheduledTaskList: withDocs("List scheduled tasks", "scheduled-task.resource-lifecycle"),
+  scheduledTaskShow: withDocs("Show scheduled task detail", "scheduled-task.resource-lifecycle"),
+  scheduledTaskConfigure: withDocs(
+    "Configure a scheduled task",
+    "scheduled-task.resource-lifecycle",
+  ),
+  scheduledTaskDelete: withDocs("Delete a scheduled task", "scheduled-task.resource-lifecycle"),
+  scheduledTaskRun: withDocs(
+    "Accept an immediate scheduled task run",
+    "scheduled-task.resource-lifecycle",
+  ),
+  scheduledTaskRuns: withDocs("Scheduled task run history", "scheduled-task.resource-lifecycle"),
+  scheduledTaskRunsList: withDocs("List scheduled task runs", "scheduled-task.resource-lifecycle"),
+  scheduledTaskRunsShow: withDocs(
+    "Show scheduled task run detail",
+    "scheduled-task.resource-lifecycle",
+  ),
+  scheduledTaskRunsLogs: withDocs(
+    "Read scheduled task run logs",
+    "scheduled-task.resource-lifecycle",
+  ),
   storage: withDocs("Storage operations", "storage.volume-lifecycle"),
   storageVolume: withDocs("Storage volume operations", "storage.volume-lifecycle"),
   storageVolumeCreate: withDocs(
@@ -190,22 +306,57 @@ export const cliCommandDescriptions = {
   storageVolumeShow: withDocs("Show storage volume detail", "storage.volume-lifecycle"),
   storageVolumeRename: withDocs("Rename a storage volume", "storage.volume-lifecycle"),
   storageVolumeDelete: withDocs("Delete an unattached storage volume", "storage.volume-lifecycle"),
-  dependency: withDocs("Dependency resource operations", "resource.concept"),
-  dependencyPostgres: withDocs("Postgres dependency resource operations", "resource.concept"),
+  dependency: withDocs("Dependency resource operations", "dependency.resource-lifecycle"),
+  dependencyPostgres: withDocs(
+    "Postgres dependency resource operations",
+    "dependency.resource-lifecycle",
+  ),
   dependencyPostgresProvision: withDocs(
     "Create an Appaloft-managed Postgres dependency resource record",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   dependencyPostgresImport: withDocs(
     "Import an external Postgres dependency resource",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
-  dependencyList: withDocs("List dependency resources", "resource.concept"),
-  dependencyShow: withDocs("Show dependency resource detail", "resource.concept"),
-  dependencyRename: withDocs("Rename a dependency resource", "resource.concept"),
+  dependencyRedis: withDocs(
+    "Redis dependency resource operations",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyRedisProvision: withDocs(
+    "Create an Appaloft-managed Redis dependency resource record",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyRedisImport: withDocs(
+    "Import an external Redis dependency resource",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyList: withDocs("List dependency resources", "dependency.resource-lifecycle"),
+  dependencyShow: withDocs("Show dependency resource detail", "dependency.resource-lifecycle"),
+  dependencyRename: withDocs("Rename a dependency resource", "dependency.resource-lifecycle"),
   dependencyDelete: withDocs(
     "Delete a dependency resource after safety checks",
-    "resource.concept",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyBackup: withDocs(
+    "Dependency resource backup operations",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyBackupCreate: withDocs(
+    "Create a backup restore point for a dependency resource",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyBackupList: withDocs(
+    "List dependency resource backups",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyBackupShow: withDocs(
+    "Show dependency resource backup detail",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyBackupRestore: withDocs(
+    "Restore a dependency resource backup in place",
+    "dependency.resource-lifecycle",
   ),
   resourceSetVariable: withDocs(
     "Set a resource-scoped variable override",

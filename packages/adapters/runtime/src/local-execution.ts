@@ -7,6 +7,7 @@ import {
   type AppLogger,
   type DeploymentExecutionGuard,
   type DeploymentProgressReporter,
+  type DependencyResourceSecretStore,
   type EdgeProxyProviderRegistry,
   type ExecutionBackend,
   type ExecutionContext,
@@ -62,6 +63,7 @@ import {
   cleanupGeneratedDockerBuildAssets,
   writeGeneratedDockerBuildAssets,
 } from "./generated-docker-build-assets";
+import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
@@ -142,31 +144,6 @@ function isRuntimeTargetCapacityFailure(logs: readonly DeploymentLogEntry[]): bo
       log.message,
     ),
   );
-}
-
-function deploymentEnv(
-  deployment: Deployment,
-  port?: number,
-): NodeJS.ProcessEnv {
-  const state = deployment.toState();
-  const env = {
-    ...process.env,
-    APPALOFT_DEPLOYMENT_ID: state.id.value,
-    APPALOFT_PROJECT_ID: state.projectId.value,
-    APPALOFT_ENVIRONMENT_ID: state.environmentId.value,
-    APPALOFT_RESOURCE_ID: state.resourceId.value,
-    APPALOFT_DESTINATION_ID: state.destinationId.value,
-  } as NodeJS.ProcessEnv;
-
-  for (const variable of state.environmentSnapshot.variables) {
-    env[variable.key] = variable.value;
-  }
-
-  if (port) {
-    env.PORT = String(port);
-  }
-
-  return env;
 }
 
 function supersededDeploymentIdsForCleanup(input: {
@@ -545,6 +522,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry,
     private readonly resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined,
     private readonly deploymentExecutionGuard?: DeploymentExecutionGuard,
+    private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
   ) {}
 
   private report(
@@ -1040,7 +1018,17 @@ export class LocalExecutionBackend implements ExecutionBackend {
     mkdirSync(runtimeDir, { recursive: true });
 
     const port = await reservePort(state.runtimePlan.execution.port);
-    const env = deploymentEnv(deployment, port);
+    const packageEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      port,
+      includeDependencyRuntimeSecrets: false,
+    });
+    if (packageEnv.isErr()) {
+      return err(packageEnv.error);
+    }
+    const { env, redactions } = packageEnv.value;
     const logs: DeploymentLogEntry[] = [
       phaseLog("plan", "Using local host-process execution"),
     ];
@@ -1083,6 +1071,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         command,
         cwd: workdir,
         env,
+        redactions,
         onOutput: (line, level, stream) => {
           persistedCount = this.pushOutputLog(logs, {
             context,
@@ -1181,6 +1170,17 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     logs.push(phaseLog("deploy", `Start command: ${startCommand}`));
+    const runtimeEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      port,
+    });
+    if (runtimeEnv.isErr()) {
+      return err(runtimeEnv.error);
+    }
+    const startEnv = runtimeEnv.value.env;
+    const startRedactions = runtimeEnv.value.redactions;
     this.report(context, {
       deploymentId: state.id.value,
       phase: "deploy",
@@ -1188,6 +1188,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       message: `Start command: ${startCommand}`,
     });
     const logTailer = new AppLogTailer(logPath, (line) => {
+      const redactedLine = redactSecrets(line, startRedactions);
       const persistedCount = logs.filter(
         (log) => log.source === "application" && log.phase === "deploy",
       ).length;
@@ -1195,7 +1196,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         context,
         deploymentId: state.id.value,
         phase: "deploy",
-        line,
+        line: redactedLine,
         level: "info",
         stream: "stdout",
         persistedCount,
@@ -1206,7 +1207,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const stderrFd = openSync(logPath, "a");
     const child = spawn(startCommand, {
       cwd: workdir,
-      env,
+      env: startEnv,
       shell: true,
       detached: true,
       stdio: ["ignore", stdoutFd, stderrFd],
@@ -1327,7 +1328,17 @@ export class LocalExecutionBackend implements ExecutionBackend {
     if (usesDirectHostPort) {
       await reservePort(containerPort);
     }
-    const env = deploymentEnv(deployment, containerPort);
+    const packageEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      port: containerPort,
+      includeDependencyRuntimeSecrets: false,
+    });
+    if (packageEnv.isErr()) {
+      return err(packageEnv.error);
+    }
+    const { env } = packageEnv.value;
     const logs: DeploymentLogEntry[] = [
       phaseLog("plan", "Using local docker-container execution"),
     ];
@@ -1806,11 +1817,26 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
     }
 
-    const dockerEnvVariables = Object.entries(env)
+    const runtimeEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      port: containerPort,
+    });
+    if (runtimeEnv.isErr()) {
+      return err(runtimeEnv.error);
+    }
+    const {
+      env: runtimeExecutionEnv,
+      redactions,
+      dependencyTargetNames,
+    } = runtimeEnv.value;
+    const dockerEnvVariables = Object.entries(runtimeExecutionEnv)
       .filter((entry): entry is [string, string] => typeof entry[1] === "string")
       .filter(([key]) =>
         key === "PORT" ||
         key.startsWith("APPALOFT_") ||
+        dependencyTargetNames.has(key) ||
         state.environmentSnapshot.variables.some((variable) => variable.key === key),
       )
       .map(([name, value]) => {
@@ -1820,7 +1846,9 @@ export class LocalExecutionBackend implements ExecutionBackend {
         return {
           name,
           value,
-          ...(snapshotVariable?.isSecret ? { redacted: true } : {}),
+          ...(snapshotVariable?.isSecret || dependencyTargetNames.has(name)
+            ? { redacted: true }
+            : {}),
         };
     });
     const labels = dockerLabelsFromAssignments([
@@ -1858,7 +1886,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const run = runSyncCommand({
       command: runCommand,
       cwd: workdir,
-      env,
+      env: runtimeExecutionEnv,
+      redactions,
     });
     this.pushCommandOutput(logs, {
       context,
@@ -2188,7 +2217,17 @@ export class LocalExecutionBackend implements ExecutionBackend {
   ): Promise<Result<{ deployment: Deployment }>> {
     const state = deployment.toState();
     const runtimeDir = this.runtimeDirectory(state.id.value);
-    const env = deploymentEnv(deployment, state.runtimePlan.execution.port);
+    const packageEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      ...(state.runtimePlan.execution.port ? { port: state.runtimePlan.execution.port } : {}),
+      includeDependencyRuntimeSecrets: false,
+    });
+    if (packageEnv.isErr()) {
+      return err(packageEnv.error);
+    }
+    const { env } = packageEnv.value;
     const logs: DeploymentLogEntry[] = [
       phaseLog("plan", "Using local docker-compose-stack execution"),
     ];
@@ -2231,6 +2270,15 @@ export class LocalExecutionBackend implements ExecutionBackend {
       { quote: shellQuote },
     );
     logs.push(phaseLog("deploy", upCommand));
+    const runtimeEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      ...(state.runtimePlan.execution.port ? { port: state.runtimePlan.execution.port } : {}),
+    });
+    if (runtimeEnv.isErr()) {
+      return err(runtimeEnv.error);
+    }
     this.report(context, {
       deploymentId: state.id.value,
       phase: "deploy",
@@ -2241,7 +2289,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const up = runSyncCommand({
       command: upCommand,
       cwd: workdir,
-      env,
+      env: runtimeEnv.value.env,
+      redactions: runtimeEnv.value.redactions,
     });
     this.pushCommandOutput(logs, {
       context,
@@ -2372,7 +2421,16 @@ export class LocalExecutionBackend implements ExecutionBackend {
   ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
     const state = deployment.toState();
     const metadata = state.runtimePlan.execution.metadata ?? {};
-    const env = deploymentEnv(deployment);
+    const runtimeEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      includeDependencyRuntimeSecrets: false,
+    });
+    if (runtimeEnv.isErr()) {
+      return err(runtimeEnv.error);
+    }
+    const { env } = runtimeEnv.value;
     const workdir =
       state.runtimePlan.execution.workingDirectory ??
       normalizeWorkingDirectory(state.runtimePlan.source.locator);
@@ -2449,7 +2507,16 @@ export class LocalExecutionBackend implements ExecutionBackend {
     void plan;
     const state = deployment.toState();
     const metadata = state.runtimePlan.execution.metadata ?? {};
-    const env = deploymentEnv(deployment);
+    const runtimeEnv = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment,
+      dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      includeDependencyRuntimeSecrets: false,
+    });
+    if (runtimeEnv.isErr()) {
+      return err(runtimeEnv.error);
+    }
+    const { env } = runtimeEnv.value;
     const workdir =
       state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator);
     const logs: DeploymentLogEntry[] = [];

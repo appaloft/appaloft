@@ -251,6 +251,7 @@ function serverSummary(overrides?: Partial<ServerSummary>): ServerSummary {
     host: "203.0.113.10",
     port: 22,
     providerKey: "local-shell",
+    targetKind: "single-server",
     lifecycleStatus: "active",
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
@@ -522,8 +523,7 @@ describe("ShowDeploymentQueryService", () => {
         },
       ],
       runtimeInjection: {
-        status: "deferred",
-        reason: "runtime dependency environment injection is deferred for this slice",
+        status: "ready",
       },
     });
     expect(JSON.stringify(detail.snapshot?.dependencyBindings)).not.toContain("postgres://");

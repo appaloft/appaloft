@@ -66,6 +66,7 @@ import {
   UpsertResourceSpec,
 } from "@appaloft/core";
 import {
+  FakeDependencyResourceSecretStore,
   FixedClock,
   MemoryDependencyResourceRepository,
   MemoryDestinationRepository,
@@ -148,6 +149,7 @@ class StaticRuntimeTargetBackendRegistry implements RuntimeTargetBackendRegistry
         capabilities: [
           "runtime.apply",
           "runtime.verify",
+          "runtime.dependency-secrets",
           "runtime.logs",
           "proxy.route",
         ] satisfies RuntimeTargetCapability[],
@@ -201,7 +203,7 @@ function context(): ExecutionContext {
   });
 }
 
-async function createHarness(input?: { blockedBinding?: boolean }) {
+async function createHarness(input?: { blockedBinding?: boolean; unresolvedSecret?: boolean }) {
   const testContext = context();
   const repositoryContext = toRepositoryContext(testContext);
   const clock = new FixedClock("2026-01-01T00:00:00.000Z");
@@ -212,6 +214,7 @@ async function createHarness(input?: { blockedBinding?: boolean }) {
   const environments = new MemoryEnvironmentRepository();
   const resources = new MemoryResourceRepository();
   const dependencyResources = new MemoryDependencyResourceRepository();
+  const dependencyResourceSecretStore = new FakeDependencyResourceSecretStore();
   const dependencyBindings = new MemoryResourceDependencyBindingRepository();
   const baseBindingReadModel = new MemoryResourceDependencyBindingReadModel(
     dependencyBindings,
@@ -286,7 +289,9 @@ async function createHarness(input?: { blockedBinding?: boolean }) {
       databaseName: "app",
       maskedConnection: "postgres://app:********@db.example.com:5432/app",
     },
-    connectionSecretRef: DependencyResourceSecretRef.rehydrate("secret://postgres/super-secret"),
+    connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+      "appaloft://dependency-resources/rsi_pg/connection",
+    ),
     providerManaged: false,
     createdAt,
   })._unsafeUnwrap();
@@ -324,6 +329,17 @@ async function createHarness(input?: { blockedBinding?: boolean }) {
     dependencyResource,
     UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
   );
+  if (!input?.unresolvedSecret) {
+    await dependencyResourceSecretStore.storeConnection(testContext, {
+      dependencyResourceId: "rsi_pg",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      kind: "postgres",
+      purpose: "connection",
+      secretValue: "postgres://app:super-secret@db.example.com:5432/app",
+      storedAt: clock.now(),
+    });
+  }
   await dependencyBindings.upsert(
     repositoryContext,
     binding,
@@ -342,6 +358,7 @@ async function createHarness(input?: { blockedBinding?: boolean }) {
       undefined,
       undefined,
       bindingReadModel,
+      dependencyResourceSecretStore,
     ),
     query: DeploymentPlanQuery.create({
       projectId: "prj_demo",
@@ -394,16 +411,15 @@ describe("DeploymentPlanQueryService", () => {
         },
       ],
       runtimeInjection: {
-        status: "deferred",
+        status: "ready",
       },
     });
     const serialized = JSON.stringify(preview.dependencyBindings);
     expect(serialized).not.toContain("super-secret");
     expect(serialized).not.toContain("postgres://");
-    expect(serialized).not.toContain("secret://");
   });
 
-  test("[DEP-BIND-SNAP-REF-004] reports not-ready binding as deferred diagnostic without blocking admission preview", async () => {
+  test("[DEP-BIND-SNAP-REF-004] [DEP-BIND-RUNTIME-INJECT-003] reports not-ready binding as blocked runtime injection readiness", async () => {
     const harness = await createHarness({ blockedBinding: true });
 
     const preview = unwrap(await harness.service.execute(harness.context, harness.query));
@@ -421,8 +437,34 @@ describe("DeploymentPlanQueryService", () => {
         },
       ],
       runtimeInjection: {
-        status: "deferred",
+        status: "blocked",
+        reason: "dependency resource readiness is degraded",
       },
     });
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-004] reports unresolved Appaloft-owned dependency runtime refs as blocked", async () => {
+    const harness = await createHarness({ unresolvedSecret: true });
+
+    const preview = unwrap(await harness.service.execute(harness.context, harness.query));
+
+    expect(preview.readiness.status).toBe("ready");
+    expect(preview.dependencyBindings).toMatchObject({
+      status: "blocked",
+      references: [
+        {
+          bindingId: "rbd_pg",
+          snapshotReadiness: {
+            status: "ready",
+          },
+        },
+      ],
+      runtimeInjection: {
+        status: "blocked",
+        reason: "dependency_runtime_secret_unresolved",
+      },
+    });
+    expect(JSON.stringify(preview.dependencyBindings)).not.toContain("super-secret");
+    expect(JSON.stringify(preview.dependencyBindings)).not.toContain("postgres://");
   });
 });

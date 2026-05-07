@@ -101,6 +101,7 @@ function serverSummary(overrides?: Partial<ServerSummary>): ServerSummary {
     host: "203.0.113.10",
     port: 22,
     providerKey: "generic-ssh",
+    targetKind: "single-server",
     lifecycleStatus: "active",
     edgeProxy: {
       kind: "traefik",

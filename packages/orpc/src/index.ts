@@ -19,20 +19,25 @@ import {
   type CommandBus,
   ConfigureDefaultAccessDomainPolicyCommand,
   ConfigureDomainBindingRouteCommand,
+  ConfigurePreviewPolicyCommand,
   ConfigureResourceAccessCommand,
+  ConfigureResourceAutoDeployCommand,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
+  ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   ConfigureServerEdgeProxyCommand,
   ConfirmDomainBindingOwnershipCommand,
+  CreateDependencyResourceBackupCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
   CreateDomainBindingCommand,
   CreateEnvironmentCommand,
   CreateProjectCommand,
   CreateResourceCommand,
+  CreateScheduledTaskCommand,
   CreateSshCredentialCommand,
   CreateStorageVolumeCommand,
   checkDomainBindingDeleteSafetyQueryInputSchema,
@@ -40,26 +45,33 @@ import {
   cloneEnvironmentCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureDomainBindingRouteCommandInputSchema,
+  configurePreviewPolicyCommandInputSchema,
   configureResourceAccessCommandInputSchema,
+  configureResourceAutoDeployCommandInputSchema,
   configureResourceHealthCommandInputSchema,
   configureResourceNetworkCommandInputSchema,
   configureResourceRuntimeCommandInputSchema,
   configureResourceSourceCommandInputSchema,
+  configureScheduledTaskCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   configureServerEdgeProxyCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
+  createDependencyResourceBackupCommandInputSchema,
   createDeploymentCommandInputSchema,
   createDomainBindingCommandInputSchema,
   createEnvironmentCommandInputSchema,
   createProjectCommandInputSchema,
   createResourceCommandInputSchema,
+  createScheduledTaskCommandInputSchema,
   createSshCredentialCommandInputSchema,
   createStorageVolumeCommandInputSchema,
   DeactivateServerCommand,
   DeleteCertificateCommand,
   DeleteDependencyResourceCommand,
   DeleteDomainBindingCommand,
+  DeletePreviewEnvironmentCommand,
   DeleteResourceCommand,
+  DeleteScheduledTaskCommand,
   DeleteServerCommand,
   DeleteSshCredentialCommand,
   DeleteStorageVolumeCommand,
@@ -75,7 +87,9 @@ import {
   deleteCertificateCommandInputSchema,
   deleteDependencyResourceCommandInputSchema,
   deleteDomainBindingCommandInputSchema,
+  deletePreviewEnvironmentCommandInputSchema,
   deleteResourceCommandInputSchema,
+  deleteScheduledTaskCommandInputSchema,
   deleteServerCommandInputSchema,
   deleteSshCredentialCommandInputSchema,
   deleteStorageVolumeCommandInputSchema,
@@ -88,16 +102,23 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   environmentEffectivePrecedenceQueryInputSchema,
+  type GitHubPreviewPullRequestWebhookVerifier,
+  type GitHubSourceEventWebhookVerifier,
   ImportCertificateCommand,
   ImportPostgresDependencyResourceCommand,
+  ImportRedisDependencyResourceCommand,
   ImportResourceVariablesCommand,
+  IngestPreviewPullRequestEventCommand,
+  IngestSourceEventCommand,
   IssueOrRenewCertificateCommand,
   importCertificateCommandInputSchema,
   importPostgresDependencyResourceCommandInputSchema,
+  importRedisDependencyResourceCommandInputSchema,
   importResourceVariablesCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
   ListCertificatesQuery,
   ListDefaultAccessDomainPoliciesQuery,
+  ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
   ListDeploymentsQuery,
   ListDomainBindingsQuery,
@@ -105,24 +126,33 @@ import {
   ListGitHubRepositoriesQuery,
   ListOperatorWorkQuery,
   ListPluginsQuery,
+  ListPreviewEnvironmentsQuery,
   ListProjectsQuery,
   ListProvidersQuery,
   ListResourceDependencyBindingsQuery,
   ListResourcesQuery,
+  ListScheduledTaskRunsQuery,
+  ListScheduledTasksQuery,
   ListServersQuery,
+  ListSourceEventsQuery,
   ListSshCredentialsQuery,
   ListStorageVolumesQuery,
   LockEnvironmentCommand,
   listCertificatesQueryInputSchema,
   listDefaultAccessDomainPoliciesQueryInputSchema,
+  listDependencyResourceBackupsQueryInputSchema,
   listDependencyResourcesQueryInputSchema,
   listDeploymentsQueryInputSchema,
   listDomainBindingsQueryInputSchema,
   listEnvironmentsQueryInputSchema,
   listGitHubRepositoriesQueryInputSchema,
   listOperatorWorkQueryInputSchema,
+  listPreviewEnvironmentsQueryInputSchema,
   listResourceDependencyBindingsQueryInputSchema,
   listResourcesQueryInputSchema,
+  listScheduledTaskRunsQueryInputSchema,
+  listScheduledTasksQueryInputSchema,
+  listSourceEventsQueryInputSchema,
   listSshCredentialsQueryInputSchema,
   listStorageVolumesQueryInputSchema,
   lockEnvironmentCommandInputSchema,
@@ -130,10 +160,13 @@ import {
   openTerminalSessionCommandInputSchema,
   PromoteEnvironmentCommand,
   ProvisionPostgresDependencyResourceCommand,
+  ProvisionRedisDependencyResourceCommand,
   promoteEnvironmentCommandInputSchema,
   provisionPostgresDependencyResourceCommandInputSchema,
+  provisionRedisDependencyResourceCommandInputSchema,
   type Query,
   type QueryBus,
+  RedeployDeploymentCommand,
   RegisterServerCommand,
   RenameDependencyResourceCommand,
   RenameEnvironmentCommand,
@@ -145,14 +178,22 @@ import {
   ResourceEffectiveConfigQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
+  type ResourceRepository,
   type ResourceRuntimeLogEvent,
   ResourceRuntimeLogsQuery,
   type ResourceRuntimeLogsQueryInput,
   type ResourceRuntimeLogsResult,
+  RestartResourceRuntimeCommand,
+  RestoreDependencyResourceBackupCommand,
   RetryCertificateCommand,
+  RetryDeploymentCommand,
   RetryDomainBindingVerificationCommand,
   RevokeCertificateCommand,
+  RollbackDeploymentCommand,
+  RotateResourceDependencyBindingSecretCommand,
   RotateSshCredentialCommand,
+  RunScheduledTaskNowCommand,
+  redeployDeploymentCommandInputSchema,
   registerServerCommandInputSchema,
   renameDependencyResourceCommandInputSchema,
   renameEnvironmentCommandInputSchema,
@@ -165,47 +206,74 @@ import {
   resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
+  restartResourceRuntimeCommandInputSchema,
+  restoreDependencyResourceBackupCommandInputSchema,
   retryCertificateCommandInputSchema,
+  retryDeploymentCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
   revokeCertificateCommandInputSchema,
+  rollbackDeploymentCommandInputSchema,
+  rotateResourceDependencyBindingSecretCommandInputSchema,
   rotateSshCredentialCommandInputSchema,
+  runScheduledTaskNowCommandInputSchema,
+  ScheduledTaskRunLogsQuery,
   SetEnvironmentVariableCommand,
   SetResourceVariableCommand,
   ShowCertificateQuery,
   ShowDefaultAccessDomainPolicyQuery,
+  ShowDependencyResourceBackupQuery,
   ShowDependencyResourceQuery,
   ShowDeploymentQuery,
   ShowDomainBindingQuery,
   ShowEnvironmentQuery,
   ShowOperatorWorkQuery,
+  ShowPreviewEnvironmentQuery,
+  ShowPreviewPolicyQuery,
   ShowProjectQuery,
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
+  ShowScheduledTaskQuery,
+  ShowScheduledTaskRunQuery,
   ShowServerQuery,
+  ShowSourceEventQuery,
   ShowSshCredentialQuery,
   ShowStorageVolumeQuery,
+  type SourceEventPolicyReader,
+  type SourceEventVerificationPort,
+  StartResourceRuntimeCommand,
+  StopResourceRuntimeCommand,
   StreamDeploymentEventsQuery,
   type StreamDeploymentEventsQueryInput,
   type StreamDeploymentEventsResult,
+  scheduledTaskRunLogsQueryInputSchema,
   setEnvironmentVariableCommandInputSchema,
   setResourceVariableCommandInputSchema,
   showCertificateQueryInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
+  showDependencyResourceBackupQueryInputSchema,
   showDependencyResourceQueryInputSchema,
   showDeploymentQueryInputSchema,
   showDomainBindingQueryInputSchema,
   showEnvironmentQueryInputSchema,
   showOperatorWorkQueryInputSchema,
+  showPreviewEnvironmentQueryInputSchema,
+  showPreviewPolicyQueryInputSchema,
   showProjectQueryInputSchema,
   showResourceDependencyBindingQueryInputSchema,
   showResourceQueryInputSchema,
+  showScheduledTaskQueryInputSchema,
+  showScheduledTaskRunQueryInputSchema,
   showServerQueryInputSchema,
+  showSourceEventQueryInputSchema,
   showSshCredentialQueryInputSchema,
   showStorageVolumeQueryInputSchema,
+  startResourceRuntimeCommandInputSchema,
+  stopResourceRuntimeCommandInputSchema,
   streamDeploymentEventsQueryInputSchema,
   TestServerConnectivityCommand,
   testDraftServerConnectivityCommandInputSchema,
   testRegisteredServerConnectivityCommandInputSchema,
+  toRepositoryContext,
   UnbindResourceDependencyCommand,
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
@@ -227,7 +295,9 @@ import {
   cloneEnvironmentResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
   configureDomainBindingRouteResponseSchema,
+  configurePreviewPolicyResponseSchema,
   configureResourceAccessResponseSchema,
+  configureResourceAutoDeployResponseSchema,
   configureResourceHealthResponseSchema,
   configureResourceNetworkResponseSchema,
   configureResourceRuntimeResponseSchema,
@@ -244,7 +314,9 @@ import {
   deactivateServerResponseSchema,
   deleteCertificateResponseSchema,
   deleteDomainBindingResponseSchema,
+  deletePreviewEnvironmentResponseSchema,
   deleteResourceResponseSchema,
+  deleteScheduledTaskResponseSchema,
   deleteServerResponseSchema,
   deleteSshCredentialResponseSchema,
   deleteStorageVolumeResponseSchema,
@@ -265,6 +337,7 @@ import {
   issueOrRenewCertificateResponseSchema,
   listCertificatesResponseSchema,
   listDefaultAccessDomainPoliciesResponseSchema,
+  listDependencyResourceBackupsResponseSchema,
   listDependencyResourcesResponseSchema,
   listDeploymentsResponseSchema,
   listDomainBindingsResponseSchema,
@@ -272,16 +345,21 @@ import {
   listGitHubRepositoriesResponseSchema,
   listOperatorWorkResponseSchema,
   listPluginsResponseSchema,
+  listPreviewEnvironmentsResponseSchema,
   listProjectsResponseSchema,
   listProvidersResponseSchema,
   listResourceDependencyBindingsResponseSchema,
   listResourcesResponseSchema,
+  listScheduledTaskRunsResponseSchema,
+  listScheduledTasksResponseSchema,
   listServersResponseSchema,
+  listSourceEventsResponseSchema,
   listSshCredentialsResponseSchema,
   listStorageVolumesResponseSchema,
   lockEnvironmentResponseSchema,
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
+  redeployDeploymentResponseSchema,
   registerServerResponseSchema,
   renameEnvironmentResponseSchema,
   renameProjectResponseSchema,
@@ -295,29 +373,52 @@ import {
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
+  restartResourceRuntimeResponseSchema,
   retryCertificateResponseSchema,
+  retryDeploymentResponseSchema,
   retryDomainBindingVerificationResponseSchema,
   revokeCertificateResponseSchema,
+  rollbackDeploymentResponseSchema,
+  rotateResourceDependencyBindingSecretResponseSchema,
   rotateSshCredentialResponseSchema,
+  runScheduledTaskNowResponseSchema,
+  scheduledTaskCommandResponseSchema,
+  scheduledTaskRunLogsResponseSchema,
   setResourceVariableResponseSchema,
   showCertificateResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
+  showDependencyResourceBackupResponseSchema,
   showDependencyResourceResponseSchema,
   showDeploymentResponseSchema,
   showDomainBindingResponseSchema,
   showOperatorWorkResponseSchema,
+  showPreviewEnvironmentResponseSchema,
+  showPreviewPolicyResponseSchema,
   showProjectResponseSchema,
   showResourceDependencyBindingResponseSchema,
+  showScheduledTaskResponseSchema,
+  showScheduledTaskRunResponseSchema,
   showServerResponseSchema,
+  showSourceEventResponseSchema,
   showSshCredentialResponseSchema,
   showStorageVolumeResponseSchema,
+  startResourceRuntimeResponseSchema,
+  stopResourceRuntimeResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
   unbindResourceDependencyResponseSchema,
   unlockEnvironmentResponseSchema,
   unsetResourceVariableResponseSchema,
 } from "@appaloft/contracts";
-import { type DomainError, type Result } from "@appaloft/core";
+import {
+  type DomainError,
+  domainError,
+  err,
+  ok,
+  ResourceByIdSpec,
+  ResourceId,
+  type Result,
+} from "@appaloft/core";
 import { resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
 import { resolveAppaloftLocaleFromHeaders, translateDomainError } from "@appaloft/i18n";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
@@ -332,6 +433,12 @@ export interface AppaloftOrpcContext {
   queryBus: QueryBus;
   logger: AppLogger;
   deploymentProgressObserver?: DeploymentProgressObserver;
+  resourceRepository?: ResourceRepository;
+  sourceEventVerificationPort?: SourceEventVerificationPort;
+  githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
+  githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
+  sourceEventPolicyReader?: SourceEventPolicyReader;
+  githubWebhookSecret?: string;
 }
 
 interface AppaloftOrpcRequestContext extends AppaloftOrpcContext {
@@ -349,6 +456,24 @@ export interface RequestContextRunner {
     callback: () => Promise<T>,
   ): Promise<T>;
 }
+
+const genericSignedSourceEventBodySchema = z
+  .object({
+    eventKind: z.enum(["push", "tag"]),
+    sourceIdentity: z
+      .object({
+        locator: z.string().trim().min(1),
+        providerRepositoryId: z.string().trim().min(1).optional(),
+        repositoryFullName: z.string().trim().min(1).optional(),
+      })
+      .strict(),
+    ref: z.string().trim().min(1),
+    revision: z.string().trim().min(1),
+    deliveryId: z.string().trim().min(1).optional(),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    receivedAt: z.string().trim().min(1).optional(),
+  })
+  .strict();
 
 const base = os.$context<AppaloftOrpcRequestContext>();
 const emptyResponseSchema = z.null();
@@ -368,6 +493,7 @@ export const apiDocsHrefs = {
   serverCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
   serverConnectivity: resolvePublicDocsHelpHref("server.connectivity-test"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
+  serverDockerSwarmTarget: resolvePublicDocsHelpHref("server.docker-swarm-target"),
   serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),
   environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
   environmentDiffPromote: resolvePublicDocsHelpHref("environment.diff-promote"),
@@ -376,6 +502,7 @@ export const apiDocsHrefs = {
   defaultAccessPolicy: resolvePublicDocsHelpHref("default-access.policy"),
   resourceSourceProfile: resolvePublicDocsHelpHref("resource.source-profile"),
   resourceRuntimeProfile: resolvePublicDocsHelpHref("resource.runtime-profile"),
+  resourceProfileDrift: resolvePublicDocsHelpHref("resource.profile-drift"),
   resourceHealthProfile: resolvePublicDocsHelpHref("resource.health-profile"),
   resourceNetworkProfile: resolvePublicDocsHelpHref("resource.network-profile"),
   resourceAccessProfile: resolvePublicDocsHelpHref("resource.access-profile"),
@@ -390,7 +517,15 @@ export const apiDocsHrefs = {
   terminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
   storageVolumeLifecycle: resolvePublicDocsHelpHref("storage.volume-lifecycle"),
-  dependencyResourceLifecycle: resolvePublicDocsHelpHref("resource.concept"),
+  dependencyResourceLifecycle: resolvePublicDocsHelpHref("dependency.resource-lifecycle"),
+  dependencyRuntimeInjection: resolvePublicDocsHelpHref("dependency.runtime-injection"),
+  sourceAutoDeploySetup: resolvePublicDocsHelpHref("source.auto-deploy-setup"),
+  sourceAutoDeploySignatures: resolvePublicDocsHelpHref("source.auto-deploy-signatures"),
+  sourceAutoDeployDedupe: resolvePublicDocsHelpHref("source.auto-deploy-dedupe"),
+  sourceAutoDeployIgnoredEvents: resolvePublicDocsHelpHref("source.auto-deploy-ignored-events"),
+  sourceAutoDeployRecovery: resolvePublicDocsHelpHref("source.auto-deploy-recovery"),
+  scheduledTaskLifecycle: resolvePublicDocsHelpHref("scheduled-task.resource-lifecycle"),
+  productGradePreviews: resolvePublicDocsHelpHref("deployment.product-grade-previews"),
 } as const;
 
 export const apiRouteDescriptions = {
@@ -407,6 +542,10 @@ export const apiRouteDescriptions = {
     "deployment.recovery-readiness",
   ),
   projectLifecycle: routeDescription("Read, rename, and archive projects.", "project.lifecycle"),
+  registerServer: routeDescription(
+    "Registers a deployment target. Docker Swarm targets are accepted when the runtime backend is available.",
+    "server.docker-swarm-target",
+  ),
   showServer: routeDescription(
     "Reads one deployment target with proxy status and usage rollups.",
     "server.deployment-target",
@@ -471,6 +610,10 @@ export const apiRouteDescriptions = {
     "Reads one persisted default access policy scope.",
     "default-access.policy",
   ),
+  showResource: routeDescription(
+    "Reads one resource profile with optional diagnostics for profile drift.",
+    "resource.profile-drift",
+  ),
   configureResourceSource: routeDescription(
     "Configures the source profile used by later deployment detect and plan stages.",
     "resource.source-profile",
@@ -478,6 +621,10 @@ export const apiRouteDescriptions = {
   configureResourceRuntime: routeDescription(
     "Configures runtime settings such as strategy, commands, and publish directory.",
     "resource.runtime-profile",
+  ),
+  resourceRuntimeControl: routeDescription(
+    "Stops, starts, or restarts the current resource runtime without creating a deployment attempt.",
+    "resource.runtime-controls",
   ),
   configureResourceHealth: routeDescription(
     "Configures readiness and health checks used during verification.",
@@ -490,6 +637,10 @@ export const apiRouteDescriptions = {
   configureResourceAccess: routeDescription(
     "Configures resource participation in generated default access route planning.",
     "resource.access-profile",
+  ),
+  configureResourceAutoDeploy: routeDescription(
+    "Configures a Resource-owned auto-deploy policy for trusted source events.",
+    "source.auto-deploy-setup",
   ),
   attachResourceStorage: routeDescription(
     "Attaches an existing storage volume to a resource at a validated destination path.",
@@ -521,43 +672,107 @@ export const apiRouteDescriptions = {
   ),
   provisionPostgresDependencyResource: routeDescription(
     "Records provider-neutral Appaloft-managed Postgres dependency resource intent without creating provider-native database infrastructure.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   importPostgresDependencyResource: routeDescription(
     "Imports external Postgres dependency metadata while keeping raw connection secrets outside list and show responses.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
+  ),
+  provisionRedisDependencyResource: routeDescription(
+    "Records provider-neutral Appaloft-managed Redis dependency resource intent without creating provider-native Redis infrastructure.",
+    "dependency.resource-lifecycle",
+  ),
+  importRedisDependencyResource: routeDescription(
+    "Imports external Redis dependency metadata while keeping raw connection secrets outside list and show responses.",
+    "dependency.resource-lifecycle",
   ),
   listDependencyResources: routeDescription(
     "Lists dependency resources with ownership, masked connection, binding readiness, and backup relationship summaries.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   showDependencyResource: routeDescription(
     "Reads one dependency resource with masked connection and delete-safety metadata.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   renameDependencyResource: routeDescription(
     "Renames one dependency resource without changing provider ownership, bindings, or connection secret boundaries.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   deleteDependencyResource: routeDescription(
     "Deletes only dependency resources that are not blocked by bindings, backup relationships, provider-managed unsafe state, or snapshot references.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
+  ),
+  createDependencyResourceBackup: routeDescription(
+    "Creates a dependency resource backup through the selected provider while recording safe artifact metadata.",
+    "dependency.resource-lifecycle",
+  ),
+  listDependencyResourceBackups: routeDescription(
+    "Lists dependency resource backups without exposing provider-native artifact secrets.",
+    "dependency.resource-lifecycle",
+  ),
+  showDependencyResourceBackup: routeDescription(
+    "Reads one dependency resource backup with latest restore attempt metadata.",
+    "dependency.resource-lifecycle",
+  ),
+  restoreDependencyResourceBackup: routeDescription(
+    "Restores a ready dependency resource backup after explicit data-overwrite acknowledgements.",
+    "dependency.resource-lifecycle",
   ),
   bindResourceDependency: routeDescription(
     "Binds a ready Postgres dependency resource to a resource using safe control-plane metadata only.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   unbindResourceDependency: routeDescription(
     "Removes a resource dependency binding without deleting the dependency resource or external database.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
+  ),
+  rotateResourceDependencyBindingSecret: routeDescription(
+    "Rotates the safe secret reference used by a resource dependency binding for future deployments.",
+    "dependency.resource-lifecycle",
   ),
   listResourceDependencyBindings: routeDescription(
     "Lists safe dependency binding summaries for one resource without exposing raw connection secrets.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
   ),
   showResourceDependencyBinding: routeDescription(
     "Reads one safe dependency binding summary for a resource without exposing raw connection secrets.",
-    "resource.concept",
+    "dependency.resource-lifecycle",
+  ),
+  listScheduledTasks: routeDescription(
+    "Lists Resource-owned scheduled task definitions by project, environment, resource, status, cursor, and limit.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  showScheduledTask: routeDescription(
+    "Reads one Resource-owned scheduled task definition with latest run summary.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  createScheduledTask: routeDescription(
+    "Creates a Resource-owned scheduled task definition without creating a deployment attempt.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  configureScheduledTask: routeDescription(
+    "Configures schedule, command, timeout, retry, or enabled state for one scheduled task.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  deleteScheduledTask: routeDescription(
+    "Deletes one scheduled task definition without deleting the Resource or deployment history.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  runScheduledTaskNow: routeDescription(
+    "Accepts one immediate scheduled task run and returns before task execution completes.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  listScheduledTaskRuns: routeDescription(
+    "Lists scheduled task run attempts by task, resource, status, trigger kind, cursor, and limit.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  showScheduledTaskRun: routeDescription(
+    "Reads one scheduled task run attempt with safe status and terminal details.",
+    "scheduled-task.resource-lifecycle",
+  ),
+  scheduledTaskRunLogs: routeDescription(
+    "Reads run-scoped scheduled task logs without mixing them into deployment or resource runtime logs.",
+    "scheduled-task.resource-lifecycle",
   ),
   setResourceVariable: routeDescription(
     "Sets one resource-scoped variable or secret override.",
@@ -695,6 +910,34 @@ export const apiRouteDescriptions = {
   openTerminalSession: routeDescription(
     "Opens a controlled terminal session for server or resource troubleshooting.",
     "server.terminal-session",
+  ),
+  listSourceEvents: routeDescription(
+    "Lists safe source event deliveries for a project or resource.",
+    "source.auto-deploy-dedupe",
+  ),
+  showSourceEvent: routeDescription(
+    "Reads one safe source event delivery with dedupe, policy, and dispatch details.",
+    "source.auto-deploy-ignored-events",
+  ),
+  configurePreviewPolicy: routeDescription(
+    "Configures product-grade preview policy for a project or resource scope.",
+    "deployment.product-grade-previews",
+  ),
+  showPreviewPolicy: routeDescription(
+    "Reads effective product-grade preview policy for a project or resource scope.",
+    "deployment.product-grade-previews",
+  ),
+  listPreviewEnvironments: routeDescription(
+    "Lists durable preview environments with source, ownership, status, and expiry summaries.",
+    "deployment.product-grade-previews",
+  ),
+  showPreviewEnvironment: routeDescription(
+    "Reads one durable preview environment with safe source, ownership, status, and expiry detail.",
+    "deployment.product-grade-previews",
+  ),
+  deletePreviewEnvironment: routeDescription(
+    "Requests cleanup for one preview environment while preserving deployment history and audit.",
+    "deployment.product-grade-previews",
   ),
 } as const;
 export const createDeploymentRouteDescription = apiRouteDescriptions.createDeployment;
@@ -848,6 +1091,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
 
   switch (error.code) {
     case "not_found":
+    case "source_event_not_found":
       return new ORPCError("NOT_FOUND", {
         message,
         status: 404,
@@ -886,9 +1130,22 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "terminal_session_workspace_unavailable":
     case "terminal_session_policy_denied":
     case "terminal_session_not_found":
+    case "source_event_scope_required":
+    case "resource_auto_deploy_secret_unavailable":
+    case "source_event_signature_invalid":
+    case "source_event_unsupported_kind":
       return new ORPCError("BAD_REQUEST", {
         message,
         status: 400,
+        data: {
+          domainCode: error.code,
+          locale: context.locale,
+        },
+      });
+    case "source_event_provider_webhook_not_configured":
+      return new ORPCError("SERVICE_UNAVAILABLE", {
+        message,
+        status: 503,
         data: {
           domainCode: error.code,
           locale: context.locale,
@@ -1329,6 +1586,7 @@ export const registerServerProcedure = base
   .route({
     method: "POST",
     path: "/servers",
+    description: apiRouteDescriptions.registerServer,
     successStatus: 201,
   })
   .input(registerServerCommandInputSchema)
@@ -1528,6 +1786,7 @@ export const showResourceProcedure = base
   .route({
     method: "GET",
     path: "/resources/{resourceId}",
+    description: apiRouteDescriptions.showResource,
     successStatus: 200,
   })
   .input(showResourceQueryInputSchema)
@@ -1607,6 +1866,19 @@ export const configureResourceAccessProcedure = base
   .output(configureResourceAccessResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, ConfigureResourceAccessCommand.create(input)),
+  );
+
+export const configureResourceAutoDeployProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/auto-deploy",
+    description: apiRouteDescriptions.configureResourceAutoDeploy,
+    successStatus: 200,
+  })
+  .input(configureResourceAutoDeployCommandInputSchema)
+  .output(configureResourceAutoDeployResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceAutoDeployCommand.create(input)),
   );
 
 export const attachResourceStorageProcedure = base
@@ -2080,6 +2352,95 @@ export const showOperatorWorkProcedure = base
     executeQuery(context, ShowOperatorWorkQuery.create(input)),
   );
 
+export const listSourceEventsProcedure = base
+  .route({
+    method: "GET",
+    path: "/source-events",
+    description: apiRouteDescriptions.listSourceEvents,
+    successStatus: 200,
+  })
+  .input(listSourceEventsQueryInputSchema)
+  .output(listSourceEventsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSourceEventsQuery.create(input)),
+  );
+
+export const showSourceEventProcedure = base
+  .route({
+    method: "GET",
+    path: "/source-events/{sourceEventId}",
+    description: apiRouteDescriptions.showSourceEvent,
+    successStatus: 200,
+  })
+  .input(showSourceEventQueryInputSchema)
+  .output(showSourceEventResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowSourceEventQuery.create(input)));
+
+export const configurePreviewPolicyProcedure = base
+  .route({
+    method: "POST",
+    path: "/preview-policies",
+    description: apiRouteDescriptions.configurePreviewPolicy,
+    successStatus: 200,
+  })
+  .input(configurePreviewPolicyCommandInputSchema)
+  .output(configurePreviewPolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigurePreviewPolicyCommand.create(input)),
+  );
+
+export const showPreviewPolicyProcedure = base
+  .route({
+    method: "POST",
+    path: "/preview-policies/show",
+    description: apiRouteDescriptions.showPreviewPolicy,
+    successStatus: 200,
+  })
+  .input(showPreviewPolicyQueryInputSchema)
+  .output(showPreviewPolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowPreviewPolicyQuery.create(input)),
+  );
+
+export const listPreviewEnvironmentsProcedure = base
+  .route({
+    method: "GET",
+    path: "/preview-environments",
+    description: apiRouteDescriptions.listPreviewEnvironments,
+    successStatus: 200,
+  })
+  .input(listPreviewEnvironmentsQueryInputSchema)
+  .output(listPreviewEnvironmentsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListPreviewEnvironmentsQuery.create(input)),
+  );
+
+export const showPreviewEnvironmentProcedure = base
+  .route({
+    method: "GET",
+    path: "/preview-environments/{previewEnvironmentId}",
+    description: apiRouteDescriptions.showPreviewEnvironment,
+    successStatus: 200,
+  })
+  .input(showPreviewEnvironmentQueryInputSchema)
+  .output(showPreviewEnvironmentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowPreviewEnvironmentQuery.create(input)),
+  );
+
+export const deletePreviewEnvironmentProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/resources/{resourceId}/preview-environments/{previewEnvironmentId}",
+    description: apiRouteDescriptions.deletePreviewEnvironment,
+    successStatus: 202,
+  })
+  .input(deletePreviewEnvironmentCommandInputSchema)
+  .output(deletePreviewEnvironmentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeletePreviewEnvironmentCommand.create(input)),
+  );
+
 export const createDeploymentProcedure = base
   .route({
     method: "POST",
@@ -2092,6 +2453,48 @@ export const createDeploymentProcedure = base
   .output(createDeploymentResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, CreateDeploymentCommand.create(input)),
+  );
+
+export const retryDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/{deploymentId}/retry",
+    summary: "Retry deployment",
+    description: apiRouteDescriptions.deploymentRecoveryReadiness,
+    successStatus: 201,
+  })
+  .input(retryDeploymentCommandInputSchema)
+  .output(retryDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RetryDeploymentCommand.create(input)),
+  );
+
+export const redeployDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/redeploy",
+    summary: "Redeploy resource",
+    description: apiRouteDescriptions.deploymentRecoveryReadiness,
+    successStatus: 201,
+  })
+  .input(redeployDeploymentCommandInputSchema)
+  .output(redeployDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RedeployDeploymentCommand.create(input)),
+  );
+
+export const rollbackDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/{deploymentId}/rollback",
+    summary: "Roll back deployment",
+    description: apiRouteDescriptions.deploymentRecoveryReadiness,
+    successStatus: 201,
+  })
+  .input(rollbackDeploymentCommandInputSchema)
+  .output(rollbackDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RollbackDeploymentCommand.create(input)),
   );
 
 export const showDeploymentProcedure = base
@@ -2234,6 +2637,45 @@ export const resourceRuntimeLogsStreamProcedure = base
   .output(eventIterator(resourceRuntimeLogEventSchema, resourceRuntimeLogsStreamResponseSchema))
   .handler(({ input, context }) => createResourceRuntimeLogStream(context, input));
 
+export const stopResourceRuntimeProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/runtime/stop",
+    description: apiRouteDescriptions.resourceRuntimeControl,
+    successStatus: 202,
+  })
+  .input(stopResourceRuntimeCommandInputSchema)
+  .output(stopResourceRuntimeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, StopResourceRuntimeCommand.create(input)),
+  );
+
+export const startResourceRuntimeProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/runtime/start",
+    description: apiRouteDescriptions.resourceRuntimeControl,
+    successStatus: 202,
+  })
+  .input(startResourceRuntimeCommandInputSchema)
+  .output(startResourceRuntimeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, StartResourceRuntimeCommand.create(input)),
+  );
+
+export const restartResourceRuntimeProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/runtime/restart",
+    description: apiRouteDescriptions.resourceRuntimeControl,
+    successStatus: 202,
+  })
+  .input(restartResourceRuntimeCommandInputSchema)
+  .output(restartResourceRuntimeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RestartResourceRuntimeCommand.create(input)),
+  );
+
 export const resourceDiagnosticSummaryProcedure = base
   .route({
     method: "GET",
@@ -2282,6 +2724,123 @@ export const resourceProxyConfigurationPreviewProcedure = base
   .output(proxyConfigurationViewSchema)
   .handler(async ({ input, context }) =>
     executeQuery(context, ResourceProxyConfigurationPreviewQuery.create(input)),
+  );
+
+export const listScheduledTasksProcedure = base
+  .route({
+    method: "GET",
+    path: "/scheduled-tasks",
+    description: apiRouteDescriptions.listScheduledTasks,
+    successStatus: 200,
+  })
+  .input(listScheduledTasksQueryInputSchema)
+  .output(listScheduledTasksResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListScheduledTasksQuery.create(input)),
+  );
+
+export const showScheduledTaskProcedure = base
+  .route({
+    method: "GET",
+    path: "/scheduled-tasks/{taskId}",
+    description: apiRouteDescriptions.showScheduledTask,
+    successStatus: 200,
+  })
+  .input(showScheduledTaskQueryInputSchema)
+  .output(showScheduledTaskResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowScheduledTaskQuery.create(input)),
+  );
+
+export const createScheduledTaskProcedure = base
+  .route({
+    method: "POST",
+    path: "/scheduled-tasks",
+    description: apiRouteDescriptions.createScheduledTask,
+    successStatus: 201,
+  })
+  .input(createScheduledTaskCommandInputSchema)
+  .output(scheduledTaskCommandResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateScheduledTaskCommand.create(input)),
+  );
+
+export const configureScheduledTaskProcedure = base
+  .route({
+    method: "POST",
+    path: "/scheduled-tasks/{taskId}",
+    description: apiRouteDescriptions.configureScheduledTask,
+    successStatus: 200,
+  })
+  .input(configureScheduledTaskCommandInputSchema)
+  .output(scheduledTaskCommandResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureScheduledTaskCommand.create(input)),
+  );
+
+export const deleteScheduledTaskProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/scheduled-tasks/{taskId}",
+    description: apiRouteDescriptions.deleteScheduledTask,
+    successStatus: 200,
+  })
+  .input(deleteScheduledTaskCommandInputSchema)
+  .output(deleteScheduledTaskResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteScheduledTaskCommand.create(input)),
+  );
+
+export const runScheduledTaskNowProcedure = base
+  .route({
+    method: "POST",
+    path: "/scheduled-tasks/{taskId}/runs",
+    description: apiRouteDescriptions.runScheduledTaskNow,
+    successStatus: 202,
+  })
+  .input(runScheduledTaskNowCommandInputSchema)
+  .output(runScheduledTaskNowResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RunScheduledTaskNowCommand.create(input)),
+  );
+
+export const listScheduledTaskRunsProcedure = base
+  .route({
+    method: "GET",
+    path: "/scheduled-task-runs",
+    description: apiRouteDescriptions.listScheduledTaskRuns,
+    successStatus: 200,
+  })
+  .input(listScheduledTaskRunsQueryInputSchema)
+  .output(listScheduledTaskRunsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListScheduledTaskRunsQuery.create(input)),
+  );
+
+export const showScheduledTaskRunProcedure = base
+  .route({
+    method: "GET",
+    path: "/scheduled-task-runs/{runId}",
+    description: apiRouteDescriptions.showScheduledTaskRun,
+    successStatus: 200,
+  })
+  .input(showScheduledTaskRunQueryInputSchema)
+  .output(showScheduledTaskRunResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowScheduledTaskRunQuery.create(input)),
+  );
+
+export const scheduledTaskRunLogsProcedure = base
+  .route({
+    method: "GET",
+    path: "/scheduled-task-runs/{runId}/logs",
+    description: apiRouteDescriptions.scheduledTaskRunLogs,
+    successStatus: 200,
+  })
+  .input(scheduledTaskRunLogsQueryInputSchema)
+  .output(scheduledTaskRunLogsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ScheduledTaskRunLogsQuery.create(input)),
   );
 
 export const createStorageVolumeProcedure = base
@@ -2375,6 +2934,32 @@ export const importPostgresDependencyResourceProcedure = base
     executeCommand(context, ImportPostgresDependencyResourceCommand.create(input)),
   );
 
+export const provisionRedisDependencyResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/redis/provision",
+    description: apiRouteDescriptions.provisionRedisDependencyResource,
+    successStatus: 201,
+  })
+  .input(provisionRedisDependencyResourceCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ProvisionRedisDependencyResourceCommand.create(input)),
+  );
+
+export const importRedisDependencyResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/redis/import",
+    description: apiRouteDescriptions.importRedisDependencyResource,
+    successStatus: 201,
+  })
+  .input(importRedisDependencyResourceCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ImportRedisDependencyResourceCommand.create(input)),
+  );
+
 export const listDependencyResourcesProcedure = base
   .route({
     method: "GET",
@@ -2427,6 +3012,58 @@ export const deleteDependencyResourceProcedure = base
     executeCommand(context, DeleteDependencyResourceCommand.create(input)),
   );
 
+export const createDependencyResourceBackupProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/{dependencyResourceId}/backups",
+    description: apiRouteDescriptions.createDependencyResourceBackup,
+    successStatus: 201,
+  })
+  .input(createDependencyResourceBackupCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateDependencyResourceBackupCommand.create(input)),
+  );
+
+export const listDependencyResourceBackupsProcedure = base
+  .route({
+    method: "GET",
+    path: "/dependency-resources/{dependencyResourceId}/backups",
+    description: apiRouteDescriptions.listDependencyResourceBackups,
+    successStatus: 200,
+  })
+  .input(listDependencyResourceBackupsQueryInputSchema)
+  .output(listDependencyResourceBackupsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListDependencyResourceBackupsQuery.create(input)),
+  );
+
+export const showDependencyResourceBackupProcedure = base
+  .route({
+    method: "GET",
+    path: "/dependency-resources/backups/{backupId}",
+    description: apiRouteDescriptions.showDependencyResourceBackup,
+    successStatus: 200,
+  })
+  .input(showDependencyResourceBackupQueryInputSchema)
+  .output(showDependencyResourceBackupResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowDependencyResourceBackupQuery.create(input)),
+  );
+
+export const restoreDependencyResourceBackupProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/backups/{backupId}/restore",
+    description: apiRouteDescriptions.restoreDependencyResourceBackup,
+    successStatus: 202,
+  })
+  .input(restoreDependencyResourceBackupCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RestoreDependencyResourceBackupCommand.create(input)),
+  );
+
 export const bindResourceDependencyProcedure = base
   .route({
     method: "POST",
@@ -2451,6 +3088,19 @@ export const unbindResourceDependencyProcedure = base
   .output(unbindResourceDependencyResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, UnbindResourceDependencyCommand.create(input)),
+  );
+
+export const rotateResourceDependencyBindingSecretProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations",
+    description: apiRouteDescriptions.rotateResourceDependencyBindingSecret,
+    successStatus: 200,
+  })
+  .input(rotateResourceDependencyBindingSecretCommandInputSchema)
+  .output(rotateResourceDependencyBindingSecretResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RotateResourceDependencyBindingSecretCommand.create(input)),
   );
 
 export const listResourceDependencyBindingsProcedure = base
@@ -2582,6 +3232,7 @@ export const appaloftOrpcRouter = {
     configureHealth: configureResourceHealthProcedure,
     configureNetwork: configureResourceNetworkProcedure,
     configureAccess: configureResourceAccessProcedure,
+    configureAutoDeploy: configureResourceAutoDeployProcedure,
     attachStorage: attachResourceStorageProcedure,
     detachStorage: detachResourceStorageProcedure,
     configureRuntime: configureResourceRuntimeProcedure,
@@ -2596,9 +3247,15 @@ export const appaloftOrpcRouter = {
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
     logs: resourceRuntimeLogsProcedure,
     logsStream: resourceRuntimeLogsStreamProcedure,
+    runtime: {
+      stop: stopResourceRuntimeProcedure,
+      start: startResourceRuntimeProcedure,
+      restart: restartResourceRuntimeProcedure,
+    },
     dependencyBindings: {
       bind: bindResourceDependencyProcedure,
       unbind: unbindResourceDependencyProcedure,
+      rotateSecret: rotateResourceDependencyBindingSecretProcedure,
       list: listResourceDependencyBindingsProcedure,
       show: showResourceDependencyBindingProcedure,
     },
@@ -2610,13 +3267,32 @@ export const appaloftOrpcRouter = {
     rename: renameStorageVolumeProcedure,
     delete: deleteStorageVolumeProcedure,
   },
+  scheduledTasks: {
+    list: listScheduledTasksProcedure,
+    show: showScheduledTaskProcedure,
+    create: createScheduledTaskProcedure,
+    configure: configureScheduledTaskProcedure,
+    delete: deleteScheduledTaskProcedure,
+    runNow: runScheduledTaskNowProcedure,
+    runs: {
+      list: listScheduledTaskRunsProcedure,
+      show: showScheduledTaskRunProcedure,
+      logs: scheduledTaskRunLogsProcedure,
+    },
+  },
   dependencyResources: {
     provisionPostgres: provisionPostgresDependencyResourceProcedure,
     importPostgres: importPostgresDependencyResourceProcedure,
+    provisionRedis: provisionRedisDependencyResourceProcedure,
+    importRedis: importRedisDependencyResourceProcedure,
     list: listDependencyResourcesProcedure,
     show: showDependencyResourceProcedure,
     rename: renameDependencyResourceProcedure,
     delete: deleteDependencyResourceProcedure,
+    createBackup: createDependencyResourceBackupProcedure,
+    listBackups: listDependencyResourceBackupsProcedure,
+    showBackup: showDependencyResourceBackupProcedure,
+    restoreBackup: restoreDependencyResourceBackupProcedure,
   },
   terminalSessions: {
     open: openTerminalSessionProcedure,
@@ -2643,6 +3319,9 @@ export const appaloftOrpcRouter = {
   deployments: {
     list: listDeploymentsProcedure,
     create: createDeploymentProcedure,
+    retry: retryDeploymentProcedure,
+    redeploy: redeployDeploymentProcedure,
+    rollback: rollbackDeploymentProcedure,
     plan: deploymentPlanProcedure,
     show: showDeploymentProcedure,
     recoveryReadiness: deploymentRecoveryReadinessProcedure,
@@ -2654,6 +3333,19 @@ export const appaloftOrpcRouter = {
   operatorWork: {
     list: listOperatorWorkProcedure,
     show: showOperatorWorkProcedure,
+  },
+  sourceEvents: {
+    list: listSourceEventsProcedure,
+    show: showSourceEventProcedure,
+  },
+  previewPolicies: {
+    configure: configurePreviewPolicyProcedure,
+    show: showPreviewPolicyProcedure,
+  },
+  previewEnvironments: {
+    list: listPreviewEnvironmentsProcedure,
+    show: showPreviewEnvironmentProcedure,
+    delete: deletePreviewEnvironmentProcedure,
   },
   providers: {
     list: listProvidersProcedure,
@@ -2691,6 +3383,566 @@ function createRequestRunner(
   }
 
   return <T>(callback: () => Promise<T>) => callback();
+}
+
+function domainErrorHttpResponse(error: DomainError, context: ExecutionContext): Response {
+  const mapped = toOrpcError(error, context);
+  return Response.json(
+    {
+      error: {
+        code: error.code,
+        category: error.category,
+        message: mapped.message,
+        retryable: error.retryable,
+      },
+    },
+    {
+      status: mapped.status,
+    },
+  );
+}
+
+function sourceEventRouteUnavailableResponse(): Response {
+  return Response.json(
+    {
+      error: {
+        code: "source_event_ingestion_unavailable",
+        category: "infra",
+        message: "Source event ingestion is not available",
+        retryable: true,
+      },
+    },
+    {
+      status: 503,
+    },
+  );
+}
+
+function requiredPreviewContextHeader(
+  request: Request,
+  headerName: string,
+  label: string,
+): Result<string> {
+  const value = request.headers.get(headerName)?.trim();
+  if (value) {
+    return ok(value);
+  }
+
+  return err(
+    domainError.validation(`${label} header is required for preview pull request ingestion`, {
+      phase: "preview-event-ingestion",
+      header: headerName,
+    }),
+  );
+}
+
+function previewSourceEventIdFromDelivery(deliveryId: string): string {
+  const normalized = deliveryId.replace(/[^A-Za-z0-9_]/g, "_").replace(/^_+|_+$/g, "");
+  return `sevt_preview_${normalized.slice(0, 96) || "delivery"}`;
+}
+
+interface PreviewPullRequestContextSelection {
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId: string;
+  sourceBindingFingerprint: string;
+}
+
+const previewContextHeaderNames = [
+  "x-appaloft-project-id",
+  "x-appaloft-environment-id",
+  "x-appaloft-resource-id",
+  "x-appaloft-server-id",
+  "x-appaloft-destination-id",
+  "x-appaloft-source-binding-fingerprint",
+] as const;
+
+function hasTrustedPreviewContextHeader(request: Request): boolean {
+  return previewContextHeaderNames.some((headerName) => request.headers.has(headerName));
+}
+
+function trustedPreviewContextFromHeaders(
+  request: Request,
+): Result<PreviewPullRequestContextSelection> {
+  const projectId = requiredPreviewContextHeader(request, "x-appaloft-project-id", "Project id");
+  const environmentId = requiredPreviewContextHeader(
+    request,
+    "x-appaloft-environment-id",
+    "Environment id",
+  );
+  const resourceId = requiredPreviewContextHeader(request, "x-appaloft-resource-id", "Resource id");
+  const serverId = requiredPreviewContextHeader(request, "x-appaloft-server-id", "Server id");
+  const destinationId = requiredPreviewContextHeader(
+    request,
+    "x-appaloft-destination-id",
+    "Destination id",
+  );
+  const sourceBindingFingerprint = requiredPreviewContextHeader(
+    request,
+    "x-appaloft-source-binding-fingerprint",
+    "Source binding fingerprint",
+  );
+  if (projectId.isErr()) return err(projectId.error);
+  if (environmentId.isErr()) return err(environmentId.error);
+  if (resourceId.isErr()) return err(resourceId.error);
+  if (serverId.isErr()) return err(serverId.error);
+  if (destinationId.isErr()) return err(destinationId.error);
+  if (sourceBindingFingerprint.isErr()) return err(sourceBindingFingerprint.error);
+
+  return ok({
+    projectId: projectId.value,
+    environmentId: environmentId.value,
+    resourceId: resourceId.value,
+    serverId: serverId.value,
+    destinationId: destinationId.value,
+    sourceBindingFingerprint: sourceBindingFingerprint.value,
+  });
+}
+
+function githubRepositoryLocator(repositoryFullName: string): string {
+  return `https://github.com/${repositoryFullName}.git`;
+}
+
+function previewRefMatches(candidateRef: string, baseRef: string): boolean {
+  return candidateRef === baseRef || candidateRef === `refs/heads/${baseRef}`;
+}
+
+async function mappedPreviewContextFromSourcePolicy(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  event: {
+    repositoryFullName: string;
+    providerRepositoryId?: string;
+    installationId?: string;
+    baseRef: string;
+  };
+}): Promise<Result<PreviewPullRequestContextSelection>> {
+  const policyReader = input.context.sourceEventPolicyReader;
+  if (!policyReader) {
+    return err(
+      domainError.validation("Preview pull request context headers are required", {
+        phase: "preview-event-ingestion",
+      }),
+    );
+  }
+
+  const candidates = await policyReader.listCandidates(
+    toRepositoryContext(input.executionContext),
+    {
+      sourceKind: "github",
+      sourceIdentity: {
+        locator: githubRepositoryLocator(input.event.repositoryFullName),
+        repositoryFullName: input.event.repositoryFullName,
+        ...(input.event.providerRepositoryId
+          ? { providerRepositoryId: input.event.providerRepositoryId }
+          : {}),
+      },
+    },
+  );
+  const eligibleCandidates = candidates.filter(
+    (candidate) =>
+      candidate.status === "enabled" &&
+      Boolean(candidate.serverId) &&
+      Boolean(candidate.destinationId) &&
+      Boolean(candidate.sourceBindingFingerprint) &&
+      candidate.refs.some((ref) => previewRefMatches(ref, input.event.baseRef)),
+  );
+
+  if (eligibleCandidates.length === 0) {
+    return err(
+      domainError.validation("No preview context matched the GitHub pull request repository", {
+        phase: "preview-event-ingestion",
+        provider: "github",
+        repositoryFullName: input.event.repositoryFullName,
+        baseRef: input.event.baseRef,
+        ...(input.event.installationId ? { installationId: input.event.installationId } : {}),
+      }),
+    );
+  }
+
+  if (eligibleCandidates.length > 1) {
+    return err(
+      domainError.conflict("GitHub pull request preview context is ambiguous", {
+        phase: "preview-event-ingestion",
+        provider: "github",
+        repositoryFullName: input.event.repositoryFullName,
+        baseRef: input.event.baseRef,
+        matchCount: eligibleCandidates.length,
+        ...(input.event.installationId ? { installationId: input.event.installationId } : {}),
+      }),
+    );
+  }
+
+  const candidate = eligibleCandidates[0];
+  if (!candidate?.serverId || !candidate.destinationId || !candidate.sourceBindingFingerprint) {
+    return err(
+      domainError.validation("GitHub pull request preview context is incomplete", {
+        phase: "preview-event-ingestion",
+        provider: "github",
+        repositoryFullName: input.event.repositoryFullName,
+      }),
+    );
+  }
+
+  return ok({
+    projectId: candidate.projectId,
+    environmentId: candidate.environmentId,
+    resourceId: candidate.resourceId,
+    serverId: candidate.serverId,
+    destinationId: candidate.destinationId,
+    sourceBindingFingerprint: candidate.sourceBindingFingerprint,
+  });
+}
+
+async function resolvePreviewPullRequestContext(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  request: Request;
+  event: {
+    repositoryFullName: string;
+    providerRepositoryId?: string;
+    installationId?: string;
+    baseRef: string;
+  };
+}): Promise<Result<PreviewPullRequestContextSelection>> {
+  const trustedHeaders = trustedPreviewContextFromHeaders(input.request);
+  if (trustedHeaders.isOk()) {
+    return trustedHeaders;
+  }
+
+  if (hasTrustedPreviewContextHeader(input.request)) {
+    return err(trustedHeaders.error);
+  }
+
+  if (!input.context.sourceEventPolicyReader) {
+    return err(trustedHeaders.error);
+  }
+
+  return mappedPreviewContextFromSourcePolicy(input);
+}
+
+function parseGenericSignedSourceEventBody(
+  rawBody: string,
+  executionContext: ExecutionContext,
+): Result<z.output<typeof genericSignedSourceEventBodySchema>> {
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(rawBody);
+  } catch {
+    return err(
+      domainError.validation("Generic signed source event body must be valid JSON", {
+        phase: "source-event-normalization",
+      }),
+    );
+  }
+
+  const parsed = genericSignedSourceEventBodySchema.safeParse(parsedJson);
+  if (!parsed.success) {
+    return err(
+      domainError.validation("Generic signed source event body is invalid", {
+        phase: "source-event-normalization",
+        issueCount: parsed.error.issues.length,
+        locale: executionContext.locale ?? null,
+      }),
+    );
+  }
+
+  return ok(parsed.data);
+}
+
+async function resolveGenericSignedSecretValue(
+  context: ExecutionContext,
+  resourceRepository: ResourceRepository,
+  resourceIdValue: string,
+): Promise<Result<string>> {
+  const resourceId = ResourceId.create(resourceIdValue);
+  if (resourceId.isErr()) {
+    return err(resourceId.error);
+  }
+
+  const resource = await resourceRepository.findOne(
+    toRepositoryContext(context),
+    ResourceByIdSpec.create(resourceId.value),
+  );
+  if (!resource) {
+    return err(domainError.notFound("resource", resourceId.value.value));
+  }
+
+  const state = resource.toState();
+  const secretRef = state.autoDeployPolicy?.genericWebhookSecretRef;
+  if (
+    !state.autoDeployPolicy ||
+    state.autoDeployPolicy.triggerKind.value !== "generic-signed-webhook" ||
+    !secretRef
+  ) {
+    return err(
+      domainError.resourceAutoDeploySecretUnavailable(
+        "Generic signed webhook secret is unavailable",
+        {
+          phase: "source-event-verification",
+          resourceId: resourceId.value.value,
+          refFamily: "resource-secret",
+        },
+      ),
+    );
+  }
+
+  const secretKey = secretRef.resourceVariableKey();
+  const variable = state.variables
+    .toState()
+    .find(
+      (candidate) =>
+        candidate.key.equals(secretKey) &&
+        candidate.scope.value === "resource" &&
+        candidate.exposure.value === "runtime" &&
+        (candidate.isSecret || candidate.kind.value === "secret"),
+    );
+
+  if (!variable) {
+    return err(
+      domainError.resourceAutoDeploySecretUnavailable(
+        "Generic signed webhook secret is unavailable",
+        {
+          phase: "source-event-verification",
+          resourceId: resourceId.value.value,
+          refFamily: "resource-secret",
+        },
+      ),
+    );
+  }
+
+  return ok(variable.value.value);
+}
+
+async function handleGenericSignedSourceEventRoute(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  request: Request;
+  resourceId: string;
+}): Promise<Response> {
+  const { context, executionContext, request, resourceId } = input;
+  if (!context.resourceRepository || !context.sourceEventVerificationPort) {
+    return sourceEventRouteUnavailableResponse();
+  }
+
+  const signature = request.headers.get("x-appaloft-signature") ?? "";
+  const rawBody = await request.text();
+  const body = parseGenericSignedSourceEventBody(rawBody, executionContext);
+  if (body.isErr()) {
+    return domainErrorHttpResponse(body.error, executionContext);
+  }
+
+  const secretValue = await resolveGenericSignedSecretValue(
+    executionContext,
+    context.resourceRepository,
+    resourceId,
+  );
+  if (secretValue.isErr()) {
+    return domainErrorHttpResponse(secretValue.error, executionContext);
+  }
+
+  const sourceIdentity = {
+    locator: body.value.sourceIdentity.locator,
+    ...(body.value.sourceIdentity.providerRepositoryId
+      ? { providerRepositoryId: body.value.sourceIdentity.providerRepositoryId }
+      : {}),
+    ...(body.value.sourceIdentity.repositoryFullName
+      ? { repositoryFullName: body.value.sourceIdentity.repositoryFullName }
+      : {}),
+  };
+  const verified = await context.sourceEventVerificationPort.verify(executionContext, {
+    sourceKind: "generic-signed",
+    eventKind: body.value.eventKind,
+    sourceIdentity,
+    ref: body.value.ref,
+    revision: body.value.revision,
+    rawBody,
+    signature,
+    secretValue: secretValue.value,
+    method: "generic-hmac",
+    ...(body.value.deliveryId ? { deliveryId: body.value.deliveryId } : {}),
+    ...(body.value.idempotencyKey ? { idempotencyKey: body.value.idempotencyKey } : {}),
+    ...(body.value.receivedAt ? { receivedAt: body.value.receivedAt } : {}),
+  });
+  if (verified.isErr()) {
+    return domainErrorHttpResponse(verified.error, executionContext);
+  }
+
+  const command = IngestSourceEventCommand.create({
+    ...verified.value,
+    scopeResourceId: resourceId,
+  });
+  if (command.isErr()) {
+    return domainErrorHttpResponse(command.error, executionContext);
+  }
+
+  const result = await context.commandBus.execute(executionContext, command.value);
+  if (result.isErr()) {
+    return domainErrorHttpResponse(result.error, executionContext);
+  }
+
+  return Response.json(result.value);
+}
+
+async function handleGitHubSourceEventRoute(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  request: Request;
+}): Promise<Response> {
+  const { context, executionContext, request } = input;
+  if (
+    !context.githubSourceEventWebhookVerifier &&
+    !context.githubPreviewPullRequestWebhookVerifier
+  ) {
+    return sourceEventRouteUnavailableResponse();
+  }
+
+  const secretValue = context.githubWebhookSecret?.trim();
+  if (!secretValue) {
+    return domainErrorHttpResponse(
+      domainError.sourceEventProviderWebhookNotConfigured(
+        "GitHub source event webhook secret is not configured",
+        {
+          phase: "source-event-verification",
+          sourceKind: "github",
+        },
+      ),
+      executionContext,
+    );
+  }
+
+  const eventName = request.headers.get("x-github-event")?.trim() ?? "";
+  const deliveryId = request.headers.get("x-github-delivery")?.trim();
+  const signature = request.headers.get("x-hub-signature-256") ?? "";
+  const rawBody = await request.text();
+
+  if (eventName === "pull_request") {
+    return handleGitHubPreviewPullRequestRoute({
+      context,
+      executionContext,
+      request,
+      eventName,
+      signature,
+      rawBody,
+      secretValue,
+      ...(deliveryId ? { deliveryId } : {}),
+    });
+  }
+
+  if (!context.githubSourceEventWebhookVerifier) {
+    return sourceEventRouteUnavailableResponse();
+  }
+
+  const verified = await context.githubSourceEventWebhookVerifier.verify(executionContext, {
+    eventName,
+    rawBody,
+    signature,
+    secretValue,
+    ...(deliveryId ? { deliveryId } : {}),
+  });
+  if (verified.isErr()) {
+    return domainErrorHttpResponse(verified.error, executionContext);
+  }
+
+  if (verified.value.outcome === "noop") {
+    return new Response(null, { status: 204 });
+  }
+
+  const command = IngestSourceEventCommand.create(verified.value.sourceEvent);
+  if (command.isErr()) {
+    return domainErrorHttpResponse(command.error, executionContext);
+  }
+
+  const result = await context.commandBus.execute(executionContext, command.value);
+  if (result.isErr()) {
+    return domainErrorHttpResponse(result.error, executionContext);
+  }
+
+  return Response.json(result.value);
+}
+
+async function handleGitHubPreviewPullRequestRoute(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  request: Request;
+  eventName: string;
+  deliveryId?: string;
+  signature: string;
+  rawBody: string;
+  secretValue: string;
+}): Promise<Response> {
+  const {
+    context,
+    executionContext,
+    request,
+    eventName,
+    deliveryId,
+    signature,
+    rawBody,
+    secretValue,
+  } = input;
+  if (!context.githubPreviewPullRequestWebhookVerifier) {
+    return sourceEventRouteUnavailableResponse();
+  }
+
+  if (!deliveryId) {
+    return domainErrorHttpResponse(
+      domainError.validation("GitHub delivery id is required for preview pull request ingestion", {
+        phase: "preview-webhook-verification",
+        sourceKind: "github",
+        eventKind: eventName,
+      }),
+      executionContext,
+    );
+  }
+
+  const verified = await context.githubPreviewPullRequestWebhookVerifier.verify(executionContext, {
+    eventName,
+    rawBody,
+    signature,
+    secretValue,
+    deliveryId,
+  });
+  if (verified.isErr()) {
+    return domainErrorHttpResponse(verified.error, executionContext);
+  }
+
+  if (verified.value.outcome === "noop") {
+    return new Response(null, { status: 204 });
+  }
+
+  const previewContext = await resolvePreviewPullRequestContext({
+    context,
+    executionContext,
+    request,
+    event: verified.value.previewEvent,
+  });
+  if (previewContext.isErr()) {
+    return domainErrorHttpResponse(previewContext.error, executionContext);
+  }
+
+  const command = IngestPreviewPullRequestEventCommand.create({
+    sourceEventId: previewSourceEventIdFromDelivery(deliveryId),
+    event: verified.value.previewEvent,
+    projectId: previewContext.value.projectId,
+    environmentId: previewContext.value.environmentId,
+    resourceId: previewContext.value.resourceId,
+    serverId: previewContext.value.serverId,
+    destinationId: previewContext.value.destinationId,
+    sourceBindingFingerprint: previewContext.value.sourceBindingFingerprint,
+  });
+  if (command.isErr()) {
+    return domainErrorHttpResponse(command.error, executionContext);
+  }
+
+  const result = await context.commandBus.execute(executionContext, command.value);
+  if (result.isErr()) {
+    return domainErrorHttpResponse(result.error, executionContext);
+  }
+
+  return Response.json(result.value);
 }
 
 export function mountAppaloftOrpcRoutes(
@@ -2774,6 +4026,65 @@ export function mountAppaloftOrpcRoutes(
     }
   };
 
+  const genericSignedSourceEventRouteHandler = async ({
+    request,
+    params,
+  }: {
+    request: Request;
+    params: { resourceId: string };
+  }) => {
+    const executionContext = createRequestExecutionContext(
+      context.executionContextFactory,
+      "http",
+      request,
+    );
+    const run = createRequestRunner(request, executionContext, context.requestContextRunner);
+
+    try {
+      return await run(() =>
+        handleGenericSignedSourceEventRoute({
+          context,
+          executionContext,
+          request,
+          resourceId: params.resourceId,
+        }),
+      );
+    } catch (error) {
+      context.logger.error("generic_signed_source_event_route_unhandled_error", {
+        method: request.method,
+        url: request.url,
+        ...buildUnexpectedErrorContext(error),
+      });
+      throw error;
+    }
+  };
+
+  const githubSourceEventRouteHandler = async ({ request }: { request: Request }) => {
+    const executionContext = createRequestExecutionContext(
+      context.executionContextFactory,
+      "http",
+      request,
+    );
+    const run = createRequestRunner(request, executionContext, context.requestContextRunner);
+
+    try {
+      return await run(() =>
+        handleGitHubSourceEventRoute({
+          context,
+          executionContext,
+          request,
+        }),
+      );
+    } catch (error) {
+      context.logger.error("github_source_event_route_unhandled_error", {
+        method: request.method,
+        url: request.url,
+        ...buildUnexpectedErrorContext(error),
+      });
+      throw error;
+    }
+  };
+
   const routes = [
     "/api/projects",
     "/api/projects/:projectId",
@@ -2809,6 +4120,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources",
     "/api/resources/:resourceId",
     "/api/resources/:resourceId/archive",
+    "/api/resources/:resourceId/redeploy",
     "/api/resources/:resourceId/source",
     "/api/resources/:resourceId/health",
     "/api/resources/:resourceId/health-policy",
@@ -2819,8 +4131,19 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/proxy-configuration",
     "/api/resources/:resourceId/runtime-logs",
     "/api/resources/:resourceId/runtime-logs/stream",
+    "/api/resources/:resourceId/runtime/stop",
+    "/api/resources/:resourceId/runtime/start",
+    "/api/resources/:resourceId/runtime/restart",
+    "/api/resources/:resourceId/preview-environments/:previewEnvironmentId",
     "/api/resources/:resourceId/dependency-bindings",
     "/api/resources/:resourceId/dependency-bindings/:bindingId",
+    "/api/resources/:resourceId/dependency-bindings/:bindingId/secret-rotations",
+    "/api/scheduled-tasks",
+    "/api/scheduled-tasks/:taskId",
+    "/api/scheduled-tasks/:taskId/runs",
+    "/api/scheduled-task-runs",
+    "/api/scheduled-task-runs/:runId",
+    "/api/scheduled-task-runs/:runId/logs",
     "/api/resource-access-failures/:requestId",
     "/api/terminal-sessions",
     "/api/domain-bindings",
@@ -2836,6 +4159,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/certificates/:certificateId/retries",
     "/api/certificates/:certificateId/revoke",
     "/api/deployments",
+    "/api/deployments/:deploymentId/retry",
+    "/api/deployments/:deploymentId/rollback",
     "/api/deployments/plan",
     "/api/deployments/:deploymentId",
     "/api/deployments/:deploymentId/recovery-readiness",
@@ -2846,16 +4171,37 @@ export function mountAppaloftOrpcRoutes(
     "/api/dependency-resources",
     "/api/dependency-resources/postgres/provision",
     "/api/dependency-resources/postgres/import",
+    "/api/dependency-resources/redis/provision",
+    "/api/dependency-resources/redis/import",
+    "/api/dependency-resources/backups/:backupId",
+    "/api/dependency-resources/backups/:backupId/restore",
     "/api/dependency-resources/:dependencyResourceId",
+    "/api/dependency-resources/:dependencyResourceId/backups",
     "/api/dependency-resources/:dependencyResourceId/rename",
     "/api/operator-work",
     "/api/operator-work/:workId",
+    "/api/preview-policies",
+    "/api/preview-policies/show",
+    "/api/preview-environments",
+    "/api/preview-environments/:previewEnvironmentId",
     "/api/providers",
     "/api/plugins",
     "/api/integrations/github/repositories",
   ] as const;
 
   let mounted = app;
+
+  mounted = mounted.post("/api/integrations/github/source-events", githubSourceEventRouteHandler, {
+    parse: "none",
+  }) as unknown as Elysia;
+
+  mounted = mounted.post(
+    "/api/resources/:resourceId/source-events/generic-signed",
+    genericSignedSourceEventRouteHandler,
+    {
+      parse: "none",
+    },
+  ) as unknown as Elysia;
 
   mounted = mounted.all("/api/rpc", rpcRouteHandler, {
     parse: "none",

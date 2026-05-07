@@ -9,18 +9,27 @@ import { showCertificateQueryInputSchema } from "./operations/certificates/show-
 import { configureDefaultAccessDomainPolicyCommandInputSchema } from "./operations/default-access-domain-policies/configure-default-access-domain-policy.command";
 import { listDefaultAccessDomainPoliciesQueryInputSchema } from "./operations/default-access-domain-policies/list-default-access-domain-policies.query";
 import { showDefaultAccessDomainPolicyQueryInputSchema } from "./operations/default-access-domain-policies/show-default-access-domain-policy.query";
+import { createDependencyResourceBackupCommandInputSchema } from "./operations/dependency-resources/create-dependency-resource-backup.command";
 import { deleteDependencyResourceCommandInputSchema } from "./operations/dependency-resources/delete-dependency-resource.command";
 import { importPostgresDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-postgres-dependency-resource.command";
+import { importRedisDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-redis-dependency-resource.command";
+import { listDependencyResourceBackupsQueryInputSchema } from "./operations/dependency-resources/list-dependency-resource-backups.query";
 import { listDependencyResourcesQueryInputSchema } from "./operations/dependency-resources/list-dependency-resources.query";
 import { provisionPostgresDependencyResourceCommandInputSchema } from "./operations/dependency-resources/provision-postgres-dependency-resource.command";
+import { provisionRedisDependencyResourceCommandInputSchema } from "./operations/dependency-resources/provision-redis-dependency-resource.command";
 import { renameDependencyResourceCommandInputSchema } from "./operations/dependency-resources/rename-dependency-resource.command";
+import { restoreDependencyResourceBackupCommandInputSchema } from "./operations/dependency-resources/restore-dependency-resource-backup.command";
 import { showDependencyResourceQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource.query";
+import { showDependencyResourceBackupQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource-backup.query";
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
 import { deploymentPlanQueryInputSchema } from "./operations/deployments/deployment-plan.query";
 import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deployments/deployment-recovery-readiness.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
+import { redeployDeploymentCommandInputSchema } from "./operations/deployments/redeploy-deployment.command";
+import { retryDeploymentCommandInputSchema } from "./operations/deployments/retry-deployment.command";
+import { rollbackDeploymentCommandInputSchema } from "./operations/deployments/rollback-deployment.command";
 import { showDeploymentQueryInputSchema } from "./operations/deployments/show-deployment.query";
 import { streamDeploymentEventsQueryInputSchema } from "./operations/deployments/stream-deployment-events.query";
 import { checkDomainBindingDeleteSafetyQueryInputSchema } from "./operations/domain-bindings/check-domain-binding-delete-safety.query";
@@ -46,6 +55,11 @@ import { unlockEnvironmentCommandInputSchema } from "./operations/environments/u
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { listOperatorWorkQueryInputSchema } from "./operations/operator-work/list-operator-work.query";
 import { showOperatorWorkQueryInputSchema } from "./operations/operator-work/show-operator-work.query";
+import { configurePreviewPolicyCommandInputSchema } from "./operations/preview-deployments/configure-preview-policy.command";
+import { deletePreviewEnvironmentCommandInputSchema } from "./operations/preview-deployments/delete-preview-environment.command";
+import { listPreviewEnvironmentsQueryInputSchema } from "./operations/preview-deployments/list-preview-environments.query";
+import { showPreviewEnvironmentQueryInputSchema } from "./operations/preview-deployments/show-preview-environment.query";
+import { showPreviewPolicyQueryInputSchema } from "./operations/preview-deployments/show-preview-policy.query";
 import { archiveProjectCommandInputSchema } from "./operations/projects/archive-project.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
@@ -55,6 +69,7 @@ import { archiveResourceCommandInputSchema } from "./operations/resources/archiv
 import { attachResourceStorageCommandInputSchema } from "./operations/resources/attach-resource-storage.command";
 import { bindResourceDependencyCommandInputSchema } from "./operations/resources/bind-resource-dependency.command";
 import { configureResourceAccessCommandInputSchema } from "./operations/resources/configure-resource-access.command";
+import { configureResourceAutoDeployCommandInputSchema } from "./operations/resources/configure-resource-auto-deploy.command";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
 import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
 import { configureResourceRuntimeCommandInputSchema } from "./operations/resources/configure-resource-runtime.command";
@@ -70,12 +85,27 @@ import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resource
 import { resourceEffectiveConfigQueryInputSchema } from "./operations/resources/resource-effective-config.query";
 import { resourceHealthQueryInputSchema } from "./operations/resources/resource-health.query";
 import { resourceProxyConfigurationPreviewQueryInputSchema } from "./operations/resources/resource-proxy-configuration-preview.query";
+import {
+  restartResourceRuntimeCommandInputSchema,
+  startResourceRuntimeCommandInputSchema,
+  stopResourceRuntimeCommandInputSchema,
+} from "./operations/resources/resource-runtime-control.schema";
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
+import { rotateResourceDependencyBindingSecretCommandInputSchema } from "./operations/resources/rotate-resource-dependency-binding-secret.command";
 import { setResourceVariableCommandInputSchema } from "./operations/resources/set-resource-variable.command";
 import { showResourceQueryInputSchema } from "./operations/resources/show-resource.query";
 import { showResourceDependencyBindingQueryInputSchema } from "./operations/resources/show-resource-dependency-binding.query";
 import { unbindResourceDependencyCommandInputSchema } from "./operations/resources/unbind-resource-dependency.command";
 import { unsetResourceVariableCommandInputSchema } from "./operations/resources/unset-resource-variable.command";
+import { createScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/create-scheduled-task.command";
+import { deleteScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/delete-scheduled-task.command";
+import { listScheduledTaskRunsQueryInputSchema } from "./operations/scheduled-tasks/list-scheduled-task-runs.query";
+import { listScheduledTasksQueryInputSchema } from "./operations/scheduled-tasks/list-scheduled-tasks.query";
+import { runScheduledTaskNowCommandInputSchema } from "./operations/scheduled-tasks/run-scheduled-task-now.command";
+import { scheduledTaskRunLogsQueryInputSchema } from "./operations/scheduled-tasks/scheduled-task-run-logs.query";
+import { showScheduledTaskQueryInputSchema } from "./operations/scheduled-tasks/show-scheduled-task.query";
+import { showScheduledTaskRunQueryInputSchema } from "./operations/scheduled-tasks/show-scheduled-task-run.query";
+import { configureScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/update-scheduled-task.command";
 import { bootstrapServerProxyCommandInputSchema } from "./operations/servers/bootstrap-server-proxy.command";
 import { checkServerDeleteSafetyQueryInputSchema } from "./operations/servers/check-server-delete-safety.query";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
@@ -93,6 +123,9 @@ import { rotateSshCredentialCommandInputSchema } from "./operations/servers/rota
 import { showServerQueryInputSchema } from "./operations/servers/show-server.query";
 import { showSshCredentialQueryInputSchema } from "./operations/servers/show-ssh-credential.query";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
+import { ingestSourceEventCommandInputSchema } from "./operations/source-events/ingest-source-event.command";
+import { listSourceEventsQueryInputSchema } from "./operations/source-events/list-source-events.query";
+import { showSourceEventQueryInputSchema } from "./operations/source-events/show-source-event.query";
 import { relinkSourceLinkCommandInputSchema } from "./operations/source-links/relink-source-link.command";
 import { createStorageVolumeCommandInputSchema } from "./operations/storage-volumes/create-storage-volume.command";
 import { deleteStorageVolumeCommandInputSchema } from "./operations/storage-volumes/delete-storage-volume.command";
@@ -111,12 +144,17 @@ type OperationDomain =
   | "environments"
   | "resources"
   | "dependency-resources"
+  | "scheduled-tasks"
+  | "scheduled-task-runs"
   | "storage-volumes"
   | "deployments"
   | "operator-work"
+  | "preview-policies"
+  | "preview-environments"
   | "default-access-domain-policies"
   | "domain-bindings"
   | "certificates"
+  | "source-events"
   | "source-links"
   | "system"
   | "terminal-sessions";
@@ -136,6 +174,10 @@ export interface OperationCatalogEntry {
       method: "GET" | "POST" | "DELETE";
       path: string;
     };
+    orpcAdditional?: {
+      method: "GET" | "POST" | "DELETE";
+      path: string;
+    }[];
     orpcStream?: {
       method: "GET" | "POST";
       path: string;
@@ -146,6 +188,79 @@ export interface OperationCatalogEntry {
 // Source of truth for business operations.
 // CLI, oRPC, HTTP, and future MCP tools must dispatch these messages instead of bypassing application handlers.
 export const operationCatalog = [
+  {
+    key: "preview-policies.configure",
+    kind: "command",
+    domain: "preview-policies",
+    messageName: "ConfigurePreviewPolicyCommand",
+    handlerName: "ConfigurePreviewPolicyCommandHandler",
+    serviceName: "ConfigurePreviewPolicyUseCase",
+    inputSchema: configurePreviewPolicyCommandInputSchema,
+    serviceToken: tokens.configurePreviewPolicyUseCase,
+    transports: {
+      cli: "appaloft preview policy configure",
+      orpc: { method: "POST", path: "/api/preview-policies" },
+    },
+  },
+  {
+    key: "preview-policies.show",
+    kind: "query",
+    domain: "preview-policies",
+    messageName: "ShowPreviewPolicyQuery",
+    handlerName: "ShowPreviewPolicyQueryHandler",
+    serviceName: "ShowPreviewPolicyQueryService",
+    inputSchema: showPreviewPolicyQueryInputSchema,
+    serviceToken: tokens.showPreviewPolicyQueryService,
+    transports: {
+      cli: "appaloft preview policy show",
+      orpc: { method: "POST", path: "/api/preview-policies/show" },
+    },
+  },
+  {
+    key: "preview-environments.list",
+    kind: "query",
+    domain: "preview-environments",
+    messageName: "ListPreviewEnvironmentsQuery",
+    handlerName: "ListPreviewEnvironmentsQueryHandler",
+    serviceName: "ListPreviewEnvironmentsQueryService",
+    inputSchema: listPreviewEnvironmentsQueryInputSchema,
+    serviceToken: tokens.listPreviewEnvironmentsQueryService,
+    transports: {
+      cli: "appaloft preview environment list",
+      orpc: { method: "GET", path: "/api/preview-environments" },
+    },
+  },
+  {
+    key: "preview-environments.show",
+    kind: "query",
+    domain: "preview-environments",
+    messageName: "ShowPreviewEnvironmentQuery",
+    handlerName: "ShowPreviewEnvironmentQueryHandler",
+    serviceName: "ShowPreviewEnvironmentQueryService",
+    inputSchema: showPreviewEnvironmentQueryInputSchema,
+    serviceToken: tokens.showPreviewEnvironmentQueryService,
+    transports: {
+      cli: "appaloft preview environment show",
+      orpc: { method: "GET", path: "/api/preview-environments/{previewEnvironmentId}" },
+    },
+  },
+  {
+    key: "preview-environments.delete",
+    kind: "command",
+    domain: "preview-environments",
+    messageName: "DeletePreviewEnvironmentCommand",
+    handlerName: "DeletePreviewEnvironmentCommandHandler",
+    serviceName: "PreviewEnvironmentCleanupService",
+    inputSchema: deletePreviewEnvironmentCommandInputSchema,
+    serviceToken: tokens.previewEnvironmentCleanupService,
+    transports: {
+      cli: "appaloft preview environment delete",
+      orpc: {
+        method: "DELETE",
+        path: "/api/resources/{resourceId}/preview-environments/{previewEnvironmentId}",
+      },
+    },
+  },
   {
     key: "projects.create",
     kind: "command",
@@ -608,6 +723,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "resources.configure-auto-deploy",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceAutoDeployCommand",
+    handlerName: "ConfigureResourceAutoDeployCommandHandler",
+    serviceName: "ConfigureResourceAutoDeployUseCase",
+    inputSchema: configureResourceAutoDeployCommandInputSchema,
+    serviceToken: tokens.configureResourceAutoDeployUseCase,
+    transports: {
+      cli: "appaloft resource auto-deploy <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/auto-deploy" },
+    },
+  },
+  {
     key: "resources.attach-storage",
     kind: "command",
     domain: "resources",
@@ -808,6 +937,34 @@ export const operationCatalog = [
     },
   },
   {
+    key: "dependency-resources.provision-redis",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "ProvisionRedisDependencyResourceCommand",
+    handlerName: "ProvisionRedisDependencyResourceCommandHandler",
+    serviceName: "ProvisionRedisDependencyResourceUseCase",
+    inputSchema: provisionRedisDependencyResourceCommandInputSchema,
+    serviceToken: tokens.provisionRedisDependencyResourceUseCase,
+    transports: {
+      cli: "appaloft dependency redis provision",
+      orpc: { method: "POST", path: "/api/dependency-resources/redis/provision" },
+    },
+  },
+  {
+    key: "dependency-resources.import-redis",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "ImportRedisDependencyResourceCommand",
+    handlerName: "ImportRedisDependencyResourceCommandHandler",
+    serviceName: "ImportRedisDependencyResourceUseCase",
+    inputSchema: importRedisDependencyResourceCommandInputSchema,
+    serviceToken: tokens.importRedisDependencyResourceUseCase,
+    transports: {
+      cli: "appaloft dependency redis import",
+      orpc: { method: "POST", path: "/api/dependency-resources/redis/import" },
+    },
+  },
+  {
     key: "dependency-resources.list",
     kind: "query",
     domain: "dependency-resources",
@@ -864,6 +1021,62 @@ export const operationCatalog = [
     },
   },
   {
+    key: "dependency-resources.create-backup",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "CreateDependencyResourceBackupCommand",
+    handlerName: "CreateDependencyResourceBackupCommandHandler",
+    serviceName: "CreateDependencyResourceBackupUseCase",
+    inputSchema: createDependencyResourceBackupCommandInputSchema,
+    serviceToken: tokens.createDependencyResourceBackupUseCase,
+    transports: {
+      cli: "appaloft dependency backup create <dependencyResourceId>",
+      orpc: { method: "POST", path: "/api/dependency-resources/{dependencyResourceId}/backups" },
+    },
+  },
+  {
+    key: "dependency-resources.list-backups",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "ListDependencyResourceBackupsQuery",
+    handlerName: "ListDependencyResourceBackupsQueryHandler",
+    serviceName: "ListDependencyResourceBackupsQueryService",
+    inputSchema: listDependencyResourceBackupsQueryInputSchema,
+    serviceToken: tokens.listDependencyResourceBackupsQueryService,
+    transports: {
+      cli: "appaloft dependency backup list <dependencyResourceId>",
+      orpc: { method: "GET", path: "/api/dependency-resources/{dependencyResourceId}/backups" },
+    },
+  },
+  {
+    key: "dependency-resources.show-backup",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "ShowDependencyResourceBackupQuery",
+    handlerName: "ShowDependencyResourceBackupQueryHandler",
+    serviceName: "ShowDependencyResourceBackupQueryService",
+    inputSchema: showDependencyResourceBackupQueryInputSchema,
+    serviceToken: tokens.showDependencyResourceBackupQueryService,
+    transports: {
+      cli: "appaloft dependency backup show <backupId>",
+      orpc: { method: "GET", path: "/api/dependency-resources/backups/{backupId}" },
+    },
+  },
+  {
+    key: "dependency-resources.restore-backup",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "RestoreDependencyResourceBackupCommand",
+    handlerName: "RestoreDependencyResourceBackupCommandHandler",
+    serviceName: "RestoreDependencyResourceBackupUseCase",
+    inputSchema: restoreDependencyResourceBackupCommandInputSchema,
+    serviceToken: tokens.restoreDependencyResourceBackupUseCase,
+    transports: {
+      cli: "appaloft dependency backup restore <backupId>",
+      orpc: { method: "POST", path: "/api/dependency-resources/backups/{backupId}/restore" },
+    },
+  },
+  {
     key: "resources.bind-dependency",
     kind: "command",
     domain: "resources",
@@ -895,6 +1108,23 @@ export const operationCatalog = [
     },
   },
   {
+    key: "resources.rotate-dependency-binding-secret",
+    kind: "command",
+    domain: "resources",
+    messageName: "RotateResourceDependencyBindingSecretCommand",
+    handlerName: "RotateResourceDependencyBindingSecretCommandHandler",
+    serviceName: "RotateResourceDependencyBindingSecretUseCase",
+    inputSchema: rotateResourceDependencyBindingSecretCommandInputSchema,
+    serviceToken: tokens.rotateResourceDependencyBindingSecretUseCase,
+    transports: {
+      cli: "appaloft resource dependency rotate-secret <resourceId> <bindingId>",
+      orpc: {
+        method: "POST",
+        path: "/api/resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations",
+      },
+    },
+  },
+  {
     key: "resources.list-dependency-bindings",
     kind: "query",
     domain: "resources",
@@ -920,6 +1150,132 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource dependency show <resourceId> <bindingId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/dependency-bindings/{bindingId}" },
+    },
+  },
+  {
+    key: "scheduled-tasks.create",
+    kind: "command",
+    domain: "scheduled-tasks",
+    messageName: "CreateScheduledTaskCommand",
+    handlerName: "CreateScheduledTaskCommandHandler",
+    serviceName: "CreateScheduledTaskUseCase",
+    inputSchema: createScheduledTaskCommandInputSchema,
+    serviceToken: tokens.createScheduledTaskUseCase,
+    transports: {
+      cli: "appaloft scheduled-task create <resourceId>",
+      orpc: { method: "POST", path: "/api/scheduled-tasks" },
+    },
+  },
+  {
+    key: "scheduled-tasks.list",
+    kind: "query",
+    domain: "scheduled-tasks",
+    messageName: "ListScheduledTasksQuery",
+    handlerName: "ListScheduledTasksQueryHandler",
+    serviceName: "ListScheduledTasksQueryService",
+    inputSchema: listScheduledTasksQueryInputSchema,
+    serviceToken: tokens.listScheduledTasksQueryService,
+    transports: {
+      cli: "appaloft scheduled-task list",
+      orpc: { method: "GET", path: "/api/scheduled-tasks" },
+    },
+  },
+  {
+    key: "scheduled-tasks.show",
+    kind: "query",
+    domain: "scheduled-tasks",
+    messageName: "ShowScheduledTaskQuery",
+    handlerName: "ShowScheduledTaskQueryHandler",
+    serviceName: "ShowScheduledTaskQueryService",
+    inputSchema: showScheduledTaskQueryInputSchema,
+    serviceToken: tokens.showScheduledTaskQueryService,
+    transports: {
+      cli: "appaloft scheduled-task show <taskId>",
+      orpc: { method: "GET", path: "/api/scheduled-tasks/{taskId}" },
+    },
+  },
+  {
+    key: "scheduled-tasks.configure",
+    kind: "command",
+    domain: "scheduled-tasks",
+    messageName: "ConfigureScheduledTaskCommand",
+    handlerName: "ConfigureScheduledTaskCommandHandler",
+    serviceName: "ConfigureScheduledTaskUseCase",
+    inputSchema: configureScheduledTaskCommandInputSchema,
+    serviceToken: tokens.configureScheduledTaskUseCase,
+    transports: {
+      cli: "appaloft scheduled-task configure <taskId>",
+      orpc: { method: "POST", path: "/api/scheduled-tasks/{taskId}" },
+    },
+  },
+  {
+    key: "scheduled-tasks.delete",
+    kind: "command",
+    domain: "scheduled-tasks",
+    messageName: "DeleteScheduledTaskCommand",
+    handlerName: "DeleteScheduledTaskCommandHandler",
+    serviceName: "DeleteScheduledTaskUseCase",
+    inputSchema: deleteScheduledTaskCommandInputSchema,
+    serviceToken: tokens.deleteScheduledTaskUseCase,
+    transports: {
+      cli: "appaloft scheduled-task delete <taskId>",
+      orpc: { method: "DELETE", path: "/api/scheduled-tasks/{taskId}" },
+    },
+  },
+  {
+    key: "scheduled-tasks.run-now",
+    kind: "command",
+    domain: "scheduled-tasks",
+    messageName: "RunScheduledTaskNowCommand",
+    handlerName: "RunScheduledTaskNowCommandHandler",
+    serviceName: "RunScheduledTaskNowUseCase",
+    inputSchema: runScheduledTaskNowCommandInputSchema,
+    serviceToken: tokens.runScheduledTaskNowUseCase,
+    transports: {
+      cli: "appaloft scheduled-task run <taskId>",
+      orpc: { method: "POST", path: "/api/scheduled-tasks/{taskId}/runs" },
+    },
+  },
+  {
+    key: "scheduled-task-runs.list",
+    kind: "query",
+    domain: "scheduled-task-runs",
+    messageName: "ListScheduledTaskRunsQuery",
+    handlerName: "ListScheduledTaskRunsQueryHandler",
+    serviceName: "ListScheduledTaskRunsQueryService",
+    inputSchema: listScheduledTaskRunsQueryInputSchema,
+    serviceToken: tokens.listScheduledTaskRunsQueryService,
+    transports: {
+      cli: "appaloft scheduled-task runs list",
+      orpc: { method: "GET", path: "/api/scheduled-task-runs" },
+    },
+  },
+  {
+    key: "scheduled-task-runs.show",
+    kind: "query",
+    domain: "scheduled-task-runs",
+    messageName: "ShowScheduledTaskRunQuery",
+    handlerName: "ShowScheduledTaskRunQueryHandler",
+    serviceName: "ShowScheduledTaskRunQueryService",
+    inputSchema: showScheduledTaskRunQueryInputSchema,
+    serviceToken: tokens.showScheduledTaskRunQueryService,
+    transports: {
+      cli: "appaloft scheduled-task runs show <runId>",
+      orpc: { method: "GET", path: "/api/scheduled-task-runs/{runId}" },
+    },
+  },
+  {
+    key: "scheduled-task-runs.logs",
+    kind: "query",
+    domain: "scheduled-task-runs",
+    messageName: "ScheduledTaskRunLogsQuery",
+    handlerName: "ScheduledTaskRunLogsQueryHandler",
+    serviceName: "ScheduledTaskRunLogsQueryService",
+    inputSchema: scheduledTaskRunLogsQueryInputSchema,
+    serviceToken: tokens.scheduledTaskRunLogsQueryService,
+    transports: {
+      cli: "appaloft scheduled-task runs logs <runId>",
+      orpc: { method: "GET", path: "/api/scheduled-task-runs/{runId}/logs" },
     },
   },
   {
@@ -1206,6 +1562,90 @@ export const operationCatalog = [
     },
   },
   {
+    key: "deployments.retry",
+    kind: "command",
+    domain: "deployments",
+    messageName: "RetryDeploymentCommand",
+    handlerName: "RetryDeploymentCommandHandler",
+    serviceName: "RetryDeploymentUseCase",
+    inputSchema: retryDeploymentCommandInputSchema,
+    serviceToken: tokens.retryDeploymentUseCase,
+    transports: {
+      cli: "appaloft deployments retry <deploymentId>",
+      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/retry" },
+    },
+  },
+  {
+    key: "deployments.redeploy",
+    kind: "command",
+    domain: "deployments",
+    messageName: "RedeployDeploymentCommand",
+    handlerName: "RedeployDeploymentCommandHandler",
+    serviceName: "RedeployDeploymentUseCase",
+    inputSchema: redeployDeploymentCommandInputSchema,
+    serviceToken: tokens.redeployDeploymentUseCase,
+    transports: {
+      cli: "appaloft deployments redeploy <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/redeploy" },
+    },
+  },
+  {
+    key: "deployments.rollback",
+    kind: "command",
+    domain: "deployments",
+    messageName: "RollbackDeploymentCommand",
+    handlerName: "RollbackDeploymentCommandHandler",
+    serviceName: "RollbackDeploymentUseCase",
+    inputSchema: rollbackDeploymentCommandInputSchema,
+    serviceToken: tokens.rollbackDeploymentUseCase,
+    transports: {
+      cli: "appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>",
+      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/rollback" },
+    },
+  },
+  {
+    key: "resources.runtime.stop",
+    kind: "command",
+    domain: "resources",
+    messageName: "StopResourceRuntimeCommand",
+    handlerName: "StopResourceRuntimeCommandHandler",
+    serviceName: "ResourceRuntimeControlUseCase",
+    inputSchema: stopResourceRuntimeCommandInputSchema,
+    serviceToken: tokens.resourceRuntimeControlUseCase,
+    transports: {
+      cli: "appaloft resource runtime stop <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime/stop" },
+    },
+  },
+  {
+    key: "resources.runtime.start",
+    kind: "command",
+    domain: "resources",
+    messageName: "StartResourceRuntimeCommand",
+    handlerName: "StartResourceRuntimeCommandHandler",
+    serviceName: "ResourceRuntimeControlUseCase",
+    inputSchema: startResourceRuntimeCommandInputSchema,
+    serviceToken: tokens.resourceRuntimeControlUseCase,
+    transports: {
+      cli: "appaloft resource runtime start <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime/start" },
+    },
+  },
+  {
+    key: "resources.runtime.restart",
+    kind: "command",
+    domain: "resources",
+    messageName: "RestartResourceRuntimeCommand",
+    handlerName: "RestartResourceRuntimeCommandHandler",
+    serviceName: "ResourceRuntimeControlUseCase",
+    inputSchema: restartResourceRuntimeCommandInputSchema,
+    serviceToken: tokens.resourceRuntimeControlUseCase,
+    transports: {
+      cli: "appaloft resource runtime restart <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime/restart" },
+    },
+  },
+  {
     key: "deployments.list",
     kind: "query",
     domain: "deployments",
@@ -1329,6 +1769,56 @@ export const operationCatalog = [
     serviceToken: tokens.relinkSourceLinkUseCase,
     transports: {
       cli: "appaloft source-links relink",
+    },
+  },
+  {
+    key: "source-events.ingest",
+    kind: "command",
+    domain: "source-events",
+    messageName: "IngestSourceEventCommand",
+    handlerName: "IngestSourceEventCommandHandler",
+    serviceName: "IngestSourceEventUseCase",
+    inputSchema: ingestSourceEventCommandInputSchema,
+    serviceToken: tokens.ingestSourceEventUseCase,
+    transports: {
+      orpc: {
+        method: "POST",
+        path: "/api/resources/{resourceId}/source-events/generic-signed",
+      },
+      orpcAdditional: [
+        {
+          method: "POST",
+          path: "/api/integrations/github/source-events",
+        },
+      ],
+    },
+  },
+  {
+    key: "source-events.list",
+    kind: "query",
+    domain: "source-events",
+    messageName: "ListSourceEventsQuery",
+    handlerName: "ListSourceEventsQueryHandler",
+    serviceName: "ListSourceEventsQueryService",
+    inputSchema: listSourceEventsQueryInputSchema,
+    serviceToken: tokens.listSourceEventsQueryService,
+    transports: {
+      cli: "appaloft source-event list --resource <resourceId> | --project <projectId>",
+      orpc: { method: "GET", path: "/api/source-events" },
+    },
+  },
+  {
+    key: "source-events.show",
+    kind: "query",
+    domain: "source-events",
+    messageName: "ShowSourceEventQuery",
+    handlerName: "ShowSourceEventQueryHandler",
+    serviceName: "ShowSourceEventQueryService",
+    inputSchema: showSourceEventQueryInputSchema,
+    serviceToken: tokens.showSourceEventQueryService,
+    transports: {
+      cli: "appaloft source-event show <sourceEventId> --resource <resourceId> | --project <projectId>",
+      orpc: { method: "GET", path: "/api/source-events/{sourceEventId}" },
     },
   },
   {

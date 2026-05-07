@@ -403,23 +403,43 @@ Docker self-host installer, checksums, release manifest, release notes, and rele
 
 The main repository already has an opt-in SSH e2e harness that simulates GitHub Actions process
 boundaries by running two separate CLI processes against the same SSH-server state. That proves the
-underlying CLI behavior but not the public `deploy-action` install/download/checksum wrapper.
+underlying CLI behavior.
+
+The main repository now also contains a reference composite action under
+`.github/actions/deploy-action`. It includes:
+
+- `action.yml` with wrapper inputs/outputs and separate install/deploy steps;
+- `README.md` with Marketplace-facing deploy, PR preview, close-event cleanup, fork-safety, secret
+  handling, output, and reserved control-plane examples;
+- `scripts/install-appaloft.sh`, which resolves `latest` or exact release tags, selects the runner
+  target, downloads the CLI archive plus `checksums.txt`, verifies SHA-256, extracts the binary, and
+  adds it to the job path;
+- `scripts/run-deploy.sh`, which maps trusted wrapper inputs to the existing CLI flags, writes
+  `ssh-private-key` to a temp file, rejects future control-plane inputs before mutation, and maps PR
+  preview inputs to `--preview`, `--preview-id`, `--preview-domain-template`, and
+  `--require-preview-url`; it also passes a temp `--preview-output-file` and publishes
+  `preview-url` from the CLI-produced file when available. `command: preview-cleanup` maps
+  close-event workflows to `appaloft preview cleanup` with the same trusted preview identity;
+- `scripts/test/deploy-action-wrapper.test.ts` coverage for wrapper metadata, SSH key temp-file
+  cleanup, PR preview flag mapping, CLI preview-output-file handling, preview cleanup command
+  mapping, Marketplace README examples, no-config default behavior, and unsupported control-plane
+  input rejection.
+- `scripts/export-deploy-action-wrapper.ts`, which mirrors the reference action metadata,
+  Marketplace README, public wrapper CI workflow, and install/deploy scripts into a standalone
+  directory with executable script bits preserved for the future public `appaloft/deploy-action`
+  repository. The wrapper test suite verifies the exported repository layout matches the reference
+  action.
+- `.github/workflows/ci.yml` under the exported wrapper layout validates shell script syntax,
+  dry-run PR preview argument/output mapping, and an opt-in exact-version install smoke controlled
+  by the public repository's `APPALOFT_INSTALL_SMOKE_VERSION` variable.
 
 Missing pieces before public release:
 
 - create the `appaloft/deploy-action` repository;
-- add `action.yml`, install scripts, README examples, and wrapper tests;
-- add a main-repo doc page that links release assets, action usage, and minimal `appaloft.yml`;
-- add PR preview examples that explicitly require `on.pull_request`, skip fork PRs by default, and
-  explain explicit preview config paths, generated/default access, and user-owned wildcard preview
-  domains;
-- add a wrapper-level CI test that verifies exact-version install from a fixture or real release;
-- decide whether generated docs examples use `version: latest` or a pinned version by default;
-- map wrapper preview inputs to the CLI `--preview`, `--preview-id`, and
-  `--preview-domain-template` options;
-- add stable CLI JSON output or diagnostic file support so the wrapper can expose `preview-url`
-  without parsing human text;
-- wire wrapper cleanup inputs or `args` examples to the active CLI preview cleanup command;
+- run the export script into the public wrapper repository and enable the exported public wrapper
+  CI;
+- configure `APPALOFT_INSTALL_SMOKE_VERSION` in the public wrapper repository when a release asset
+  should be smoke-tested from CI;
 - add control-plane mode inputs only after the CLI resolver/parser and structured unsupported
   errors exist;
 - add structured CLI deploy output if action outputs need deployment/resource ids.

@@ -19,6 +19,8 @@ import {
   type ResourceBindingMutationSpec,
   type ResourceBindingMutationSpecVisitor,
   ResourceBindingScopeValue,
+  ResourceBindingSecretRef,
+  ResourceBindingSecretVersion,
   type ResourceBindingSelectionSpec,
   type ResourceBindingSelectionSpecVisitor,
   ResourceBindingStatusValue,
@@ -111,6 +113,9 @@ class KyselyResourceBindingMutationVisitor
         target_name: state.targetName.value,
         scope: state.scope.value,
         injection_mode: state.injectionMode.value,
+        secret_ref: state.secretRef?.value ?? null,
+        secret_version: state.secretVersion?.value ?? null,
+        secret_rotated_at: state.secretRotatedAt?.value ?? null,
         lifecycle_status: state.status.value,
         created_at: state.createdAt.value,
         removed_at: state.removedAt?.value ?? null,
@@ -133,6 +138,17 @@ function rehydrateBinding(row: BindingRow): ResourceBinding {
     injectionMode: ResourceInjectionModeValue.rehydrate(
       row.injection_mode as Parameters<typeof ResourceInjectionModeValue.rehydrate>[0],
     ),
+    ...(row.secret_ref ? { secretRef: ResourceBindingSecretRef.rehydrate(row.secret_ref) } : {}),
+    ...(row.secret_version
+      ? { secretVersion: ResourceBindingSecretVersion.rehydrate(row.secret_version) }
+      : {}),
+    ...(row.secret_rotated_at
+      ? {
+          secretRotatedAt: UpdatedAt.rehydrate(
+            normalizeTimestamp(row.secret_rotated_at) ?? row.secret_rotated_at,
+          ),
+        }
+      : {}),
     status: ResourceBindingStatusValue.rehydrate(
       row.lifecycle_status as Parameters<typeof ResourceBindingStatusValue.rehydrate>[0],
     ),
@@ -154,6 +170,7 @@ function deserializeEndpoint(
 
 function toSummary(row: BindingSummaryRow): ResourceDependencyBindingSummary {
   const endpoint = deserializeEndpoint(row.dependency_endpoint);
+  const currentSecretRef = row.secret_ref ?? row.dependency_connection_secret_ref;
   return {
     id: row.id,
     projectId: row.project_id,
@@ -174,10 +191,17 @@ function toSummary(row: BindingSummaryRow): ResourceDependencyBindingSummary {
       scope: row.scope as ResourceDependencyBindingSummary["target"]["scope"],
       injectionMode:
         row.injection_mode as ResourceDependencyBindingSummary["target"]["injectionMode"],
-      ...(row.dependency_connection_secret_ref
-        ? { secretRef: row.dependency_connection_secret_ref }
-        : {}),
+      ...(currentSecretRef ? { secretRef: currentSecretRef } : {}),
     },
+    ...(row.secret_version && row.secret_rotated_at
+      ? {
+          secretRotation: {
+            ...(row.secret_ref ? { secretRef: row.secret_ref } : {}),
+            secretVersion: row.secret_version,
+            rotatedAt: normalizeTimestamp(row.secret_rotated_at) ?? row.secret_rotated_at,
+          },
+        }
+      : {}),
     ...(endpoint
       ? {
           connection: {
@@ -185,9 +209,7 @@ function toSummary(row: BindingSummaryRow): ResourceDependencyBindingSummary {
             ...(endpoint.port ? { port: endpoint.port } : {}),
             ...(endpoint.databaseName ? { databaseName: endpoint.databaseName } : {}),
             maskedConnection: endpoint.maskedConnection,
-            ...(row.dependency_connection_secret_ref
-              ? { secretRef: row.dependency_connection_secret_ref }
-              : {}),
+            ...(currentSecretRef ? { secretRef: currentSecretRef } : {}),
           },
         }
       : {}),
@@ -260,6 +282,9 @@ export class PgResourceDependencyBindingRepository implements ResourceDependency
             .onConflict((conflict) =>
               conflict.column("id").doUpdateSet({
                 lifecycle_status: mutation.binding.lifecycle_status,
+                secret_ref: mutation.binding.secret_ref,
+                secret_version: mutation.binding.secret_version,
+                secret_rotated_at: mutation.binding.secret_rotated_at,
                 removed_at: mutation.binding.removed_at,
               }),
             )

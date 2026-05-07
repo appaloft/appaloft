@@ -415,6 +415,11 @@ That product line may support:
 The same repository config and operation contracts still apply. Product-grade preview orchestration
 must not add source/runtime/domain fields to `deployments.create`.
 
+The governing Spec Round for this future product line is
+[Product-Grade Preview Deployments](../specs/046-product-grade-preview-deployments/spec.md), with
+coverage tracked in the
+[Product-Grade Preview Deployments Test Matrix](../testing/product-grade-preview-deployments-test-matrix.md).
+
 ## Error Semantics
 
 Canonical preview-specific phases:
@@ -446,7 +451,12 @@ preview-scoped source fingerprints, non-interactive preview environment selectio
 `--preview-domain-template` server-applied route intent, explicit preview config paths, and the
 implicit-root-domain skip rule needed for Action-style execution. CLI/action profile flags must
 remain in sync with config profile fields so Action previews can be expressed without generating a
-temporary config file. The public `appaloft/deploy-action` repository is not yet implemented.
+temporary config file. The main repository now includes a reference `.github/actions/deploy-action`
+composite wrapper that maps trusted PR preview inputs to the CLI, handles SSH private-key temp-file
+custody, maps `command: preview-cleanup` to `appaloft preview cleanup`, and includes
+Marketplace-facing examples. A deterministic export script now mirrors the reference wrapper assets
+into a standalone repository layout, but the public `appaloft/deploy-action` repository is not yet
+created.
 
 The main Appaloft repository now includes `.github/workflows/deploy-docs-preview.yml` as a
 repository-authored docs preview workflow over the same CLI path. It classifies PRs whose changed
@@ -460,14 +470,14 @@ preview feature; it does not replace the public `appaloft/deploy-action` wrapper
 
 Missing pieces before Action PR preview can be documented as supported:
 
-- `appaloft/deploy-action` wrapper repository and Marketplace README;
-- wrapper inputs that map `preview`, `preview-id`, and optional `preview-domain-template` to the
-  CLI;
-- stable machine-readable CLI output for `preview-url` or an action-safe diagnostic file the
-  wrapper can parse;
-- wrapper tests for install, secret mapping, fork-safety docs, generated access output, and cleanup
-  plus GitHub deployment/environment metadata cleanup behavior;
-- public docs that distinguish Action-only preview deploy from product-grade GitHub App previews.
+- `appaloft/deploy-action` wrapper repository;
+- running the reference export into that repository and wiring public wrapper CI;
+- wrapper tests for fixture or real-release install and GitHub deployment/environment metadata
+  cleanup behavior in the public wrapper repository.
+
+The public docs now distinguish Action-only preview deploy from product-grade GitHub App previews
+under `/docs/deploy/previews/#deployment-pr-preview-action-workflow` and
+`/docs/deploy/previews/#product-grade-preview-deployments`.
 
 Missing pieces for product-grade previews:
 
@@ -476,3 +486,5 @@ Missing pieces for product-grade previews:
 - scheduler-owned close-event handling, retries, and audit around preview cleanup;
 - scheduler/agent cleanup retries;
 - Cloud/self-hosted source links, locks, audit, and managed domain mapping.
+
+The product-grade preview Spec Round is positioned, but Code Round implementation remains open.

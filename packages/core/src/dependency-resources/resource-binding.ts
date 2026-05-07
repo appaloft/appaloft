@@ -81,6 +81,63 @@ export class ResourceBindingStatusValue extends ScalarValueObject<ResourceBindin
   }
 }
 
+const resourceBindingSecretRefBrand: unique symbol = Symbol("ResourceBindingSecretRef");
+export class ResourceBindingSecretRef extends ScalarValueObject<string> {
+  private [resourceBindingSecretRefBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceBindingSecretRef> {
+    const normalized = value.trim();
+    if (!normalized) {
+      return err(resourceDependencyBindingValidationError("Binding secret reference is required"));
+    }
+    if (/\s/.test(normalized)) {
+      return err(
+        resourceDependencyBindingValidationError(
+          "Binding secret reference must be a single token",
+          { field: "secretRef" },
+        ),
+      );
+    }
+    return ok(new ResourceBindingSecretRef(normalized));
+  }
+
+  static rehydrate(value: string): ResourceBindingSecretRef {
+    return new ResourceBindingSecretRef(value.trim());
+  }
+}
+
+const resourceBindingSecretVersionBrand: unique symbol = Symbol("ResourceBindingSecretVersion");
+export class ResourceBindingSecretVersion extends ScalarValueObject<string> {
+  private [resourceBindingSecretVersionBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceBindingSecretVersion> {
+    const normalized = value.trim();
+    if (!normalized) {
+      return err(resourceDependencyBindingValidationError("Binding secret version is required"));
+    }
+    if (/\s/.test(normalized)) {
+      return err(
+        resourceDependencyBindingValidationError("Binding secret version must be a single token", {
+          field: "secretVersion",
+        }),
+      );
+    }
+    return ok(new ResourceBindingSecretVersion(normalized));
+  }
+
+  static rehydrate(value: string): ResourceBindingSecretVersion {
+    return new ResourceBindingSecretVersion(value.trim());
+  }
+}
+
 export interface ResourceBindingState {
   id: ResourceBindingId;
   projectId: ProjectId;
@@ -90,6 +147,9 @@ export interface ResourceBindingState {
   targetName: ResourceBindingTargetName;
   scope: ResourceBindingScopeValue;
   injectionMode: ResourceInjectionModeValue;
+  secretRef?: ResourceBindingSecretRef;
+  secretVersion?: ResourceBindingSecretVersion;
+  secretRotatedAt?: UpdatedAt;
   status: ResourceBindingStatusValue;
   createdAt: CreatedAt;
   removedAt?: UpdatedAt;
@@ -181,9 +241,52 @@ export class ResourceBinding extends AggregateRoot<ResourceBindingState> {
     return ok({ changed: true });
   }
 
+  rotateSecret(input: {
+    secretRef: ResourceBindingSecretRef;
+    secretVersion: ResourceBindingSecretVersion;
+    rotatedAt: UpdatedAt;
+  }): Result<{ previousSecretVersion?: ResourceBindingSecretVersion }> {
+    if (!this.state.status.isActive()) {
+      return err(
+        domainError.resourceDependencyBindingRotationBlocked(
+          "Resource dependency binding is not active",
+          {
+            phase: "resource-dependency-binding-secret-rotation",
+            bindingId: this.state.id.value,
+            resourceId: this.state.resourceId.value,
+            currentBindingState: this.state.status.value,
+            blockerReasonCode: "binding_not_active",
+          },
+        ),
+      );
+    }
+
+    const previousSecretVersion = this.state.secretVersion;
+    this.state.secretRef = input.secretRef;
+    this.state.secretVersion = input.secretVersion;
+    this.state.secretRotatedAt = input.rotatedAt;
+    this.recordDomainEvent("resource-dependency-binding-secret-rotated", input.rotatedAt, {
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceId: this.state.resourceId.value,
+      dependencyResourceId: this.state.resourceInstanceId.value,
+      bindingId: this.state.id.value,
+      targetName: this.state.targetName.value,
+      secretVersion: input.secretVersion.value,
+      rotatedAt: input.rotatedAt.value,
+      ...(previousSecretVersion ? { previousSecretVersion: previousSecretVersion.value } : {}),
+    });
+    return ok({
+      ...(previousSecretVersion ? { previousSecretVersion } : {}),
+    });
+  }
+
   toState(): ResourceBindingState {
     return {
       ...this.state,
+      ...(this.state.secretRef ? { secretRef: this.state.secretRef } : {}),
+      ...(this.state.secretVersion ? { secretVersion: this.state.secretVersion } : {}),
+      ...(this.state.secretRotatedAt ? { secretRotatedAt: this.state.secretRotatedAt } : {}),
       ...(this.state.removedAt ? { removedAt: this.state.removedAt } : {}),
     };
   }

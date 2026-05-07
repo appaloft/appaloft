@@ -8,6 +8,9 @@ import {
   type CertificateSource,
   type CertificateStatus,
   type ConfigScope,
+  type DependencyResourceBackup,
+  type DependencyResourceBackupMutationSpec,
+  type DependencyResourceBackupSelectionSpec,
   type Deployment,
   type DeploymentLogEntry,
   type DeploymentLogSource,
@@ -15,6 +18,7 @@ import {
   type DeploymentSelectionSpec,
   type DeploymentStatus,
   type DeploymentTargetState,
+  type DeploymentTriggerKind,
   type Destination,
   type DestinationKind,
   type DestinationMutationSpec,
@@ -37,6 +41,11 @@ import {
   type ExecutionStrategyKind,
   type LogLevel,
   type PackagingMode,
+  type PreviewEnvironment,
+  type PreviewEnvironmentMutationSpec,
+  type PreviewEnvironmentProvider,
+  type PreviewEnvironmentSelectionSpec,
+  type PreviewEnvironmentStatus,
   type Project,
   type ProjectMutationSpec,
   type ProjectSelectionSpec,
@@ -58,6 +67,12 @@ import {
   type RuntimeArtifactIntent,
   type RuntimeArtifactKind,
   type RuntimePlan,
+  type ScheduledTaskDefinition,
+  type ScheduledTaskDefinitionMutationSpec,
+  type ScheduledTaskDefinitionSelectionSpec,
+  type ScheduledTaskRunAttempt,
+  type ScheduledTaskRunAttemptMutationSpec,
+  type ScheduledTaskRunAttemptSelectionSpec,
   type Server,
   type ServerMutationSpec,
   type ServerSelectionSpec,
@@ -389,6 +404,60 @@ export interface ResourceRepository {
   upsert(context: RepositoryContext, resource: Resource, spec: ResourceMutationSpec): Promise<void>;
 }
 
+export interface ScheduledTaskDefinitionRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: ScheduledTaskDefinitionSelectionSpec,
+  ): Promise<ScheduledTaskDefinition | null>;
+  upsert(
+    context: RepositoryContext,
+    task: ScheduledTaskDefinition,
+    spec: ScheduledTaskDefinitionMutationSpec,
+  ): Promise<void>;
+  delete(context: RepositoryContext, spec: ScheduledTaskDefinitionMutationSpec): Promise<void>;
+}
+
+export interface PreviewEnvironmentRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: PreviewEnvironmentSelectionSpec,
+  ): Promise<PreviewEnvironment | null>;
+  upsert(
+    context: RepositoryContext,
+    previewEnvironment: PreviewEnvironment,
+    spec: PreviewEnvironmentMutationSpec,
+  ): Promise<void>;
+  delete(context: RepositoryContext, spec: PreviewEnvironmentMutationSpec): Promise<void>;
+}
+
+export interface ScheduledTaskRunAttemptRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: ScheduledTaskRunAttemptSelectionSpec,
+  ): Promise<ScheduledTaskRunAttempt | null>;
+  upsert(
+    context: RepositoryContext,
+    runAttempt: ScheduledTaskRunAttempt,
+    spec: ScheduledTaskRunAttemptMutationSpec,
+  ): Promise<void>;
+}
+
+export interface ScheduledTaskDueCandidate {
+  taskId: string;
+  resourceId: string;
+  scheduledFor: string;
+}
+
+export interface ScheduledTaskDueCandidateReader {
+  listDue(
+    context: RepositoryContext,
+    input: {
+      now: string;
+      limit: number;
+    },
+  ): Promise<ScheduledTaskDueCandidate[]>;
+}
+
 export interface StorageVolumeRepository {
   findOne(
     context: RepositoryContext,
@@ -413,6 +482,22 @@ export interface DependencyResourceRepository {
   ): Promise<void>;
 }
 
+export interface DependencyResourceBackupRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: DependencyResourceBackupSelectionSpec,
+  ): Promise<DependencyResourceBackup | null>;
+  findMany(
+    context: RepositoryContext,
+    spec: DependencyResourceBackupSelectionSpec,
+  ): Promise<DependencyResourceBackup[]>;
+  upsert(
+    context: RepositoryContext,
+    backup: DependencyResourceBackup,
+    spec: DependencyResourceBackupMutationSpec,
+  ): Promise<void>;
+}
+
 export interface ResourceDependencyBindingRepository {
   findOne(
     context: RepositoryContext,
@@ -428,6 +513,7 @@ export interface ResourceDependencyBindingRepository {
 export type DependencyResourceDeleteBlockerKind =
   | "resource-binding"
   | "backup-relationship"
+  | "dependency-resource-backup"
   | "provider-managed-unsafe"
   | "deployment-snapshot-reference";
 
@@ -1002,6 +1088,60 @@ export interface CertificateSecretStore {
   ): Promise<Result<void, DomainError>>;
 }
 
+export interface DependencyBindingSecretStoreInput {
+  bindingId: string;
+  resourceId: string;
+  secretValue: string;
+  secretVersion: string;
+  rotatedAt: string;
+}
+
+export interface DependencyBindingSecretStoreResult {
+  secretRef: string;
+  secretVersion: string;
+}
+
+export interface DependencyBindingSecretStore {
+  store(
+    context: ExecutionContext,
+    input: DependencyBindingSecretStoreInput,
+  ): Promise<Result<DependencyBindingSecretStoreResult, DomainError>>;
+}
+
+export interface DependencyResourceSecretStoreInput {
+  dependencyResourceId: string;
+  projectId: string;
+  environmentId: string;
+  kind: "postgres" | "redis";
+  purpose: "connection";
+  secretValue: string;
+  storedAt: string;
+}
+
+export interface DependencyResourceSecretStoreResult {
+  secretRef: string;
+}
+
+export interface DependencyResourceSecretResolutionInput {
+  secretRef: string;
+}
+
+export interface DependencyResourceSecretResolutionResult {
+  secretRef: string;
+  secretValue: string;
+}
+
+export interface DependencyResourceSecretStore {
+  storeConnection(
+    context: ExecutionContext,
+    input: DependencyResourceSecretStoreInput,
+  ): Promise<Result<DependencyResourceSecretStoreResult, DomainError>>;
+  resolve(
+    context: ExecutionContext,
+    input: DependencyResourceSecretResolutionInput,
+  ): Promise<Result<DependencyResourceSecretResolutionResult, DomainError>>;
+}
+
 export interface CertificateHttpChallengeToken {
   domainName: string;
   token: string;
@@ -1045,6 +1185,7 @@ export interface ServerSummary {
   host: string;
   port: number;
   providerKey: string;
+  targetKind: TargetKind;
   lifecycleStatus: "active" | "inactive";
   deactivatedAt?: string;
   deactivationReason?: string;
@@ -1638,6 +1779,7 @@ export interface ResourceSummary {
   deploymentCount: number;
   lastDeploymentId?: string;
   lastDeploymentStatus?: DeploymentStatus;
+  latestRuntimeControl?: ResourceRuntimeControlSummary;
   accessSummary?: ResourceAccessSummary;
 }
 
@@ -2036,6 +2178,7 @@ export interface ResourceDetailSourceProfile {
   kind: SourceKind;
   locator: string;
   displayName: string;
+  sourceBindingFingerprint: string;
   gitRef?: string;
   commitSha?: string;
   baseDirectory?: string;
@@ -2047,6 +2190,18 @@ export interface ResourceDetailSourceProfile {
   imageTag?: string;
   imageDigest?: string;
   metadata?: Record<string, string>;
+}
+
+export interface ResourceDetailAutoDeployPolicy {
+  status: "enabled" | "disabled" | "blocked";
+  triggerKind: "git-push" | "generic-signed-webhook";
+  refs: string[];
+  eventKinds: SourceEventKind[];
+  sourceBindingFingerprint: string;
+  blockedReason?: "source-binding-changed";
+  genericWebhookSecretRef?: string;
+  dedupeWindowSeconds?: number;
+  updatedAt: string;
 }
 
 export interface ResourceDetailRuntimeProfile {
@@ -2146,6 +2301,7 @@ export interface ResourceDetail {
   schemaVersion: "resources.show/v1";
   resource: ResourceDetailIdentity;
   source?: ResourceDetailSourceProfile;
+  autoDeployPolicy?: ResourceDetailAutoDeployPolicy;
   runtimeProfile?: ResourceDetailRuntimeProfile;
   networkProfile?: ResourceDetailNetworkProfile;
   accessProfile?: ResourceAccessProfile;
@@ -2200,7 +2356,7 @@ export interface ShowStorageVolumeResult {
   generatedAt: string;
 }
 
-export type DependencyResourceKind = "postgres";
+export type DependencyResourceKind = "postgres" | "redis";
 export type DependencyResourceSourceMode = "appaloft-managed" | "imported-external";
 export type DependencyResourceLifecycleStatus = "provisioning" | "ready" | "degraded" | "deleted";
 
@@ -2210,6 +2366,17 @@ export interface DependencyResourceConnectionSummary {
   databaseName?: string;
   maskedConnection: string;
   secretRef?: string;
+}
+
+export interface DependencyResourceProviderRealizationSummary {
+  status: "pending" | "ready" | "failed" | "delete-pending" | "deleted";
+  attemptId: string;
+  attemptedAt: string;
+  providerResourceHandle?: string;
+  realizedAt?: string;
+  failedAt?: string;
+  failureCode?: string;
+  failureMessage?: string;
 }
 
 export interface DependencyResourceBindingReadinessSummary {
@@ -2230,6 +2397,7 @@ export interface DependencyResourceSummary {
   description?: string;
   lifecycleStatus: DependencyResourceLifecycleStatus;
   connection?: DependencyResourceConnectionSummary;
+  providerRealization?: DependencyResourceProviderRealizationSummary;
   bindingReadiness: DependencyResourceBindingReadinessSummary;
   backupRelationship?: {
     retentionRequired: boolean;
@@ -2254,11 +2422,60 @@ export interface ShowDependencyResourceResult {
   generatedAt: string;
 }
 
+export interface DependencyResourceRestoreAttemptSummary {
+  attemptId: string;
+  status: "pending" | "completed" | "failed";
+  requestedAt: string;
+  completedAt?: string;
+  failedAt?: string;
+  failureCode?: string;
+  failureMessage?: string;
+}
+
+export interface DependencyResourceBackupSummary {
+  id: string;
+  dependencyResourceId: string;
+  projectId: string;
+  environmentId: string;
+  dependencyKind: DependencyResourceKind;
+  providerKey: string;
+  status: "pending" | "ready" | "failed";
+  attemptId: string;
+  requestedAt: string;
+  retentionStatus: "retained" | "none";
+  providerArtifactHandle?: string;
+  completedAt?: string;
+  failedAt?: string;
+  failureCode?: string;
+  failureMessage?: string;
+  latestRestoreAttempt?: DependencyResourceRestoreAttemptSummary;
+  createdAt: string;
+}
+
+export interface ListDependencyResourceBackupsResult {
+  schemaVersion: "dependency-resources.backups.list/v1";
+  items: DependencyResourceBackupSummary[];
+  generatedAt: string;
+}
+
+export interface ShowDependencyResourceBackupResult {
+  schemaVersion: "dependency-resources.backups.show/v1";
+  backup: DependencyResourceBackupSummary;
+  generatedAt: string;
+}
+
 export interface ResourceDependencyBindingTargetSummary {
   targetName: string;
   scope: "environment" | "release" | "build-only" | "runtime-only";
   injectionMode: "env" | "file" | "reference";
   secretRef?: string;
+}
+
+export interface ResourceDependencyBindingSecretRotationSummary {
+  secretRef?: string;
+  secretVersion: string;
+  rotatedAt: string;
+  previousSecretVersion?: string;
 }
 
 export interface ResourceDependencyBindingReadinessSummary {
@@ -2285,6 +2502,7 @@ export interface ResourceDependencyBindingSummary {
   providerManaged: boolean;
   lifecycleStatus: DependencyResourceLifecycleStatus;
   target: ResourceDependencyBindingTargetSummary;
+  secretRotation?: ResourceDependencyBindingSecretRotationSummary;
   connection?: DependencyResourceConnectionSummary;
   bindingReadiness: ResourceDependencyBindingReadinessSummary;
   snapshotReadiness: ResourceDependencyBindingSnapshotReadinessSummary;
@@ -2310,8 +2528,8 @@ export interface DeploymentDependencyBindingSnapshotSummary {
   status: "ready" | "blocked" | "not-applicable";
   references: DeploymentDependencyBindingSnapshotReferenceSummary[];
   runtimeInjection: {
-    status: "deferred";
-    reason: string;
+    status: "ready" | "blocked" | "not-applicable";
+    reason?: string;
   };
 }
 
@@ -2355,6 +2573,195 @@ export interface ResourceConfigOverrideSummary {
   overriddenScopes: ConfigScope[];
 }
 
+export type ScheduledTaskConcurrencyPolicy = "forbid";
+export type ScheduledTaskDefinitionStatus = "enabled" | "disabled";
+export type ScheduledTaskRunTriggerKind = "manual" | "scheduled";
+export type ScheduledTaskRunStatus = "accepted" | "running" | "succeeded" | "failed" | "skipped";
+export type ScheduledTaskRunSkippedReason =
+  | "concurrency-forbidden"
+  | "resource-archived"
+  | "task-disabled";
+
+export interface ScheduledTaskRunSummary {
+  runId: string;
+  taskId: string;
+  resourceId: string;
+  triggerKind: ScheduledTaskRunTriggerKind;
+  status: ScheduledTaskRunStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  exitCode?: number;
+  failureSummary?: string;
+  skippedReason?: ScheduledTaskRunSkippedReason;
+}
+
+export interface ScheduledTaskDefinitionSummary {
+  taskId: string;
+  resourceId: string;
+  schedule: string;
+  timezone: string;
+  commandIntent: string;
+  timeoutSeconds: number;
+  retryLimit: number;
+  concurrencyPolicy: ScheduledTaskConcurrencyPolicy;
+  status: ScheduledTaskDefinitionStatus;
+  createdAt: string;
+  updatedAt?: string;
+  latestRun?: ScheduledTaskRunSummary;
+}
+
+export interface ScheduledTaskCommandResult {
+  schemaVersion: "scheduled-tasks.command/v1";
+  task: ScheduledTaskDefinitionSummary;
+}
+
+export interface DeleteScheduledTaskResult {
+  schemaVersion: "scheduled-tasks.delete/v1";
+  taskId: string;
+  resourceId: string;
+  status: "deleted";
+  deletedAt: string;
+}
+
+export interface RunScheduledTaskNowResult {
+  schemaVersion: "scheduled-tasks.run-now/v1";
+  run: ScheduledTaskRunSummary;
+}
+
+export interface ListScheduledTasksResult {
+  schemaVersion: "scheduled-tasks.list/v1";
+  items: ScheduledTaskDefinitionSummary[];
+  nextCursor?: string;
+  generatedAt: string;
+}
+
+export interface ShowScheduledTaskResult {
+  schemaVersion: "scheduled-tasks.show/v1";
+  task: ScheduledTaskDefinitionSummary;
+  generatedAt: string;
+}
+
+export interface ListScheduledTaskRunsResult {
+  schemaVersion: "scheduled-task-runs.list/v1";
+  items: ScheduledTaskRunSummary[];
+  nextCursor?: string;
+  generatedAt: string;
+}
+
+export interface ShowScheduledTaskRunResult {
+  schemaVersion: "scheduled-task-runs.show/v1";
+  run: ScheduledTaskRunSummary;
+  generatedAt: string;
+}
+
+export interface ScheduledTaskRunLogEntry {
+  timestamp: string;
+  stream: "stdout" | "stderr" | "system";
+  message: string;
+}
+
+export interface ScheduledTaskRunLogsResult {
+  schemaVersion: "scheduled-task-runs.logs/v1";
+  runId: string;
+  taskId: string;
+  resourceId: string;
+  entries: ScheduledTaskRunLogEntry[];
+  nextCursor?: string;
+  generatedAt: string;
+}
+
+export interface ScheduledTaskReadModel {
+  list(
+    context: RepositoryContext,
+    input: {
+      projectId?: string;
+      environmentId?: string;
+      resourceId?: string;
+      status?: ScheduledTaskDefinitionStatus;
+      limit?: number;
+      cursor?: string;
+    },
+  ): Promise<Omit<ListScheduledTasksResult, "schemaVersion" | "generatedAt">>;
+  show(
+    context: RepositoryContext,
+    input: { taskId: string; resourceId?: string },
+  ): Promise<ScheduledTaskDefinitionSummary | null>;
+}
+
+export interface ScheduledTaskRunReadModel {
+  list(
+    context: RepositoryContext,
+    input: {
+      taskId?: string;
+      resourceId?: string;
+      status?: ScheduledTaskRunStatus;
+      triggerKind?: ScheduledTaskRunTriggerKind;
+      limit?: number;
+      cursor?: string;
+    },
+  ): Promise<Omit<ListScheduledTaskRunsResult, "schemaVersion" | "generatedAt">>;
+  show(
+    context: RepositoryContext,
+    input: { runId: string; taskId?: string; resourceId?: string },
+  ): Promise<ScheduledTaskRunSummary | null>;
+}
+
+export interface ScheduledTaskRunLogReadModel {
+  read(
+    context: RepositoryContext,
+    input: {
+      runId: string;
+      taskId?: string;
+      resourceId?: string;
+      cursor?: string;
+      limit?: number;
+    },
+  ): Promise<Omit<ScheduledTaskRunLogsResult, "schemaVersion" | "generatedAt">>;
+}
+
+export interface ScheduledTaskRunLogRecord {
+  id: string;
+  runId: string;
+  taskId: string;
+  resourceId: string;
+  timestamp: string;
+  stream: ScheduledTaskRunLogEntry["stream"];
+  message: string;
+}
+
+export interface ScheduledTaskRunLogRecorder {
+  recordMany(
+    context: RepositoryContext,
+    records: ScheduledTaskRunLogRecord[],
+  ): Promise<Result<{ recorded: number }, DomainError>>;
+}
+
+export interface ScheduledTaskRuntimeExecutionRequest {
+  runId: string;
+  taskId: string;
+  resourceId: string;
+  commandIntent: string;
+  timeoutSeconds: number;
+  environment?: Record<string, string>;
+}
+
+export interface ScheduledTaskRuntimeExecutionResult {
+  status: Extract<ScheduledTaskRunStatus, "succeeded" | "failed">;
+  exitCode: number;
+  startedAt: string;
+  finishedAt: string;
+  logs: ScheduledTaskRunLogEntry[];
+  failureSummary?: string;
+}
+
+export interface ScheduledTaskRuntimePort {
+  execute(
+    context: ExecutionContext,
+    request: ScheduledTaskRuntimeExecutionRequest,
+  ): Promise<Result<ScheduledTaskRuntimeExecutionResult, DomainError>>;
+}
+
 export type ResourceHealthOverall =
   | "healthy"
   | "degraded"
@@ -2383,7 +2790,8 @@ export type ResourceHealthSource =
   | "health-check"
   | "proxy"
   | "public-access"
-  | "domain-binding";
+  | "domain-binding"
+  | "runtime-control";
 
 export interface ResourceHealthSourceError {
   source: ResourceHealthSource;
@@ -2466,6 +2874,104 @@ export interface ResourceHealthCheck {
   metadata?: Record<string, string>;
 }
 
+export type ResourceRuntimeControlOperation = "stop" | "start" | "restart";
+
+export type ResourceRuntimeControlStatus =
+  | "accepted"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "blocked";
+
+export type ResourceRuntimeControlRuntimeState =
+  | "starting"
+  | "running"
+  | "restarting"
+  | "stopping"
+  | "stopped"
+  | "unknown";
+
+export type ResourceRuntimeControlBlockedReason =
+  | "resource-archived"
+  | "resource-deleted"
+  | "runtime-not-found"
+  | "runtime-metadata-stale"
+  | "runtime-already-running"
+  | "runtime-already-stopped"
+  | "runtime-control-in-progress"
+  | "deployment-in-progress"
+  | "profile-acknowledgement-required"
+  | "adapter-unsupported";
+
+export interface ResourceRuntimeControlPhaseSummary {
+  phase: "stop" | "start";
+  status: "pending" | "running" | "succeeded" | "failed" | "skipped";
+  errorCode?: string;
+}
+
+export interface ResourceRuntimeControlSummary {
+  runtimeControlAttemptId: string;
+  operation: ResourceRuntimeControlOperation;
+  status: ResourceRuntimeControlStatus;
+  startedAt: string;
+  completedAt?: string;
+  runtimeState: ResourceRuntimeControlRuntimeState;
+  blockedReason?: ResourceRuntimeControlBlockedReason;
+  errorCode?: string;
+  phases?: ResourceRuntimeControlPhaseSummary[];
+}
+
+export interface ResourceRuntimeControlCommandResult extends ResourceRuntimeControlSummary {
+  resourceId: string;
+  deploymentId?: string;
+}
+
+export interface ResourceRuntimeControlAttemptRecord extends ResourceRuntimeControlCommandResult {
+  serverId: string;
+  destinationId: string;
+  reason?: string;
+  idempotencyKey?: string;
+}
+
+export interface ResourceRuntimeControlTargetRequest {
+  runtimeControlAttemptId: string;
+  operation: ResourceRuntimeControlOperation;
+  resourceId: string;
+  deploymentId: string;
+  serverId: string;
+  destinationId: string;
+  runtimeKind: ExecutionStrategyKind;
+  targetKind: TargetKind;
+  providerKey: string;
+  runtimeMetadata?: Record<string, string>;
+  composeFile?: string;
+  workingDirectory?: string;
+  targetServiceName?: string;
+  reason?: string;
+}
+
+export interface ResourceRuntimeControlTargetResult {
+  status: "succeeded" | "failed" | "blocked";
+  runtimeState: ResourceRuntimeControlRuntimeState;
+  blockedReason?: ResourceRuntimeControlBlockedReason;
+  errorCode?: string;
+  phases?: ResourceRuntimeControlPhaseSummary[];
+}
+
+export interface ResourceRuntimeControlTargetPort {
+  control(
+    context: ExecutionContext,
+    request: ResourceRuntimeControlTargetRequest,
+  ): Promise<Result<ResourceRuntimeControlTargetResult, DomainError>>;
+}
+
+export interface ResourceRuntimeControlAttemptRecorder {
+  record(
+    context: RepositoryContext,
+    attempt: ResourceRuntimeControlAttemptRecord,
+  ): Promise<Result<ResourceRuntimeControlAttemptRecord, DomainError>>;
+}
+
 export interface ResourceHealthProbeRequest {
   name: string;
   target: "runtime" | "public-access";
@@ -2489,11 +2995,35 @@ export interface ResourceHealthProbeResult {
   metadata?: Record<string, string>;
 }
 
+export interface ResourceRuntimeHealthProbeRequest {
+  resourceId: string;
+  deploymentId: string;
+  targetServerId?: string;
+  runtimeKind: ExecutionStrategyKind;
+  targetKind: TargetKind;
+  providerKey: string;
+  runtimeMetadata?: Record<string, string>;
+  timeoutSeconds: number;
+}
+
+export interface ResourceRuntimeHealthProbeResult {
+  lifecycle: ResourceRuntimeLifecycle;
+  health: ResourceRuntimeHealth;
+  observedAt: string;
+  reasonCode?: string;
+  message?: string;
+  check: ResourceHealthCheck;
+}
+
 export interface ResourceHealthProbeRunner {
   probe(
     context: ExecutionContext,
     request: ResourceHealthProbeRequest,
   ): Promise<Result<ResourceHealthProbeResult, DomainError>>;
+  probeRuntime?(
+    context: ExecutionContext,
+    request: ResourceRuntimeHealthProbeRequest,
+  ): Promise<Result<ResourceRuntimeHealthProbeResult, DomainError>>;
 }
 
 export interface ResourceHealthSummary {
@@ -2504,6 +3034,7 @@ export interface ResourceHealthSummary {
   overall: ResourceHealthOverall;
   latestDeployment?: ResourceHealthDeploymentContext;
   runtime: ResourceRuntimeHealthSection;
+  latestRuntimeControl?: ResourceRuntimeControlSummary;
   healthPolicy: ResourceHealthPolicySection;
   publicAccess: ResourcePublicAccessHealthSection;
   proxy: ResourceProxyHealthSection;
@@ -2877,6 +3408,9 @@ export interface DeploymentSummary {
   serverId: string;
   destinationId: string;
   status: DeploymentStatus;
+  triggerKind?: DeploymentTriggerKind;
+  sourceDeploymentId?: string;
+  rollbackCandidateDeploymentId?: string;
   sourceCommitSha?: string;
   runtimePlan: {
     id: string;
@@ -3722,6 +4256,611 @@ export interface CertificateSummary {
   createdAt: string;
 }
 
+export type SourceEventSourceKind = "github" | "gitlab" | "generic-signed";
+export type SourceEventKind = "push" | "tag";
+export type SourceEventStatus =
+  | "accepted"
+  | "deduped"
+  | "ignored"
+  | "blocked"
+  | "dispatched"
+  | "failed";
+export type SourceEventDedupeStatus = "new" | "duplicate";
+export type SourceEventVerificationMethod = "provider-signature" | "generic-hmac";
+export type SourceEventIgnoredReason =
+  | "no-matching-policy"
+  | "ref-not-matched"
+  | "policy-disabled"
+  | "policy-blocked";
+export type SourceEventPolicyResultStatus =
+  | "matched"
+  | "ignored"
+  | "blocked"
+  | "dispatch-failed"
+  | "dispatched";
+export type SourceEventPolicyResultReason =
+  | "ref-not-matched"
+  | "policy-disabled"
+  | "policy-blocked"
+  | "dispatch-failed";
+
+export interface SourceEventIdentity {
+  locator: string;
+  providerRepositoryId?: string;
+  repositoryFullName?: string;
+}
+
+export interface SourceEventVerificationSummary {
+  status: "verified" | "rejected";
+  method?: SourceEventVerificationMethod;
+  keyVersion?: string;
+}
+
+export interface SourceEventPolicyResult {
+  resourceId: string;
+  status: SourceEventPolicyResultStatus;
+  reason?: SourceEventPolicyResultReason;
+  deploymentId?: string;
+  errorCode?: string;
+}
+
+export interface SourceEventRecord {
+  sourceEventId: string;
+  projectId?: string;
+  matchedResourceIds: string[];
+  sourceKind: SourceEventSourceKind;
+  eventKind: SourceEventKind;
+  sourceIdentity: SourceEventIdentity;
+  ref: string;
+  revision: string;
+  deliveryId?: string;
+  idempotencyKey?: string;
+  dedupeKey: string;
+  dedupeStatus: SourceEventDedupeStatus;
+  dedupeOfSourceEventId?: string;
+  verification: SourceEventVerificationSummary;
+  status: SourceEventStatus;
+  ignoredReasons: SourceEventIgnoredReason[];
+  policyResults: SourceEventPolicyResult[];
+  createdDeploymentIds: string[];
+  receivedAt: string;
+}
+
+export interface SourceEventOutcomeUpdate {
+  sourceEventId: string;
+  status: SourceEventStatus;
+  projectId?: string;
+  matchedResourceIds: string[];
+  ignoredReasons: SourceEventIgnoredReason[];
+  policyResults: SourceEventPolicyResult[];
+  createdDeploymentIds: string[];
+}
+
+export interface SourceEventListInput {
+  projectId?: string;
+  resourceId?: string;
+  status?: SourceEventStatus;
+  sourceKind?: SourceEventSourceKind;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface SourceEventShowInput {
+  sourceEventId: string;
+  projectId?: string;
+  resourceId?: string;
+}
+
+export interface SourceEventListItem {
+  sourceEventId: string;
+  projectId?: string;
+  resourceIds: string[];
+  sourceKind: SourceEventSourceKind;
+  eventKind: SourceEventKind;
+  ref: string;
+  revision: string;
+  status: SourceEventStatus;
+  dedupeStatus: SourceEventDedupeStatus;
+  ignoredReasons: SourceEventIgnoredReason[];
+  createdDeploymentIds: string[];
+  receivedAt: string;
+}
+
+export interface SourceEventListResult {
+  items: SourceEventListItem[];
+  nextCursor?: string;
+  generatedAt: string;
+}
+
+export interface SourceEventListPage {
+  items: SourceEventListItem[];
+  nextCursor?: string;
+}
+
+export interface SourceEventDetail {
+  sourceEventId: string;
+  projectId?: string;
+  matchedResourceIds: string[];
+  sourceKind: SourceEventSourceKind;
+  eventKind: SourceEventKind;
+  sourceIdentity: SourceEventIdentity;
+  ref: string;
+  revision: string;
+  verification: SourceEventVerificationSummary;
+  status: SourceEventStatus;
+  dedupeOfSourceEventId?: string;
+  policyResults: SourceEventPolicyResult[];
+  createdDeploymentIds: string[];
+  receivedAt: string;
+}
+
+export interface IngestSourceEventResult {
+  sourceEventId: string;
+  status: SourceEventStatus;
+  matchedResourceIds: string[];
+  createdDeploymentIds: string[];
+  ignoredReasons: SourceEventIgnoredReason[];
+  dedupeOfSourceEventId?: string;
+}
+
+export interface VerifiedSourceEventInput {
+  sourceKind: SourceEventSourceKind;
+  eventKind: SourceEventKind;
+  sourceIdentity: SourceEventIdentity;
+  ref: string;
+  revision: string;
+  deliveryId?: string;
+  idempotencyKey?: string;
+  verification: {
+    status: "verified";
+    method: SourceEventVerificationMethod;
+    keyVersion?: string;
+  };
+  receivedAt?: string;
+}
+
+export interface SourceEventVerificationInput {
+  sourceKind: SourceEventSourceKind;
+  eventKind: SourceEventKind;
+  sourceIdentity: SourceEventIdentity;
+  ref: string;
+  revision: string;
+  rawBody: string;
+  signature: string;
+  secretValue: string;
+  method: SourceEventVerificationMethod;
+  deliveryId?: string;
+  idempotencyKey?: string;
+  keyVersion?: string;
+  receivedAt?: string;
+}
+
+export interface SourceEventVerificationPort {
+  verify(
+    context: ExecutionContext,
+    input: SourceEventVerificationInput,
+  ): Promise<Result<VerifiedSourceEventInput>>;
+}
+
+export interface GitHubSourceEventWebhookVerificationInput {
+  eventName: string;
+  rawBody: string;
+  signature: string;
+  secretValue: string;
+  deliveryId?: string;
+  receivedAt?: string;
+}
+
+export type GitHubSourceEventWebhookVerificationResult =
+  | {
+      outcome: "source-event";
+      sourceEvent: VerifiedSourceEventInput;
+    }
+  | {
+      outcome: "noop";
+    };
+
+export interface GitHubSourceEventWebhookVerifier {
+  verify(
+    context: ExecutionContext,
+    input: GitHubSourceEventWebhookVerificationInput,
+  ): Promise<Result<GitHubSourceEventWebhookVerificationResult>>;
+}
+
+export type GitHubPreviewPullRequestAction = "opened" | "reopened" | "synchronize" | "closed";
+
+export interface GitHubPreviewPullRequestWebhookEvent {
+  provider: "github";
+  eventKind: "pull-request";
+  eventAction: GitHubPreviewPullRequestAction;
+  repositoryFullName: string;
+  providerRepositoryId?: string;
+  installationId?: string;
+  headRepositoryFullName: string;
+  pullRequestNumber: number;
+  headSha: string;
+  baseRef: string;
+  verified: true;
+  deliveryId?: string;
+  receivedAt?: string;
+}
+
+export interface GitHubPreviewPullRequestWebhookVerificationInput {
+  eventName: string;
+  rawBody: string;
+  signature: string;
+  secretValue: string;
+  deliveryId?: string;
+  receivedAt?: string;
+}
+
+export type GitHubPreviewPullRequestWebhookVerificationResult =
+  | {
+      outcome: "preview-pull-request-event";
+      previewEvent: GitHubPreviewPullRequestWebhookEvent;
+    }
+  | {
+      outcome: "noop";
+    };
+
+export interface GitHubPreviewPullRequestWebhookVerifier {
+  verify(
+    context: ExecutionContext,
+    input: GitHubPreviewPullRequestWebhookVerificationInput,
+  ): Promise<Result<GitHubPreviewPullRequestWebhookVerificationResult>>;
+}
+
+export type PreviewFeedbackChannel =
+  | "github-pr-comment"
+  | "github-check"
+  | "github-deployment-status";
+export type PreviewDeploymentStatusState = "success" | "inactive";
+export type PreviewFeedbackStatus = "published" | "retryable-failed" | "terminal-failed";
+
+export interface PreviewFeedbackRecord {
+  feedbackKey: string;
+  sourceEventId: string;
+  previewEnvironmentId: string;
+  channel: PreviewFeedbackChannel;
+  status: PreviewFeedbackStatus;
+  providerFeedbackId?: string;
+  errorCode?: string;
+  retryable?: boolean;
+  updatedAt: string;
+}
+
+export interface PreviewFeedbackWriterInput {
+  feedbackKey: string;
+  sourceEventId: string;
+  previewEnvironmentId: string;
+  channel: PreviewFeedbackChannel;
+  repositoryFullName: string;
+  pullRequestNumber: number;
+  body: string;
+  providerDeploymentId?: string;
+  providerFeedbackId?: string;
+  deploymentStatusState?: PreviewDeploymentStatusState;
+}
+
+export interface PreviewFeedbackWriterResult {
+  providerFeedbackId: string;
+}
+
+export interface PreviewFeedbackWriter {
+  publish(
+    context: ExecutionContext,
+    input: PreviewFeedbackWriterInput,
+  ): Promise<Result<PreviewFeedbackWriterResult>>;
+}
+
+export interface PreviewFeedbackRecorder {
+  findOne(
+    context: RepositoryContext,
+    input: { feedbackKey: string },
+  ): Promise<PreviewFeedbackRecord | null>;
+  findLatestForPreviewEnvironment(
+    context: RepositoryContext,
+    input: { previewEnvironmentId: string; channel: PreviewFeedbackChannel },
+  ): Promise<PreviewFeedbackRecord | null>;
+  record(context: RepositoryContext, record: PreviewFeedbackRecord): Promise<void>;
+}
+
+export interface PreviewEnvironmentCleanerInput {
+  previewEnvironmentId: string;
+  resourceId: string;
+  sourceBindingFingerprint: string;
+  provider: PreviewEnvironmentProvider;
+  repositoryFullName: string;
+  pullRequestNumber: number;
+}
+
+export interface PreviewEnvironmentCleanerResult {
+  cleanedRuntime: boolean;
+  removedRoute: boolean;
+  removedSourceLink: boolean;
+  removedProviderMetadata: boolean;
+  updatedFeedback: boolean;
+}
+
+export interface PreviewEnvironmentCleaner {
+  cleanup(
+    context: ExecutionContext,
+    input: PreviewEnvironmentCleanerInput,
+  ): Promise<Result<PreviewEnvironmentCleanerResult>>;
+}
+
+export type PreviewCleanupAttemptStatus = "succeeded" | "retry-scheduled" | "failed";
+
+export interface PreviewCleanupAttemptRecord {
+  attemptId: string;
+  previewEnvironmentId: string;
+  resourceId: string;
+  sourceBindingFingerprint: string;
+  owner: string;
+  status: PreviewCleanupAttemptStatus;
+  phase: string;
+  attemptedAt: string;
+  updatedAt: string;
+  errorCode?: string;
+  retryable?: boolean;
+  nextRetryAt?: string;
+}
+
+export interface PreviewCleanupAttemptRecorder {
+  record(context: RepositoryContext, record: PreviewCleanupAttemptRecord): Promise<void>;
+}
+
+export interface PreviewCleanupRetryCandidate {
+  attemptId: string;
+  previewEnvironmentId: string;
+  resourceId: string;
+  sourceBindingFingerprint: string;
+  owner: string;
+  phase: string;
+  nextRetryAt: string;
+}
+
+export interface PreviewCleanupRetryCandidateReader {
+  listDueRetries(
+    context: RepositoryContext,
+    input: {
+      now: string;
+      limit: number;
+    },
+  ): Promise<PreviewCleanupRetryCandidate[]>;
+}
+
+export interface SourceEventPolicyCandidate {
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId?: string;
+  destinationId?: string;
+  sourceBindingFingerprint?: string;
+  status: "enabled" | "disabled" | "blocked";
+  refs: string[];
+  eventKinds: SourceEventKind[];
+  sourceBinding: SourceEventIdentity;
+  blockedReason?: "source-binding-changed";
+}
+
+export interface SourceEventPolicyReader {
+  listCandidates(
+    context: RepositoryContext,
+    input: {
+      sourceKind: SourceEventSourceKind;
+      sourceIdentity: SourceEventIdentity;
+    },
+  ): Promise<SourceEventPolicyCandidate[]>;
+}
+
+export interface SourceEventDeploymentDispatchInput {
+  sourceEventId: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId?: string;
+}
+
+export interface SourceEventDeploymentDispatchResult {
+  deploymentId: string;
+}
+
+export interface SourceEventDeploymentDispatcher {
+  dispatch(
+    context: ExecutionContext,
+    input: SourceEventDeploymentDispatchInput,
+  ): Promise<Result<SourceEventDeploymentDispatchResult>>;
+}
+
+export interface SourceEventRecorder {
+  findByDedupeKey(context: RepositoryContext, dedupeKey: string): Promise<SourceEventRecord | null>;
+  record(context: RepositoryContext, record: SourceEventRecord): Promise<SourceEventRecord>;
+  updateOutcome(
+    context: RepositoryContext,
+    input: SourceEventOutcomeUpdate,
+  ): Promise<SourceEventRecord>;
+}
+
+export interface SourceEventReadModel {
+  list(context: RepositoryContext, input: SourceEventListInput): Promise<SourceEventListPage>;
+  findOne(
+    context: RepositoryContext,
+    input: SourceEventShowInput,
+  ): Promise<SourceEventDetail | null>;
+}
+
+export interface PreviewEnvironmentSourceSummary {
+  provider: "github";
+  repositoryFullName: string;
+  headRepositoryFullName: string;
+  pullRequestNumber: number;
+  baseRef: string;
+  headSha: string;
+  sourceBindingFingerprint: string;
+}
+
+export interface PreviewEnvironmentSummary {
+  previewEnvironmentId: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId: string;
+  source: PreviewEnvironmentSourceSummary;
+  status: PreviewEnvironmentStatus;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt?: string;
+}
+
+export interface PreviewEnvironmentReadModel {
+  list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      resourceId?: string;
+      status?: PreviewEnvironmentStatus;
+      repositoryFullName?: string;
+      pullRequestNumber?: number;
+      limit?: number;
+      cursor?: string;
+    },
+  ): Promise<{ items: PreviewEnvironmentSummary[]; nextCursor?: string }>;
+  findOne(
+    context: RepositoryContext,
+    input: {
+      previewEnvironmentId: string;
+      projectId?: string;
+      resourceId?: string;
+    },
+  ): Promise<PreviewEnvironmentSummary | null>;
+}
+
+export interface ListPreviewEnvironmentsResult {
+  schemaVersion: "preview-environments.list/v1";
+  items: PreviewEnvironmentSummary[];
+  nextCursor?: string;
+  generatedAt: string;
+}
+
+export interface ShowPreviewEnvironmentResult {
+  schemaVersion: "preview-environments.show/v1";
+  previewEnvironment: PreviewEnvironmentSummary;
+  generatedAt: string;
+}
+
+export type PreviewPolicyScope =
+  | {
+      kind: "project";
+      projectId: string;
+    }
+  | {
+      kind: "resource";
+      projectId: string;
+      resourceId: string;
+    };
+
+export interface PreviewPolicySettings {
+  sameRepositoryPreviews: boolean;
+  forkPreviews: "disabled" | "without-secrets" | "with-secrets";
+  secretBackedPreviews: boolean;
+  maxActivePreviews?: number;
+  previewTtlHours?: number;
+}
+
+export interface PreviewPolicyRecord {
+  id: string;
+  scope: PreviewPolicyScope;
+  settings: PreviewPolicySettings;
+  updatedAt: string;
+  idempotencyKey?: string;
+}
+
+export interface PreviewPolicySummary {
+  id?: string;
+  scope: PreviewPolicyScope;
+  settings: PreviewPolicySettings;
+  source: "default" | "configured";
+  updatedAt?: string;
+}
+
+export type PreviewPolicyDecisionReasonCode =
+  | "preview_event_unverified"
+  | "preview_same_repository_disabled"
+  | "preview_fork_disabled"
+  | "preview_fork_secrets_blocked"
+  | "preview_secret_backed_disabled"
+  | "preview_quota_exceeded";
+
+export interface PreviewPolicyDecisionProjection {
+  sourceEventId: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  provider: "github";
+  eventKind: "pull-request";
+  eventAction: "opened" | "reopened" | "synchronize";
+  repositoryFullName: string;
+  headRepositoryFullName: string;
+  pullRequestNumber: number;
+  headSha: string;
+  baseRef: string;
+  fork: boolean;
+  secretBacked: boolean;
+  requestedSecretScopeCount: number;
+  activePreviewCount: number;
+  status: "allowed" | "blocked";
+  phase: "preview-policy-evaluation";
+  deploymentEligible: boolean;
+  evaluatedAt: string;
+  reasonCode?: PreviewPolicyDecisionReasonCode;
+  maxActivePreviews?: number;
+  previewEnvironmentId?: string;
+  previewExpiresAt?: string;
+  deploymentId?: string;
+}
+
+export interface ConfigurePreviewPolicyResult {
+  id: string;
+}
+
+export interface ShowPreviewPolicyResult {
+  schemaVersion: "preview-policies.show/v1";
+  policy: PreviewPolicySummary;
+  generatedAt: string;
+}
+
+export interface PreviewPolicyRepository {
+  findOne(
+    context: RepositoryContext,
+    scope: PreviewPolicyScope,
+  ): Promise<PreviewPolicyRecord | null>;
+  upsert(context: RepositoryContext, record: PreviewPolicyRecord): Promise<PreviewPolicyRecord>;
+}
+
+export interface PreviewPolicyReadModel {
+  findOneSummary(
+    context: RepositoryContext,
+    scope: PreviewPolicyScope,
+  ): Promise<PreviewPolicySummary>;
+}
+
+export interface PreviewPolicyDecisionRecorder {
+  record(context: RepositoryContext, projection: PreviewPolicyDecisionProjection): Promise<void>;
+}
+
+export interface PreviewPolicyDecisionReadModel {
+  findOne(
+    context: RepositoryContext,
+    input: {
+      sourceEventId: string;
+    },
+  ): Promise<PreviewPolicyDecisionProjection | null>;
+}
+
 export interface ProjectReadModel {
   list(context: RepositoryContext): Promise<ProjectSummary[]>;
   findOne(context: RepositoryContext, spec: ProjectSelectionSpec): Promise<ProjectSummary | null>;
@@ -3796,6 +4935,20 @@ export interface DependencyResourceReadModel {
   ): Promise<DependencyResourceSummary | null>;
 }
 
+export interface DependencyResourceBackupReadModel {
+  list(
+    context: RepositoryContext,
+    input: {
+      dependencyResourceId: string;
+      status?: DependencyResourceBackupSummary["status"];
+    },
+  ): Promise<DependencyResourceBackupSummary[]>;
+  findOne(
+    context: RepositoryContext,
+    spec: DependencyResourceBackupSelectionSpec,
+  ): Promise<DependencyResourceBackupSummary | null>;
+}
+
 export interface ResourceDependencyBindingReadModel {
   list(
     context: RepositoryContext,
@@ -3810,6 +4963,142 @@ export interface ResourceDependencyBindingReadModel {
       bindingId: string;
     },
   ): Promise<Result<ResourceDependencyBindingSummary | null>>;
+}
+
+export interface ManagedPostgresRealizationInput {
+  dependencyResourceId: string;
+  projectId: string;
+  environmentId: string;
+  providerKey: string;
+  name: string;
+  slug: string;
+  attemptId: string;
+  requestedAt: string;
+}
+
+export interface ManagedPostgresRealizationResult {
+  providerResourceHandle: string;
+  endpoint: {
+    host: string;
+    port?: number;
+    databaseName?: string;
+    maskedConnection: string;
+  };
+  secretRef?: string;
+  realizedAt: string;
+}
+
+export interface ManagedPostgresDeleteInput {
+  dependencyResourceId: string;
+  providerKey: string;
+  providerResourceHandle: string;
+  attemptId: string;
+  requestedAt: string;
+}
+
+export interface ManagedPostgresDeleteResult {
+  deletedAt: string;
+}
+
+export interface ManagedPostgresProviderPort {
+  supports(providerKey: string): boolean;
+  realize(
+    context: ExecutionContext,
+    input: ManagedPostgresRealizationInput,
+  ): Promise<Result<ManagedPostgresRealizationResult, DomainError>>;
+  delete(
+    context: ExecutionContext,
+    input: ManagedPostgresDeleteInput,
+  ): Promise<Result<ManagedPostgresDeleteResult, DomainError>>;
+}
+
+export interface ManagedRedisRealizationInput {
+  dependencyResourceId: string;
+  projectId: string;
+  environmentId: string;
+  providerKey: string;
+  name: string;
+  slug: string;
+  attemptId: string;
+  requestedAt: string;
+}
+
+export interface ManagedRedisRealizationResult {
+  providerResourceHandle: string;
+  endpoint: {
+    host: string;
+    port?: number;
+    databaseName?: string;
+    maskedConnection: string;
+  };
+  secretRef?: string;
+  connectionSecretValue?: string;
+  realizedAt: string;
+}
+
+export interface ManagedRedisDeleteInput {
+  dependencyResourceId: string;
+  providerKey: string;
+  providerResourceHandle: string;
+  attemptId: string;
+  requestedAt: string;
+}
+
+export interface ManagedRedisDeleteResult {
+  deletedAt: string;
+}
+
+export interface ManagedRedisProviderPort {
+  supports(providerKey: string): boolean;
+  realize(
+    context: ExecutionContext,
+    input: ManagedRedisRealizationInput,
+  ): Promise<Result<ManagedRedisRealizationResult, DomainError>>;
+  delete(
+    context: ExecutionContext,
+    input: ManagedRedisDeleteInput,
+  ): Promise<Result<ManagedRedisDeleteResult, DomainError>>;
+}
+
+export interface DependencyResourceBackupProviderInput {
+  backupId: string;
+  dependencyResourceId: string;
+  dependencyKind: DependencyResourceKind;
+  providerKey: string;
+  attemptId: string;
+  requestedAt: string;
+}
+
+export interface DependencyResourceBackupProviderResult {
+  providerArtifactHandle: string;
+  completedAt: string;
+  retentionStatus?: "retained" | "none";
+}
+
+export interface DependencyResourceRestoreProviderInput {
+  backupId: string;
+  dependencyResourceId: string;
+  dependencyKind: DependencyResourceKind;
+  providerKey: string;
+  providerArtifactHandle: string;
+  restoreAttemptId: string;
+  requestedAt: string;
+}
+
+export interface DependencyResourceRestoreProviderResult {
+  completedAt: string;
+}
+
+export interface DependencyResourceBackupProviderPort {
+  supports(providerKey: string, dependencyKind: DependencyResourceKind): boolean;
+  createBackup(
+    context: ExecutionContext,
+    input: DependencyResourceBackupProviderInput,
+  ): Promise<Result<DependencyResourceBackupProviderResult, DomainError>>;
+  restoreBackup(
+    context: ExecutionContext,
+    input: DependencyResourceRestoreProviderInput,
+  ): Promise<Result<DependencyResourceRestoreProviderResult, DomainError>>;
 }
 
 export interface DeploymentReadModel {
@@ -4283,6 +5572,7 @@ export type RuntimeTargetCapability =
   | "runtime.plan-target"
   | "runtime.apply"
   | "runtime.verify"
+  | "runtime.dependency-secrets"
   | "runtime.logs"
   | "runtime.health"
   | "runtime.cleanup"

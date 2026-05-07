@@ -121,6 +121,7 @@ export interface DeploymentServerDraft {
   name?: string;
   host?: string;
   providerKey?: string;
+  targetKind?: RegisterServerCommandInput["targetKind"];
   port?: number;
   proxyKind?: RegisterServerCommandInput["proxyKind"];
   credential?: ConfigureServerCredentialCommandInput["credential"];
@@ -960,6 +961,7 @@ function resolveServer(input: {
             name: name.trim(),
             host: host.trim(),
             providerKey: providerKey.trim(),
+            targetKind: input.seed.server?.targetKind ?? "single-server",
             port,
             proxyKind: input.seed.server?.proxyKind ?? "traefik",
           },

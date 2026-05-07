@@ -257,6 +257,36 @@ describe("public docs operation coverage", () => {
     );
   });
 
+  test("[PG-PREVIEW-SURFACE-001] preview operation contracts record product-grade preview docs coverage", () => {
+    const topic = publicDocsHelpTopics["deployment.product-grade-previews"];
+    const operationKeys = [
+      "preview-policies.configure",
+      "preview-policies.show",
+      "preview-environments.list",
+      "preview-environments.show",
+      "preview-environments.delete",
+    ];
+
+    for (const operationKey of operationKeys) {
+      expect(getPublicDocsOperationCoverage(operationKey)).toMatchObject({
+        operationKey,
+        status: "documented",
+        topicId: "deployment.product-grade-previews",
+      });
+    }
+
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/046-product-grade-preview-deployments/spec.md",
+        "docs/testing/product-grade-preview-deployments-test-matrix.md",
+      ]),
+    );
+    expect(topic.surfaces).toEqual(
+      expect.arrayContaining(["web", "cli", "http-api", "repository-config", "mcp"]),
+    );
+    expect(topic.webSurfaces?.join("\n")).toContain("preview policy");
+  });
+
   test("[RES-PROFILE-ENTRY-012] resource profile topics record resource detail editing closure coverage", () => {
     for (const [operationKey, topicId] of [
       ["resources.configure-source", "resource.source-profile"],
@@ -312,5 +342,65 @@ describe("public docs operation coverage", () => {
         "apps/web/src/routes/resources/[resourceId]/+page.svelte",
       );
     }
+  });
+
+  test("[SRC-AUTO-SURFACE-003] source auto-deploy operations record docs coverage", () => {
+    expect(getPublicDocsOperationCoverage("resources.configure-auto-deploy")).toMatchObject({
+      operationKey: "resources.configure-auto-deploy",
+      status: "documented",
+      topicId: "source.auto-deploy-setup",
+    });
+    expect(getPublicDocsOperationCoverage("source-events.ingest")).toMatchObject({
+      operationKey: "source-events.ingest",
+      status: "documented",
+      topicId: "source.auto-deploy-signatures",
+    });
+    expect(getPublicDocsOperationCoverage("source-events.list")).toMatchObject({
+      operationKey: "source-events.list",
+      status: "documented",
+      topicId: "source.auto-deploy-dedupe",
+    });
+    expect(getPublicDocsOperationCoverage("source-events.show")).toMatchObject({
+      operationKey: "source-events.show",
+      status: "documented",
+      topicId: "source.auto-deploy-ignored-events",
+    });
+    expect(publicDocsHelpTopics["source.auto-deploy-setup"].webSurfaces?.join("\n")).toContain(
+      "Resource detail auto-deploy settings",
+    );
+    expect(
+      publicDocsHelpTopics["source.auto-deploy-ignored-events"].webSurfaces?.join("\n"),
+    ).toContain("Resource detail source event diagnostics");
+  });
+
+  test("[SCHED-TASK-DOCS-001] scheduled task operations record docs coverage", () => {
+    for (const operationKey of [
+      "scheduled-tasks.create",
+      "scheduled-tasks.list",
+      "scheduled-tasks.show",
+      "scheduled-tasks.configure",
+      "scheduled-tasks.delete",
+      "scheduled-tasks.run-now",
+      "scheduled-task-runs.list",
+      "scheduled-task-runs.show",
+      "scheduled-task-runs.logs",
+    ] as const) {
+      expect(getPublicDocsOperationCoverage(operationKey)).toMatchObject({
+        operationKey,
+        status: "documented",
+        topicId: "scheduled-task.resource-lifecycle",
+      });
+    }
+
+    const topic = publicDocsHelpTopics["scheduled-task.resource-lifecycle"];
+
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/decisions/ADR-039-scheduled-task-resource-ownership.md",
+        "docs/specs/044-scheduled-task-resource-shape/spec.md",
+        "docs/testing/scheduled-task-resource-test-matrix.md",
+      ]),
+    );
+    expect(topic.webSurfaces?.join("\n")).toContain("Web controls deferred");
   });
 });

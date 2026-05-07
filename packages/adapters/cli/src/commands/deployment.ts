@@ -9,6 +9,9 @@ import {
   DeploymentRecoveryReadinessQuery,
   type DeploymentSummary,
   ListDeploymentsQuery,
+  RedeployDeploymentCommand,
+  RetryDeploymentCommand,
+  RollbackDeploymentCommand,
   ShowDeploymentQuery,
   StreamDeploymentEventsQuery,
 } from "@appaloft/application";
@@ -65,9 +68,12 @@ import {
   type SourceFingerprintScope,
 } from "./deployment-state.js";
 import { cliCommandDescriptions, cliDocsHrefs } from "./docs-help.js";
+import { previewEnvironmentCommand } from "./preview-environment.js";
+import { previewPolicyCommand } from "./preview-policy.js";
 
 const pathOrSourceArg = Args.text({ name: "pathOrSource" }).pipe(Args.optional);
 const deploymentIdArg = Args.text({ name: "deploymentId" });
+const resourceIdArg = Args.text({ name: "resourceId" });
 
 const sourceBaseDirectoryOption = Options.text("source-base-directory").pipe(Options.optional);
 const projectOption = Options.text("project").pipe(Options.optional);
@@ -103,6 +109,7 @@ const previewTlsModeOption = Options.choice("preview-tls-mode", previewTlsModes)
 const requirePreviewUrlOption = Options.boolean("require-preview-url").pipe(
   Options.withDefault(false),
 );
+const previewOutputFileOption = Options.text("preview-output-file").pipe(Options.optional);
 const installOption = Options.text("install").pipe(Options.optional);
 const buildOption = Options.text("build").pipe(Options.optional);
 const startOption = Options.text("start").pipe(Options.optional);
@@ -130,6 +137,9 @@ const deploymentCursorOption = Options.text("cursor").pipe(Options.optional);
 const deploymentHistoryLimitOption = Options.text("history-limit").pipe(Options.withDefault("100"));
 const includeHistoryOption = Options.boolean("include-history").pipe(Options.withDefault(true));
 const untilTerminalOption = Options.boolean("until-terminal").pipe(Options.withDefault(true));
+const readinessGeneratedAtOption = Options.text("readiness-generated-at").pipe(Options.optional);
+const sourceDeploymentOption = Options.text("source-deployment").pipe(Options.optional);
+const rollbackCandidateOption = Options.text("candidate");
 const deploymentStateBackendKinds = [
   "ssh-pglite",
   "local-pglite",
@@ -575,6 +585,7 @@ function resolvePreviewDeployContext(input: {
   previewDomainTemplate?: string;
   previewTlsMode?: (typeof previewTlsModes)[number];
   requirePreviewUrl?: boolean;
+  previewOutputFile?: string;
   env: Record<string, string | undefined>;
 }): Result<PreviewDeployContext | undefined> {
   if (!input.mode) {
@@ -582,7 +593,8 @@ function resolvePreviewDeployContext(input: {
       input.previewId ||
       input.previewDomainTemplate ||
       input.previewTlsMode ||
-      input.requirePreviewUrl
+      input.requirePreviewUrl ||
+      input.previewOutputFile
     ) {
       return err(
         previewContextValidationError("Preview inputs require preview mode", {
@@ -824,7 +836,69 @@ function publicPreviewUrlsFromDeployment(deployment: DeploymentSummary): string[
   return urls;
 }
 
-function requirePreviewUrlForDeployment(input: { deploymentId: string; resourceId: string }) {
+interface PreviewAccessResolution {
+  deploymentId: string;
+  resourceId: string;
+  status?: string;
+  previewUrls: string[];
+}
+
+function previewOutputFileText(input: {
+  previewId?: string;
+  resolution: PreviewAccessResolution;
+}): string {
+  const lines = [
+    "schema-version=deploy.preview-output/v1",
+    `deployment-id=${input.resolution.deploymentId}`,
+    `resource-id=${input.resolution.resourceId}`,
+  ];
+
+  if (input.previewId) {
+    lines.push(`preview-id=${input.previewId}`);
+  }
+
+  if (input.resolution.status) {
+    lines.push(`deployment-status=${input.resolution.status}`);
+  }
+
+  const [previewUrl] = input.resolution.previewUrls;
+  if (previewUrl) {
+    lines.push(`preview-url=${previewUrl}`);
+    lines.push(`preview-urls=${input.resolution.previewUrls.join(",")}`);
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function writePreviewOutputFile(input: {
+  filePath: string;
+  previewId?: string;
+  resolution: PreviewAccessResolution;
+}) {
+  return Effect.tryPromise({
+    try: async () => {
+      await Bun.write(
+        input.filePath,
+        previewOutputFileText({
+          ...(input.previewId ? { previewId: input.previewId } : {}),
+          resolution: input.resolution,
+        }),
+      );
+    },
+    catch: (error) =>
+      domainError.infra("Failed to write preview output file", {
+        phase: "preview-access-output",
+        path: input.filePath,
+        message: error instanceof Error ? error.message : String(error),
+      }),
+  });
+}
+
+function resolvePreviewAccessForDeployment(input: {
+  deploymentId: string;
+  resourceId: string;
+  requirePreviewUrl: boolean;
+}) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
     const query = yield* resultToEffect(
@@ -835,18 +909,26 @@ function requirePreviewUrlForDeployment(input: { deploymentId: string; resourceI
     const deployment = deployments.items.find((item) => item.id === input.deploymentId);
 
     if (!deployment) {
-      return yield* Effect.fail(
-        domainError.validation("Preview URL is required but the deployment was not observable", {
-          phase: "preview-access-resolution",
-          reason: "preview_url_missing",
-          deploymentId: input.deploymentId,
-          resourceId: input.resourceId,
-        }),
-      );
+      if (input.requirePreviewUrl) {
+        return yield* Effect.fail(
+          domainError.validation("Preview URL is required but the deployment was not observable", {
+            phase: "preview-access-resolution",
+            reason: "preview_url_missing",
+            deploymentId: input.deploymentId,
+            resourceId: input.resourceId,
+          }),
+        );
+      }
+
+      return {
+        deploymentId: input.deploymentId,
+        resourceId: input.resourceId,
+        previewUrls: [],
+      };
     }
 
     const previewUrls = publicPreviewUrlsFromDeployment(deployment);
-    if (previewUrls.length === 0) {
+    if (input.requirePreviewUrl && previewUrls.length === 0) {
       return yield* Effect.fail(
         domainError.validation("Preview URL is required but no public route was resolved", {
           phase: "preview-access-resolution",
@@ -858,7 +940,7 @@ function requirePreviewUrlForDeployment(input: { deploymentId: string; resourceI
       );
     }
 
-    if (deployment.status !== "succeeded") {
+    if (input.requirePreviewUrl && deployment.status !== "succeeded") {
       return yield* Effect.fail(
         domainError.validation("Preview URL is required but deployment did not succeed", {
           phase: "preview-access-resolution",
@@ -870,6 +952,13 @@ function requirePreviewUrlForDeployment(input: { deploymentId: string; resourceI
         }),
       );
     }
+
+    return {
+      deploymentId: input.deploymentId,
+      resourceId: input.resourceId,
+      status: deployment.status,
+      previewUrls,
+    };
   });
 }
 
@@ -878,6 +967,8 @@ function runCreateDeploymentCommand(
   options: {
     appLogLines: number;
     requirePreviewUrl: boolean;
+    previewOutputFile?: string;
+    previewId?: string;
   },
 ) {
   return Effect.gen(function* () {
@@ -885,11 +976,20 @@ function runCreateDeploymentCommand(
       appLogLines: options.appLogLines,
     });
 
-    if (options.requirePreviewUrl) {
-      yield* requirePreviewUrlForDeployment({
+    if (options.requirePreviewUrl || options.previewOutputFile) {
+      const resolution = yield* resolvePreviewAccessForDeployment({
         deploymentId: output.id,
         resourceId: input.resourceId,
+        requirePreviewUrl: options.requirePreviewUrl,
       });
+
+      if (options.previewOutputFile) {
+        yield* writePreviewOutputFile({
+          filePath: options.previewOutputFile,
+          ...(options.previewId ? { previewId: options.previewId } : {}),
+          resolution,
+        });
+      }
     }
   });
 }
@@ -1033,6 +1133,7 @@ export const deployCommand = EffectCommand.make(
     previewDomainTemplate: previewDomainTemplateOption,
     previewTlsMode: previewTlsModeOption,
     requirePreviewUrl: requirePreviewUrlOption,
+    previewOutputFile: previewOutputFileOption,
     install: installOption,
     build: buildOption,
     start: startOption,
@@ -1075,6 +1176,7 @@ export const deployCommand = EffectCommand.make(
     preview,
     previewDomainTemplate,
     previewId,
+    previewOutputFile,
     previewTlsMode,
     project,
     publishDir,
@@ -1140,6 +1242,7 @@ export const deployCommand = EffectCommand.make(
       const requestedPreviewId = optionalValue(previewId);
       const requestedPreviewDomainTemplate = optionalValue(previewDomainTemplate);
       const requestedPreviewTlsMode = optionalValue(previewTlsMode);
+      const previewOutputFilePath = optionalValue(previewOutputFile);
       const previewContext = yield* resultToEffect(
         resolvePreviewDeployContext({
           ...(requestedPreviewMode ? { mode: requestedPreviewMode } : {}),
@@ -1149,6 +1252,7 @@ export const deployCommand = EffectCommand.make(
             : {}),
           ...(requestedPreviewTlsMode ? { previewTlsMode: requestedPreviewTlsMode } : {}),
           ...(requirePreviewUrl ? { requirePreviewUrl } : {}),
+          ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
           env: Bun.env,
         }),
       );
@@ -1205,6 +1309,7 @@ export const deployCommand = EffectCommand.make(
         return yield* runCreateDeploymentCommand(input, {
           appLogLines: parseAppLogLines(appLogLines),
           requirePreviewUrl,
+          ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
         });
       }
 
@@ -1378,6 +1483,8 @@ export const deployCommand = EffectCommand.make(
         return yield* runCreateDeploymentCommand(input, {
           appLogLines: parseAppLogLines(appLogLines),
           requirePreviewUrl,
+          ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
+          ...(previewContext?.previewId ? { previewId: previewContext.previewId } : {}),
         });
       });
 
@@ -1455,6 +1562,75 @@ const deploymentRecoveryReadinessCommand = EffectCommand.make(
   ({ deploymentId }) => runQuery(DeploymentRecoveryReadinessQuery.create({ deploymentId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRecoveryReadiness));
 
+const retryDeploymentCommand = EffectCommand.make(
+  "retry",
+  {
+    deploymentId: deploymentIdArg,
+    resource: resourceOption,
+    readinessGeneratedAt: readinessGeneratedAtOption,
+  },
+  ({ deploymentId, readinessGeneratedAt, resource }) =>
+    runCommand(
+      RetryDeploymentCommand.create({
+        deploymentId,
+        resourceId: optionalValue(resource),
+        readinessGeneratedAt: optionalValue(readinessGeneratedAt),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRetry));
+
+const redeployDeploymentCommand = EffectCommand.make(
+  "redeploy",
+  {
+    resourceId: resourceIdArg,
+    project: projectOption,
+    environment: environmentOption,
+    server: serverOption,
+    destination: destinationOption,
+    sourceDeployment: sourceDeploymentOption,
+    readinessGeneratedAt: readinessGeneratedAtOption,
+  },
+  ({
+    destination,
+    environment,
+    project,
+    readinessGeneratedAt,
+    resourceId,
+    server,
+    sourceDeployment,
+  }) =>
+    runCommand(
+      RedeployDeploymentCommand.create({
+        resourceId,
+        projectId: optionalValue(project),
+        environmentId: optionalValue(environment),
+        serverId: optionalValue(server),
+        destinationId: optionalValue(destination),
+        sourceDeploymentId: optionalValue(sourceDeployment),
+        readinessGeneratedAt: optionalValue(readinessGeneratedAt),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRedeploy));
+
+const rollbackDeploymentCommand = EffectCommand.make(
+  "rollback",
+  {
+    deploymentId: deploymentIdArg,
+    candidate: rollbackCandidateOption,
+    resource: resourceOption,
+    readinessGeneratedAt: readinessGeneratedAtOption,
+  },
+  ({ candidate, deploymentId, readinessGeneratedAt, resource }) =>
+    runCommand(
+      RollbackDeploymentCommand.create({
+        deploymentId,
+        rollbackCandidateDeploymentId: candidate,
+        resourceId: optionalValue(resource),
+        readinessGeneratedAt: optionalValue(readinessGeneratedAt),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRollback));
+
 const streamDeploymentEventsCommand = EffectCommand.make(
   "events",
   {
@@ -1485,11 +1661,18 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
     showDeploymentCommand,
     deploymentPlanCommand,
     deploymentRecoveryReadinessCommand,
+    retryDeploymentCommand,
+    redeployDeploymentCommand,
+    rollbackDeploymentCommand,
     streamDeploymentEventsCommand,
   ]),
 );
 
 export const previewCommand = EffectCommand.make("preview").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.preview),
-  EffectCommand.withSubcommands([previewCleanupCommand]),
+  EffectCommand.withSubcommands([
+    previewCleanupCommand,
+    previewPolicyCommand,
+    previewEnvironmentCommand,
+  ]),
 );

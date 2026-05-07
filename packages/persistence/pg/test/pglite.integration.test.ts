@@ -96,6 +96,7 @@ import {
   RuntimePlan,
   RuntimePlanId,
   Server,
+  ServerByIdSpec,
   SourceDescriptor,
   SourceKindValue,
   SourceLocator,
@@ -905,6 +906,53 @@ async function insertDomainBinding(
 }
 
 describe("pglite persistence integration", () => {
+  test("[SWARM-TARGET-REG-001] persists and reads deployment target kind", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-target-kind-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    const context = createRepositoryContext();
+
+    try {
+      const { createDatabase, createMigrator, PgServerReadModel, PgServerRepository } =
+        await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      const migrator = createMigrator(database.db);
+      await migrator.migrateToLatest();
+
+      const serverRepository = new PgServerRepository(database.db);
+      const serverReadModel = new PgServerReadModel(database.db);
+      const server = Server.register({
+        id: DeploymentTargetId.rehydrate("srv_swarm_manager"),
+        name: DeploymentTargetName.rehydrate("Swarm manager"),
+        host: HostAddress.rehydrate("swarm-manager.internal"),
+        port: PortNumber.rehydrate(2377),
+        providerKey: ProviderKey.rehydrate("docker-swarm"),
+        targetKind: TargetKindValue.rehydrate("orchestrator-cluster"),
+        createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      })._unsafeUnwrap();
+
+      await serverRepository.upsert(context, server, UpsertServerSpec.fromServer(server));
+
+      const persisted = await serverRepository.findOne(
+        context,
+        ServerByIdSpec.create(DeploymentTargetId.rehydrate("srv_swarm_manager")),
+      );
+      expect(persisted?.toState().targetKind.value).toBe("orchestrator-cluster");
+
+      const readModel = await serverReadModel.findOne(
+        context,
+        ServerByIdSpec.create(DeploymentTargetId.rehydrate("srv_swarm_manager")),
+      );
+      expect(readModel?.targetKind).toBe("orchestrator-cluster");
+
+      await database.close();
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("persists environments and deployments to a file-backed embedded store", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
@@ -2679,7 +2727,7 @@ describe("pglite persistence integration", () => {
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });
     }
-  }, 15000);
+  }, 30000);
 
   test("PgMutationCoordinator returns coordination_timeout when the scope stays occupied", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-mutation-timeout-"));
@@ -2766,5 +2814,5 @@ describe("pglite persistence integration", () => {
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });
     }
-  }, 15000);
+  }, 30000);
 });

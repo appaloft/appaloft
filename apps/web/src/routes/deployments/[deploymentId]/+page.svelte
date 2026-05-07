@@ -3,7 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onDestroy } from "svelte";
-  import { createQuery, queryOptions } from "@tanstack/svelte-query";
+  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
     Boxes,
@@ -14,6 +14,7 @@
     FileText,
     FolderOpen,
     Link2,
+    RefreshCw,
     Server,
     ShieldCheck,
   } from "@lucide/svelte";
@@ -22,9 +23,12 @@
     type DeploymentDetailSummary,
     type DeploymentLogsResponse,
     type DeploymentRecoveryReadinessResponse,
+    type DeploymentProgressEvent,
+    type RedeployDeploymentInput,
+    type RetryDeploymentInput,
+    type RollbackDeploymentInput,
     shortDeploymentSourceCommitSha,
     sourceCommitShaForDeployment,
-    type DeploymentProgressEvent,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -41,6 +45,7 @@
     groupDeploymentProgressEvents,
     latestDeploymentEventCursor,
     mergeDeploymentEventEnvelopes,
+    observeDeploymentProgressAfterAcceptance,
     progressSourceLabel,
     progressStatusVariant,
     progressEventsFromDeployment,
@@ -54,6 +59,7 @@
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
+  import { queryClient } from "$lib/query-client";
 
   type AccessRoute =
     NonNullable<DeploymentDetailSummary["runtimePlan"]["execution"]["accessRoutes"]>[number];
@@ -64,12 +70,15 @@
   };
   type DeploymentDetailTab = "overview" | "logs" | "timeline" | "snapshot";
   type DeploymentLogEntry = DeploymentLogsResponse["logs"][number];
+  type DeploymentRecoveryAction = "retry" | "redeploy" | "rollback";
 
   const deploymentDetailTabs = ["overview", "logs", "timeline", "snapshot"] as const;
 
   let deploymentProgressDialogOpen = $state(false);
   let deploymentProgressRequestId = $state("");
   let deploymentProgressDeploymentId = $state("");
+  let recoveryDeploymentProgressStatus = $state<DeploymentProgressDialogStatus>("idle");
+  let recoveryDeploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
   let liveDeploymentEventEnvelopes = $state<DeploymentEventStreamEnvelope[]>([]);
   let deploymentEventFollowError = $state("");
   let deploymentEventsFollowing = $state(false);
@@ -79,6 +88,8 @@
   > | null = null;
   let logsCopyState = $state<"idle" | "copied" | "failed">("idle");
   let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
+  let deploymentRecoveryActionError = $state("");
+  let selectedRollbackCandidateId = $state("");
   let logsCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -137,6 +148,27 @@
       staleTime: 5_000,
     }),
   );
+  const retryDeploymentMutation = createMutation(() => ({
+    mutationFn: (input: RetryDeploymentInput) => orpcClient.deployments.retry(input),
+    onSuccess: (result) => observeAcceptedRecoveryDeployment(result.id),
+    onError: (error) => {
+      deploymentRecoveryActionError = readErrorMessage(error);
+    },
+  }));
+  const redeployDeploymentMutation = createMutation(() => ({
+    mutationFn: (input: RedeployDeploymentInput) => orpcClient.deployments.redeploy(input),
+    onSuccess: (result) => observeAcceptedRecoveryDeployment(result.id),
+    onError: (error) => {
+      deploymentRecoveryActionError = readErrorMessage(error);
+    },
+  }));
+  const rollbackDeploymentMutation = createMutation(() => ({
+    mutationFn: (input: RollbackDeploymentInput) => orpcClient.deployments.rollback(input),
+    onSuccess: (result) => observeAcceptedRecoveryDeployment(result.id),
+    onError: (error) => {
+      deploymentRecoveryActionError = readErrorMessage(error);
+    },
+  }));
   const pageLoading = $derived(
     deploymentDetailQuery.isPending ||
       deploymentLogsQuery.isPending ||
@@ -164,8 +196,15 @@
         ? progressEventsFromDeployment(deployment, deploymentLogs)
         : [],
   );
+  const deploymentProgressDialogEvents = $derived(
+    recoveryDeploymentProgressEvents.length > 0
+      ? recoveryDeploymentProgressEvents
+      : deploymentProgressEvents,
+  );
   const deploymentProgressDialogStatus = $derived<DeploymentProgressDialogStatus>(
-    deployment
+    recoveryDeploymentProgressStatus !== "idle"
+      ? recoveryDeploymentProgressStatus
+      : deployment
       ? deploymentEventProgressStatus(deploymentEventEnvelopes, deployment.status)
       : "idle",
   );
@@ -186,6 +225,7 @@
   const shouldFollowDeploymentEvents = $derived(
     browser &&
       Boolean(deployment) &&
+      deploymentProgressDeploymentId === deployment?.id &&
       deploymentProgressDialogStatus === "running" &&
       (activeTab === "timeline" || deploymentProgressDialogOpen),
   );
@@ -203,6 +243,47 @@
         ? $t(i18nKeys.console.deployments.accessUrlCopyFailed)
         : $t(i18nKeys.console.deployments.copyAccessUrl),
   );
+  const recoveryActionPending = $derived(
+    retryDeploymentMutation.isPending ||
+      redeployDeploymentMutation.isPending ||
+      rollbackDeploymentMutation.isPending,
+  );
+  const rollbackDeploymentRecoveryCandidate = $derived(
+    recoveryReadiness?.rollback.candidates.find(
+      (candidate) =>
+        candidate.deploymentId === selectedRollbackCandidateId && candidate.rollbackReady,
+    ) ??
+      recoveryReadiness?.rollback.candidates.find(
+        (candidate) =>
+          candidate.deploymentId === recoveryReadiness.rollback.recommendedCandidateId &&
+          candidate.rollbackReady,
+      ) ??
+      recoveryReadiness?.rollback.candidates.find((candidate) => candidate.rollbackReady) ??
+      null,
+  );
+  const retryDeploymentRecoveryAllowed = $derived(
+    Boolean(
+      recoveryReadiness?.retry.allowed &&
+        recoveryReadiness.retry.commandActive &&
+        !recoveryActionPending,
+    ),
+  );
+  const redeployDeploymentRecoveryAllowed = $derived(
+    Boolean(
+      recoveryReadiness?.redeploy.allowed &&
+        recoveryReadiness.redeploy.commandActive &&
+        !recoveryActionPending,
+    ),
+  );
+  const rollbackDeploymentRecoveryAllowed = $derived(
+    Boolean(
+      recoveryReadiness?.rollback.allowed &&
+        recoveryReadiness.rollback.commandActive &&
+        rollbackDeploymentRecoveryCandidate &&
+        !recoveryActionPending,
+    ),
+  );
+
 
   function handleViewProgress(): void {
     const progressDeployment = deployment;
@@ -216,9 +297,104 @@
     deploymentProgressDialogOpen = true;
   }
 
+  function appendRecoveryDeploymentProgressEvent(event: DeploymentProgressEvent): void {
+    liveDeploymentEventEnvelopes = [];
+    recoveryDeploymentProgressEvents = [...recoveryDeploymentProgressEvents, event];
+    deploymentProgressDeploymentId = event.deploymentId ?? deploymentProgressDeploymentId;
+
+    if (event.status === "failed") {
+      recoveryDeploymentProgressStatus = "failed";
+    } else if (event.status === "succeeded") {
+      recoveryDeploymentProgressStatus = "succeeded";
+    } else {
+      recoveryDeploymentProgressStatus = "running";
+    }
+  }
+
+  async function observeAcceptedRecoveryDeployment(acceptedDeploymentId: string): Promise<void> {
+    deploymentRecoveryActionError = "";
+    deploymentProgressRequestId = "";
+    deploymentProgressDeploymentId = acceptedDeploymentId;
+    recoveryDeploymentProgressEvents = [];
+    recoveryDeploymentProgressStatus = "running";
+    deploymentProgressDialogOpen = true;
+    deploymentEventFollowError = "";
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["deployments"] }),
+      queryClient.invalidateQueries({ queryKey: ["deployments", "recovery-readiness", deploymentId] }),
+      queryClient.invalidateQueries({ queryKey: ["deployments", "show", acceptedDeploymentId] }),
+      queryClient.invalidateQueries({ queryKey: ["deployments", "events", acceptedDeploymentId] }),
+    ]);
+
+    await observeDeploymentProgressAfterAcceptance(
+      acceptedDeploymentId,
+      appendRecoveryDeploymentProgressEvent,
+      {
+        onStreamError: (message) => {
+          deploymentEventFollowError = message;
+        },
+      },
+    );
+  }
+
+  function runDeploymentRecoveryAction(action: DeploymentRecoveryAction): void {
+    const readiness = recoveryReadiness;
+
+    if (!deployment || !readiness) {
+      return;
+    }
+
+    deploymentRecoveryActionError = "";
+
+    if (action === "retry") {
+      if (!retryDeploymentRecoveryAllowed) {
+        return;
+      }
+
+      retryDeploymentMutation.mutate({
+        deploymentId: deployment.id,
+        resourceId: readiness.resourceId,
+        readinessGeneratedAt: readiness.generatedAt,
+      });
+      return;
+    }
+
+    if (action === "redeploy") {
+      if (!redeployDeploymentRecoveryAllowed) {
+        return;
+      }
+
+      redeployDeploymentMutation.mutate({
+        resourceId: readiness.resourceId,
+        projectId: deployment.projectId,
+        environmentId: deployment.environmentId,
+        serverId: deployment.serverId,
+        destinationId: deployment.destinationId,
+        sourceDeploymentId: deployment.id,
+        readinessGeneratedAt: readiness.generatedAt,
+      });
+      return;
+    }
+
+    if (!rollbackDeploymentRecoveryAllowed || !rollbackDeploymentRecoveryCandidate) {
+      return;
+    }
+
+    rollbackDeploymentMutation.mutate({
+      deploymentId: deployment.id,
+      rollbackCandidateDeploymentId: rollbackDeploymentRecoveryCandidate.deploymentId,
+      resourceId: readiness.resourceId,
+      readinessGeneratedAt: readiness.generatedAt,
+    });
+  }
+
   function deploymentProgressHref(): string {
-    if (deployment && deployment.id === deploymentProgressDeploymentId) {
-      return deploymentDetailHref(deployment);
+    if (deployment && deploymentProgressDeploymentId) {
+      return deploymentDetailHref({
+        ...deployment,
+        id: deploymentProgressDeploymentId,
+      });
     }
 
     return `/deployments/${encodeURIComponent(deploymentProgressDeploymentId)}`;
@@ -550,6 +726,8 @@
     const currentDeploymentId = deploymentId;
 
     liveDeploymentEventEnvelopes = [];
+    recoveryDeploymentProgressEvents = [];
+    recoveryDeploymentProgressStatus = "idle";
     deploymentEventFollowError = "";
     deploymentProgressRequestId = "";
     deploymentProgressDeploymentId = currentDeploymentId;
@@ -887,6 +1065,11 @@
                   })}
                 </Badge>
               </div>
+              {#if deploymentRecoveryActionError}
+                <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {deploymentRecoveryActionError}
+                </div>
+              {/if}
 
               <div class="mt-4 grid gap-3 md:grid-cols-3">
                 <div class="rounded-md border bg-muted/20 p-3">
@@ -908,6 +1091,18 @@
                       <li>{$t(i18nKeys.console.deployments.recoveryNoReasons)}</li>
                     {/each}
                   </ul>
+                  <Button
+                    type="button"
+                    size="sm"
+                    class="mt-3 w-full"
+                    disabled={!retryDeploymentRecoveryAllowed}
+                    onclick={() => runDeploymentRecoveryAction("retry")}
+                  >
+                    <RefreshCw class="size-4" />
+                    {retryDeploymentMutation.isPending
+                      ? $t(i18nKeys.console.deployments.recoveryRetryingAction)
+                      : $t(i18nKeys.console.deployments.recoveryRetryAction)}
+                  </Button>
                 </div>
 
                 <div class="rounded-md border bg-muted/20 p-3">
@@ -929,6 +1124,18 @@
                       <li>{$t(i18nKeys.console.deployments.recoveryNoReasons)}</li>
                     {/each}
                   </ul>
+                  <Button
+                    type="button"
+                    size="sm"
+                    class="mt-3 w-full"
+                    disabled={!redeployDeploymentRecoveryAllowed}
+                    onclick={() => runDeploymentRecoveryAction("redeploy")}
+                  >
+                    <RefreshCw class="size-4" />
+                    {redeployDeploymentMutation.isPending
+                      ? $t(i18nKeys.console.deployments.recoveryRedeployingAction)
+                      : $t(i18nKeys.console.deployments.recoveryRedeployAction)}
+                  </Button>
                 </div>
 
                 <div class="rounded-md border bg-muted/20 p-3">
@@ -950,6 +1157,37 @@
                       <li>{$t(i18nKeys.console.deployments.recoveryNoReasons)}</li>
                     {/each}
                   </ul>
+                  {#if recoveryReadiness.rollback.candidates.length > 0}
+                    <select
+                      class="mt-3 h-9 w-full rounded-md border bg-background px-2 text-sm"
+                      value={rollbackDeploymentRecoveryCandidate?.deploymentId ?? ""}
+                      disabled={recoveryActionPending}
+                      onchange={(event) => {
+                        selectedRollbackCandidateId = event.currentTarget.value;
+                      }}
+                    >
+                      {#each recoveryReadiness.rollback.candidates as candidate (candidate.deploymentId)}
+                        <option value={candidate.deploymentId} disabled={!candidate.rollbackReady}>
+                          {$t(i18nKeys.console.deployments.recoveryRollbackCandidate, {
+                            deploymentId: candidate.deploymentId,
+                          })}
+                          {candidate.artifactSummary ? ` - ${candidate.artifactSummary}` : ""}
+                        </option>
+                      {/each}
+                    </select>
+                  {/if}
+                  <Button
+                    type="button"
+                    size="sm"
+                    class="mt-3 w-full"
+                    disabled={!rollbackDeploymentRecoveryAllowed}
+                    onclick={() => runDeploymentRecoveryAction("rollback")}
+                  >
+                    <RefreshCw class="size-4" />
+                    {rollbackDeploymentMutation.isPending
+                      ? $t(i18nKeys.console.deployments.recoveryRollingBackAction)
+                      : $t(i18nKeys.console.deployments.recoveryRollbackAction)}
+                  </Button>
                 </div>
               </div>
             </section>
@@ -1226,7 +1464,7 @@
 <DeploymentProgressDialog
   open={deploymentProgressDialogOpen}
   status={deploymentProgressDialogStatus}
-  events={deploymentProgressEvents}
+  events={deploymentProgressDialogEvents}
   streamError={deploymentProgressStreamError}
   requestId={deploymentProgressRequestId}
   deploymentId={deploymentProgressDeploymentId}

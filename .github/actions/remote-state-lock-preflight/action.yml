@@ -15,6 +15,10 @@ inputs:
     description: Remote Appaloft runtime root. The state root is <remote-runtime-root>/state.
     required: false
     default: /var/lib/appaloft/runtime
+  stale-after-seconds:
+    description: Stale window for state-root maintenance locks.
+    required: false
+    default: "180"
 
 runs:
   using: composite
@@ -26,6 +30,7 @@ runs:
         APPALOFT_SSH_USER: ${{ inputs.ssh-user }}
         APPALOFT_SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
         REMOTE_RUNTIME_ROOT: ${{ inputs.remote-runtime-root }}
+        STALE_AFTER_SECONDS: ${{ inputs.stale-after-seconds }}
       run: |
         set -euo pipefail
 
@@ -39,7 +44,8 @@ runs:
           --server-host "$APPALOFT_SSH_HOST" \
           --server-ssh-username "$APPALOFT_SSH_USER" \
           --server-ssh-private-key-file "$key_file" \
-          --remote-runtime-root "$REMOTE_RUNTIME_ROOT" > "$output_file"
+          --remote-runtime-root "$REMOTE_RUNTIME_ROOT" \
+          --stale-after-seconds "$STALE_AFTER_SECONDS" > "$output_file"
         exit_code=$?
         set -e
 

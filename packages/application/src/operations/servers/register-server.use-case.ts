@@ -10,6 +10,7 @@ import {
   ProviderKey,
   type Result,
   safeTry,
+  TargetKindValue,
   UpsertDeploymentTargetSpec,
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
@@ -52,6 +53,7 @@ export class RegisterServerUseCase {
       const name = yield* DeploymentTargetName.create(input.name);
       const host = yield* HostAddress.create(input.host);
       const providerKey = yield* ProviderKey.create(input.providerKey);
+      const targetKind = yield* TargetKindValue.create(input.targetKind ?? "single-server");
       const createdAt = yield* CreatedAt.create(clock.now());
       const port = yield* PortNumber.create(input.port ?? 22);
       const edgeProxyKind = yield* EdgeProxyKindValue.create(input.proxyKind ?? "traefik");
@@ -61,6 +63,7 @@ export class RegisterServerUseCase {
         name,
         host,
         providerKey,
+        targetKind,
         createdAt,
         port,
         edgeProxyKind,

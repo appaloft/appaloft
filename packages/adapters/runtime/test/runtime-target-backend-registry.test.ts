@@ -111,12 +111,14 @@ function registeredBackend(input: {
   providerKey: string;
   backend?: ExecutionBackend;
   capabilities?: RuntimeTargetBackend["descriptor"]["capabilities"];
+  targetKinds?: RuntimeTargetBackendDescriptor["targetKinds"];
+  key?: string;
 }): RuntimeTargetBackend {
   return new input.Adapter(
     {
-      key: `single-server-${input.providerKey}`,
+      key: input.key ?? `single-server-${input.providerKey}`,
       providerKey: input.providerKey,
-      targetKinds: ["single-server"],
+      targetKinds: input.targetKinds ?? ["single-server"],
       capabilities: input.capabilities ?? ["runtime.apply"],
     },
     input.backend ?? new RecordingExecutionBackend(input.providerKey),
@@ -201,6 +203,97 @@ describe("DefaultRuntimeTargetBackendRegistry", () => {
     expect(composeResult.isOk()).toBe(true);
     expect(dockerfileResult._unsafeUnwrap().descriptor.providerKey).toBe("generic-ssh");
     expect(composeResult._unsafeUnwrap().descriptor.targetKinds).toContain("single-server");
+  });
+
+  test("[SWARM-TARGET-SELECT-001] resolves docker-swarm by target kind, provider key, and capabilities", async () => {
+    ensureReflectMetadata();
+    const {
+      createDockerSwarmRuntimeTargetBackendDescriptor,
+      DefaultRuntimeTargetBackendRegistry,
+      ExecutionBackendRuntimeTargetAdapter,
+    } = await import("../src");
+    const registry = new DefaultRuntimeTargetBackendRegistry([
+      new ExecutionBackendRuntimeTargetAdapter(
+        createDockerSwarmRuntimeTargetBackendDescriptor({
+          capabilities: ["runtime.apply", "runtime.verify", "runtime.logs", "proxy.route"],
+        }),
+        new RecordingExecutionBackend("swarm"),
+      ),
+      registeredBackend({
+        Adapter: ExecutionBackendRuntimeTargetAdapter,
+        providerKey: "docker-swarm",
+        key: "single-server-docker-swarm",
+        targetKinds: ["single-server"],
+        capabilities: ["runtime.apply", "runtime.verify", "runtime.logs", "proxy.route"],
+      }),
+    ]);
+
+    const result = registry.find({
+      targetKind: "orchestrator-cluster",
+      providerKey: "docker-swarm",
+      requiredCapabilities: ["runtime.apply", "runtime.verify", "runtime.logs", "proxy.route"],
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().descriptor).toMatchObject({
+      key: "docker-swarm",
+      providerKey: "docker-swarm",
+      targetKinds: ["orchestrator-cluster"],
+    });
+  });
+
+  test("[SWARM-TARGET-ADM-002][SWARM-TARGET-SELECT-001] reports unsupported Swarm targets when no backend is registered", async () => {
+    ensureReflectMetadata();
+    const { createDefaultRuntimeTargetBackendRegistry } = await import("../src");
+    const registry = createDefaultRuntimeTargetBackendRegistry({
+      localBackend: new RecordingExecutionBackend("local"),
+      sshBackend: new RecordingExecutionBackend("ssh"),
+    });
+
+    const result = registry.find({
+      targetKind: "orchestrator-cluster",
+      providerKey: "docker-swarm",
+      requiredCapabilities: ["runtime.apply", "runtime.verify", "runtime.logs"],
+    });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error.code).toBe("runtime_target_unsupported");
+      expect(result.error.details).toMatchObject({
+        phase: "runtime-target-resolution",
+        targetKind: "orchestrator-cluster",
+        providerKey: "docker-swarm",
+      });
+    }
+  });
+
+  test("[SWARM-TARGET-SELECT-001] resolves an explicitly composed Docker Swarm backend", async () => {
+    ensureReflectMetadata();
+    const { createDefaultRuntimeTargetBackendRegistry, DockerSwarmExecutionBackend } = await import(
+      "../src"
+    );
+    const registry = createDefaultRuntimeTargetBackendRegistry({
+      localBackend: new RecordingExecutionBackend("local"),
+      sshBackend: new RecordingExecutionBackend("ssh"),
+      swarmBackend: new DockerSwarmExecutionBackend({
+        async run() {
+          return ok({ exitCode: 0 });
+        },
+      }),
+    });
+
+    const result = registry.find({
+      targetKind: "orchestrator-cluster",
+      providerKey: "docker-swarm",
+      requiredCapabilities: ["runtime.apply", "runtime.verify", "runtime.logs", "proxy.route"],
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().descriptor).toMatchObject({
+      key: "docker-swarm",
+      providerKey: "docker-swarm",
+      targetKinds: ["orchestrator-cluster"],
+    });
   });
 });
 

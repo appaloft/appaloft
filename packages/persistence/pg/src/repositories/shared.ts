@@ -39,6 +39,7 @@ import {
   DeletedAt,
   type DeploymentDependencyBindingReferenceState,
   DeploymentDependencyBindingSnapshotReadinessValue,
+  DeploymentDependencyRuntimeSecretRef,
   DeploymentId,
   DeploymentLogEntry,
   type DeploymentLogEntry as DeploymentLogEntryType,
@@ -51,6 +52,7 @@ import {
   DeploymentTargetLifecycleStatusValue,
   DeploymentTargetName,
   DeploymentTargetUsername,
+  DeploymentTriggerKindValue,
   DescriptionText,
   DestinationId,
   DestinationKindValue,
@@ -119,6 +121,10 @@ import {
   ProjectSlug,
   ProviderKey,
   PublicDomainName,
+  ResourceAutoDeployPolicyBlockedReasonValue,
+  ResourceAutoDeployPolicyStatusValue,
+  ResourceAutoDeploySecretRef,
+  ResourceAutoDeployTriggerKindValue,
   ResourceBindingId,
   ResourceBindingScopeValue,
   ResourceBindingTargetName,
@@ -152,9 +158,12 @@ import {
   RuntimeVerificationStepKindValue,
   SourceApplicationShapeValue,
   SourceBaseDirectory,
+  SourceBindingFingerprint,
   SourceDescriptor,
   SourceDetectedFileValue,
   SourceDetectedScriptValue,
+  SourceEventDedupeWindowSeconds,
+  SourceEventKindValue,
   SourceFrameworkValue,
   SourceInspectionSnapshot,
   SourceKindValue,
@@ -202,6 +211,7 @@ type EnvironmentLifecycleStatusInput = Parameters<
   typeof EnvironmentLifecycleStatusValue.rehydrate
 >[0];
 type DeploymentStatusInput = Parameters<typeof DeploymentStatusValue.rehydrate>[0];
+type DeploymentTriggerKindInput = Parameters<typeof DeploymentTriggerKindValue.rehydrate>[0];
 type DestinationKindInput = Parameters<typeof DestinationKindValue.rehydrate>[0];
 type DeploymentPhaseInput = Parameters<typeof DeploymentPhaseValue.rehydrate>[0];
 type LogLevelInput = Parameters<typeof LogLevelValue.rehydrate>[0];
@@ -373,6 +383,7 @@ export interface SerializedDeploymentDependencyBindingReference extends Record<s
   targetName: string;
   scope: ResourceBindingScopeInput;
   injectionMode: ResourceInjectionModeInput;
+  runtimeSecretRef?: string;
   snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessInput;
   snapshotReadinessReason?: string;
 }
@@ -424,6 +435,18 @@ export interface SerializedResourceNetworkProfile extends Record<string, unknown
 export interface SerializedResourceAccessProfile extends Record<string, unknown> {
   generatedAccessMode: "inherit" | "disabled";
   pathPrefix: string;
+}
+
+export interface SerializedResourceAutoDeployPolicy extends Record<string, unknown> {
+  status: "enabled" | "disabled" | "blocked";
+  triggerKind: "git-push" | "generic-signed-webhook";
+  refs: string[];
+  eventKinds: ("push" | "tag")[];
+  sourceBindingFingerprint: string;
+  updatedAt: string;
+  blockedReason?: "source-binding-changed";
+  genericWebhookSecretRef?: string;
+  dedupeWindowSeconds?: number;
 }
 
 export interface SerializedDomainVerificationAttempt extends Record<string, unknown> {
@@ -910,6 +933,7 @@ export function serializeDeploymentDependencyBindingReferences(
     targetName: reference.targetName.value,
     scope: reference.scope.value,
     injectionMode: reference.injectionMode.value,
+    ...(reference.runtimeSecretRef ? { runtimeSecretRef: reference.runtimeSecretRef.value } : {}),
     snapshotReadiness: reference.snapshotReadiness.value,
     ...(reference.snapshotReadinessReason
       ? { snapshotReadinessReason: reference.snapshotReadinessReason.value }
@@ -933,6 +957,13 @@ export function rehydrateDeploymentDependencyBindingReferences(
       targetName: ResourceBindingTargetName.rehydrate(record.targetName),
       scope: ResourceBindingScopeValue.rehydrate(record.scope),
       injectionMode: ResourceInjectionModeValue.rehydrate(record.injectionMode),
+      ...(record.runtimeSecretRef
+        ? {
+            runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+              record.runtimeSecretRef,
+            ),
+          }
+        : {}),
       snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.rehydrate(
         record.snapshotReadiness,
       ),
@@ -1033,7 +1064,9 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
     host: HostAddress.rehydrate(row.host),
     port: PortNumber.rehydrate(row.port),
     providerKey: ProviderKey.rehydrate(row.provider_key),
-    targetKind: TargetKindValue.rehydrate("single-server"),
+    targetKind: TargetKindValue.rehydrate(
+      row.target_kind as "single-server" | "orchestrator-cluster",
+    ),
     lifecycleStatus: DeploymentTargetLifecycleStatusValue.rehydrate(
       row.lifecycle_status as "active" | "inactive" | "deleted",
     ),
@@ -1466,6 +1499,9 @@ export function rehydrateResourceRow(
   const accessProfile = row.access_profile
     ? (row.access_profile as unknown as SerializedResourceAccessProfile)
     : undefined;
+  const autoDeployPolicy = row.auto_deploy_policy
+    ? (row.auto_deploy_policy as unknown as SerializedResourceAutoDeployPolicy)
+    : undefined;
 
   return {
     id: ResourceId.rehydrate(row.id),
@@ -1637,6 +1673,43 @@ export function rehydrateResourceRow(
           },
         }
       : {}),
+    ...(autoDeployPolicy
+      ? {
+          autoDeployPolicy: {
+            status: ResourceAutoDeployPolicyStatusValue.rehydrate(autoDeployPolicy.status),
+            triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate(autoDeployPolicy.triggerKind),
+            refs: autoDeployPolicy.refs.map((ref) => GitRefText.rehydrate(ref)),
+            eventKinds: autoDeployPolicy.eventKinds.map((eventKind) =>
+              SourceEventKindValue.rehydrate(eventKind),
+            ),
+            sourceBindingFingerprint: SourceBindingFingerprint.rehydrate(
+              autoDeployPolicy.sourceBindingFingerprint,
+            ),
+            updatedAt: UpdatedAt.rehydrate(autoDeployPolicy.updatedAt),
+            ...(autoDeployPolicy.blockedReason
+              ? {
+                  blockedReason: ResourceAutoDeployPolicyBlockedReasonValue.rehydrate(
+                    autoDeployPolicy.blockedReason,
+                  ),
+                }
+              : {}),
+            ...(autoDeployPolicy.genericWebhookSecretRef
+              ? {
+                  genericWebhookSecretRef: ResourceAutoDeploySecretRef.rehydrate(
+                    autoDeployPolicy.genericWebhookSecretRef,
+                  ),
+                }
+              : {}),
+            ...(autoDeployPolicy.dedupeWindowSeconds
+              ? {
+                  dedupeWindowSeconds: SourceEventDedupeWindowSeconds.rehydrate(
+                    autoDeployPolicy.dedupeWindowSeconds,
+                  ),
+                }
+              : {}),
+          },
+        }
+      : {}),
     storageAttachments: storageAttachments.map((attachment) => ({
       id: ResourceStorageAttachmentId.rehydrate(attachment.id),
       storageVolumeId: StorageVolumeId.rehydrate(attachment.storage_volume_id),
@@ -1683,6 +1756,19 @@ export function rehydrateDeploymentRow(row: Selectable<Database["deployments"]>)
     ),
     logs: rehydrateDeploymentLogs(row.logs),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
+    triggerKind: DeploymentTriggerKindValue.rehydrate(
+      row.trigger_kind as DeploymentTriggerKindInput,
+    ),
+    ...(row.source_deployment_id
+      ? { sourceDeploymentId: DeploymentId.rehydrate(row.source_deployment_id) }
+      : {}),
+    ...(row.rollback_candidate_deployment_id
+      ? {
+          rollbackCandidateDeploymentId: DeploymentId.rehydrate(
+            row.rollback_candidate_deployment_id,
+          ),
+        }
+      : {}),
     ...(startedAt ? { startedAt: StartedAt.rehydrate(startedAt) } : {}),
     ...(finishedAt ? { finishedAt: FinishedAt.rehydrate(finishedAt) } : {}),
     ...(row.rollback_of_deployment_id

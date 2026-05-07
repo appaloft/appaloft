@@ -45,6 +45,8 @@ import {
   type ResourceHealthProbeRunner,
   type ResourceReadModel,
   type ResourceRepository,
+  type ResourceRuntimeHealthProbeRequest,
+  type ResourceRuntimeHealthProbeResult,
   type ResourceSummary,
   type ServerRepository,
 } from "../src/ports";
@@ -158,8 +160,12 @@ class DisabledDefaultAccessDomainProvider implements DefaultAccessDomainProvider
 
 class StaticResourceHealthProbeRunner implements ResourceHealthProbeRunner {
   readonly requests: ResourceHealthProbeRequest[] = [];
+  readonly runtimeRequests: ResourceRuntimeHealthProbeRequest[] = [];
 
-  constructor(private readonly result?: ResourceHealthProbeResult) {}
+  constructor(
+    private readonly result?: ResourceHealthProbeResult,
+    private readonly runtimeResult?: ResourceRuntimeHealthProbeResult,
+  ) {}
 
   async probe(
     _context: ExecutionContext,
@@ -174,6 +180,38 @@ class StaticResourceHealthProbeRunner implements ResourceHealthProbeRunner {
         observedAt: "2026-01-01T00:00:10.100Z",
         durationMs: 12,
         statusCode: request.expectedStatusCode,
+      },
+    );
+  }
+
+  async probeRuntime(
+    _context: ExecutionContext,
+    request: ResourceRuntimeHealthProbeRequest,
+  ): Promise<Result<ResourceRuntimeHealthProbeResult>> {
+    this.runtimeRequests.push(request);
+    return ok(
+      this.runtimeResult ?? {
+        lifecycle: "running",
+        health: "healthy",
+        observedAt: "2026-01-01T00:00:10.100Z",
+        reasonCode: "docker_swarm_service_running",
+        check: {
+          name: "runtime-service",
+          target: "container",
+          status: "passed",
+          observedAt: "2026-01-01T00:00:10.100Z",
+          durationMs: 12,
+          reasonCode: "docker_swarm_service_running",
+          phase: "runtime-live-probe",
+          metadata: {
+            providerKey: request.providerKey,
+            runtimeKind: request.runtimeKind,
+            serviceName: request.runtimeMetadata?.["swarm.serviceName"] ?? "",
+            taskCount: "1",
+            runningTasks: "1",
+            failedTasks: "0",
+          },
+        },
       },
     );
   }
@@ -405,6 +443,59 @@ describe("ResourceHealthQueryService", () => {
         code: "resource_health_policy_not_configured",
       }),
     );
+  });
+
+  test("[RUNTIME-CTRL-READ-001] includes latest runtime-control readback when projected", async () => {
+    const service = createService({
+      resources: [
+        resourceSummary({
+          latestRuntimeControl: {
+            runtimeControlAttemptId: "rtc_0001",
+            operation: "restart",
+            status: "failed",
+            startedAt: "2026-01-01T00:00:06.000Z",
+            completedAt: "2026-01-01T00:00:08.000Z",
+            runtimeState: "stopped",
+            errorCode: "resource_runtime_control_failed",
+            phases: [
+              {
+                phase: "stop",
+                status: "succeeded",
+              },
+              {
+                phase: "start",
+                status: "failed",
+                errorCode: "resource_runtime_control_failed",
+              },
+            ],
+          },
+        }),
+      ],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().latestRuntimeControl).toEqual({
+      runtimeControlAttemptId: "rtc_0001",
+      operation: "restart",
+      status: "failed",
+      startedAt: "2026-01-01T00:00:06.000Z",
+      completedAt: "2026-01-01T00:00:08.000Z",
+      runtimeState: "stopped",
+      errorCode: "resource_runtime_control_failed",
+      phases: [
+        {
+          phase: "stop",
+          status: "succeeded",
+        },
+        {
+          phase: "start",
+          status: "failed",
+          errorCode: "resource_runtime_control_failed",
+        },
+      ],
+    });
   });
 
   test("[RES-HEALTH-QRY-020][EDGE-PROXY-ROUTE-005][HEALTH-ACCESS-001] reports server-applied domain before generated route", async () => {
@@ -854,6 +945,98 @@ describe("ResourceHealthQueryService", () => {
         reasonCode: "cached_policy_not_executed",
       }),
     );
+  });
+
+  test("[SWARM-TARGET-OBS-002] merges Swarm runtime inspection into normalized resource health", async () => {
+    const baseDeployment = deploymentSummary();
+    const probeRunner = new StaticResourceHealthProbeRunner(undefined, {
+      lifecycle: "running",
+      health: "healthy",
+      observedAt: "2026-01-01T00:00:10.100Z",
+      reasonCode: "docker_swarm_service_running",
+      check: {
+        name: "runtime-service",
+        target: "container",
+        status: "passed",
+        observedAt: "2026-01-01T00:00:10.100Z",
+        durationMs: 18,
+        reasonCode: "docker_swarm_service_running",
+        phase: "runtime-live-probe",
+        metadata: {
+          providerKey: "docker-swarm",
+          runtimeKind: "docker-container",
+          serviceName: "appaloft-res-web-dst-demo-dep-web_web",
+          taskCount: "1",
+          runningTasks: "1",
+          failedTasks: "0",
+        },
+      },
+    });
+    const service = createService({
+      resourceAggregates: [resourceAggregateWithHealthPolicy()],
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...baseDeployment.runtimePlan,
+            execution: {
+              ...baseDeployment.runtimePlan.execution,
+              kind: "docker-container",
+              healthCheckPath: "/health",
+              metadata: {
+                "swarm.serviceName": "appaloft-res-web-dst-demo-dep-web_web",
+              },
+            },
+            target: {
+              kind: "orchestrator-cluster",
+              providerKey: "docker-swarm",
+              serverIds: ["srv_demo"],
+            },
+          },
+        }),
+      ],
+      probeRunner,
+    });
+
+    const result = await service.execute(
+      createTestContext(),
+      createQuery({
+        mode: "live",
+        includeRuntimeProbe: true,
+        includeChecks: true,
+      }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.overall).toBe("healthy");
+    expect(summary.runtime).toMatchObject({
+      lifecycle: "running",
+      health: "healthy",
+      runtimeKind: "docker-container",
+    });
+    expect(summary.checks).toContainEqual(
+      expect.objectContaining({
+        name: "runtime-service",
+        target: "container",
+        status: "passed",
+        reasonCode: "docker_swarm_service_running",
+        metadata: expect.objectContaining({
+          providerKey: "docker-swarm",
+          serviceName: "appaloft-res-web-dst-demo-dep-web_web",
+        }),
+      }),
+    );
+    expect(probeRunner.runtimeRequests[0]).toMatchObject({
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      providerKey: "docker-swarm",
+      targetKind: "orchestrator-cluster",
+      runtimeMetadata: {
+        "swarm.serviceName": "appaloft-res-web-dst-demo-dep-web_web",
+      },
+    });
+    expect(JSON.stringify(summary)).not.toContain("DesiredState");
+    expect(JSON.stringify(summary)).not.toContain("CurrentState");
   });
 
   test("[RES-HEALTH-QRY-009] marks live HTTP policy pass as healthy", async () => {

@@ -86,6 +86,65 @@ describe("operation catalog aggregate mutation boundary", () => {
     }
   });
 
+  test("[PHASE7-DAY2-MGMT-001] day-two management exit operations expose CLI and HTTP/oRPC transports", () => {
+    const dayTwoManagementOperationKeys = [
+      "resources.configure-source",
+      "resources.configure-runtime",
+      "resources.configure-network",
+      "resources.configure-access",
+      "resources.configure-health",
+      "resources.set-variable",
+      "resources.import-variables",
+      "resources.unset-variable",
+      "resources.effective-config",
+      "storage-volumes.create",
+      "storage-volumes.list",
+      "storage-volumes.show",
+      "storage-volumes.rename",
+      "storage-volumes.delete",
+      "resources.attach-storage",
+      "resources.detach-storage",
+      "dependency-resources.provision-postgres",
+      "dependency-resources.import-postgres",
+      "dependency-resources.provision-redis",
+      "dependency-resources.import-redis",
+      "dependency-resources.list",
+      "dependency-resources.show",
+      "dependency-resources.rename",
+      "dependency-resources.delete",
+      "dependency-resources.create-backup",
+      "dependency-resources.list-backups",
+      "dependency-resources.show-backup",
+      "dependency-resources.restore-backup",
+      "resources.bind-dependency",
+      "resources.unbind-dependency",
+      "resources.rotate-dependency-binding-secret",
+      "resources.list-dependency-bindings",
+      "resources.show-dependency-binding",
+      "resources.configure-auto-deploy",
+      "source-events.list",
+      "source-events.show",
+      "deployments.list",
+      "deployments.show",
+      "deployments.logs",
+      "deployments.stream-events",
+      "deployments.recovery-readiness",
+      "deployments.rollback",
+    ];
+    const entriesByKey = new Map<string, OperationCatalogEntry>(
+      operationCatalog.map((entry) => [entry.key, entry]),
+    );
+
+    for (const key of dayTwoManagementOperationKeys) {
+      const entry = entriesByKey.get(key);
+
+      expect(entry, key).toBeDefined();
+      expect(entry?.inputSchema, key).toBeDefined();
+      expect(entry?.transports.cli, key).toBeTruthy();
+      expect(entry?.transports.orpc, key).toBeDefined();
+    }
+  });
+
   test("[WEB-CLI-API-ACCESS-001][WEB-CLI-API-ACCESS-002] route and access observation reads share catalog transports", () => {
     const observationOperationKeys = [
       "resources.show",
@@ -128,6 +187,77 @@ describe("operation catalog aggregate mutation boundary", () => {
       },
     });
     expect(entry?.inputSchema).toBeDefined();
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-009] Redis provider-native realization reuses stable catalog operations and schemas", () => {
+    const catalogEntries: readonly OperationCatalogEntry[] = operationCatalog;
+    const entriesByKey = new Map<string, OperationCatalogEntry>(
+      catalogEntries.map((entry) => [entry.key, entry]),
+    );
+    const nativeRedisOperations = [
+      {
+        key: "dependency-resources.provision-redis",
+        messageName: "ProvisionRedisDependencyResourceCommand",
+        serviceName: "ProvisionRedisDependencyResourceUseCase",
+        cli: "appaloft dependency redis provision",
+        orpc: { method: "POST", path: "/api/dependency-resources/redis/provision" },
+        sample: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          name: "Managed Redis",
+          providerKey: "appaloft-managed-redis",
+        },
+      },
+      {
+        key: "resources.bind-dependency",
+        messageName: "BindResourceDependencyCommand",
+        serviceName: "BindResourceDependencyUseCase",
+        cli: "appaloft resource dependency bind <resourceId>",
+        orpc: { method: "POST", path: "/api/resources/{resourceId}/dependency-bindings" },
+        sample: {
+          resourceId: "res_web",
+          dependencyResourceId: "rsi_managed_redis",
+          targetName: "REDIS_URL",
+        },
+      },
+      {
+        key: "dependency-resources.delete",
+        messageName: "DeleteDependencyResourceCommand",
+        serviceName: "DeleteDependencyResourceUseCase",
+        cli: "appaloft dependency delete <dependencyResourceId>",
+        orpc: { method: "DELETE", path: "/api/dependency-resources/{dependencyResourceId}" },
+        sample: {
+          dependencyResourceId: "rsi_managed_redis",
+        },
+      },
+    ];
+
+    for (const operation of nativeRedisOperations) {
+      const entry = entriesByKey.get(operation.key);
+
+      expect(entry, operation.key).toMatchObject({
+        kind: "command",
+        messageName: operation.messageName,
+        serviceName: operation.serviceName,
+        transports: {
+          cli: operation.cli,
+          orpc: operation.orpc,
+        },
+      });
+      expect(entry?.inputSchema, operation.key).toBeDefined();
+      const parsed = entry?.inputSchema?.parse({
+        ...operation.sample,
+        rawConnectionUrl: "redis://:super-secret@managed-redis.redis.internal:6379/0",
+        providerResourceHandle: "redis/rsi_managed_redis",
+        providerSdkResponse: { password: "super-secret" },
+      });
+      const serialized = JSON.stringify(parsed);
+
+      expect(serialized).not.toContain("super-secret");
+      expect(serialized).not.toContain("providerResourceHandle");
+      expect(serialized).not.toContain("providerSdkResponse");
+      expect(serialized).not.toContain("rawConnectionUrl");
+    }
   });
 
   test("[SRV-LIFE-ENTRY-012] server delete is exposed through the active operation catalog", () => {
@@ -401,6 +531,80 @@ describe("operation catalog aggregate mutation boundary", () => {
       transports: {
         cli: "appaloft resource configure-access <resourceId>",
         orpc: { method: "POST", path: "/api/resources/{resourceId}/access-profile" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
+  test("[SRC-AUTO-ENTRY-001] resource auto-deploy configure is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find(
+      (candidate) => candidate.key === "resources.configure-auto-deploy",
+    );
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "resources",
+      messageName: "ConfigureResourceAutoDeployCommand",
+      handlerName: "ConfigureResourceAutoDeployCommandHandler",
+      serviceName: "ConfigureResourceAutoDeployUseCase",
+      transports: {
+        cli: "appaloft resource auto-deploy <resourceId>",
+        orpc: { method: "POST", path: "/api/resources/{resourceId}/auto-deploy" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
+  test("[SRC-AUTO-QUERY-001][SRC-AUTO-QUERY-002] source event reads are exposed through the active operation catalog", () => {
+    const listEntry = operationCatalog.find((candidate) => candidate.key === "source-events.list");
+    const showEntry = operationCatalog.find((candidate) => candidate.key === "source-events.show");
+
+    expect(listEntry).toMatchObject({
+      kind: "query",
+      domain: "source-events",
+      messageName: "ListSourceEventsQuery",
+      handlerName: "ListSourceEventsQueryHandler",
+      serviceName: "ListSourceEventsQueryService",
+      transports: {
+        cli: "appaloft source-event list --resource <resourceId> | --project <projectId>",
+        orpc: { method: "GET", path: "/api/source-events" },
+      },
+    });
+    expect(showEntry).toMatchObject({
+      kind: "query",
+      domain: "source-events",
+      messageName: "ShowSourceEventQuery",
+      handlerName: "ShowSourceEventQueryHandler",
+      serviceName: "ShowSourceEventQueryService",
+      transports: {
+        cli: "appaloft source-event show <sourceEventId> --resource <resourceId> | --project <projectId>",
+        orpc: { method: "GET", path: "/api/source-events/{sourceEventId}" },
+      },
+    });
+    expect(listEntry?.inputSchema).toBeDefined();
+    expect(showEntry?.inputSchema).toBeDefined();
+  });
+
+  test("[SRC-AUTO-ENTRY-002][SRC-AUTO-ENTRY-004] source event ingest exposes governed HTTP routes", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "source-events.ingest");
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "source-events",
+      messageName: "IngestSourceEventCommand",
+      handlerName: "IngestSourceEventCommandHandler",
+      serviceName: "IngestSourceEventUseCase",
+      transports: {
+        orpc: {
+          method: "POST",
+          path: "/api/resources/{resourceId}/source-events/generic-signed",
+        },
+        orpcAdditional: [
+          {
+            method: "POST",
+            path: "/api/integrations/github/source-events",
+          },
+        ],
       },
     });
     expect(entry?.inputSchema).toBeDefined();

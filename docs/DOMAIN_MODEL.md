@@ -404,6 +404,7 @@ Implemented now:
 - foundational `ResourceInstance`
 - foundational `ResourceBinding`
 - Postgres Resource binding baseline: bind/unbind/list/show safe metadata
+- Resource binding secret rotation safe reference/version metadata
 
 ### Postgres Dependency Resource
 
@@ -412,8 +413,8 @@ Meaning:
 
 Rules:
 - source mode is either `appaloft-managed` or `imported-external`
-- Appaloft-managed Postgres in this slice is provider-neutral control-plane metadata; it does not
-  create provider-native databases, run runtime work, or mutate deployment snapshots
+- Appaloft-managed Postgres and Redis include durable provider-native realization state and safe
+  provider handles without moving provider SDK concerns into core
 - imported external Postgres delete removes only the Appaloft control-plane record and must not
   imply external database deletion
 - connection read models expose only masked endpoint/connection metadata and secret references; raw
@@ -431,19 +432,58 @@ Current scope:
   [Dependency Resource Binding Baseline](./specs/034-dependency-resource-binding-baseline/spec.md)
 - Phase 7 deployment snapshot safe reference baseline under
   [Dependency Binding Deployment Snapshot Reference Baseline](./specs/035-dependency-binding-snapshot-reference-baseline/spec.md)
-- Redis, secret rotation, provider-native provisioning/deletion, backup/restore, runtime env
-  injection, and provider-native runtime materialization are future Phase 7 work
+- Phase 7 binding secret rotation baseline under
+  [Dependency Binding Secret Rotation](./specs/036-dependency-binding-secret-rotation/spec.md)
+- Phase 7 Redis dependency resource lifecycle baseline under
+  [Redis Dependency Resource Lifecycle](./specs/037-redis-dependency-resource-lifecycle/spec.md)
+- Phase 7 provider-native Postgres realization baseline under
+  [Postgres Provider-Native Realization](./specs/038-postgres-provider-native-realization/spec.md)
+- Phase 7 dependency resource backup/restore baseline under
+  [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md)
+- Phase 7 dependency runtime injection and secret value resolution under
+  [Dependency Binding Runtime Injection](./specs/047-dependency-binding-runtime-injection/spec.md)
+  and
+  [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md)
+- Phase 7 provider-native Redis realization under
+  [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md)
+- provider-native credential rotation, runtime cleanup, and final closed-loop verification are
+  future Phase 7 work
+
+### Dependency Resource Backup
+
+Meaning:
+- a dependency-resource-owned backup attempt and restore point represented by
+  `DependencyResourceBackup`
+
+Rules:
+- one backup belongs to one `ResourceInstance`
+- ready backups expose only safe restore point metadata and provider artifact handles
+- restore is in-place to the same dependency resource in the first Phase 7 slice
+- restore requires explicit overwrite and runtime-not-restarted acknowledgements
+- retained ready backups and in-flight backup/restore attempts block dependency resource deletion
+- backup/restore must not mutate ResourceBindings, historical deployment snapshots, runtime env, or
+  workload runtime state
+- raw dump contents, passwords, provider credentials, raw connection URLs, provider SDK payloads,
+  and command output must not appear in core state, read models, events, errors, logs, or public
+  contracts
+
+Current scope:
+- governed by
+  [ADR-036: Dependency Resource Backup And Restore Lifecycle](./decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md)
+  and [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md)
 
 ### Release Orchestration
 
 Owns:
 - `Release`
 - `Deployment`
+- `PreviewEnvironment`
 - rollback plans and execution results
 
 Implemented now:
 - `Release`
 - `Deployment`
+- foundational `PreviewEnvironment`
 - `RuntimePlan`
 - `RollbackPlan`
 
@@ -474,9 +514,22 @@ Boundary rule:
 - deployment logs are attempt/progress records; application runtime logs are resource-owned
   observation and must not be treated as Deployment aggregate state unless a future ADR introduces
   persisted runtime log archival
-- public rollback remains absent under ADR-016, but rollback plans in the v1 model are expected to
-  reference prior deployment snapshots and Docker/OCI runtime artifact identity rather than
-  reconstructing host-process command state
+- public rollback is active under ADR-016/ADR-034, and rollback plans in the v1 model reference
+  prior deployment snapshots and Docker/OCI runtime artifact identity rather than reconstructing
+  host-process command state
+- `PreviewPolicy` is currently an application/persistence control-plane record, not a core
+  aggregate. It stores project- or Resource-scoped preview policy settings for same-repository
+  previews, fork preview mode, secret-backed preview eligibility, active preview quota, and preview
+  TTL; durable read models expose safe configured/default summaries without idempotency keys,
+  provider payloads, or secret material.
+- `PreviewEnvironment` is the product-grade preview lifecycle identity for one preview scope, such
+  as a GitHub pull request. It records project/environment/resource/target placement, safe source
+  fingerprint context, provider-neutral status, expiry, and cleanup-request state. It does not own
+  source binding, production config, deployment admission input, provider comments/checks, or
+  runtime cleanup execution.
+- Phase 7 Postgres/PGlite persistence for `PreviewEnvironment` stores safe list/show/delete
+  lifecycle state by scoped preview environment and Resource identity. Deployment dispatch,
+  feedback, and cleanup retry remain process/application work rather than aggregate state.
 
 ### Identity & Governance
 
@@ -630,9 +683,9 @@ Current scope:
 - may host the default `ssh-pglite` Appaloft state backend for CLI/GitHub Actions deployments,
   while PostgreSQL/PGlite selected backends persist source link state and server-applied proxy route
   desired/applied state through dedicated application persistence adapters
-- current code includes provisional future target-kind values; they must be replaced with the
-  canonical target model from ADR-023 before cluster targets become public or persisted by new
-  features
+- current code uses the canonical target-kind values `single-server` and `orchestrator-cluster`;
+  cluster runtime providers such as Docker Swarm still require backend readiness and execution
+  support before they are deployable
 
 ### Destination
 
@@ -766,6 +819,11 @@ Rules:
   stop another resource
 - generated default access routes target `ResourceNetworkProfile.internalPort` through the selected
   deployment target's edge proxy and do not require public host publication of the application port
+- runtime stop/start/restart are Resource-scoped operational controls over current or retained
+  runtime placement. They do not mutate Resource profile, create Deployment attempts, apply profile
+  changes, or rewrite deployment snapshots. Runtime control attempt state is governed by
+  [ADR-038: Resource Runtime Control Ownership](./decisions/ADR-038-resource-runtime-control-ownership.md)
+  and remains separate from Resource lifecycle status.
 - resource storage attachments belong to the Resource profile. Attach/detach affects future
   deployment snapshots only and does not apply mounts to current runtime state or rewrite historical
   deployment snapshots
@@ -847,7 +905,7 @@ Rules:
   project/environment ownership in this slice
 - binding stores only provider-neutral safe metadata: Resource reference, Dependency Resource
   reference, target name/profile label, scope, injection mode, safe secret reference pointer,
-  lifecycle status, and timestamps
+  safe secret version/rotation metadata, lifecycle status, and timestamps
 - binding must not store raw connection strings, raw passwords, tokens, auth headers, cookies, SSH
   credentials, provider tokens, private keys, sensitive query parameters, or raw environment values
 - binding scope and injection mode must remain coherent
@@ -856,6 +914,9 @@ Rules:
   owns the cross-VO coherence rule
 - unbind removes/tombstones only the association; it must not delete the dependency resource,
   external/provider database, runtime state, backup data, or historical deployment snapshot
+- binding secret rotation replaces only the binding-scoped safe secret reference/version for future
+  deployments; it must not rotate provider-native credentials, inject runtime env, restart runtime,
+  or rewrite historical deployment snapshots
 
 Current scope:
 - wired into Phase 7 Postgres Dependency Resource Binding Baseline through
@@ -863,7 +924,10 @@ Current scope:
   `resources.list-dependency-bindings`, and `resources.show-dependency-binding`
 - new deployment attempts copy active binding metadata into safe dependency binding snapshot
   references
-- runtime env injection remains deferred
+- `resources.rotate-dependency-binding-secret` updates the safe binding secret reference/version
+  used by future deployments
+- runtime env injection is governed by ADR-040 and ADR-041; managed Redis binding requires
+  provider-native Redis realization and a resolvable connection reference
 
 ### ResourceInstance
 

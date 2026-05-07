@@ -1,5 +1,7 @@
 import { type ResourceBindingTargetName } from "../dependency-resources/resource-binding";
+import { domainError } from "../shared/errors";
 import { type ResourceBindingId, type ResourceInstanceId } from "../shared/identifiers";
+import { err, ok, type Result } from "../shared/result";
 import {
   type ResourceBindingScopeValue,
   type ResourceInjectionModeValue,
@@ -39,6 +41,34 @@ export class DeploymentDependencyBindingSnapshotReadinessValue extends ScalarVal
   }
 }
 
+const dependencyRuntimeSecretRefBrand: unique symbol = Symbol(
+  "DeploymentDependencyRuntimeSecretRef",
+);
+export class DeploymentDependencyRuntimeSecretRef extends ScalarValueObject<string> {
+  private [dependencyRuntimeSecretRefBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DeploymentDependencyRuntimeSecretRef> {
+    const normalized = value.trim();
+    if (!normalized) {
+      return err(
+        domainError.validation("Dependency runtime secret reference is required", {
+          field: "secretRef",
+        }),
+      );
+    }
+
+    return ok(new DeploymentDependencyRuntimeSecretRef(normalized));
+  }
+
+  static rehydrate(value: string): DeploymentDependencyRuntimeSecretRef {
+    return new DeploymentDependencyRuntimeSecretRef(value.trim());
+  }
+}
+
 export interface DeploymentDependencyBindingReferenceState {
   bindingId: ResourceBindingId;
   dependencyResourceId: ResourceInstanceId;
@@ -46,6 +76,7 @@ export interface DeploymentDependencyBindingReferenceState {
   targetName: ResourceBindingTargetName;
   scope: ResourceBindingScopeValue;
   injectionMode: ResourceInjectionModeValue;
+  runtimeSecretRef?: DeploymentDependencyRuntimeSecretRef;
   snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue;
   snapshotReadinessReason?: DescriptionText;
 }

@@ -27,6 +27,9 @@ describe("CLI docs help links", () => {
     expect(cliDocsHrefs.resourceRuntimeProfile).toBe(
       "/docs/resources/profiles/source-runtime/#resource-runtime-profile",
     );
+    expect(cliDocsHrefs.resourceProfileDrift).toBe(
+      "/docs/resources/profiles/source-runtime/#resource-profile-drift",
+    );
     expect(cliDocsHrefs.resourceAccessProfile).toBe(
       "/docs/access/generated-routes/#resource-access-profile",
     );
@@ -48,12 +51,40 @@ describe("CLI docs help links", () => {
     expect(cliDocsHrefs.serverTerminalSession).toBe(
       "/docs/servers/operations/proxy-and-terminal/#server-terminal-session",
     );
+    expect(cliDocsHrefs.serverDockerSwarmTarget).toBe(
+      "/docs/servers/register-connect/#docker-swarm-runtime-target",
+    );
     expect(cliDocsHrefs.remoteStateLock).toBe("/docs/reference/errors-statuses/#remote-state-lock");
     expect(cliDocsHrefs.operatorWorkLedger).toBe(
       "/docs/reference/errors-statuses/#operator-work-ledger",
     );
+    expect(cliDocsHrefs.sourceAutoDeploySetup).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-setup",
+    );
+    expect(cliDocsHrefs.sourceAutoDeploySignatures).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-signatures",
+    );
+    expect(cliDocsHrefs.sourceAutoDeployDedupe).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-dedupe",
+    );
+    expect(cliDocsHrefs.sourceAutoDeployIgnoredEvents).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-ignored-events",
+    );
+    expect(cliDocsHrefs.sourceAutoDeployRecovery).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-recovery",
+    );
+    expect(cliDocsHrefs.scheduledTaskLifecycle).toBe(
+      "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+    );
+    expect(cliDocsHrefs.dependencyResourceLifecycle).toBe(
+      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+    );
+    expect(cliDocsHrefs.dependencyRuntimeInjection).toBe(
+      "/docs/resources/dependencies/#dependency-runtime-injection",
+    );
 
     expect(cliCommandDescriptions.serverCredential).toContain(cliDocsHrefs.serverSshCredential);
+    expect(cliCommandDescriptions.serverRegister).toContain(cliDocsHrefs.serverDockerSwarmTarget);
     expect(cliCommandDescriptions.serverCredentialRotate).toContain(
       cliDocsHrefs.serverSshCredential,
     );
@@ -66,6 +97,7 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.resourceConfigureRuntime).toContain(
       cliDocsHrefs.resourceRuntimeProfile,
     );
+    expect(cliCommandDescriptions.resourceShow).toContain(cliDocsHrefs.resourceProfileDrift);
     expect(cliCommandDescriptions.resourceConfigureAccess).toContain(
       cliDocsHrefs.resourceAccessProfile,
     );
@@ -78,6 +110,21 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.certificateRevoke).toContain(cliDocsHrefs.certificateReadiness);
     expect(cliCommandDescriptions.certificateDelete).toContain(cliDocsHrefs.certificateReadiness);
     expect(cliCommandDescriptions.previewCleanup).toContain(cliDocsHrefs.deploymentPreviewCleanup);
+    expect(cliCommandDescriptions.previewPolicy).toContain(cliDocsHrefs.productGradePreviews);
+    expect(cliCommandDescriptions.previewPolicyConfigure).toContain(
+      cliDocsHrefs.productGradePreviews,
+    );
+    expect(cliCommandDescriptions.previewPolicyShow).toContain(cliDocsHrefs.productGradePreviews);
+    expect(cliCommandDescriptions.previewEnvironment).toContain(cliDocsHrefs.productGradePreviews);
+    expect(cliCommandDescriptions.previewEnvironmentList).toContain(
+      cliDocsHrefs.productGradePreviews,
+    );
+    expect(cliCommandDescriptions.previewEnvironmentShow).toContain(
+      cliDocsHrefs.productGradePreviews,
+    );
+    expect(cliCommandDescriptions.previewEnvironmentDelete).toContain(
+      cliDocsHrefs.productGradePreviews,
+    );
     expect(cliCommandDescriptions.deploymentPlan).toContain(cliDocsHrefs.deploymentPlanPreview);
     expect(cliCommandDescriptions.sourceLinkRelink).toContain(cliDocsHrefs.deploymentSourceRelink);
     expect(cliCommandDescriptions.remoteStateLockInspect).toContain(cliDocsHrefs.remoteStateLock);
@@ -87,5 +134,31 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.serverTerminal).toContain(cliDocsHrefs.serverTerminalSession);
     expect(cliCommandDescriptions.operatorWorkList).toContain(cliDocsHrefs.operatorWorkLedger);
     expect(cliCommandDescriptions.operatorWorkShow).toContain(cliDocsHrefs.operatorWorkLedger);
+    expect(cliCommandDescriptions.resourceConfigureAutoDeploy).toContain(
+      cliDocsHrefs.sourceAutoDeploySetup,
+    );
+    expect(cliCommandDescriptions.sourceEventList).toContain(cliDocsHrefs.sourceAutoDeployDedupe);
+    expect(cliCommandDescriptions.sourceEventShow).toContain(
+      cliDocsHrefs.sourceAutoDeployIgnoredEvents,
+    );
+    expect(cliCommandDescriptions.scheduledTaskCreate).toContain(
+      cliDocsHrefs.scheduledTaskLifecycle,
+    );
+    expect(cliCommandDescriptions.scheduledTaskRun).toContain(cliDocsHrefs.scheduledTaskLifecycle);
+    expect(cliCommandDescriptions.scheduledTaskRunsLogs).toContain(
+      cliDocsHrefs.scheduledTaskLifecycle,
+    );
+    expect(cliCommandDescriptions.dependencyPostgresProvision).toContain(
+      cliDocsHrefs.dependencyResourceLifecycle,
+    );
+    expect(cliCommandDescriptions.dependencyRedisImport).toContain(
+      cliDocsHrefs.dependencyResourceLifecycle,
+    );
+    expect(cliCommandDescriptions.resourceDependencyBind).toContain(
+      cliDocsHrefs.dependencyResourceLifecycle,
+    );
+    expect(cliCommandDescriptions.resourceDependencyRotateSecret).toContain(
+      cliDocsHrefs.dependencyResourceLifecycle,
+    );
   });
 });

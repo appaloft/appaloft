@@ -123,6 +123,7 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
 
     deploymentTarget.recordDomainEvent("deployment_target.registered", input.createdAt, {
       providerKey: input.providerKey.value,
+      targetKind: deploymentTarget.state.targetKind.value,
     });
 
     return ok(deploymentTarget);

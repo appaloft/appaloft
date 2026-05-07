@@ -50,9 +50,19 @@ Current status:
 - `PUB-DOCS-002` is covered by `@appaloft/docs-registry` operation coverage tests. Every current
   `packages/application/src/operation-catalog.ts` key must have exactly one public docs decision:
   documented topic, not-applicable reason, or explicit migration gap. The current operation catalog
-  maps to documented public topics.
+  maps to documented public topics, including Phase 7 storage, dependency resource,
+  dependency-binding, backup/restore, retry, redeploy, rollback, and source auto-deploy
+  operations.
 - `PUB-DOCS-003` is covered for registered help topics by `@appaloft/docs-registry`; full
-  enforcement for every Web/CLI/API/MCP help target is still incomplete.
+  enforcement for every Web/CLI/API/MCP help target is still incomplete. Source auto-deploy now has
+  registered stub anchors for setup, signatures, dedupe, ignored events, and recovery before Code
+  Round activation. Resource runtime controls now have registered stub anchors for runtime
+  controls, restart versus redeploy, and blocked start before Code Round activation. Docker Swarm
+  runtime targets now have a registered server docs anchor for default-active Swarm execution.
+  Action-only pull request previews and future product-grade previews now have registered
+  `deploy/previews` anchors that distinguish workflow-file previews from control-plane previews.
+  Dependency runtime injection now has a registered dependency docs anchor for plan/show blocked
+  readiness and safe bind-to-deploy behavior.
 - `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
   a dedicated automated link checker does not exist yet.
 - `PUB-DOCS-005` is covered for registered help topics by tests that resolve each locale page and
@@ -69,24 +79,48 @@ Current status:
   identity, runtime, health, network profile, custom domain, generated access route, TLS
   certificate readiness, proxy readiness, safe diagnostic payloads, runtime logs, terminal
   sessions, and resource detail/profile editing closure for source/runtime/network/access/health/
-  configuration sections.
+  configuration sections. Server registration provider help now points at the Docker Swarm runtime
+  target anchor for cluster-target readiness and unsupported-field recovery.
 - `PUB-DOCS-011` has expanded CLI coverage for high-confusion operations including deployment
   source, preview cleanup, source relink, SSH credentials, server connectivity, terminal sessions,
   project lifecycle, resource profiles, environment variables, domains, certificates, logs, health,
   diagnostics, and deployment plan preview blocked/fix/override guidance.
+- `PUB-DOCS-011` now also covers Docker Swarm target registration guidance through CLI
+  `server register` help.
+- `PUB-DOCS-011` now also covers scheduled task lifecycle, run-now, run history, and run-log
+  guidance through CLI `scheduled-task` help.
+- `PUB-DOCS-011` now also covers dependency resource and resource dependency binding guidance
+  through CLI dependency help. Dependency runtime injection has a registered CLI help target for
+  plan/show blocked readiness.
 - `PUB-DOCS-012` has expanded HTTP/API route-description coverage for high-confusion operations
   including deployment source, SSH credentials, server connectivity, resource profiles, environment
   variables, project lifecycle, domains, certificates, logs, health, diagnostics, and terminal
   sessions. The HTTP API reference page also names the runtime OpenAPI document path
   `/api/openapi.json`, Scalar reference path `/api/reference`, and docs-generated OpenAPI
   reference path `/docs/reference/openapi/`.
+- `PUB-DOCS-012` now also covers Docker Swarm target registration guidance through the HTTP
+  `POST /servers` route description.
+- `PUB-DOCS-012` now also covers scheduled task lifecycle, run-now, run history, and run-log
+  guidance through the scheduled-task HTTP route descriptions.
+- `PUB-DOCS-012` now also covers dependency resource and resource dependency binding route
+  descriptions through the dependency resource lifecycle anchor. Dependency runtime injection has a
+  registered HTTP/API help target for plan/show blocked readiness.
 - `PUB-DOCS-013` is covered by HTTP adapter tests for embedded docs routing and binary bundle smoke
   verification that `/docs/*` is served separately from Web console assets.
 - `PUB-DOCS-014` is covered by HTTP adapter tests for `docsStaticDir` override behavior and binary
   bundle documentation of `APPALOFT_DOCS_STATIC_DIR`.
 - `PUB-DOCS-016` is covered for initial high-confusion access and resource profile topics by
   `@appaloft/docs-registry` topic metadata and
-  `docs/documentation/public-docs-traceability.md`.
+  `docs/documentation/public-docs-traceability.md`. Source auto-deploy traceability is recorded as
+  future Web/CLI/API surface coverage until those operations are active. Phase 7 storage,
+  dependency resource, backup/restore, and recovery-command traceability is recorded for active
+  CLI/HTTP/API operations. Resource runtime control traceability is recorded as future
+  Web/CLI/API/MCP surface coverage until those commands are active. Docker Swarm runtime target
+  traceability is recorded as a target-help anchor with deferred execution UI. Scheduled task
+  traceability is recorded for active CLI/HTTP/API/Web/future MCP help links. Preview deployment
+  traceability is recorded for Action-only CLI/repository-config guidance and future
+  Cloud/self-hosted product-grade preview surfaces. Dependency runtime injection traceability is
+  recorded for safe bind-to-deploy behavior and plan/show blocked readiness.
 - `PUB-DOCS-017` is covered for registered public error guides by
   `packages/docs-registry/test/help-topics.test.ts`.
 

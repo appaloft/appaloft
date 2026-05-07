@@ -6,7 +6,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@appaloft/contracts": "workspace:*",
+    "@appaloft/application": "workspace:*",
     "zod": "^4.1.12"
   },
   "scripts": {

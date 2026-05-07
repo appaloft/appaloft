@@ -76,11 +76,40 @@ describe("servers.register command", () => {
     expect(persisted?.host.value).toBe("127.0.0.1");
     expect(persisted?.port.value).toBe(22);
     expect(persisted?.providerKey.value).toBe("local-shell");
+    expect(persisted?.targetKind.value).toBe("single-server");
     expect(persisted?.edgeProxy?.kind.value).toBe("traefik");
     expect(persisted?.edgeProxy?.status.value).toBe("pending");
 
     expect(eventByType(eventBus.events, "deployment_target.registered").payload).toMatchObject({
       providerKey: "local-shell",
+      targetKind: "single-server",
+    });
+  });
+
+  test("[SWARM-TARGET-REG-001] servers.register persists Swarm manager target kind metadata", async () => {
+    const { eventBus, handler, serverRepository } = createHarness();
+    const command = RegisterServerCommand.create({
+      name: "Swarm manager",
+      host: "swarm-manager.internal",
+      providerKey: "docker-swarm",
+      targetKind: "orchestrator-cluster",
+      proxyKind: "none",
+    });
+    expect(command.isOk()).toBe(true);
+
+    const result = await handler.handle(createTestContext(), command._unsafeUnwrap());
+    expect(result.isOk()).toBe(true);
+
+    const serverId = result._unsafeUnwrap().id;
+    const persisted = serverRepository.items.get(serverId)?.toState();
+    expect(persisted?.providerKey.value).toBe("docker-swarm");
+    expect(persisted?.targetKind.value).toBe("orchestrator-cluster");
+    expect(persisted?.edgeProxy?.kind.value).toBe("none");
+    expect(persisted?.edgeProxy?.status.value).toBe("disabled");
+
+    expect(eventByType(eventBus.events, "deployment_target.registered").payload).toMatchObject({
+      providerKey: "docker-swarm",
+      targetKind: "orchestrator-cluster",
     });
   });
 
@@ -104,6 +133,7 @@ describe("servers.register command", () => {
     expect(persisted?.edgeProxy?.status.value).toBe("disabled");
     expect(eventByType(eventBus.events, "deployment_target.registered").payload).toMatchObject({
       providerKey: "local-shell",
+      targetKind: "single-server",
     });
   });
 

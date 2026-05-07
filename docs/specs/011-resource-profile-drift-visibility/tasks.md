@@ -19,8 +19,9 @@
   configuration section compares effective Resource config against entry profile config.
 - [x] `RES-PROFILE-DRIFT-004`: add HTTP/oRPC contract test for the `resources.show` diagnostic
   shape.
-- [ ] `RES-PROFILE-DRIFT-005`: add Web resource detail drift display test. Covered by Svelte
-  semantic check in this slice; e2e/webview assertion remains a deferred hardening row.
+- [x] `RES-PROFILE-DRIFT-005`: add Web resource detail drift display test. Covered by static Web
+  help/rendering assertions plus Svelte semantic checks; e2e/webview assertion remains a deferred
+  hardening row.
 - [x] `CONFIG-FILE-PROFILE-006`: update CLI config workflow test for fail-before-deployment
   existing-resource drift.
 - [x] `CONFIG-FILE-PROFILE-007`: decide whether this row remains planned auto-apply behavior or is
@@ -40,11 +41,9 @@
 
 ## Entrypoints And Docs
 
-- [ ] Update public docs/help with a stable profile-drift troubleshooting anchor. Deferred because
-  this Code Round closes product behavior and source-of-truth specs; public docs anchor remains a
-  Docs Round follow-up.
-- [ ] Update CLI help/examples for `appaloft resource show --json` diagnostics and config deploy
-  drift remediation. Deferred to the same Docs Round as the public troubleshooting anchor.
+- [x] Update public docs/help with a stable profile-drift troubleshooting anchor.
+- [x] Update CLI help/examples for `appaloft resource show --json` diagnostics and config deploy
+  drift remediation.
 - [x] Update Web resource detail help copy/i18n keys for sectioned drift badges and future-only
   profile guidance.
 
@@ -53,8 +52,8 @@
 - [x] Run targeted application tests for `resources.show` and config deploy workflow.
 - [x] Run targeted CLI tests for config deploy error rendering and resource command remedies.
 - [x] Run targeted oRPC/HTTP resource-show contract tests.
-- [x] Run targeted Web resource detail test for drift display through `svelte-check`; e2e/webview
-  remains deferred.
+- [x] Run targeted Web resource detail test for drift display through static help assertions and
+  `svelte-check`; e2e/webview remains deferred.
 - [x] Run `bun run lint` before final Code Round report.
 
 ## Post-Implementation Sync

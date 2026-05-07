@@ -10,8 +10,10 @@ export * from "./operations/default-access-domain-policies/list-default-access-d
 export * from "./operations/default-access-domain-policies/show-default-access-domain-policy.schema";
 export * from "./operations/dependency-resources/delete-dependency-resource.schema";
 export * from "./operations/dependency-resources/import-postgres-dependency-resource.schema";
+export * from "./operations/dependency-resources/import-redis-dependency-resource.schema";
 export * from "./operations/dependency-resources/list-dependency-resources.schema";
 export * from "./operations/dependency-resources/provision-postgres-dependency-resource.schema";
+export * from "./operations/dependency-resources/provision-redis-dependency-resource.schema";
 export * from "./operations/dependency-resources/rename-dependency-resource.schema";
 export * from "./operations/dependency-resources/show-dependency-resource.schema";
 export * from "./operations/deployments/create-deployment.schema";
@@ -19,6 +21,9 @@ export * from "./operations/deployments/deployment-logs.schema";
 export * from "./operations/deployments/deployment-plan.schema";
 export * from "./operations/deployments/deployment-recovery-readiness.schema";
 export * from "./operations/deployments/list-deployments.schema";
+export * from "./operations/deployments/redeploy-deployment.schema";
+export * from "./operations/deployments/retry-deployment.schema";
+export * from "./operations/deployments/rollback-deployment.schema";
 export * from "./operations/deployments/show-deployment.schema";
 export * from "./operations/deployments/stream-deployment-events.schema";
 export * from "./operations/domain-bindings/check-domain-binding-delete-safety.schema";
@@ -44,12 +49,37 @@ export * from "./operations/environments/unlock-environment.schema";
 export * from "./operations/environments/unset-environment-variable.schema";
 export * from "./operations/operator-work/list-operator-work.schema";
 export * from "./operations/operator-work/show-operator-work.schema";
+export {
+  type ConfigurePreviewPolicyCommandInput,
+  configurePreviewPolicyCommandInputSchema,
+} from "./operations/preview-deployments/configure-preview-policy.schema";
+export {
+  type DeletePreviewEnvironmentCommandInput,
+  deletePreviewEnvironmentCommandInputSchema,
+} from "./operations/preview-deployments/delete-preview-environment.schema";
+export {
+  type IngestPreviewPullRequestEventCommandInput,
+  ingestPreviewPullRequestEventCommandInputSchema,
+} from "./operations/preview-deployments/ingest-preview-pull-request-event.schema";
+export {
+  type ListPreviewEnvironmentsQueryInput,
+  listPreviewEnvironmentsQueryInputSchema,
+} from "./operations/preview-deployments/list-preview-environments.schema";
+export {
+  type ShowPreviewEnvironmentQueryInput,
+  showPreviewEnvironmentQueryInputSchema,
+} from "./operations/preview-deployments/show-preview-environment.schema";
+export {
+  type ShowPreviewPolicyQueryInput,
+  showPreviewPolicyQueryInputSchema,
+} from "./operations/preview-deployments/show-preview-policy.schema";
 export * from "./operations/projects/archive-project.schema";
 export * from "./operations/projects/create-project.schema";
 export * from "./operations/projects/rename-project.schema";
 export * from "./operations/projects/show-project.schema";
 export * from "./operations/resources/archive-resource.schema";
 export * from "./operations/resources/configure-resource-access.schema";
+export * from "./operations/resources/configure-resource-auto-deploy.schema";
 export * from "./operations/resources/configure-resource-health.schema";
 export * from "./operations/resources/configure-resource-network.schema";
 export * from "./operations/resources/configure-resource-runtime.schema";
@@ -63,10 +93,12 @@ export * from "./operations/resources/resource-diagnostic-summary.schema";
 export * from "./operations/resources/resource-effective-config.schema";
 export * from "./operations/resources/resource-health.schema";
 export * from "./operations/resources/resource-proxy-configuration-preview.schema";
+export * from "./operations/resources/resource-runtime-control.schema";
 export * from "./operations/resources/resource-runtime-logs.schema";
 export * from "./operations/resources/set-resource-variable.schema";
 export * from "./operations/resources/show-resource.schema";
 export * from "./operations/resources/unset-resource-variable.schema";
+export * from "./operations/scheduled-tasks/scheduled-task.schema";
 export * from "./operations/servers/bootstrap-server-proxy.schema";
 export * from "./operations/servers/check-server-delete-safety.schema";
 export * from "./operations/servers/configure-server-credential.schema";
@@ -82,5 +114,7 @@ export * from "./operations/servers/rotate-ssh-credential.schema";
 export * from "./operations/servers/show-server.schema";
 export * from "./operations/servers/show-ssh-credential.schema";
 export * from "./operations/servers/test-server-connectivity.schema";
+export * from "./operations/source-events/list-source-events.schema";
+export * from "./operations/source-events/show-source-event.schema";
 export * from "./operations/system/list-github-repositories.schema";
 export * from "./operations/terminal-sessions/open-terminal-session.schema";

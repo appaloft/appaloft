@@ -8,11 +8,15 @@ localeState:
 searchAliases:
   - "source profile"
   - "runtime profile"
+  - "profile drift"
+  - "resource_profile_drift"
   - "start command"
   - "资源来源"
+  - "资源配置漂移"
 relatedOperations:
   - resources.configure-source
   - resources.configure-runtime
+  - resources.show
 sidebar:
   label: "Source and runtime"
   order: 3
@@ -59,6 +63,21 @@ Runtime profile 描述 Appaloft 应该如何运行资源。它包含安装、构
 - Git 仓库没有可识别的构建线索，且 runtime profile 为空。
 - 镜像来源却配置了源码构建命令。
 - 应用实际监听端口和 network profile 不一致。
+
+<h2 id="resource-profile-drift">Profile drift</h2>
+
+Profile drift 表示资源当前保存的 profile、入口配置文件里的 profile，或最近一次部署快照里的 profile 不一致。它通常发生在资源已经存在后，又从 repository config、GitHub Action、CLI 参数或 Web console 中修改了 source、runtime、network、health、access 或配置项。
+
+查看资源详情时，Appaloft 可以返回 sectioned diagnostics，说明哪个 section 和字段不一致、是否会阻止部署，以及建议运行哪个显式资源命令。默认的 config deploy 流程在发现 existing-resource drift 时会先停止，不会把部署命令当作 profile 更新命令。
+
+处理方式：
+
+- 先运行 `appaloft resource show <resource-id> --json` 查看 diagnostics。
+- 如果 diagnostics 指向 source、runtime、network、health 或 access，运行对应的 `appaloft resource configure-source`、`configure-runtime`、`configure-network`、`configure-health` 或 `configure-access`。
+- 如果 diagnostics 指向配置项，使用 `appaloft resource set-variable` 或 `unset-variable` 处理资源级覆盖。
+- 更新 profile 后重新运行部署。历史部署快照不会被修改。
+
+Secret 和配置值在 diagnostics、错误、日志和支持信息中必须保持 masked。排查时只依赖 key、scope、exposure、reference 或 suggested command，不复制 raw secret value。
 
 <h2 id="resource-source-runtime-surfaces">入口说明</h2>
 

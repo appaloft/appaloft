@@ -117,6 +117,48 @@ describe("resolveConfig", () => {
     expect(config.docsStaticDir).toBe("/srv/appaloft/docs");
   });
 
+  test("reads the GitHub webhook secret from runtime configuration", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_GITHUB_WEBHOOK_SECRET: "github-webhook-secret",
+      },
+    });
+
+    expect(config.githubWebhookSecret).toBe("github-webhook-secret");
+  });
+
+  test("reads the GitHub preview feedback worker token from runtime configuration", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN: "github-preview-worker-token",
+      },
+    });
+
+    expect(config.githubPreviewFeedbackToken).toBe("github-preview-worker-token");
+  });
+
+  test("enables Docker Swarm execution by default and accepts explicit shell opt-out", () => {
+    const defaults = resolveConfig();
+    const configured = resolveConfig({
+      env: {
+        APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED: "false",
+        APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS: "45000",
+        APPALOFT_DOCKER_SWARM_EDGE_NETWORK: "appaloft-smoke-edge",
+      },
+    });
+
+    expect(defaults.dockerSwarmExecution).toEqual({
+      enabled: true,
+      commandTimeoutMs: 60000,
+      edgeNetworkName: "appaloft-edge",
+    });
+    expect(configured.dockerSwarmExecution).toEqual({
+      enabled: false,
+      commandTimeoutMs: 45000,
+      edgeNetworkName: "appaloft-smoke-edge",
+    });
+  });
+
   test("uses an explicit resource access failure renderer URL only when it is HTTP based", () => {
     const configured = resolveConfig({
       env: {
@@ -212,6 +254,16 @@ describe("resolveConfig", () => {
       defaultRetryDelaySeconds: 300,
       batchSize: 25,
     });
+    expect(config.scheduledTaskRunner).toEqual({
+      enabled: false,
+      intervalSeconds: 60,
+      batchSize: 25,
+    });
+    expect(config.previewCleanupRetryScheduler).toEqual({
+      enabled: false,
+      intervalSeconds: 300,
+      batchSize: 25,
+    });
   });
 
   test("allows enabling ACME certificate provider through environment", () => {
@@ -256,6 +308,38 @@ describe("resolveConfig", () => {
       intervalSeconds: 30,
       defaultRetryDelaySeconds: 45,
       batchSize: 7,
+    });
+  });
+
+  test("allows configuring the scheduled task runner through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_SCHEDULED_TASK_RUNNER_ENABLED: "true",
+        APPALOFT_SCHEDULED_TASK_RUNNER_INTERVAL_SECONDS: "15",
+        APPALOFT_SCHEDULED_TASK_RUNNER_BATCH_SIZE: "3",
+      },
+    });
+
+    expect(config.scheduledTaskRunner).toEqual({
+      enabled: true,
+      intervalSeconds: 15,
+      batchSize: 3,
+    });
+  });
+
+  test("allows configuring the preview cleanup retry scheduler through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_ENABLED: "true",
+        APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_INTERVAL_SECONDS: "20",
+        APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_BATCH_SIZE: "4",
+      },
+    });
+
+    expect(config.previewCleanupRetryScheduler).toEqual({
+      enabled: true,
+      intervalSeconds: 20,
+      batchSize: 4,
     });
   });
 });

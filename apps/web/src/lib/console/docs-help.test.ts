@@ -22,6 +22,9 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.serverConnectivityTest).toBe(
       "/docs/servers/register-connect/#server-connectivity-test",
     );
+    expect(webDocsHrefs.serverDockerSwarmTarget).toBe(
+      "/docs/servers/register-connect/#docker-swarm-runtime-target",
+    );
     expect(webDocsHrefs.environmentVariablePrecedence).toBe(
       "/docs/environments/variables/precedence/#environment-variable-precedence",
     );
@@ -31,11 +34,20 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.resourceRuntimeProfile).toBe(
       "/docs/resources/profiles/source-runtime/#resource-runtime-profile",
     );
+    expect(webDocsHrefs.resourceProfileDrift).toBe(
+      "/docs/resources/profiles/source-runtime/#resource-profile-drift",
+    );
     expect(webDocsHrefs.resourceHealthProfile).toBe(
       "/docs/resources/profiles/health-network/#resource-health-profile",
     );
     expect(webDocsHrefs.resourceNetworkProfile).toBe(
       "/docs/resources/profiles/health-network/#resource-network-profile",
+    );
+    expect(webDocsHrefs.dependencyResourceLifecycle).toBe(
+      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+    );
+    expect(webDocsHrefs.dependencyRuntimeInjection).toBe(
+      "/docs/resources/dependencies/#dependency-runtime-injection",
     );
   });
 
@@ -43,6 +55,9 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.deploymentLifecycle).toBe("/docs/deploy/lifecycle/#deployment-lifecycle");
     expect(webDocsHrefs.deploymentPlanPreview).toBe(
       "/docs/deploy/lifecycle/#deployment-plan-preview",
+    );
+    expect(webDocsHrefs.productGradePreviews).toBe(
+      "/docs/deploy/previews/#product-grade-preview-deployments",
     );
     expect(webDocsHrefs.serverProxyReadiness).toBe(
       "/docs/servers/operations/proxy-and-terminal/#server-proxy-readiness",
@@ -68,6 +83,24 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.diagnosticsSafeSupportPayload).toBe(
       "/docs/observe/diagnostics/#diagnostic-summary-copy-support-payload",
     );
+    expect(webDocsHrefs.sourceAutoDeploySetup).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-setup",
+    );
+    expect(webDocsHrefs.sourceAutoDeploySignatures).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-signatures",
+    );
+    expect(webDocsHrefs.sourceAutoDeployDedupe).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-dedupe",
+    );
+    expect(webDocsHrefs.sourceAutoDeployIgnoredEvents).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-ignored-events",
+    );
+    expect(webDocsHrefs.sourceAutoDeployRecovery).toBe(
+      "/docs/deploy/sources/#source-auto-deploy-recovery",
+    );
+    expect(webDocsHrefs.scheduledTaskLifecycle).toBe(
+      "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+    );
   });
 
   test("[PUB-DOCS-010] owner-scoped Web forms mount help links for complex inputs", async () => {
@@ -75,6 +108,9 @@ describe("console docs help links", () => {
       await Promise.all(
         [
           "routes/domain-bindings/+page.svelte",
+          "routes/preview-environments/+page.svelte",
+          "routes/preview-environments/[previewEnvironmentId]/+page.svelte",
+          "routes/preview-policies/+page.svelte",
           "routes/projects/[projectId]/+page.svelte",
           "routes/resources/[resourceId]/+page.svelte",
           "routes/projects/[projectId]/environments/[environmentId]/resources/[resourceId]/deployments/new/+page.svelte",
@@ -93,6 +129,13 @@ describe("console docs help links", () => {
     );
     expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain("certificateReadiness");
     expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain("serverProxyReadiness");
+    expect(sourceByPath["routes/preview-environments/+page.svelte"]).toContain(
+      "productGradePreviews",
+    );
+    expect(
+      sourceByPath["routes/preview-environments/[previewEnvironmentId]/+page.svelte"],
+    ).toContain("productGradePreviews");
+    expect(sourceByPath["routes/preview-policies/+page.svelte"]).toContain("productGradePreviews");
     expect(sourceByPath["routes/projects/[projectId]/+page.svelte"]).toContain(
       "environmentLifecycle",
     );
@@ -113,10 +156,25 @@ describe("console docs help links", () => {
       "diagnosticsSafeSupportPayload",
     );
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "resourceProfileDrift",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "profileDiagnosticsSuggestedCommand",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "serverTerminalSession",
     );
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "certificateReadiness",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "scheduledTaskLifecycle",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "orpcClient.scheduledTasks.runNow",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "scheduledTaskRunLogs",
     );
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "orpcClient.certificates.retry",
@@ -161,5 +219,11 @@ describe("console docs help links", () => {
     expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
       "serverTerminalSession",
     );
+    expect(
+      await readFile(
+        new URL("../../lib/components/console/ServerRegistrationForm.svelte", import.meta.url),
+        "utf8",
+      ),
+    ).toContain("serverDockerSwarmTarget");
   });
 });

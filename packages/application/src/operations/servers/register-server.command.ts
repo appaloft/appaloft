@@ -17,6 +17,7 @@ export class RegisterServerCommand extends Command<{ id: string }> {
     public readonly name: string,
     public readonly host: string,
     public readonly providerKey: string,
+    public readonly targetKind: RegisterServerCommandInput["targetKind"] = "single-server",
     public readonly port?: number,
     public readonly proxyKind: RegisterServerCommandInput["proxyKind"] = "traefik",
   ) {
@@ -30,6 +31,7 @@ export class RegisterServerCommand extends Command<{ id: string }> {
           parsed.name,
           parsed.host,
           parsed.providerKey,
+          parsed.targetKind,
           parsed.port,
           parsed.proxyKind,
         ),

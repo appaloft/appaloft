@@ -36,9 +36,9 @@ ResourceSourceBinding + ResourceRuntimeProfile + ResourceNetworkProfile
   -> normalized deployment/resource read models
 ```
 
-Single-server Docker/Compose remains the first active backend. Docker Swarm is the first required
+Single-server Docker/Compose remains the first active backend. Docker Swarm is the first active
 cluster backend on the path to `1.0.0`, and Kubernetes remains a later backend implementation.
-Both must plug into the same target abstraction after their own Spec Rounds.
+Cluster backends must plug into the same target abstraction after their own Spec Rounds.
 
 ## Expected Code Shape
 
@@ -118,7 +118,7 @@ concerns:
 - single-server Docker local backend;
 - single-server Docker generic-SSH backend;
 - in-memory fake backend for tests and local demos;
-- future Docker Swarm backend after a Swarm Spec Round;
+- Docker Swarm backend;
 - future Kubernetes backend only if the implementation is adapter-local and does not leak
   Kubernetes client types into core/application.
 
@@ -159,16 +159,15 @@ normalized.
 
 ### Docker Swarm Backend
 
-Before Code Round:
+The Spec Round and Code Round are active through
+[Docker Swarm Runtime Target](../specs/045-docker-swarm-runtime-target/spec.md) and
+[Docker Swarm Runtime Target Test Matrix](../testing/docker-swarm-runtime-target-test-matrix.md).
 
-- define target registration/readiness for a Swarm manager;
-- define destination placement and stack identity;
-- define registry push/pull and secret handling;
-- define service update, health, logs, diagnostics, cleanup, and rollback-candidate identity;
-- update deployment and resource health/log/proxy specs.
-
-This backend is required before `1.0.0`; the abstraction is not roadmap-complete until these Swarm
-contracts and the corresponding implementation/tests exist.
+The implementation uses those artifacts to keep Swarm manager readiness, ids-only deployment
+admission, registry selection, render/apply/verify/log/health/cleanup, route realization,
+redaction, and default shell activation behind adapter/application boundaries. Swarm destination
+placement and stack/service identity remain adapter-owned; public read models expose only
+sanitized Appaloft runtime identity and normalized log/health/access state.
 
 ### Kubernetes Backend
 
@@ -230,6 +229,11 @@ Current code has the initial target backend shape, but it is still running throu
 `ExecutionBackend` compatibility port:
 
 - `RuntimePlanResolver` exists and currently emits `single-server` target descriptors.
+- `servers.register` can persist canonical `single-server` or `orchestrator-cluster` target kind
+  metadata; `single-server` and Docker Swarm cluster targets have active runtime target backends.
+- `packages/adapters/runtime` exposes a `docker-swarm` descriptor factory and registry selection
+  coverage for `orchestrator-cluster` targets, and shell composition activates Swarm execution in
+  the default runtime registry unless explicitly opted out.
 - `ExecutionBackend` exists and owns `execute`, `cancel`, and `rollback`, even though cancel and
   rollback are not public deployment operations under ADR-016.
 - `RuntimeTargetBackendRegistry` exists as an application port.

@@ -678,6 +678,10 @@ export class DeploymentStatusValue extends StateMachineValueObject<
     );
   }
 
+  canRetryRecovery(): boolean {
+    return this.value === "failed" || this.value === "canceled";
+  }
+
   allowsExecutionContinuation(): boolean {
     return this.value !== "cancel-requested" && this.value !== "canceled";
   }

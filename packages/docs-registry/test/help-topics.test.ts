@@ -81,6 +81,148 @@ describe("public docs help registry", () => {
     }
   });
 
+  test("[RUNTIME-CTRL-DOCS-001] runtime-control help topics resolve to stable anchors", () => {
+    const runtimeControlsTopic = publicDocsHelpTopics["resource.runtime-controls"];
+    const restartVsRedeployTopic = publicDocsHelpTopics["resource.runtime-restart-vs-redeploy"];
+    const blockedStartTopic = publicDocsHelpTopics["resource.runtime-control-blocked-start"];
+
+    expect(resolvePublicDocsHelpHref(runtimeControlsTopic.id)).toBe(
+      "/docs/observe/logs-health/#resource-runtime-controls",
+    );
+    expect(resolvePublicDocsHelpHref(restartVsRedeployTopic.id, { locale: "en-US" })).toBe(
+      "/docs/en/observe/logs-health/#runtime-restart-vs-redeploy",
+    );
+    expect(resolvePublicDocsHelpHref(blockedStartTopic.id)).toBe(
+      "/docs/observe/logs-health/#runtime-control-blocked-start",
+    );
+    expect(runtimeControlsTopic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/commands/resources.runtime.stop.md",
+        "docs/commands/resources.runtime.start.md",
+        "docs/commands/resources.runtime.restart.md",
+        "docs/errors/resource-runtime-controls.md",
+      ]),
+    );
+  });
+
+  test("[RES-PROFILE-DRIFT-005] profile drift help topic resolves to public troubleshooting docs", () => {
+    const topic = publicDocsHelpTopics["resource.profile-drift"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/resources/profiles/source-runtime/#resource-profile-drift",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/resources/profiles/source-runtime/#resource-profile-drift",
+    );
+    expect(topic.relatedOperation).toBe("resources.show");
+    expect(topic.surfaces).toEqual(
+      expect.arrayContaining(["web", "cli", "http-api", "repository-config", "mcp"]),
+    );
+    expect(topic.aliases).toEqual(expect.arrayContaining(["resource_profile_drift"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/011-resource-profile-drift-visibility/spec.md",
+        "docs/testing/resource-profile-lifecycle-test-matrix.md",
+        "docs/testing/deployment-config-file-test-matrix.md",
+      ]),
+    );
+  });
+
+  test("[DEP-BIND-RUNTIME-INJECT-003] dependency runtime injection help resolves to stable anchors", () => {
+    const lifecycleTopic = publicDocsHelpTopics["dependency.resource-lifecycle"];
+    const runtimeTopic = publicDocsHelpTopics["dependency.runtime-injection"];
+
+    expect(resolvePublicDocsHelpHref(lifecycleTopic.id)).toBe(
+      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+    );
+    expect(resolvePublicDocsHelpHref(runtimeTopic.id)).toBe(
+      "/docs/resources/dependencies/#dependency-runtime-injection",
+    );
+    expect(resolvePublicDocsHelpHref(runtimeTopic.id, { locale: "en-US" })).toBe(
+      "/docs/en/resources/dependencies/#dependency-runtime-injection",
+    );
+    expect(runtimeTopic.surfaces).toEqual(
+      expect.arrayContaining(["web", "cli", "http-api", "mcp"]),
+    );
+    expect(runtimeTopic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/047-dependency-binding-runtime-injection/spec.md",
+        "docs/decisions/ADR-040-dependency-binding-runtime-injection-boundary.md",
+        "docs/queries/deployments.plan.md",
+        "docs/queries/deployments.show.md",
+      ]),
+    );
+  });
+
+  test("[SWARM-TARGET-DOCS-001] Swarm runtime target help resolves to server docs", () => {
+    const topic = publicDocsHelpTopics["server.docker-swarm-target"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/servers/register-connect/#docker-swarm-runtime-target",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/servers/register-connect/#docker-swarm-runtime-target",
+    );
+    expect(topic.surfaces).toEqual(
+      expect.arrayContaining(["web", "cli", "http-api", "repository-config", "mcp"]),
+    );
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining([
+        "docker swarm",
+        "orchestrator cluster",
+        "runtime_target_unsupported",
+      ]),
+    );
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/045-docker-swarm-runtime-target/spec.md",
+        "docs/testing/docker-swarm-runtime-target-test-matrix.md",
+      ]),
+    );
+  });
+
+  test("[SCHED-TASK-DOCS-001] scheduled task help resolves to resource docs", () => {
+    const topic = publicDocsHelpTopics["scheduled-task.resource-lifecycle"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+    );
+    expect(topic.surfaces).toEqual(expect.arrayContaining(["cli", "http-api", "mcp"]));
+    expect(topic.aliases).toEqual(expect.arrayContaining(["scheduled task", "cron"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/decisions/ADR-039-scheduled-task-resource-ownership.md",
+        "docs/specs/044-scheduled-task-resource-shape/spec.md",
+        "docs/testing/scheduled-task-resource-test-matrix.md",
+      ]),
+    );
+  });
+
+  test("[PREVIEW-DOCS-001] preview deployment help resolves to preview docs", () => {
+    const actionTopic = publicDocsHelpTopics["deployment.pr-preview-action"];
+    const productGradeTopic = publicDocsHelpTopics["deployment.product-grade-previews"];
+
+    expect(resolvePublicDocsHelpHref(actionTopic.id)).toBe(
+      "/docs/deploy/previews/#deployment-pr-preview-action-workflow",
+    );
+    expect(resolvePublicDocsHelpHref(actionTopic.id, { locale: "en-US" })).toBe(
+      "/docs/en/deploy/previews/#deployment-pr-preview-action-workflow",
+    );
+    expect(resolvePublicDocsHelpHref(productGradeTopic.id)).toBe(
+      "/docs/deploy/previews/#product-grade-preview-deployments",
+    );
+    expect(productGradeTopic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/046-product-grade-preview-deployments/spec.md",
+        "docs/testing/product-grade-preview-deployments-test-matrix.md",
+      ]),
+    );
+    expect(actionTopic.aliases).toEqual(expect.arrayContaining(["deploy-action", "preview-url"]));
+  });
+
   test("[ERROR-KNOWLEDGE-002] public error guides resolve docs, agent guide, and remedies", () => {
     const guide = findPublicDocsErrorGuide({
       code: "infra_error",

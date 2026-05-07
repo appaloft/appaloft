@@ -18,6 +18,7 @@ type ServerListResponse = {
     name: string;
     port: number;
     providerKey: string;
+    targetKind: string;
   }>;
 };
 
@@ -32,6 +33,7 @@ function serverSummary(input: { id: string; name: string }) {
     name: input.name,
     port: 22,
     providerKey: "local-shell",
+    targetKind: "single-server",
   });
 }
 

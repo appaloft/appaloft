@@ -6,12 +6,19 @@ import {
   type Query as AppQuery,
   BindResourceDependencyCommand,
   type CommandBus,
+  CreateDependencyResourceBackupCommand,
   type ExecutionContextFactory,
   ImportPostgresDependencyResourceCommand,
+  ImportRedisDependencyResourceCommand,
+  ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
   ListResourceDependencyBindingsQuery,
   ProvisionPostgresDependencyResourceCommand,
+  ProvisionRedisDependencyResourceCommand,
   type QueryBus,
+  RestoreDependencyResourceBackupCommand,
+  RotateResourceDependencyBindingSecretCommand,
+  ShowDependencyResourceBackupQuery,
   ShowDependencyResourceQuery,
   ShowResourceDependencyBindingQuery,
   UnbindResourceDependencyCommand,
@@ -133,6 +140,42 @@ describe("CLI dependency commands", () => {
     });
   });
 
+  test("[DEP-RES-REDIS-ENTRY-001] dependency redis provision/import dispatch commands", async () => {
+    const { commands, program } = await createCommandCaptureHarness("req_cli_dep_redis");
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "redis",
+      "provision",
+      "--project",
+      "prj_demo",
+      "--environment",
+      "env_demo",
+      "--name",
+      "Main Cache",
+    ]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "redis",
+      "import",
+      "--project",
+      "prj_demo",
+      "--environment",
+      "env_demo",
+      "--name",
+      "External Cache",
+      "--connection-url",
+      "redis://default:secret@cache.example.com:6379/0",
+    ]);
+
+    expect(commands[0]).toBeInstanceOf(ProvisionRedisDependencyResourceCommand);
+    expect(commands[1]).toBeInstanceOf(ImportRedisDependencyResourceCommand);
+  });
+
   test("[DEP-RES-PG-ENTRY-001] dependency list/show dispatch query bus", async () => {
     const { program, queries } = await createCommandCaptureHarness("req_cli_dep_query");
 
@@ -141,6 +184,39 @@ describe("CLI dependency commands", () => {
 
     expect(queries[0]).toBeInstanceOf(ListDependencyResourcesQuery);
     expect(queries[1]).toBeInstanceOf(ShowDependencyResourceQuery);
+  });
+
+  test("[DEP-RES-BACKUP-011] dependency backup commands dispatch buses", async () => {
+    const { commands, program, queries } = await createCommandCaptureHarness("req_cli_dep_backup");
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "backup",
+      "create",
+      "rsi_pg",
+      "--description",
+      "pre deploy",
+    ]);
+    await parseCli(program, ["node", "appaloft", "dependency", "backup", "list", "rsi_pg"]);
+    await parseCli(program, ["node", "appaloft", "dependency", "backup", "show", "drb_1"]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "backup",
+      "restore",
+      "drb_1",
+      "--confirm-data-overwrite",
+      "--confirm-runtime-not-restarted",
+    ]);
+
+    expect(commands[0]).toBeInstanceOf(CreateDependencyResourceBackupCommand);
+    expect(commands[0]).toMatchObject({ dependencyResourceId: "rsi_pg" });
+    expect(queries[0]).toBeInstanceOf(ListDependencyResourceBackupsQuery);
+    expect(queries[1]).toBeInstanceOf(ShowDependencyResourceBackupQuery);
+    expect(commands[1]).toBeInstanceOf(RestoreDependencyResourceBackupCommand);
   });
 
   test("[DEP-BIND-PG-ENTRY-001] resource dependency commands dispatch buses", async () => {
@@ -166,6 +242,18 @@ describe("CLI dependency commands", () => {
       "res_web",
       "rbd_pg",
     ]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "dependency",
+      "rotate-secret",
+      "res_web",
+      "rbd_pg",
+      "--secret-ref",
+      "secret://dependency-binding/rbd_pg/current",
+      "--confirm-historical-snapshots-remain-unchanged",
+    ]);
     await parseCli(program, ["node", "appaloft", "resource", "dependency", "list", "res_web"]);
     await parseCli(program, [
       "node",
@@ -179,6 +267,7 @@ describe("CLI dependency commands", () => {
 
     expect(commands[0]).toBeInstanceOf(BindResourceDependencyCommand);
     expect(commands[1]).toBeInstanceOf(UnbindResourceDependencyCommand);
+    expect(commands[2]).toBeInstanceOf(RotateResourceDependencyBindingSecretCommand);
     expect(queries[0]).toBeInstanceOf(ListResourceDependencyBindingsQuery);
     expect(queries[1]).toBeInstanceOf(ShowResourceDependencyBindingQuery);
   });

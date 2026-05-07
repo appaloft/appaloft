@@ -105,13 +105,47 @@ export class BindResourceDependencyUseCase {
           }),
         );
       }
-      if (dependencyState.status.value !== "ready" || dependencyState.kind.value !== "postgres") {
+      if (
+        dependencyState.status.value !== "ready" ||
+        (dependencyState.kind.value !== "postgres" && dependencyState.kind.value !== "redis")
+      ) {
         return err(
           domainError.validation("Dependency resource is not bindable", {
             phase: "resource-dependency-binding",
             dependencyResourceId: dependencyResourceId.value,
             dependencyResourceStatus: dependencyState.status.value,
             dependencyResourceKind: dependencyState.kind.value,
+          }),
+        );
+      }
+      if (
+        dependencyState.providerManaged &&
+        dependencyState.sourceMode?.value === "appaloft-managed" &&
+        dependencyState.providerRealization?.status.value !== "ready"
+      ) {
+        return err(
+          domainError.validation("Managed dependency resource is not realized", {
+            phase: "resource-dependency-binding",
+            dependencyResourceId: dependencyResourceId.value,
+            dependencyResourceKind: dependencyState.kind.value,
+            providerRealizationStatus:
+              dependencyState.providerRealization?.status.value ?? "not-realized",
+          }),
+        );
+      }
+      if (
+        dependencyState.bindingReadiness &&
+        dependencyState.bindingReadiness.status === "blocked"
+      ) {
+        return err(
+          domainError.validation("Dependency resource is not ready for binding", {
+            phase: "resource-dependency-binding",
+            dependencyResourceId: dependencyResourceId.value,
+            dependencyResourceKind: dependencyState.kind.value,
+            bindingReadinessStatus: dependencyState.bindingReadiness.status,
+            ...(dependencyState.bindingReadiness.reason
+              ? { bindingReadinessReason: dependencyState.bindingReadiness.reason.value }
+              : {}),
           }),
         );
       }

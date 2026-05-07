@@ -8,10 +8,13 @@ localeState:
 searchAliases:
   - "source profile"
   - "runtime profile"
+  - "profile drift"
+  - "resource_profile_drift"
   - "start command"
 relatedOperations:
   - resources.configure-source
   - resources.configure-runtime
+  - resources.show
 sidebar:
   label: "Source and runtime"
   order: 3
@@ -58,6 +61,21 @@ Common mismatches:
 - Git repository with no detectable build evidence and no runtime profile.
 - Image source combined with source build commands.
 - Application listener port does not match the network profile.
+
+<h2 id="resource-profile-drift">Profile drift</h2>
+
+Profile drift means the resource's saved profile, the profile in an entry config file, or the profile captured by the latest deployment snapshot no longer match. It often appears after an existing resource is changed through repository config, a GitHub Action, CLI flags, or the Web console.
+
+When you inspect resource detail, Appaloft can return sectioned diagnostics that show the affected section and field, whether the mismatch blocks deployment, and which explicit resource command should fix it. The default config deploy workflow stops before deployment when it detects existing-resource drift; the deploy command does not silently update the resource profile.
+
+To resolve it:
+
+- Run `appaloft resource show <resource-id> --json` and read the diagnostics.
+- If diagnostics point at source, runtime, network, health, or access, run the matching `appaloft resource configure-source`, `configure-runtime`, `configure-network`, `configure-health`, or `configure-access` command.
+- If diagnostics point at configuration, use `appaloft resource set-variable` or `unset-variable` for the resource-level override.
+- Deploy again after updating the profile. Historical deployment snapshots are not edited.
+
+Secret and configuration values must stay masked in diagnostics, errors, logs, and support payloads. Use keys, scope, exposure, references, and suggested commands while troubleshooting; do not copy raw secret values.
 
 <h2 id="resource-source-runtime-surfaces">Entrypoints</h2>
 

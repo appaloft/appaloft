@@ -10,6 +10,8 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   enrichResourceAccessFailureDiagnosticWithRouteContext,
+  type GitHubPreviewPullRequestWebhookVerifier,
+  type GitHubSourceEventWebhookVerifier,
   ListDeploymentsQuery,
   ListEnvironmentsQuery,
   ListProjectsQuery,
@@ -17,6 +19,9 @@ import {
   ListServersQuery,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
+  type ResourceRepository,
+  type SourceEventPolicyReader,
+  type SourceEventVerificationPort,
   type TerminalSession,
   type TerminalSessionGateway,
   toRepositoryContext,
@@ -455,6 +460,11 @@ export function createHttpApp(input: {
   certificateHttpChallengeTokenStore?: CertificateHttpChallengeTokenStore;
   resourceAccessFailureEvidenceRecorder?: ResourceAccessFailureEvidenceRecorder;
   resourceAccessRouteContextLookup?: AutomaticRouteContextLookup;
+  resourceRepository?: ResourceRepository;
+  sourceEventPolicyReader?: SourceEventPolicyReader;
+  sourceEventVerificationPort?: SourceEventVerificationPort;
+  githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
+  githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
 }) {
   const pluginMiddlewares = input.pluginRuntime?.listHttpMiddlewares() ?? [];
   const pluginRoutes = input.pluginRuntime?.listHttpRoutes() ?? [];
@@ -1088,6 +1098,32 @@ export function createHttpApp(input: {
     executionContextFactory: input.executionContextFactory,
     queryBus: input.queryBus,
     logger: input.logger,
+    ...(input.resourceRepository ? { resourceRepository: input.resourceRepository } : {}),
+    ...(input.sourceEventVerificationPort
+      ? {
+          sourceEventVerificationPort: input.sourceEventVerificationPort,
+        }
+      : {}),
+    ...(input.sourceEventPolicyReader
+      ? {
+          sourceEventPolicyReader: input.sourceEventPolicyReader,
+        }
+      : {}),
+    ...(input.githubSourceEventWebhookVerifier
+      ? {
+          githubSourceEventWebhookVerifier: input.githubSourceEventWebhookVerifier,
+        }
+      : {}),
+    ...(input.githubPreviewPullRequestWebhookVerifier
+      ? {
+          githubPreviewPullRequestWebhookVerifier: input.githubPreviewPullRequestWebhookVerifier,
+        }
+      : {}),
+    ...(input.config.githubWebhookSecret
+      ? {
+          githubWebhookSecret: input.config.githubWebhookSecret,
+        }
+      : {}),
     ...(input.requestContextRunner
       ? {
           requestContextRunner: input.requestContextRunner,

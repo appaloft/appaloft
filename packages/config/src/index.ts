@@ -33,6 +33,24 @@ export interface CertificateRetrySchedulerConfig {
   batchSize: number;
 }
 
+export interface ScheduledTaskRunnerConfig {
+  enabled: boolean;
+  intervalSeconds: number;
+  batchSize: number;
+}
+
+export interface PreviewCleanupRetrySchedulerConfig {
+  enabled: boolean;
+  intervalSeconds: number;
+  batchSize: number;
+}
+
+export interface DockerSwarmExecutionConfig {
+  enabled: boolean;
+  commandTimeoutMs: number;
+  edgeNetworkName?: string;
+}
+
 export interface AppConfig {
   appName: string;
   appVersion: string;
@@ -42,6 +60,8 @@ export interface AppConfig {
   betterAuthSecret: string;
   githubClientId?: string;
   githubClientSecret?: string;
+  githubWebhookSecret?: string;
+  githubPreviewFeedbackToken?: string;
   httpHost: string;
   httpPort: number;
   webOrigin: string;
@@ -67,6 +87,9 @@ export interface AppConfig {
   defaultAccessDomain: DefaultAccessDomainConfig;
   certificateProvider: CertificateProviderConfig;
   certificateRetryScheduler: CertificateRetrySchedulerConfig;
+  previewCleanupRetryScheduler: PreviewCleanupRetrySchedulerConfig;
+  dockerSwarmExecution: DockerSwarmExecutionConfig;
+  scheduledTaskRunner: ScheduledTaskRunnerConfig;
   enabledSystemPlugins: string[];
   configFilePath?: string;
 }
@@ -76,6 +99,8 @@ export interface ConfigSource<TValue> {
   env?: ConfigEnv;
   configFilePath?: string;
 }
+
+const defaultDockerSwarmEdgeNetworkName = "appaloft-edge";
 
 const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   appName: "Appaloft",
@@ -115,6 +140,21 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
     enabled: true,
     intervalSeconds: 300,
     defaultRetryDelaySeconds: 300,
+    batchSize: 25,
+  },
+  previewCleanupRetryScheduler: {
+    enabled: false,
+    intervalSeconds: 300,
+    batchSize: 25,
+  },
+  dockerSwarmExecution: {
+    enabled: true,
+    commandTimeoutMs: 60_000,
+    edgeNetworkName: defaultDockerSwarmEdgeNetworkName,
+  },
+  scheduledTaskRunner: {
+    enabled: false,
+    intervalSeconds: 60,
     batchSize: 25,
   },
   enabledSystemPlugins: [],
@@ -319,6 +359,49 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(env.APPALOFT_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE) ??
     parsePositiveInteger(certificateRetryScheduler.batchSize) ??
     defaults.certificateRetryScheduler.batchSize;
+  const scheduledTaskRunner =
+    source.flags?.scheduledTaskRunner ??
+    fileConfig.scheduledTaskRunner ??
+    defaults.scheduledTaskRunner;
+  const dockerSwarmExecution =
+    source.flags?.dockerSwarmExecution ??
+    fileConfig.dockerSwarmExecution ??
+    defaults.dockerSwarmExecution;
+  const previewCleanupRetryScheduler =
+    source.flags?.previewCleanupRetryScheduler ??
+    fileConfig.previewCleanupRetryScheduler ??
+    defaults.previewCleanupRetryScheduler;
+  const previewCleanupRetrySchedulerEnabled =
+    parseBoolean(env.APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_ENABLED) ??
+    previewCleanupRetryScheduler.enabled;
+  const previewCleanupRetrySchedulerIntervalSeconds =
+    parsePositiveInteger(env.APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_INTERVAL_SECONDS) ??
+    parsePositiveInteger(previewCleanupRetryScheduler.intervalSeconds) ??
+    defaults.previewCleanupRetryScheduler.intervalSeconds;
+  const previewCleanupRetrySchedulerBatchSize =
+    parsePositiveInteger(env.APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_BATCH_SIZE) ??
+    parsePositiveInteger(previewCleanupRetryScheduler.batchSize) ??
+    defaults.previewCleanupRetryScheduler.batchSize;
+  const scheduledTaskRunnerEnabled =
+    parseBoolean(env.APPALOFT_SCHEDULED_TASK_RUNNER_ENABLED) ?? scheduledTaskRunner.enabled;
+  const scheduledTaskRunnerIntervalSeconds =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_TASK_RUNNER_INTERVAL_SECONDS) ??
+    parsePositiveInteger(scheduledTaskRunner.intervalSeconds) ??
+    defaults.scheduledTaskRunner.intervalSeconds;
+  const scheduledTaskRunnerBatchSize =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_TASK_RUNNER_BATCH_SIZE) ??
+    parsePositiveInteger(scheduledTaskRunner.batchSize) ??
+    defaults.scheduledTaskRunner.batchSize;
+  const dockerSwarmExecutionEnabled =
+    parseBoolean(env.APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED) ?? dockerSwarmExecution.enabled;
+  const dockerSwarmExecutionCommandTimeoutMs =
+    parsePositiveInteger(env.APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS) ??
+    parsePositiveInteger(dockerSwarmExecution.commandTimeoutMs) ??
+    defaults.dockerSwarmExecution.commandTimeoutMs;
+  const dockerSwarmExecutionEdgeNetworkName =
+    env.APPALOFT_DOCKER_SWARM_EDGE_NETWORK ??
+    dockerSwarmExecution.edgeNetworkName ??
+    defaultDockerSwarmEdgeNetworkName;
   const resourceAccessFailureRendererUrl = normalizeHttpUrl(
     source.flags?.resourceAccessFailureRendererUrl ??
       env.APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL ??
@@ -369,6 +452,26 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
             source.flags?.githubClientSecret ??
             env.APPALOFT_GITHUB_CLIENT_SECRET ??
             fileConfig.githubClientSecret,
+        }
+      : {}),
+    ...(source.flags?.githubWebhookSecret ||
+    env.APPALOFT_GITHUB_WEBHOOK_SECRET ||
+    fileConfig.githubWebhookSecret
+      ? {
+          githubWebhookSecret:
+            source.flags?.githubWebhookSecret ??
+            env.APPALOFT_GITHUB_WEBHOOK_SECRET ??
+            fileConfig.githubWebhookSecret,
+        }
+      : {}),
+    ...(source.flags?.githubPreviewFeedbackToken ||
+    env.APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN ||
+    fileConfig.githubPreviewFeedbackToken
+      ? {
+          githubPreviewFeedbackToken:
+            source.flags?.githubPreviewFeedbackToken ??
+            env.APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN ??
+            fileConfig.githubPreviewFeedbackToken,
         }
       : {}),
     httpHost:
@@ -535,6 +638,21 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       intervalSeconds: certificateRetrySchedulerIntervalSeconds,
       defaultRetryDelaySeconds: certificateRetryDefaultDelaySeconds,
       batchSize: certificateRetrySchedulerBatchSize,
+    },
+    previewCleanupRetryScheduler: {
+      enabled: previewCleanupRetrySchedulerEnabled,
+      intervalSeconds: previewCleanupRetrySchedulerIntervalSeconds,
+      batchSize: previewCleanupRetrySchedulerBatchSize,
+    },
+    dockerSwarmExecution: {
+      enabled: dockerSwarmExecutionEnabled,
+      commandTimeoutMs: dockerSwarmExecutionCommandTimeoutMs,
+      edgeNetworkName: dockerSwarmExecutionEdgeNetworkName,
+    },
+    scheduledTaskRunner: {
+      enabled: scheduledTaskRunnerEnabled,
+      intervalSeconds: scheduledTaskRunnerIntervalSeconds,
+      batchSize: scheduledTaskRunnerBatchSize,
     },
     enabledSystemPlugins,
     ...(source.configFilePath ? { configFilePath: source.configFilePath } : {}),

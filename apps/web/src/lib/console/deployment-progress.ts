@@ -514,7 +514,7 @@ export function progressSourceLabel(event: DeploymentProgressEvent): string {
   return event.stream ? `${source}:${event.stream}` : source;
 }
 
-async function observeDeploymentProgressAfterAcceptance(
+export async function observeDeploymentProgressAfterAcceptance(
   deploymentId: string,
   onEvent: (event: DeploymentProgressEvent) => void,
   options: CreateDeploymentProgressStreamOptions,
