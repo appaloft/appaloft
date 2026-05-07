@@ -3,6 +3,7 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 import { describe, expect, test } from "bun:test";
 import {
   type AppLogger,
+  CleanupPreviewCommand,
   type Command,
   type CommandBus,
   CreateDeploymentCommand,
@@ -15,6 +16,10 @@ import {
   RestartResourceRuntimeCommand,
   RetryDeploymentCommand,
   RollbackDeploymentCommand,
+  type SourceLinkRecord,
+  type SourceLinkRepository,
+  type SourceLinkSelectionSpec,
+  type SourceLinkUpsertSpec,
   StartResourceRuntimeCommand,
   StopResourceRuntimeCommand,
 } from "@appaloft/application";
@@ -133,6 +138,229 @@ describe("deployment create HTTP route", () => {
     );
 
     expect(response.status).toBe(400);
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-008] dispatches Action server-mode deployment from source link", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_from_source_link" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const sourceLinkRepository = {
+      findOne: async (_spec: SourceLinkSelectionSpec) =>
+        ok({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          projectId: "prj_console",
+          environmentId: "env_prod",
+          resourceId: "res_www",
+          serverId: "srv_prod",
+          destinationId: "dst_prod",
+          updatedAt: "2026-05-07T00:00:00.000Z",
+        }),
+      upsert: async (_record: SourceLinkRecord, _spec: SourceLinkUpsertSpec) => ok(_record),
+      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
+    } as SourceLinkRepository;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+      sourceLinkRepository,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-source-link", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ id: "dep_from_source_link" });
+    expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+      destinationId: "dst_prod",
+    });
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-010] Action server-mode explicit ids bootstrap source link", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let createdLink: SourceLinkRecord | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_bootstrap_source_link" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const sourceLinkRepository = {
+      findOne: async (_spec: SourceLinkSelectionSpec) => ok(null),
+      upsert: async (record: SourceLinkRecord, _spec: SourceLinkUpsertSpec) => {
+        createdLink = record;
+        return ok(record);
+      },
+      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
+    } as SourceLinkRepository;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+      sourceLinkRepository,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-source-link", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          projectId: "prj_console",
+          environmentId: "env_prod",
+          resourceId: "res_www",
+          serverId: "srv_prod",
+          destinationId: "dst_prod",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ id: "dep_bootstrap_source_link" });
+    expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+      destinationId: "dst_prod",
+    });
+    expect(createdLink).toMatchObject({
+      sourceFingerprint:
+        "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+      destinationId: "dst_prod",
+      reason: "github-action-source-link-bootstrap",
+    });
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-010] Action server-mode explicit ids cannot retarget source link", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const sourceLinkRepository = {
+      findOne: async (_spec: SourceLinkSelectionSpec) =>
+        ok({
+          sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+          projectId: "prj_console",
+          environmentId: "env_prod",
+          resourceId: "res_www",
+          serverId: "srv_prod",
+          updatedAt: "2026-05-07T00:00:00.000Z",
+        }),
+      upsert: async (_record: SourceLinkRecord, _spec: SourceLinkUpsertSpec) => ok(_record),
+      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
+    } as SourceLinkRepository;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+      sourceLinkRepository,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-source-link", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+          projectId: "prj_console",
+          environmentId: "env_prod",
+          resourceId: "res_other",
+          serverId: "srv_prod",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-008] Action server-mode source-link deployment fails without link", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const sourceLinkRepository = {
+      findOne: async (_spec: SourceLinkSelectionSpec) => ok(null),
+      upsert: async (_record: SourceLinkRecord, _spec: SourceLinkUpsertSpec) => ok(_record),
+      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
+    } as SourceLinkRepository;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+      sourceLinkRepository,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-source-link", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint: "source-fingerprint:v1:missing",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(404);
     expect(capturedCommand).toBeUndefined();
   });
 
@@ -343,6 +571,63 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommands[2]).toMatchObject({
       resourceId: "res_demo",
       acknowledgeRetainedRuntimeMetadata: true,
+    });
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-HTTP-001] dispatches CleanupPreviewCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          sourceFingerprint:
+            "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
+          status: "cleaned",
+          cleanedRuntime: true,
+          cleanedArtifacts: true,
+          removedServerAppliedRoute: true,
+          removedSourceLink: true,
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments/cleanup-preview", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      sourceFingerprint:
+        "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
+      status: "cleaned",
+      cleanedRuntime: true,
+      cleanedArtifacts: true,
+      removedServerAppliedRoute: true,
+      removedSourceLink: true,
+    });
+    expect(capturedCommand).toBeInstanceOf(CleanupPreviewCommand);
+    expect(capturedCommand).toMatchObject({
+      sourceFingerprint:
+        "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
     });
   });
 });

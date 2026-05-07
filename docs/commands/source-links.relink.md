@@ -143,7 +143,7 @@ authoritative state.
 | Entrypoint | Contract |
 | --- | --- |
 | CLI | `appaloft source-links relink <sourceFingerprint> --project <id> --environment <id> --resource <id>` accepts the fingerprint and explicit target ids, then dispatches this command. SSH pure CLI mode uses trusted SSH target options such as `--server-host` to select and lock remote PGlite state before command execution. |
-| API/oRPC | Future endpoint may expose the same command schema for hosted/self-hosted control planes. |
+| API/oRPC | `POST /api/source-links/relink` exposes the same command schema for hosted/self-hosted control planes. |
 | Web | Future resource/source settings may call the same command after showing current and target mapping. |
 | GitHub Actions | Action deploys must not relink implicitly; they may fail with relink-required guidance. |
 
@@ -174,9 +174,9 @@ At minimum, Test-First Round must cover:
 
 ## Current Implementation Notes And Migration Gaps
 
-`source-links.relink` is active in the application command surface, operation catalog, and CLI. The
-CLI entrypoint accepts explicit target ids and SSH remote-state options, and shell startup mirrors
-the selected SSH server's PGlite/source-link state before dispatching the command.
+`source-links.relink` is active in the application command surface, operation catalog, CLI, and
+HTTP/oRPC. The CLI entrypoint accepts explicit target ids and SSH remote-state options, and shell
+startup mirrors the selected SSH server's PGlite/source-link state before dispatching the command.
 
 The current implementation validates project/environment/resource/server/destination relationships
 against the active Appaloft state backend before updating the source link. Shell runtime uses the

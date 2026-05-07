@@ -136,6 +136,19 @@ Exit criteria:
 
 Purpose: users can run Appaloft as their own control plane.
 
+0.9.x pulled-forward slice:
+
+- `appaloft/deploy-action` accepts `control-plane-mode: self-hosted` as a server API trigger for an
+  existing resource profile.
+- The Action performs `/api/version` compatibility checking and calls
+  `POST /api/action/deployments/from-source-link` for deploy, optionally using trusted
+  project/environment/resource/server ids to bootstrap a missing source link.
+- The Action calls `POST /api/deployments/cleanup-preview` for server-owned preview cleanup.
+- The Action does not install or invoke the CLI, open SSH, apply repository config to create a full
+  resource profile, mutate SSH-server PGlite, or run the full product-grade preview workflow in this
+  slice.
+- This is not SSH PGlite adoption and does not make `auto` mode active.
+
 Deliverables:
 
 - The public website `install.sh` provisions the basic single-node Docker Compose control plane.
@@ -229,11 +242,14 @@ Current implementation is between Phase 0 and Phase 1:
 - config domains and canonical redirects have provider route support;
 - `APPALOFT_CONTROL_PLANE_URL` and `APPALOFT_DATABASE_URL` skip SSH PGlite sync as a backend
   selection hint;
-- config `controlPlane` schema does not exist;
-- Cloud/self-hosted API handshake does not exist;
+- config `controlPlane` schema exists for non-secret mode and URL policy;
+- deploy-action self-hosted API handshake exists for the initial Action-to-server deploy slice;
+- `install.sh` can install a self-hosted Docker control plane with PostgreSQL or durable PGlite;
+- `.github/workflows/deploy-console.yml` can install or upgrade this repository's self-hosted
+  console on an SSH server using the release installer path;
 - adoption import/marker does not exist;
 - Web mode selection does not exist;
-- deploy-action has no control-plane inputs yet.
+- deploy-action has control-plane mode, URL, token, and optional trusted id inputs.
 
-Future Code Rounds should start with Phase 1 before any Cloud/self-hosted behavior is made
-user-visible.
+Future Code Rounds should finish the remaining Phase 3 adoption and source package contracts before
+claiming self-hosted mode as complete.

@@ -38,7 +38,7 @@ This matrix inherits:
 | Fingerprint normalization | Stable source identity, no runner temp paths, no secret-bearing URL content, branch/commit scope rules. |
 | Remote state repository | Link create/read/update under SSH-server PGlite state. |
 | Config workflow | First-run link creation, repeated reuse, retarget rejection. |
-| Relink command | Explicit target change, idempotency, optimistic guards, error mapping. |
+| Relink command | Explicit target change, idempotency, optimistic guards, HTTP/API dispatch, error mapping. |
 | CLI | `appaloft source-links relink` and config deploy failure guidance. |
 | Diagnostics | Safe source/config origin and link mapping explanation. |
 
@@ -63,7 +63,7 @@ This matrix inherits:
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected state |
 | --- | --- | --- | --- | --- | --- | --- |
-| SOURCE-LINK-STATE-008 | e2e-preferred | Relink source to another resource | Existing source link and explicit target project/environment/resource ids | `source-links.relink` updates the link and later config deploy uses the new mapping | None | Link points at new resource; resource profiles/deployments unchanged |
+| SOURCE-LINK-STATE-008 | e2e-preferred | Relink source to another resource | Existing source link and explicit target project/environment/resource ids | `source-links.relink` updates the link through CLI or `POST /api/source-links/relink`, and later config deploy uses the new mapping | None | Link points at new resource; resource profiles/deployments unchanged |
 | SOURCE-LINK-STATE-009 | integration | Relink idempotent same target | Existing link already matches requested target ids | Command returns ok with existing mapping | None | No duplicate link or audit event beyond idempotent record policy |
 | SOURCE-LINK-STATE-010 | integration | Relink optimistic guard conflict | Command includes `expectedCurrentResourceId`, but current link points elsewhere | Command rejects without mutation | `source_link_conflict`, phase `source-link-resolution` | Existing link unchanged |
 | SOURCE-LINK-STATE-011 | integration | Relink validates context | Target resource does not belong to target project/environment or destination does not belong to target server | Command rejects without mutation | `source_link_context_mismatch`, phase `source-link-admission` | Existing link unchanged |

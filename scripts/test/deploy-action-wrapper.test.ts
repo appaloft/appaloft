@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -60,6 +61,9 @@ describe("deploy-action wrapper reference", () => {
     expect(actionYaml).toContain("command:");
     expect(actionYaml).toContain("appaloft-version");
     expect(actionYaml).toContain("preview-url");
+    expect(actionYaml).toContain("preview-cleanup-status");
+    expect(actionYaml).toContain("pr-comment");
+    expect(actionYaml).toContain("github-token");
     expect(actionYaml).not.toContain("project:");
     expect(actionYaml).not.toContain("resource:");
     expect(actionYaml).not.toContain("server:");
@@ -82,6 +86,7 @@ describe("deploy-action wrapper reference", () => {
         "README.md",
         "scripts/install-appaloft.sh",
         "scripts/run-deploy.sh",
+        "scripts/resolve-control-plane.sh",
       ]) {
         expect(readFileSync(join(outputRoot, file), "utf8")).toBe(
           readFileSync(join(actionRoot, file), "utf8"),
@@ -89,13 +94,18 @@ describe("deploy-action wrapper reference", () => {
       }
       expect(statSync(join(outputRoot, "scripts/install-appaloft.sh")).mode & 0o111).toBeTruthy();
       expect(statSync(join(outputRoot, "scripts/run-deploy.sh")).mode & 0o111).toBeTruthy();
+      expect(
+        statSync(join(outputRoot, "scripts/resolve-control-plane.sh")).mode & 0o111,
+      ).toBeTruthy();
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }
   });
 
   test("[CONFIG-FILE-ENTRY-009] exported public CI validates wrapper layout and dry-run preview mapping", () => {
-    expect(publicCiWorkflow).toContain("bash -n scripts/install-appaloft.sh scripts/run-deploy.sh");
+    expect(publicCiWorkflow).toContain(
+      "bash -n scripts/install-appaloft.sh scripts/run-deploy.sh scripts/resolve-control-plane.sh",
+    );
     expect(publicCiWorkflow).toContain("APPALOFT_DEPLOY_ACTION_DRY_RUN");
     expect(publicCiWorkflow).toContain("INPUT_PREVIEW: pull-request");
     expect(publicCiWorkflow).toContain('grep -q -- "--preview-output-file"');
@@ -121,6 +131,9 @@ describe("deploy-action wrapper reference", () => {
       INPUT_PREVIEW_DOMAIN_TEMPLATE: "pr-42.preview.example.com",
       INPUT_PREVIEW_TLS_MODE: "disabled",
       INPUT_REQUIRE_PREVIEW_URL: "true",
+      INPUT_ENVIRONMENT_VARIABLES:
+        "HOST=0.0.0.0\nPORT=4321\nAPPALOFT_BETTER_AUTH_URL=http://pr-42.preview.example.com",
+      INPUT_SECRET_VARIABLES: "APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_BETTER_AUTH_SECRET",
     });
 
     try {
@@ -144,6 +157,13 @@ describe("deploy-action wrapper reference", () => {
       expect(result.argv).toContain("pr-42");
       expect(result.argv).toContain("--preview-domain-template");
       expect(result.argv).toContain("pr-42.preview.example.com");
+      expect(result.argv).toContain("--env");
+      expect(result.argv).toContain("HOST=0.0.0.0");
+      expect(result.argv).toContain("APPALOFT_BETTER_AUTH_URL=http://pr-42.preview.example.com");
+      expect(result.argv).toContain("--secret");
+      expect(result.argv).toContain(
+        "APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_BETTER_AUTH_SECRET",
+      );
       expect(result.argv).toContain("--require-preview-url");
       expect(result.output).toContain("preview-id=pr-42");
       expect(result.output).toContain("preview-url=http://pr-42.preview.example.com");
@@ -274,6 +294,102 @@ describe("deploy-action wrapper reference", () => {
       expect(result.stderr).toContain("control-plane-mode=cloud");
     } finally {
       rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-011] self-hosted preview cleanup calls the server cleanup API", () => {
+    const result = runDeploy({
+      INPUT_COMMAND: "preview-cleanup",
+      INPUT_CONFIG: "appaloft.preview.yml",
+      INPUT_CONTROL_PLANE_MODE: "self-hosted",
+      INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+      INPUT_PREVIEW: "pull-request",
+      INPUT_PREVIEW_ID: "pr-42",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv).toEqual([
+        "GET https://console.example.com/api/version",
+        "POST https://console.example.com/api/deployments/cleanup-preview",
+      ]);
+      expect(result.output).toContain("console-url=https://console.example.com");
+      expect(result.output).toContain("preview-id=pr-42");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-ENTRY-027] optional PR comment publishes the console feedback endpoint", () => {
+    const result = runDeploy({
+      INPUT_COMMAND: "preview-cleanup",
+      INPUT_CONFIG: "appaloft.preview.yml",
+      INPUT_CONTROL_PLANE_MODE: "self-hosted",
+      INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+      INPUT_PREVIEW: "pull-request",
+      INPUT_PREVIEW_ID: "pr-42",
+      INPUT_PR_COMMENT: "true",
+      INPUT_GITHUB_TOKEN: "github-token-fixture",
+      GITHUB_REPOSITORY: "appaloft/www",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv).toEqual([
+        "GET https://console.example.com/api/version",
+        "POST https://console.example.com/api/deployments/cleanup-preview",
+        "COMMENT https://api.github.com/repos/appaloft/www/issues/42/comments",
+      ]);
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-ENTRY-027] PR comment failures do not fail a successful deployment", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-pr-comment-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    const fakeAppaloft = join(workspace, "appaloft");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      ["#!/usr/bin/env bash", "echo 'comment denied' >&2", "exit 22", ""].join("\n"),
+    );
+    writeFileSync(fakeAppaloft, ["#!/usr/bin/env bash", "exit 0", ""].join("\n"));
+    chmodSync(fakeCurl, 0o755);
+    chmodSync(fakeAppaloft, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: fakeAppaloft,
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_SOURCE: ".",
+        INPUT_SSH_HOST: "203.0.113.10",
+        INPUT_PREVIEW: "pull-request",
+        INPUT_PREVIEW_ID: "pr-44",
+        INPUT_PREVIEW_DOMAIN_TEMPLATE: "pr-44.preview.example.com",
+        INPUT_PREVIEW_TLS_MODE: "disabled",
+        INPUT_PR_COMMENT: "true",
+        INPUT_GITHUB_TOKEN: "github-token-fixture",
+        GITHUB_REPOSITORY: "appaloft/www",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(readFileSync(outputPath, "utf8")).toContain(
+        "preview-url=http://pr-44.preview.example.com",
+      );
+      expect(result.stderr.toString()).toContain("Appaloft PR comment was not published");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
     }
   });
 

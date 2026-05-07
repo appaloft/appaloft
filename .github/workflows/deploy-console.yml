@@ -1,0 +1,187 @@
+name: Deploy Console
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Appaloft image tag to install. Defaults to latest.
+        required: false
+        default: latest
+        type: string
+      database:
+        description: Self-hosted database backend for the console.
+        required: false
+        default: pglite
+        type: choice
+        options:
+          - pglite
+          - postgres
+      skip_docker_install:
+        description: Require Docker Engine to already be installed on the SSH host.
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: appaloft-console-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: console-production
+      url: ${{ vars.APPALOFT_CONSOLE_ORIGIN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve Console Settings
+        id: settings
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_DATABASE: ${{ inputs.database }}
+          INPUT_SKIP_DOCKER_INSTALL: ${{ inputs.skip_docker_install }}
+          APPALOFT_CONSOLE_SSH_HOST: ${{ vars.APPALOFT_CONSOLE_SSH_HOST }}
+          APPALOFT_CONSOLE_SSH_USER: ${{ vars.APPALOFT_CONSOLE_SSH_USER }}
+          APPALOFT_CONSOLE_SSH_PORT: ${{ vars.APPALOFT_CONSOLE_SSH_PORT }}
+          APPALOFT_CONSOLE_ORIGIN: ${{ vars.APPALOFT_CONSOLE_ORIGIN }}
+          HAS_CONSOLE_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY != '' }}
+        run: |
+          set -euo pipefail
+
+          missing=0
+          if [ -z "$APPALOFT_CONSOLE_SSH_HOST" ]; then
+            echo "::error::Missing repository variable APPALOFT_CONSOLE_SSH_HOST."
+            missing=1
+          fi
+          if [ "$HAS_CONSOLE_SSH_PRIVATE_KEY" != "true" ]; then
+            echo "::error::Missing repository secret APPALOFT_CONSOLE_SSH_PRIVATE_KEY."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+          version="${INPUT_VERSION:-latest}"
+          database="${INPUT_DATABASE:-pglite}"
+          ssh_user="${APPALOFT_CONSOLE_SSH_USER:-root}"
+          ssh_port="${APPALOFT_CONSOLE_SSH_PORT:-22}"
+          origin="${APPALOFT_CONSOLE_ORIGIN:-http://${APPALOFT_CONSOLE_SSH_HOST}:3001}"
+
+          case "$version" in
+            ''|*[!A-Za-z0-9._-]*)
+              echo "::error::Console version must be a simple image tag such as latest or 0.9.0."
+              exit 1
+              ;;
+          esac
+
+          case "$database" in
+            postgres|pglite)
+              ;;
+            *)
+              echo "::error::Console database must be postgres or pglite."
+              exit 1
+              ;;
+          esac
+
+          case "$ssh_port" in
+            ''|*[!0-9]*)
+              echo "::error::APPALOFT_CONSOLE_SSH_PORT must be numeric."
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "version=$version"
+            echo "database=$database"
+            echo "ssh-host=$APPALOFT_CONSOLE_SSH_HOST"
+            echo "ssh-user=$ssh_user"
+            echo "ssh-port=$ssh_port"
+            echo "origin=$origin"
+            echo "skip-docker-install=${INPUT_SKIP_DOCKER_INSTALL:-false}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prepare SSH Key
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$RUNNER_TEMP/appaloft-console-ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$RUNNER_TEMP/appaloft-console-ssh/key"
+          chmod 600 "$RUNNER_TEMP/appaloft-console-ssh/key"
+          echo "APPALOFT_CONSOLE_SSH_KEY=$RUNNER_TEMP/appaloft-console-ssh/key" >> "$GITHUB_ENV"
+
+      - name: Copy Installer
+        shell: bash
+        env:
+          SSH_HOST: ${{ steps.settings.outputs.ssh-host }}
+          SSH_USER: ${{ steps.settings.outputs.ssh-user }}
+          SSH_PORT: ${{ steps.settings.outputs.ssh-port }}
+        run: |
+          set -euo pipefail
+          scp \
+            -i "$APPALOFT_CONSOLE_SSH_KEY" \
+            -P "$SSH_PORT" \
+            -o StrictHostKeyChecking=accept-new \
+            install.sh \
+            "$SSH_USER@$SSH_HOST:/tmp/appaloft-install.sh"
+
+      - name: Install Or Upgrade Console
+        shell: bash
+        env:
+          SSH_HOST: ${{ steps.settings.outputs.ssh-host }}
+          SSH_USER: ${{ steps.settings.outputs.ssh-user }}
+          SSH_PORT: ${{ steps.settings.outputs.ssh-port }}
+          APPALOFT_VERSION: ${{ steps.settings.outputs.version }}
+          APPALOFT_WEB_ORIGIN: ${{ steps.settings.outputs.origin }}
+          APPALOFT_SELF_HOST_DATABASE: ${{ steps.settings.outputs.database }}
+          APPALOFT_SKIP_DOCKER_INSTALL: ${{ steps.settings.outputs.skip-docker-install }}
+        run: |
+          set -euo pipefail
+
+          shell_quote() {
+            printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+          }
+
+          skip_arg=""
+          case "$APPALOFT_SKIP_DOCKER_INSTALL" in
+            true|TRUE|True|1|yes|YES|Yes)
+              skip_arg=" --skip-docker-install"
+              ;;
+          esac
+
+          remote_env="APPALOFT_VERSION=$(shell_quote "$APPALOFT_VERSION") APPALOFT_WEB_ORIGIN=$(shell_quote "$APPALOFT_WEB_ORIGIN") APPALOFT_SELF_HOST_DATABASE=$(shell_quote "$APPALOFT_SELF_HOST_DATABASE")"
+
+          ssh \
+            -i "$APPALOFT_CONSOLE_SSH_KEY" \
+            -p "$SSH_PORT" \
+            -o StrictHostKeyChecking=accept-new \
+            -o ServerAliveInterval=30 \
+            "$SSH_USER@$SSH_HOST" \
+            "chmod 700 /tmp/appaloft-install.sh && $remote_env sh /tmp/appaloft-install.sh --version $(shell_quote "$APPALOFT_VERSION") --web-origin $(shell_quote "$APPALOFT_WEB_ORIGIN") --database $(shell_quote "$APPALOFT_SELF_HOST_DATABASE")$skip_arg"
+
+      - name: Verify Console Health
+        shell: bash
+        env:
+          APPALOFT_WEB_ORIGIN: ${{ steps.settings.outputs.origin }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS "$APPALOFT_WEB_ORIGIN/api/health" >/dev/null; then
+              {
+                echo "### Appaloft console"
+                echo
+                echo "- URL: $APPALOFT_WEB_ORIGIN"
+                echo "- Health: ok"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 6
+          done
+          echo "::error::Appaloft console did not become healthy at $APPALOFT_WEB_ORIGIN/api/health."
+          exit 1

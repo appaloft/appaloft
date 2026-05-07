@@ -14,6 +14,7 @@ import {
   bootstrapServerProxyCommandInputSchema,
   CheckDomainBindingDeleteSafetyQuery,
   CheckServerDeleteSafetyQuery,
+  CleanupPreviewCommand,
   CloneEnvironmentCommand,
   type Command,
   type CommandBus,
@@ -42,6 +43,7 @@ import {
   CreateStorageVolumeCommand,
   checkDomainBindingDeleteSafetyQueryInputSchema,
   checkServerDeleteSafetyQueryInputSchema,
+  cleanupPreviewCommandInputSchema,
   cloneEnvironmentCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureDomainBindingRouteCommandInputSchema,
@@ -168,6 +170,7 @@ import {
   type QueryBus,
   RedeployDeploymentCommand,
   RegisterServerCommand,
+  RelinkSourceLinkCommand,
   RenameDependencyResourceCommand,
   RenameEnvironmentCommand,
   RenameProjectCommand,
@@ -195,6 +198,7 @@ import {
   RunScheduledTaskNowCommand,
   redeployDeploymentCommandInputSchema,
   registerServerCommandInputSchema,
+  relinkSourceLinkCommandInputSchema,
   renameDependencyResourceCommandInputSchema,
   renameEnvironmentCommandInputSchema,
   renameProjectCommandInputSchema,
@@ -240,6 +244,9 @@ import {
   ShowStorageVolumeQuery,
   type SourceEventPolicyReader,
   type SourceEventVerificationPort,
+  SourceLinkBySourceFingerprintSpec,
+  type SourceLinkRecord,
+  type SourceLinkRepository,
   StartResourceRuntimeCommand,
   StopResourceRuntimeCommand,
   StreamDeploymentEventsQuery,
@@ -278,6 +285,7 @@ import {
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
   UnsetResourceVariableCommand,
+  UpsertSourceLinkSpec,
   unbindResourceDependencyCommandInputSchema,
   unlockEnvironmentCommandInputSchema,
   unsetEnvironmentVariableCommandInputSchema,
@@ -292,6 +300,7 @@ import {
   bootstrapServerProxyResponseSchema,
   checkDomainBindingDeleteSafetyResponseSchema,
   checkServerDeleteSafetyResponseSchema,
+  cleanupPreviewResponseSchema,
   cloneEnvironmentResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
   configureDomainBindingRouteResponseSchema,
@@ -434,6 +443,7 @@ export interface AppaloftOrpcContext {
   logger: AppLogger;
   deploymentProgressObserver?: DeploymentProgressObserver;
   resourceRepository?: ResourceRepository;
+  sourceLinkRepository?: SourceLinkRepository;
   sourceEventVerificationPort?: SourceEventVerificationPort;
   githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
@@ -474,6 +484,26 @@ const genericSignedSourceEventBodySchema = z
     receivedAt: z.string().trim().min(1).optional(),
   })
   .strict();
+
+const actionSourceLinkDeploymentBodySchema = z
+  .object({
+    sourceFingerprint: z.string().trim().min(1),
+    projectId: z.string().trim().min(1).optional(),
+    environmentId: z.string().trim().min(1).optional(),
+    resourceId: z.string().trim().min(1).optional(),
+    serverId: z.string().trim().min(1).optional(),
+    destinationId: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+const relinkSourceLinkResponseSchema = z.object({
+  sourceFingerprint: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  resourceId: z.string(),
+  serverId: z.string().optional(),
+  destinationId: z.string().optional(),
+});
 
 const base = os.$context<AppaloftOrpcRequestContext>();
 const emptyResponseSchema = z.null();
@@ -532,6 +562,10 @@ export const apiRouteDescriptions = {
   createDeployment: routeDescription(
     "Creates a deployment from an explicit project, server, environment, and resource context.",
     "deployment.source",
+  ),
+  cleanupPreview: routeDescription(
+    "Cleans preview-scoped runtime, route, and source-link state by source fingerprint.",
+    "deployment.preview-cleanup",
   ),
   deploymentPlan: routeDescription(
     "Previews detected deployment evidence and the execution plan without creating or running a deployment.",
@@ -919,6 +953,10 @@ export const apiRouteDescriptions = {
     "Reads one safe source event delivery with dedupe, policy, and dispatch details.",
     "source.auto-deploy-ignored-events",
   ),
+  relinkSourceLink: routeDescription(
+    "Moves a source fingerprint link to an explicit project, environment, resource, and optional deployment target.",
+    "deployment.source",
+  ),
   configurePreviewPolicy: routeDescription(
     "Configures product-grade preview policy for a project or resource scope.",
     "deployment.product-grade-previews",
@@ -1130,6 +1168,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "terminal_session_workspace_unavailable":
     case "terminal_session_policy_denied":
     case "terminal_session_not_found":
+    case "source_link_context_mismatch":
     case "source_event_scope_required":
     case "resource_auto_deploy_secret_unavailable":
     case "source_event_signature_invalid":
@@ -1933,6 +1972,19 @@ export const configureResourceSourceProcedure = base
     executeCommand(context, ConfigureResourceSourceCommand.create(input)),
   );
 
+export const relinkSourceLinkProcedure = base
+  .route({
+    method: "POST",
+    path: "/source-links/relink",
+    description: apiRouteDescriptions.relinkSourceLink,
+    successStatus: 200,
+  })
+  .input(relinkSourceLinkCommandInputSchema)
+  .output(relinkSourceLinkResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RelinkSourceLinkCommand.create(input)),
+  );
+
 export const setResourceVariableProcedure = base
   .route({
     method: "POST",
@@ -2453,6 +2505,20 @@ export const createDeploymentProcedure = base
   .output(createDeploymentResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, CreateDeploymentCommand.create(input)),
+  );
+
+export const cleanupPreviewProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/cleanup-preview",
+    summary: "Cleanup preview deployment",
+    description: apiRouteDescriptions.cleanupPreview,
+    successStatus: 202,
+  })
+  .input(cleanupPreviewCommandInputSchema)
+  .output(cleanupPreviewResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CleanupPreviewCommand.create(input)),
   );
 
 export const retryDeploymentProcedure = base
@@ -3319,6 +3385,7 @@ export const appaloftOrpcRouter = {
   deployments: {
     list: listDeploymentsProcedure,
     create: createDeploymentProcedure,
+    cleanupPreview: cleanupPreviewProcedure,
     retry: retryDeploymentProcedure,
     redeploy: redeployDeploymentProcedure,
     rollback: rollbackDeploymentProcedure,
@@ -3337,6 +3404,9 @@ export const appaloftOrpcRouter = {
   sourceEvents: {
     list: listSourceEventsProcedure,
     show: showSourceEventProcedure,
+  },
+  sourceLinks: {
+    relink: relinkSourceLinkProcedure,
   },
   previewPolicies: {
     configure: configurePreviewPolicyProcedure,
@@ -3863,6 +3933,165 @@ async function handleGitHubSourceEventRoute(input: {
   return Response.json(result.value);
 }
 
+async function handleActionSourceLinkDeploymentRoute(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  request: Request;
+}): Promise<Response> {
+  const { context, executionContext, request } = input;
+  if (!context.sourceLinkRepository) {
+    return domainErrorHttpResponse(
+      domainError.validation("Source link repository is unavailable", {
+        phase: "action-source-link-deployment",
+      }),
+      executionContext,
+    );
+  }
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(await request.text());
+  } catch {
+    return domainErrorHttpResponse(
+      domainError.validation("Action deployment body must be valid JSON", {
+        phase: "action-source-link-deployment",
+      }),
+      executionContext,
+    );
+  }
+
+  const body = actionSourceLinkDeploymentBodySchema.safeParse(parsedJson);
+  if (!body.success) {
+    return domainErrorHttpResponse(
+      domainError.validation("Action deployment body is invalid", {
+        phase: "action-source-link-deployment",
+        issueCount: body.error.issues.length,
+      }),
+      executionContext,
+    );
+  }
+
+  const link = await context.sourceLinkRepository.findOne(
+    SourceLinkBySourceFingerprintSpec.create(body.data.sourceFingerprint),
+  );
+  if (link.isErr()) {
+    return domainErrorHttpResponse(link.error, executionContext);
+  }
+
+  const hasExplicitContext = Boolean(
+    body.data.projectId ||
+      body.data.environmentId ||
+      body.data.resourceId ||
+      body.data.serverId ||
+      body.data.destinationId,
+  );
+  if (
+    hasExplicitContext &&
+    (!body.data.projectId ||
+      !body.data.environmentId ||
+      !body.data.resourceId ||
+      !body.data.serverId)
+  ) {
+    return domainErrorHttpResponse(
+      domainError.validation(
+        "Action deployment source-link bootstrap requires project, environment, resource, and server ids",
+        {
+          phase: "action-source-link-deployment",
+          sourceFingerprint: body.data.sourceFingerprint,
+        },
+      ),
+      executionContext,
+    );
+  }
+
+  if (!link.value && !hasExplicitContext) {
+    return domainErrorHttpResponse(
+      domainError.notFound("Source link", body.data.sourceFingerprint),
+      executionContext,
+    );
+  }
+
+  if (link.value && hasExplicitContext) {
+    const conflict =
+      link.value.projectId !== body.data.projectId ||
+      link.value.environmentId !== body.data.environmentId ||
+      link.value.resourceId !== body.data.resourceId ||
+      link.value.serverId !== body.data.serverId ||
+      Boolean(body.data.destinationId && link.value.destinationId !== body.data.destinationId);
+    if (conflict) {
+      return domainErrorHttpResponse(
+        domainError.validation(
+          "Action deployment explicit context conflicts with existing source link; relink the source before deploying",
+          {
+            phase: "action-source-link-deployment",
+            sourceFingerprint: body.data.sourceFingerprint,
+          },
+        ),
+        executionContext,
+      );
+    }
+  }
+
+  const target = link.value ?? {
+    sourceFingerprint: body.data.sourceFingerprint,
+    projectId: body.data.projectId ?? "",
+    environmentId: body.data.environmentId ?? "",
+    resourceId: body.data.resourceId ?? "",
+    serverId: body.data.serverId,
+    ...(body.data.destinationId ? { destinationId: body.data.destinationId } : {}),
+    updatedAt: new Date().toISOString(),
+    reason: "github-action-source-link-bootstrap",
+  };
+
+  if (!target.serverId) {
+    return domainErrorHttpResponse(
+      domainError.validation("Source link does not include a deployment target", {
+        phase: "action-source-link-deployment",
+        sourceFingerprint: body.data.sourceFingerprint,
+      }),
+      executionContext,
+    );
+  }
+
+  const command = CreateDeploymentCommand.create({
+    projectId: target.projectId,
+    environmentId: target.environmentId,
+    resourceId: target.resourceId,
+    serverId: target.serverId,
+    ...(target.destinationId ? { destinationId: target.destinationId } : {}),
+  });
+  if (command.isErr()) {
+    return domainErrorHttpResponse(command.error, executionContext);
+  }
+
+  const result = await context.commandBus.execute(executionContext, command.value);
+  if (result.isErr()) {
+    return domainErrorHttpResponse(result.error, executionContext);
+  }
+
+  if (!link.value) {
+    const record = {
+      sourceFingerprint: target.sourceFingerprint,
+      projectId: target.projectId,
+      environmentId: target.environmentId,
+      resourceId: target.resourceId,
+      updatedAt: target.updatedAt,
+      reason: "github-action-source-link-bootstrap",
+      ...(target.serverId ? { serverId: target.serverId } : {}),
+      ...(target.destinationId ? { destinationId: target.destinationId } : {}),
+    } satisfies SourceLinkRecord;
+    const persisted = await context.sourceLinkRepository.upsert(
+      record,
+      UpsertSourceLinkSpec.fromRecord(record),
+    );
+    if (persisted.isErr()) {
+      return domainErrorHttpResponse(persisted.error, executionContext);
+    }
+  }
+
+  return Response.json(result.value, { status: 202 });
+}
+
 async function handleGitHubPreviewPullRequestRoute(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
@@ -4085,6 +4314,32 @@ export function mountAppaloftOrpcRoutes(
     }
   };
 
+  const actionSourceLinkDeploymentRouteHandler = async ({ request }: { request: Request }) => {
+    const executionContext = createRequestExecutionContext(
+      context.executionContextFactory,
+      "http",
+      request,
+    );
+    const run = createRequestRunner(request, executionContext, context.requestContextRunner);
+
+    try {
+      return await run(() =>
+        handleActionSourceLinkDeploymentRoute({
+          context,
+          executionContext,
+          request,
+        }),
+      );
+    } catch (error) {
+      context.logger.error("action_source_link_deployment_route_unhandled_error", {
+        method: request.method,
+        url: request.url,
+        ...buildUnexpectedErrorContext(error),
+      });
+      throw error;
+    }
+  };
+
   const routes = [
     "/api/projects",
     "/api/projects/:projectId",
@@ -4159,6 +4414,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/certificates/:certificateId/retries",
     "/api/certificates/:certificateId/revoke",
     "/api/deployments",
+    "/api/deployments/cleanup-preview",
     "/api/deployments/:deploymentId/retry",
     "/api/deployments/:deploymentId/rollback",
     "/api/deployments/plan",
@@ -4168,6 +4424,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/deployments/:deploymentId/logs",
     "/api/deployments/:deploymentId/events",
     "/api/deployments/:deploymentId/events/stream",
+    "/api/source-links/relink",
     "/api/dependency-resources",
     "/api/dependency-resources/postgres/provision",
     "/api/dependency-resources/postgres/import",
@@ -4190,6 +4447,14 @@ export function mountAppaloftOrpcRoutes(
   ] as const;
 
   let mounted = app;
+
+  mounted = mounted.post(
+    "/api/action/deployments/from-source-link",
+    actionSourceLinkDeploymentRouteHandler,
+    {
+      parse: "none",
+    },
+  ) as unknown as Elysia;
 
   mounted = mounted.post("/api/integrations/github/source-events", githubSourceEventRouteHandler, {
     parse: "none",

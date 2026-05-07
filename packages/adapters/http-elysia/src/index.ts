@@ -22,6 +22,7 @@ import {
   type ResourceRepository,
   type SourceEventPolicyReader,
   type SourceEventVerificationPort,
+  type SourceLinkRepository,
   type TerminalSession,
   type TerminalSessionGateway,
   toRepositoryContext,
@@ -461,6 +462,7 @@ export function createHttpApp(input: {
   resourceAccessFailureEvidenceRecorder?: ResourceAccessFailureEvidenceRecorder;
   resourceAccessRouteContextLookup?: AutomaticRouteContextLookup;
   resourceRepository?: ResourceRepository;
+  sourceLinkRepository?: SourceLinkRepository;
   sourceEventPolicyReader?: SourceEventPolicyReader;
   sourceEventVerificationPort?: SourceEventVerificationPort;
   githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
@@ -1099,6 +1101,7 @@ export function createHttpApp(input: {
     queryBus: input.queryBus,
     logger: input.logger,
     ...(input.resourceRepository ? { resourceRepository: input.resourceRepository } : {}),
+    ...(input.sourceLinkRepository ? { sourceLinkRepository: input.sourceLinkRepository } : {}),
     ...(input.sourceEventVerificationPort
       ? {
           sourceEventVerificationPort: input.sourceEventVerificationPort,

@@ -115,6 +115,10 @@ export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
 
 export interface DeploymentEnvironmentVariablesFromConfigOptions {
   env?: Record<string, string | undefined>;
+  previewContext?: {
+    previewId: string;
+    pullRequestNumber: number;
+  };
 }
 
 export interface DeploymentServerDraft {
@@ -399,6 +403,48 @@ function exposureForConfigEnvKey(key: string): DeploymentEnvironmentVariableSeed
   return /^(PUBLIC_|VITE_)/.test(key) ? "build-time" : "runtime";
 }
 
+function renderConfigEnvValueTemplate(input: {
+  key: string;
+  value: string;
+  previewContext?: DeploymentEnvironmentVariablesFromConfigOptions["previewContext"];
+}): Result<string> {
+  let missingVariable: "preview_id" | "pr_number" | undefined;
+  const rendered = input.value.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, rawToken) => {
+    const token = String(rawToken).toLowerCase();
+    if (token === "preview_id") {
+      const previewId = input.previewContext?.previewId.trim().toLowerCase();
+      if (!previewId) {
+        missingVariable = "preview_id";
+        return "";
+      }
+      return previewId;
+    }
+
+    if (token === "pr_number") {
+      const pullRequestNumber = input.previewContext?.pullRequestNumber;
+      if (pullRequestNumber === undefined || pullRequestNumber === null) {
+        missingVariable = "pr_number";
+        return "";
+      }
+      return String(pullRequestNumber);
+    }
+
+    return match;
+  });
+
+  if (missingVariable) {
+    return err(
+      domainError.validation("Deployment config env template requires preview context", {
+        phase: "config-template-resolution",
+        field: `env.${input.key}`,
+        variable: missingVariable,
+      }),
+    );
+  }
+
+  return ok(rendered);
+}
+
 export function deploymentEnvironmentVariablesFromConfig(
   config: AppaloftDeploymentConfig,
   options: DeploymentEnvironmentVariablesFromConfigOptions = {},
@@ -406,9 +452,18 @@ export function deploymentEnvironmentVariablesFromConfig(
   const variables: DeploymentEnvironmentVariableSeed[] = [];
 
   for (const [key, value] of Object.entries(config.env ?? {}).sort(compareConfigKeys)) {
-    variables.push({
+    const renderedValue = renderConfigEnvValueTemplate({
       key,
       value: String(value),
+      ...(options.previewContext ? { previewContext: options.previewContext } : {}),
+    });
+    if (renderedValue.isErr()) {
+      return err(renderedValue.error);
+    }
+
+    variables.push({
+      key,
+      value: renderedValue.value,
       kind: "plain-config",
       exposure: exposureForConfigEnvKey(key),
       scope: "environment",
