@@ -796,7 +796,9 @@ Current boundary:
   context from existing source-link state. For `preview=pull-request`, server-mode deploy derives a
   preview-scoped source fingerprint and triggers the same source-link deployment API, but it still
   does not apply runner-side runtime/profile/env/secret inputs, preview route inputs, or
-  `require-preview-url`. Preview cleanup always resolves context from the preview source link.
+  `require-preview-url`. The deployment API response includes the accepted deployment id and console
+  deployment href so the Action can publish a stable detail link in GitHub outputs, step summaries,
+  and optional PR comments. Preview cleanup always resolves context from the preview source link.
 - GitHub Action PR preview deploy is also an entry workflow over the same commands, not a new
   operation. A repository must add a workflow with `on.pull_request` before GitHub will attempt a
   preview deploy. The action may use trusted GitHub event context, such as PR number and head SHA,

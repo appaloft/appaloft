@@ -367,7 +367,7 @@ describe("deploy-action wrapper reference", () => {
         '    printf \'{"apiVersion":"v1"}\'',
         "    ;;",
         '  *"/api/action/deployments/from-source-link"*)',
-        '    printf \'{"id":"dep_server_mode"}\'',
+        '    printf \'{"id":"dep_server_mode","deploymentHref":"/deployments/dep_server_mode"}\'',
         "    ;;",
         "  *)",
         "    echo 'unexpected curl call' >&2",

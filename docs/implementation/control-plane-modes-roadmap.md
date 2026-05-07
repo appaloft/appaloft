@@ -142,7 +142,9 @@ Purpose: users can run Appaloft as their own control plane.
   existing resource profile.
 - The Action performs `/api/version` compatibility checking and calls
   `POST /api/action/deployments/from-source-link` for deploy, optionally using trusted
-  project/environment/resource/server ids to bootstrap a missing source link.
+  project/environment/resource/server ids to bootstrap a missing source link. The server response
+  includes a deployment detail href so GitHub step summaries and PR comments can point back to the
+  self-hosted console.
 - The Action calls `POST /api/deployments/cleanup-preview` for server-owned preview cleanup.
 - The Action does not install or invoke the CLI, open SSH, apply repository config to create a full
   resource profile, mutate SSH-server PGlite, or run the full product-grade preview workflow in this
