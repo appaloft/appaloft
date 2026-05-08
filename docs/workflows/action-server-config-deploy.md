@@ -245,11 +245,15 @@ console output.
 - When the validated config contains runtime, network, or health profile fields, the endpoint
   applies them through `resources.configure-runtime`, `resources.configure-network`, and
   `resources.configure-health` before dispatching `deployments.create`.
+- When the validated config contains plain `env` values, the endpoint applies them through
+  `environments.set-variable` as non-secret `plain-config` values at environment scope before
+  dispatching `deployments.create`. `PUBLIC_` and `VITE_` keys use build-time exposure; all other
+  keys use runtime exposure.
 - When the validated config contains `access.domains[]`, the endpoint resolves the trusted
   resource/destination and server proxy context, applies each domain through
   `domain-bindings.create` with deterministic idempotency keys, creates served domains before
   canonical redirect aliases, and only then dispatches `deployments.create`.
-- When the validated config contains source, environment, or secret profile fields,
+- When the validated config contains source or secret profile fields,
   the endpoint fails before mutation with `profile-application`; these fields still require later
   explicit-operation bootstrap slices.
 - `/api/version` advertises granular feature flags. Self-hosted console builds that wire the
@@ -259,6 +263,6 @@ console output.
   `POST /api/action/deployments/from-source-link`, which triggers an existing resource profile from
   source-link context.
 - Inline archive and remote archive URL transport, source package storage, diagnostics, cleanup
-  rules, and source/env/secret profile bootstrap are not implemented yet. Domain bootstrap is
-  currently the managed `DomainBinding` control-plane path; pure SSH CLI server-applied route state
-  remains the non-server mode.
+  rules, and source/secret profile bootstrap are not implemented yet. Domain bootstrap is currently
+  the managed `DomainBinding` control-plane path; pure SSH CLI server-applied route state remains
+  the non-server mode.

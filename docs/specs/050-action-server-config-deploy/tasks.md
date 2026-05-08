@@ -46,9 +46,10 @@
   ids-only `CreateDeploymentCommand`. Current implementation accepts the existing-resource/no-profile
   slice, resolves existing source-link context for no-profile requests, bootstraps source-link
   context from complete trusted ids, applies runtime/network/health profile fields through explicit
-  resource commands, applies `access.domains[]` through managed `domain-bindings.create` commands
-  using trusted resource/destination/server proxy context, and rejects unsupported source/env/secret
-  profile application before mutation.
+  resource commands, applies plain `env` values through `environments.set-variable`, applies
+  `access.domains[]` through managed `domain-bindings.create` commands using trusted
+  resource/destination/server proxy context, and rejects unsupported source/secret profile
+  application before mutation.
 - [ ] Add safe source package diagnostics/read-model output if needed for Web and support.
 
 ## Entrypoints And Docs
