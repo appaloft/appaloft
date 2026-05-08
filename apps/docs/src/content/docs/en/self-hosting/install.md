@@ -42,3 +42,11 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite
 PGlite mode stores Appaloft state in a durable Docker volume mounted at `/appaloft-data`. Do not put
 database passwords, GitHub tokens, SSH keys, or deployment identity values in repository config; keep
 those values in the host, CI secret store, or the Appaloft server after it is installed.
+
+When the host is already a Docker Swarm manager, install the console as a Swarm stack:
+
+```sh
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite --orchestrator swarm --stack-name appaloft
+```
+
+Add `--swarm-init` only when the installer should initialize a single-node Swarm manager.

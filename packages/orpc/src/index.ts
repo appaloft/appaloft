@@ -428,6 +428,10 @@ import {
   ResourceId,
   type Result,
 } from "@appaloft/core";
+import {
+  type AppaloftDeploymentConfig,
+  parseAppaloftDeploymentConfigText,
+} from "@appaloft/deployment-config";
 import { resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
 import { resolveAppaloftLocaleFromHeaders, translateDomainError } from "@appaloft/i18n";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
@@ -449,6 +453,7 @@ export interface AppaloftOrpcContext {
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
   sourceEventPolicyReader?: SourceEventPolicyReader;
   githubWebhookSecret?: string;
+  actionSourcePackageConfigReader?: ActionSourcePackageConfigReader;
 }
 
 interface AppaloftOrpcRequestContext extends AppaloftOrpcContext {
@@ -465,6 +470,15 @@ export interface RequestContextRunner {
     context: ExecutionContext,
     callback: () => Promise<T>,
   ): Promise<T>;
+}
+
+export interface ActionSourcePackageConfigReader {
+  readConfig(input: {
+    sourceFingerprint: string;
+    configPath: string;
+    sourceRoot: string;
+    sourcePackage: z.infer<typeof sourcePackageManifestSchema>;
+  }): Promise<Result<{ text: string; fileName?: string }>>;
 }
 
 const genericSignedSourceEventBodySchema = z
@@ -495,6 +509,62 @@ const actionSourceLinkDeploymentBodySchema = z
     destinationId: z.string().trim().min(1).optional(),
   })
   .strict();
+
+const sourcePackageManifestSchema = z
+  .object({
+    transport: z.enum(["inline-archive", "remote-archive-url", "server-github-fetch"]),
+    sourceFingerprint: z.string().trim().min(1),
+    configPath: z.string().trim().min(1),
+    sourceRoot: z.string().trim().min(1),
+    revision: z.string().trim().min(1).optional(),
+    repositoryFullName: z.string().trim().min(1).optional(),
+    repositoryId: z.string().trim().min(1).optional(),
+    archiveSha256: z
+      .string()
+      .trim()
+      .regex(/^[a-f0-9]{64}$/i)
+      .optional(),
+    archiveSizeBytes: z.number().int().positive().max(250_000_000).optional(),
+    archiveUrlExpiresAt: z.string().trim().datetime().optional(),
+  })
+  .strict();
+
+const actionServerConfigDeployBodySchema = z
+  .object({
+    sourceFingerprint: z.string().trim().min(1),
+    configPath: z.string().trim().min(1),
+    sourceRoot: z.string().trim().min(1),
+    sourcePackage: sourcePackageManifestSchema,
+    resolvedSecrets: z.record(z.string().trim().min(1), z.string()).optional(),
+    preview: z
+      .object({
+        kind: z.literal("pull-request"),
+        previewId: z.string().trim().min(1),
+        pullRequestNumber: z.number().int().positive().optional(),
+        headSha: z.string().trim().min(1).optional(),
+        baseRef: z.string().trim().min(1).optional(),
+        headRef: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+    trustedContext: z
+      .object({
+        projectId: z.string().trim().min(1).optional(),
+        environmentId: z.string().trim().min(1).optional(),
+        resourceId: z.string().trim().min(1).optional(),
+        serverId: z.string().trim().min(1).optional(),
+        destinationId: z.string().trim().min(1).optional(),
+        repositoryFullName: z.string().trim().min(1).optional(),
+        repositoryId: z.string().trim().min(1).optional(),
+        ref: z.string().trim().min(1).optional(),
+        revision: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+type ActionServerConfigDeployBody = z.infer<typeof actionServerConfigDeployBodySchema>;
 
 const relinkSourceLinkResponseSchema = z.object({
   sourceFingerprint: z.string(),
@@ -3464,6 +3534,7 @@ function domainErrorHttpResponse(error: DomainError, context: ExecutionContext):
         category: error.category,
         message: mapped.message,
         retryable: error.retryable,
+        ...(error.details ? { details: error.details } : {}),
       },
     },
     {
@@ -4098,6 +4169,790 @@ async function handleActionSourceLinkDeploymentRoute(input: {
   );
 }
 
+function isSafePackageRelativePath(value: string, input?: { allowDot?: boolean }): boolean {
+  const normalized = value.trim().replaceAll("\\", "/").replace(/\/+/g, "/");
+  if (!normalized || normalized.startsWith("/") || normalized.startsWith("~")) {
+    return false;
+  }
+
+  if (normalized === ".") {
+    return input?.allowDot === true;
+  }
+
+  return normalized.split("/").every((segment) => segment && segment !== "." && segment !== "..");
+}
+
+function validateActionServerConfigDeployBody(
+  body: z.infer<typeof actionServerConfigDeployBodySchema>,
+): DomainError | undefined {
+  if (body.sourcePackage.sourceFingerprint !== body.sourceFingerprint) {
+    return domainError.validation("Source package fingerprint must match request fingerprint", {
+      phase: "source-package-validation",
+      field: "sourcePackage.sourceFingerprint",
+    });
+  }
+
+  if (body.sourcePackage.configPath !== body.configPath) {
+    return domainError.validation("Source package config path must match request config path", {
+      phase: "source-package-validation",
+      field: "sourcePackage.configPath",
+    });
+  }
+
+  if (body.sourcePackage.sourceRoot !== body.sourceRoot) {
+    return domainError.validation("Source package root must match request source root", {
+      phase: "source-package-validation",
+      field: "sourcePackage.sourceRoot",
+    });
+  }
+
+  if (!isSafePackageRelativePath(body.configPath)) {
+    return domainError.validation(
+      "Action server config deploy configPath must stay inside package root",
+      {
+        phase: "source-package-validation",
+        field: "configPath",
+      },
+    );
+  }
+
+  if (!isSafePackageRelativePath(body.sourceRoot, { allowDot: true })) {
+    return domainError.validation(
+      "Action server config deploy sourceRoot must stay inside package root",
+      {
+        phase: "source-package-validation",
+        field: "sourceRoot",
+      },
+    );
+  }
+
+  if (
+    (body.sourcePackage.transport === "inline-archive" ||
+      body.sourcePackage.transport === "remote-archive-url") &&
+    !body.sourcePackage.archiveSha256
+  ) {
+    return domainError.validation("Archive source packages require archiveSha256", {
+      phase: "source-package-validation",
+      field: "sourcePackage.archiveSha256",
+    });
+  }
+
+  return undefined;
+}
+
+function phaseFromDeploymentConfigIssues(issues: { message: string }[]): string {
+  const messages = issues.map((issue) => issue.message).join("\n");
+
+  if (messages.includes("config_identity_field")) {
+    return "config-identity";
+  }
+
+  if (messages.includes("raw_secret_config_field")) {
+    return "config-secret-validation";
+  }
+
+  if (messages.includes("config_domain_resolution")) {
+    return "config-domain-resolution";
+  }
+
+  if (messages.includes("unsupported_config_field")) {
+    return "config-capability-resolution";
+  }
+
+  if (messages.includes("config_parse_error")) {
+    return "config-parse";
+  }
+
+  return "config-schema";
+}
+
+const defaultActionServerConfigApplicationInternalPort = 3000;
+const defaultActionServerConfigStaticInternalPort = 80;
+
+function actionServerConfigHasUnsupportedProfileApplication(
+  config: AppaloftDeploymentConfig,
+): boolean {
+  return Boolean(config.source);
+}
+
+function runtimeProfileFromActionServerConfig(config: AppaloftDeploymentConfig) {
+  if (!config.runtime) {
+    return undefined;
+  }
+
+  return {
+    ...(config.runtime.strategy ? { strategy: config.runtime.strategy } : {}),
+    ...(config.runtime.installCommand ? { installCommand: config.runtime.installCommand } : {}),
+    ...(config.runtime.buildCommand ? { buildCommand: config.runtime.buildCommand } : {}),
+    ...(config.runtime.startCommand ? { startCommand: config.runtime.startCommand } : {}),
+    ...(config.runtime.name ? { runtimeName: config.runtime.name } : {}),
+    ...(config.runtime.publishDirectory
+      ? { publishDirectory: config.runtime.publishDirectory }
+      : {}),
+    ...(config.runtime.dockerfilePath ? { dockerfilePath: config.runtime.dockerfilePath } : {}),
+    ...(config.runtime.dockerComposeFilePath
+      ? { dockerComposeFilePath: config.runtime.dockerComposeFilePath }
+      : {}),
+    ...(config.runtime.buildTarget ? { buildTarget: config.runtime.buildTarget } : {}),
+  };
+}
+
+function networkProfileFromActionServerConfig(config: AppaloftDeploymentConfig) {
+  if (!config.network) {
+    return undefined;
+  }
+
+  const defaultPort =
+    config.runtime?.strategy === "static"
+      ? defaultActionServerConfigStaticInternalPort
+      : defaultActionServerConfigApplicationInternalPort;
+
+  return {
+    internalPort: config.network.internalPort ?? defaultPort,
+    ...(config.network.upstreamProtocol
+      ? { upstreamProtocol: config.network.upstreamProtocol }
+      : {}),
+    ...(config.network.exposureMode ? { exposureMode: config.network.exposureMode } : {}),
+    ...(config.network.targetServiceName
+      ? { targetServiceName: config.network.targetServiceName }
+      : {}),
+    ...(config.network.hostPort ? { hostPort: config.network.hostPort } : {}),
+  };
+}
+
+function healthCheckFromActionServerConfig(config: AppaloftDeploymentConfig) {
+  const healthCheck = config.runtime?.healthCheck ?? config.health;
+  const path = healthCheck?.path ?? config.runtime?.healthCheckPath;
+  if (!healthCheck && !path) {
+    return undefined;
+  }
+
+  return {
+    enabled: healthCheck?.enabled ?? true,
+    type: "http" as const,
+    intervalSeconds: healthCheck?.intervalSeconds ?? 5,
+    timeoutSeconds: healthCheck?.timeoutSeconds ?? 5,
+    retries: healthCheck?.retries ?? 10,
+    startPeriodSeconds: 5,
+    http: {
+      method: "GET" as const,
+      scheme: "http" as const,
+      host: "localhost",
+      path: path ?? "/",
+      expectedStatusCode: 200,
+    },
+  };
+}
+
+function environmentVariableExposureFromActionServerConfigKey(key: string) {
+  return key.startsWith("PUBLIC_") || key.startsWith("VITE_") ? "build-time" : "runtime";
+}
+
+const actionServerConfigCiEnvSecretReferencePrefix = "ci-env:";
+
+function actionServerConfigSecretResolutionError(input: {
+  message: string;
+  secretKey: string;
+  secretRef: string;
+}): ReturnType<typeof domainError.validation> {
+  return domainError.validation(input.message, {
+    phase: "config-secret-resolution",
+    secretKey: input.secretKey,
+    secretRef: input.secretRef,
+  });
+}
+
+function actionServerConfigSecretEnvironmentVariables(input: {
+  config: AppaloftDeploymentConfig;
+  resolvedSecrets?: Record<string, string>;
+}): Result<
+  {
+    key: string;
+    value: string;
+    kind: "secret";
+    exposure: "runtime";
+    scope: "environment";
+    isSecret: true;
+  }[]
+> {
+  const variables: {
+    key: string;
+    value: string;
+    kind: "secret";
+    exposure: "runtime";
+    scope: "environment";
+    isSecret: true;
+  }[] = [];
+
+  for (const [key, reference] of Object.entries(input.config.secrets ?? {}).sort(
+    ([left], [right]) => left.localeCompare(right),
+  )) {
+    const secretRef = reference.from.trim();
+    const required = reference.required ?? true;
+
+    if (!secretRef.startsWith(actionServerConfigCiEnvSecretReferencePrefix)) {
+      if (!required) {
+        continue;
+      }
+
+      return err(
+        actionServerConfigSecretResolutionError({
+          message: "Action server config secret reference uses an unsupported resolver",
+          secretKey: key,
+          secretRef,
+        }),
+      );
+    }
+
+    const envName = secretRef.slice(actionServerConfigCiEnvSecretReferencePrefix.length).trim();
+    if (!envName) {
+      if (!required) {
+        continue;
+      }
+
+      return err(
+        actionServerConfigSecretResolutionError({
+          message: "Action server config CI secret reference is missing an environment name",
+          secretKey: key,
+          secretRef,
+        }),
+      );
+    }
+
+    const value = input.resolvedSecrets?.[envName];
+    if (value === undefined) {
+      if (!required) {
+        continue;
+      }
+
+      return err(
+        actionServerConfigSecretResolutionError({
+          message:
+            "Required action server config CI secret reference was not supplied by the action",
+          secretKey: key,
+          secretRef,
+        }),
+      );
+    }
+
+    variables.push({
+      key,
+      value,
+      kind: "secret",
+      exposure: "runtime",
+      scope: "environment",
+      isSecret: true,
+    });
+  }
+
+  return ok(variables);
+}
+
+type ActionServerConfigAccessDomain = NonNullable<
+  NonNullable<AppaloftDeploymentConfig["access"]>["domains"]
+>[number];
+
+function actionServerConfigDomainIdempotencyKey(input: {
+  sourceFingerprint: string;
+  domain: ActionServerConfigAccessDomain;
+}): string {
+  return [
+    "action-server-config-domain",
+    input.sourceFingerprint,
+    input.domain.host,
+    input.domain.pathPrefix,
+    input.domain.tlsMode,
+    input.domain.redirectTo ?? "serve",
+    String(input.domain.redirectStatus ?? "serve"),
+  ].join(":");
+}
+
+function orderedActionServerConfigDomains(
+  domains: readonly ActionServerConfigAccessDomain[],
+): ActionServerConfigAccessDomain[] {
+  return [...domains].sort((left, right) => {
+    if (left.redirectTo && !right.redirectTo) {
+      return 1;
+    }
+    if (!left.redirectTo && right.redirectTo) {
+      return -1;
+    }
+    return left.host.localeCompare(right.host);
+  });
+}
+
+async function resolveActionServerConfigDomainContext(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  target: SourceLinkRecord;
+}): Promise<Result<{ destinationId: string; proxyKind: "traefik" | "caddy"; serverId: string }>> {
+  const { context, executionContext, target } = input;
+  const serverId = target.serverId;
+  if (!serverId) {
+    return err(
+      domainError.validation(
+        "Action server config domain application requires a server id from source-link context",
+        {
+          phase: "profile-application",
+          resourceId: target.resourceId,
+        },
+      ),
+    );
+  }
+
+  let destinationId = target.destinationId;
+
+  if (!destinationId) {
+    const query = ShowResourceQuery.create({
+      resourceId: target.resourceId,
+      includeLatestDeployment: false,
+      includeAccessSummary: false,
+      includeProfileDiagnostics: false,
+    });
+    if (query.isErr()) {
+      return err(query.error);
+    }
+
+    const resource = await context.queryBus.execute(executionContext, query.value);
+    if (resource.isErr()) {
+      return err(resource.error);
+    }
+    destinationId = resource.value.resource.destinationId;
+  }
+
+  if (!destinationId) {
+    return err(
+      domainError.validation(
+        "Action server config domain application requires a destination id from source-link or resource context",
+        {
+          phase: "profile-application",
+          resourceId: target.resourceId,
+        },
+      ),
+    );
+  }
+
+  const serverQuery = ShowServerQuery.create({
+    serverId,
+    includeRollups: false,
+  });
+  if (serverQuery.isErr()) {
+    return err(serverQuery.error);
+  }
+
+  const server = await context.queryBus.execute(executionContext, serverQuery.value);
+  if (server.isErr()) {
+    return err(server.error);
+  }
+
+  const proxyKind = server.value.server.edgeProxy?.kind;
+  if (!proxyKind || proxyKind === "none") {
+    return err(
+      domainError.validation(
+        "Action server config domain application requires an edge proxy enabled server",
+        {
+          phase: "profile-application",
+          serverId,
+        },
+      ),
+    );
+  }
+
+  return ok({ destinationId, proxyKind, serverId });
+}
+
+async function applyActionServerConfigProfileCommands(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  config: AppaloftDeploymentConfig;
+  resolvedSecrets?: Record<string, string>;
+  target: SourceLinkRecord;
+}): Promise<Result<void>> {
+  const { context, executionContext, config, resolvedSecrets, target } = input;
+
+  const runtimeProfile = runtimeProfileFromActionServerConfig(config);
+  if (runtimeProfile) {
+    const command = ConfigureResourceRuntimeCommand.create({
+      resourceId: target.resourceId,
+      runtimeProfile,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
+
+  const networkProfile = networkProfileFromActionServerConfig(config);
+  if (networkProfile) {
+    const command = ConfigureResourceNetworkCommand.create({
+      resourceId: target.resourceId,
+      networkProfile,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
+
+  const healthCheck = healthCheckFromActionServerConfig(config);
+  if (healthCheck) {
+    const command = ConfigureResourceHealthCommand.create({
+      resourceId: target.resourceId,
+      healthCheck,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
+
+  for (const [key, value] of Object.entries(config.env ?? {})) {
+    const command = SetEnvironmentVariableCommand.create({
+      environmentId: target.environmentId,
+      key,
+      value: String(value),
+      kind: "plain-config",
+      exposure: environmentVariableExposureFromActionServerConfigKey(key),
+      scope: "environment",
+      isSecret: false,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
+
+  const secretVariables = actionServerConfigSecretEnvironmentVariables({
+    config,
+    ...(resolvedSecrets ? { resolvedSecrets } : {}),
+  });
+  if (secretVariables.isErr()) {
+    return err(secretVariables.error);
+  }
+
+  for (const variable of secretVariables.value) {
+    const command = SetEnvironmentVariableCommand.create({
+      environmentId: target.environmentId,
+      ...variable,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
+
+  if (config.access?.domains?.length) {
+    const domainContext = await resolveActionServerConfigDomainContext({
+      context,
+      executionContext,
+      target,
+    });
+    if (domainContext.isErr()) {
+      return err(domainContext.error);
+    }
+
+    for (const domain of orderedActionServerConfigDomains(config.access.domains)) {
+      const command = CreateDomainBindingCommand.create({
+        projectId: target.projectId,
+        environmentId: target.environmentId,
+        resourceId: target.resourceId,
+        serverId: domainContext.value.serverId,
+        destinationId: domainContext.value.destinationId,
+        domainName: domain.host,
+        pathPrefix: domain.pathPrefix,
+        proxyKind: domainContext.value.proxyKind,
+        tlsMode: domain.tlsMode,
+        ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
+        ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),
+        idempotencyKey: actionServerConfigDomainIdempotencyKey({
+          sourceFingerprint: target.sourceFingerprint,
+          domain,
+        }),
+      });
+      if (command.isErr()) {
+        return err(command.error);
+      }
+
+      const result = await context.commandBus.execute(executionContext, command.value);
+      if (result.isErr()) {
+        return err(result.error);
+      }
+    }
+  }
+
+  return ok(undefined);
+}
+
+function hasTrustedActionServerConfigDeploymentContext(
+  trustedContext: ActionServerConfigDeployBody["trustedContext"],
+): boolean {
+  return Boolean(
+    trustedContext?.projectId ||
+      trustedContext?.environmentId ||
+      trustedContext?.resourceId ||
+      trustedContext?.serverId ||
+      trustedContext?.destinationId,
+  );
+}
+
+function hasCompleteTrustedActionServerConfigDeploymentContext(
+  trustedContext: ActionServerConfigDeployBody["trustedContext"],
+): boolean {
+  return Boolean(
+    trustedContext?.projectId &&
+      trustedContext.environmentId &&
+      trustedContext.resourceId &&
+      trustedContext.serverId,
+  );
+}
+
+async function resolveActionServerConfigDeploymentTarget(input: {
+  context: AppaloftOrpcContext;
+  body: ActionServerConfigDeployBody;
+}): Promise<Result<SourceLinkRecord>> {
+  const { context, body } = input;
+  const trustedContext = body.trustedContext;
+  const hasExplicitContext = hasTrustedActionServerConfigDeploymentContext(trustedContext);
+
+  if (
+    hasExplicitContext &&
+    !hasCompleteTrustedActionServerConfigDeploymentContext(trustedContext)
+  ) {
+    return err(
+      domainError.validation(
+        "Action server config deploy source-link bootstrap requires project, environment, resource, and server ids",
+        {
+          phase: "source-link-resolution",
+          sourceFingerprint: body.sourceFingerprint,
+        },
+      ),
+    );
+  }
+
+  let link: SourceLinkRecord | null = null;
+  if (context.sourceLinkRepository) {
+    const found = await context.sourceLinkRepository.findOne(
+      SourceLinkBySourceFingerprintSpec.create(body.sourceFingerprint),
+    );
+    if (found.isErr()) {
+      return err(found.error);
+    }
+    link = found.value;
+  }
+
+  if (link && hasExplicitContext) {
+    const conflict =
+      link.projectId !== trustedContext?.projectId ||
+      link.environmentId !== trustedContext.environmentId ||
+      link.resourceId !== trustedContext.resourceId ||
+      link.serverId !== trustedContext.serverId ||
+      Boolean(trustedContext.destinationId && link.destinationId !== trustedContext.destinationId);
+    if (conflict) {
+      return err(
+        domainError.validation(
+          "Action server config deploy explicit context conflicts with existing source link; relink the source before deploying",
+          {
+            phase: "source-link-resolution",
+            sourceFingerprint: body.sourceFingerprint,
+          },
+        ),
+      );
+    }
+  }
+
+  if (link) {
+    return ok(link);
+  }
+
+  if (!hasExplicitContext || !trustedContext?.serverId) {
+    return err(domainError.notFound("Source link", body.sourceFingerprint));
+  }
+
+  const target = {
+    sourceFingerprint: body.sourceFingerprint,
+    projectId: trustedContext.projectId ?? "",
+    environmentId: trustedContext.environmentId ?? "",
+    resourceId: trustedContext.resourceId ?? "",
+    serverId: trustedContext.serverId,
+    ...(trustedContext.destinationId ? { destinationId: trustedContext.destinationId } : {}),
+    updatedAt: new Date().toISOString(),
+    reason: "github-action-server-config-bootstrap",
+  } satisfies SourceLinkRecord;
+
+  if (!context.sourceLinkRepository) {
+    return ok(target);
+  }
+
+  const persisted = await context.sourceLinkRepository.upsert(
+    target,
+    UpsertSourceLinkSpec.fromRecord(target),
+  );
+  if (persisted.isErr()) {
+    return err(persisted.error);
+  }
+
+  return ok(persisted.value);
+}
+
+async function handleActionServerConfigDeploymentRoute(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  request: Request;
+}): Promise<Response> {
+  const { context, executionContext, request } = input;
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(await request.text());
+  } catch {
+    return domainErrorHttpResponse(
+      domainError.validation("Action server config deployment body must be valid JSON", {
+        phase: "source-package-validation",
+      }),
+      executionContext,
+    );
+  }
+
+  const body = actionServerConfigDeployBodySchema.safeParse(parsedJson);
+  if (!body.success) {
+    return domainErrorHttpResponse(
+      domainError.validation("Action server config deployment body is invalid", {
+        phase: "source-package-validation",
+        issueCount: body.error.issues.length,
+      }),
+      executionContext,
+    );
+  }
+
+  const validationError = validateActionServerConfigDeployBody(body.data);
+  if (validationError) {
+    return domainErrorHttpResponse(validationError, executionContext);
+  }
+
+  if (!context.actionSourcePackageConfigReader) {
+    return domainErrorHttpResponse(
+      domainError.validation(
+        "Action server config deployment endpoint is available, but source package config reading is not enabled in this build",
+        {
+          phase: "config-bootstrap",
+        },
+      ),
+      executionContext,
+    );
+  }
+
+  const configText = await context.actionSourcePackageConfigReader.readConfig({
+    sourceFingerprint: body.data.sourceFingerprint,
+    configPath: body.data.configPath,
+    sourceRoot: body.data.sourceRoot,
+    sourcePackage: body.data.sourcePackage,
+  });
+  if (configText.isErr()) {
+    return domainErrorHttpResponse(configText.error, executionContext);
+  }
+
+  const parsedConfig = parseAppaloftDeploymentConfigText(
+    configText.value.text,
+    configText.value.fileName ?? body.data.configPath,
+  );
+  if (!parsedConfig.success) {
+    return domainErrorHttpResponse(
+      domainError.validation("Appaloft deployment config is invalid", {
+        phase: phaseFromDeploymentConfigIssues(parsedConfig.error.issues),
+        configPath: body.data.configPath,
+        issues: JSON.stringify(
+          parsedConfig.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        ),
+      }),
+      executionContext,
+    );
+  }
+
+  if (actionServerConfigHasUnsupportedProfileApplication(parsedConfig.data)) {
+    return domainErrorHttpResponse(
+      domainError.validation(
+        "Action server config deployment endpoint validated the config, but source profile application is not enabled in this build",
+        {
+          phase: "profile-application",
+        },
+      ),
+      executionContext,
+    );
+  }
+
+  const target = await resolveActionServerConfigDeploymentTarget({
+    context,
+    body: body.data,
+  });
+  if (target.isErr()) {
+    return domainErrorHttpResponse(target.error, executionContext);
+  }
+
+  if (!target.value.serverId) {
+    return domainErrorHttpResponse(
+      domainError.validation("Source link does not include a deployment target", {
+        phase: "source-link-resolution",
+        sourceFingerprint: body.data.sourceFingerprint,
+      }),
+      executionContext,
+    );
+  }
+
+  const profileApplied = await applyActionServerConfigProfileCommands({
+    context,
+    executionContext,
+    config: parsedConfig.data,
+    ...(body.data.resolvedSecrets ? { resolvedSecrets: body.data.resolvedSecrets } : {}),
+    target: target.value,
+  });
+  if (profileApplied.isErr()) {
+    return domainErrorHttpResponse(profileApplied.error, executionContext);
+  }
+
+  const command = CreateDeploymentCommand.create({
+    projectId: target.value.projectId,
+    environmentId: target.value.environmentId,
+    resourceId: target.value.resourceId,
+    serverId: target.value.serverId,
+    ...(target.value.destinationId ? { destinationId: target.value.destinationId } : {}),
+  });
+  if (command.isErr()) {
+    return domainErrorHttpResponse(command.error, executionContext);
+  }
+
+  const result = await context.commandBus.execute(executionContext, command.value);
+  if (result.isErr()) {
+    return domainErrorHttpResponse(result.error, executionContext);
+  }
+
+  return Response.json(
+    {
+      ...result.value,
+      deploymentHref: `/deployments/${result.value.id}`,
+    },
+    { status: 202 },
+  );
+}
+
 async function handleGitHubPreviewPullRequestRoute(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
@@ -4346,6 +5201,32 @@ export function mountAppaloftOrpcRoutes(
     }
   };
 
+  const actionServerConfigDeploymentRouteHandler = async ({ request }: { request: Request }) => {
+    const executionContext = createRequestExecutionContext(
+      context.executionContextFactory,
+      "http",
+      request,
+    );
+    const run = createRequestRunner(request, executionContext, context.requestContextRunner);
+
+    try {
+      return await run(() =>
+        handleActionServerConfigDeploymentRoute({
+          context,
+          executionContext,
+          request,
+        }),
+      );
+    } catch (error) {
+      context.logger.error("action_server_config_deployment_route_unhandled_error", {
+        method: request.method,
+        url: request.url,
+        ...buildUnexpectedErrorContext(error),
+      });
+      throw error;
+    }
+  };
+
   const routes = [
     "/api/projects",
     "/api/projects/:projectId",
@@ -4457,6 +5338,14 @@ export function mountAppaloftOrpcRoutes(
   mounted = mounted.post(
     "/api/action/deployments/from-source-link",
     actionSourceLinkDeploymentRouteHandler,
+    {
+      parse: "none",
+    },
+  ) as unknown as Elysia;
+
+  mounted = mounted.post(
+    "/api/action/deployments/from-config-package",
+    actionServerConfigDeploymentRouteHandler,
     {
       parse: "none",
     },

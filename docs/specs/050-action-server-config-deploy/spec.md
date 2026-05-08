@@ -27,6 +27,7 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
 - [ADR-028: Command Coordination Scope And Mutation Admission](../../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [Repository Deployment Config File Bootstrap](../../workflows/deployment-config-file-bootstrap.md)
 - [Control-Plane Mode Selection And Adoption](../../workflows/control-plane-mode-selection-and-adoption.md)
+- [Action Server Config Deploy Workflow](../../workflows/action-server-config-deploy.md)
 - [Deployment Config File Test Matrix](../../testing/deployment-config-file-test-matrix.md)
 - [Control-Plane Modes Test Matrix](../../testing/control-plane-modes-test-matrix.md)
 - [Error Model](../../errors/model.md)
@@ -52,6 +53,7 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
 | ACTION-SERVER-CONFIG-SPEC-005 | Preview context is scoped by trusted event facts | `preview=pull-request` and `preview-id` are supplied by a user-authored PR workflow | Server-side config bootstrap runs | The server uses a preview-scoped source fingerprint and trusted preview context; root production config domains or secrets are not reused as preview route or secret policy unless an accepted preview-safe config/overlay selects them. |
 | ACTION-SERVER-CONFIG-SPEC-006 | Incompatible feature fails before upload mutation | The server handshake does not advertise source package or server-side config bootstrap support | The Action starts | The Action fails in `control-plane-handshake` or `control-plane-capability` before source upload, source-link mutation, resource mutation, route mutation, or deployment creation. |
 | ACTION-SERVER-CONFIG-SPEC-007 | Source package is bounded and verifiable | A source package is prepared by the Action | The server accepts the package or reference | The server records safe package metadata, verifies checksum/size/path boundaries, rejects parent traversal or untrusted config paths, and does not persist raw secrets or oversized package content as read-model data. |
+| ACTION-SERVER-CONFIG-SPEC-008 | CI secret references stay runner-scoped and server-applied | Committed config declares `secrets.KEY.from: ci-env:NAME` and the workflow maps `secret-variables: KEY=ci-env:NAME` from GitHub Secrets into the runner environment | The Action submits the server config deploy request | The Action sends only transient resolved secret values to the self-hosted server API, the server applies them through environment commands as runtime secrets, missing required references fail before mutation with sanitized details, and pure SSH CLI mode still handles `--secret` directly. |
 
 ## Domain Ownership
 
@@ -66,16 +68,18 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
 
 ## Public Surfaces
 
-- API: a future config-aware Action endpoint or RPC must be separate from strict
-  `deployments.create` and must reuse application command/query schemas internally.
+- API: [Action Server Config Deploy Workflow](../../workflows/action-server-config-deploy.md)
+  reserves `POST /api/action/deployments/from-config-package` as the dedicated workflow endpoint.
+  It remains separate from strict `deployments.create` and must reuse application command/query
+  schemas internally.
 - CLI: no new CLI command in this Spec Round. Pure SSH CLI mode remains the default and continues
   to own the local/SSH config workflow.
 - GitHub Action: future wrapper inputs may select server config deploy and source package behavior;
   defaults remain pure SSH `none` or existing self-hosted source-link trigger when selected.
 - Web/UI: Web may link to the accepted deployment detail and source package diagnostics; Web mode
   selection remains separate.
-- Config: committed config may carry non-secret profile and control-plane connection policy only.
-  It must not carry identity or secret material.
+- Config: committed config may carry non-secret profile, `ci-env:` secret references, and
+  control-plane connection policy only. It must not carry identity or raw secret material.
 - Events: Code Round must define any new source package accepted/rejected events or process-state
   records before adding workers.
 - Public docs/help: docs must keep distinguishing pure Action/SSH, self-hosted source-link trigger,
@@ -110,3 +114,13 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
   PGlite from the runner.
 - Existing server trigger mode does not read/apply repository config, upload source packages,
   apply runner-side resource profile inputs, or perform product-grade preview orchestration.
+- The first Action Server Config Deploy code slices validate package metadata, read
+  `server-github-fetch` config files from GitHub raw content, reject committed identity/secrets,
+  resolve/bootstrap source-link context, apply runtime/network/health profile fields through
+  explicit resource commands, apply plain `env` values through `environments.set-variable`, apply
+  `access.domains[]` through managed `domain-bindings.create` commands when trusted
+  resource/destination/server proxy context is available, apply `ci-env:` secret references from
+  transient Action-supplied values through `environments.set-variable`, and dispatch ids-only
+  deployment admission. Inline archive transport, remote archive URL transport, source package
+  storage, diagnostics, cleanup, source profile application, non-`ci-env:` secret resolvers, and
+  product-grade preview orchestration remain migration gaps.

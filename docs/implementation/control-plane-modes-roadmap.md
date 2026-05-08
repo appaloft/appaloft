@@ -153,8 +153,9 @@ Purpose: users can run Appaloft as their own control plane.
 
 Next `0.9.x` accepted candidate:
 
-- [Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md) lets the Action
-  hand a bounded source package reference and selected config path to the self-hosted server.
+- [Action Server Config Deploy](../workflows/action-server-config-deploy.md), coordinated by
+  [spec 050](../specs/050-action-server-config-deploy/spec.md), lets the Action hand a bounded
+  source package reference and selected config path to the self-hosted server.
 - The self-hosted server validates package metadata, parses repository config, rejects committed
   identity/secret fields, applies profile/env/route intent through explicit commands, resolves
   source links from trusted context, and dispatches ids-only deployment admission.

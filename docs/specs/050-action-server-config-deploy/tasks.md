@@ -12,22 +12,26 @@
 
 ## Test-First
 
-- [ ] `CONTROL-PLANE-HANDSHAKE-013`: wrapper requires source package/server config feature support
+- [x] `CONTROL-PLANE-HANDSHAKE-013`: wrapper requires source package/server config feature support
   before mutation.
-- [ ] `CONTROL-PLANE-HANDSHAKE-014`: wrapper server config mode does not invoke CLI, SSH, or
+- [x] `CONTROL-PLANE-HANDSHAKE-014`: wrapper server config mode does not invoke CLI, SSH, or
   state-backend mutation.
-- [ ] `CONTROL-PLANE-HANDSHAKE-015`: HTTP server config endpoint validates package manifest and
+- [x] `CONTROL-PLANE-HANDSHAKE-015`: HTTP server config endpoint validates package manifest and
   rejects unsafe config/source paths before mutation.
-- [ ] `CONTROL-PLANE-HANDSHAKE-016`: server-side config bootstrap rejects identity/secret fields in
+- [x] `CONTROL-PLANE-HANDSHAKE-016`: server-side config bootstrap rejects identity/secret fields in
   committed config before source-link/resource/route/deployment mutation.
-- [ ] `CONTROL-PLANE-HANDSHAKE-017`: server-side config bootstrap applies accepted config through
+- [x] `CONTROL-PLANE-HANDSHAKE-017`: server-side config bootstrap applies accepted config through
   explicit commands before ids-only deployment.
 - [ ] `CONFIG-FILE-ENTRY-028`: Action server config deploy keeps committed config non-secret and
   uses trusted source/preview context for identity.
+- [x] `ACTION-SERVER-CONFIG-SPEC-008`: Action server config deploy resolves `ci-env:` secrets from
+  runner environment and applies them through server-owned environment commands.
+- [x] `CONTROL-PLANE-INSTALL-003`: `command=install-console` reads non-secret console install
+  settings from repository config while keeping SSH host/key and secrets in trusted workflow inputs.
 
 ## Source Of Truth
 
-- [ ] Add command/workflow spec for the dedicated server config deploy API contract.
+- [x] Add command/workflow spec for the dedicated server config deploy API contract.
 - [ ] Define source package manifest fields, limits, checksum rules, storage lifecycle, and cleanup
   behavior.
 - [ ] Define source package/config bootstrap errors and public help anchors.
@@ -35,28 +39,37 @@
 
 ## Implementation
 
-- [ ] Add wrapper inputs and dry-run traces for server config deploy/package behavior.
-- [ ] Add API route or RPC endpoint for Action server config deploy.
-- [ ] Add source package manifest validation and a hermetic fake source package adapter.
-- [ ] Reuse repository config parser/validator on the server side and keep identity/secret
+- [x] Add wrapper inputs and dry-run traces for server config deploy/package behavior.
+- [x] Add API route or RPC endpoint for Action server config deploy.
+- [x] Add source package manifest validation and a hermetic fake source package adapter.
+- [x] Wire the self-hosted console composition to a GitHub `server-github-fetch` config reader for
+  reading the selected repository config from trusted package metadata.
+- [x] Reuse repository config parser/validator on the server side and keep identity/secret
   rejection identical to pure CLI config deploy.
 - [ ] Orchestrate server-side config bootstrap through existing resource/environment commands and
-  ids-only `CreateDeploymentCommand`.
+  ids-only `CreateDeploymentCommand`. Current implementation accepts the existing-resource/no-profile
+  slice, resolves existing source-link context for no-profile requests, bootstraps source-link
+  context from complete trusted ids, applies runtime/network/health profile fields through explicit
+  resource commands, applies plain `env` values through `environments.set-variable`, applies
+  `access.domains[]` through managed `domain-bindings.create` commands using trusted
+  resource/destination/server proxy context, applies `ci-env:` secret references through
+  `environments.set-variable` from transient Action-supplied values, and rejects unsupported source
+  profile application before mutation.
 - [ ] Add safe source package diagnostics/read-model output if needed for Web and support.
 
 ## Entrypoints And Docs
 
-- [ ] Update deploy-action README/action metadata after wrapper behavior exists.
+- [x] Update deploy-action README/action metadata after wrapper behavior exists.
 - [ ] Update public docs only after the server config closed loop is verified.
 - [ ] Update Web console links/diagnostics only if the Code Round adds source package read models.
 
 ## Verification
 
-- [ ] Run targeted wrapper tests.
-- [ ] Run targeted HTTP/orpc tests.
+- [x] Run targeted wrapper tests.
+- [x] Run targeted HTTP/orpc tests.
 - [ ] Run targeted deployment config parser tests.
-- [ ] Run `bun run lint`.
-- [ ] Run typecheck for changed packages.
+- [x] Run `bun run lint`.
+- [x] Run typecheck for changed packages.
 
 ## Post-Implementation Sync
 
