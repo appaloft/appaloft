@@ -20,7 +20,7 @@
   rejects unsafe config/source paths before mutation.
 - [x] `CONTROL-PLANE-HANDSHAKE-016`: server-side config bootstrap rejects identity/secret fields in
   committed config before source-link/resource/route/deployment mutation.
-- [ ] `CONTROL-PLANE-HANDSHAKE-017`: server-side config bootstrap applies accepted config through
+- [x] `CONTROL-PLANE-HANDSHAKE-017`: server-side config bootstrap applies accepted config through
   explicit commands before ids-only deployment.
 - [ ] `CONFIG-FILE-ENTRY-028`: Action server config deploy keeps committed config non-secret and
   uses trusted source/preview context for identity.
@@ -46,8 +46,9 @@
   ids-only `CreateDeploymentCommand`. Current implementation accepts the existing-resource/no-profile
   slice, resolves existing source-link context for no-profile requests, bootstraps source-link
   context from complete trusted ids, applies runtime/network/health profile fields through explicit
-  resource commands, and rejects unsupported source/access/env/secret profile application before
-  mutation.
+  resource commands, applies `access.domains[]` through managed `domain-bindings.create` commands
+  using trusted resource/destination/server proxy context, and rejects unsupported source/env/secret
+  profile application before mutation.
 - [ ] Add safe source package diagnostics/read-model output if needed for Web and support.
 
 ## Entrypoints And Docs

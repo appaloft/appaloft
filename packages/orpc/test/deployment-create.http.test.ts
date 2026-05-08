@@ -10,6 +10,7 @@ import {
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   CreateDeploymentCommand,
+  CreateDomainBindingCommand,
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
@@ -19,6 +20,8 @@ import {
   RestartResourceRuntimeCommand,
   RetryDeploymentCommand,
   RollbackDeploymentCommand,
+  ShowResourceQuery,
+  ShowServerQuery,
   type SourceLinkRecord,
   type SourceLinkRepository,
   type SourceLinkSelectionSpec,
@@ -1005,7 +1008,152 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommands[3]).toBeInstanceOf(CreateDeploymentCommand);
   });
 
-  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint fails before mutation when unsupported profile application is required", async () => {
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies access domain commands before deployment", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommands.push(command as Command<unknown>);
+        return ok({
+          id:
+            command instanceof CreateDeploymentCommand
+              ? "dep_domain_config"
+              : `dmb_${capturedCommands.length}`,
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        if (query instanceof ShowResourceQuery) {
+          return ok({
+            schemaVersion: "resources.show/v1",
+            resource: {
+              id: "res_www",
+              projectId: "prj_console",
+              environmentId: "env_prod",
+              destinationId: "dst_prod",
+              name: "Docs",
+              slug: "docs",
+              kind: "application",
+              createdAt: "2026-05-08T00:00:00.000Z",
+              services: [],
+              deploymentCount: 0,
+            },
+            lifecycle: {
+              status: "active",
+            },
+            diagnostics: [],
+            generatedAt: "2026-05-08T00:00:00.000Z",
+          } as T);
+        }
+        if (query instanceof ShowServerQuery) {
+          return ok({
+            schemaVersion: "servers.show/v1",
+            server: {
+              id: "srv_prod",
+              name: "prod",
+              host: "203.0.113.10",
+              port: 22,
+              providerKey: "ssh",
+              targetKind: "single-server",
+              lifecycleStatus: "active",
+              edgeProxy: {
+                kind: "traefik",
+                status: "ready",
+              },
+              createdAt: "2026-05-08T00:00:00.000Z",
+            },
+            generatedAt: "2026-05-08T00:00:00.000Z",
+          } as T);
+        }
+        return ok({} as T);
+      },
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "access:",
+            "  domains:",
+            "    - host: docs.example.com",
+            "      pathPrefix: /",
+            "      tlsMode: auto",
+            "    - host: www.example.com",
+            "      pathPrefix: /",
+            "      tlsMode: auto",
+            "      redirectTo: docs.example.com",
+            "      redirectStatus: 308",
+          ].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      id: "dep_domain_config",
+      deploymentHref: "/deployments/dep_domain_config",
+    });
+    expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      CreateDomainBindingCommand,
+      CreateDomainBindingCommand,
+      CreateDeploymentCommand,
+    ]);
+    expect(capturedCommands[0]).toMatchObject({
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+      destinationId: "dst_prod",
+      domainName: "docs.example.com",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+    expect(capturedCommands[1]).toMatchObject({
+      domainName: "www.example.com",
+      redirectTo: "docs.example.com",
+      redirectStatus: 308,
+    });
+    expect(capturedCommands[2]).toBeInstanceOf(CreateDeploymentCommand);
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint fails before mutation when unsupported source profile application is required", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
@@ -1020,13 +1168,7 @@ describe("deployment create HTTP route", () => {
     const actionSourcePackageConfigReader = {
       readConfig: async () =>
         ok({
-          text: [
-            "access:",
-            "  domains:",
-            "    - host: docs.example.com",
-            "      pathPrefix: /",
-            "      tlsMode: auto",
-          ].join("\n"),
+          text: ["source:", "  baseDirectory: apps/docs"].join("\n"),
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;

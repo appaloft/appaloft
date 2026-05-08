@@ -109,8 +109,10 @@ It also covers the first `CONTROL-PLANE-HANDSHAKE-017` existing-resource slice: 
 does not require profile application dispatches ids-only `deployments.create`, can reuse existing
 source-link state after bootstrap, bootstraps source-link context from complete trusted ids, and
 applies runtime/network/health profile fields through explicit resource commands before deployment
-admission, while unsupported source/access/env/secret fields fail before mutation with
-`profile-application`.
+admission. The same row now covers managed `access.domains[]` bootstrap through
+`domain-bindings.create` before deployment admission, including destination lookup from resource
+context and server proxy kind lookup. Unsupported source/env/secret fields still fail before
+mutation with `profile-application`.
 
 Existing tests in `deployment-state.test.ts` and `remote-pglite-state-sync.test.ts` partially cover
 the older `postgres-control-plane` backend selection branch. Those tests should be renamed or
