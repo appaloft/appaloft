@@ -63,6 +63,7 @@ describe("deploy-action wrapper reference", () => {
     expect(actionYaml).toContain("install-console");
     expect(actionYaml).toContain("console-domain");
     expect(actionYaml).toContain("console-database");
+    expect(actionYaml).toContain("console-orchestrator");
     expect(actionYaml).toContain("appaloft-version");
     expect(actionYaml).toContain("preview-url");
     expect(actionYaml).toContain("preview-cleanup-status");
@@ -126,6 +127,7 @@ describe("deploy-action wrapper reference", () => {
     );
     expect(publicCiWorkflow).toContain("Validate dry-run console install");
     expect(publicCiWorkflow).toContain("INPUT_COMMAND: install-console");
+    expect(publicCiWorkflow).toContain("INPUT_CONSOLE_ORCHESTRATOR: swarm");
     expect(publicCiWorkflow).toContain("HEALTH https://console.example.com/api/health");
     expect(publicCiWorkflow).toContain("Opt-in exact-version install smoke");
     expect(publicCiWorkflow).toContain("APPALOFT_INSTALL_SMOKE_VERSION");
@@ -393,6 +395,9 @@ describe("deploy-action wrapper reference", () => {
       INPUT_SSH_PORT: "2222",
       INPUT_CONSOLE_DOMAIN: "console.example.com",
       INPUT_CONSOLE_DATABASE: "pglite",
+      INPUT_CONSOLE_ORCHESTRATOR: "swarm",
+      INPUT_CONSOLE_SWARM_STACK_NAME: "appaloft-console",
+      INPUT_CONSOLE_SWARM_INIT: "true",
       INPUT_CONSOLE_SKIP_DOCKER_INSTALL: "true",
     });
 
@@ -401,7 +406,7 @@ describe("deploy-action wrapper reference", () => {
       expect(result.argv).toEqual([
         "SSH root@203.0.113.10:2222",
         "INSTALLER https://github.com/appaloft/appaloft/releases/download/v0.9.1/install.sh",
-        "RUN sh /tmp/appaloft-install.sh --version 'v0.9.1' --web-origin 'https://console.example.com' --database 'pglite' --host '0.0.0.0' --port '3001' --image 'ghcr.io/appaloft/appaloft' --skip-docker-install",
+        "RUN sh /tmp/appaloft-install.sh --version 'v0.9.1' --web-origin 'https://console.example.com' --database 'pglite' --orchestrator 'swarm' --host '0.0.0.0' --port '3001' --image 'ghcr.io/appaloft/appaloft' --stack-name 'appaloft-console' --swarm-init --skip-docker-install",
         "HEALTH https://console.example.com/api/health",
       ]);
       expect(result.output).toContain("console-url=https://console.example.com");
@@ -431,6 +436,21 @@ describe("deploy-action wrapper reference", () => {
     } finally {
       rmSync(install.workspace, { recursive: true, force: true });
       rmSync(deploy.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-002] install-console rejects unknown orchestrators before SSH", () => {
+    const result = runDeploy({
+      INPUT_COMMAND: "install-console",
+      INPUT_SSH_HOST: "203.0.113.10",
+      INPUT_CONSOLE_ORCHESTRATOR: "kubernetes",
+    });
+
+    try {
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("console-orchestrator must be compose or swarm");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
     }
   });
 

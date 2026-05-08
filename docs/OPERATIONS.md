@@ -218,6 +218,15 @@ volume, pass:
 curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite
 ```
 
+To install the same console as a Docker Swarm stack on an existing manager, pass:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite --orchestrator swarm --stack-name appaloft
+```
+
+On a single fresh host, add `--swarm-init` only when the installer should initialize that host as a
+single-node Swarm manager.
+
 `install.sh` is authored in the Appaloft main repository and published as a GitHub Release asset.
 The website route should redirect or proxy to
 `https://github.com/appaloft/appaloft/releases/latest/download/install.sh` rather than copying from a

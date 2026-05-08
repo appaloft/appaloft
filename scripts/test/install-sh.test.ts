@@ -37,10 +37,22 @@ async function createFakeDocker(tempRoot: string): Promise<{ binDir: string; log
     `#!/usr/bin/env sh
 printf '%s\\n' "$*" >> "$APPALOFT_FAKE_DOCKER_LOG"
 case "$1" in
-  version | info)
+  version)
+    exit 0
+    ;;
+  info)
+    if [ "$2" = "--format" ]; then
+      case "$3" in
+        *LocalNodeState*) printf 'active\\n' ;;
+        *ControlAvailable*) printf 'true\\n' ;;
+      esac
+    fi
     exit 0
     ;;
   compose)
+    exit 0
+    ;;
+  stack | swarm)
     exit 0
     ;;
 esac
@@ -71,9 +83,44 @@ test("install.sh dry-run reports the selected Docker stack", async () => {
   expect(result.stdout).toContain("image: ghcr.io/appaloft/appaloft:0.2.1");
   expect(result.stdout).toContain(`home: ${home}`);
   expect(result.stdout).toContain(`compose file: ${join(home, "docker-compose.yml")}`);
+  expect(result.stdout).toContain("orchestrator: compose");
+  expect(result.stdout).toContain("compose project: appaloft");
   expect(result.stdout).toContain("bind: 0.0.0.0:3001");
   expect(result.stdout).toContain("database: postgres");
   expect(result.stdout).toContain("install docker: yes");
+});
+
+test("install.sh dry-run reports a selected Docker Swarm stack", async () => {
+  const home = join(tmpdir(), "appaloft-install-test-home");
+  const result = await run(
+    [
+      "sh",
+      installScript,
+      "--dry-run",
+      "--orchestrator",
+      "swarm",
+      "--stack-name",
+      "appaloft-console",
+      "--swarm-init",
+    ],
+    {
+      APPALOFT_HOME: home,
+    },
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toContain("orchestrator: swarm");
+  expect(result.stdout).toContain("swarm stack: appaloft-console");
+  expect(result.stdout).toContain("swarm init: yes");
+});
+
+test("install.sh rejects unknown Docker orchestrators", async () => {
+  const result = await run(["sh", installScript, "--dry-run", "--orchestrator", "kubernetes"], {
+    APPALOFT_HOME: join(tmpdir(), "appaloft-install-test-home"),
+  });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr).toContain("--orchestrator must be compose or swarm");
 });
 
 test("install.sh dry-run accepts an existing full image ref and skipped Docker bootstrap", async () => {
@@ -196,6 +243,60 @@ test("install.sh writes a PGlite self-host stack with durable app data", async (
 
     const dockerLog = await Bun.file(logPath).text();
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh writes a Docker Swarm PGlite stack and deploys it", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--database",
+        "pglite",
+        "--orchestrator",
+        "swarm",
+        "--stack-name",
+        "appaloft-console",
+        "--web-origin",
+        "https://console.appaloft.example.test",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+    expect(install.stdout).toContain("Orchestrator: swarm");
+    expect(install.stdout).toContain("Logs: docker service logs -f appaloft-console_app");
+
+    const compose = await Bun.file(join(home, "docker-compose.yml")).text();
+    expect(compose).toContain("APPALOFT_DATABASE_DRIVER: pglite");
+    expect(compose).toContain("node.role == manager");
+
+    const env = await Bun.file(join(home, ".env")).text();
+    expect(env).toContain("APPALOFT_SELF_HOST_ORCHESTRATOR=swarm");
+    expect(env).toContain("APPALOFT_SWARM_STACK_NAME=appaloft-console");
+
+    const dockerLog = await Bun.file(logPath).text();
+    expect(dockerLog).toContain("info --format {{.Swarm.LocalNodeState}}");
+    expect(dockerLog).toContain("info --format {{.Swarm.ControlAvailable}}");
+    expect(dockerLog).toContain(
+      `stack deploy -c ${join(home, "docker-compose.yml")} appaloft-console`,
+    );
+    expect(dockerLog).not.toContain("compose --env-file");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
