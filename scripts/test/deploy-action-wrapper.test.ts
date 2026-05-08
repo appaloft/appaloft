@@ -65,6 +65,7 @@ describe("deploy-action wrapper reference", () => {
     expect(actionYaml).toContain("deployment-url");
     expect(actionYaml).toContain("pr-comment");
     expect(actionYaml).toContain("github-token");
+    expect(actionYaml).toContain("server-config-deploy");
     expect(actionYaml).not.toContain("project:");
     expect(actionYaml).not.toContain("resource:");
     expect(actionYaml).not.toContain("server:");
@@ -114,6 +115,10 @@ describe("deploy-action wrapper reference", () => {
     expect(publicCiWorkflow).toContain("INPUT_CONTROL_PLANE_MODE: self-hosted");
     expect(publicCiWorkflow).toContain(
       "POST https://console.example.com/api/action/deployments/from-source-link",
+    );
+    expect(publicCiWorkflow).toContain("Validate dry-run self-hosted server config deploy");
+    expect(publicCiWorkflow).toContain(
+      "POST https://console.example.com/api/action/deployments/from-config-package",
     );
     expect(publicCiWorkflow).toContain("Opt-in exact-version install smoke");
     expect(publicCiWorkflow).toContain("APPALOFT_INSTALL_SMOKE_VERSION");
@@ -349,6 +354,80 @@ describe("deploy-action wrapper reference", () => {
       expect(result.output).toContain("preview-id=pr-42");
     } finally {
       rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-014] self-hosted server config deploy calls the config package API in dry-run", () => {
+    const result = runDeploy({
+      INPUT_CONFIG: "appaloft.yml",
+      INPUT_CONTROL_PLANE_MODE: "self-hosted",
+      INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+      INPUT_SERVER_CONFIG_DEPLOY: "true",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv).toEqual([
+        "GET https://console.example.com/api/version",
+        "POST https://console.example.com/api/action/deployments/from-config-package",
+      ]);
+      expect(result.output).toContain("console-url=https://console.example.com");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-013] self-hosted server config deploy fails when the server lacks source package support", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-config-gate-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'case "$*" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        "    echo 'unexpected config package mutation' >&2",
+        "    exit 22",
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).toContain("Action Server Config Deploy");
+      expect(existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "").toBe("");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
     }
   });
 

@@ -217,8 +217,14 @@ console output.
 
 ## Current Implementation Notes And Migration Gaps
 
-- This workflow spec is not implemented yet.
-- The active self-hosted Action route remains
+- The deploy-action wrapper accepts explicit `server-config-deploy: true` for self-hosted mode,
+  feature-gates server support through `/api/version`, and fails before package handoff or state
+  mutation when the server does not advertise source package plus server-side config bootstrap
+  support.
+- The wrapper dry-run path maps the selected mode to
+  `POST /api/action/deployments/from-config-package`.
+- The active implemented self-hosted server route remains
   `POST /api/action/deployments/from-source-link`, which triggers an existing resource profile from
   source-link context.
-- Source package transport, storage, diagnostics, and cleanup rules still require a Code Round.
+- The `POST /api/action/deployments/from-config-package` server endpoint, source package transport,
+  source package storage, diagnostics, and cleanup rules are not implemented yet.

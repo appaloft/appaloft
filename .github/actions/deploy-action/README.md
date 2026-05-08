@@ -195,6 +195,24 @@ them to bootstrap a missing source link before later runs omit ids. When ids are
 resolves project, environment, resource, and target from existing source-link state. It does not
 install or invoke the Appaloft CLI, open SSH, or read or write SSH-server PGlite state.
 
+`server-config-deploy: true` selects the next self-hosted server config workflow. In that mode the
+action feature-gates server support through `/api/version` before source package handoff and then
+calls `POST /api/action/deployments/from-config-package`. A server that does not advertise source
+package and server-side config bootstrap support fails before package upload or state mutation. This
+mode is for compatible `0.9.x` self-hosted servers; leave it unset for the existing source-link
+trigger mode.
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  id: deploy
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    server-config-deploy: true
+    config: appaloft.yml
+```
+
 For `preview: pull-request`, server API mode derives a preview-scoped source fingerprint and calls
 the same deployment endpoint. It writes `preview-id`, `deployment-id`, `deployment-url`, and
 `console-url` outputs, but it does not apply `preview-domain-template`, `preview-tls-mode`,
@@ -278,6 +296,7 @@ source-link state, or the Appaloft server, not from committed config.
 | `control-plane-url` | empty | Self-hosted Appaloft server endpoint for server API mode. When empty, `controlPlane.url` from config may supply the endpoint. |
 | `appaloft-token` | empty | Optional bearer token for server API mode. |
 | `use-oidc` | `false` | Reserved for future GitHub OIDC exchange. |
+| `server-config-deploy` | `false` | Experimental self-hosted mode that calls `POST /api/action/deployments/from-config-package` after the server advertises source package and server-side config bootstrap support. |
 | `project-id` | empty | Optional trusted project id for server API mode. When supplied with environment/resource/server ids, the server may bootstrap a missing source link. When omitted with the other ids, the server resolves context from source-link state. |
 | `environment-id` | empty | Optional trusted environment id for server API mode. Required only when any explicit deployment id is supplied. |
 | `resource-id` | empty | Optional trusted resource id for server API mode. Required only when any explicit deployment id is supplied. |
@@ -312,6 +331,8 @@ source-link state, or the Appaloft server, not from committed config.
   rejected until the server owns that policy. `command: preview-cleanup` accepts only source/config
   and trusted preview scope inputs. Deployment target ids are intentionally ignored/rejected for
   cleanup because cleanup resolves from server-owned source-link state.
+- `server-config-deploy` requires explicit self-hosted server support. The action fails before
+  source package handoff when the server handshake does not advertise the required capability.
 - `pr-comment` requires explicit workflow permission and token wiring. The action updates the same
   marker comment for the PR instead of creating a new comment on each run. Comment API failures are
   warnings so they do not mask a successful deployment.

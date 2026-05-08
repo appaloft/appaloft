@@ -93,7 +93,12 @@ This matrix inherits:
 
 ## Current Implementation Notes And Migration Gaps
 
-Current implementation has no automated rows in this matrix yet.
+Current implementation covers the first deploy-action wrapper rows in
+`scripts/test/deploy-action-wrapper.test.ts`: unsupported control-plane input rejection
+(`CONTROL-PLANE-ENTRY-002`), self-hosted source-link deployment and preview cleanup
+(`CONTROL-PLANE-HANDSHAKE-011` and `CONTROL-PLANE-HANDSHAKE-012`), and the first Action Server
+Config Deploy wrapper gate/dry-run rows (`CONTROL-PLANE-HANDSHAKE-013` and
+`CONTROL-PLANE-HANDSHAKE-014`).
 
 Existing tests in `deployment-state.test.ts` and `remote-pglite-state-sync.test.ts` partially cover
 the older `postgres-control-plane` backend selection branch. Those tests should be renamed or
@@ -103,5 +108,5 @@ extended with the IDs above during Phase 1 Code Round.
 behavior after remote revision conflict. That coverage belongs to the SSH state-backend path under
 mode `none`; it is not evidence of Cloud/self-hosted control-plane handshake or adoption behavior.
 
-Cloud/self-hosted rows remain target coverage until the handshake, adoption, and API mode contracts
-exist.
+Cloud/self-hosted API rows beyond the wrapper gate remain target coverage until the server
+endpoint, source package storage, adoption, and broader API mode contracts exist.
