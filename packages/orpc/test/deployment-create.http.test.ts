@@ -715,6 +715,185 @@ describe("deployment create HTTP route", () => {
     });
   });
 
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint resolves existing source-link context without trusted ids", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const sourceLinkRecord = {
+      sourceFingerprint:
+        "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+      projectId: "prj_linked",
+      environmentId: "env_linked",
+      resourceId: "res_linked",
+      serverId: "srv_linked",
+      destinationId: "dst_linked",
+      updatedAt: "2026-05-08T00:00:00.000Z",
+      reason: "test-source-link",
+    } satisfies SourceLinkRecord;
+    const sourceLinkRepository = {
+      findOne: async (_spec: SourceLinkSelectionSpec) => ok(sourceLinkRecord),
+      upsert: async (
+        record: SourceLinkRecord,
+        _spec: SourceLinkUpsertSpec,
+      ): Promise<Result<SourceLinkRecord>> => ok(record),
+      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
+    } satisfies SourceLinkRepository;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_from_source_link_config_package" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: ["controlPlane:", "  mode: self-hosted", "  url: https://console.example.com"].join(
+            "\n",
+          ),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+      sourceLinkRepository,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      id: "dep_from_source_link_config_package",
+      deploymentHref: "/deployments/dep_from_source_link_config_package",
+    });
+    expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      projectId: "prj_linked",
+      environmentId: "env_linked",
+      resourceId: "res_linked",
+      serverId: "srv_linked",
+      destinationId: "dst_linked",
+    });
+  });
+
+  test("[CONFIG-FILE-ENTRY-028] Action server config endpoint bootstraps source-link context from trusted ids", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let upsertedRecord: SourceLinkRecord | undefined;
+    const sourceLinkRepository = {
+      findOne: async (_spec: SourceLinkSelectionSpec) => ok(null),
+      upsert: async (
+        record: SourceLinkRecord,
+        _spec: SourceLinkUpsertSpec,
+      ): Promise<Result<SourceLinkRecord>> => {
+        upsertedRecord = record;
+        return ok(record);
+      },
+      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
+    } satisfies SourceLinkRepository;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_bootstrapped_config_package" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: ["controlPlane:", "  mode: self-hosted", "  url: https://console.example.com"].join(
+            "\n",
+          ),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+      sourceLinkRepository,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+    });
+    expect(upsertedRecord).toMatchObject({
+      sourceFingerprint:
+        "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+      reason: "github-action-server-config-bootstrap",
+    });
+  });
+
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint fails before mutation when profile application is required", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {

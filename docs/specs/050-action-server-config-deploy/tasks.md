@@ -42,7 +42,8 @@
   rejection identical to pure CLI config deploy.
 - [ ] Orchestrate server-side config bootstrap through existing resource/environment commands and
   ids-only `CreateDeploymentCommand`. Current implementation accepts the existing-resource/no-profile
-  slice and rejects profile application before mutation.
+  slice, resolves existing source-link context for no-profile requests, bootstraps source-link
+  context from complete trusted ids, and rejects profile application before mutation.
 - [ ] Add safe source package diagnostics/read-model output if needed for Web and support.
 
 ## Entrypoints And Docs
