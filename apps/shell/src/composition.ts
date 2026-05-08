@@ -47,6 +47,7 @@ import {
 import { createBetterAuthRuntime } from "@appaloft/auth-better";
 import { type AppConfig, resolveConfig } from "@appaloft/config";
 import { domainError, err, ok } from "@appaloft/core";
+import { createGitHubActionSourcePackageConfigReader } from "@appaloft/integration-github";
 import {
   bootstrapOpenTelemetry,
   createExecutionContextFactory,
@@ -471,6 +472,7 @@ export async function createAppComposition(
     sourceEventVerificationPort,
     githubSourceEventWebhookVerifier,
     githubPreviewPullRequestWebhookVerifier,
+    actionSourcePackageConfigReader: createGitHubActionSourcePackageConfigReader(),
     pluginRuntime,
     authRuntime,
     requestContextRunner,

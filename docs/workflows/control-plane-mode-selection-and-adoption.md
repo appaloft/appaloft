@@ -138,6 +138,18 @@ controlPlane:
   url: https://appaloft.internal.example.com
 ```
 
+Self-hosted console install workflows may add non-secret installer defaults:
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+  install:
+    database: pglite
+    orchestrator: compose
+    httpPort: 3001
+```
+
 Rules:
 
 - `mode` may be `none`, `auto`, `cloud`, or `self-hosted`.
@@ -145,6 +157,9 @@ Rules:
   endpoints.
 - Raw tokens, API keys, database URLs, SSH keys, certificate material, project ids, resource ids,
   server ids, destination ids, credential ids, organization ids, and tenant ids are rejected.
+- `controlPlane.install` is limited to non-secret console installer defaults. SSH host/key, API
+  tokens, raw database credentials, and deployment identity remain trusted entrypoint inputs or
+  server-owned state.
 - A committed config file may not choose Cloud project/resource identity.
 - If `controlPlane` is omitted, the default mode is `none`.
 
@@ -256,13 +271,14 @@ mutation. Preview cleanup must resolve context from preview source-link state. C
 source package, and broader preview workflow contracts remain later server-side work.
 
 The next accepted-candidate `0.9.x` slice is
-[Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md). That slice keeps
-the same state-owner boundary but lets the Action hand a bounded source package reference and
-selected config path to the self-hosted server. The server, not the runner, validates the package
-manifest, parses repository config, applies resource/environment/profile changes through explicit
-operations, resolves source links from trusted context, and dispatches ids-only deployment
-admission. It must fail before source package mutation or state mutation when the handshake does not
-advertise source package and server-side config bootstrap support.
+[Action Server Config Deploy](../workflows/action-server-config-deploy.md), coordinated by the
+[Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md) feature artifact.
+That slice keeps the same state-owner boundary but lets the Action hand a bounded source package
+reference and selected config path to the self-hosted server. The server, not the runner, validates
+the package manifest, parses repository config, applies resource/environment/profile changes
+through explicit operations, resolves source links from trusted context, and dispatches ids-only
+deployment admission. It must fail before source package mutation or state mutation when the
+handshake does not advertise source package and server-side config bootstrap support.
 
 ### Web
 

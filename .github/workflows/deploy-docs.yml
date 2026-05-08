@@ -175,6 +175,7 @@ jobs:
           control-plane-mode: ${{ steps.control-plane.outputs.control-plane-mode }}
           control-plane-url: ${{ steps.control-plane.outputs.control-plane-url }}
           appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+          server-config-deploy: true
           project-id: ${{ vars.APPALOFT_PROJECT_ID }}
           environment-id: ${{ vars.APPALOFT_ENVIRONMENT_ID }}
           resource-id: ${{ vars.APPALOFT_DOCS_RESOURCE_ID }}

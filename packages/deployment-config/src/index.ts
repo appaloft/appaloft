@@ -48,6 +48,9 @@ const domainRedirectToError =
   "config_domain_resolution: access.domains[].redirectTo must be a domain name without scheme, port, path, or wildcard";
 const controlPlaneUrlError =
   "control_plane_config: controlPlane.url must be an http(s) URL without credentials, query, or fragment";
+const controlPlaneInstallerUrlError =
+  "control_plane_config: controlPlane.install.installerUrl must be an http(s) URL without credentials, query, or fragment";
+const positiveIntegerSchema = z.number().int().positive();
 
 const identityConfigFields = new Set([
   "organization",
@@ -458,10 +461,44 @@ function isSafeControlPlaneUrl(value: string): boolean {
   }
 }
 
+function isSafeHttpUrlWithoutCredentials(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return false;
+    }
+
+    return !parsed.username && !parsed.password && !parsed.search && !parsed.hash;
+  } catch {
+    return false;
+  }
+}
+
 export const appaloftDeploymentControlPlaneConfigSchema = z
   .object({
     mode: z.enum(["none", "auto", "cloud", "self-hosted"]),
     url: nonEmptyStringSchema.refine(isSafeControlPlaneUrl, controlPlaneUrlError).optional(),
+    install: z
+      .object({
+        url: nonEmptyStringSchema.refine(isSafeControlPlaneUrl, controlPlaneUrlError).optional(),
+        domain: nonEmptyStringSchema.optional(),
+        database: z.enum(["postgres", "pglite"]).optional(),
+        orchestrator: z.enum(["compose", "swarm"]).optional(),
+        httpHost: nonEmptyStringSchema.optional(),
+        httpPort: positiveIntegerSchema.optional(),
+        installDir: nonEmptyStringSchema.optional(),
+        composeProjectName: nonEmptyStringSchema.optional(),
+        swarmStackName: nonEmptyStringSchema.optional(),
+        swarmInit: z.boolean().optional(),
+        swarmAdvertiseAddr: nonEmptyStringSchema.optional(),
+        image: nonEmptyStringSchema.optional(),
+        installerUrl: nonEmptyStringSchema
+          .refine(isSafeHttpUrlWithoutCredentials, controlPlaneInstallerUrlError)
+          .optional(),
+        skipDockerInstall: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((value, context) => {

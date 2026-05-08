@@ -25,6 +25,13 @@ export const versionResponseSchema = z.object({
   version: z.string(),
   apiVersion: z.string(),
   mode: z.enum(["hosted-control-plane", "self-hosted"]),
+  features: z
+    .object({
+      actionServerConfigDeploy: z.boolean().optional(),
+      sourcePackages: z.boolean().optional(),
+      serverSideConfigBootstrap: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export const authProviderStatusSchema = z.object({

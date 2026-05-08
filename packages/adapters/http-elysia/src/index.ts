@@ -43,7 +43,7 @@ import {
   wrapHttpRequestHandlerWithSpan,
   writeActiveTraceResponseHeaders,
 } from "@appaloft/observability";
-import { mountAppaloftOrpcRoutes } from "@appaloft/orpc";
+import { type ActionSourcePackageConfigReader, mountAppaloftOrpcRoutes } from "@appaloft/orpc";
 import {
   type SystemPluginHttpMiddleware,
   type SystemPluginHttpRoute,
@@ -467,6 +467,7 @@ export function createHttpApp(input: {
   sourceEventVerificationPort?: SourceEventVerificationPort;
   githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
+  actionSourcePackageConfigReader?: ActionSourcePackageConfigReader;
 }) {
   const pluginMiddlewares = input.pluginRuntime?.listHttpMiddlewares() ?? [];
   const pluginRoutes = input.pluginRuntime?.listHttpRoutes() ?? [];
@@ -947,6 +948,11 @@ export function createHttpApp(input: {
       version: input.config.appVersion,
       apiVersion,
       mode: input.config.runtimeMode,
+      features: {
+        actionServerConfigDeploy: Boolean(input.actionSourcePackageConfigReader),
+        sourcePackages: true,
+        serverSideConfigBootstrap: Boolean(input.actionSourcePackageConfigReader),
+      },
     }))
     .get("/api/console-overview", ({ request }) => consoleOverview(request))
     .get("/.well-known/acme-challenge/:token", ({ request, params }) =>
@@ -1120,6 +1126,11 @@ export function createHttpApp(input: {
     ...(input.githubPreviewPullRequestWebhookVerifier
       ? {
           githubPreviewPullRequestWebhookVerifier: input.githubPreviewPullRequestWebhookVerifier,
+        }
+      : {}),
+    ...(input.actionSourcePackageConfigReader
+      ? {
+          actionSourcePackageConfigReader: input.actionSourcePackageConfigReader,
         }
       : {}),
     ...(input.config.githubWebhookSecret

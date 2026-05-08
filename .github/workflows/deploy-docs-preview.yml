@@ -153,6 +153,7 @@ jobs:
             --resource-name "$RESOURCE_NAME" \
             --resource-kind static-site \
             --runtime-name "$RESOURCE_NAME" \
+            --install "bun install --frozen-lockfile" \
             --build "$build_command" \
             --publish-dir apps/docs/dist \
             --port 80 \

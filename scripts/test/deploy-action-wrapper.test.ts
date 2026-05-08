@@ -19,10 +19,13 @@ const publicCiWorkflow = readFileSync(join(actionRoot, ".github/workflows/ci.yml
 const runDeployScript = join(actionRoot, "scripts/run-deploy.sh");
 const exportScript = resolve(import.meta.dir, "../export-deploy-action-wrapper.ts");
 
-function runDeploy(input: Record<string, string | undefined>) {
+function runDeploy(input: Record<string, string | undefined>, files?: Record<string, string>) {
   const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-test-"));
   const argvPath = join(workspace, "argv.txt");
   const outputPath = join(workspace, "github-output.txt");
+  for (const [path, content] of Object.entries(files ?? {})) {
+    writeFileSync(join(workspace, path), content);
+  }
   const env = {
     ...Bun.env,
     APPALOFT_DEPLOY_ACTION_ARGV_PATH: argvPath,
@@ -41,7 +44,8 @@ function runDeploy(input: Record<string, string | undefined>) {
   });
 
   const argv = result.exitCode === 0 ? readFileSync(argvPath, "utf8").trim().split("\n") : [];
-  const output = result.exitCode === 0 ? readFileSync(outputPath, "utf8") : "";
+  const output =
+    result.exitCode === 0 && existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "";
 
   return {
     argv,
@@ -59,12 +63,17 @@ describe("deploy-action wrapper reference", () => {
     expect(actionYaml).toContain("scripts/install-appaloft.sh");
     expect(actionYaml).toContain("scripts/run-deploy.sh");
     expect(actionYaml).toContain("command:");
+    expect(actionYaml).toContain("install-console");
+    expect(actionYaml).toContain("console-domain");
+    expect(actionYaml).toContain("console-database");
+    expect(actionYaml).toContain("console-orchestrator");
     expect(actionYaml).toContain("appaloft-version");
     expect(actionYaml).toContain("preview-url");
     expect(actionYaml).toContain("preview-cleanup-status");
     expect(actionYaml).toContain("deployment-url");
     expect(actionYaml).toContain("pr-comment");
     expect(actionYaml).toContain("github-token");
+    expect(actionYaml).toContain("server-config-deploy");
     expect(actionYaml).not.toContain("project:");
     expect(actionYaml).not.toContain("resource:");
     expect(actionYaml).not.toContain("server:");
@@ -115,6 +124,14 @@ describe("deploy-action wrapper reference", () => {
     expect(publicCiWorkflow).toContain(
       "POST https://console.example.com/api/action/deployments/from-source-link",
     );
+    expect(publicCiWorkflow).toContain("Validate dry-run self-hosted server config deploy");
+    expect(publicCiWorkflow).toContain(
+      "POST https://console.example.com/api/action/deployments/from-config-package",
+    );
+    expect(publicCiWorkflow).toContain("Validate dry-run console install");
+    expect(publicCiWorkflow).toContain("INPUT_COMMAND: install-console");
+    expect(publicCiWorkflow).toContain("INPUT_CONSOLE_ORCHESTRATOR: swarm");
+    expect(publicCiWorkflow).toContain("HEALTH https://console.example.com/api/health");
     expect(publicCiWorkflow).toContain("Opt-in exact-version install smoke");
     expect(publicCiWorkflow).toContain("APPALOFT_INSTALL_SMOKE_VERSION");
     expect(publicCiWorkflow).not.toContain("APPALOFT_SSH_PRIVATE_KEY");
@@ -349,6 +366,363 @@ describe("deploy-action wrapper reference", () => {
       expect(result.output).toContain("preview-id=pr-42");
     } finally {
       rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-014] self-hosted server config deploy calls the config package API in dry-run", () => {
+    const result = runDeploy({
+      INPUT_CONFIG: "appaloft.yml",
+      INPUT_CONTROL_PLANE_MODE: "self-hosted",
+      INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+      INPUT_SERVER_CONFIG_DEPLOY: "true",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv).toEqual([
+        "GET https://console.example.com/api/version",
+        "POST https://console.example.com/api/action/deployments/from-config-package",
+      ]);
+      expect(result.output).toContain("console-url=https://console.example.com");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-014] self-hosted server config deploy sends resolved ci-env secrets to the server API", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-secrets-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const payloadPath = join(workspace, "payload.json");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'args="$*"',
+        'payload_file=""',
+        'while [ "$#" -gt 0 ]; do',
+        '  if [ "$1" = "--data-binary" ]; then',
+        "    shift",
+        '    payload_file="$1"',
+        "    payload_file=\"$(printf '%s' \"$payload_file\" | sed 's/^@//')\"",
+        "  fi",
+        "  shift || true",
+        "done",
+        'case "$args" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackage":true,"serverSideConfigBootstrap":true}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        '    cp "$payload_file" "$APPALOFT_TEST_PAYLOAD_PATH"',
+        '    printf \'{"id":"dep_server_config_secret","deploymentHref":"/deployments/dep_server_config_secret"}\'',
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BETTER_AUTH_SECRET: "resolved-ci-secret",
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        APPALOFT_TEST_PAYLOAD_PATH: payloadPath,
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_SECRET_VARIABLES: "APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_BETTER_AUTH_SECRET",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(readFileSync(payloadPath, "utf8"));
+      expect(payload.resolvedSecrets).toEqual({
+        APPALOFT_BETTER_AUTH_SECRET: "resolved-ci-secret",
+      });
+      expect(result.stderr.toString()).not.toContain("resolved-ci-secret");
+      expect(result.stdout.toString()).not.toContain("resolved-ci-secret");
+      const output = readFileSync(outputPath, "utf8");
+      expect(output).toContain("deployment-id=dep_server_config_secret");
+      expect(output).toContain(
+        "deployment-url=https://console.example.com/deployments/dep_server_config_secret",
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-014] self-hosted server config deploy rejects missing ci-env secrets before API mutation", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-secret-missing-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'case "$*" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackage":true,"serverSideConfigBootstrap":true}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        "    echo 'unexpected config package mutation' >&2",
+        "    exit 22",
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_SECRET_VARIABLES:
+          "APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_DEPLOY_ACTION_TEST_MISSING_SECRET_404",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).toContain("required secret was not found");
+      expect(result.stderr.toString()).toContain("APPALOFT_BETTER_AUTH_SECRET");
+      expect(result.stderr.toString()).toContain(
+        "ci-env:APPALOFT_DEPLOY_ACTION_TEST_MISSING_SECRET_404",
+      );
+      expect(existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "").toBe("");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-002] install-console downloads and runs the self-hosted installer over SSH", () => {
+    const result = runDeploy({
+      INPUT_COMMAND: "install-console",
+      INPUT_VERSION: "v0.9.1",
+      INPUT_SSH_HOST: "203.0.113.10",
+      INPUT_SSH_USER: "root",
+      INPUT_SSH_PORT: "2222",
+      INPUT_CONSOLE_DOMAIN: "console.example.com",
+      INPUT_CONSOLE_DATABASE: "pglite",
+      INPUT_CONSOLE_ORCHESTRATOR: "swarm",
+      INPUT_CONSOLE_SWARM_STACK_NAME: "appaloft-console",
+      INPUT_CONSOLE_SWARM_INIT: "true",
+      INPUT_CONSOLE_SKIP_DOCKER_INSTALL: "true",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv).toEqual([
+        "SSH root@203.0.113.10:2222",
+        "INSTALLER https://github.com/appaloft/appaloft/releases/download/v0.9.1/install.sh",
+        "RUN sh /tmp/appaloft-install.sh --version 'v0.9.1' --web-origin 'https://console.example.com' --database 'pglite' --orchestrator 'swarm' --host '0.0.0.0' --port '3001' --image 'ghcr.io/appaloft/appaloft' --stack-name 'appaloft-console' --swarm-init --skip-docker-install",
+        "HEALTH https://console.example.com/api/health",
+      ]);
+      expect(result.output).toContain("console-url=https://console.example.com");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-003] install-console reads non-secret console settings from config", () => {
+    const result = runDeploy(
+      {
+        INPUT_COMMAND: "install-console",
+        INPUT_VERSION: "latest",
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_SSH_HOST: "203.0.113.10",
+      },
+      {
+        "appaloft.yml": [
+          "controlPlane:",
+          "  mode: self-hosted",
+          "  url: https://console.example.com",
+          "  install:",
+          "    database: pglite",
+          "    orchestrator: swarm",
+          "    httpHost: 127.0.0.1",
+          "    httpPort: 3101",
+          "    swarmStackName: appaloft-console",
+          "    swarmInit: true",
+          "    image: ghcr.io/appaloft/appaloft:v0.9.x",
+          "    skipDockerInstall: true",
+        ].join("\n"),
+      },
+    );
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv).toEqual([
+        "SSH root@203.0.113.10:22",
+        "INSTALLER https://github.com/appaloft/appaloft/releases/latest/download/install.sh",
+        "RUN sh /tmp/appaloft-install.sh --version 'latest' --web-origin 'https://console.example.com' --database 'pglite' --orchestrator 'swarm' --host '127.0.0.1' --port '3101' --image 'ghcr.io/appaloft/appaloft:v0.9.x' --stack-name 'appaloft-console' --swarm-init --skip-docker-install",
+        "HEALTH https://console.example.com/api/health",
+      ]);
+      expect(result.output).toContain("console-url=https://console.example.com");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-003] install-console inputs override config defaults", () => {
+    const result = runDeploy(
+      {
+        INPUT_COMMAND: "install-console",
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_SSH_HOST: "203.0.113.10",
+        INPUT_CONSOLE_DATABASE: "postgres",
+        INPUT_CONSOLE_ORCHESTRATOR: "compose",
+        INPUT_CONSOLE_HTTP_PORT: "3201",
+      },
+      {
+        "appaloft.yml": [
+          "controlPlane:",
+          "  mode: self-hosted",
+          "  url: https://console.example.com",
+          "  install:",
+          "    database: pglite",
+          "    orchestrator: swarm",
+          "    httpPort: 3101",
+          "    swarmStackName: appaloft-console",
+          "    swarmInit: true",
+        ].join("\n"),
+      },
+    );
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv[2]).toContain("--database 'postgres'");
+      expect(result.argv[2]).toContain("--orchestrator 'compose'");
+      expect(result.argv[2]).toContain("--port '3201'");
+      expect(result.argv[2]).toContain("--project-name 'appaloft'");
+      expect(result.argv[2]).not.toContain("--stack-name");
+      expect(result.argv[2]).not.toContain("--swarm-init");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-002] install-console preserves pure SSH deploy as a separate command path", () => {
+    const install = runDeploy({
+      INPUT_COMMAND: "install-console",
+      INPUT_SSH_HOST: "203.0.113.10",
+      INPUT_CONSOLE_URL: "http://203.0.113.10:3001",
+    });
+    const deploy = runDeploy({
+      INPUT_SOURCE: ".",
+      INPUT_SSH_HOST: "203.0.113.10",
+    });
+
+    try {
+      expect(install.exitCode).toBe(0);
+      expect(install.argv[0]).toBe("SSH root@203.0.113.10:22");
+      expect(deploy.exitCode).toBe(0);
+      expect(deploy.argv.slice(0, 3)).toEqual(["/opt/appaloft/appaloft", "deploy", "."]);
+      expect(deploy.argv).toContain("--state-backend");
+      expect(deploy.argv).toContain("ssh-pglite");
+    } finally {
+      rmSync(install.workspace, { recursive: true, force: true });
+      rmSync(deploy.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-002] install-console rejects unknown orchestrators before SSH", () => {
+    const result = runDeploy({
+      INPUT_COMMAND: "install-console",
+      INPUT_SSH_HOST: "203.0.113.10",
+      INPUT_CONSOLE_ORCHESTRATOR: "kubernetes",
+    });
+
+    try {
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("console-orchestrator must be compose or swarm");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-013] self-hosted server config deploy fails when the server lacks source package support", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-config-gate-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'case "$*" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        "    echo 'unexpected config package mutation' >&2",
+        "    exit 22",
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).toContain("Action Server Config Deploy");
+      expect(existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "").toBe("");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
     }
   });
 

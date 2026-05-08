@@ -43,3 +43,11 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite
 PGlite 模式会把 Appaloft 状态放在挂载到 `/appaloft-data` 的持久 Docker volume 中。不要把
 数据库密码、GitHub token、SSH key 或部署身份值写进仓库配置；这些值应放在主机、CI secret
 store，或安装后的 Appaloft server 内。
+
+如果主机已经是 Docker Swarm manager，可以把 console 安装成 Swarm stack：
+
+```sh
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite --orchestrator swarm --stack-name appaloft
+```
+
+只有在明确希望安装器初始化单节点 Swarm manager 时，才加 `--swarm-init`。

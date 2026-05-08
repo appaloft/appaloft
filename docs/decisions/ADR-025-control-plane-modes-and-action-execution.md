@@ -343,6 +343,7 @@ This decision governs:
 - [Control-Plane Modes Test Matrix](../testing/control-plane-modes-test-matrix.md)
 - [GitHub Action Deploy Wrapper Plan](../implementation/github-action-deploy-action-plan.md)
 - [Control-Plane Modes Roadmap](../implementation/control-plane-modes-roadmap.md)
+- [Action Server Config Deploy Workflow](../workflows/action-server-config-deploy.md)
 - [Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md)
 
 ## Current Implementation Notes And Migration Gaps

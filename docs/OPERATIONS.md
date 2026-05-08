@@ -69,7 +69,9 @@ The binary bundle is self-contained:
 ## Docs Deployment
 
 Production docs deploys run from `.github/workflows/deploy-docs.yml` on `main` and use
-`appaloft.docs.yml` to deploy `docs.appaloft.com` through the Appaloft CLI itself.
+`appaloft.docs.yml` to deploy `docs.appaloft.com`. When `APPALOFT_CONTROL_PLANE_MODE` resolves to
+`self-hosted`, the workflow calls the Appaloft server config deploy API so the server owns config
+bootstrap and state. Otherwise it keeps the pure SSH CLI fallback path.
 
 PR docs previews run from `.github/workflows/deploy-docs-preview.yml`. The preview job runs only for
 same-repository pull requests whose changed files affect docs content, the docs app, or docs build
@@ -218,6 +220,15 @@ volume, pass:
 curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite
 ```
 
+To install the same console as a Docker Swarm stack on an existing manager, pass:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite --orchestrator swarm --stack-name appaloft
+```
+
+On a single fresh host, add `--swarm-init` only when the installer should initialize that host as a
+single-node Swarm manager.
+
 `install.sh` is authored in the Appaloft main repository and published as a GitHub Release asset.
 The website route should redirect or proxy to
 `https://github.com/appaloft/appaloft/releases/latest/download/install.sh` rather than copying from a
@@ -239,8 +250,9 @@ APPALOFT_IMAGE_REF=ghcr.io/appaloft/appaloft:latest docker compose -f docker-com
 ## Console Deploy Workflow
 
 The checked-in `.github/workflows/deploy-console.yml` workflow installs or upgrades the self-hosted
-Appaloft console on an SSH server by copying the repository `install.sh` to the host and running it
-there.
+Appaloft console on an SSH server by calling the local deploy action with `command:
+install-console`. The action downloads the selected release `install.sh` on the host, runs it
+there, and verifies `/api/health`.
 
 Configure:
 
@@ -248,11 +260,25 @@ Configure:
 - repository secret `APPALOFT_CONSOLE_SSH_PRIVATE_KEY`
 - optional repository variable `APPALOFT_CONSOLE_SSH_USER`, default `root`
 - optional repository variable `APPALOFT_CONSOLE_SSH_PORT`, default `22`
-- optional repository variable `APPALOFT_CONSOLE_ORIGIN`, default `http://<host>:3001`
 
-The workflow defaults to `database=pglite`. Once the console is healthy, other repositories can set
-their `controlPlane.mode: self-hosted` and `controlPlane.url` to this origin, while keeping tokens,
-SSH keys, and resource identity in trusted Action inputs or the Appaloft server.
+Non-secret console settings can be committed in the selected Appaloft config:
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+  install:
+    database: pglite
+    orchestrator: swarm
+    httpPort: 3001
+    swarmStackName: appaloft-console
+```
+
+The workflow defaults to `database=pglite` and `orchestrator=compose`; dispatch input can select
+`orchestrator=swarm`. Action inputs override matching config fields. Once the console is healthy,
+other repositories can set their `controlPlane.mode: self-hosted` and `controlPlane.url` to this
+origin, while keeping tokens, SSH keys, and resource identity in trusted Action inputs or the
+Appaloft server.
 
 ## PostgreSQL
 

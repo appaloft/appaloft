@@ -6,7 +6,11 @@ import {
   CleanupPreviewCommand,
   type Command,
   type CommandBus,
+  ConfigureResourceHealthCommand,
+  ConfigureResourceNetworkCommand,
+  ConfigureResourceRuntimeCommand,
   CreateDeploymentCommand,
+  CreateDomainBindingCommand,
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
@@ -16,6 +20,9 @@ import {
   RestartResourceRuntimeCommand,
   RetryDeploymentCommand,
   RollbackDeploymentCommand,
+  SetEnvironmentVariableCommand,
+  ShowResourceQuery,
+  ShowServerQuery,
   type SourceLinkRecord,
   type SourceLinkRepository,
   type SourceLinkSelectionSpec,
@@ -26,7 +33,7 @@ import {
 import { ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
 
-import { mountAppaloftOrpcRoutes } from "../src";
+import { type ActionSourcePackageConfigReader, mountAppaloftOrpcRoutes } from "../src";
 
 class NoopLogger implements AppLogger {
   debug(): void {}
@@ -367,6 +374,1099 @@ describe("deployment create HTTP route", () => {
     );
 
     expect(response.status).toBe(404);
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-015] Action server config endpoint rejects unsafe package paths before mutation", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "../appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "../appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "source-package-validation",
+          field: "configPath",
+        },
+      },
+    });
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-015] Action server config endpoint reports bootstrap gap after package validation", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "config-bootstrap",
+        },
+      },
+    });
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-016] Action server config endpoint rejects committed identity config before mutation", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let readConfigCalled = false;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () => {
+        readConfigCalled = true;
+        return ok({
+          text: ["projectId: prj_committed", "runtime:", "  strategy: static"].join("\n"),
+          fileName: "appaloft.yml",
+        });
+      },
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "config-identity",
+        },
+      },
+    });
+    expect(readConfigCalled).toBe(true);
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-016] Action server config endpoint rejects committed secret config before mutation", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "env:",
+            "  DATABASE_URL: postgres://user:password@example.test/app",
+            "runtime:",
+            "  strategy: static",
+          ].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "config-secret-validation",
+        },
+      },
+    });
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint dispatches ids-only deployment for an existing resource", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_from_config_package" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: ["controlPlane:", "  mode: self-hosted", "  url: https://console.example.com"].join(
+            "\n",
+          ),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+            destinationId: "dst_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      id: "dep_from_config_package",
+      deploymentHref: "/deployments/dep_from_config_package",
+    });
+    expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+      destinationId: "dst_prod",
+    });
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint resolves existing source-link context without trusted ids", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const sourceLinkRecord = {
+      sourceFingerprint:
+        "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+      projectId: "prj_linked",
+      environmentId: "env_linked",
+      resourceId: "res_linked",
+      serverId: "srv_linked",
+      destinationId: "dst_linked",
+      updatedAt: "2026-05-08T00:00:00.000Z",
+      reason: "test-source-link",
+    } satisfies SourceLinkRecord;
+    const sourceLinkRepository = {
+      findOne: async (_spec: SourceLinkSelectionSpec) => ok(sourceLinkRecord),
+      upsert: async (
+        record: SourceLinkRecord,
+        _spec: SourceLinkUpsertSpec,
+      ): Promise<Result<SourceLinkRecord>> => ok(record),
+      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
+    } satisfies SourceLinkRepository;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_from_source_link_config_package" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: ["controlPlane:", "  mode: self-hosted", "  url: https://console.example.com"].join(
+            "\n",
+          ),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+      sourceLinkRepository,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      id: "dep_from_source_link_config_package",
+      deploymentHref: "/deployments/dep_from_source_link_config_package",
+    });
+    expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      projectId: "prj_linked",
+      environmentId: "env_linked",
+      resourceId: "res_linked",
+      serverId: "srv_linked",
+      destinationId: "dst_linked",
+    });
+  });
+
+  test("[CONFIG-FILE-ENTRY-028] Action server config endpoint bootstraps source-link context from trusted ids", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let upsertedRecord: SourceLinkRecord | undefined;
+    const sourceLinkRepository = {
+      findOne: async (_spec: SourceLinkSelectionSpec) => ok(null),
+      upsert: async (
+        record: SourceLinkRecord,
+        _spec: SourceLinkUpsertSpec,
+      ): Promise<Result<SourceLinkRecord>> => {
+        upsertedRecord = record;
+        return ok(record);
+      },
+      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
+    } satisfies SourceLinkRepository;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_bootstrapped_config_package" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: ["controlPlane:", "  mode: self-hosted", "  url: https://console.example.com"].join(
+            "\n",
+          ),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+      sourceLinkRepository,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+    });
+    expect(upsertedRecord).toMatchObject({
+      sourceFingerprint:
+        "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+      reason: "github-action-server-config-bootstrap",
+    });
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies runtime, network, and health profile commands before deployment", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommands.push(command as Command<unknown>);
+        return ok({
+          id: command instanceof CreateDeploymentCommand ? "dep_profile_config" : "res_www",
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "runtime:",
+            "  strategy: static",
+            "  name: docs",
+            "  installCommand: bun install --frozen-lockfile",
+            "  buildCommand: bun run build",
+            "  publishDirectory: dist",
+            "  healthCheckPath: /ready",
+            "network:",
+            "  upstreamProtocol: http",
+            "  exposureMode: reverse-proxy",
+          ].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      ConfigureResourceRuntimeCommand,
+      ConfigureResourceNetworkCommand,
+      ConfigureResourceHealthCommand,
+      CreateDeploymentCommand,
+    ]);
+    expect(capturedCommands[0]).toMatchObject({
+      resourceId: "res_www",
+      runtimeProfile: {
+        strategy: "static",
+        runtimeName: "docs",
+        installCommand: "bun install --frozen-lockfile",
+        buildCommand: "bun run build",
+        publishDirectory: "dist",
+      },
+    });
+    expect(capturedCommands[1]).toMatchObject({
+      resourceId: "res_www",
+      networkProfile: {
+        internalPort: 80,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    });
+    expect(capturedCommands[2]).toMatchObject({
+      resourceId: "res_www",
+      healthCheck: {
+        enabled: true,
+        type: "http",
+        http: {
+          path: "/ready",
+        },
+      },
+    });
+    expect(capturedCommands[3]).toBeInstanceOf(CreateDeploymentCommand);
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies plain environment variables before deployment", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommands.push(command as Command<unknown>);
+        return ok(
+          (command instanceof CreateDeploymentCommand ? { id: "dep_env_config" } : null) as T,
+        );
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: ["env:", "  PUBLIC_SITE: https://www.example.com", "  HOST: 0.0.0.0"].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      SetEnvironmentVariableCommand,
+      SetEnvironmentVariableCommand,
+      CreateDeploymentCommand,
+    ]);
+    expect(capturedCommands[0]).toMatchObject({
+      environmentId: "env_prod",
+      key: "PUBLIC_SITE",
+      value: "https://www.example.com",
+      kind: "plain-config",
+      exposure: "build-time",
+      scope: "environment",
+      isSecret: false,
+    });
+    expect(capturedCommands[1]).toMatchObject({
+      environmentId: "env_prod",
+      key: "HOST",
+      value: "0.0.0.0",
+      kind: "plain-config",
+      exposure: "runtime",
+      scope: "environment",
+      isSecret: false,
+    });
+    expect(capturedCommands[2]).toBeInstanceOf(CreateDeploymentCommand);
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies resolved CI secrets before deployment", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommands.push(command as Command<unknown>);
+        return ok(
+          (command instanceof CreateDeploymentCommand ? { id: "dep_secret_config" } : null) as T,
+        );
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "secrets:",
+            "  APPALOFT_BETTER_AUTH_SECRET:",
+            "    from: ci-env:APPALOFT_BETTER_AUTH_SECRET",
+            "    required: true",
+          ].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          resolvedSecrets: {
+            APPALOFT_BETTER_AUTH_SECRET: "resolved-ci-secret",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      SetEnvironmentVariableCommand,
+      CreateDeploymentCommand,
+    ]);
+    expect(capturedCommands[0]).toMatchObject({
+      environmentId: "env_prod",
+      key: "APPALOFT_BETTER_AUTH_SECRET",
+      value: "resolved-ci-secret",
+      kind: "secret",
+      exposure: "runtime",
+      scope: "environment",
+      isSecret: true,
+    });
+    expect(capturedCommands[1]).toBeInstanceOf(CreateDeploymentCommand);
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint rejects missing resolved CI secrets before mutation", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "secrets:",
+            "  APPALOFT_BETTER_AUTH_SECRET:",
+            "    from: ci-env:APPALOFT_BETTER_AUTH_SECRET",
+          ].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+    const responseJson = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(responseJson).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "config-secret-resolution",
+          secretKey: "APPALOFT_BETTER_AUTH_SECRET",
+          secretRef: "ci-env:APPALOFT_BETTER_AUTH_SECRET",
+        },
+      },
+    });
+    expect(JSON.stringify(responseJson)).not.toContain("resolved-ci-secret");
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies access domain commands before deployment", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommands.push(command as Command<unknown>);
+        return ok({
+          id:
+            command instanceof CreateDeploymentCommand
+              ? "dep_domain_config"
+              : `dmb_${capturedCommands.length}`,
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        if (query instanceof ShowResourceQuery) {
+          return ok({
+            schemaVersion: "resources.show/v1",
+            resource: {
+              id: "res_www",
+              projectId: "prj_console",
+              environmentId: "env_prod",
+              destinationId: "dst_prod",
+              name: "Docs",
+              slug: "docs",
+              kind: "application",
+              createdAt: "2026-05-08T00:00:00.000Z",
+              services: [],
+              deploymentCount: 0,
+            },
+            lifecycle: {
+              status: "active",
+            },
+            diagnostics: [],
+            generatedAt: "2026-05-08T00:00:00.000Z",
+          } as T);
+        }
+        if (query instanceof ShowServerQuery) {
+          return ok({
+            schemaVersion: "servers.show/v1",
+            server: {
+              id: "srv_prod",
+              name: "prod",
+              host: "203.0.113.10",
+              port: 22,
+              providerKey: "ssh",
+              targetKind: "single-server",
+              lifecycleStatus: "active",
+              edgeProxy: {
+                kind: "traefik",
+                status: "ready",
+              },
+              createdAt: "2026-05-08T00:00:00.000Z",
+            },
+            generatedAt: "2026-05-08T00:00:00.000Z",
+          } as T);
+        }
+        return ok({} as T);
+      },
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "access:",
+            "  domains:",
+            "    - host: docs.example.com",
+            "      pathPrefix: /",
+            "      tlsMode: auto",
+            "    - host: www.example.com",
+            "      pathPrefix: /",
+            "      tlsMode: auto",
+            "      redirectTo: docs.example.com",
+            "      redirectStatus: 308",
+          ].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      id: "dep_domain_config",
+      deploymentHref: "/deployments/dep_domain_config",
+    });
+    expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      CreateDomainBindingCommand,
+      CreateDomainBindingCommand,
+      CreateDeploymentCommand,
+    ]);
+    expect(capturedCommands[0]).toMatchObject({
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+      destinationId: "dst_prod",
+      domainName: "docs.example.com",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+    expect(capturedCommands[1]).toMatchObject({
+      domainName: "www.example.com",
+      redirectTo: "docs.example.com",
+      redirectStatus: 308,
+    });
+    expect(capturedCommands[2]).toBeInstanceOf(CreateDeploymentCommand);
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint fails before mutation when unsupported source profile application is required", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: ["source:", "  baseDirectory: apps/docs"].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "profile-application",
+        },
+      },
+    });
     expect(capturedCommand).toBeUndefined();
   });
 

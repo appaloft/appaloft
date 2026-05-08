@@ -8,9 +8,13 @@ APPALOFT_HTTP_HOST="${APPALOFT_HTTP_HOST:-0.0.0.0}"
 APPALOFT_HTTP_PORT="${APPALOFT_HTTP_PORT:-3001}"
 APPALOFT_WEB_ORIGIN="${APPALOFT_WEB_ORIGIN:-}"
 APPALOFT_SELF_HOST_DATABASE="${APPALOFT_SELF_HOST_DATABASE:-postgres}"
+APPALOFT_SELF_HOST_ORCHESTRATOR="${APPALOFT_SELF_HOST_ORCHESTRATOR:-compose}"
 APPALOFT_POSTGRES_IMAGE="${APPALOFT_POSTGRES_IMAGE:-postgres:16}"
 APPALOFT_POSTGRES_PASSWORD="${APPALOFT_POSTGRES_PASSWORD:-}"
 APPALOFT_COMPOSE_PROJECT_NAME="${APPALOFT_COMPOSE_PROJECT_NAME:-appaloft}"
+APPALOFT_SWARM_STACK_NAME="${APPALOFT_SWARM_STACK_NAME:-appaloft}"
+APPALOFT_SWARM_INIT="${APPALOFT_SWARM_INIT:-0}"
+APPALOFT_SWARM_ADVERTISE_ADDR="${APPALOFT_SWARM_ADVERTISE_ADDR:-}"
 APPALOFT_SKIP_DOCKER_INSTALL="${APPALOFT_SKIP_DOCKER_INSTALL:-0}"
 APPALOFT_INSTALL_DRY_RUN="${APPALOFT_INSTALL_DRY_RUN:-0}"
 APPALOFT_DOCKER_INSTALL_SCRIPT_URL="${APPALOFT_DOCKER_INSTALL_SCRIPT_URL:-https://get.docker.com}"
@@ -30,7 +34,7 @@ fail() {
 
 usage() {
   cat <<'USAGE'
-Install Appaloft as a self-hosted Docker Compose stack.
+Install Appaloft as a self-hosted Docker Compose or Docker Swarm stack.
 
 Usage:
   curl -fsSL https://appaloft.com/install.sh | sudo sh
@@ -44,9 +48,13 @@ Options:
   --port <port>                    Host HTTP port. Defaults to 3001.
   --web-origin <url>               Public console origin. Defaults to http://localhost:<port>.
   --database <postgres|pglite>      Persistence backend. Defaults to postgres.
+  --orchestrator <compose|swarm>    Docker orchestrator. Defaults to compose.
   --postgres-password <password>   PostgreSQL password. Existing installs reuse .env.
   --postgres-image <image>         PostgreSQL image. Defaults to postgres:16.
   --project-name <name>            Docker Compose project name. Defaults to appaloft.
+  --stack-name <name>              Docker Swarm stack name. Defaults to appaloft.
+  --swarm-init                     Initialize a single-node Swarm manager when none is active.
+  --swarm-advertise-addr <addr>    Optional address passed to docker swarm init.
   --skip-docker-install            Require an existing Docker Engine installation.
   --dry-run                        Print the selected Docker stack without installing.
   -h, --help                       Show this help.
@@ -59,9 +67,13 @@ Environment:
   APPALOFT_HTTP_PORT
   APPALOFT_WEB_ORIGIN
   APPALOFT_SELF_HOST_DATABASE=postgres|pglite
+  APPALOFT_SELF_HOST_ORCHESTRATOR=compose|swarm
   APPALOFT_POSTGRES_IMAGE
   APPALOFT_POSTGRES_PASSWORD
   APPALOFT_COMPOSE_PROJECT_NAME
+  APPALOFT_SWARM_STACK_NAME
+  APPALOFT_SWARM_INIT=1
+  APPALOFT_SWARM_ADVERTISE_ADDR
   APPALOFT_SKIP_DOCKER_INSTALL=1
   APPALOFT_INSTALL_DRY_RUN=1
 USAGE
@@ -125,6 +137,14 @@ while [ "$#" -gt 0 ]; do
     --database=*)
       APPALOFT_SELF_HOST_DATABASE="${1#--database=}"
       ;;
+    --orchestrator)
+      shift
+      [ "$#" -gt 0 ] || fail "--orchestrator requires a value"
+      APPALOFT_SELF_HOST_ORCHESTRATOR="$1"
+      ;;
+    --orchestrator=*)
+      APPALOFT_SELF_HOST_ORCHESTRATOR="${1#--orchestrator=}"
+      ;;
     --postgres-password)
       shift
       [ "$#" -gt 0 ] || fail "--postgres-password requires a value"
@@ -148,6 +168,25 @@ while [ "$#" -gt 0 ]; do
       ;;
     --project-name=*)
       APPALOFT_COMPOSE_PROJECT_NAME="${1#--project-name=}"
+      ;;
+    --stack-name)
+      shift
+      [ "$#" -gt 0 ] || fail "--stack-name requires a value"
+      APPALOFT_SWARM_STACK_NAME="$1"
+      ;;
+    --stack-name=*)
+      APPALOFT_SWARM_STACK_NAME="${1#--stack-name=}"
+      ;;
+    --swarm-init)
+      APPALOFT_SWARM_INIT=1
+      ;;
+    --swarm-advertise-addr)
+      shift
+      [ "$#" -gt 0 ] || fail "--swarm-advertise-addr requires a value"
+      APPALOFT_SWARM_ADVERTISE_ADDR="$1"
+      ;;
+    --swarm-advertise-addr=*)
+      APPALOFT_SWARM_ADVERTISE_ADDR="${1#--swarm-advertise-addr=}"
       ;;
     --skip-docker-install | --no-install-docker)
       APPALOFT_SKIP_DOCKER_INSTALL=1
@@ -245,6 +284,15 @@ validate_database() {
   case "$APPALOFT_SELF_HOST_DATABASE" in
     postgres | pglite) return 0 ;;
     *) fail "--database must be postgres or pglite" ;;
+  esac
+}
+
+validate_orchestrator() {
+  APPALOFT_SELF_HOST_ORCHESTRATOR="$(printf '%s' "$APPALOFT_SELF_HOST_ORCHESTRATOR" | tr '[:upper:]' '[:lower:]')"
+
+  case "$APPALOFT_SELF_HOST_ORCHESTRATOR" in
+    compose | swarm) return 0 ;;
+    *) fail "--orchestrator must be compose or swarm" ;;
   esac
 }
 
@@ -354,10 +402,45 @@ ensure_docker() {
   docker_command_succeeds version ||
     fail "Docker is installed but the daemon is not reachable"
 
-  docker_command_succeeds compose version ||
-    fail "Docker compose plugin is required; install docker-compose-plugin and rerun"
+  if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "compose" ]; then
+    docker_command_succeeds compose version ||
+      fail "Docker compose plugin is required; install docker-compose-plugin and rerun"
+  fi
 
-  say "Docker Engine and docker compose are ready"
+  say "Docker Engine is ready"
+  if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "compose" ]; then
+    say "Docker compose is ready"
+  fi
+}
+
+docker_stdout() {
+  if docker "$@" 2>/dev/null; then
+    return
+  fi
+
+  root_docker "$@"
+}
+
+ensure_swarm_manager() {
+  local_state="$(docker_stdout info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || true)"
+  control_available="$(docker_stdout info --format '{{.Swarm.ControlAvailable}}' 2>/dev/null || true)"
+
+  if [ "$local_state" = "active" ] && [ "$control_available" = "true" ]; then
+    say "Docker Swarm manager is ready"
+    return
+  fi
+
+  if truthy "$APPALOFT_SWARM_INIT"; then
+    say "Initializing Docker Swarm manager"
+    if [ -n "$APPALOFT_SWARM_ADVERTISE_ADDR" ]; then
+      root_docker swarm init --advertise-addr "$APPALOFT_SWARM_ADVERTISE_ADDR"
+    else
+      root_docker swarm init
+    fi
+    return
+  fi
+
+  fail "Docker Swarm manager is required; run docker swarm init first or pass --swarm-init"
 }
 
 generate_password() {
@@ -407,6 +490,10 @@ services:
       - "${APPALOFT_HTTP_HOST}:${APPALOFT_HTTP_PORT}:3001"
     volumes:
       - appaloft-data:/appaloft-data
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
 
 volumes:
   appaloft-data:
@@ -433,6 +520,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
 
   postgres:
     image: ${APPALOFT_POSTGRES_IMAGE}
@@ -448,6 +539,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
 
 volumes:
   postgres-data:
@@ -465,6 +560,8 @@ APPALOFT_HTTP_HOST=$APPALOFT_HTTP_HOST
 APPALOFT_HTTP_PORT=$APPALOFT_HTTP_PORT
 APPALOFT_WEB_ORIGIN=$appaloft_web_origin
 APPALOFT_SELF_HOST_DATABASE=pglite
+APPALOFT_SELF_HOST_ORCHESTRATOR=$APPALOFT_SELF_HOST_ORCHESTRATOR
+APPALOFT_SWARM_STACK_NAME=$APPALOFT_SWARM_STACK_NAME
 ENV
     return
   fi
@@ -476,6 +573,8 @@ APPALOFT_HTTP_HOST=$APPALOFT_HTTP_HOST
 APPALOFT_HTTP_PORT=$APPALOFT_HTTP_PORT
 APPALOFT_WEB_ORIGIN=$appaloft_web_origin
 APPALOFT_SELF_HOST_DATABASE=postgres
+APPALOFT_SELF_HOST_ORCHESTRATOR=$APPALOFT_SELF_HOST_ORCHESTRATOR
+APPALOFT_SWARM_STACK_NAME=$APPALOFT_SWARM_STACK_NAME
 APPALOFT_POSTGRES_IMAGE=$APPALOFT_POSTGRES_IMAGE
 POSTGRES_DB=appaloft
 POSTGRES_USER=appaloft
@@ -502,8 +601,33 @@ docker_compose() {
   root_docker compose --env-file "$env_file" -p "$APPALOFT_COMPOSE_PROJECT_NAME" -f "$compose_file" "$@"
 }
 
+docker_stack_deploy() {
+  set -a
+  # shellcheck disable=SC1090
+  . "$env_file"
+  set +a
+
+  if docker stack deploy -c "$compose_file" "$APPALOFT_SWARM_STACK_NAME"; then
+    return
+  fi
+
+  run_as_root env \
+    APPALOFT_IMAGE_REF="$appaloft_image_ref" \
+    APPALOFT_APP_VERSION="$appaloft_version" \
+    APPALOFT_HTTP_HOST="$APPALOFT_HTTP_HOST" \
+    APPALOFT_HTTP_PORT="$APPALOFT_HTTP_PORT" \
+    APPALOFT_WEB_ORIGIN="$appaloft_web_origin" \
+    APPALOFT_SELF_HOST_DATABASE="$APPALOFT_SELF_HOST_DATABASE" \
+    APPALOFT_POSTGRES_IMAGE="$APPALOFT_POSTGRES_IMAGE" \
+    POSTGRES_DB="appaloft" \
+    POSTGRES_USER="appaloft" \
+    POSTGRES_PASSWORD="${appaloft_postgres_password:-}" \
+    docker stack deploy -c "$compose_file" "$APPALOFT_SWARM_STACK_NAME"
+}
+
 validate_port
 validate_database
+validate_orchestrator
 appaloft_version="$(normalize_version "$APPALOFT_VERSION")"
 appaloft_image_ref="$(image_ref "$appaloft_version")"
 appaloft_home="$(choose_home)"
@@ -517,6 +641,17 @@ if [ "$APPALOFT_INSTALL_DRY_RUN" = "1" ]; then
   say "image: $appaloft_image_ref"
   say "home: $appaloft_home"
   say "compose file: $compose_file"
+  say "orchestrator: $APPALOFT_SELF_HOST_ORCHESTRATOR"
+  if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "compose" ]; then
+    say "compose project: $APPALOFT_COMPOSE_PROJECT_NAME"
+  else
+    say "swarm stack: $APPALOFT_SWARM_STACK_NAME"
+    if truthy "$APPALOFT_SWARM_INIT"; then
+      say "swarm init: yes"
+    else
+      say "swarm init: no"
+    fi
+  fi
   say "bind: $APPALOFT_HTTP_HOST:$APPALOFT_HTTP_PORT"
   say "web origin: $appaloft_web_origin"
   say "database: $APPALOFT_SELF_HOST_DATABASE"
@@ -535,6 +670,10 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 ensure_docker
+
+if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
+  ensure_swarm_manager
+fi
 
 if [ "$APPALOFT_SELF_HOST_DATABASE" = "postgres" ]; then
   existing_postgres_password="$(read_existing_env_value POSTGRES_PASSWORD "$env_file" || true)"
@@ -561,9 +700,18 @@ say "Home: $appaloft_home"
 say "Image: $appaloft_image_ref"
 say "HTTP: $appaloft_web_origin"
 say "Database: $APPALOFT_SELF_HOST_DATABASE"
+say "Orchestrator: $APPALOFT_SELF_HOST_ORCHESTRATOR"
 
-docker_compose pull
-docker_compose up -d
+if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
+  docker_stack_deploy
+else
+  docker_compose pull
+  docker_compose up -d
+fi
 
 say "Appaloft is starting at $appaloft_web_origin"
-say "Logs: docker compose --env-file $env_file -p $APPALOFT_COMPOSE_PROJECT_NAME -f $compose_file logs -f"
+if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
+  say "Logs: docker service logs -f ${APPALOFT_SWARM_STACK_NAME}_app"
+else
+  say "Logs: docker compose --env-file $env_file -p $APPALOFT_COMPOSE_PROJECT_NAME -f $compose_file logs -f"
+fi

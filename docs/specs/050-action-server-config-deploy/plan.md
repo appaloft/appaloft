@@ -12,6 +12,7 @@
 - Local specs:
   [Repository Deployment Config File Bootstrap](../../workflows/deployment-config-file-bootstrap.md),
   [Control-Plane Mode Selection And Adoption](../../workflows/control-plane-mode-selection-and-adoption.md),
+  [Action Server Config Deploy Workflow](../../workflows/action-server-config-deploy.md),
   [Quick Deploy](../../workflows/quick-deploy.md)
 - Test matrix:
   [Control-Plane Modes Test Matrix](../../testing/control-plane-modes-test-matrix.md),
@@ -24,8 +25,9 @@
   `Deployment` admission.
 - Command/query placement: final deployment remains `CreateDeploymentCommand`. Profile changes
   must dispatch existing intention-revealing resource/environment commands before deployment.
-- API placement: add a dedicated Action/server config endpoint or RPC contract for the source
-  package request. Keep `/api/action/deployments/from-source-link` as the existing trigger-only
+- API placement: implement the dedicated
+  `POST /api/action/deployments/from-config-package` workflow endpoint from the Action Server
+  Config Deploy spec. Keep `/api/action/deployments/from-source-link` as the existing trigger-only
   endpoint.
 - Source package placement: define a safe manifest first, then choose package transport. Transport
   adapters must validate size, checksum, path boundaries, config path, and source root before
