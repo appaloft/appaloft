@@ -103,6 +103,9 @@ the first server endpoint source package validation slice (`CONTROL-PLANE-HANDSH
 safe path rejection before command dispatch and the explicit `config-bootstrap` migration-gap error
 after package validation. The same file now covers server-side committed config identity/secret
 rejection (`CONTROL-PLANE-HANDSHAKE-016`) through a hermetic source package config reader.
+It also covers the first `CONTROL-PLANE-HANDSHAKE-017` existing-resource slice: accepted config that
+does not require profile application dispatches ids-only `deployments.create`, while profile fields
+fail before mutation with `profile-application`.
 
 Existing tests in `deployment-state.test.ts` and `remote-pglite-state-sync.test.ts` partially cover
 the older `postgres-control-plane` backend selection branch. Those tests should be renamed or
@@ -112,5 +115,5 @@ extended with the IDs above during Phase 1 Code Round.
 behavior after remote revision conflict. That coverage belongs to the SSH state-backend path under
 mode `none`; it is not evidence of Cloud/self-hosted control-plane handshake or adoption behavior.
 
-Cloud/self-hosted API rows beyond committed config validation remain target coverage until source
-package storage, adoption, profile application, and broader API mode contracts exist.
+Cloud/self-hosted API rows beyond existing-resource/no-profile deployment remain target coverage
+until source package storage, adoption, profile application, and broader API mode contracts exist.
