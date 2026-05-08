@@ -85,7 +85,9 @@ test("install.sh dry-run reports the selected Docker stack", async () => {
   expect(result.stdout).toContain(`compose file: ${join(home, "docker-compose.yml")}`);
   expect(result.stdout).toContain("orchestrator: compose");
   expect(result.stdout).toContain("compose project: appaloft");
-  expect(result.stdout).toContain("bind: 0.0.0.0:3001");
+  expect(result.stdout).toContain("bind: 0.0.0.0:3721");
+  expect(result.stdout).toContain("web origin: http://localhost:3721");
+  expect(result.stdout).toContain("proxy: traefik");
   expect(result.stdout).toContain("database: postgres");
   expect(result.stdout).toContain("install docker: yes");
 });
@@ -121,6 +123,15 @@ test("install.sh rejects unknown Docker orchestrators", async () => {
 
   expect(result.exitCode).toBe(1);
   expect(result.stderr).toContain("--orchestrator must be compose or swarm");
+});
+
+test("install.sh rejects unsafe console domains", async () => {
+  const result = await run(["sh", installScript, "--dry-run", "--domain", "https://"], {
+    APPALOFT_HOME: join(tmpdir(), "appaloft-install-test-home"),
+  });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr).toContain("--domain must be a hostname");
 });
 
 test("install.sh dry-run accepts an existing full image ref and skipped Docker bootstrap", async () => {
@@ -195,6 +206,59 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     expect(dockerLog).toContain("compose --env-file");
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} pull`);
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh configures Traefik console domain bootstrap when a domain is supplied", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--domain",
+        "https://console.appaloft.example.test/setup",
+        "--postgres-password",
+        "fixture-password",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+    expect(install.stdout).toContain("HTTP: https://console.appaloft.example.test");
+    expect(install.stdout).toContain("Console domain: console.appaloft.example.test");
+    expect(install.stdout).toContain("Proxy: traefik");
+
+    const compose = await Bun.file(join(home, "docker-compose.yml")).text();
+    expect(compose).toContain("container_name: appaloft-traefik");
+    expect(compose).toContain("--providers.docker.network=$" + "{APPALOFT_EDGE_NETWORK_NAME}");
+    expect(compose).not.toContain("--providers.swarm=true");
+    expect(compose).toContain("traefik.http.routers.appaloft-console.rule");
+    expect(compose).toContain("Host(`$" + "{APPALOFT_CONSOLE_DOMAIN}`)");
+    expect(compose).toContain("traefik.http.routers.appaloft-console.tls.certresolver: appaloft");
+    expect(compose).toContain("traefik.http.services.appaloft-console.loadbalancer.server.port");
+    expect(compose).toContain("traefik-acme:");
+    expect(compose).toContain("appaloft-edge:");
+
+    const env = await Bun.file(join(home, ".env")).text();
+    expect(env).toContain("APPALOFT_HTTP_PORT=3721");
+    expect(env).toContain("APPALOFT_WEB_ORIGIN=https://console.appaloft.example.test");
+    expect(env).toContain("APPALOFT_CONSOLE_DOMAIN=console.appaloft.example.test");
+    expect(env).toContain("APPALOFT_SELF_HOST_PROXY=traefik");
+    expect(env).toContain("APPALOFT_EDGE_NETWORK_NAME=appaloft-edge");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
@@ -285,6 +349,8 @@ test("install.sh writes a Docker Swarm PGlite stack and deploys it", async () =>
     const compose = await Bun.file(join(home, "docker-compose.yml")).text();
     expect(compose).toContain("APPALOFT_DATABASE_DRIVER: pglite");
     expect(compose).toContain("node.role == manager");
+    expect(compose).toContain("--providers.swarm.network=$" + "{APPALOFT_EDGE_NETWORK_NAME}");
+    expect(compose).not.toContain("--providers.docker=true");
 
     const env = await Bun.file(join(home, ".env")).text();
     expect(env).toContain("APPALOFT_SELF_HOST_ORCHESTRATOR=swarm");

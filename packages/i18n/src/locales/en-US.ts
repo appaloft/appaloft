@@ -351,11 +351,34 @@ export const enUS = {
       environmentCreatedDuringDeployment: "Create the first environment during deployment",
       targetNeeded: "First deployment target needed",
     },
+    instance: {
+      actionControlPlaneTitle: "GitHub Actions",
+      actionControlPlaneBody:
+        "Use this origin as control-plane-url when a repository selects control-plane-mode: self-hosted.",
+      currentOriginLabel: "Current console origin",
+      directInstallBody:
+        "Without a domain, Appaloft remains reachable through the host IP and direct console port.",
+      directInstallTitle: "Install with direct IP access",
+      domainInstallBody:
+        "When a domain is supplied, the installer starts the managed Traefik edge and creates a bootstrap console route with TLS.",
+      domainInstallTitle: "Install with a console domain",
+      domainRouteBadge: "managed Traefik route",
+      fallbackRouteBadge: "direct port fallback",
+      pageDescription: "Bootstrap proxy, domain, and Action connection guidance for this instance",
+      pageTitle: "Instance",
+      proxyTitle: "Managed proxy",
+      proxyBody:
+        "The installer creates the resident Traefik edge used by the console bootstrap route and later project routes.",
+      rerunBody:
+        "Change the console domain by rerunning the installer with the new domain; the operation is idempotent and keeps the existing database volume.",
+      rerunTitle: "Change the console domain",
+    },
     nav: {
       deploy: "New deployment",
       domainBindings: "Domain bindings",
       deployments: "Deployments",
       home: "Home",
+      instance: "Instance",
       previewEnvironments: "Preview environments",
       previewPolicies: "Preview policies",
       projects: "Projects",

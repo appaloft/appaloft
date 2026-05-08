@@ -344,11 +344,32 @@ export const zhCN = {
       environmentCreatedDuringDeployment: "部署时建立第一个环境",
       targetNeeded: "需要第一个部署目标",
     },
+    instance: {
+      actionControlPlaneTitle: "GitHub Actions",
+      actionControlPlaneBody:
+        "仓库选择 control-plane-mode: self-hosted 时，把这个 origin 作为 control-plane-url。",
+      currentOriginLabel: "当前 console origin",
+      directInstallBody: "没有域名时，Appaloft 会通过服务器 IP 和直连 console 端口访问。",
+      directInstallTitle: "使用 IP 直连安装",
+      domainInstallBody:
+        "指定域名时，安装器会启动托管的 Traefik edge，并创建带 TLS 的 console bootstrap route。",
+      domainInstallTitle: "使用 console 域名安装",
+      domainRouteBadge: "托管 Traefik route",
+      fallbackRouteBadge: "直连端口 fallback",
+      pageDescription: "这个 instance 的 bootstrap proxy、域名和 Action 连接指引",
+      pageTitle: "Instance",
+      proxyTitle: "托管代理",
+      proxyBody: "安装器创建常驻 Traefik edge，console bootstrap route 和后续项目 route 共用它。",
+      rerunBody:
+        "要修改 console 域名，使用新域名重新运行安装器；操作是幂等的，会保留已有数据库卷。",
+      rerunTitle: "修改 console 域名",
+    },
     nav: {
       deploy: "新部署",
       domainBindings: "域名绑定",
       deployments: "部署",
       home: "首页",
+      instance: "Instance",
       previewEnvironments: "预览环境",
       previewPolicies: "预览策略",
       projects: "项目",

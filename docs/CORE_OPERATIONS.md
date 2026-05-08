@@ -789,15 +789,22 @@ Current boundary:
 - The deploy action also exposes `command: install-console` for the operator-owned self-hosted
   console bootstrap path. That command uses trusted SSH inputs to download the selected release
   `install.sh` on the target host, runs the self-hosted Docker installer with a configured public
-  console origin/domain and database backend, verifies `/api/health`, and outputs `console-url`.
-  Non-secret install settings may come from `controlPlane.url` and `controlPlane.install.*` in the
-  selected repository config, while SSH host/key, tokens, and raw database credentials remain trusted
-  workflow inputs or secrets. It can run the installer through Docker Compose or Docker Swarm when
-  `console-orchestrator` or `controlPlane.install.orchestrator` is configured. Swarm installation
-  requires an existing manager unless `console-swarm-init` or `controlPlane.install.swarmInit` is
-  explicitly selected. It is separate from `command: deploy`, so existing SSH CLI deployments with
-  `control-plane-mode: none` continue to mutate SSH-server `ssh-pglite` directly until the operator
-  selects a self-hosted control-plane API mode.
+  console origin/domain, database backend, and proxy mode, verifies `/api/health`, and outputs
+  `console-url`. The installer defaults to PostgreSQL, direct host access on port `3721`, and a
+  resident Traefik edge proxy. When `console-domain` or `controlPlane.install.domain` is supplied,
+  the installer passes `--domain` and creates the Appaloft instance console route through that edge.
+  This route is installer-owned infrastructure for the Appaloft instance, not a Resource route,
+  deployment snapshot route, or DomainBinding operation. Non-secret install settings may come from
+  `controlPlane.url` and `controlPlane.install.*` in the selected repository config, while SSH
+  host/key, tokens, and raw database credentials remain trusted workflow inputs or secrets. It can
+  run the installer through Docker Compose or Docker Swarm when `console-orchestrator` or
+  `controlPlane.install.orchestrator` is configured. Swarm installation requires an existing manager
+  unless `console-swarm-init` or `controlPlane.install.swarmInit` is explicitly selected. Operators
+  may choose embedded single-instance storage with explicit `console-database: pglite` and may opt
+  out of the resident proxy with `console-proxy: none` or `controlPlane.install.proxy: none`. It is
+  separate from `command: deploy`, so existing SSH CLI deployments with `control-plane-mode: none`
+  continue to mutate SSH-server `ssh-pglite` directly until the operator selects a self-hosted
+  control-plane API mode.
 - In `control-plane-mode: self-hosted`, the deploy action uses server API trigger mode for the
   first 0.9.x slice: it does not install or invoke the CLI, open SSH, select a state backend, or
   mutate SSH-server PGlite. It calls the self-hosted server's `/api/version` endpoint, then uses
