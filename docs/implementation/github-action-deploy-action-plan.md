@@ -23,6 +23,14 @@ The non-secret connection policy may come from
 inputs, variables, secrets, or server-side source links. When ids are omitted, the self-hosted
 server owns context resolution from existing source-link state.
 
+The next `0.9.x` self-hosted server API candidate is
+[Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md). In that shape the
+Action is still a trigger, but it may hand a bounded source package reference and selected config
+path to the self-hosted server. The server owns package validation, repository config parsing,
+resource/environment/profile operations, source-link resolution, and ids-only deployment admission.
+The wrapper must feature-gate this path through the server handshake and fail before source package
+or state mutation when the server does not advertise support.
+
 ## Product Boundary
 
 `appaloft/deploy-action` is an entrypoint wrapper, not a business operation.
@@ -48,6 +56,9 @@ It must follow these boundaries:
   backend selection. Deploy may pass explicit trusted ids or ask the server to resolve an existing
   source link by source fingerprint; preview cleanup must resolve context from preview source-link
   state and must not accept deployment target ids.
+- future server config deploy mode keeps the Action as a trigger and the self-hosted server as the
+  owner of config bootstrap/source package handling. It must not add config/source fields to
+  `deployments.create` and must keep committed config free of identity and secret material.
 
 The action wrapper may live in a separate public repository because its release cadence and
 Marketplace metadata are different from the main Appaloft repository. The wrapper should remain
