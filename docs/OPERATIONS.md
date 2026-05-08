@@ -211,7 +211,25 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh
 
 The public `https://appaloft.com/install.sh` quick-start script is the Docker self-host installer.
 It installs or verifies Docker Engine plus the compose plugin on Linux, writes the Compose stack and
-environment file under `/opt/appaloft`, and starts Appaloft with PostgreSQL.
+environment file under `/opt/appaloft`, and starts Appaloft with PostgreSQL. The installer also
+starts a resident Traefik edge proxy by default. Without a domain, the console is reachable on the
+direct host port `3721`:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh
+```
+
+To bind the console to a domain, point DNS at the server, make ports `80` and `443` reachable, then
+pass the domain to the installer:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --domain console.example.com
+```
+
+That domain route is the Appaloft instance's own bootstrap route through the resident Traefik edge.
+It is separate from project Resource routes, DomainBinding records, and deployment snapshots. Rerun
+the installer with a different `--domain` to change the console domain. Use `--proxy none` only when
+another reverse proxy already owns public routing.
 
 For a single-server Appaloft console that should keep embedded PGlite state in a durable Docker
 volume, pass:
@@ -223,7 +241,7 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite
 To install the same console as a Docker Swarm stack on an existing manager, pass:
 
 ```bash
-curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite --orchestrator swarm --stack-name appaloft
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --orchestrator swarm --stack-name appaloft
 ```
 
 On a single fresh host, add `--swarm-init` only when the installer should initialize that host as a
@@ -268,17 +286,20 @@ controlPlane:
   mode: self-hosted
   url: https://console.example.com
   install:
-    database: pglite
+    database: postgres
+    domain: console.example.com
+    proxy: traefik
     orchestrator: swarm
-    httpPort: 3001
+    httpPort: 3721
     swarmStackName: appaloft-console
 ```
 
-The workflow defaults to `database=pglite` and `orchestrator=compose`; dispatch input can select
-`orchestrator=swarm`. Action inputs override matching config fields. Once the console is healthy,
-other repositories can set their `controlPlane.mode: self-hosted` and `controlPlane.url` to this
-origin, while keeping tokens, SSH keys, and resource identity in trusted Action inputs or the
-Appaloft server.
+The workflow defaults to `database=postgres`, `orchestrator=compose`, direct host port `3721`, and
+`proxy=traefik`; dispatch input can select `orchestrator=swarm`. `console-domain` is passed to the
+installer as the Appaloft instance console route, and action inputs override matching config fields.
+Once the console is healthy, other repositories can set their `controlPlane.mode: self-hosted` and
+`controlPlane.url` to this origin, while keeping tokens, SSH keys, and resource identity in trusted
+Action inputs or the Appaloft server.
 
 ## PostgreSQL
 

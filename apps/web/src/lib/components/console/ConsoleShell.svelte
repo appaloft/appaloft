@@ -16,6 +16,7 @@
     Server,
     ServerCrash,
     ShieldCheck,
+    Settings2,
     Sun,
     UserRound,
   } from "@lucide/svelte";
@@ -98,6 +99,7 @@
       labelKey: i18nKeys.console.nav.previewPolicies,
       icon: ShieldCheck,
     },
+    { href: "/instance", labelKey: i18nKeys.console.nav.instance, icon: Settings2 },
   ] as const;
 
   let { title, description, breadcrumbs = [], children }: Props = $props();

@@ -546,7 +546,7 @@ describe("deploy-action wrapper reference", () => {
       expect(result.argv).toEqual([
         "SSH root@203.0.113.10:2222",
         "INSTALLER https://github.com/appaloft/appaloft/releases/download/v0.9.1/install.sh",
-        "RUN sh /tmp/appaloft-install.sh --version 'v0.9.1' --web-origin 'https://console.example.com' --database 'pglite' --orchestrator 'swarm' --host '0.0.0.0' --port '3001' --image 'ghcr.io/appaloft/appaloft' --stack-name 'appaloft-console' --swarm-init --skip-docker-install",
+        "RUN sh /tmp/appaloft-install.sh --version 'v0.9.1' --web-origin 'https://console.example.com' --database 'pglite' --orchestrator 'swarm' --host '0.0.0.0' --port '3721' --image 'ghcr.io/appaloft/appaloft' --domain 'console.example.com' --proxy 'traefik' --stack-name 'appaloft-console' --swarm-init --skip-docker-install",
         "HEALTH https://console.example.com/api/health",
       ]);
       expect(result.output).toContain("console-url=https://console.example.com");
@@ -571,6 +571,7 @@ describe("deploy-action wrapper reference", () => {
           "  install:",
           "    database: pglite",
           "    orchestrator: swarm",
+          "    proxy: none",
           "    httpHost: 127.0.0.1",
           "    httpPort: 3101",
           "    swarmStackName: appaloft-console",
@@ -586,7 +587,7 @@ describe("deploy-action wrapper reference", () => {
       expect(result.argv).toEqual([
         "SSH root@203.0.113.10:22",
         "INSTALLER https://github.com/appaloft/appaloft/releases/latest/download/install.sh",
-        "RUN sh /tmp/appaloft-install.sh --version 'latest' --web-origin 'https://console.example.com' --database 'pglite' --orchestrator 'swarm' --host '127.0.0.1' --port '3101' --image 'ghcr.io/appaloft/appaloft:v0.9.x' --stack-name 'appaloft-console' --swarm-init --skip-docker-install",
+        "RUN sh /tmp/appaloft-install.sh --version 'latest' --web-origin 'https://console.example.com' --database 'pglite' --orchestrator 'swarm' --host '127.0.0.1' --port '3101' --image 'ghcr.io/appaloft/appaloft:v0.9.x' --proxy 'none' --stack-name 'appaloft-console' --swarm-init --skip-docker-install",
         "HEALTH https://console.example.com/api/health",
       ]);
       expect(result.output).toContain("console-url=https://console.example.com");
@@ -667,6 +668,21 @@ describe("deploy-action wrapper reference", () => {
     try {
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain("console-orchestrator must be compose or swarm");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-002] install-console rejects unknown proxy modes before SSH", () => {
+    const result = runDeploy({
+      INPUT_COMMAND: "install-console",
+      INPUT_SSH_HOST: "203.0.113.10",
+      INPUT_CONSOLE_PROXY: "nginx",
+    });
+
+    try {
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("console-proxy must be traefik or none");
     } finally {
       rmSync(result.workspace, { recursive: true, force: true });
     }

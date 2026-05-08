@@ -484,6 +484,7 @@ export const appaloftDeploymentControlPlaneConfigSchema = z
         domain: nonEmptyStringSchema.optional(),
         database: z.enum(["postgres", "pglite"]).optional(),
         orchestrator: z.enum(["compose", "swarm"]).optional(),
+        proxy: z.enum(["traefik", "none"]).optional(),
         httpHost: nonEmptyStringSchema.optional(),
         httpPort: positiveIntegerSchema.optional(),
         installDir: nonEmptyStringSchema.optional(),

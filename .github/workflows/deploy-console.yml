@@ -11,7 +11,7 @@ on:
       database:
         description: Self-hosted database backend for the console.
         required: false
-        default: pglite
+        default: postgres
         type: choice
         options:
           - pglite
