@@ -227,12 +227,17 @@ console output.
   validation slice. It validates request shape, source package manifest fields, source package path
   boundaries, source fingerprint/path consistency, archive checksum presence, and size limits before
   any command dispatch. The route still returns an explicit `config-bootstrap` migration-gap error
-  after package validation because server-side config bootstrap is not enabled yet.
+  after package validation and committed config validation because profile application is not enabled
+  yet.
+- The route can use a server-side source package config reader and the same
+  `@appaloft/deployment-config` parser used by CLI/local config deploy. Identity and raw secret
+  fields in committed config fail with `config-identity` or `config-secret-validation` before
+  source-link, resource, route, or deployment mutation.
 - `/api/version` advertises granular feature flags with source package validation present and
   server-side config bootstrap disabled; wrappers must keep failing before source package handoff
   until both capabilities are true.
 - The active implemented self-hosted server route remains
   `POST /api/action/deployments/from-source-link`, which triggers an existing resource profile from
   source-link context.
-- Source package transport, source package storage, diagnostics, cleanup rules, committed config
-  identity/secret rejection, and explicit-operation config bootstrap are not implemented yet.
+- Source package transport, source package storage, diagnostics, cleanup rules, and
+  explicit-operation config bootstrap are not implemented yet.

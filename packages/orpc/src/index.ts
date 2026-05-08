@@ -428,6 +428,7 @@ import {
   ResourceId,
   type Result,
 } from "@appaloft/core";
+import { parseAppaloftDeploymentConfigText } from "@appaloft/deployment-config";
 import { resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
 import { resolveAppaloftLocaleFromHeaders, translateDomainError } from "@appaloft/i18n";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
@@ -449,6 +450,7 @@ export interface AppaloftOrpcContext {
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
   sourceEventPolicyReader?: SourceEventPolicyReader;
   githubWebhookSecret?: string;
+  actionSourcePackageConfigReader?: ActionSourcePackageConfigReader;
 }
 
 interface AppaloftOrpcRequestContext extends AppaloftOrpcContext {
@@ -465,6 +467,15 @@ export interface RequestContextRunner {
     context: ExecutionContext,
     callback: () => Promise<T>,
   ): Promise<T>;
+}
+
+export interface ActionSourcePackageConfigReader {
+  readConfig(input: {
+    sourceFingerprint: string;
+    configPath: string;
+    sourceRoot: string;
+    sourcePackage: z.infer<typeof sourcePackageManifestSchema>;
+  }): Promise<Result<{ text: string; fileName?: string }>>;
 }
 
 const genericSignedSourceEventBodySchema = z
@@ -4223,11 +4234,38 @@ function validateActionServerConfigDeployBody(
   return undefined;
 }
 
+function phaseFromDeploymentConfigIssues(issues: { message: string }[]): string {
+  const messages = issues.map((issue) => issue.message).join("\n");
+
+  if (messages.includes("config_identity_field")) {
+    return "config-identity";
+  }
+
+  if (messages.includes("raw_secret_config_field")) {
+    return "config-secret-validation";
+  }
+
+  if (messages.includes("config_domain_resolution")) {
+    return "config-domain-resolution";
+  }
+
+  if (messages.includes("unsupported_config_field")) {
+    return "config-capability-resolution";
+  }
+
+  if (messages.includes("config_parse_error")) {
+    return "config-parse";
+  }
+
+  return "config-schema";
+}
+
 async function handleActionServerConfigDeploymentRoute(input: {
+  context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
   request: Request;
 }): Promise<Response> {
-  const { executionContext, request } = input;
+  const { context, executionContext, request } = input;
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(await request.text());
@@ -4254,6 +4292,48 @@ async function handleActionServerConfigDeploymentRoute(input: {
   const validationError = validateActionServerConfigDeployBody(body.data);
   if (validationError) {
     return domainErrorHttpResponse(validationError, executionContext);
+  }
+
+  if (!context.actionSourcePackageConfigReader) {
+    return domainErrorHttpResponse(
+      domainError.validation(
+        "Action server config deployment endpoint is available, but source package config reading is not enabled in this build",
+        {
+          phase: "config-bootstrap",
+        },
+      ),
+      executionContext,
+    );
+  }
+
+  const configText = await context.actionSourcePackageConfigReader.readConfig({
+    sourceFingerprint: body.data.sourceFingerprint,
+    configPath: body.data.configPath,
+    sourceRoot: body.data.sourceRoot,
+    sourcePackage: body.data.sourcePackage,
+  });
+  if (configText.isErr()) {
+    return domainErrorHttpResponse(configText.error, executionContext);
+  }
+
+  const parsedConfig = parseAppaloftDeploymentConfigText(
+    configText.value.text,
+    configText.value.fileName ?? body.data.configPath,
+  );
+  if (!parsedConfig.success) {
+    return domainErrorHttpResponse(
+      domainError.validation("Appaloft deployment config is invalid", {
+        phase: phaseFromDeploymentConfigIssues(parsedConfig.error.issues),
+        configPath: body.data.configPath,
+        issues: JSON.stringify(
+          parsedConfig.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        ),
+      }),
+      executionContext,
+    );
   }
 
   return domainErrorHttpResponse(
@@ -4526,6 +4606,7 @@ export function mountAppaloftOrpcRoutes(
     try {
       return await run(() =>
         handleActionServerConfigDeploymentRoute({
+          context,
           executionContext,
           request,
         }),
