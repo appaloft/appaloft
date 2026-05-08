@@ -16,6 +16,67 @@
         "url": {
           "type": "string",
           "minLength": 1
+        },
+        "install": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 1
+            },
+            "domain": {
+              "type": "string",
+              "minLength": 1
+            },
+            "database": {
+              "type": "string",
+              "enum": ["postgres", "pglite"]
+            },
+            "orchestrator": {
+              "type": "string",
+              "enum": ["compose", "swarm"]
+            },
+            "httpHost": {
+              "type": "string",
+              "minLength": 1
+            },
+            "httpPort": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "installDir": {
+              "type": "string",
+              "minLength": 1
+            },
+            "composeProjectName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "swarmStackName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "swarmInit": {
+              "type": "boolean"
+            },
+            "swarmAdvertiseAddr": {
+              "type": "string",
+              "minLength": 1
+            },
+            "image": {
+              "type": "string",
+              "minLength": 1
+            },
+            "installerUrl": {
+              "type": "string",
+              "minLength": 1
+            },
+            "skipDockerInstall": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "required": ["mode"],

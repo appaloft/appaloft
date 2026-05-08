@@ -99,6 +99,26 @@ Swarm stack; `console-swarm-init: true` may initialize a single-node Swarm manag
 not already a manager. This command is separate from `deploy`, so the original pure SSH CLI
 deployment path remains available.
 
+Non-secret console install settings can live in the selected config file. SSH host, SSH key, API
+tokens, and raw database credentials still come from trusted workflow inputs or secrets.
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+  install:
+    database: pglite
+    orchestrator: swarm
+    httpPort: 3001
+    swarmStackName: appaloft-console
+    swarmInit: true
+```
+
+When `command: install-console` is used, explicit action inputs override the matching
+`controlPlane.install.*` values. If `console-url` is omitted, the action uses
+`controlPlane.install.url`, then `controlPlane.url`, then `https://<console-domain>`, and finally
+`http://<ssh-host>:<console-http-port>`.
+
 ## Pull Request Preview
 
 Action-only pull request previews require a workflow file. The action does not install a webhook or
@@ -345,16 +365,16 @@ source-link state, or the Appaloft server, not from committed config.
 | `ssh-private-key-file` | empty | Existing runner-local private key path. Mutually exclusive with `ssh-private-key`. |
 | `console-url` | empty | Public console origin for `command: install-console`. Defaults to `https://<console-domain>` or `http://<ssh-host>:<console-http-port>`. |
 | `console-domain` | empty | Public console domain used to derive `console-url` when `console-url` is empty. |
-| `console-database` | `pglite` | Self-hosted console database backend for `command: install-console`; `pglite` or `postgres`. |
-| `console-orchestrator` | `compose` | Self-hosted Docker orchestrator for `command: install-console`; `compose` or `swarm`. |
-| `console-http-host` | `0.0.0.0` | Host bind address passed to the self-hosted console installer. |
-| `console-http-port` | `3001` | Host HTTP port passed to the self-hosted console installer. |
+| `console-database` | config or `pglite` | Self-hosted console database backend for `command: install-console`; `pglite` or `postgres`. |
+| `console-orchestrator` | config or `compose` | Self-hosted Docker orchestrator for `command: install-console`; `compose` or `swarm`. |
+| `console-http-host` | config or `0.0.0.0` | Host bind address passed to the self-hosted console installer. |
+| `console-http-port` | config or `3001` | Host HTTP port passed to the self-hosted console installer. |
 | `console-install-dir` | empty | Remote install directory passed to the self-hosted console installer. Empty uses the installer default. |
-| `console-compose-project-name` | `appaloft` | Docker Compose project name passed to the self-hosted console installer. |
-| `console-swarm-stack-name` | `appaloft` | Docker Swarm stack name passed to the self-hosted console installer. |
-| `console-swarm-init` | `false` | Initialize a single-node Swarm manager when `console-orchestrator` is `swarm`. |
+| `console-compose-project-name` | config or `appaloft` | Docker Compose project name passed to the self-hosted console installer. |
+| `console-swarm-stack-name` | config or `appaloft` | Docker Swarm stack name passed to the self-hosted console installer. |
+| `console-swarm-init` | config or `false` | Initialize a single-node Swarm manager when `console-orchestrator` is `swarm`. |
 | `console-swarm-advertise-addr` | empty | Optional advertise address passed to `docker swarm init`. |
-| `console-image` | `ghcr.io/appaloft/appaloft` | Appaloft console image repository or full image reference passed to the self-hosted console installer. |
+| `console-image` | config or `ghcr.io/appaloft/appaloft` | Appaloft console image repository or full image reference passed to the self-hosted console installer. |
 | `console-installer-url` | empty | Override URL for the self-hosted `install.sh` used by `command: install-console`. |
 | `console-skip-docker-install` | `false` | Require Docker Engine to already exist on the SSH host during `command: install-console`. |
 | `server-provider` | `generic-ssh` | Server provider key. |
