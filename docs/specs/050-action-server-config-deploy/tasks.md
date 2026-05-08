@@ -27,7 +27,7 @@
 
 ## Source Of Truth
 
-- [ ] Add command/workflow spec for the dedicated server config deploy API contract.
+- [x] Add command/workflow spec for the dedicated server config deploy API contract.
 - [ ] Define source package manifest fields, limits, checksum rules, storage lifecycle, and cleanup
   behavior.
 - [ ] Define source package/config bootstrap errors and public help anchors.

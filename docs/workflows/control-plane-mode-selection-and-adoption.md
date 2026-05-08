@@ -256,13 +256,14 @@ mutation. Preview cleanup must resolve context from preview source-link state. C
 source package, and broader preview workflow contracts remain later server-side work.
 
 The next accepted-candidate `0.9.x` slice is
-[Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md). That slice keeps
-the same state-owner boundary but lets the Action hand a bounded source package reference and
-selected config path to the self-hosted server. The server, not the runner, validates the package
-manifest, parses repository config, applies resource/environment/profile changes through explicit
-operations, resolves source links from trusted context, and dispatches ids-only deployment
-admission. It must fail before source package mutation or state mutation when the handshake does not
-advertise source package and server-side config bootstrap support.
+[Action Server Config Deploy](../workflows/action-server-config-deploy.md), coordinated by the
+[Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md) feature artifact.
+That slice keeps the same state-owner boundary but lets the Action hand a bounded source package
+reference and selected config path to the self-hosted server. The server, not the runner, validates
+the package manifest, parses repository config, applies resource/environment/profile changes
+through explicit operations, resolves source links from trusted context, and dispatches ids-only
+deployment admission. It must fail before source package mutation or state mutation when the
+handshake does not advertise source package and server-side config bootstrap support.
 
 ### Web
 

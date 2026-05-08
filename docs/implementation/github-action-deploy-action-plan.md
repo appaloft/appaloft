@@ -24,9 +24,10 @@ inputs, variables, secrets, or server-side source links. When ids are omitted, t
 server owns context resolution from existing source-link state.
 
 The next `0.9.x` self-hosted server API candidate is
-[Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md). In that shape the
-Action is still a trigger, but it may hand a bounded source package reference and selected config
-path to the self-hosted server. The server owns package validation, repository config parsing,
+[Action Server Config Deploy](../workflows/action-server-config-deploy.md), coordinated by
+[spec 050](../specs/050-action-server-config-deploy/spec.md). In that shape the Action is still a
+trigger, but it may hand a bounded source package reference and selected config path to the
+self-hosted server. The server owns package validation, repository config parsing,
 resource/environment/profile operations, source-link resolution, and ids-only deployment admission.
 The wrapper must feature-gate this path through the server handshake and fail before source package
 or state mutation when the server does not advertise support.
