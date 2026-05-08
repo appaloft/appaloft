@@ -563,6 +563,8 @@ const actionServerConfigDeployBodySchema = z
   })
   .strict();
 
+type ActionServerConfigDeployBody = z.infer<typeof actionServerConfigDeployBodySchema>;
+
 const relinkSourceLinkResponseSchema = z.object({
   sourceFingerprint: z.string(),
   projectId: z.string(),
@@ -4275,6 +4277,117 @@ function actionServerConfigRequiresProfileApplication(config: AppaloftDeployment
   );
 }
 
+function hasTrustedActionServerConfigDeploymentContext(
+  trustedContext: ActionServerConfigDeployBody["trustedContext"],
+): boolean {
+  return Boolean(
+    trustedContext?.projectId ||
+      trustedContext?.environmentId ||
+      trustedContext?.resourceId ||
+      trustedContext?.serverId ||
+      trustedContext?.destinationId,
+  );
+}
+
+function hasCompleteTrustedActionServerConfigDeploymentContext(
+  trustedContext: ActionServerConfigDeployBody["trustedContext"],
+): boolean {
+  return Boolean(
+    trustedContext?.projectId &&
+      trustedContext.environmentId &&
+      trustedContext.resourceId &&
+      trustedContext.serverId,
+  );
+}
+
+async function resolveActionServerConfigDeploymentTarget(input: {
+  context: AppaloftOrpcContext;
+  body: ActionServerConfigDeployBody;
+}): Promise<Result<SourceLinkRecord>> {
+  const { context, body } = input;
+  const trustedContext = body.trustedContext;
+  const hasExplicitContext = hasTrustedActionServerConfigDeploymentContext(trustedContext);
+
+  if (
+    hasExplicitContext &&
+    !hasCompleteTrustedActionServerConfigDeploymentContext(trustedContext)
+  ) {
+    return err(
+      domainError.validation(
+        "Action server config deploy source-link bootstrap requires project, environment, resource, and server ids",
+        {
+          phase: "source-link-resolution",
+          sourceFingerprint: body.sourceFingerprint,
+        },
+      ),
+    );
+  }
+
+  let link: SourceLinkRecord | null = null;
+  if (context.sourceLinkRepository) {
+    const found = await context.sourceLinkRepository.findOne(
+      SourceLinkBySourceFingerprintSpec.create(body.sourceFingerprint),
+    );
+    if (found.isErr()) {
+      return err(found.error);
+    }
+    link = found.value;
+  }
+
+  if (link && hasExplicitContext) {
+    const conflict =
+      link.projectId !== trustedContext?.projectId ||
+      link.environmentId !== trustedContext.environmentId ||
+      link.resourceId !== trustedContext.resourceId ||
+      link.serverId !== trustedContext.serverId ||
+      Boolean(trustedContext.destinationId && link.destinationId !== trustedContext.destinationId);
+    if (conflict) {
+      return err(
+        domainError.validation(
+          "Action server config deploy explicit context conflicts with existing source link; relink the source before deploying",
+          {
+            phase: "source-link-resolution",
+            sourceFingerprint: body.sourceFingerprint,
+          },
+        ),
+      );
+    }
+  }
+
+  if (link) {
+    return ok(link);
+  }
+
+  if (!hasExplicitContext || !trustedContext?.serverId) {
+    return err(domainError.notFound("Source link", body.sourceFingerprint));
+  }
+
+  const target = {
+    sourceFingerprint: body.sourceFingerprint,
+    projectId: trustedContext.projectId ?? "",
+    environmentId: trustedContext.environmentId ?? "",
+    resourceId: trustedContext.resourceId ?? "",
+    serverId: trustedContext.serverId,
+    ...(trustedContext.destinationId ? { destinationId: trustedContext.destinationId } : {}),
+    updatedAt: new Date().toISOString(),
+    reason: "github-action-server-config-bootstrap",
+  } satisfies SourceLinkRecord;
+
+  if (!context.sourceLinkRepository) {
+    return ok(target);
+  }
+
+  const persisted = await context.sourceLinkRepository.upsert(
+    target,
+    UpsertSourceLinkSpec.fromRecord(target),
+  );
+  if (persisted.isErr()) {
+    return err(persisted.error);
+  }
+
+  return ok(persisted.value);
+}
+
 async function handleActionServerConfigDeploymentRoute(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
@@ -4363,31 +4476,30 @@ async function handleActionServerConfigDeploymentRoute(input: {
     );
   }
 
-  const trustedContext = body.data.trustedContext;
-  if (
-    !trustedContext?.projectId ||
-    !trustedContext.environmentId ||
-    !trustedContext.resourceId ||
-    !trustedContext.serverId
-  ) {
+  const target = await resolveActionServerConfigDeploymentTarget({
+    context,
+    body: body.data,
+  });
+  if (target.isErr()) {
+    return domainErrorHttpResponse(target.error, executionContext);
+  }
+
+  if (!target.value.serverId) {
     return domainErrorHttpResponse(
-      domainError.validation(
-        "Action server config deploy requires trusted project, environment, resource, and server ids until source-link resolution is enabled",
-        {
-          phase: "source-link-resolution",
-          sourceFingerprint: body.data.sourceFingerprint,
-        },
-      ),
+      domainError.validation("Source link does not include a deployment target", {
+        phase: "source-link-resolution",
+        sourceFingerprint: body.data.sourceFingerprint,
+      }),
       executionContext,
     );
   }
 
   const command = CreateDeploymentCommand.create({
-    projectId: trustedContext.projectId,
-    environmentId: trustedContext.environmentId,
-    resourceId: trustedContext.resourceId,
-    serverId: trustedContext.serverId,
-    ...(trustedContext.destinationId ? { destinationId: trustedContext.destinationId } : {}),
+    projectId: target.value.projectId,
+    environmentId: target.value.environmentId,
+    resourceId: target.value.resourceId,
+    serverId: target.value.serverId,
+    ...(target.value.destinationId ? { destinationId: target.value.destinationId } : {}),
   });
   if (command.isErr()) {
     return domainErrorHttpResponse(command.error, executionContext);
