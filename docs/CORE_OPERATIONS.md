@@ -790,8 +790,11 @@ Current boundary:
   console bootstrap path. That command uses trusted SSH inputs to download the selected release
   `install.sh` on the target host, runs the self-hosted Docker installer with a configured public
   console origin/domain and database backend, verifies `/api/health`, and outputs `console-url`.
-  It can run the installer through Docker Compose or Docker Swarm when `console-orchestrator` is
-  configured. Swarm installation requires an existing manager unless `console-swarm-init` is
+  Non-secret install settings may come from `controlPlane.url` and `controlPlane.install.*` in the
+  selected repository config, while SSH host/key, tokens, and raw database credentials remain trusted
+  workflow inputs or secrets. It can run the installer through Docker Compose or Docker Swarm when
+  `console-orchestrator` or `controlPlane.install.orchestrator` is configured. Swarm installation
+  requires an existing manager unless `console-swarm-init` or `controlPlane.install.swarmInit` is
   explicitly selected. It is separate from `command: deploy`, so existing SSH CLI deployments with
   `control-plane-mode: none` continue to mutate SSH-server `ssh-pglite` directly until the operator
   selects a self-hosted control-plane API mode.

@@ -138,6 +138,18 @@ controlPlane:
   url: https://appaloft.internal.example.com
 ```
 
+Self-hosted console install workflows may add non-secret installer defaults:
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+  install:
+    database: pglite
+    orchestrator: compose
+    httpPort: 3001
+```
+
 Rules:
 
 - `mode` may be `none`, `auto`, `cloud`, or `self-hosted`.
@@ -145,6 +157,9 @@ Rules:
   endpoints.
 - Raw tokens, API keys, database URLs, SSH keys, certificate material, project ids, resource ids,
   server ids, destination ids, credential ids, organization ids, and tenant ids are rejected.
+- `controlPlane.install` is limited to non-secret console installer defaults. SSH host/key, API
+  tokens, raw database credentials, and deployment identity remain trusted entrypoint inputs or
+  server-owned state.
 - A committed config file may not choose Cloud project/resource identity.
 - If `controlPlane` is omitted, the default mode is `none`.
 

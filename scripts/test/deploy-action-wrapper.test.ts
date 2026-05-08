@@ -19,10 +19,13 @@ const publicCiWorkflow = readFileSync(join(actionRoot, ".github/workflows/ci.yml
 const runDeployScript = join(actionRoot, "scripts/run-deploy.sh");
 const exportScript = resolve(import.meta.dir, "../export-deploy-action-wrapper.ts");
 
-function runDeploy(input: Record<string, string | undefined>) {
+function runDeploy(input: Record<string, string | undefined>, files?: Record<string, string>) {
   const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-test-"));
   const argvPath = join(workspace, "argv.txt");
   const outputPath = join(workspace, "github-output.txt");
+  for (const [path, content] of Object.entries(files ?? {})) {
+    writeFileSync(join(workspace, path), content);
+  }
   const env = {
     ...Bun.env,
     APPALOFT_DEPLOY_ACTION_ARGV_PATH: argvPath,
@@ -547,6 +550,84 @@ describe("deploy-action wrapper reference", () => {
         "HEALTH https://console.example.com/api/health",
       ]);
       expect(result.output).toContain("console-url=https://console.example.com");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-003] install-console reads non-secret console settings from config", () => {
+    const result = runDeploy(
+      {
+        INPUT_COMMAND: "install-console",
+        INPUT_VERSION: "latest",
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_SSH_HOST: "203.0.113.10",
+      },
+      {
+        "appaloft.yml": [
+          "controlPlane:",
+          "  mode: self-hosted",
+          "  url: https://console.example.com",
+          "  install:",
+          "    database: pglite",
+          "    orchestrator: swarm",
+          "    httpHost: 127.0.0.1",
+          "    httpPort: 3101",
+          "    swarmStackName: appaloft-console",
+          "    swarmInit: true",
+          "    image: ghcr.io/appaloft/appaloft:v0.9.x",
+          "    skipDockerInstall: true",
+        ].join("\n"),
+      },
+    );
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv).toEqual([
+        "SSH root@203.0.113.10:22",
+        "INSTALLER https://github.com/appaloft/appaloft/releases/latest/download/install.sh",
+        "RUN sh /tmp/appaloft-install.sh --version 'latest' --web-origin 'https://console.example.com' --database 'pglite' --orchestrator 'swarm' --host '127.0.0.1' --port '3101' --image 'ghcr.io/appaloft/appaloft:v0.9.x' --stack-name 'appaloft-console' --swarm-init --skip-docker-install",
+        "HEALTH https://console.example.com/api/health",
+      ]);
+      expect(result.output).toContain("console-url=https://console.example.com");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-003] install-console inputs override config defaults", () => {
+    const result = runDeploy(
+      {
+        INPUT_COMMAND: "install-console",
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_SSH_HOST: "203.0.113.10",
+        INPUT_CONSOLE_DATABASE: "postgres",
+        INPUT_CONSOLE_ORCHESTRATOR: "compose",
+        INPUT_CONSOLE_HTTP_PORT: "3201",
+      },
+      {
+        "appaloft.yml": [
+          "controlPlane:",
+          "  mode: self-hosted",
+          "  url: https://console.example.com",
+          "  install:",
+          "    database: pglite",
+          "    orchestrator: swarm",
+          "    httpPort: 3101",
+          "    swarmStackName: appaloft-console",
+          "    swarmInit: true",
+        ].join("\n"),
+      },
+    );
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv[2]).toContain("--database 'postgres'");
+      expect(result.argv[2]).toContain("--orchestrator 'compose'");
+      expect(result.argv[2]).toContain("--port '3201'");
+      expect(result.argv[2]).toContain("--project-name 'appaloft'");
+      expect(result.argv[2]).not.toContain("--stack-name");
+      expect(result.argv[2]).not.toContain("--swarm-init");
     } finally {
       rmSync(result.workspace, { recursive: true, force: true });
     }

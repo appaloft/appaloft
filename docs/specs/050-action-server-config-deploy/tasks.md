@@ -26,6 +26,8 @@
   uses trusted source/preview context for identity.
 - [x] `ACTION-SERVER-CONFIG-SPEC-008`: Action server config deploy resolves `ci-env:` secrets from
   runner environment and applies them through server-owned environment commands.
+- [x] `CONTROL-PLANE-INSTALL-003`: `command=install-console` reads non-secret console install
+  settings from repository config while keeping SSH host/key and secrets in trusted workflow inputs.
 
 ## Source Of Truth
 

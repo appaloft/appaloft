@@ -113,6 +113,73 @@ read_json_block_value() {
   ' "$file" "$block" "$key"
 }
 
+read_yaml_path_value() {
+  local file="$1"
+  local path="$2"
+  awk -v path="$path" '
+    BEGIN {
+      path_length = split(path, path_parts, ".")
+      depth = 0
+    }
+    function trim(value) {
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      sub(/^"/, "", value)
+      sub(/"$/, "", value)
+      sub(/^\047/, "", value)
+      sub(/\047$/, "", value)
+      return value
+    }
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    {
+      line = $0
+      sub(/[[:space:]]+#.*$/, "", line)
+      indent = match(line, /[^[:space:]]/) - 1
+      content = line
+      sub(/^[[:space:]]+/, "", content)
+      separator = index(content, ":")
+      if (separator == 0) next
+
+      key = substr(content, 1, separator - 1)
+      value = trim(substr(content, separator + 1))
+
+      while (depth > 0 && indent <= indent_stack[depth]) {
+        depth--
+      }
+
+      if (key == path_parts[depth + 1]) {
+        depth++
+        indent_stack[depth] = indent
+        if (depth == path_length) {
+          print value
+          exit
+        }
+      }
+    }
+  ' "$file"
+}
+
+read_json_path_value() {
+  local file="$1"
+  local path="$2"
+  node -e '
+    const fs = require("fs");
+    const file = process.argv[1];
+    const path = process.argv[2].split(".");
+    let value = JSON.parse(fs.readFileSync(file, "utf8"));
+    for (const part of path) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        value = undefined;
+        break;
+      }
+      value = value[part];
+    }
+    if (["string", "number", "boolean"].includes(typeof value)) {
+      process.stdout.write(String(value));
+    }
+  ' "$file" "$path"
+}
+
 read_config_block_value() {
   local file="$1"
   local block="$2"
@@ -132,8 +199,30 @@ read_config_block_value() {
   esac
 }
 
+read_config_path_value() {
+  local file="$1"
+  local path="$2"
+  if [ ! -f "$file" ]; then
+    return 0
+  fi
+
+  normalized_file="$(printf '%s' "$file" | tr '[:upper:]' '[:lower:]')"
+  case "$normalized_file" in
+    *.json)
+      read_json_path_value "$file" "$path"
+      ;;
+    *)
+      trim_config_value "$(read_yaml_path_value "$file" "$path")"
+      ;;
+  esac
+}
+
 read_control_plane_value() {
   read_config_block_value "$1" controlPlane "$2"
+}
+
+read_control_plane_install_value() {
+  read_config_path_value "$1" "controlPlane.install.$2"
 }
 
 read_source_value() {
@@ -467,8 +556,8 @@ console_installer_url_for_version() {
   local version="$1"
   local normalized_version
 
-  if [ -n "${INPUT_CONSOLE_INSTALLER_URL:-}" ]; then
-    printf '%s' "$INPUT_CONSOLE_INSTALLER_URL"
+  if [ -n "$console_installer_url" ]; then
+    printf '%s' "$console_installer_url"
     return 0
   fi
 
@@ -760,17 +849,18 @@ ssh_private_key="${INPUT_SSH_PRIVATE_KEY:-}"
 ssh_private_key_file="${INPUT_SSH_PRIVATE_KEY_FILE:-}"
 console_url="${INPUT_CONSOLE_URL:-}"
 console_domain="${INPUT_CONSOLE_DOMAIN:-}"
-console_database="${INPUT_CONSOLE_DATABASE:-pglite}"
-console_orchestrator="${INPUT_CONSOLE_ORCHESTRATOR:-compose}"
-console_http_host="${INPUT_CONSOLE_HTTP_HOST:-0.0.0.0}"
-console_http_port="${INPUT_CONSOLE_HTTP_PORT:-3001}"
+console_database="${INPUT_CONSOLE_DATABASE:-}"
+console_orchestrator="${INPUT_CONSOLE_ORCHESTRATOR:-}"
+console_http_host="${INPUT_CONSOLE_HTTP_HOST:-}"
+console_http_port="${INPUT_CONSOLE_HTTP_PORT:-}"
 console_install_dir="${INPUT_CONSOLE_INSTALL_DIR:-}"
-console_compose_project_name="${INPUT_CONSOLE_COMPOSE_PROJECT_NAME:-appaloft}"
-console_swarm_stack_name="${INPUT_CONSOLE_SWARM_STACK_NAME:-appaloft}"
-console_swarm_init="${INPUT_CONSOLE_SWARM_INIT:-false}"
+console_compose_project_name="${INPUT_CONSOLE_COMPOSE_PROJECT_NAME:-}"
+console_swarm_stack_name="${INPUT_CONSOLE_SWARM_STACK_NAME:-}"
+console_swarm_init="${INPUT_CONSOLE_SWARM_INIT:-}"
 console_swarm_advertise_addr="${INPUT_CONSOLE_SWARM_ADVERTISE_ADDR:-}"
-console_image="${INPUT_CONSOLE_IMAGE:-ghcr.io/appaloft/appaloft}"
-console_skip_docker_install="${INPUT_CONSOLE_SKIP_DOCKER_INSTALL:-false}"
+console_image="${INPUT_CONSOLE_IMAGE:-}"
+console_installer_url="${INPUT_CONSOLE_INSTALLER_URL:-}"
+console_skip_docker_install="${INPUT_CONSOLE_SKIP_DOCKER_INSTALL:-}"
 state_backend="${INPUT_STATE_BACKEND:-}"
 environment_variables="${INPUT_ENVIRONMENT_VARIABLES:-}"
 secret_variables="${INPUT_SECRET_VARIABLES:-}"
@@ -803,11 +893,44 @@ if [ -n "$selected_config_path" ] && [ -f "$selected_config_path" ]; then
     control_plane_url="$config_control_plane_url"
   fi
   config_source_base_directory="$(read_source_value "$selected_config_path" baseDirectory)"
+  config_console_url="$(read_control_plane_install_value "$selected_config_path" url)"
+  config_console_domain="$(read_control_plane_install_value "$selected_config_path" domain)"
+  config_console_database="$(read_control_plane_install_value "$selected_config_path" database)"
+  config_console_orchestrator="$(read_control_plane_install_value "$selected_config_path" orchestrator)"
+  config_console_http_host="$(read_control_plane_install_value "$selected_config_path" httpHost)"
+  config_console_http_port="$(read_control_plane_install_value "$selected_config_path" httpPort)"
+  config_console_install_dir="$(read_control_plane_install_value "$selected_config_path" installDir)"
+  config_console_compose_project_name="$(read_control_plane_install_value "$selected_config_path" composeProjectName)"
+  config_console_swarm_stack_name="$(read_control_plane_install_value "$selected_config_path" swarmStackName)"
+  config_console_swarm_init="$(read_control_plane_install_value "$selected_config_path" swarmInit)"
+  config_console_swarm_advertise_addr="$(read_control_plane_install_value "$selected_config_path" swarmAdvertiseAddr)"
+  config_console_image="$(read_control_plane_install_value "$selected_config_path" image)"
+  config_console_installer_url="$(read_control_plane_install_value "$selected_config_path" installerUrl)"
+  config_console_skip_docker_install="$(read_control_plane_install_value "$selected_config_path" skipDockerInstall)"
 fi
 
 if [ -z "$control_plane_mode" ]; then
   control_plane_mode="none"
 fi
+
+if [ -z "$console_url" ]; then
+  console_url="${config_console_url:-${config_control_plane_url:-}}"
+fi
+if [ -z "$console_domain" ]; then
+  console_domain="${config_console_domain:-}"
+fi
+console_database="${console_database:-${config_console_database:-pglite}}"
+console_orchestrator="${console_orchestrator:-${config_console_orchestrator:-compose}}"
+console_http_host="${console_http_host:-${config_console_http_host:-0.0.0.0}}"
+console_http_port="${console_http_port:-${config_console_http_port:-3001}}"
+console_install_dir="${console_install_dir:-${config_console_install_dir:-}}"
+console_compose_project_name="${console_compose_project_name:-${config_console_compose_project_name:-appaloft}}"
+console_swarm_stack_name="${console_swarm_stack_name:-${config_console_swarm_stack_name:-appaloft}}"
+console_swarm_init="${console_swarm_init:-${config_console_swarm_init:-false}}"
+console_swarm_advertise_addr="${console_swarm_advertise_addr:-${config_console_swarm_advertise_addr:-}}"
+console_image="${console_image:-${config_console_image:-ghcr.io/appaloft/appaloft}}"
+console_installer_url="${console_installer_url:-${config_console_installer_url:-}}"
+console_skip_docker_install="${console_skip_docker_install:-${config_console_skip_docker_install:-false}}"
 
 case "$wrapper_command" in
   ""|deploy)

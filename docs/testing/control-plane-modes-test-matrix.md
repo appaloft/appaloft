@@ -70,6 +70,7 @@ This matrix inherits:
 | --- | --- | --- | --- | --- | --- | --- |
 | CONTROL-PLANE-INSTALL-001 | script contract | Self-hosted Docker installer selects persistence backend and orchestrator | `install.sh` runs with default options, `--database pglite`, or `--orchestrator swarm` | Default install writes a PostgreSQL Compose stack; PGlite install writes no database URL or PostgreSQL service and mounts durable Appaloft data at `/appaloft-data`; Swarm install writes the same safe stack shape, constrains local-volume state to manager nodes, requires an existing manager unless `--swarm-init` is explicit, and deploys through `docker stack deploy` | Invalid database/orchestrator/port, Docker unavailable, Compose plugin unavailable for Compose, or Swarm manager unavailable without explicit init | Validate inputs -> write compose/env -> docker compose pull/up or docker stack deploy |
 | CONTROL-PLANE-INSTALL-002 | workflow/wrapper contract | Repository console deploy workflow or deploy action installs the control plane over SSH | `.github/workflows/deploy-console.yml` is dispatched with trusted SSH host/key settings, or `appaloft/deploy-action` runs with `command=install-console` and trusted SSH inputs | Workflow copies `install.sh`, or the action downloads the release installer on the SSH host; both run it with configurable version/origin/database/orchestrator, default database to PGlite, verify `/api/health`, output the console URL, and keep secrets out of repository config | Missing SSH variable/secret/input, invalid version/database/orchestrator/port, installer download failure, or health timeout | Resolve trusted settings -> transfer or download installer -> remote install/upgrade -> health check |
+| CONTROL-PLANE-INSTALL-003 | config/parser + wrapper contract | Console install settings are repository-configurable | `command=install-console` runs with a selected config that contains non-secret `controlPlane.url` and `controlPlane.install.*` settings | The wrapper derives console origin, database, Docker orchestrator, host/port, image, installer URL, and Swarm/Compose names from config when matching Action inputs are omitted; explicit Action inputs remain trusted overrides, SSH host/key and API tokens stay outside config, and pure SSH CLI deploy remains separate | Invalid install database/orchestrator/port/URL, raw secret fields, or missing SSH target | Config parse -> trusted SSH input resolution -> remote installer invocation -> health check |
 
 ## Adoption Matrix
 
@@ -96,6 +97,9 @@ This matrix inherits:
 Current implementation covers the self-hosted Docker installer and console workflow rows
 (`CONTROL-PLANE-INSTALL-001` and `CONTROL-PLANE-INSTALL-002`) in `scripts/test/install-sh.test.ts`,
 `scripts/test/deploy-console-workflow.test.ts`, and `scripts/test/deploy-action-wrapper.test.ts`.
+`packages/deployment-config/test/appaloft-config.test.ts` and
+`scripts/test/deploy-action-wrapper.test.ts` cover config-driven console install settings
+(`CONTROL-PLANE-INSTALL-003`).
 `scripts/test/deploy-action-wrapper.test.ts` also covers unsupported control-plane input rejection
 (`CONTROL-PLANE-ENTRY-002`), self-hosted source-link deployment and preview cleanup
 (`CONTROL-PLANE-HANDSHAKE-011` and `CONTROL-PLANE-HANDSHAKE-012`), and the first Action Server

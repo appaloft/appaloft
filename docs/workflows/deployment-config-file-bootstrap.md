@@ -89,6 +89,18 @@ controlPlane:
   url: https://appaloft.internal.example.com
 ```
 
+Self-hosted console install workflows may also read non-secret install defaults from config:
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+  install:
+    database: pglite
+    orchestrator: swarm
+    httpPort: 3001
+```
+
 Rules:
 
 - `mode` may be `none`, `auto`, `cloud`, or `self-hosted`.
@@ -98,6 +110,10 @@ Rules:
 - Tokens, API keys, database URLs, SSH keys, certificate material, project ids, resource ids, server
   ids, destination ids, credential ids, organization ids, tenant ids, and Cloud project selectors
   are rejected.
+- `controlPlane.install` may contain only non-secret console installer settings such as public
+  origin/domain, database backend selector, Docker orchestrator selector, bind port, image, and
+  Swarm/Compose names. SSH host/key, tokens, raw database credentials, and resource identity remain
+  trusted entrypoint inputs or server-owned state.
 - Config `controlPlane` cannot retarget source link identity. Identity comes from trusted
   entrypoint input, authenticated control-plane scope, GitHub repository identity, source link
   state, adoption markers, or explicit relink/adoption operations.
@@ -489,6 +505,7 @@ deployment admission.
 | Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. |
 | `access.domains[]` | Server-applied route state in SSH CLI mode; managed `DomainBinding` or managed route intent in control-plane mode | Accepted values describe provider-neutral host/path/TLS route intent and optional canonical redirect aliases. They never enter `deployments.create`, never select identity or credentials, and never contain raw certificate material. |
 | `controlPlane.mode` / `controlPlane.url` | Entry workflow mode resolver | Selects connection policy and non-secret endpoint metadata only. It never enters `deployments.create`, never selects durable identity, and never stores tokens or database URLs. |
+| `controlPlane.install.*` | Console install entry workflow | Provides non-secret defaults for `command=install-console`, including public origin/domain, database backend selector, Docker orchestrator selector, bind port, image, and Swarm/Compose names. It never enters `deployments.create`, never selects durable deployment identity, and never carries SSH keys, tokens, raw database URLs, or raw secret values. |
 | CPU, memory, replicas, restart policy, rollout overlap/drain | Future resource/runtime-target profile specs | Must be rejected until an ADR/spec and runtime enforcement exist; no silent ignore. |
 
 If a resource already exists and the file changes reusable profile fields, the entry workflow must

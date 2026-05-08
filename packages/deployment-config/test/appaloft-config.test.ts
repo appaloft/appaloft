@@ -98,6 +98,38 @@ describe("Appaloft deployment config schema", () => {
     }
   });
 
+  test("[CONTROL-PLANE-INSTALL-003] accepts non-secret control-plane install config", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "controlPlane:",
+        "  mode: self-hosted",
+        "  url: https://console.example.com",
+        "  install:",
+        "    database: pglite",
+        "    orchestrator: swarm",
+        "    httpPort: 3001",
+        "    swarmStackName: appaloft-console",
+        "    swarmInit: true",
+        "    skipDockerInstall: true",
+        "    installerUrl: https://github.com/appaloft/appaloft/releases/latest/download/install.sh",
+      ].join("\n"),
+      "appaloft.yml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.controlPlane?.install).toEqual({
+        database: "pglite",
+        orchestrator: "swarm",
+        httpPort: 3001,
+        swarmStackName: "appaloft-console",
+        swarmInit: true,
+        skipDockerInstall: true,
+        installerUrl: "https://github.com/appaloft/appaloft/releases/latest/download/install.sh",
+      });
+    }
+  });
+
   test("[CONTROL-PLANE-MODE-011] rejects control-plane identity and secret fields", () => {
     const identity = parseAppaloftDeploymentConfig({
       controlPlane: {
