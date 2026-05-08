@@ -1848,6 +1848,11 @@ work below before GA.
 - [x] Self-hosted Action server API trigger: user-authored GitHub Actions workflow can call an
   existing self-hosted Appaloft server with trusted project/environment/resource/server ids to
   create a deployment without installing CLI, opening SSH, or mutating SSH-server PGlite state.
+- [ ] Self-hosted Action server config deploy: user-authored GitHub Actions workflow can hand a
+  bounded source package reference and selected config path to the self-hosted server, which owns
+  repository config bootstrap and ids-only deployment admission without runner-side CLI/SSH/PGlite
+  mutation. Spec Round is
+  [Action Server Config Deploy](./specs/050-action-server-config-deploy/spec.md).
 - [ ] Product-grade preview deployment: create from PR event, list/show/update policy/delete on
   close, scoped env, GitHub App status/comments, and cleanup retries.
 - [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs. Spec Round
