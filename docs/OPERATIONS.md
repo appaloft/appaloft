@@ -260,15 +260,25 @@ Configure:
 - repository secret `APPALOFT_CONSOLE_SSH_PRIVATE_KEY`
 - optional repository variable `APPALOFT_CONSOLE_SSH_USER`, default `root`
 - optional repository variable `APPALOFT_CONSOLE_SSH_PORT`, default `22`
-- optional repository variable `APPALOFT_CONSOLE_ORIGIN`, default `http://<host>:3001`
-- optional repository variable `APPALOFT_CONSOLE_COMPOSE_PROJECT_NAME`, default `appaloft`
-- optional repository variable `APPALOFT_CONSOLE_SWARM_STACK_NAME`, default `appaloft`
-- optional repository variable `APPALOFT_CONSOLE_SWARM_ADVERTISE_ADDR` when `swarm_init` is true
+
+Non-secret console settings can be committed in the selected Appaloft config:
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+  install:
+    database: pglite
+    orchestrator: swarm
+    httpPort: 3001
+    swarmStackName: appaloft-console
+```
 
 The workflow defaults to `database=pglite` and `orchestrator=compose`; dispatch input can select
-`orchestrator=swarm`. Once the console is healthy, other repositories can set their
-`controlPlane.mode: self-hosted` and `controlPlane.url` to this origin, while keeping tokens, SSH
-keys, and resource identity in trusted Action inputs or the Appaloft server.
+`orchestrator=swarm`. Action inputs override matching config fields. Once the console is healthy,
+other repositories can set their `controlPlane.mode: self-hosted` and `controlPlane.url` to this
+origin, while keeping tokens, SSH keys, and resource identity in trusted Action inputs or the
+Appaloft server.
 
 ## PostgreSQL
 

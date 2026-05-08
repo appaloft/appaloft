@@ -51,53 +51,53 @@ inputs:
     required: false
     default: ""
   console-database:
-    description: Self-hosted console database backend for command=install-console.
+    description: Self-hosted console database backend for command=install-console. Defaults to controlPlane.install.database or pglite.
     required: false
-    default: "pglite"
+    default: ""
   console-orchestrator:
-    description: Self-hosted console Docker orchestrator for command=install-console.
+    description: Self-hosted console Docker orchestrator for command=install-console. Defaults to controlPlane.install.orchestrator or compose.
     required: false
-    default: "compose"
+    default: ""
   console-http-host:
-    description: Host bind address passed to the self-hosted console installer.
+    description: Host bind address passed to the self-hosted console installer. Defaults to controlPlane.install.httpHost or 0.0.0.0.
     required: false
-    default: "0.0.0.0"
+    default: ""
   console-http-port:
-    description: Host HTTP port passed to the self-hosted console installer.
+    description: Host HTTP port passed to the self-hosted console installer. Defaults to controlPlane.install.httpPort or 3001.
     required: false
-    default: "3001"
+    default: ""
   console-install-dir:
     description: Remote install directory passed to the self-hosted console installer. Defaults to the installer default.
     required: false
     default: ""
   console-compose-project-name:
-    description: Docker Compose project name passed to the self-hosted console installer.
+    description: Docker Compose project name passed to the self-hosted console installer. Defaults to controlPlane.install.composeProjectName or appaloft.
     required: false
-    default: "appaloft"
+    default: ""
   console-swarm-stack-name:
-    description: Docker Swarm stack name passed to the self-hosted console installer.
+    description: Docker Swarm stack name passed to the self-hosted console installer. Defaults to controlPlane.install.swarmStackName or appaloft.
     required: false
-    default: "appaloft"
+    default: ""
   console-swarm-init:
-    description: Initialize a single-node Swarm manager on the SSH host when command=install-console and console-orchestrator=swarm.
+    description: Initialize a single-node Swarm manager on the SSH host when command=install-console and console-orchestrator=swarm. Defaults to controlPlane.install.swarmInit or false.
     required: false
-    default: "false"
+    default: ""
   console-swarm-advertise-addr:
     description: Optional advertise address passed to docker swarm init for command=install-console.
     required: false
     default: ""
   console-image:
-    description: Appaloft console image repository or full image reference passed to the self-hosted console installer.
+    description: Appaloft console image repository or full image reference passed to the self-hosted console installer. Defaults to controlPlane.install.image or ghcr.io/appaloft/appaloft.
     required: false
-    default: "ghcr.io/appaloft/appaloft"
+    default: ""
   console-installer-url:
     description: Override URL for the self-hosted install.sh script used by command=install-console.
     required: false
     default: ""
   console-skip-docker-install:
-    description: Require Docker Engine to already exist on the SSH host when command=install-console.
+    description: Require Docker Engine to already exist on the SSH host when command=install-console. Defaults to controlPlane.install.skipDockerInstall or false.
     required: false
-    default: "false"
+    default: ""
   server-provider:
     description: Server provider key.
     required: false
