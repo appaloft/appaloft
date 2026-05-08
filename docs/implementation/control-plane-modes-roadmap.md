@@ -151,6 +151,18 @@ Purpose: users can run Appaloft as their own control plane.
   slice.
 - This is not SSH PGlite adoption and does not make `auto` mode active.
 
+Next `0.9.x` accepted candidate:
+
+- [Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md) lets the Action
+  hand a bounded source package reference and selected config path to the self-hosted server.
+- The self-hosted server validates package metadata, parses repository config, rejects committed
+  identity/secret fields, applies profile/env/route intent through explicit commands, resolves
+  source links from trusted context, and dispatches ids-only deployment admission.
+- The Action still does not install or invoke the CLI, open SSH, select a state backend, or mutate
+  SSH-server PGlite in this mode.
+- Source package transport, storage limits, diagnostics, and cleanup rules must be closed before
+  this candidate is marked implemented.
+
 Deliverables:
 
 - The public website `install.sh` provisions the basic single-node Docker Compose control plane.
@@ -249,9 +261,11 @@ Current implementation is between Phase 0 and Phase 1:
 - `install.sh` can install a self-hosted Docker control plane with PostgreSQL or durable PGlite;
 - `.github/workflows/deploy-console.yml` can install or upgrade this repository's self-hosted
   console on an SSH server using the release installer path;
+- Action Server Config Deploy is specified as the next `0.9.x` server-mode slice, but source package
+  transport/storage and server-side config bootstrap code do not exist yet;
 - adoption import/marker does not exist;
 - Web mode selection does not exist;
 - deploy-action has control-plane mode, URL, token, and optional trusted id inputs.
 
-Future Code Rounds should finish the remaining Phase 3 adoption and source package contracts before
-claiming self-hosted mode as complete.
+Future Code Rounds should implement the source package/config bootstrap contract and finish the
+remaining Phase 3 adoption work before claiming self-hosted mode as complete.
