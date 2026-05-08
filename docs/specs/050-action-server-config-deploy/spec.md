@@ -116,6 +116,8 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
 - The first Action Server Config Deploy code slices validate package metadata, read
   `server-github-fetch` config files from GitHub raw content, reject committed identity/secrets,
   resolve/bootstrap source-link context, apply runtime/network/health profile fields through
-  explicit resource commands, and dispatch ids-only deployment admission. Inline archive transport,
-  remote archive URL transport, source package storage, diagnostics, cleanup, source/access/domain/
-  env/secret profile application, and product-grade preview orchestration remain migration gaps.
+  explicit resource commands, apply `access.domains[]` through managed `domain-bindings.create`
+  commands when trusted resource/destination/server proxy context is available, and dispatch
+  ids-only deployment admission. Inline archive transport, remote archive URL transport, source
+  package storage, diagnostics, cleanup, source/env/secret profile application, and product-grade
+  preview orchestration remain migration gaps.

@@ -4271,7 +4271,7 @@ const defaultActionServerConfigStaticInternalPort = 80;
 function actionServerConfigHasUnsupportedProfileApplication(
   config: AppaloftDeploymentConfig,
 ): boolean {
-  return Boolean(config.source || config.access || config.env || config.secrets);
+  return Boolean(config.source || config.env || config.secrets);
 }
 
 function runtimeProfileFromActionServerConfig(config: AppaloftDeploymentConfig) {
@@ -4343,6 +4343,119 @@ function healthCheckFromActionServerConfig(config: AppaloftDeploymentConfig) {
   };
 }
 
+type ActionServerConfigAccessDomain = NonNullable<
+  NonNullable<AppaloftDeploymentConfig["access"]>["domains"]
+>[number];
+
+function actionServerConfigDomainIdempotencyKey(input: {
+  sourceFingerprint: string;
+  domain: ActionServerConfigAccessDomain;
+}): string {
+  return [
+    "action-server-config-domain",
+    input.sourceFingerprint,
+    input.domain.host,
+    input.domain.pathPrefix,
+    input.domain.tlsMode,
+    input.domain.redirectTo ?? "serve",
+    String(input.domain.redirectStatus ?? "serve"),
+  ].join(":");
+}
+
+function orderedActionServerConfigDomains(
+  domains: readonly ActionServerConfigAccessDomain[],
+): ActionServerConfigAccessDomain[] {
+  return [...domains].sort((left, right) => {
+    if (left.redirectTo && !right.redirectTo) {
+      return 1;
+    }
+    if (!left.redirectTo && right.redirectTo) {
+      return -1;
+    }
+    return left.host.localeCompare(right.host);
+  });
+}
+
+async function resolveActionServerConfigDomainContext(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  target: SourceLinkRecord;
+}): Promise<Result<{ destinationId: string; proxyKind: "traefik" | "caddy"; serverId: string }>> {
+  const { context, executionContext, target } = input;
+  const serverId = target.serverId;
+  if (!serverId) {
+    return err(
+      domainError.validation(
+        "Action server config domain application requires a server id from source-link context",
+        {
+          phase: "profile-application",
+          resourceId: target.resourceId,
+        },
+      ),
+    );
+  }
+
+  let destinationId = target.destinationId;
+
+  if (!destinationId) {
+    const query = ShowResourceQuery.create({
+      resourceId: target.resourceId,
+      includeLatestDeployment: false,
+      includeAccessSummary: false,
+      includeProfileDiagnostics: false,
+    });
+    if (query.isErr()) {
+      return err(query.error);
+    }
+
+    const resource = await context.queryBus.execute(executionContext, query.value);
+    if (resource.isErr()) {
+      return err(resource.error);
+    }
+    destinationId = resource.value.resource.destinationId;
+  }
+
+  if (!destinationId) {
+    return err(
+      domainError.validation(
+        "Action server config domain application requires a destination id from source-link or resource context",
+        {
+          phase: "profile-application",
+          resourceId: target.resourceId,
+        },
+      ),
+    );
+  }
+
+  const serverQuery = ShowServerQuery.create({
+    serverId,
+    includeRollups: false,
+  });
+  if (serverQuery.isErr()) {
+    return err(serverQuery.error);
+  }
+
+  const server = await context.queryBus.execute(executionContext, serverQuery.value);
+  if (server.isErr()) {
+    return err(server.error);
+  }
+
+  const proxyKind = server.value.server.edgeProxy?.kind;
+  if (!proxyKind || proxyKind === "none") {
+    return err(
+      domainError.validation(
+        "Action server config domain application requires an edge proxy enabled server",
+        {
+          phase: "profile-application",
+          serverId,
+        },
+      ),
+    );
+  }
+
+  return ok({ destinationId, proxyKind, serverId });
+}
+
 async function applyActionServerConfigProfileCommands(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
@@ -4393,6 +4506,45 @@ async function applyActionServerConfigProfileCommands(input: {
     const result = await context.commandBus.execute(executionContext, command.value);
     if (result.isErr()) {
       return err(result.error);
+    }
+  }
+
+  if (config.access?.domains?.length) {
+    const domainContext = await resolveActionServerConfigDomainContext({
+      context,
+      executionContext,
+      target,
+    });
+    if (domainContext.isErr()) {
+      return err(domainContext.error);
+    }
+
+    for (const domain of orderedActionServerConfigDomains(config.access.domains)) {
+      const command = CreateDomainBindingCommand.create({
+        projectId: target.projectId,
+        environmentId: target.environmentId,
+        resourceId: target.resourceId,
+        serverId: domainContext.value.serverId,
+        destinationId: domainContext.value.destinationId,
+        domainName: domain.host,
+        pathPrefix: domain.pathPrefix,
+        proxyKind: domainContext.value.proxyKind,
+        tlsMode: domain.tlsMode,
+        ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
+        ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),
+        idempotencyKey: actionServerConfigDomainIdempotencyKey({
+          sourceFingerprint: target.sourceFingerprint,
+          domain,
+        }),
+      });
+      if (command.isErr()) {
+        return err(command.error);
+      }
+
+      const result = await context.commandBus.execute(executionContext, command.value);
+      if (result.isErr()) {
+        return err(result.error);
+      }
     }
   }
 
@@ -4589,7 +4741,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
   if (actionServerConfigHasUnsupportedProfileApplication(parsedConfig.data)) {
     return domainErrorHttpResponse(
       domainError.validation(
-        "Action server config deployment endpoint validated the config, but source/access/env/secret profile application is not enabled in this build",
+        "Action server config deployment endpoint validated the config, but source/env/secret profile application is not enabled in this build",
         {
           phase: "profile-application",
         },

@@ -223,12 +223,9 @@ console output.
   support.
 - The wrapper dry-run path maps the selected mode to
   `POST /api/action/deployments/from-config-package`.
-- The server route `POST /api/action/deployments/from-config-package` now exists for the first
-  validation slice. It validates request shape, source package manifest fields, source package path
-  boundaries, source fingerprint/path consistency, archive checksum presence, and size limits before
-  any command dispatch. The route still returns an explicit `config-bootstrap` migration-gap error
-  after package validation and committed config validation because profile application is not enabled
-  yet.
+- The server route `POST /api/action/deployments/from-config-package` validates request shape,
+  source package manifest fields, source package path boundaries, source fingerprint/path
+  consistency, archive checksum presence, and size limits before any command dispatch.
 - The route can use a server-side source package config reader and the same
   `@appaloft/deployment-config` parser used by CLI/local config deploy. Identity and raw secret
   fields in committed config fail with `config-identity` or `config-secret-validation` before
@@ -248,7 +245,11 @@ console output.
 - When the validated config contains runtime, network, or health profile fields, the endpoint
   applies them through `resources.configure-runtime`, `resources.configure-network`, and
   `resources.configure-health` before dispatching `deployments.create`.
-- When the validated config contains source, access/domain, environment, or secret profile fields,
+- When the validated config contains `access.domains[]`, the endpoint resolves the trusted
+  resource/destination and server proxy context, applies each domain through
+  `domain-bindings.create` with deterministic idempotency keys, creates served domains before
+  canonical redirect aliases, and only then dispatches `deployments.create`.
+- When the validated config contains source, environment, or secret profile fields,
   the endpoint fails before mutation with `profile-application`; these fields still require later
   explicit-operation bootstrap slices.
 - `/api/version` advertises granular feature flags. Self-hosted console builds that wire the
@@ -258,4 +259,6 @@ console output.
   `POST /api/action/deployments/from-source-link`, which triggers an existing resource profile from
   source-link context.
 - Inline archive and remote archive URL transport, source package storage, diagnostics, cleanup
-  rules, and source/access/domain/env/secret profile bootstrap are not implemented yet.
+  rules, and source/env/secret profile bootstrap are not implemented yet. Domain bootstrap is
+  currently the managed `DomainBinding` control-plane path; pure SSH CLI server-applied route state
+  remains the non-server mode.
