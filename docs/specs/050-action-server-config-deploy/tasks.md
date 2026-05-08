@@ -16,7 +16,7 @@
   before mutation.
 - [x] `CONTROL-PLANE-HANDSHAKE-014`: wrapper server config mode does not invoke CLI, SSH, or
   state-backend mutation.
-- [ ] `CONTROL-PLANE-HANDSHAKE-015`: HTTP server config endpoint validates package manifest and
+- [x] `CONTROL-PLANE-HANDSHAKE-015`: HTTP server config endpoint validates package manifest and
   rejects unsafe config/source paths before mutation.
 - [ ] `CONTROL-PLANE-HANDSHAKE-016`: server-side config bootstrap rejects identity/secret fields in
   committed config before source-link/resource/route/deployment mutation.
@@ -36,7 +36,7 @@
 ## Implementation
 
 - [x] Add wrapper inputs and dry-run traces for server config deploy/package behavior.
-- [ ] Add API route or RPC endpoint for Action server config deploy.
+- [x] Add API route or RPC endpoint for Action server config deploy.
 - [ ] Add source package manifest validation and a hermetic fake source package adapter.
 - [ ] Reuse repository config parser/validator on the server side and keep identity/secret
   rejection identical to pure CLI config deploy.
@@ -53,10 +53,10 @@
 ## Verification
 
 - [ ] Run targeted wrapper tests.
-- [ ] Run targeted HTTP/orpc tests.
+- [x] Run targeted HTTP/orpc tests.
 - [ ] Run targeted deployment config parser tests.
-- [ ] Run `bun run lint`.
-- [ ] Run typecheck for changed packages.
+- [x] Run `bun run lint`.
+- [x] Run typecheck for changed packages.
 
 ## Post-Implementation Sync
 

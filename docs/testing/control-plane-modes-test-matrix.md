@@ -98,7 +98,10 @@ Current implementation covers the first deploy-action wrapper rows in
 (`CONTROL-PLANE-ENTRY-002`), self-hosted source-link deployment and preview cleanup
 (`CONTROL-PLANE-HANDSHAKE-011` and `CONTROL-PLANE-HANDSHAKE-012`), and the first Action Server
 Config Deploy wrapper gate/dry-run rows (`CONTROL-PLANE-HANDSHAKE-013` and
-`CONTROL-PLANE-HANDSHAKE-014`).
+`CONTROL-PLANE-HANDSHAKE-014`). `packages/orpc/test/deployment-create.http.test.ts` also covers
+the first server endpoint source package validation slice (`CONTROL-PLANE-HANDSHAKE-015`), including
+safe path rejection before command dispatch and the explicit `config-bootstrap` migration-gap error
+after package validation.
 
 Existing tests in `deployment-state.test.ts` and `remote-pglite-state-sync.test.ts` partially cover
 the older `postgres-control-plane` backend selection branch. Those tests should be renamed or
@@ -108,5 +111,5 @@ extended with the IDs above during Phase 1 Code Round.
 behavior after remote revision conflict. That coverage belongs to the SSH state-backend path under
 mode `none`; it is not evidence of Cloud/self-hosted control-plane handshake or adoption behavior.
 
-Cloud/self-hosted API rows beyond the wrapper gate remain target coverage until the server
-endpoint, source package storage, adoption, and broader API mode contracts exist.
+Cloud/self-hosted API rows beyond source package validation remain target coverage until source
+package storage, adoption, committed config bootstrap, and broader API mode contracts exist.

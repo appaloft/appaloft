@@ -947,6 +947,11 @@ export function createHttpApp(input: {
       version: input.config.appVersion,
       apiVersion,
       mode: input.config.runtimeMode,
+      features: {
+        actionServerConfigDeploy: false,
+        sourcePackages: true,
+        serverSideConfigBootstrap: false,
+      },
     }))
     .get("/api/console-overview", ({ request }) => consoleOverview(request))
     .get("/.well-known/acme-challenge/:token", ({ request, params }) =>

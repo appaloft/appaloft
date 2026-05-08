@@ -370,6 +370,129 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommand).toBeUndefined();
   });
 
+  test("[CONTROL-PLANE-HANDSHAKE-015] Action server config endpoint rejects unsafe package paths before mutation", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "../appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "../appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "source-package-validation",
+          field: "configPath",
+        },
+      },
+    });
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-015] Action server config endpoint reports bootstrap gap after package validation", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "config-bootstrap",
+        },
+      },
+    });
+    expect(capturedCommand).toBeUndefined();
+  });
+
   test("[DEP-RETRY-001] dispatches RetryDeploymentCommand through HTTP", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {

@@ -496,6 +496,59 @@ const actionSourceLinkDeploymentBodySchema = z
   })
   .strict();
 
+const sourcePackageManifestSchema = z
+  .object({
+    transport: z.enum(["inline-archive", "remote-archive-url", "server-github-fetch"]),
+    sourceFingerprint: z.string().trim().min(1),
+    configPath: z.string().trim().min(1),
+    sourceRoot: z.string().trim().min(1),
+    revision: z.string().trim().min(1).optional(),
+    repositoryFullName: z.string().trim().min(1).optional(),
+    repositoryId: z.string().trim().min(1).optional(),
+    archiveSha256: z
+      .string()
+      .trim()
+      .regex(/^[a-f0-9]{64}$/i)
+      .optional(),
+    archiveSizeBytes: z.number().int().positive().max(250_000_000).optional(),
+    archiveUrlExpiresAt: z.string().trim().datetime().optional(),
+  })
+  .strict();
+
+const actionServerConfigDeployBodySchema = z
+  .object({
+    sourceFingerprint: z.string().trim().min(1),
+    configPath: z.string().trim().min(1),
+    sourceRoot: z.string().trim().min(1),
+    sourcePackage: sourcePackageManifestSchema,
+    preview: z
+      .object({
+        kind: z.literal("pull-request"),
+        previewId: z.string().trim().min(1),
+        pullRequestNumber: z.number().int().positive().optional(),
+        headSha: z.string().trim().min(1).optional(),
+        baseRef: z.string().trim().min(1).optional(),
+        headRef: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+    trustedContext: z
+      .object({
+        projectId: z.string().trim().min(1).optional(),
+        environmentId: z.string().trim().min(1).optional(),
+        resourceId: z.string().trim().min(1).optional(),
+        serverId: z.string().trim().min(1).optional(),
+        destinationId: z.string().trim().min(1).optional(),
+        repositoryFullName: z.string().trim().min(1).optional(),
+        repositoryId: z.string().trim().min(1).optional(),
+        ref: z.string().trim().min(1).optional(),
+        revision: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 const relinkSourceLinkResponseSchema = z.object({
   sourceFingerprint: z.string(),
   projectId: z.string(),
@@ -3464,6 +3517,7 @@ function domainErrorHttpResponse(error: DomainError, context: ExecutionContext):
         category: error.category,
         message: mapped.message,
         retryable: error.retryable,
+        ...(error.details ? { details: error.details } : {}),
       },
     },
     {
@@ -4098,6 +4152,121 @@ async function handleActionSourceLinkDeploymentRoute(input: {
   );
 }
 
+function isSafePackageRelativePath(value: string, input?: { allowDot?: boolean }): boolean {
+  const normalized = value.trim().replaceAll("\\", "/").replace(/\/+/g, "/");
+  if (!normalized || normalized.startsWith("/") || normalized.startsWith("~")) {
+    return false;
+  }
+
+  if (normalized === ".") {
+    return input?.allowDot === true;
+  }
+
+  return normalized.split("/").every((segment) => segment && segment !== "." && segment !== "..");
+}
+
+function validateActionServerConfigDeployBody(
+  body: z.infer<typeof actionServerConfigDeployBodySchema>,
+): DomainError | undefined {
+  if (body.sourcePackage.sourceFingerprint !== body.sourceFingerprint) {
+    return domainError.validation("Source package fingerprint must match request fingerprint", {
+      phase: "source-package-validation",
+      field: "sourcePackage.sourceFingerprint",
+    });
+  }
+
+  if (body.sourcePackage.configPath !== body.configPath) {
+    return domainError.validation("Source package config path must match request config path", {
+      phase: "source-package-validation",
+      field: "sourcePackage.configPath",
+    });
+  }
+
+  if (body.sourcePackage.sourceRoot !== body.sourceRoot) {
+    return domainError.validation("Source package root must match request source root", {
+      phase: "source-package-validation",
+      field: "sourcePackage.sourceRoot",
+    });
+  }
+
+  if (!isSafePackageRelativePath(body.configPath)) {
+    return domainError.validation(
+      "Action server config deploy configPath must stay inside package root",
+      {
+        phase: "source-package-validation",
+        field: "configPath",
+      },
+    );
+  }
+
+  if (!isSafePackageRelativePath(body.sourceRoot, { allowDot: true })) {
+    return domainError.validation(
+      "Action server config deploy sourceRoot must stay inside package root",
+      {
+        phase: "source-package-validation",
+        field: "sourceRoot",
+      },
+    );
+  }
+
+  if (
+    (body.sourcePackage.transport === "inline-archive" ||
+      body.sourcePackage.transport === "remote-archive-url") &&
+    !body.sourcePackage.archiveSha256
+  ) {
+    return domainError.validation("Archive source packages require archiveSha256", {
+      phase: "source-package-validation",
+      field: "sourcePackage.archiveSha256",
+    });
+  }
+
+  return undefined;
+}
+
+async function handleActionServerConfigDeploymentRoute(input: {
+  executionContext: ExecutionContext;
+  request: Request;
+}): Promise<Response> {
+  const { executionContext, request } = input;
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(await request.text());
+  } catch {
+    return domainErrorHttpResponse(
+      domainError.validation("Action server config deployment body must be valid JSON", {
+        phase: "source-package-validation",
+      }),
+      executionContext,
+    );
+  }
+
+  const body = actionServerConfigDeployBodySchema.safeParse(parsedJson);
+  if (!body.success) {
+    return domainErrorHttpResponse(
+      domainError.validation("Action server config deployment body is invalid", {
+        phase: "source-package-validation",
+        issueCount: body.error.issues.length,
+      }),
+      executionContext,
+    );
+  }
+
+  const validationError = validateActionServerConfigDeployBody(body.data);
+  if (validationError) {
+    return domainErrorHttpResponse(validationError, executionContext);
+  }
+
+  return domainErrorHttpResponse(
+    domainError.validation(
+      "Action server config deployment endpoint is available, but server-side config bootstrap is not enabled in this build",
+      {
+        phase: "config-bootstrap",
+      },
+    ),
+    executionContext,
+  );
+}
+
 async function handleGitHubPreviewPullRequestRoute(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
@@ -4346,6 +4515,31 @@ export function mountAppaloftOrpcRoutes(
     }
   };
 
+  const actionServerConfigDeploymentRouteHandler = async ({ request }: { request: Request }) => {
+    const executionContext = createRequestExecutionContext(
+      context.executionContextFactory,
+      "http",
+      request,
+    );
+    const run = createRequestRunner(request, executionContext, context.requestContextRunner);
+
+    try {
+      return await run(() =>
+        handleActionServerConfigDeploymentRoute({
+          executionContext,
+          request,
+        }),
+      );
+    } catch (error) {
+      context.logger.error("action_server_config_deployment_route_unhandled_error", {
+        method: request.method,
+        url: request.url,
+        ...buildUnexpectedErrorContext(error),
+      });
+      throw error;
+    }
+  };
+
   const routes = [
     "/api/projects",
     "/api/projects/:projectId",
@@ -4457,6 +4651,14 @@ export function mountAppaloftOrpcRoutes(
   mounted = mounted.post(
     "/api/action/deployments/from-source-link",
     actionSourceLinkDeploymentRouteHandler,
+    {
+      parse: "none",
+    },
+  ) as unknown as Elysia;
+
+  mounted = mounted.post(
+    "/api/action/deployments/from-config-package",
+    actionServerConfigDeploymentRouteHandler,
     {
       parse: "none",
     },
