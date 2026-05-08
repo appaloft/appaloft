@@ -343,6 +343,7 @@ This decision governs:
 - [Control-Plane Modes Test Matrix](../testing/control-plane-modes-test-matrix.md)
 - [GitHub Action Deploy Wrapper Plan](../implementation/github-action-deploy-action-plan.md)
 - [Control-Plane Modes Roadmap](../implementation/control-plane-modes-roadmap.md)
+- [Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md)
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -356,6 +357,9 @@ secret fields under `controlPlane`, and normalizes safe self-hosted URLs.
 The deploy-action wrapper can run pure SSH deployments or the initial self-hosted Action-to-server
 API deploy slice. OIDC/token exchange semantics, Cloud-assisted API mode, and full adoption remain
 roadmap work.
+
+Action Server Config Deploy is specified as the next `0.9.x` self-hosted server-mode slice, but its
+source package transport/storage and server-side config bootstrap implementation do not exist yet.
 
 No Cloud-assisted Action API, self-hosted adoption marker, source-link import, managed config
 domain mapping, or control-plane-owned execution runner is implemented yet.
