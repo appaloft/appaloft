@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.9.3](https://github.com/appaloft/appaloft/compare/v0.9.2...v0.9.3) (2026-05-08)
+
+
+### Features
+
+* accept action server config existing resource deploy ([3f96919](https://github.com/appaloft/appaloft/commit/3f96919131842b1cf9269cd855b79c7395659acf))
+* add action console server config deploy ([3bc33a7](https://github.com/appaloft/appaloft/commit/3bc33a77ef17eada8df8f263b20cbb9d2b8706cd))
+* add action server config endpoint gate ([5b3b1be](https://github.com/appaloft/appaloft/commit/5b3b1be7f064d0ce1e521cd6806d62d6cbb874a0))
+* add deploy action console install command ([70cfbf0](https://github.com/appaloft/appaloft/commit/70cfbf01be32805a08067d6ccb74989053bd64c2))
+* apply action server config domains ([d6b4dd4](https://github.com/appaloft/appaloft/commit/d6b4dd4083e5d33f39163a771a714e05bde78d7a))
+* apply action server config env ([201e1ec](https://github.com/appaloft/appaloft/commit/201e1ece8fd83b1f39faf995da88fcfdd2b53082))
+* apply action server config profiles ([6d22f52](https://github.com/appaloft/appaloft/commit/6d22f529462c751e3c7ba24ab9d10ae3a545cbd5))
+* apply action server config secrets ([4e496a2](https://github.com/appaloft/appaloft/commit/4e496a29727746268d471702caa6ea7ab32c7289))
+* gate action server config deploy ([a2cc1e5](https://github.com/appaloft/appaloft/commit/a2cc1e50483bdaa1a422120c4d5c97bd531fa1dd))
+* read console install config from action config ([d211bcf](https://github.com/appaloft/appaloft/commit/d211bcf56d815e86599834aa68ffedd079af0e82))
+* resolve action server config source links ([4cb5c5a](https://github.com/appaloft/appaloft/commit/4cb5c5aafacc77cb2a8c836364082235ff80ec71))
+* support swarm console install ([edbc1ff](https://github.com/appaloft/appaloft/commit/edbc1ffdf7ce7f2793632c3bd596859ab259a06f))
+* validate action server config contents ([5b72421](https://github.com/appaloft/appaloft/commit/5b72421539b76d5378c06dde0d7933acbf44747f))
+* validate action server config contents ([34c416b](https://github.com/appaloft/appaloft/commit/34c416baea855edb571266d5ed10f29cf4650956))
+* wire action server config github reader ([10d96e4](https://github.com/appaloft/appaloft/commit/10d96e46f26061753d718c285fad06abdb2e766d))
+
+
+### Documentation
+
+* define action server config workflow ([c0dc28e](https://github.com/appaloft/appaloft/commit/c0dc28e12919b994548fc7c67a5f6c57d26a0716))
+* specify action server config deploy ([50ca384](https://github.com/appaloft/appaloft/commit/50ca384632ebdcf47f1c238711e28631455527e1))
+* specify action server config deploy ([880c723](https://github.com/appaloft/appaloft/commit/880c7237cadac70b98e7a57babdd0cb3afe69e31))
+* sync action console release gate ([9460eea](https://github.com/appaloft/appaloft/commit/9460eea81c8b825d125c20c42b977d03e3244fad))
+* sync action console release gate ([d44c193](https://github.com/appaloft/appaloft/commit/d44c193415e279d68441822eec979b898f2669e3))
+
 ## [0.9.2](https://github.com/appaloft/appaloft/compare/v0.9.1...v0.9.2) (2026-05-07)
 
 
