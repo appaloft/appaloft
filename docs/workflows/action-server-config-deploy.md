@@ -223,8 +223,16 @@ console output.
   support.
 - The wrapper dry-run path maps the selected mode to
   `POST /api/action/deployments/from-config-package`.
+- The server route `POST /api/action/deployments/from-config-package` now exists for the first
+  validation slice. It validates request shape, source package manifest fields, source package path
+  boundaries, source fingerprint/path consistency, archive checksum presence, and size limits before
+  any command dispatch. The route still returns an explicit `config-bootstrap` migration-gap error
+  after package validation because server-side config bootstrap is not enabled yet.
+- `/api/version` advertises granular feature flags with source package validation present and
+  server-side config bootstrap disabled; wrappers must keep failing before source package handoff
+  until both capabilities are true.
 - The active implemented self-hosted server route remains
   `POST /api/action/deployments/from-source-link`, which triggers an existing resource profile from
   source-link context.
-- The `POST /api/action/deployments/from-config-package` server endpoint, source package transport,
-  source package storage, diagnostics, and cleanup rules are not implemented yet.
+- Source package transport, source package storage, diagnostics, cleanup rules, committed config
+  identity/secret rejection, and explicit-operation config bootstrap are not implemented yet.
