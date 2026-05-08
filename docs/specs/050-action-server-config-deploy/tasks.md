@@ -12,9 +12,9 @@
 
 ## Test-First
 
-- [ ] `CONTROL-PLANE-HANDSHAKE-013`: wrapper requires source package/server config feature support
+- [x] `CONTROL-PLANE-HANDSHAKE-013`: wrapper requires source package/server config feature support
   before mutation.
-- [ ] `CONTROL-PLANE-HANDSHAKE-014`: wrapper server config mode does not invoke CLI, SSH, or
+- [x] `CONTROL-PLANE-HANDSHAKE-014`: wrapper server config mode does not invoke CLI, SSH, or
   state-backend mutation.
 - [ ] `CONTROL-PLANE-HANDSHAKE-015`: HTTP server config endpoint validates package manifest and
   rejects unsafe config/source paths before mutation.
@@ -35,7 +35,7 @@
 
 ## Implementation
 
-- [ ] Add wrapper inputs and dry-run traces for server config deploy/package behavior.
+- [x] Add wrapper inputs and dry-run traces for server config deploy/package behavior.
 - [ ] Add API route or RPC endpoint for Action server config deploy.
 - [ ] Add source package manifest validation and a hermetic fake source package adapter.
 - [ ] Reuse repository config parser/validator on the server side and keep identity/secret
