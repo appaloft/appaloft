@@ -95,12 +95,20 @@ The CLI binary bundle embeds:
   source repository is private, npm provenance is not requested.
 - `HOMEBREW_TAP_TOKEN`: token with write access to `appaloft/homebrew-tap`.
 - `APPALOFT_SSH_PRIVATE_KEY`: SSH private key used by `deploy-docs.yml` to deploy to the same
-  server as `appaloft/www`.
+  server as `appaloft/www` when the docs workflow uses the pure SSH CLI fallback.
+- `APPALOFT_TOKEN`: bearer token used by `deploy-docs.yml` when
+  `APPALOFT_CONTROL_PLANE_MODE=self-hosted`.
 
 ## Required Variables
 
 - `APPALOFT_SSH_HOST`: SSH host used by `deploy-docs.yml`; keep it aligned with `appaloft/www`.
 - `APPALOFT_SSH_USER`: optional SSH username used by `deploy-docs.yml`; defaults to `root`.
+- `APPALOFT_CONTROL_PLANE_MODE`: set to `self-hosted` to route docs deployment through the
+  Appaloft server config deploy API.
+- `APPALOFT_CONTROL_PLANE_URL`: Appaloft server URL used when
+  `APPALOFT_CONTROL_PLANE_MODE=self-hosted`.
+- `APPALOFT_PROJECT_ID`, `APPALOFT_ENVIRONMENT_ID`, `APPALOFT_DOCS_RESOURCE_ID`,
+  `APPALOFT_SERVER_ID`: trusted Appaloft context used by the docs server config deploy workflow.
 
 ## Required DNS
 

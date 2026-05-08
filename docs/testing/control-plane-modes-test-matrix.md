@@ -114,6 +114,9 @@ through `environments.set-variable`, plus managed `access.domains[]` bootstrap t
 `domain-bindings.create` before deployment admission, including destination lookup from resource
 context and server proxy kind lookup. Unsupported source fields still fail before mutation with
 `profile-application`; unsupported secret resolvers fail with `config-secret-resolution`.
+`scripts/test/deploy-docs-workflow.test.ts` covers the main repository dogfood path: production
+docs deployment opts into `server-config-deploy: true` for self-hosted mode and keeps the pure SSH
+CLI fallback separate.
 
 Existing tests in `deployment-state.test.ts` and `remote-pglite-state-sync.test.ts` partially cover
 the older `postgres-control-plane` backend selection branch. Those tests should be renamed or
