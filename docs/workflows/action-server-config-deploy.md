@@ -233,6 +233,10 @@ console output.
   `@appaloft/deployment-config` parser used by CLI/local config deploy. Identity and raw secret
   fields in committed config fail with `config-identity` or `config-secret-validation` before
   source-link, resource, route, or deployment mutation.
+- The self-hosted console composition wires a GitHub `server-github-fetch` config reader that reads
+  the selected config file from `raw.githubusercontent.com` using trusted `repositoryFullName`,
+  revision, and config path metadata. Unsupported package transports still fail closed until their
+  storage/fetch contracts exist.
 - When the validated config does not require server-side profile application and trusted
   project/environment/resource/server ids are supplied, the endpoint dispatches the existing
   ids-only `deployments.create` command, bootstraps the source-link context when the link is
@@ -247,11 +251,11 @@ console output.
 - When the validated config contains source, access/domain, environment, or secret profile fields,
   the endpoint fails before mutation with `profile-application`; these fields still require later
   explicit-operation bootstrap slices.
-- `/api/version` advertises granular feature flags with source package validation present and
-  server-side config bootstrap disabled; wrappers must keep failing before source package handoff
-  until both capabilities are true.
+- `/api/version` advertises granular feature flags. Self-hosted console builds that wire the
+  source package config reader advertise Action Server Config Deploy support; builds without the
+  reader keep failing wrapper handshakes before source package handoff.
 - The active implemented self-hosted server route remains
   `POST /api/action/deployments/from-source-link`, which triggers an existing resource profile from
   source-link context.
-- Source package transport, source package storage, diagnostics, cleanup rules, and
-  source/access/domain/env/secret profile bootstrap are not implemented yet.
+- Inline archive and remote archive URL transport, source package storage, diagnostics, cleanup
+  rules, and source/access/domain/env/secret profile bootstrap are not implemented yet.
