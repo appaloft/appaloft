@@ -68,7 +68,34 @@ For normal deployments, `appaloft/deploy-action` can trigger an existing self-ho
     server-id: ${{ secrets.APPALOFT_SERVER_ID }}
 ```
 
-This server API slice requires the project, environment, resource, and deployment target to already exist in the Appaloft server. The Action always calls the server source-link deployment route. When explicit ids are supplied, the server can bootstrap a missing source link; later runs can omit the ids and let the server resolve context from its source-link state using the GitHub repository, ref, config path, and source base directory fingerprint. It does not apply `appaloft.yml`, upload a source archive, create resources, open SSH, or mutate SSH-server PGlite state.
+Without `server-config-deploy`, this server API slice requires the project, environment, resource, and deployment target to already exist in the Appaloft server. The Action calls the server source-link deployment route. When explicit ids are supplied, the server can bootstrap a missing source link; later runs can omit the ids and let the server resolve context from its source-link state using the GitHub repository, ref, config path, and source base directory fingerprint. That path does not apply `appaloft.yml`, upload a source archive, create resources, open SSH, or mutate SSH-server PGlite state.
+
+Use `server-config-deploy: true` when the self-hosted server should read the selected repository
+config and apply it before creating the deployment:
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  id: deploy
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    config: appaloft.yml
+    server-config-deploy: true
+    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
+    environment-id: ${{ secrets.APPALOFT_ENVIRONMENT_ID }}
+    resource-id: ${{ secrets.APPALOFT_RESOURCE_ID }}
+    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
+    secret-variables: |
+      APP_SECRET=ci-env:APP_SECRET
+```
+
+In this mode the Action performs the server handshake, sends a bounded GitHub source/config
+reference, resolves `ci-env:` secrets from the runner environment, and calls the server API. The
+runner still does not install the CLI, open SSH, select a state backend, or mutate SSH-server PGlite
+state. The server validates the committed config, rejects identity and raw secret fields, applies
+runtime/network/health/env/domain settings through Appaloft operations, then dispatches ids-only
+deployment admission.
 
 Self-hosted server mode can also trigger PR preview deploys:
 

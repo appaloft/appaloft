@@ -69,7 +69,33 @@ appaloft deploy . \
     server-id: ${{ secrets.APPALOFT_SERVER_ID }}
 ```
 
-这个 server API slice 要求 project、environment、resource 和 deployment target 已经存在于 Appaloft server。Action 会调用 server 的 source-link deployment route。提供显式 ids 时，server 可以 bootstrap 缺失的 source link；之后的运行可以省略 ids，让 server 通过 GitHub repository、ref、config path 和 source base directory fingerprint 从已有 source-link state 解析上下文。它不会应用 `appaloft.yml`、上传 source archive、创建 resource、打开 SSH，或修改 SSH-server PGlite state。
+不使用 `server-config-deploy` 时，这个 server API slice 要求 project、environment、resource 和 deployment target 已经存在于 Appaloft server。Action 会调用 server 的 source-link deployment route。提供显式 ids 时，server 可以 bootstrap 缺失的 source link；之后的运行可以省略 ids，让 server 通过 GitHub repository、ref、config path 和 source base directory fingerprint 从已有 source-link state 解析上下文。这个路径不会应用 `appaloft.yml`、上传 source archive、创建 resource、打开 SSH，或修改 SSH-server PGlite state。
+
+当 self-hosted server 需要读取所选 repository config 并在创建部署前应用它时，使用
+`server-config-deploy: true`：
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  id: deploy
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    config: appaloft.yml
+    server-config-deploy: true
+    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
+    environment-id: ${{ secrets.APPALOFT_ENVIRONMENT_ID }}
+    resource-id: ${{ secrets.APPALOFT_RESOURCE_ID }}
+    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
+    secret-variables: |
+      APP_SECRET=ci-env:APP_SECRET
+```
+
+在这个模式下，Action 执行 server handshake，发送有边界的 GitHub source/config 引用，从
+runner environment 解析 `ci-env:` secrets，并调用 server API。Runner 仍然不会安装 CLI、
+打开 SSH、选择 state backend，或修改 SSH-server PGlite state。Server 会验证 committed
+config，拒绝 identity 和 raw secret 字段，通过 Appaloft operations 应用
+runtime/network/health/env/domain 设置，然后 dispatch ids-only deployment admission。
 
 Self-hosted server mode 也可以触发 PR preview deploy：
 
