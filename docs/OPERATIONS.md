@@ -248,8 +248,9 @@ APPALOFT_IMAGE_REF=ghcr.io/appaloft/appaloft:latest docker compose -f docker-com
 ## Console Deploy Workflow
 
 The checked-in `.github/workflows/deploy-console.yml` workflow installs or upgrades the self-hosted
-Appaloft console on an SSH server by copying the repository `install.sh` to the host and running it
-there.
+Appaloft console on an SSH server by calling the local deploy action with `command:
+install-console`. The action downloads the selected release `install.sh` on the host, runs it
+there, and verifies `/api/health`.
 
 Configure:
 
@@ -258,10 +259,14 @@ Configure:
 - optional repository variable `APPALOFT_CONSOLE_SSH_USER`, default `root`
 - optional repository variable `APPALOFT_CONSOLE_SSH_PORT`, default `22`
 - optional repository variable `APPALOFT_CONSOLE_ORIGIN`, default `http://<host>:3001`
+- optional repository variable `APPALOFT_CONSOLE_COMPOSE_PROJECT_NAME`, default `appaloft`
+- optional repository variable `APPALOFT_CONSOLE_SWARM_STACK_NAME`, default `appaloft`
+- optional repository variable `APPALOFT_CONSOLE_SWARM_ADVERTISE_ADDR` when `swarm_init` is true
 
-The workflow defaults to `database=pglite`. Once the console is healthy, other repositories can set
-their `controlPlane.mode: self-hosted` and `controlPlane.url` to this origin, while keeping tokens,
-SSH keys, and resource identity in trusted Action inputs or the Appaloft server.
+The workflow defaults to `database=pglite` and `orchestrator=compose`; dispatch input can select
+`orchestrator=swarm`. Once the console is healthy, other repositories can set their
+`controlPlane.mode: self-hosted` and `controlPlane.url` to this origin, while keeping tokens, SSH
+keys, and resource identity in trusted Action inputs or the Appaloft server.
 
 ## PostgreSQL
 
