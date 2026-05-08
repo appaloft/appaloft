@@ -535,6 +535,7 @@ const actionServerConfigDeployBodySchema = z
     configPath: z.string().trim().min(1),
     sourceRoot: z.string().trim().min(1),
     sourcePackage: sourcePackageManifestSchema,
+    resolvedSecrets: z.record(z.string().trim().min(1), z.string()).optional(),
     preview: z
       .object({
         kind: z.literal("pull-request"),
@@ -4271,7 +4272,7 @@ const defaultActionServerConfigStaticInternalPort = 80;
 function actionServerConfigHasUnsupportedProfileApplication(
   config: AppaloftDeploymentConfig,
 ): boolean {
-  return Boolean(config.source || config.secrets);
+  return Boolean(config.source);
 }
 
 function runtimeProfileFromActionServerConfig(config: AppaloftDeploymentConfig) {
@@ -4345,6 +4346,106 @@ function healthCheckFromActionServerConfig(config: AppaloftDeploymentConfig) {
 
 function environmentVariableExposureFromActionServerConfigKey(key: string) {
   return key.startsWith("PUBLIC_") || key.startsWith("VITE_") ? "build-time" : "runtime";
+}
+
+const actionServerConfigCiEnvSecretReferencePrefix = "ci-env:";
+
+function actionServerConfigSecretResolutionError(input: {
+  message: string;
+  secretKey: string;
+  secretRef: string;
+}): ReturnType<typeof domainError.validation> {
+  return domainError.validation(input.message, {
+    phase: "config-secret-resolution",
+    secretKey: input.secretKey,
+    secretRef: input.secretRef,
+  });
+}
+
+function actionServerConfigSecretEnvironmentVariables(input: {
+  config: AppaloftDeploymentConfig;
+  resolvedSecrets?: Record<string, string>;
+}): Result<
+  {
+    key: string;
+    value: string;
+    kind: "secret";
+    exposure: "runtime";
+    scope: "environment";
+    isSecret: true;
+  }[]
+> {
+  const variables: {
+    key: string;
+    value: string;
+    kind: "secret";
+    exposure: "runtime";
+    scope: "environment";
+    isSecret: true;
+  }[] = [];
+
+  for (const [key, reference] of Object.entries(input.config.secrets ?? {}).sort(
+    ([left], [right]) => left.localeCompare(right),
+  )) {
+    const secretRef = reference.from.trim();
+    const required = reference.required ?? true;
+
+    if (!secretRef.startsWith(actionServerConfigCiEnvSecretReferencePrefix)) {
+      if (!required) {
+        continue;
+      }
+
+      return err(
+        actionServerConfigSecretResolutionError({
+          message: "Action server config secret reference uses an unsupported resolver",
+          secretKey: key,
+          secretRef,
+        }),
+      );
+    }
+
+    const envName = secretRef.slice(actionServerConfigCiEnvSecretReferencePrefix.length).trim();
+    if (!envName) {
+      if (!required) {
+        continue;
+      }
+
+      return err(
+        actionServerConfigSecretResolutionError({
+          message: "Action server config CI secret reference is missing an environment name",
+          secretKey: key,
+          secretRef,
+        }),
+      );
+    }
+
+    const value = input.resolvedSecrets?.[envName];
+    if (value === undefined) {
+      if (!required) {
+        continue;
+      }
+
+      return err(
+        actionServerConfigSecretResolutionError({
+          message:
+            "Required action server config CI secret reference was not supplied by the action",
+          secretKey: key,
+          secretRef,
+        }),
+      );
+    }
+
+    variables.push({
+      key,
+      value,
+      kind: "secret",
+      exposure: "runtime",
+      scope: "environment",
+      isSecret: true,
+    });
+  }
+
+  return ok(variables);
 }
 
 type ActionServerConfigAccessDomain = NonNullable<
@@ -4464,9 +4565,10 @@ async function applyActionServerConfigProfileCommands(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
   config: AppaloftDeploymentConfig;
+  resolvedSecrets?: Record<string, string>;
   target: SourceLinkRecord;
 }): Promise<Result<void>> {
-  const { context, executionContext, config, target } = input;
+  const { context, executionContext, config, resolvedSecrets, target } = input;
 
   const runtimeProfile = runtimeProfileFromActionServerConfig(config);
   if (runtimeProfile) {
@@ -4522,6 +4624,29 @@ async function applyActionServerConfigProfileCommands(input: {
       exposure: environmentVariableExposureFromActionServerConfigKey(key),
       scope: "environment",
       isSecret: false,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
+
+  const secretVariables = actionServerConfigSecretEnvironmentVariables({
+    config,
+    ...(resolvedSecrets ? { resolvedSecrets } : {}),
+  });
+  if (secretVariables.isErr()) {
+    return err(secretVariables.error);
+  }
+
+  for (const variable of secretVariables.value) {
+    const command = SetEnvironmentVariableCommand.create({
+      environmentId: target.environmentId,
+      ...variable,
     });
     if (command.isErr()) {
       return err(command.error);
@@ -4765,7 +4890,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
   if (actionServerConfigHasUnsupportedProfileApplication(parsedConfig.data)) {
     return domainErrorHttpResponse(
       domainError.validation(
-        "Action server config deployment endpoint validated the config, but source/secret profile application is not enabled in this build",
+        "Action server config deployment endpoint validated the config, but source profile application is not enabled in this build",
         {
           phase: "profile-application",
         },
@@ -4796,6 +4921,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
     context,
     executionContext,
     config: parsedConfig.data,
+    ...(body.data.resolvedSecrets ? { resolvedSecrets: body.data.resolvedSecrets } : {}),
     target: target.value,
   });
   if (profileApplied.isErr()) {

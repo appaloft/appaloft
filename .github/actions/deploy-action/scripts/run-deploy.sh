@@ -296,11 +296,83 @@ version_supports_action_server_config_deploy() {
   '
 }
 
+resolved_secrets_payload_for_action() {
+  APPALOFT_ACTION_SECRET_VARIABLES="$secret_variables" node -e '
+    const input = process.env.APPALOFT_ACTION_SECRET_VARIABLES || "";
+    const resolvedSecrets = {};
+
+    function fail(message, details = {}) {
+      const suffix = Object.entries(details)
+        .filter(([, value]) => value)
+        .map(([key, value]) => `${key}=${value}`)
+        .join(" ");
+      console.error(`::error::${message}${suffix ? ` (${suffix})` : ""}`);
+      process.exit(1);
+    }
+
+    for (const rawLine of input.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      const separatorIndex = line.indexOf("=");
+      const key = separatorIndex >= 0 ? line.slice(0, separatorIndex).trim() : line;
+      const reference = separatorIndex >= 0 ? line.slice(separatorIndex + 1).trim() : `ci-env:${key}`;
+      if (!key || !reference) {
+        fail("server-config-deploy secret-variables must use KEY=ci-env:NAME syntax");
+      }
+      if (!reference.startsWith("ci-env:")) {
+        fail("server-config-deploy secret-variables only supports ci-env references", {
+          secretKey: key,
+          secretRef: reference,
+        });
+      }
+
+      const envName = reference.slice("ci-env:".length).trim();
+      if (!envName) {
+        fail("server-config-deploy secret-variables ci-env reference is missing an environment name", {
+          secretKey: key,
+          secretRef: reference,
+        });
+      }
+      if (process.env[envName] === undefined) {
+        fail("server-config-deploy required secret was not found in the runner environment", {
+          secretKey: key,
+          secretRef: reference,
+        });
+      }
+
+      resolvedSecrets[envName] = process.env[envName];
+    }
+
+    if (Object.keys(resolvedSecrets).length > 0) {
+      process.stdout.write(`,"resolvedSecrets":${JSON.stringify(resolvedSecrets)}`);
+    }
+  '
+}
+
+post_json() {
+  local endpoint="$1"
+  local payload="$2"
+  local payload_file
+  local status
+
+  payload_file="$(mktemp "${RUNNER_TEMP:-/tmp}/appaloft-payload.XXXXXX")"
+  chmod 600 "$payload_file"
+  printf '%s' "$payload" > "$payload_file"
+  set +e
+  curl "${curl_args[@]}" -X POST "$endpoint" -H "Content-Type: application/json" --data-binary "@$payload_file"
+  status=$?
+  set -e
+  rm -f "$payload_file"
+  return "$status"
+}
+
 source_package_payload_for_action() {
   local source_fingerprint="$1"
   local selected_config="$2"
   local source_root="$3"
   local payload
+  local resolved_secrets_payload
 
   payload="{\"sourceFingerprint\":\"$(json_escape "$source_fingerprint")\",\"configPath\":\"$(json_escape "$selected_config")\",\"sourceRoot\":\"$(json_escape "$source_root")\",\"sourcePackage\":{\"transport\":\"server-github-fetch\",\"sourceFingerprint\":\"$(json_escape "$source_fingerprint")\",\"configPath\":\"$(json_escape "$selected_config")\",\"sourceRoot\":\"$(json_escape "$source_root")\""
   if [ -n "${GITHUB_SHA:-}" ]; then
@@ -345,6 +417,10 @@ source_package_payload_for_action() {
     fi
     payload="${payload}}"
   fi
+  if ! resolved_secrets_payload="$(resolved_secrets_payload_for_action)"; then
+    return 1
+  fi
+  payload="${payload}${resolved_secrets_payload}"
   payload="${payload}}"
   printf '%s' "$payload"
 }
@@ -840,8 +916,8 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
     exit 1
   fi
 
-  if truthy "$server_config_deploy" && { [ -n "${INPUT_RUNTIME_NAME:-}" ] || [ -n "$preview_domain_template" ] || [ -n "$preview_tls_mode" ] || truthy "$require_preview_url" || [ -n "$environment_variables" ] || [ -n "$secret_variables" ]; }; then
-    error "server-config-deploy hands source/config to the self-hosted server and does not accept runner-side profile, env, secret, or preview route inputs"
+  if truthy "$server_config_deploy" && { [ -n "${INPUT_RUNTIME_NAME:-}" ] || [ -n "$preview_domain_template" ] || [ -n "$preview_tls_mode" ] || truthy "$require_preview_url" || [ -n "$environment_variables" ]; }; then
+    error "server-config-deploy hands source/config to the self-hosted server and does not accept runner-side profile, env, or preview route inputs"
     exit 1
   fi
 
@@ -900,7 +976,7 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
 
     if [ "$wrapper_command" = "preview-cleanup" ]; then
       cleanup_endpoint="$control_plane_url/api/deployments/cleanup-preview"
-      cleanup_response="$(curl "${curl_args[@]}" -X POST "$cleanup_endpoint" -H "Content-Type: application/json" --data "$payload")"
+      cleanup_response="$(post_json "$cleanup_endpoint" "$payload")"
       cleanup_status="$(printf '%s\n' "$cleanup_response" | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
       if [ -z "$cleanup_status" ]; then
         error "self-hosted control-plane preview cleanup response did not include status"
@@ -914,7 +990,7 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
       else
         deploy_endpoint="$control_plane_url/api/action/deployments/from-source-link"
       fi
-      deploy_response="$(curl "${curl_args[@]}" -X POST "$deploy_endpoint" -H "Content-Type: application/json" --data "$payload")"
+      deploy_response="$(post_json "$deploy_endpoint" "$payload")"
       deployment_id="$(printf '%s\n' "$deploy_response" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
       if [ -z "$deployment_id" ]; then
         error "self-hosted control-plane deploy response did not include deployment id"
