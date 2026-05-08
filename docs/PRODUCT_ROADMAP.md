@@ -1852,7 +1852,8 @@ work below before GA.
   bounded source package reference and selected config path to the self-hosted server, which owns
   repository config bootstrap and ids-only deployment admission without runner-side CLI/SSH/PGlite
   mutation. Spec Round is
-  [Action Server Config Deploy](./specs/050-action-server-config-deploy/spec.md).
+  [Action Server Config Deploy](./specs/050-action-server-config-deploy/spec.md), with workflow
+  contract in [Action Server Config Deploy](./workflows/action-server-config-deploy.md).
 - [ ] Product-grade preview deployment: create from PR event, list/show/update policy/delete on
   close, scoped env, GitHub App status/comments, and cleanup retries.
 - [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs. Spec Round

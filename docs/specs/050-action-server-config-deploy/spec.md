@@ -27,6 +27,7 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
 - [ADR-028: Command Coordination Scope And Mutation Admission](../../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [Repository Deployment Config File Bootstrap](../../workflows/deployment-config-file-bootstrap.md)
 - [Control-Plane Mode Selection And Adoption](../../workflows/control-plane-mode-selection-and-adoption.md)
+- [Action Server Config Deploy Workflow](../../workflows/action-server-config-deploy.md)
 - [Deployment Config File Test Matrix](../../testing/deployment-config-file-test-matrix.md)
 - [Control-Plane Modes Test Matrix](../../testing/control-plane-modes-test-matrix.md)
 - [Error Model](../../errors/model.md)
@@ -66,8 +67,10 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
 
 ## Public Surfaces
 
-- API: a future config-aware Action endpoint or RPC must be separate from strict
-  `deployments.create` and must reuse application command/query schemas internally.
+- API: [Action Server Config Deploy Workflow](../../workflows/action-server-config-deploy.md)
+  reserves `POST /api/action/deployments/from-config-package` as the dedicated workflow endpoint.
+  It remains separate from strict `deployments.create` and must reuse application command/query
+  schemas internally.
 - CLI: no new CLI command in this Spec Round. Pure SSH CLI mode remains the default and continues
   to own the local/SSH config workflow.
 - GitHub Action: future wrapper inputs may select server config deploy and source package behavior;

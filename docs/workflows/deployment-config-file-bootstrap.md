@@ -42,6 +42,7 @@ This workflow inherits:
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
 - [Control-Plane Mode Selection And Adoption](./control-plane-mode-selection-and-adoption.md)
+- [Action Server Config Deploy](./action-server-config-deploy.md)
 - [GitHub Action PR Preview Deploy](./github-action-pr-preview-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
