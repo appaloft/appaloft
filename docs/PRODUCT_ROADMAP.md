@@ -44,18 +44,10 @@ Current release alignment:
 
 <!-- release-alignment:start -->
 - [x] On 2026-05-08, the latest public release is `v0.9.2`; root package
-  and Release Please manifest on `main` are `0.9.2`; the next release PR target is
+  and Release Please manifest on `main` are `0.9.2`; the release PR target is
   `0.9.3`.
 - [x] On 2026-05-08, the roadmap gate allows `Release-As: 0.9.3` because
-  Phase 0 through Phase 7 release rules, required items, and exit criteria remain checked,
-  Phase 8 remains open, and `0.9.x` patches are allowed while Phase 8 is incomplete.
-- [x] On 2026-05-08, the self-hosted Action server config deploy slice was completed early in the
-  Phase 8 backlog for the `server-github-fetch` source package path, including Action wrapper
-  selection, server capability gating, server-side config bootstrap, trusted identity resolution,
-  `ci-env:` secret resolution, domain application, docs workflow dogfooding, and public action
-  wrapper sync. Inline archive transport, remote archive URL transport, source package storage,
-  package diagnostics, cleanup lifecycle, source profile bootstrap, and product-grade preview
-  orchestration remain later `0.9.x` work.
+  Phase 0 through Phase 7 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
 Historical alignment notes:
