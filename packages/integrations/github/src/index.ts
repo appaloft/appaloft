@@ -120,6 +120,140 @@ export function createGitHubRepositoryBrowser(
   return new GitHubApiRepositoryBrowser(fetcher, apiBaseUrl);
 }
 
+interface ActionSourcePackageManifestInput {
+  transport: "inline-archive" | "remote-archive-url" | "server-github-fetch";
+  sourceFingerprint?: string | undefined;
+  configPath: string;
+  sourceRoot: string;
+  repositoryFullName?: string | undefined;
+  revision?: string | undefined;
+}
+
+interface ActionSourcePackageConfigReaderInput {
+  sourceFingerprint: string;
+  configPath: string;
+  sourceRoot: string;
+  sourcePackage: ActionSourcePackageManifestInput;
+}
+
+function isSafeGitHubRepositoryFullName(value: string): boolean {
+  return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value.trim());
+}
+
+function isSafeGitHubRevision(value: string): boolean {
+  return /^[A-Za-z0-9_.-]+$/.test(value.trim());
+}
+
+function encodeRepositoryConfigPath(path: string): string {
+  return path
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
+export class GitHubRawActionSourcePackageConfigReader {
+  constructor(
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly rawBaseUrl = "https://raw.githubusercontent.com",
+    private readonly maxConfigBytes = 1_000_000,
+  ) {}
+
+  async readConfig(
+    input: ActionSourcePackageConfigReaderInput,
+  ): Promise<Result<{ text: string; fileName?: string }>> {
+    if (input.sourcePackage.transport !== "server-github-fetch") {
+      return err(
+        domainError.validation(
+          "GitHub source package config reader supports only server-github-fetch transport",
+          {
+            phase: "source-package-validation",
+            transport: input.sourcePackage.transport,
+          },
+        ),
+      );
+    }
+
+    const repositoryFullName = input.sourcePackage.repositoryFullName?.trim();
+    if (!repositoryFullName || !isSafeGitHubRepositoryFullName(repositoryFullName)) {
+      return err(
+        domainError.validation("GitHub source package requires a safe repositoryFullName", {
+          phase: "source-package-validation",
+          field: "sourcePackage.repositoryFullName",
+        }),
+      );
+    }
+
+    const revision = input.sourcePackage.revision?.trim();
+    if (!revision || !isSafeGitHubRevision(revision)) {
+      return err(
+        domainError.validation(
+          "GitHub source package requires a safe revision SHA or ref without path separators",
+          {
+            phase: "source-package-validation",
+            field: "sourcePackage.revision",
+          },
+        ),
+      );
+    }
+
+    const url = new URL(
+      `${repositoryFullName}/${encodeURIComponent(revision)}/${encodeRepositoryConfigPath(
+        input.configPath,
+      )}`,
+      `${this.rawBaseUrl.replace(/\/+$/, "")}/`,
+    );
+    const response = await this.fetcher(url, {
+      headers: {
+        accept: "text/plain",
+        "user-agent": "appaloft-control-plane",
+      },
+    });
+
+    if (!response.ok) {
+      return err(
+        domainError.validation("GitHub source package config could not be fetched", {
+          phase: "config-bootstrap",
+          status: response.status,
+          repositoryFullName,
+          configPath: input.configPath,
+        }),
+      );
+    }
+
+    const contentLength = response.headers.get("content-length");
+    if (contentLength && Number(contentLength) > this.maxConfigBytes) {
+      return err(
+        domainError.validation("GitHub source package config exceeds the maximum supported size", {
+          phase: "source-package-validation",
+          field: "sourcePackage.configPath",
+          maxConfigBytes: this.maxConfigBytes,
+        }),
+      );
+    }
+
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > this.maxConfigBytes) {
+      return err(
+        domainError.validation("GitHub source package config exceeds the maximum supported size", {
+          phase: "source-package-validation",
+          field: "sourcePackage.configPath",
+          maxConfigBytes: this.maxConfigBytes,
+        }),
+      );
+    }
+
+    return ok({ text, fileName: input.configPath });
+  }
+}
+
+export function createGitHubActionSourcePackageConfigReader(
+  fetcher?: typeof fetch,
+  rawBaseUrl?: string,
+): GitHubRawActionSourcePackageConfigReader {
+  return new GitHubRawActionSourcePackageConfigReader(fetcher, rawBaseUrl);
+}
+
 export class GitHubWebhookSourceEventVerifier implements GitHubSourceEventWebhookVerifier {
   async verify(
     _context: ExecutionContext,

@@ -37,7 +37,9 @@
 
 - [x] Add wrapper inputs and dry-run traces for server config deploy/package behavior.
 - [x] Add API route or RPC endpoint for Action server config deploy.
-- [ ] Add source package manifest validation and a hermetic fake source package adapter.
+- [x] Add source package manifest validation and a hermetic fake source package adapter.
+- [x] Wire the self-hosted console composition to a GitHub `server-github-fetch` config reader for
+  reading the selected repository config from trusted package metadata.
 - [x] Reuse repository config parser/validator on the server side and keep identity/secret
   rejection identical to pure CLI config deploy.
 - [ ] Orchestrate server-side config bootstrap through existing resource/environment commands and
