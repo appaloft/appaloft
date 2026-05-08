@@ -107,8 +107,10 @@ after package validation. The same file now covers server-side committed config 
 rejection (`CONTROL-PLANE-HANDSHAKE-016`) through a hermetic source package config reader.
 It also covers the first `CONTROL-PLANE-HANDSHAKE-017` existing-resource slice: accepted config that
 does not require profile application dispatches ids-only `deployments.create`, can reuse existing
-source-link state after bootstrap, bootstraps source-link context from complete trusted ids, while
-profile fields fail before mutation with `profile-application`.
+source-link state after bootstrap, bootstraps source-link context from complete trusted ids, and
+applies runtime/network/health profile fields through explicit resource commands before deployment
+admission, while unsupported source/access/env/secret fields fail before mutation with
+`profile-application`.
 
 Existing tests in `deployment-state.test.ts` and `remote-pglite-state-sync.test.ts` partially cover
 the older `postgres-control-plane` backend selection branch. Those tests should be renamed or

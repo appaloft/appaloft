@@ -4265,16 +4265,138 @@ function phaseFromDeploymentConfigIssues(issues: { message: string }[]): string 
   return "config-schema";
 }
 
-function actionServerConfigRequiresProfileApplication(config: AppaloftDeploymentConfig): boolean {
-  return Boolean(
-    config.source ||
-      config.runtime ||
-      config.network ||
-      config.health ||
-      config.access ||
-      config.env ||
-      config.secrets,
-  );
+const defaultActionServerConfigApplicationInternalPort = 3000;
+const defaultActionServerConfigStaticInternalPort = 80;
+
+function actionServerConfigHasUnsupportedProfileApplication(
+  config: AppaloftDeploymentConfig,
+): boolean {
+  return Boolean(config.source || config.access || config.env || config.secrets);
+}
+
+function runtimeProfileFromActionServerConfig(config: AppaloftDeploymentConfig) {
+  if (!config.runtime) {
+    return undefined;
+  }
+
+  return {
+    ...(config.runtime.strategy ? { strategy: config.runtime.strategy } : {}),
+    ...(config.runtime.installCommand ? { installCommand: config.runtime.installCommand } : {}),
+    ...(config.runtime.buildCommand ? { buildCommand: config.runtime.buildCommand } : {}),
+    ...(config.runtime.startCommand ? { startCommand: config.runtime.startCommand } : {}),
+    ...(config.runtime.name ? { runtimeName: config.runtime.name } : {}),
+    ...(config.runtime.publishDirectory
+      ? { publishDirectory: config.runtime.publishDirectory }
+      : {}),
+    ...(config.runtime.dockerfilePath ? { dockerfilePath: config.runtime.dockerfilePath } : {}),
+    ...(config.runtime.dockerComposeFilePath
+      ? { dockerComposeFilePath: config.runtime.dockerComposeFilePath }
+      : {}),
+    ...(config.runtime.buildTarget ? { buildTarget: config.runtime.buildTarget } : {}),
+  };
+}
+
+function networkProfileFromActionServerConfig(config: AppaloftDeploymentConfig) {
+  if (!config.network) {
+    return undefined;
+  }
+
+  const defaultPort =
+    config.runtime?.strategy === "static"
+      ? defaultActionServerConfigStaticInternalPort
+      : defaultActionServerConfigApplicationInternalPort;
+
+  return {
+    internalPort: config.network.internalPort ?? defaultPort,
+    ...(config.network.upstreamProtocol
+      ? { upstreamProtocol: config.network.upstreamProtocol }
+      : {}),
+    ...(config.network.exposureMode ? { exposureMode: config.network.exposureMode } : {}),
+    ...(config.network.targetServiceName
+      ? { targetServiceName: config.network.targetServiceName }
+      : {}),
+    ...(config.network.hostPort ? { hostPort: config.network.hostPort } : {}),
+  };
+}
+
+function healthCheckFromActionServerConfig(config: AppaloftDeploymentConfig) {
+  const healthCheck = config.runtime?.healthCheck ?? config.health;
+  const path = healthCheck?.path ?? config.runtime?.healthCheckPath;
+  if (!healthCheck && !path) {
+    return undefined;
+  }
+
+  return {
+    enabled: healthCheck?.enabled ?? true,
+    type: "http" as const,
+    intervalSeconds: healthCheck?.intervalSeconds ?? 5,
+    timeoutSeconds: healthCheck?.timeoutSeconds ?? 5,
+    retries: healthCheck?.retries ?? 10,
+    startPeriodSeconds: 5,
+    http: {
+      method: "GET" as const,
+      scheme: "http" as const,
+      host: "localhost",
+      path: path ?? "/",
+      expectedStatusCode: 200,
+    },
+  };
+}
+
+async function applyActionServerConfigProfileCommands(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  config: AppaloftDeploymentConfig;
+  target: SourceLinkRecord;
+}): Promise<Result<void>> {
+  const { context, executionContext, config, target } = input;
+
+  const runtimeProfile = runtimeProfileFromActionServerConfig(config);
+  if (runtimeProfile) {
+    const command = ConfigureResourceRuntimeCommand.create({
+      resourceId: target.resourceId,
+      runtimeProfile,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
+
+  const networkProfile = networkProfileFromActionServerConfig(config);
+  if (networkProfile) {
+    const command = ConfigureResourceNetworkCommand.create({
+      resourceId: target.resourceId,
+      networkProfile,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
+
+  const healthCheck = healthCheckFromActionServerConfig(config);
+  if (healthCheck) {
+    const command = ConfigureResourceHealthCommand.create({
+      resourceId: target.resourceId,
+      healthCheck,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
+
+  return ok(undefined);
 }
 
 function hasTrustedActionServerConfigDeploymentContext(
@@ -4464,10 +4586,10 @@ async function handleActionServerConfigDeploymentRoute(input: {
     );
   }
 
-  if (actionServerConfigRequiresProfileApplication(parsedConfig.data)) {
+  if (actionServerConfigHasUnsupportedProfileApplication(parsedConfig.data)) {
     return domainErrorHttpResponse(
       domainError.validation(
-        "Action server config deployment endpoint validated the config, but profile application is not enabled in this build",
+        "Action server config deployment endpoint validated the config, but source/access/env/secret profile application is not enabled in this build",
         {
           phase: "profile-application",
         },
@@ -4492,6 +4614,16 @@ async function handleActionServerConfigDeploymentRoute(input: {
       }),
       executionContext,
     );
+  }
+
+  const profileApplied = await applyActionServerConfigProfileCommands({
+    context,
+    executionContext,
+    config: parsedConfig.data,
+    target: target.value,
+  });
+  if (profileApplied.isErr()) {
+    return domainErrorHttpResponse(profileApplied.error, executionContext);
   }
 
   const command = CreateDeploymentCommand.create({
