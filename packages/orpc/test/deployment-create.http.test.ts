@@ -640,6 +640,150 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommand).toBeUndefined();
   });
 
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint dispatches ids-only deployment for an existing resource", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_from_config_package" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: ["controlPlane:", "  mode: self-hosted", "  url: https://console.example.com"].join(
+            "\n",
+          ),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+            destinationId: "dst_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      id: "dep_from_config_package",
+      deploymentHref: "/deployments/dep_from_config_package",
+    });
+    expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+      destinationId: "dst_prod",
+    });
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint fails before mutation when profile application is required", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: ["runtime:", "  strategy: static", "  publishDirectory: dist"].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "profile-application",
+        },
+      },
+    });
+    expect(capturedCommand).toBeUndefined();
+  });
+
   test("[DEP-RETRY-001] dispatches RetryDeploymentCommand through HTTP", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {

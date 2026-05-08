@@ -428,7 +428,10 @@ import {
   ResourceId,
   type Result,
 } from "@appaloft/core";
-import { parseAppaloftDeploymentConfigText } from "@appaloft/deployment-config";
+import {
+  type AppaloftDeploymentConfig,
+  parseAppaloftDeploymentConfigText,
+} from "@appaloft/deployment-config";
 import { resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
 import { resolveAppaloftLocaleFromHeaders, translateDomainError } from "@appaloft/i18n";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
@@ -4260,6 +4263,18 @@ function phaseFromDeploymentConfigIssues(issues: { message: string }[]): string 
   return "config-schema";
 }
 
+function actionServerConfigRequiresProfileApplication(config: AppaloftDeploymentConfig): boolean {
+  return Boolean(
+    config.source ||
+      config.runtime ||
+      config.network ||
+      config.health ||
+      config.access ||
+      config.env ||
+      config.secrets,
+  );
+}
+
 async function handleActionServerConfigDeploymentRoute(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
@@ -4336,14 +4351,59 @@ async function handleActionServerConfigDeploymentRoute(input: {
     );
   }
 
-  return domainErrorHttpResponse(
-    domainError.validation(
-      "Action server config deployment endpoint is available, but server-side config bootstrap is not enabled in this build",
-      {
-        phase: "config-bootstrap",
-      },
-    ),
-    executionContext,
+  if (actionServerConfigRequiresProfileApplication(parsedConfig.data)) {
+    return domainErrorHttpResponse(
+      domainError.validation(
+        "Action server config deployment endpoint validated the config, but profile application is not enabled in this build",
+        {
+          phase: "profile-application",
+        },
+      ),
+      executionContext,
+    );
+  }
+
+  const trustedContext = body.data.trustedContext;
+  if (
+    !trustedContext?.projectId ||
+    !trustedContext.environmentId ||
+    !trustedContext.resourceId ||
+    !trustedContext.serverId
+  ) {
+    return domainErrorHttpResponse(
+      domainError.validation(
+        "Action server config deploy requires trusted project, environment, resource, and server ids until source-link resolution is enabled",
+        {
+          phase: "source-link-resolution",
+          sourceFingerprint: body.data.sourceFingerprint,
+        },
+      ),
+      executionContext,
+    );
+  }
+
+  const command = CreateDeploymentCommand.create({
+    projectId: trustedContext.projectId,
+    environmentId: trustedContext.environmentId,
+    resourceId: trustedContext.resourceId,
+    serverId: trustedContext.serverId,
+    ...(trustedContext.destinationId ? { destinationId: trustedContext.destinationId } : {}),
+  });
+  if (command.isErr()) {
+    return domainErrorHttpResponse(command.error, executionContext);
+  }
+
+  const result = await context.commandBus.execute(executionContext, command.value);
+  if (result.isErr()) {
+    return domainErrorHttpResponse(result.error, executionContext);
+  }
+
+  return Response.json(
+    {
+      ...result.value,
+      deploymentHref: `/deployments/${result.value.id}`,
+    },
+    { status: 202 },
   );
 }
 

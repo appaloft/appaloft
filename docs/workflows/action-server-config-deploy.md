@@ -233,11 +233,18 @@ console output.
   `@appaloft/deployment-config` parser used by CLI/local config deploy. Identity and raw secret
   fields in committed config fail with `config-identity` or `config-secret-validation` before
   source-link, resource, route, or deployment mutation.
+- When the validated config does not require server-side profile application and trusted
+  project/environment/resource/server ids are supplied, the endpoint dispatches the existing
+  ids-only `deployments.create` command and returns the accepted deployment id and console
+  deployment href.
+- When the validated config contains source/runtime/network/health/access/env/secret profile
+  fields, the endpoint fails before mutation with `profile-application`; these fields still require
+  the later explicit-operation bootstrap slice.
 - `/api/version` advertises granular feature flags with source package validation present and
   server-side config bootstrap disabled; wrappers must keep failing before source package handoff
   until both capabilities are true.
 - The active implemented self-hosted server route remains
   `POST /api/action/deployments/from-source-link`, which triggers an existing resource profile from
   source-link context.
-- Source package transport, source package storage, diagnostics, cleanup rules, and
-  explicit-operation config bootstrap are not implemented yet.
+- Source package transport, source package storage, diagnostics, cleanup rules, source-link
+  resolution without trusted ids, and explicit-operation profile bootstrap are not implemented yet.
