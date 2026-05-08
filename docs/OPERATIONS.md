@@ -69,7 +69,9 @@ The binary bundle is self-contained:
 ## Docs Deployment
 
 Production docs deploys run from `.github/workflows/deploy-docs.yml` on `main` and use
-`appaloft.docs.yml` to deploy `docs.appaloft.com` through the Appaloft CLI itself.
+`appaloft.docs.yml` to deploy `docs.appaloft.com`. When `APPALOFT_CONTROL_PLANE_MODE` resolves to
+`self-hosted`, the workflow calls the Appaloft server config deploy API so the server owns config
+bootstrap and state. Otherwise it keeps the pure SSH CLI fallback path.
 
 PR docs previews run from `.github/workflows/deploy-docs-preview.yml`. The preview job runs only for
 same-repository pull requests whose changed files affect docs content, the docs app, or docs build
