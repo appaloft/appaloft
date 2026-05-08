@@ -41,7 +41,8 @@ function runDeploy(input: Record<string, string | undefined>) {
   });
 
   const argv = result.exitCode === 0 ? readFileSync(argvPath, "utf8").trim().split("\n") : [];
-  const output = result.exitCode === 0 ? readFileSync(outputPath, "utf8") : "";
+  const output =
+    result.exitCode === 0 && existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "";
 
   return {
     argv,
@@ -59,6 +60,9 @@ describe("deploy-action wrapper reference", () => {
     expect(actionYaml).toContain("scripts/install-appaloft.sh");
     expect(actionYaml).toContain("scripts/run-deploy.sh");
     expect(actionYaml).toContain("command:");
+    expect(actionYaml).toContain("install-console");
+    expect(actionYaml).toContain("console-domain");
+    expect(actionYaml).toContain("console-database");
     expect(actionYaml).toContain("appaloft-version");
     expect(actionYaml).toContain("preview-url");
     expect(actionYaml).toContain("preview-cleanup-status");
@@ -120,6 +124,9 @@ describe("deploy-action wrapper reference", () => {
     expect(publicCiWorkflow).toContain(
       "POST https://console.example.com/api/action/deployments/from-config-package",
     );
+    expect(publicCiWorkflow).toContain("Validate dry-run console install");
+    expect(publicCiWorkflow).toContain("INPUT_COMMAND: install-console");
+    expect(publicCiWorkflow).toContain("HEALTH https://console.example.com/api/health");
     expect(publicCiWorkflow).toContain("Opt-in exact-version install smoke");
     expect(publicCiWorkflow).toContain("APPALOFT_INSTALL_SMOKE_VERSION");
     expect(publicCiWorkflow).not.toContain("APPALOFT_SSH_PRIVATE_KEY");
@@ -374,6 +381,56 @@ describe("deploy-action wrapper reference", () => {
       expect(result.output).toContain("console-url=https://console.example.com");
     } finally {
       rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-002] install-console downloads and runs the self-hosted installer over SSH", () => {
+    const result = runDeploy({
+      INPUT_COMMAND: "install-console",
+      INPUT_VERSION: "v0.9.1",
+      INPUT_SSH_HOST: "203.0.113.10",
+      INPUT_SSH_USER: "root",
+      INPUT_SSH_PORT: "2222",
+      INPUT_CONSOLE_DOMAIN: "console.example.com",
+      INPUT_CONSOLE_DATABASE: "pglite",
+      INPUT_CONSOLE_SKIP_DOCKER_INSTALL: "true",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv).toEqual([
+        "SSH root@203.0.113.10:2222",
+        "INSTALLER https://github.com/appaloft/appaloft/releases/download/v0.9.1/install.sh",
+        "RUN sh /tmp/appaloft-install.sh --version 'v0.9.1' --web-origin 'https://console.example.com' --database 'pglite' --host '0.0.0.0' --port '3001' --image 'ghcr.io/appaloft/appaloft' --skip-docker-install",
+        "HEALTH https://console.example.com/api/health",
+      ]);
+      expect(result.output).toContain("console-url=https://console.example.com");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-002] install-console preserves pure SSH deploy as a separate command path", () => {
+    const install = runDeploy({
+      INPUT_COMMAND: "install-console",
+      INPUT_SSH_HOST: "203.0.113.10",
+      INPUT_CONSOLE_URL: "http://203.0.113.10:3001",
+    });
+    const deploy = runDeploy({
+      INPUT_SOURCE: ".",
+      INPUT_SSH_HOST: "203.0.113.10",
+    });
+
+    try {
+      expect(install.exitCode).toBe(0);
+      expect(install.argv[0]).toBe("SSH root@203.0.113.10:22");
+      expect(deploy.exitCode).toBe(0);
+      expect(deploy.argv.slice(0, 3)).toEqual(["/opt/appaloft/appaloft", "deploy", "."]);
+      expect(deploy.argv).toContain("--state-backend");
+      expect(deploy.argv).toContain("ssh-pglite");
+    } finally {
+      rmSync(install.workspace, { recursive: true, force: true });
+      rmSync(deploy.workspace, { recursive: true, force: true });
     }
   });
 

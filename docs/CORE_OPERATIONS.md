@@ -786,6 +786,13 @@ Current boundary:
   to CLI flags, writes SSH private key input to a temporary key file, and invokes the same
   repository config deploy workflow. It is not a new operation, not a hidden Quick Deploy API, and
   not a hosted control plane.
+- The deploy action also exposes `command: install-console` for the operator-owned self-hosted
+  console bootstrap path. That command uses trusted SSH inputs to download the selected release
+  `install.sh` on the target host, runs the self-hosted Docker installer with a configured public
+  console origin/domain and database backend, verifies `/api/health`, and outputs `console-url`.
+  It is separate from `command: deploy`, so existing SSH CLI deployments with `control-plane-mode:
+  none` continue to mutate SSH-server `ssh-pglite` directly until the operator selects a
+  self-hosted control-plane API mode.
 - In `control-plane-mode: self-hosted`, the deploy action uses server API trigger mode for the
   first 0.9.x slice: it does not install or invoke the CLI, open SSH, select a state backend, or
   mutate SSH-server PGlite. It calls the self-hosted server's `/api/version` endpoint, then uses

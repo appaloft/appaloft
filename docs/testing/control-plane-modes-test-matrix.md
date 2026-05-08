@@ -69,7 +69,7 @@ This matrix inherits:
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
 | --- | --- | --- | --- | --- | --- | --- |
 | CONTROL-PLANE-INSTALL-001 | script contract | Self-hosted Docker installer selects persistence backend | `install.sh` runs with default options or `--database pglite` | Default install writes a PostgreSQL Compose stack; PGlite install writes no database URL or PostgreSQL service and mounts durable Appaloft data at `/appaloft-data` | None | Validate inputs -> write compose/env -> docker compose pull/up |
-| CONTROL-PLANE-INSTALL-002 | workflow contract | Repository console deploy workflow installs the control plane over SSH | `.github/workflows/deploy-console.yml` is dispatched with trusted SSH host/key settings | Workflow copies `install.sh` to the SSH host, runs it with configurable version/origin/database, defaults database to PGlite, verifies `/api/health`, and keeps secrets out of repository config | Missing SSH variable/secret, invalid version/database/port, or health timeout | Resolve trusted settings -> copy installer -> remote install/upgrade -> health check |
+| CONTROL-PLANE-INSTALL-002 | workflow/wrapper contract | Repository console deploy workflow or deploy action installs the control plane over SSH | `.github/workflows/deploy-console.yml` is dispatched with trusted SSH host/key settings, or `appaloft/deploy-action` runs with `command=install-console` and trusted SSH inputs | Workflow copies `install.sh`, or the action downloads the release installer on the SSH host; both run it with configurable version/origin/database, default database to PGlite, verify `/api/health`, output the console URL, and keep secrets out of repository config | Missing SSH variable/secret/input, invalid version/database/port, installer download failure, or health timeout | Resolve trusted settings -> transfer or download installer -> remote install/upgrade -> health check |
 
 ## Adoption Matrix
 
@@ -93,8 +93,10 @@ This matrix inherits:
 
 ## Current Implementation Notes And Migration Gaps
 
-Current implementation covers the first deploy-action wrapper rows in
-`scripts/test/deploy-action-wrapper.test.ts`: unsupported control-plane input rejection
+Current implementation covers the self-hosted Docker installer and console workflow rows
+(`CONTROL-PLANE-INSTALL-001` and `CONTROL-PLANE-INSTALL-002`) in `scripts/test/install-sh.test.ts`,
+`scripts/test/deploy-console-workflow.test.ts`, and `scripts/test/deploy-action-wrapper.test.ts`.
+`scripts/test/deploy-action-wrapper.test.ts` also covers unsupported control-plane input rejection
 (`CONTROL-PLANE-ENTRY-002`), self-hosted source-link deployment and preview cleanup
 (`CONTROL-PLANE-HANDSHAKE-011` and `CONTROL-PLANE-HANDSHAKE-012`), and the first Action Server
 Config Deploy wrapper gate/dry-run rows (`CONTROL-PLANE-HANDSHAKE-013` and
