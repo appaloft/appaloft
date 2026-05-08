@@ -335,6 +335,7 @@
         "@appaloft/application": "workspace:*",
         "@appaloft/contracts": "workspace:*",
         "@appaloft/core": "workspace:*",
+        "@appaloft/deployment-config": "workspace:*",
         "@appaloft/docs-registry": "workspace:*",
         "@appaloft/i18n": "workspace:*",
         "@orpc/client": "latest",

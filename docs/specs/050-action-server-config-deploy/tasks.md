@@ -18,7 +18,7 @@
   state-backend mutation.
 - [x] `CONTROL-PLANE-HANDSHAKE-015`: HTTP server config endpoint validates package manifest and
   rejects unsafe config/source paths before mutation.
-- [ ] `CONTROL-PLANE-HANDSHAKE-016`: server-side config bootstrap rejects identity/secret fields in
+- [x] `CONTROL-PLANE-HANDSHAKE-016`: server-side config bootstrap rejects identity/secret fields in
   committed config before source-link/resource/route/deployment mutation.
 - [ ] `CONTROL-PLANE-HANDSHAKE-017`: server-side config bootstrap applies accepted config through
   explicit commands before ids-only deployment.
@@ -38,7 +38,7 @@
 - [x] Add wrapper inputs and dry-run traces for server config deploy/package behavior.
 - [x] Add API route or RPC endpoint for Action server config deploy.
 - [ ] Add source package manifest validation and a hermetic fake source package adapter.
-- [ ] Reuse repository config parser/validator on the server side and keep identity/secret
+- [x] Reuse repository config parser/validator on the server side and keep identity/secret
   rejection identical to pure CLI config deploy.
 - [ ] Orchestrate server-side config bootstrap through existing resource/environment commands and
   ids-only `CreateDeploymentCommand`.
