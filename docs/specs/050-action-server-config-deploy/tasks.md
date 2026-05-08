@@ -22,7 +22,7 @@
   committed config before source-link/resource/route/deployment mutation.
 - [x] `CONTROL-PLANE-HANDSHAKE-017`: server-side config bootstrap applies accepted config through
   explicit commands before ids-only deployment.
-- [ ] `CONFIG-FILE-ENTRY-028`: Action server config deploy keeps committed config non-secret and
+- [x] `CONFIG-FILE-ENTRY-028`: Action server config deploy keeps committed config non-secret and
   uses trusted source/preview context for identity.
 - [x] `ACTION-SERVER-CONFIG-SPEC-008`: Action server config deploy resolves `ci-env:` secrets from
   runner environment and applies them through server-owned environment commands.
@@ -32,9 +32,14 @@
 ## Source Of Truth
 
 - [x] Add command/workflow spec for the dedicated server config deploy API contract.
-- [ ] Define source package manifest fields, limits, checksum rules, storage lifecycle, and cleanup
-  behavior.
-- [ ] Define source package/config bootstrap errors and public help anchors.
+- [x] Define the first `server-github-fetch` source package manifest fields, path boundaries,
+  fingerprint consistency checks, revision/repository metadata, and fail-closed unsupported
+  transport behavior.
+- [ ] Define inline archive and remote archive URL source package storage lifecycle, cleanup
+  behavior, diagnostics, and public support output.
+- [x] Define source package/config bootstrap error phases for the implemented server config deploy
+  slice.
+- [ ] Define public help anchors for source package diagnostics after diagnostics/read models exist.
 - [ ] Update operation catalog only if a new user-visible operation key is activated.
 
 ## Implementation
@@ -46,7 +51,7 @@
   reading the selected repository config from trusted package metadata.
 - [x] Reuse repository config parser/validator on the server side and keep identity/secret
   rejection identical to pure CLI config deploy.
-- [ ] Orchestrate server-side config bootstrap through existing resource/environment commands and
+- [x] Orchestrate server-side config bootstrap through existing resource/environment commands and
   ids-only `CreateDeploymentCommand`. Current implementation accepts the existing-resource/no-profile
   slice, resolves existing source-link context for no-profile requests, bootstraps source-link
   context from complete trusted ids, applies runtime/network/health profile fields through explicit
@@ -60,18 +65,20 @@
 ## Entrypoints And Docs
 
 - [x] Update deploy-action README/action metadata after wrapper behavior exists.
-- [ ] Update public docs only after the server config closed loop is verified.
+- [x] Update public docs and deploy-action README after the implemented server config deploy closed
+  loop is verified.
 - [ ] Update Web console links/diagnostics only if the Code Round adds source package read models.
 
 ## Verification
 
 - [x] Run targeted wrapper tests.
 - [x] Run targeted HTTP/orpc tests.
-- [ ] Run targeted deployment config parser tests.
+- [x] Run targeted deployment config parser tests.
 - [x] Run `bun run lint`.
 - [x] Run typecheck for changed packages.
 
 ## Post-Implementation Sync
 
-- [ ] Reconcile spec, plan, tasks, durable workflow docs, test matrices, public docs, and code.
-- [ ] Record any remaining migration gap explicitly instead of weakening the normative contract.
+- [x] Reconcile spec, plan, tasks, durable workflow docs, test matrices, public docs, and code for
+  the implemented `server-github-fetch` server config deploy slice.
+- [x] Record remaining migration gaps explicitly instead of weakening the normative contract.
