@@ -6,6 +6,9 @@ import {
   CleanupPreviewCommand,
   type Command,
   type CommandBus,
+  ConfigureResourceHealthCommand,
+  ConfigureResourceNetworkCommand,
+  ConfigureResourceRuntimeCommand,
   CreateDeploymentCommand,
   createExecutionContext,
   type ExecutionContext,
@@ -894,7 +897,115 @@ describe("deployment create HTTP route", () => {
     });
   });
 
-  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint fails before mutation when profile application is required", async () => {
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies runtime, network, and health profile commands before deployment", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommands.push(command as Command<unknown>);
+        return ok({
+          id: command instanceof CreateDeploymentCommand ? "dep_profile_config" : "res_www",
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "runtime:",
+            "  strategy: static",
+            "  name: docs",
+            "  installCommand: bun install --frozen-lockfile",
+            "  buildCommand: bun run build",
+            "  publishDirectory: dist",
+            "  healthCheckPath: /ready",
+            "network:",
+            "  upstreamProtocol: http",
+            "  exposureMode: reverse-proxy",
+          ].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      ConfigureResourceRuntimeCommand,
+      ConfigureResourceNetworkCommand,
+      ConfigureResourceHealthCommand,
+      CreateDeploymentCommand,
+    ]);
+    expect(capturedCommands[0]).toMatchObject({
+      resourceId: "res_www",
+      runtimeProfile: {
+        strategy: "static",
+        runtimeName: "docs",
+        installCommand: "bun install --frozen-lockfile",
+        buildCommand: "bun run build",
+        publishDirectory: "dist",
+      },
+    });
+    expect(capturedCommands[1]).toMatchObject({
+      resourceId: "res_www",
+      networkProfile: {
+        internalPort: 80,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    });
+    expect(capturedCommands[2]).toMatchObject({
+      resourceId: "res_www",
+      healthCheck: {
+        enabled: true,
+        type: "http",
+        http: {
+          path: "/ready",
+        },
+      },
+    });
+    expect(capturedCommands[3]).toBeInstanceOf(CreateDeploymentCommand);
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint fails before mutation when unsupported profile application is required", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
@@ -909,7 +1020,13 @@ describe("deployment create HTTP route", () => {
     const actionSourcePackageConfigReader = {
       readConfig: async () =>
         ok({
-          text: ["runtime:", "  strategy: static", "  publishDirectory: dist"].join("\n"),
+          text: [
+            "access:",
+            "  domains:",
+            "    - host: docs.example.com",
+            "      pathPrefix: /",
+            "      tlsMode: auto",
+          ].join("\n"),
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;

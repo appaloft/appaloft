@@ -241,9 +241,12 @@ console output.
   fingerprint already has source-link state, the endpoint can resolve project/environment/resource/
   server context from that link without requiring trusted ids on every Action run. Complete trusted
   ids still conflict-check against existing source-link state before deployment admission.
-- When the validated config contains source/runtime/network/health/access/env/secret profile
-  fields, the endpoint fails before mutation with `profile-application`; these fields still require
-  the later explicit-operation bootstrap slice.
+- When the validated config contains runtime, network, or health profile fields, the endpoint
+  applies them through `resources.configure-runtime`, `resources.configure-network`, and
+  `resources.configure-health` before dispatching `deployments.create`.
+- When the validated config contains source, access/domain, environment, or secret profile fields,
+  the endpoint fails before mutation with `profile-application`; these fields still require later
+  explicit-operation bootstrap slices.
 - `/api/version` advertises granular feature flags with source package validation present and
   server-side config bootstrap disabled; wrappers must keep failing before source package handoff
   until both capabilities are true.
@@ -251,4 +254,4 @@ console output.
   `POST /api/action/deployments/from-source-link`, which triggers an existing resource profile from
   source-link context.
 - Source package transport, source package storage, diagnostics, cleanup rules, and
-  explicit-operation profile bootstrap are not implemented yet.
+  source/access/domain/env/secret profile bootstrap are not implemented yet.
