@@ -24,6 +24,8 @@
   explicit commands before ids-only deployment.
 - [ ] `CONFIG-FILE-ENTRY-028`: Action server config deploy keeps committed config non-secret and
   uses trusted source/preview context for identity.
+- [x] `ACTION-SERVER-CONFIG-SPEC-008`: Action server config deploy resolves `ci-env:` secrets from
+  runner environment and applies them through server-owned environment commands.
 
 ## Source Of Truth
 
@@ -48,19 +50,20 @@
   context from complete trusted ids, applies runtime/network/health profile fields through explicit
   resource commands, applies plain `env` values through `environments.set-variable`, applies
   `access.domains[]` through managed `domain-bindings.create` commands using trusted
-  resource/destination/server proxy context, and rejects unsupported source/secret profile
-  application before mutation.
+  resource/destination/server proxy context, applies `ci-env:` secret references through
+  `environments.set-variable` from transient Action-supplied values, and rejects unsupported source
+  profile application before mutation.
 - [ ] Add safe source package diagnostics/read-model output if needed for Web and support.
 
 ## Entrypoints And Docs
 
-- [ ] Update deploy-action README/action metadata after wrapper behavior exists.
+- [x] Update deploy-action README/action metadata after wrapper behavior exists.
 - [ ] Update public docs only after the server config closed loop is verified.
 - [ ] Update Web console links/diagnostics only if the Code Round adds source package read models.
 
 ## Verification
 
-- [ ] Run targeted wrapper tests.
+- [x] Run targeted wrapper tests.
 - [x] Run targeted HTTP/orpc tests.
 - [ ] Run targeted deployment config parser tests.
 - [x] Run `bun run lint`.

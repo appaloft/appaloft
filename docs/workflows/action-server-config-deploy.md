@@ -85,6 +85,7 @@ type ActionServerConfigDeployRequest = {
   configPath: string;
   sourceRoot: string;
   sourcePackage: SourcePackageManifest;
+  resolvedSecrets?: Record<string, string>;
   preview?: {
     kind: "pull-request";
     previewId: string;
@@ -110,6 +111,11 @@ type ActionServerConfigDeployRequest = {
 `trustedContext` is trusted entrypoint/server context, not committed repository config. If any
 explicit deployment identity field is supplied, the same completeness and conflict checks as the
 source-link trigger slice apply before mutation.
+
+`resolvedSecrets` is a transient Action-to-server payload keyed by trusted `ci-env:` environment
+name. It is allowed only to satisfy matching `secrets.KEY.from: ci-env:NAME` entries from the
+committed config. The server applies the resulting secret values through environment commands and
+must not include raw values in errors, logs, summaries, PR comments, or read models.
 
 Success response:
 
@@ -203,6 +209,7 @@ Expected phases:
 - `source-package-storage`
 - `config-bootstrap`
 - `config-identity`
+- `config-secret-resolution`
 - `source-link-resolution`
 - `profile-application`
 - `deployment-admission`
@@ -249,13 +256,17 @@ console output.
   `environments.set-variable` as non-secret `plain-config` values at environment scope before
   dispatching `deployments.create`. `PUBLIC_` and `VITE_` keys use build-time exposure; all other
   keys use runtime exposure.
+- When the validated config contains `secrets.KEY.from: ci-env:NAME`, the deploy-action wrapper may
+  resolve `NAME` from the runner environment, send it as transient `resolvedSecrets`, and the
+  endpoint applies `KEY` through `environments.set-variable` as a runtime secret before dispatching
+  `deployments.create`. Missing required `ci-env:` values or unsupported secret resolvers fail
+  before mutation with `config-secret-resolution`; raw secret values are not included in the error.
 - When the validated config contains `access.domains[]`, the endpoint resolves the trusted
   resource/destination and server proxy context, applies each domain through
   `domain-bindings.create` with deterministic idempotency keys, creates served domains before
   canonical redirect aliases, and only then dispatches `deployments.create`.
-- When the validated config contains source or secret profile fields,
-  the endpoint fails before mutation with `profile-application`; these fields still require later
-  explicit-operation bootstrap slices.
+- When the validated config contains `source`, the endpoint fails before mutation with
+  `profile-application`; source profile bootstrap still requires a later explicit-operation slice.
 - `/api/version` advertises granular feature flags. Self-hosted console builds that wire the
   source package config reader advertise Action Server Config Deploy support; builds without the
   reader keep failing wrapper handshakes before source package handoff.
@@ -263,6 +274,7 @@ console output.
   `POST /api/action/deployments/from-source-link`, which triggers an existing resource profile from
   source-link context.
 - Inline archive and remote archive URL transport, source package storage, diagnostics, cleanup
-  rules, and source/secret profile bootstrap are not implemented yet. Domain bootstrap is currently
+  rules, source profile bootstrap, and non-`ci-env:` secret resolvers are not implemented yet.
+  Domain bootstrap is currently
   the managed `DomainBinding` control-plane path; pure SSH CLI server-applied route state remains
   the non-server mode.

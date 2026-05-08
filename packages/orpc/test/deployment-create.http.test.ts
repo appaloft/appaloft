@@ -1095,6 +1095,167 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommands[2]).toBeInstanceOf(CreateDeploymentCommand);
   });
 
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies resolved CI secrets before deployment", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommands.push(command as Command<unknown>);
+        return ok(
+          (command instanceof CreateDeploymentCommand ? { id: "dep_secret_config" } : null) as T,
+        );
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "secrets:",
+            "  APPALOFT_BETTER_AUTH_SECRET:",
+            "    from: ci-env:APPALOFT_BETTER_AUTH_SECRET",
+            "    required: true",
+          ].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          resolvedSecrets: {
+            APPALOFT_BETTER_AUTH_SECRET: "resolved-ci-secret",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      SetEnvironmentVariableCommand,
+      CreateDeploymentCommand,
+    ]);
+    expect(capturedCommands[0]).toMatchObject({
+      environmentId: "env_prod",
+      key: "APPALOFT_BETTER_AUTH_SECRET",
+      value: "resolved-ci-secret",
+      kind: "secret",
+      exposure: "runtime",
+      scope: "environment",
+      isSecret: true,
+    });
+    expect(capturedCommands[1]).toBeInstanceOf(CreateDeploymentCommand);
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint rejects missing resolved CI secrets before mutation", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "secrets:",
+            "  APPALOFT_BETTER_AUTH_SECRET:",
+            "    from: ci-env:APPALOFT_BETTER_AUTH_SECRET",
+          ].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+    const responseJson = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(responseJson).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "config-secret-resolution",
+          secretKey: "APPALOFT_BETTER_AUTH_SECRET",
+          secretRef: "ci-env:APPALOFT_BETTER_AUTH_SECRET",
+        },
+      },
+    });
+    expect(JSON.stringify(responseJson)).not.toContain("resolved-ci-secret");
+    expect(capturedCommand).toBeUndefined();
+  });
+
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies access domain commands before deployment", async () => {
     const capturedCommands: Command<unknown>[] = [];
     const commandBus = {

@@ -255,11 +255,32 @@ trigger mode.
     config: appaloft.yml
 ```
 
+If the committed config declares `secrets.KEY.from: ci-env:NAME`, expose the GitHub secret to the
+runner environment and list the matching `secret-variables` entry. The action resolves the value
+locally, sends it only as transient API payload to the self-hosted server, and the server applies it
+as a runtime secret through its environment-variable operation.
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  id: deploy
+  env:
+    APPALOFT_BETTER_AUTH_SECRET: ${{ secrets.APPALOFT_BETTER_AUTH_SECRET }}
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    server-config-deploy: true
+    config: appaloft.yml
+    secret-variables: |
+      APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_BETTER_AUTH_SECRET
+```
+
 For `preview: pull-request`, server API mode derives a preview-scoped source fingerprint and calls
 the same deployment endpoint. It writes `preview-id`, `deployment-id`, `deployment-url`, and
 `console-url` outputs, but it does not apply `preview-domain-template`, `preview-tls-mode`,
-`require-preview-url`, `runtime-name`, `environment-variables`, or `secret-variables` in server
-mode.
+`require-preview-url`, `runtime-name`, or `environment-variables` in server mode. In
+`server-config-deploy` mode, `secret-variables` is reserved for resolving committed `ci-env:`
+secret references before the API request.
 
 ```yaml
 - uses: appaloft/deploy-action@v1
@@ -340,7 +361,7 @@ source-link state, or the Appaloft server, not from committed config.
 | `server-proxy-kind` | empty | Server proxy kind such as `traefik` or `caddy`. |
 | `state-backend` | empty | Explicit state backend. SSH targets default to `ssh-pglite`. |
 | `environment-variables` | empty | Newline-separated values passed as repeated CLI `--env` flags in pure SSH CLI mode. |
-| `secret-variables` | empty | Newline-separated values passed as repeated CLI `--secret` flags in pure SSH CLI mode. Prefer `ci-env:` references over raw secret values. |
+| `secret-variables` | empty | Newline-separated values passed as repeated CLI `--secret` flags in pure SSH CLI mode. In `server-config-deploy` mode, resolves `ci-env:` references and sends the matched values as transient server API payload for committed config `secrets` entries. Prefer `ci-env:` references over raw secret values. |
 | `preview` | empty | Use `pull-request` for PR preview deploy or cleanup. |
 | `preview-id` | empty | Trusted preview scope, for example `pr-123`. Required for pull request previews. |
 | `preview-domain-template` | empty | Trusted preview hostname for deploy, for example `pr-123.preview.example.com`. |
@@ -389,6 +410,9 @@ source-link state, or the Appaloft server, not from committed config.
   cleanup because cleanup resolves from server-owned source-link state.
 - `server-config-deploy` requires explicit self-hosted server support. The action fails before
   source package handoff when the server handshake does not advertise the required capability.
+- In `server-config-deploy` mode, `secret-variables` supports only `KEY=ci-env:NAME` references.
+  Missing runner environment values fail before the server API request, and raw secret values are
+  not written to step summaries or PR comments.
 - `pr-comment` requires explicit workflow permission and token wiring. The action updates the same
   marker comment for the PR instead of creating a new comment on each run. Comment API failures are
   warnings so they do not mask a successful deployment.

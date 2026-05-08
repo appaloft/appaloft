@@ -115,7 +115,7 @@ inputs:
     required: false
     default: ""
   secret-variables:
-    description: Newline-separated secret variables passed as repeated CLI --secret values in pure CLI mode.
+    description: Newline-separated secret variables passed as repeated CLI --secret values in pure CLI mode, or resolved as ci-env secrets for server-config-deploy.
     required: false
     default: ""
   preview:

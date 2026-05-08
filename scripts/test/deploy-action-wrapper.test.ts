@@ -386,6 +386,143 @@ describe("deploy-action wrapper reference", () => {
     }
   });
 
+  test("[CONTROL-PLANE-HANDSHAKE-014] self-hosted server config deploy sends resolved ci-env secrets to the server API", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-secrets-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const payloadPath = join(workspace, "payload.json");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'args="$*"',
+        'payload_file=""',
+        'while [ "$#" -gt 0 ]; do',
+        '  if [ "$1" = "--data-binary" ]; then',
+        "    shift",
+        '    payload_file="$1"',
+        "    payload_file=\"$(printf '%s' \"$payload_file\" | sed 's/^@//')\"",
+        "  fi",
+        "  shift || true",
+        "done",
+        'case "$args" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackage":true,"serverSideConfigBootstrap":true}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        '    cp "$payload_file" "$APPALOFT_TEST_PAYLOAD_PATH"',
+        '    printf \'{"id":"dep_server_config_secret","deploymentHref":"/deployments/dep_server_config_secret"}\'',
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BETTER_AUTH_SECRET: "resolved-ci-secret",
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        APPALOFT_TEST_PAYLOAD_PATH: payloadPath,
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_SECRET_VARIABLES: "APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_BETTER_AUTH_SECRET",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(readFileSync(payloadPath, "utf8"));
+      expect(payload.resolvedSecrets).toEqual({
+        APPALOFT_BETTER_AUTH_SECRET: "resolved-ci-secret",
+      });
+      expect(result.stderr.toString()).not.toContain("resolved-ci-secret");
+      expect(result.stdout.toString()).not.toContain("resolved-ci-secret");
+      const output = readFileSync(outputPath, "utf8");
+      expect(output).toContain("deployment-id=dep_server_config_secret");
+      expect(output).toContain(
+        "deployment-url=https://console.example.com/deployments/dep_server_config_secret",
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-014] self-hosted server config deploy rejects missing ci-env secrets before API mutation", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-secret-missing-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'case "$*" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackage":true,"serverSideConfigBootstrap":true}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        "    echo 'unexpected config package mutation' >&2",
+        "    exit 22",
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_SECRET_VARIABLES:
+          "APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_DEPLOY_ACTION_TEST_MISSING_SECRET_404",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).toContain("required secret was not found");
+      expect(result.stderr.toString()).toContain("APPALOFT_BETTER_AUTH_SECRET");
+      expect(result.stderr.toString()).toContain(
+        "ci-env:APPALOFT_DEPLOY_ACTION_TEST_MISSING_SECRET_404",
+      );
+      expect(existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "").toBe("");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   test("[CONTROL-PLANE-INSTALL-002] install-console downloads and runs the self-hosted installer over SSH", () => {
     const result = runDeploy({
       INPUT_COMMAND: "install-console",
