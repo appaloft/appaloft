@@ -20,6 +20,7 @@ import {
   RestartResourceRuntimeCommand,
   RetryDeploymentCommand,
   RollbackDeploymentCommand,
+  SetEnvironmentVariableCommand,
   ShowResourceQuery,
   ShowServerQuery,
   type SourceLinkRecord,
@@ -1006,6 +1007,92 @@ describe("deployment create HTTP route", () => {
       },
     });
     expect(capturedCommands[3]).toBeInstanceOf(CreateDeploymentCommand);
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies plain environment variables before deployment", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommands.push(command as Command<unknown>);
+        return ok(
+          (command instanceof CreateDeploymentCommand ? { id: "dep_env_config" } : null) as T,
+        );
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: ["env:", "  PUBLIC_SITE: https://www.example.com", "  HOST: 0.0.0.0"].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      SetEnvironmentVariableCommand,
+      SetEnvironmentVariableCommand,
+      CreateDeploymentCommand,
+    ]);
+    expect(capturedCommands[0]).toMatchObject({
+      environmentId: "env_prod",
+      key: "PUBLIC_SITE",
+      value: "https://www.example.com",
+      kind: "plain-config",
+      exposure: "build-time",
+      scope: "environment",
+      isSecret: false,
+    });
+    expect(capturedCommands[1]).toMatchObject({
+      environmentId: "env_prod",
+      key: "HOST",
+      value: "0.0.0.0",
+      kind: "plain-config",
+      exposure: "runtime",
+      scope: "environment",
+      isSecret: false,
+    });
+    expect(capturedCommands[2]).toBeInstanceOf(CreateDeploymentCommand);
   });
 
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies access domain commands before deployment", async () => {

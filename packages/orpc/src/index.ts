@@ -4271,7 +4271,7 @@ const defaultActionServerConfigStaticInternalPort = 80;
 function actionServerConfigHasUnsupportedProfileApplication(
   config: AppaloftDeploymentConfig,
 ): boolean {
-  return Boolean(config.source || config.env || config.secrets);
+  return Boolean(config.source || config.secrets);
 }
 
 function runtimeProfileFromActionServerConfig(config: AppaloftDeploymentConfig) {
@@ -4341,6 +4341,10 @@ function healthCheckFromActionServerConfig(config: AppaloftDeploymentConfig) {
       expectedStatusCode: 200,
     },
   };
+}
+
+function environmentVariableExposureFromActionServerConfigKey(key: string) {
+  return key.startsWith("PUBLIC_") || key.startsWith("VITE_") ? "build-time" : "runtime";
 }
 
 type ActionServerConfigAccessDomain = NonNullable<
@@ -4503,6 +4507,26 @@ async function applyActionServerConfigProfileCommands(input: {
     if (command.isErr()) {
       return err(command.error);
     }
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
+
+  for (const [key, value] of Object.entries(config.env ?? {})) {
+    const command = SetEnvironmentVariableCommand.create({
+      environmentId: target.environmentId,
+      key,
+      value: String(value),
+      kind: "plain-config",
+      exposure: environmentVariableExposureFromActionServerConfigKey(key),
+      scope: "environment",
+      isSecret: false,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+
     const result = await context.commandBus.execute(executionContext, command.value);
     if (result.isErr()) {
       return err(result.error);
@@ -4741,7 +4765,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
   if (actionServerConfigHasUnsupportedProfileApplication(parsedConfig.data)) {
     return domainErrorHttpResponse(
       domainError.validation(
-        "Action server config deployment endpoint validated the config, but source/env/secret profile application is not enabled in this build",
+        "Action server config deployment endpoint validated the config, but source/secret profile application is not enabled in this build",
         {
           phase: "profile-application",
         },
