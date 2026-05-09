@@ -115,7 +115,7 @@ inputs:
     required: false
     default: ""
   environment-variables:
-    description: Newline-separated environment variables passed as repeated CLI --env values in pure CLI mode.
+    description: Newline-separated environment variables passed as repeated CLI --env values in pure CLI mode, or transient preview env values for server-config-deploy.
     required: false
     default: ""
   secret-variables:

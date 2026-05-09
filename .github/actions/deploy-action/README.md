@@ -313,10 +313,15 @@ as a runtime secret through its environment-variable operation.
 
 For `preview: pull-request`, server API mode derives a preview-scoped source fingerprint and calls
 the same deployment endpoint. It writes `preview-id`, `deployment-id`, `deployment-url`, and
-`console-url` outputs, but it does not apply `preview-domain-template`, `preview-tls-mode`,
-`require-preview-url`, `runtime-name`, or `environment-variables` in server mode. In
-`server-config-deploy` mode, `secret-variables` is reserved for resolving committed `ci-env:`
-secret references before the API request.
+`console-url` outputs. Existing source-link server mode does not apply runner-side route/profile
+inputs. In `server-config-deploy` mode, pull request previews may keep using
+`environment-variables`, `preview-domain-template`, `preview-tls-mode`, and `require-preview-url`
+for per-run values such as PR ports, callback URLs, and preview hostnames. Those values are sent as
+transient API payload; they do not need to be committed to `appaloft.yml`. Production config
+domains from `appaloft.yml` are not reused for pull request preview routing unless a later
+preview-safe policy explicitly selects them. `runtime-name` remains a pure SSH CLI input and is not
+accepted by server config deploy. In `server-config-deploy` mode, `secret-variables` is reserved
+for resolving committed `ci-env:` secret references before the API request.
 
 ```yaml
 - uses: appaloft/deploy-action@v1
@@ -325,12 +330,17 @@ secret references before the API request.
     control-plane-mode: self-hosted
     control-plane-url: https://console.example.com
     appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    server-config-deploy: true
+    config: appaloft.preview.yml
     preview: pull-request
     preview-id: pr-${{ github.event.pull_request.number }}
-    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
-    environment-id: ${{ secrets.APPALOFT_PREVIEW_ENVIRONMENT_ID }}
-    resource-id: ${{ secrets.APPALOFT_PREVIEW_RESOURCE_ID }}
-    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
+    preview-domain-template: pr-${{ github.event.pull_request.number }}.preview.example.com
+    preview-tls-mode: disabled
+    require-preview-url: true
+    environment-variables: |
+      HOST=0.0.0.0
+      PORT=4321
+      APPALOFT_BETTER_AUTH_URL=http://pr-${{ github.event.pull_request.number }}.preview.example.com
 ```
 
 For `command: preview-cleanup`, server API mode derives the preview-scoped source fingerprint from
@@ -397,7 +407,7 @@ source-link state, or the Appaloft server, not from committed config.
 | `server-provider` | `generic-ssh` | Server provider key. |
 | `server-proxy-kind` | empty | Server proxy kind such as `traefik` or `caddy`. |
 | `state-backend` | empty | Explicit state backend. SSH targets default to `ssh-pglite`. |
-| `environment-variables` | empty | Newline-separated values passed as repeated CLI `--env` flags in pure SSH CLI mode. |
+| `environment-variables` | empty | Newline-separated values passed as repeated CLI `--env` flags in pure SSH CLI mode. In `server-config-deploy` pull request previews, sent as transient server API payload and applied through the server environment-variable operation after committed `env` values, so Action values can override per-preview fields. |
 | `secret-variables` | empty | Newline-separated values passed as repeated CLI `--secret` flags in pure SSH CLI mode. In `server-config-deploy` mode, resolves `ci-env:` references and sends the matched values as transient server API payload for committed config `secrets` entries. Prefer `ci-env:` references over raw secret values. |
 | `preview` | empty | Use `pull-request` for PR preview deploy or cleanup. |
 | `preview-id` | empty | Trusted preview scope, for example `pr-123`. Required for pull request previews. |
@@ -441,10 +451,11 @@ source-link state, or the Appaloft server, not from committed config.
 - `control-plane-mode: self-hosted` does not accept SSH keys or `state-backend`; the action calls
   the Appaloft server API and leaves state ownership with the server.
 - In self-hosted server API mode, preview deploy accepts trusted `preview` and `preview-id` inputs
-  only for source fingerprinting and feedback outputs. Preview route/profile inputs remain
-  rejected until the server owns that policy. `command: preview-cleanup` accepts only source/config
-  and trusted preview scope inputs. Deployment target ids are intentionally ignored/rejected for
-  cleanup because cleanup resolves from server-owned source-link state.
+  for source fingerprinting and feedback outputs. Preview route/profile inputs remain rejected by
+  source-link trigger mode. `server-config-deploy` may accept preview route and environment inputs
+  only with `preview=pull-request`; `command: preview-cleanup` accepts only source/config and
+  trusted preview scope inputs. Deployment target ids are intentionally ignored/rejected for cleanup
+  because cleanup resolves from server-owned source-link state.
 - `server-config-deploy` requires explicit self-hosted server support. The action fails before
   source package handoff when the server handshake does not advertise the required capability.
 - In `server-config-deploy` mode, `secret-variables` supports only `KEY=ci-env:NAME` references.

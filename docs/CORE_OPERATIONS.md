@@ -826,8 +826,10 @@ Current boundary:
   selected config path to a dedicated server config workflow API. The server must still keep
   `deployments.create` ids-only, accept only the narrow `controlPlane.deploymentContext` identity
   exception, reject broad committed identity/secret fields before mutation, apply
-  resource/environment/profile changes through explicit commands, and fail during
-  handshake/capability checks when source package or server-side config bootstrap support is absent.
+  resource/environment/profile changes through explicit commands, accept transient Action preview
+  env and route values for pull request previews without reusing production config domains, and
+  fail during handshake/capability checks when source package or server-side config bootstrap
+  support is absent.
 - GitHub Action PR preview deploy is also an entry workflow over the same commands, not a new
   operation. A repository must add a workflow with `on.pull_request` before GitHub will attempt a
   preview deploy. The action may use trusted GitHub event context, such as PR number and head SHA,

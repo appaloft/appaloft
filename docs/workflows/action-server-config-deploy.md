@@ -272,6 +272,12 @@ console output.
   resource/destination and server proxy context, applies each domain through
   `domain-bindings.create` with deterministic idempotency keys, creates served domains before
   canonical redirect aliases, and only then dispatches `deployments.create`.
+- When `preview=pull-request` is supplied to `server-config-deploy`, the wrapper may send
+  transient `environmentVariables` and `previewRoute` fields from Action inputs. The endpoint
+  applies transient environment variables after committed `env` values so PR-specific values can
+  override callback URLs, host, or port values. Pull request preview requests do not apply committed
+  production `access.domains[]`; when `previewRoute` is supplied, that route is the only domain
+  binding intent for the request.
 - When the validated config contains `source`, the endpoint fails before mutation with
   `profile-application`; source profile bootstrap still requires a later explicit-operation slice.
 - `/api/version` advertises granular feature flags. Self-hosted console builds that wire the
