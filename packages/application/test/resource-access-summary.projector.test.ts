@@ -508,4 +508,88 @@ describe("projectResourceAccessSummary", () => {
     expect(summary?.proxyRouteStatus).toBe("failed");
     expect(summary?.lastRouteRealizationDeploymentId).toBe("dep_config_domain_failed");
   });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-008][DEF-ACCESS-QRY-006] suppresses cleaned preview routes when the source link is absent", () => {
+    const previewSourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A25";
+
+    const summary = projectResourceAccessSummary(
+      [
+        {
+          id: "dep_preview_closed",
+          status: "succeeded",
+          createdAt: "2026-01-01T01:00:00.000Z",
+          runtimePlan: {
+            execution: {
+              accessRoutes: [
+                {
+                  proxyKind: "traefik",
+                  domains: ["25.preview.example.test"],
+                  pathPrefix: "/",
+                  tlsMode: "disabled",
+                  targetPort: 3000,
+                },
+              ],
+              metadata: {
+                "access.routeSource": "generated-default",
+                "access.hostname": "25.preview.example.test",
+                "access.scheme": "http",
+                "context.sourceFingerprint": previewSourceFingerprint,
+              },
+            },
+          },
+        },
+      ],
+      [],
+      {
+        previewEnvironment: true,
+        activePreviewSourceFingerprints: new Set(),
+      },
+    );
+
+    expect(summary).toBeUndefined();
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-008][DEF-ACCESS-QRY-006] keeps active preview routes while the source link exists", () => {
+    const previewSourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A26";
+
+    const summary = projectResourceAccessSummary(
+      [
+        {
+          id: "dep_preview_open",
+          status: "succeeded",
+          createdAt: "2026-01-01T01:00:00.000Z",
+          runtimePlan: {
+            execution: {
+              accessRoutes: [
+                {
+                  proxyKind: "traefik",
+                  domains: ["26.preview.example.test"],
+                  pathPrefix: "/",
+                  tlsMode: "disabled",
+                  targetPort: 3000,
+                },
+              ],
+              metadata: {
+                "access.routeSource": "generated-default",
+                "access.hostname": "26.preview.example.test",
+                "access.scheme": "http",
+                "context.sourceFingerprint": previewSourceFingerprint,
+              },
+            },
+          },
+        },
+      ],
+      [],
+      {
+        previewEnvironment: true,
+        activePreviewSourceFingerprints: new Set([previewSourceFingerprint]),
+      },
+    );
+
+    expect(summary?.latestGeneratedAccessRoute).toMatchObject({
+      hostname: "26.preview.example.test",
+      deploymentId: "dep_preview_open",
+    });
+    expect(summary?.proxyRouteStatus).toBe("ready");
+  });
 });

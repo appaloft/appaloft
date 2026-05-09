@@ -56,6 +56,7 @@ This matrix inherits:
 | DEPLOYMENTS-CLEANUP-PREVIEW-005 | integration | Preview cleanup waits only on same preview scope | Another command currently owns mutation for the same preview fingerprint while a different preview fingerprint exists on the same server/state backend | Cleanup waits only for the same logical preview-lifecycle scope; unrelated preview scopes must not be blocked by whole-server coordination | `coordination_timeout`, phase `operation-coordination` only when the bounded wait for the same preview scope expires |
 | DEPLOYMENTS-CLEANUP-PREVIEW-006 | integration | SSH final upload merges disjoint preview cleanup state changes | `ssh-pglite` preview cleanup runs against a local mirror and another command advances the remote revision for a different logical scope with disjoint authoritative rows | Cleanup still completes after final upload retries against the fresher remote snapshot | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-007 | integration | Preview artifact/workspace cleanup is ownership-scoped | Preview link exists, runtime cleanup succeeds, and target has preview-owned source workspaces, stopped preview containers, unused preview images, and unrelated volumes/state | Cleanup removes or marks cleaned the preview-owned inert artifacts/workspaces, preserves Docker volumes, remote Appaloft state, active runtime, and retained rollback candidates, then proceeds to route/link deletion | None, or `runtime_target_resource_exhausted` with `cleanupStage = artifact-cleanup` when target capacity prevents safe inspection/removal |
+| DEPLOYMENTS-CLEANUP-PREVIEW-008 | integration | Cleaned preview route is not current access | Preview resource remains as history/audit, but the preview source link has been removed by cleanup | Resource access summary does not project that historical preview route as current/ready; deployment history remains visible | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-HTTP-001 | HTTP/oRPC | HTTP preview cleanup dispatches command | `POST /api/deployments/cleanup-preview` receives a preview-scoped source fingerprint | HTTP returns `202` with cleanup result and dispatches `CleanupPreviewCommand` with the same source fingerprint | Domain error mapped through standard HTTP/oRPC error contract |
 
 ## CLI Matrix
@@ -68,6 +69,10 @@ This matrix inherits:
 
 `DEPLOYMENTS-CLEANUP-PREVIEW-001` through `DEPLOYMENTS-CLEANUP-PREVIEW-004` have application
 coverage in `packages/application/test/cleanup-preview.test.ts`.
+
+`DEPLOYMENTS-CLEANUP-PREVIEW-008` has route/access read-model coverage in
+`packages/application/test/resource-access-summary.projector.test.ts` and
+`packages/persistence/pg/test/pglite.integration.test.ts`.
 
 `DEPLOYMENTS-CLEANUP-PREVIEW-CLI-001` has CLI integration coverage in
 `packages/adapters/cli/test/preview-command.test.ts`.

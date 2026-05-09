@@ -212,7 +212,9 @@ additional stale preview deployments in the same linked project/environment scop
 metadata still carries the selected preview source fingerprint, deletes PG/PGlite or
 filesystem-backed server-applied preview route desired state both for the linked target and for
 additional matching preview-fingerprint route rows, and unlinks the preview source fingerprint from
-the selected state backend. HTTP/oRPC and Web preview cleanup entrypoints remain future work.
+the selected state backend. Resource access read models suppress current-route projection for
+preview environment deployment snapshots after their preview source link is absent, while retaining
+deployment history for audit. HTTP/oRPC and Web preview cleanup entrypoints remain future work.
 
 Current implementation now applies logical preview-lifecycle scoped coordination in the shell/runtime
 path. In SSH `ssh-pglite` mode, shell still performs brief backend state-root maintenance for

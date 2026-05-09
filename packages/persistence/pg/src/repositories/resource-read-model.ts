@@ -50,6 +50,14 @@ type ResourceDomainBindingRow = {
   tls_mode: string;
   created_at: string;
 };
+type ResourceEnvironmentRow = {
+  id: string;
+  kind: string;
+};
+type ResourceSourceLinkRow = {
+  resource_id: string;
+  source_fingerprint: string;
+};
 type ResourceRuntimeControlAttemptRow = Selectable<Database["resource_runtime_control_attempts"]>;
 
 function toRuntimeControlSummary(
@@ -93,6 +101,8 @@ function toResourceSummary(
   deploymentRows: ResourceDeploymentRow[],
   domainBindingRows: ResourceDomainBindingRow[],
   runtimeControlAttemptRows: ResourceRuntimeControlAttemptRow[],
+  environmentRows: ResourceEnvironmentRow[],
+  sourceLinkRows: ResourceSourceLinkRow[],
 ): ResourceSummary {
   const services = (row.services ?? []) as unknown as SerializedResourceService[];
   const networkProfile = row.network_profile
@@ -107,6 +117,18 @@ function toResourceSummary(
   );
   const latestRuntimeControl = runtimeControlAttemptRows.find(
     (attempt) => attempt.resource_id === row.id,
+  );
+  const environmentKind = environmentRows.find(
+    (environment) => environment.id === row.environment_id,
+  )?.kind;
+  const activePreviewSourceFingerprints = new Set(
+    sourceLinkRows
+      .filter(
+        (sourceLink) =>
+          sourceLink.resource_id === row.id &&
+          sourceLink.source_fingerprint.startsWith("source-fingerprint:v1:preview%3A"),
+      )
+      .map((sourceLink) => sourceLink.source_fingerprint),
   );
   const lastDeployment = deployments[0];
   const accessSummary = projectResourceAccessSummary(
@@ -145,6 +167,10 @@ function toResourceSummary(
       proxyKind: domainBinding.proxy_kind as ResourceAccessSummaryDomainBinding["proxyKind"],
       tlsMode: domainBinding.tls_mode as ResourceAccessSummaryDomainBinding["tlsMode"],
     })),
+    {
+      previewEnvironment: environmentKind === "preview",
+      activePreviewSourceFingerprints,
+    },
   );
 
   return {
@@ -280,9 +306,40 @@ export class PgResourceReadModel implements ResourceReadModel {
                 .orderBy("updated_at", "desc")
                 .execute()
             : [];
+        const environmentRows =
+          rows.length > 0
+            ? await executor
+                .selectFrom("environments")
+                .select(["id", "kind"])
+                .where(
+                  "id",
+                  "in",
+                  rows.map((row) => row.environment_id),
+                )
+                .execute()
+            : [];
+        const sourceLinkRows =
+          rows.length > 0
+            ? await executor
+                .selectFrom("source_links")
+                .select(["resource_id", "source_fingerprint"])
+                .where(
+                  "resource_id",
+                  "in",
+                  rows.map((row) => row.id),
+                )
+                .execute()
+            : [];
 
         return rows.map((row) =>
-          toResourceSummary(row, deploymentRows, domainBindingRows, runtimeControlAttemptRows),
+          toResourceSummary(
+            row,
+            deploymentRows,
+            domainBindingRows,
+            runtimeControlAttemptRows,
+            environmentRows,
+            sourceLinkRows,
+          ),
         );
       },
     );
@@ -310,7 +367,13 @@ export class PgResourceReadModel implements ResourceReadModel {
           return null;
         }
 
-        const [deploymentRows, domainBindingRows, runtimeControlAttemptRows] = await Promise.all([
+        const [
+          deploymentRows,
+          domainBindingRows,
+          runtimeControlAttemptRows,
+          environmentRows,
+          sourceLinkRows,
+        ] = await Promise.all([
           executor
             .selectFrom("deployments")
             .select(["id", "resource_id", "status", "runtime_plan", "created_at"])
@@ -339,9 +402,26 @@ export class PgResourceReadModel implements ResourceReadModel {
             .orderBy("updated_at", "desc")
             .limit(1)
             .execute(),
+          executor
+            .selectFrom("environments")
+            .select(["id", "kind"])
+            .where("id", "=", row.environment_id)
+            .execute(),
+          executor
+            .selectFrom("source_links")
+            .select(["resource_id", "source_fingerprint"])
+            .where("resource_id", "=", row.id)
+            .execute(),
         ]);
 
-        return toResourceSummary(row, deploymentRows, domainBindingRows, runtimeControlAttemptRows);
+        return toResourceSummary(
+          row,
+          deploymentRows,
+          domainBindingRows,
+          runtimeControlAttemptRows,
+          environmentRows,
+          sourceLinkRows,
+        );
       },
     );
   }
