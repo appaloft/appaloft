@@ -36,7 +36,7 @@ ARG APPALOFT_APP_VERSION=0.1.0
 ENV BUN_INSTALL=/root/.bun
 ENV PATH="${BUN_INSTALL}/bin:${PATH}"
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates \
+  && apt-get install -y --no-install-recommends ca-certificates openssh-client \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=bun /root/.bun /root/.bun
 
