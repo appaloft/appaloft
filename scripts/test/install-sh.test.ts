@@ -258,6 +258,7 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
 
     const compose = await Bun.file(join(home, "docker-compose.yml")).text();
     expect(compose).toContain("image: $" + "{APPALOFT_IMAGE_REF}");
+    expect(compose).toContain('APPALOFT_AUTO_MIGRATE: "true"');
     expect(compose).toContain("postgres-data:/var/lib/postgresql/data");
     expect(compose).toContain('"$' + "{APPALOFT_HTTP_HOST}:$" + '{APPALOFT_HTTP_PORT}:3001"');
     expect(compose).not.toContain("build:");
@@ -493,6 +494,7 @@ test("install.sh writes a PGlite self-host stack with durable app data", async (
 
     const compose = await Bun.file(join(home, "docker-compose.yml")).text();
     expect(compose).toContain("APPALOFT_DATABASE_DRIVER: pglite");
+    expect(compose).toContain('APPALOFT_AUTO_MIGRATE: "true"');
     expect(compose).toContain("APPALOFT_DATA_DIR: /appaloft-data");
     expect(compose).toContain("APPALOFT_PGLITE_DATA_DIR: /appaloft-data/pglite");
     expect(compose).toContain("appaloft-data:/appaloft-data");

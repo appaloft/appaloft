@@ -40,6 +40,9 @@ PGlite，可以传 `--database pglite`：
 curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite
 ```
 
+Docker 安装会在 Appaloft HTTP 服务启动前自动应用待执行的数据库迁移。迁移失败时容器不会通过
+health check，安装器会报错并提示查看容器日志；修复数据库或镜像问题后，重新运行同一条安装命令即可。
+
 PGlite 模式会把 Appaloft 状态放在挂载到 `/appaloft-data` 的持久 Docker volume 中。不要把
 数据库密码、GitHub token、SSH key 或部署身份值写进仓库配置；这些值应放在主机、CI secret
 store，或安装后的 Appaloft server 内。

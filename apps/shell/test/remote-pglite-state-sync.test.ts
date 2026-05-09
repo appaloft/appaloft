@@ -29,6 +29,7 @@ function testConfig(
     httpPort: 3001,
     webOrigin: "http://localhost:4173",
     databaseDriver: "pglite" as const,
+    autoMigrate: false,
     dataDir,
     pgliteDataDir: join(dataDir, "pglite"),
     remoteRuntimeRoot: overrides?.remoteRuntimeRoot ?? "/var/lib/appaloft/runtime",
