@@ -225,6 +225,10 @@ read_control_plane_install_value() {
   read_config_path_value "$1" "controlPlane.install.$2"
 }
 
+read_control_plane_deployment_context_value() {
+  read_config_path_value "$1" "controlPlane.deploymentContext.$2"
+}
+
 read_source_value() {
   read_config_block_value "$1" source "$2"
 }
@@ -927,6 +931,11 @@ if [ -n "$selected_config_path" ] && [ -f "$selected_config_path" ]; then
   config_console_image="$(read_control_plane_install_value "$selected_config_path" image)"
   config_console_installer_url="$(read_control_plane_install_value "$selected_config_path" installerUrl)"
   config_console_skip_docker_install="$(read_control_plane_install_value "$selected_config_path" skipDockerInstall)"
+  config_project_id="$(read_control_plane_deployment_context_value "$selected_config_path" projectId)"
+  config_environment_id="$(read_control_plane_deployment_context_value "$selected_config_path" environmentId)"
+  config_resource_id="$(read_control_plane_deployment_context_value "$selected_config_path" resourceId)"
+  config_server_id="$(read_control_plane_deployment_context_value "$selected_config_path" serverId)"
+  config_destination_id="$(read_control_plane_deployment_context_value "$selected_config_path" destinationId)"
 fi
 
 if [ -z "$control_plane_mode" ]; then
@@ -952,6 +961,11 @@ console_swarm_advertise_addr="${console_swarm_advertise_addr:-${config_console_s
 console_image="${console_image:-${config_console_image:-ghcr.io/appaloft/appaloft}}"
 console_installer_url="${console_installer_url:-${config_console_installer_url:-}}"
 console_skip_docker_install="${console_skip_docker_install:-${config_console_skip_docker_install:-false}}"
+project_id="${project_id:-${config_project_id:-}}"
+environment_id="${environment_id:-${config_environment_id:-}}"
+resource_id="${resource_id:-${config_resource_id:-}}"
+server_id="${server_id:-${config_server_id:-}}"
+destination_id="${destination_id:-${config_destination_id:-}}"
 
 case "$wrapper_command" in
   ""|deploy)

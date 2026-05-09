@@ -4,9 +4,10 @@ Run Appaloft deployments from GitHub Actions.
 
 The default mode is a thin wrapper around the released `appaloft` binary for pure SSH deployments.
 Self-hosted server API mode is available for repositories that already have their project,
-environment, resource, and deployment target registered in an Appaloft server. In both modes, the
-action does not read Appaloft project, resource, server, credential, or secret identity from
-committed `appaloft.yml`.
+environment, resource, and deployment target registered in an Appaloft server. In self-hosted mode,
+the action may read non-secret project/environment/resource/server ids from
+`controlPlane.deploymentContext` in committed `appaloft.yml`; credentials, tokens, and secret
+values still come from trusted workflow inputs or secrets.
 
 ## Basic Deploy
 
@@ -110,6 +111,12 @@ tokens, and raw database credentials still come from trusted workflow inputs or 
 controlPlane:
   mode: self-hosted
   url: https://console.example.com
+  deploymentContext:
+    projectId: prj_www
+    environmentId: env_prod
+    resourceId: res_www
+    serverId: srv_prod
+    # destinationId is optional.
   install:
     database: postgres
     domain: console.example.com
@@ -274,12 +281,15 @@ trigger mode.
 - uses: appaloft/deploy-action@v1
   id: deploy
   with:
-    control-plane-mode: self-hosted
-    control-plane-url: https://console.example.com
-    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
     server-config-deploy: true
     config: appaloft.yml
 ```
+
+With this shape, `controlPlane.mode`, `controlPlane.url`, and
+`controlPlane.deploymentContext` come from `appaloft.yml`. Explicit action inputs still override
+the matching config values when a workflow needs to do so. `appaloft-token` is optional in the
+current 0.9.x slice, but production hardening will require a deploy token or OIDC exchange for
+Action mutation endpoints.
 
 If the committed config declares `secrets.KEY.from: ci-env:NAME`, expose the GitHub secret to the
 runner environment and list the matching `secret-variables` entry. The action resolves the value
@@ -401,11 +411,11 @@ source-link state, or the Appaloft server, not from committed config.
 | `appaloft-token` | empty | Optional bearer token for server API mode. |
 | `use-oidc` | `false` | Reserved for future GitHub OIDC exchange. |
 | `server-config-deploy` | `false` | Experimental self-hosted mode that calls `POST /api/action/deployments/from-config-package` after the server advertises source package and server-side config bootstrap support. |
-| `project-id` | empty | Optional trusted project id for server API mode. When supplied with environment/resource/server ids, the server may bootstrap a missing source link. When omitted with the other ids, the server resolves context from source-link state. |
-| `environment-id` | empty | Optional trusted environment id for server API mode. Required only when any explicit deployment id is supplied. |
-| `resource-id` | empty | Optional trusted resource id for server API mode. Required only when any explicit deployment id is supplied. |
-| `server-id` | empty | Optional trusted deployment target id for server API mode. Required only when any explicit deployment id is supplied. |
-| `destination-id` | empty | Optional trusted destination id for server API mode. |
+| `project-id` | config or empty | Optional trusted project id for server API mode. Defaults to `controlPlane.deploymentContext.projectId` when present. |
+| `environment-id` | config or empty | Optional trusted environment id for server API mode. Defaults to `controlPlane.deploymentContext.environmentId` when present. Required only when any explicit deployment id is supplied. |
+| `resource-id` | config or empty | Optional trusted resource id for server API mode. Defaults to `controlPlane.deploymentContext.resourceId` when present. Required only when any explicit deployment id is supplied. |
+| `server-id` | config or empty | Optional trusted deployment target id for server API mode. Defaults to `controlPlane.deploymentContext.serverId` when present. Required only when any explicit deployment id is supplied. |
+| `destination-id` | config or empty | Optional trusted destination id for server API mode. Defaults to `controlPlane.deploymentContext.destinationId` when present. |
 
 ## Outputs
 

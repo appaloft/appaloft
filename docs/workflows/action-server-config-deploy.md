@@ -108,9 +108,11 @@ type ActionServerConfigDeployRequest = {
 };
 ```
 
-`trustedContext` is trusted entrypoint/server context, not committed repository config. If any
-explicit deployment identity field is supplied, the same completeness and conflict checks as the
-source-link trigger slice apply before mutation.
+`trustedContext` is trusted entrypoint/server context. The deploy-action wrapper may derive its
+project/environment/resource/server/destination ids from explicit workflow inputs or from the
+selected config file's non-secret `controlPlane.deploymentContext`. If any explicit deployment
+identity field is supplied, the same completeness and conflict checks as the source-link trigger
+slice apply before mutation.
 
 `resolvedSecrets` is a transient Action-to-server payload keyed by trusted `ci-env:` environment
 name. It is allowed only to satisfy matching `secrets.KEY.from: ci-env:NAME` entries from the
@@ -172,18 +174,20 @@ mode:
 validate package
   -> read selected config from package
   -> parse and validate repository config
-  -> reject committed identity and secret material
-  -> resolve control-plane/source-link context from trusted inputs, token scope, source link state,
-     preview context, or future adoption state
+  -> accept controlPlane.deploymentContext as the only committed deployment identity
+  -> reject broad committed identity and secret material
+  -> resolve control-plane/source-link context from trusted inputs, deploymentContext, token scope,
+     source link state, preview context, or future adoption state
   -> apply resource source/runtime/network/health profile changes through explicit commands
   -> apply non-secret environment values and required secret references through environment commands
   -> map route/domain intent according to selected control-plane capabilities
   -> dispatch deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
 ```
 
-The server must fail before mutation when config contains project/resource/server/destination ids,
-organization ids, credential ids, database URLs, raw tokens, raw SSH keys, raw secret values,
-certificate material, or unsupported future fields.
+The server must fail before mutation when config contains project/resource/server/destination ids
+outside `controlPlane.deploymentContext`, organization ids, tenant ids, credential ids, provider
+account ids, database URLs, raw tokens, raw SSH keys, raw secret values, certificate material, or
+unsupported future fields.
 
 When a package/config is valid but the selected resource has protected profile drift, the workflow
 must follow the existing resource profile drift contract instead of silently overwriting resource
@@ -230,13 +234,16 @@ console output.
   support.
 - The wrapper dry-run path maps the selected mode to
   `POST /api/action/deployments/from-config-package`.
+- The wrapper can read `controlPlane.mode`, `controlPlane.url`, and
+  `controlPlane.deploymentContext` from the selected config file so a repository can describe its
+  self-hosted console deploy target without duplicating non-secret ids in workflow variables.
 - The server route `POST /api/action/deployments/from-config-package` validates request shape,
   source package manifest fields, source package path boundaries, source fingerprint/path
   consistency, archive checksum presence, and size limits before any command dispatch.
 - The route can use a server-side source package config reader and the same
-  `@appaloft/deployment-config` parser used by CLI/local config deploy. Identity and raw secret
-  fields in committed config fail with `config-identity` or `config-secret-validation` before
-  source-link, resource, route, or deployment mutation.
+  `@appaloft/deployment-config` parser used by CLI/local config deploy. Broad identity and raw
+  secret fields in committed config fail with `config-identity` or `config-secret-validation`
+  before source-link, resource, route, or deployment mutation.
 - The self-hosted console composition wires a GitHub `server-github-fetch` config reader that reads
   the selected config file from `raw.githubusercontent.com` using trusted `repositoryFullName`,
   revision, and config path metadata. Unsupported package transports still fail closed until their

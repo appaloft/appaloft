@@ -389,6 +389,93 @@ describe("deploy-action wrapper reference", () => {
     }
   });
 
+  test("[CONTROL-PLANE-HANDSHAKE-014] self-hosted deploy reads deployment context from appaloft.yml", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-config-context-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const payloadPath = join(workspace, "payload.json");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      join(workspace, "appaloft.yml"),
+      [
+        "controlPlane:",
+        "  mode: self-hosted",
+        "  url: https://console.example.com",
+        "  deploymentContext:",
+        "    projectId: prj_www",
+        "    environmentId: env_prod",
+        "    resourceId: res_www",
+        "    serverId: srv_prod",
+        "runtime:",
+        "  strategy: static",
+      ].join("\n"),
+    );
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'args="$*"',
+        'payload_file=""',
+        'while [ "$#" -gt 0 ]; do',
+        '  if [ "$1" = "--data-binary" ]; then',
+        "    shift",
+        '    payload_file="$1"',
+        "    payload_file=\"$(printf '%s' \"$payload_file\" | sed 's/^@//')\"",
+        "  fi",
+        "  shift || true",
+        "done",
+        'case "$args" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackage":true,"serverSideConfigBootstrap":true}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        '    cp "$payload_file" "$APPALOFT_TEST_PAYLOAD_PATH"',
+        '    printf \'{"id":"dep_config_context","deploymentHref":"/deployments/dep_config_context"}\'',
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        APPALOFT_TEST_PAYLOAD_PATH: payloadPath,
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(readFileSync(payloadPath, "utf8"));
+      expect(payload.trustedContext).toMatchObject({
+        projectId: "prj_www",
+        environmentId: "env_prod",
+        resourceId: "res_www",
+        serverId: "srv_prod",
+      });
+      expect(readFileSync(outputPath, "utf8")).toContain(
+        "deployment-url=https://console.example.com/deployments/dep_config_context",
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   test("[CONTROL-PLANE-HANDSHAKE-014] self-hosted server config deploy sends resolved ci-env secrets to the server API", () => {
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-secrets-"));
     const outputPath = join(workspace, "github-output.txt");

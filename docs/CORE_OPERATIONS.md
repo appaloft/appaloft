@@ -772,12 +772,13 @@ Current boundary:
   execute a deployment while Appaloft Cloud or a self-hosted Appaloft server owns source links,
   locks, identity, audit, and managed domain workflow state.
 - Repository config may declare non-secret control-plane connection policy such as
-  `controlPlane.mode: none|auto|cloud|self-hosted` and optional self-host/private endpoint URL
-  metadata after the config schema implements it. It must not contain Cloud tokens, database URLs,
-  project ids, resource ids, server ids, destination ids, credential ids, organization ids, tenant
-  ids, or raw credential material. Control-plane identity comes from trusted entrypoint input,
-  authenticated token/OIDC/login scope, GitHub repository identity, source link state, or explicit
-  relink/adoption operations outside committed config.
+  `controlPlane.mode: none|auto|cloud|self-hosted`, optional self-host/private endpoint URL
+  metadata, and for self-hosted server config deploy an explicit
+  `controlPlane.deploymentContext` with project/environment/resource/server and optional
+  destination ids. It must not contain Cloud tokens, database URLs, credential ids, organization
+  ids, tenant ids, provider account ids, or raw credential material. Authentication still comes
+  from trusted entrypoint input, deploy token/OIDC/login scope, GitHub repository identity, source
+  link state, or explicit relink/adoption operations.
 - Cloud and self-hosted control-plane modes require a compatibility handshake before any
   project/resource/domain/deployment mutation. Until that handshake exists, mode selection may be
   documented as roadmap and must fail before mutation when selected.
@@ -823,7 +824,8 @@ Current boundary:
   [spec 050](./specs/050-action-server-config-deploy/spec.md). It moves config bootstrap and source
   materialization into the self-hosted server by sending a bounded source package reference and
   selected config path to a dedicated server config workflow API. The server must still keep
-  `deployments.create` ids-only, reject committed identity/secret fields before mutation, apply
+  `deployments.create` ids-only, accept only the narrow `controlPlane.deploymentContext` identity
+  exception, reject broad committed identity/secret fields before mutation, apply
   resource/environment/profile changes through explicit commands, and fail during
   handshake/capability checks when source package or server-side config bootstrap support is absent.
 - GitHub Action PR preview deploy is also an entry workflow over the same commands, not a new
