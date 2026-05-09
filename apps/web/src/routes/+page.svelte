@@ -328,16 +328,16 @@
     color: var(--text-display);
     font-size: clamp(38px, 7vw, 82px);
     font-weight: 300;
-    letter-spacing: -0.04em;
+    letter-spacing: 0;
     line-height: 0.95;
   }
 
   .nothing-display {
     color: var(--text-display);
-    font-family: "Doto", var(--font-mono);
+    font-family: var(--font-mono);
     font-size: clamp(52px, 11vw, 118px);
     font-weight: 700;
-    letter-spacing: -0.05em;
+    letter-spacing: 0;
     line-height: 0.9;
     text-transform: uppercase;
   }

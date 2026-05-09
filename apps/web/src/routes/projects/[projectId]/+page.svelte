@@ -676,7 +676,7 @@
           </div>
         </section>
 
-        <aside class="space-y-8 xl:border-l xl:pl-6">
+        <aside class="console-side-panel space-y-8 xl:sticky xl:top-24 xl:self-start">
           <section class="space-y-3">
             <div>
               <div class="flex items-center justify-between gap-3">
@@ -699,7 +699,7 @@
             <div class="console-record-list">
               {#if projectEnvironments.length > 0}
                 {#each projectEnvironments as environment (environment.id)}
-                  <div class="py-3">
+                  <div class="px-4 py-3">
                     <div class="flex items-start justify-between gap-2">
                       <div class="min-w-0 space-y-1">
                         <div class="flex min-w-0 flex-wrap items-center gap-2">
@@ -858,7 +858,7 @@
                   </div>
                 {/each}
               {:else}
-                <p class="py-4 text-sm text-muted-foreground">
+                <p class="px-4 py-4 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.projects.noEnvironment)}
                 </p>
               {/if}
@@ -894,7 +894,7 @@
                   </a>
                 {/each}
               {:else}
-                <p class="py-4 text-sm text-muted-foreground">
+                <p class="px-4 py-4 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.projects.noPublicAccess)}
                 </p>
               {/if}

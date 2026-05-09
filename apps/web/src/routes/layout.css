@@ -6,93 +6,20 @@
 :root,
 :root[data-theme="light"],
 .light {
-  --black: #f5f5f5;
-  --surface: #ffffff;
-  --surface-raised: #f0f0f0;
-  --border: #e8e8e8;
-  --border-visible: #cccccc;
-  --text-disabled: #999999;
-  --text-secondary: #666666;
-  --text-primary: #1a1a1a;
-  --text-display: #000000;
-  --accent-red: #d71921;
-  --accent-subtle: rgba(215, 25, 33, 0.15);
-  --success: #4a9e5c;
-  --warning: #d4a843;
-  --interactive: #007aff;
-  --font-display: "Doto", "Space Mono", monospace;
-  --font-sans: "Space Grotesk", "DM Sans", system-ui, sans-serif;
-  --font-mono: "Space Mono", "JetBrains Mono", "SF Mono", monospace;
-  --appaloft-font-sans: var(--font-sans);
-  --appaloft-font-mono: var(--font-mono);
-  --background: #f5f5f5;
-  --foreground: #1a1a1a;
-  --card: #ffffff;
-  --card-foreground: #1a1a1a;
-  --popover: #ffffff;
-  --popover-foreground: #1a1a1a;
-  --primary: #000000;
-  --primary-foreground: #f5f5f5;
-  --secondary: #f0f0f0;
-  --secondary-foreground: #1a1a1a;
-  --muted: #f0f0f0;
-  --muted-foreground: #666666;
-  --accent: #f0f0f0;
-  --accent-foreground: #1a1a1a;
-  --destructive: #d71921;
-  --destructive-foreground: #ffffff;
-  --input: #cccccc;
-  --ring: #000000;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #1a1a1a;
-  --sidebar-primary: #000000;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f0f0f0;
-  --sidebar-accent-foreground: #1a1a1a;
-  --sidebar-border: #e8e8e8;
-  --sidebar-ring: #000000;
-  --radius: 0.75rem;
-}
-
-.dark,
-:root[data-theme="dark"] {
-  --black: #000000;
-  --surface: #111111;
-  --surface-raised: #1a1a1a;
-  --border: #222222;
-  --border-visible: #333333;
-  --text-disabled: #666666;
-  --text-secondary: #999999;
-  --text-primary: #e8e8e8;
-  --text-display: #ffffff;
-  --accent-red: #d71921;
-  --success: #4a9e5c;
-  --warning: #d4a843;
-  --interactive: #5b9bf6;
-  --background: #000000;
-  --foreground: #e8e8e8;
-  --card: #111111;
-  --card-foreground: #e8e8e8;
-  --popover: #1a1a1a;
-  --popover-foreground: #e8e8e8;
-  --primary: #ffffff;
-  --primary-foreground: #000000;
-  --secondary: #1a1a1a;
-  --secondary-foreground: #e8e8e8;
-  --muted: #1a1a1a;
-  --muted-foreground: #999999;
-  --accent: #1a1a1a;
-  --accent-foreground: #ffffff;
-  --input: #333333;
-  --ring: #ffffff;
-  --sidebar: #000000;
-  --sidebar-foreground: #e8e8e8;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #111111;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #222222;
-  --sidebar-ring: #ffffff;
+  --black: var(--background);
+  --surface: var(--card);
+  --surface-raised: var(--muted);
+  --border-visible: color-mix(in oklch, var(--border) 72%, var(--foreground));
+  --text-disabled: color-mix(in oklch, var(--muted-foreground) 62%, transparent);
+  --text-secondary: var(--muted-foreground);
+  --text-primary: var(--foreground);
+  --text-display: var(--primary);
+  --accent-red: var(--destructive);
+  --accent-subtle: color-mix(in oklch, var(--destructive) 14%, transparent);
+  --success: var(--chart-2);
+  --warning: var(--chart-4);
+  --interactive: var(--ring);
+  --font-display: var(--appaloft-font-serif);
 }
 
 @layer components {
@@ -100,11 +27,11 @@
     background:
       radial-gradient(
         circle at 1px 1px,
-        color-mix(in srgb, var(--border-visible) 45%, transparent) 1px,
+        color-mix(in oklch, var(--border) 42%, transparent) 1px,
         transparent 0
       )
       0 0 / 24px 24px,
-      var(--black);
+      var(--background);
   }
 
   .console-panel {
@@ -113,7 +40,7 @@
     border: 1px solid var(--border);
     border-radius: calc(var(--radius-lg) + 2px);
     background: var(--card);
-    box-shadow: none;
+    box-shadow: var(--shadow-2xs);
   }
 
   .dark .console-panel {
@@ -132,7 +59,19 @@
   .console-subtle-panel {
     border: 1px solid color-mix(in oklch, var(--border) 82%, transparent);
     border-radius: calc(var(--radius-lg) - 1px);
-    background: color-mix(in oklch, var(--muted) 42%, var(--background));
+    background: color-mix(in oklch, var(--muted) 38%, var(--card));
+  }
+
+  .console-side-panel {
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius-lg) + 2px);
+    background: var(--card);
+    padding: 1rem;
+    box-shadow: var(--shadow-2xs);
+  }
+
+  .dark .console-side-panel {
+    box-shadow: none;
   }
 
   .console-section {
@@ -145,7 +84,7 @@
     border: 1px solid var(--border);
     border-radius: calc(var(--radius-lg) + 2px);
     background: var(--card);
-    box-shadow: none;
+    box-shadow: var(--shadow-2xs);
   }
 
   .console-record-list > :not([hidden]) ~ :not([hidden]) {
@@ -181,6 +120,7 @@
     border: 1px solid var(--border);
     border-radius: calc(var(--radius-lg) + 2px);
     background: var(--card);
+    box-shadow: var(--shadow-2xs);
   }
 
   .console-metric-strip > * {
@@ -295,7 +235,7 @@
 
   [data-console-header] {
     border-bottom-color: var(--border);
-    background: color-mix(in srgb, var(--black) 92%, transparent);
+    background: color-mix(in oklch, var(--background) 94%, transparent);
   }
 
   .console-owner-header {
@@ -340,11 +280,15 @@
     border-radius: calc(var(--radius-lg) + 2px);
   }
 
+  [data-console-main] :where([data-slot="table-container"]) {
+    background: var(--card);
+  }
+
   [data-console-main] :where(table) {
-    background: var(--background);
+    background: var(--card);
   }
 
   [data-console-main] :where(thead) {
-    background: color-mix(in oklch, var(--muted) 42%, transparent);
+    background: color-mix(in oklch, var(--muted) 46%, var(--card));
   }
 }

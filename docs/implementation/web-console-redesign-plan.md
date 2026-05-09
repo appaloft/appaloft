@@ -463,9 +463,12 @@ Shape and depth:
 - border-first surfaces;
 - shadow only for popovers, dialogs, drawers, and floating command palettes.
 
-## Stitch Design System Prompt
+## Stitch Prompt Entry
 
-Use `.stitch/DESIGN.md` as the semantic design system when generating redesigned screens in Stitch.
+Use [`packages/design/DESIGN.md`](../../packages/design/DESIGN.md) as the only semantic design
+system when generating redesigned screens in Stitch. `.stitch/DESIGN.md` is only a tooling pointer
+back to that file.
+
 Before generating a screen, enhance the prompt with:
 
 ```markdown
@@ -475,12 +478,9 @@ Overall vibe: precise, dense, calm, deployment-operations workspace. No marketin
 decorative gradients, no card-heavy dashboard.
 
 DESIGN SYSTEM REQUIRED:
-- Platform: Web desktop-first with responsive tablet/mobile fallbacks.
-- Palette: monochrome precision base, blue active/focus accents, semantic status colors only.
-- Typography: IBM Plex Sans for UI, IBM Plex Mono for ids/logs/commands.
-- Layout: persistent sidebar, owner header, top-level work-mode tabs, dense tables/lists.
-- Components: tabs for owner modes, section nav for configuration panels, cards only for repeated
-  object tiles or framed tools.
+- Follow packages/design/DESIGN.md exactly.
+- Do not introduce a second palette, typography stack, spacing system, surface grammar, or
+  component rule set.
 
 PAGE STRUCTURE:
 1. Console shell with project/resource/sidebar context.
