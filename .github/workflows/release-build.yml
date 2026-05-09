@@ -291,6 +291,7 @@ jobs:
           images: ${{ needs.resolve.outputs.image }}
           tags: |
             type=raw,value=${{ needs.resolve.outputs.version }}
+            type=raw,value=${{ inputs.tag_name }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag_name }}
             type=semver,pattern={{major}},value=${{ inputs.tag_name }}
             type=raw,value=latest,enable=${{ inputs.prerelease == false }}
