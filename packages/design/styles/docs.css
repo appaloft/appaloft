@@ -37,7 +37,7 @@ body {
 .site-title {
   color: var(--foreground);
   font-family: var(--appaloft-font-sans);
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
 }
 
 .site-title img {
@@ -55,7 +55,7 @@ body {
 .sl-markdown-content h1,
 .sl-markdown-content h2,
 .sl-markdown-content h3 {
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 
 .sl-markdown-content h1 {

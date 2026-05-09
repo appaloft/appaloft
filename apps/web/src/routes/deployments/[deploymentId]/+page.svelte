@@ -997,7 +997,7 @@
         </Tabs.List>
 
         <Tabs.Content value="overview" class="mt-0 space-y-5">
-          <section class="rounded-md border bg-background p-4">
+          <section class="console-panel p-4">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div class="min-w-0 space-y-2">
                 <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -1049,7 +1049,7 @@
           </section>
 
           {#if recoveryReadiness}
-            <section class="rounded-md border bg-background p-4" data-testid="deployment-recovery-readiness">
+            <section class="console-panel p-4" data-testid="deployment-recovery-readiness">
               <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div class="space-y-2">
                   <h2 class="text-lg font-semibold">
@@ -1072,7 +1072,7 @@
               {/if}
 
               <div class="mt-4 grid gap-3 md:grid-cols-3">
-                <div class="rounded-md border bg-muted/20 p-3">
+                <div class="console-subtle-panel p-3">
                   <div class="flex items-center justify-between gap-3">
                     <p class="text-sm font-medium">
                       {$t(i18nKeys.console.deployments.recoveryRetryTitle)}
@@ -1105,7 +1105,7 @@
                   </Button>
                 </div>
 
-                <div class="rounded-md border bg-muted/20 p-3">
+                <div class="console-subtle-panel p-3">
                   <div class="flex items-center justify-between gap-3">
                     <p class="text-sm font-medium">
                       {$t(i18nKeys.console.deployments.recoveryRedeployTitle)}
@@ -1138,7 +1138,7 @@
                   </Button>
                 </div>
 
-                <div class="rounded-md border bg-muted/20 p-3">
+                <div class="console-subtle-panel p-3">
                   <div class="flex items-center justify-between gap-3">
                     <p class="text-sm font-medium">
                       {$t(i18nKeys.console.deployments.recoveryRollbackTitle)}
@@ -1193,15 +1193,15 @@
             </section>
           {/if}
 
-          <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded-md border bg-background p-4">
+          <section class="console-metric-strip md:grid-cols-2 xl:grid-cols-4">
+            <div>
               <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <FolderOpen class="size-4" />
                 {$t(i18nKeys.common.domain.project)}
               </p>
               <p class="mt-2 truncate font-medium">{project?.name ?? deployment.projectId}</p>
             </div>
-            <div class="rounded-md border bg-background p-4">
+            <div>
               <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <ShieldCheck class="size-4" />
                 {$t(i18nKeys.common.domain.environment)}
@@ -1210,14 +1210,14 @@
                 {environment?.name ?? deployment.environmentId}
               </p>
             </div>
-            <div class="rounded-md border bg-background p-4">
+            <div>
               <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <Boxes class="size-4" />
                 {$t(i18nKeys.common.domain.resource)}
               </p>
               <p class="mt-2 truncate font-medium">{resource?.name ?? deployment.resourceId}</p>
             </div>
-            <div class="rounded-md border bg-background p-4">
+            <div>
               <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <Server class="size-4" />
                 {$t(i18nKeys.common.domain.server)}
@@ -1226,22 +1226,22 @@
             </div>
           </section>
 
-          <section class="rounded-md border bg-background p-4">
+          <section class="console-panel p-4">
             <h2 class="text-lg font-semibold">{$t(i18nKeys.common.domain.source)}</h2>
             <div class={sourceCommitSha ? "mt-4 grid gap-3 md:grid-cols-[10rem_14rem_minmax(0,1fr)]" : "mt-4 grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)]"}>
-              <div class="rounded-md bg-muted/30 px-3 py-2">
+              <div class="console-subtle-panel px-3 py-2">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.kind)}</p>
                 <p class="mt-1 truncate text-sm font-medium">{deployment.runtimePlan.source.kind}</p>
               </div>
               {#if sourceCommitSha}
-                <div class="rounded-md bg-muted/30 px-3 py-2">
+                <div class="console-subtle-panel px-3 py-2">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.deployments.sourceCommitSha)}</p>
                   <p class="mt-1 truncate font-mono text-sm font-medium" title={sourceCommitSha}>
                     {shortDeploymentSourceCommitSha(sourceCommitSha)}
                   </p>
                 </div>
               {/if}
-              <div class="rounded-md bg-muted/30 px-3 py-2">
+              <div class="console-subtle-panel px-3 py-2">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.source)}</p>
                 <p class="mt-1 break-all text-sm font-medium">
                   {deployment.runtimePlan.source.locator}
@@ -1305,7 +1305,7 @@
                 </div>
               </div>
             {:else}
-              <div class="rounded-md border bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
+              <div class="console-subtle-panel px-4 py-4 text-sm text-muted-foreground">
                 {$t(i18nKeys.console.deployments.noLogs)}
               </div>
             {/if}
@@ -1313,7 +1313,7 @@
         </Tabs.Content>
 
         <Tabs.Content value="timeline" class="mt-0 space-y-4">
-          <section class="rounded-md border bg-background p-4">
+          <section class="console-panel p-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 class="flex items-center gap-2 text-lg font-semibold">
@@ -1353,17 +1353,17 @@
             {/if}
 
             <div class="mt-4 grid gap-3 md:grid-cols-3">
-              <div class="rounded-md bg-muted/30 px-4 py-3">
+              <div class="console-subtle-panel px-4 py-3">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.createdAt)}</p>
                 <p class="mt-1 font-medium">{formatTime(deployment.createdAt)}</p>
               </div>
-              <div class="rounded-md bg-muted/30 px-4 py-3">
+              <div class="console-subtle-panel px-4 py-3">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.startedAt)}</p>
                 <p class="mt-1 font-medium">
                   {deployment.startedAt ? formatTime(deployment.startedAt) : "-"}
                 </p>
               </div>
-              <div class="rounded-md bg-muted/30 px-4 py-3">
+              <div class="console-subtle-panel px-4 py-3">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.finishedAt)}</p>
                 <p class="mt-1 font-medium">
                   {deployment.finishedAt ? formatTime(deployment.finishedAt) : "-"}
@@ -1418,13 +1418,13 @@
         </Tabs.Content>
 
         <Tabs.Content value="snapshot" class="mt-0 space-y-4">
-          <section class="rounded-md border bg-background p-4">
+          <section class="console-panel p-4">
             <h2 class="text-lg font-semibold">{$t(i18nKeys.console.deployments.snapshotTitle)}</h2>
             <p class="mt-1 text-sm text-muted-foreground">
               {$t(i18nKeys.console.deployments.snapshotDescription)}
             </p>
 
-            <div class="mt-4 rounded-md bg-muted/30 px-4 py-3">
+            <div class="console-subtle-panel mt-4 px-4 py-3">
               <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.deployments.precedence)}</p>
               <p class="mt-1 break-words text-sm font-medium">
                 {deployment.environmentSnapshot.precedence.join(" / ")}
