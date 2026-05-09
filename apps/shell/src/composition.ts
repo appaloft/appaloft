@@ -299,7 +299,7 @@ export async function createAppComposition(
   const migrator = createMigrator(database.db);
   const deploymentProgressReporter = new ShellDeploymentProgressReporter();
 
-  if (config.databaseDriver === "pglite") {
+  if (config.databaseDriver === "pglite" || config.autoMigrate) {
     await migrator.migrateToLatest();
   }
   const sourceLinkRepository = new PgSourceLinkRepository(database.db);

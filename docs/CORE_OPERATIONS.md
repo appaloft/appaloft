@@ -1130,6 +1130,7 @@ Implemented operations:
 
 Current boundary:
 - embedded self-hosted PGlite applies migrations automatically during shell startup
+- Docker self-hosted installs enable startup migrations before the HTTP server is marked healthy
 - explicit `db migrate` remains the schema-control operation for external PostgreSQL and operational
   workflows that want a manual migration step
 

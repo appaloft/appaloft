@@ -39,6 +39,11 @@ single-server console that keeps embedded PGlite state, pass `--database pglite`
 curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite
 ```
 
+Docker installs apply pending database migrations before the Appaloft HTTP service starts. If a
+migration fails, the container will not pass health checks, and the installer will report the
+failure with the container logs. After fixing the database or image issue, rerun the same install
+command.
+
 PGlite mode stores Appaloft state in a durable Docker volume mounted at `/appaloft-data`. Do not put
 database passwords, GitHub tokens, SSH keys, or deployment identity values in repository config; keep
 those values in the host, CI secret store, or the Appaloft server after it is installed.

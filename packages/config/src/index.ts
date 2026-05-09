@@ -69,6 +69,7 @@ export interface AppConfig {
   webStaticDir?: string;
   docsStaticDir?: string;
   databaseDriver: "postgres" | "pglite";
+  autoMigrate: boolean;
   databaseUrl?: string;
   dataDir: string;
   pgliteDataDir: string;
@@ -113,6 +114,7 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   httpPort: 3001,
   webOrigin: "http://localhost:4173",
   databaseDriver: "pglite",
+  autoMigrate: false,
   databaseUrl: "postgres://postgres:postgres@localhost:5432/appaloft",
   remoteRuntimeRoot: "/var/lib/appaloft/runtime",
   logLevel: "info",
@@ -498,6 +500,11 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
         }
       : {}),
     databaseDriver,
+    autoMigrate:
+      source.flags?.autoMigrate ??
+      parseBoolean(env.APPALOFT_AUTO_MIGRATE) ??
+      fileConfig.autoMigrate ??
+      defaults.autoMigrate,
     ...(databaseUrl ? { databaseUrl } : {}),
     dataDir,
     pgliteDataDir,
