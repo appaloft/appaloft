@@ -83,6 +83,64 @@ async function withServer<T>(
 }
 
 describe("HTTP static assets", () => {
+  test("[CONTROL-PLANE-INSTALL-005] serves SvelteKit clean URLs before the SPA fallback from embedded Web assets", async () => {
+    const app = createTestApp({
+      embeddedWebAssets: {
+        "/index.html": new Blob(["web-index"]),
+        "/200.html": new Blob(["web-spa-fallback"]),
+        "/domain-bindings.html": new Blob(["domain-bindings-page"]),
+        "/servers/srv_1/index.html": new Blob(["server-page"]),
+      },
+    });
+
+    await withServer(app, async (baseUrl) => {
+      await expect(fetch(`${baseUrl}/`).then((response) => response.text())).resolves.toBe(
+        "web-index",
+      );
+      await expect(
+        fetch(`${baseUrl}/domain-bindings`).then((response) => response.text()),
+      ).resolves.toBe("domain-bindings-page");
+      await expect(
+        fetch(`${baseUrl}/servers/srv_1`).then((response) => response.text()),
+      ).resolves.toBe("server-page");
+      await expect(
+        fetch(`${baseUrl}/projects/prj_1/environments/env_1/resources/res_1`).then((response) =>
+          response.text(),
+        ),
+      ).resolves.toBe("web-spa-fallback");
+    });
+  });
+
+  test("[CONTROL-PLANE-INSTALL-005] serves SvelteKit clean URLs before the SPA fallback from webStaticDir", async () => {
+    const webDir = await createTempDir();
+    await mkdir(join(webDir, "servers", "srv_1"), { recursive: true });
+    await Bun.write(join(webDir, "index.html"), "web-index");
+    await Bun.write(join(webDir, "200.html"), "web-spa-fallback");
+    await Bun.write(join(webDir, "domain-bindings.html"), "domain-bindings-page");
+    await Bun.write(join(webDir, "servers", "srv_1", "index.html"), "server-page");
+
+    const app = createTestApp({
+      webStaticDir: webDir,
+    });
+
+    await withServer(app, async (baseUrl) => {
+      await expect(fetch(`${baseUrl}/`).then((response) => response.text())).resolves.toBe(
+        "web-index",
+      );
+      await expect(
+        fetch(`${baseUrl}/domain-bindings`).then((response) => response.text()),
+      ).resolves.toBe("domain-bindings-page");
+      await expect(
+        fetch(`${baseUrl}/servers/srv_1`).then((response) => response.text()),
+      ).resolves.toBe("server-page");
+      await expect(
+        fetch(`${baseUrl}/projects/prj_1/environments/env_1/resources/res_1`).then((response) =>
+          response.text(),
+        ),
+      ).resolves.toBe("web-spa-fallback");
+    });
+  });
+
   test("[PUB-DOCS-013] serves embedded docs under /docs without changing Web fallback", async () => {
     const app = createTestApp({
       embeddedWebAssets: {
