@@ -203,7 +203,10 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     expect(install.stdout).toContain("Image: ghcr.io/appaloft/appaloft:9.8.7");
     expect(install.stdout).toContain("HTTP: https://appaloft.example.test");
     expect(install.stdout).toContain("==> Appaloft install completed");
-    expect(install.stdout).toContain("Console: https://appaloft.example.test");
+    expect(install.stdout).toContain("PPPP   PPPP");
+    expect(install.stdout).toContain("Open console: https://appaloft.example.test");
+    expect(install.stdout).toContain("Watch logs:");
+    expect(install.stdout).toContain("Update/repair:");
 
     const compose = await Bun.file(join(home, "docker-compose.yml")).text();
     expect(compose).toContain("image: $" + "{APPALOFT_IMAGE_REF}");
@@ -221,6 +224,42 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     expect(dockerLog).toContain("compose --env-file");
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} pull`);
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh can force colored progress and success output", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--web-origin",
+        "https://appaloft.example.test",
+        "--postgres-password",
+        "fixture-password",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        APPALOFT_FORCE_COLOR: "1",
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+    expect(install.stdout).toContain("\u001b[36m==>\u001b[0m");
+    expect(install.stdout).toContain("\u001b[32m\n      _       PPPP   PPPP");
+    expect(install.stdout).toContain("\u001b[1mOpen console:\u001b[0m");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
@@ -403,7 +442,7 @@ test("install.sh writes a Docker Swarm PGlite stack and deploys it", async () =>
 
     expect(install.exitCode).toBe(0);
     expect(install.stdout).toContain("Orchestrator: swarm");
-    expect(install.stdout).toContain("Logs: docker service logs -f appaloft-console_app");
+    expect(install.stdout).toContain("Watch logs:    docker service logs -f appaloft-console_app");
 
     const compose = await Bun.file(join(home, "docker-compose.yml")).text();
     expect(compose).toContain("APPALOFT_DATABASE_DRIVER: pglite");
