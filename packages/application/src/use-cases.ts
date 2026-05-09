@@ -23,7 +23,9 @@ export * from "./operations/dependency-resources/rename-dependency-resource.use-
 export * from "./operations/dependency-resources/restore-dependency-resource-backup.use-case";
 export * from "./operations/dependency-resources/show-dependency-resource.query-service";
 export * from "./operations/dependency-resources/show-dependency-resource-backup.query-service";
+export * from "./operations/deployments/apply-action-preview-route.use-case";
 export * from "./operations/deployments/cleanup-preview.use-case";
+export * from "./operations/deployments/confirm-action-preview-route.use-case";
 export * from "./operations/deployments/create-deployment.use-case";
 export * from "./operations/deployments/default-access-domain-runtime-plan.resolver";
 export * from "./operations/deployments/deployment.factory";

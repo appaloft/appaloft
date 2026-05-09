@@ -3,12 +3,14 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 import { describe, expect, test } from "bun:test";
 import {
   type AppLogger,
+  ApplyActionPreviewRouteCommand,
   CleanupPreviewCommand,
   type Command,
   type CommandBus,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
+  ConfirmActionPreviewRouteCommand,
   CreateDeploymentCommand,
   CreateDomainBindingCommand,
   createExecutionContext,
@@ -64,7 +66,28 @@ describe("deployment create HTTP route", () => {
     } as CommandBus;
     const queryBus = {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
-        ok({} as T),
+        ok(
+          _query instanceof ShowDeploymentQuery
+            ? ({
+                schemaVersion: "deployments.show/v1",
+                deployment: {
+                  id: "dep_preview_config",
+                  runtimePlan: {
+                    execution: {
+                      accessRoutes: [
+                        {
+                          proxyKind: "traefik",
+                          domains: ["pr-42.preview.example.com"],
+                          pathPrefix: "/",
+                          tlsMode: "disabled",
+                        },
+                      ],
+                    },
+                  },
+                },
+              } as T)
+            : ({} as T),
+        ),
     } as QueryBus;
     const app = mountAppaloftOrpcRoutes(new Elysia(), {
       commandBus,
@@ -1261,6 +1284,9 @@ describe("deployment create HTTP route", () => {
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
         capturedCommands.push(command as Command<unknown>);
+        if (command instanceof ConfirmActionPreviewRouteCommand) {
+          return ok({ previewUrl: "http://pr-42.preview.example.com" } as T);
+        }
         return ok({
           id:
             command instanceof CreateDeploymentCommand
@@ -1406,6 +1432,9 @@ describe("deployment create HTTP route", () => {
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
         capturedCommands.push(command as Command<unknown>);
+        if (command instanceof ConfirmActionPreviewRouteCommand) {
+          return ok({ previewUrl: "http://pr-42.preview.example.com" } as T);
+        }
         return ok({
           id:
             command instanceof CreateDeploymentCommand
@@ -1415,29 +1444,8 @@ describe("deployment create HTTP route", () => {
       },
     } as CommandBus;
     const queryBus = {
-      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
-        if (query instanceof ShowServerQuery) {
-          return ok({
-            schemaVersion: "servers.show/v1",
-            server: {
-              id: "srv_prod",
-              name: "prod",
-              host: "203.0.113.10",
-              port: 22,
-              providerKey: "ssh",
-              targetKind: "single-server",
-              lifecycleStatus: "active",
-              edgeProxy: {
-                kind: "traefik",
-                status: "ready",
-              },
-              createdAt: "2026-05-08T00:00:00.000Z",
-            },
-            generatedAt: "2026-05-08T00:00:00.000Z",
-          } as T);
-        }
-        return ok({} as T);
-      },
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
     } as QueryBus;
     const actionSourcePackageConfigReader = {
       readConfig: async () =>
@@ -1509,11 +1517,21 @@ describe("deployment create HTTP route", () => {
     );
 
     expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({
+      id: "dep_preview_config",
+      previewUrl: "http://pr-42.preview.example.com",
+    });
     const environmentCommands = capturedCommands.filter(
       (command) => command instanceof SetEnvironmentVariableCommand,
     );
     const domainCommands = capturedCommands.filter(
       (command) => command instanceof CreateDomainBindingCommand,
+    );
+    const applyPreviewRouteCommands = capturedCommands.filter(
+      (command) => command instanceof ApplyActionPreviewRouteCommand,
+    );
+    const confirmPreviewRouteCommands = capturedCommands.filter(
+      (command) => command instanceof ConfirmActionPreviewRouteCommand,
     );
     expect(environmentCommands).toHaveLength(3);
     expect(environmentCommands).toContainEqual(
@@ -1530,22 +1548,28 @@ describe("deployment create HTTP route", () => {
         value: "http://pr-42.preview.example.com",
       }),
     );
-    expect(domainCommands).toHaveLength(1);
-    expect(domainCommands[0]).toMatchObject({
+    expect(domainCommands).toHaveLength(0);
+    expect(applyPreviewRouteCommands).toHaveLength(1);
+    expect(applyPreviewRouteCommands[0]).toMatchObject({
       projectId: "prj_console",
       environmentId: "env_preview",
       resourceId: "res_preview",
       serverId: "srv_prod",
       destinationId: "dst_prod",
-      domainName: "pr-42.preview.example.com",
+      sourceFingerprint:
+        "source-fingerprint:v1:preview%3Apr%3A42:github:provider-repository%3A123456:.:appaloft.preview.yml",
+      host: "pr-42.preview.example.com",
       pathPrefix: "/",
-      proxyKind: "traefik",
       tlsMode: "disabled",
     });
-    expect(domainCommands[0]).not.toMatchObject({
-      domainName: "www.example.com",
+    expect(confirmPreviewRouteCommands).toHaveLength(1);
+    expect(confirmPreviewRouteCommands[0]).toMatchObject({
+      deploymentId: "dep_preview_config",
+      host: "pr-42.preview.example.com",
+      pathPrefix: "/",
+      tlsMode: "disabled",
     });
-    expect(capturedCommands.at(-1)).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommands.at(-2)).toBeInstanceOf(CreateDeploymentCommand);
   });
 
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint fails before mutation when unsupported source profile application is required", async () => {

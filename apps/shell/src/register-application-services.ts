@@ -1,4 +1,6 @@
 import {
+  ApplyActionPreviewRouteCommandHandler,
+  ApplyActionPreviewRouteUseCase,
   ArchiveEnvironmentCommandHandler,
   ArchiveEnvironmentUseCase,
   ArchiveProjectCommandHandler,
@@ -48,6 +50,8 @@ import {
   ConfigureServerCredentialUseCase,
   ConfigureServerEdgeProxyCommandHandler,
   ConfigureServerEdgeProxyUseCase,
+  ConfirmActionPreviewRouteCommandHandler,
+  ConfirmActionPreviewRouteUseCase,
   ConfirmDomainBindingOwnershipUseCase,
   CreateDependencyResourceBackupCommandHandler,
   CreateDependencyResourceBackupUseCase,
@@ -461,6 +465,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
   container.registerSingleton(ResourceAccessFailureEvidenceLookupQueryHandler);
   container.registerSingleton(EnvironmentEffectivePrecedenceQueryHandler);
+  container.registerSingleton(ApplyActionPreviewRouteCommandHandler);
+  container.registerSingleton(ConfirmActionPreviewRouteCommandHandler);
   container.registerSingleton(ShowDeploymentQueryHandler);
   container.registerSingleton(DeploymentPlanQueryHandler);
   container.registerSingleton(DeploymentRecoveryReadinessQueryHandler);
@@ -782,6 +788,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.deploymentContextResolver, DeploymentContextResolver);
   container.registerSingleton(tokens.deploymentFactory, DeploymentFactory);
   container.registerSingleton(tokens.deploymentLifecycleService, DeploymentLifecycleService);
+  container.registerSingleton(
+    tokens.applyActionPreviewRouteUseCase,
+    ApplyActionPreviewRouteUseCase,
+  );
+  container.registerSingleton(
+    tokens.confirmActionPreviewRouteUseCase,
+    ConfirmActionPreviewRouteUseCase,
+  );
   container.registerSingleton(tokens.createDeploymentUseCase, CreateDeploymentUseCase);
   container.registerSingleton(tokens.retryDeploymentUseCase, RetryDeploymentUseCase);
   container.registerSingleton(tokens.redeployDeploymentUseCase, RedeployDeploymentUseCase);

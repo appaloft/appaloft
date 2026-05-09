@@ -275,9 +275,13 @@ console output.
 - When `preview=pull-request` is supplied to `server-config-deploy`, the wrapper may send
   transient `environmentVariables` and `previewRoute` fields from Action inputs. The endpoint
   applies transient environment variables after committed `env` values so PR-specific values can
-  override callback URLs, host, or port values. Pull request preview requests do not apply committed
-  production `access.domains[]`; when `previewRoute` is supplied, that route is the only domain
-  binding intent for the request.
+  override callback URLs, host, or port values. Pull request preview requests do not apply
+  committed production `access.domains[]`; when `previewRoute` is supplied, the endpoint writes it
+  as server-applied route desired state scoped to the preview source fingerprint, so the following
+  deployment realizes the preview route without creating a durable DomainBinding. The endpoint
+  must reject the Action request after deployment execution if the accepted runtime plan does not
+  contain the requested preview host/path/TLS route; it must not silently publish a generated
+  fallback URL as if the custom preview domain succeeded.
 - When the validated config contains `source`, the endpoint fails before mutation with
   `profile-application`; source profile bootstrap still requires a later explicit-operation slice.
 - `/api/version` advertises granular feature flags. Self-hosted console builds that wire the
@@ -288,6 +292,5 @@ console output.
   source-link context.
 - Inline archive and remote archive URL transport, source package storage, diagnostics, cleanup
   rules, source profile bootstrap, and non-`ci-env:` secret resolvers are not implemented yet.
-  Domain bootstrap is currently
-  the managed `DomainBinding` control-plane path; pure SSH CLI server-applied route state remains
-  the non-server mode.
+  Committed `access.domains[]` domain bootstrap is currently the managed `DomainBinding`
+  control-plane path; transient Action preview routes use server-applied route state.

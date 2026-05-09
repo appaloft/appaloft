@@ -114,7 +114,7 @@ Self-hosted server mode 也可以触发 PR preview deploy：
     server-id: ${{ secrets.APPALOFT_SERVER_ID }}
 ```
 
-Server mode 的 preview deploy 会使用 preview-scoped source fingerprint，并输出 `preview-id`、`deployment-id` 和 `console-url`。它不会应用 `preview-domain-template`、`preview-tls-mode`、`require-preview-url`、`runtime-name`、`environment-variables` 或 `secret-variables`；这些策略需要等 server 端拥有后再进入这个路径。
+Server mode 的 preview deploy 会使用 preview-scoped source fingerprint，并输出 `preview-id`、`deployment-id`、`console-url`，配置了预览域名时也会输出 `preview-url`。`preview-domain-template` 和 `preview-tls-mode` 会作为 server-side preview route intent 应用；`environment-variables` 和 `secret-variables` 可以携带预览环境专用的运行时值。
 
 非 secret 的 control-plane connection policy 也可以写在 `appaloft.yml`：
 

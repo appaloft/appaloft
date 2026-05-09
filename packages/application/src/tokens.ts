@@ -264,6 +264,8 @@ export const tokens = {
   unsetEnvironmentVariableUseCase: Symbol.for("appaloft.unset_environment_variable_use_case"),
   diffEnvironmentsQueryService: Symbol.for("appaloft.diff_environments_query_service"),
   promoteEnvironmentUseCase: Symbol.for("appaloft.promote_environment_use_case"),
+  applyActionPreviewRouteUseCase: Symbol.for("appaloft.apply_action_preview_route_use_case"),
+  confirmActionPreviewRouteUseCase: Symbol.for("appaloft.confirm_action_preview_route_use_case"),
   createDeploymentUseCase: Symbol.for("appaloft.create_deployment_use_case"),
   retryDeploymentUseCase: Symbol.for("appaloft.retry_deployment_use_case"),
   redeployDeploymentUseCase: Symbol.for("appaloft.redeploy_deployment_use_case"),

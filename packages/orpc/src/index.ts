@@ -1,5 +1,6 @@
 import {
   type AppLogger,
+  ApplyActionPreviewRouteCommand,
   ArchiveEnvironmentCommand,
   ArchiveProjectCommand,
   ArchiveResourceCommand,
@@ -30,6 +31,7 @@ import {
   ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   ConfigureServerEdgeProxyCommand,
+  ConfirmActionPreviewRouteCommand,
   ConfirmDomainBindingOwnershipCommand,
   CreateDependencyResourceBackupCommand,
   CreateDeploymentCommand,
@@ -4521,23 +4523,7 @@ function effectiveActionServerConfigForRequest(input: {
 
   const previewConfig: AppaloftDeploymentConfig = { ...configWithRuntimeEnv };
   delete previewConfig.access;
-
-  if (!input.previewRoute) {
-    return previewConfig;
-  }
-
-  return {
-    ...previewConfig,
-    access: {
-      domains: [
-        {
-          host: input.previewRoute.host,
-          pathPrefix: input.previewRoute.pathPrefix,
-          tlsMode: input.previewRoute.tlsMode,
-        },
-      ],
-    },
-  };
+  return previewConfig;
 }
 
 async function resolveActionServerConfigDomainContext(input: {
@@ -4624,10 +4610,20 @@ async function applyActionServerConfigProfileCommands(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
   config: AppaloftDeploymentConfig;
+  sourceFingerprint: string;
   resolvedSecrets?: Record<string, string>;
+  previewRoute?: ActionServerConfigDeployBody["previewRoute"];
   target: SourceLinkRecord;
 }): Promise<Result<void>> {
-  const { context, executionContext, config, resolvedSecrets, target } = input;
+  const {
+    context,
+    executionContext,
+    config,
+    previewRoute,
+    resolvedSecrets,
+    sourceFingerprint,
+    target,
+  } = input;
 
   const runtimeProfile = runtimeProfileFromActionServerConfig(config);
   if (runtimeProfile) {
@@ -4753,6 +4749,27 @@ async function applyActionServerConfigProfileCommands(input: {
       if (result.isErr()) {
         return err(result.error);
       }
+    }
+  }
+
+  if (previewRoute) {
+    const command = ApplyActionPreviewRouteCommand.create({
+      sourceFingerprint,
+      projectId: target.projectId,
+      environmentId: target.environmentId,
+      resourceId: target.resourceId,
+      ...(target.serverId ? { serverId: target.serverId } : {}),
+      ...(target.destinationId ? { destinationId: target.destinationId } : {}),
+      host: previewRoute.host,
+      pathPrefix: previewRoute.pathPrefix,
+      tlsMode: previewRoute.tlsMode,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
     }
   }
 
@@ -4989,7 +5006,9 @@ async function handleActionServerConfigDeploymentRoute(input: {
     context,
     executionContext,
     config: effectiveConfig,
+    sourceFingerprint: body.data.sourceFingerprint,
     ...(body.data.resolvedSecrets ? { resolvedSecrets: body.data.resolvedSecrets } : {}),
+    ...(body.data.previewRoute ? { previewRoute: body.data.previewRoute } : {}),
     target: target.value,
   });
   if (profileApplied.isErr()) {
@@ -5012,9 +5031,31 @@ async function handleActionServerConfigDeploymentRoute(input: {
     return domainErrorHttpResponse(result.error, executionContext);
   }
 
+  const previewRoute = body.data.previewRoute;
+  const previewRouteVerification = previewRoute
+    ? await (async () => {
+        const command = ConfirmActionPreviewRouteCommand.create({
+          deploymentId: result.value.id,
+          host: previewRoute.host,
+          pathPrefix: previewRoute.pathPrefix,
+          tlsMode: previewRoute.tlsMode,
+        });
+        if (command.isErr()) {
+          return err(command.error);
+        }
+        return context.commandBus.execute(executionContext, command.value);
+      })()
+    : ok(undefined);
+  if (previewRouteVerification.isErr()) {
+    return domainErrorHttpResponse(previewRouteVerification.error, executionContext);
+  }
+
   return Response.json(
     {
       ...result.value,
+      ...(previewRouteVerification.value
+        ? { previewUrl: previewRouteVerification.value.previewUrl }
+        : {}),
       deploymentHref: `/deployments/${result.value.id}`,
     },
     { status: 202 },
