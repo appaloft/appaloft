@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.5](https://github.com/appaloft/appaloft/compare/v0.9.4...v0.9.5) (2026-05-09)
+
+
+### Bug Fixes
+
+* highlight installer success output ([6cbb54b](https://github.com/appaloft/appaloft/commit/6cbb54bed907580c91e7a3b8a7f27762832bb508))
+* make installer edge network idempotent ([2c821d6](https://github.com/appaloft/appaloft/commit/2c821d680f6f7682febf86a31b93614f2756ab01))
+
+
+### Miscellaneous
+
+* improve release and installer tagging ([eee9c52](https://github.com/appaloft/appaloft/commit/eee9c52d8e62876f9baaad2c42d3aa6abd92f853))
+* publish v-prefixed container tags ([d7d5cfc](https://github.com/appaloft/appaloft/commit/d7d5cfc4f0fe4c6e340d94b7605388c43558474d))
+
 ## [0.9.4](https://github.com/appaloft/appaloft/compare/v0.9.3...v0.9.4) (2026-05-09)
 
 
