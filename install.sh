@@ -23,18 +23,89 @@ APPALOFT_SWARM_ADVERTISE_ADDR="${APPALOFT_SWARM_ADVERTISE_ADDR:-}"
 APPALOFT_SKIP_DOCKER_INSTALL="${APPALOFT_SKIP_DOCKER_INSTALL:-0}"
 APPALOFT_INSTALL_DRY_RUN="${APPALOFT_INSTALL_DRY_RUN:-0}"
 APPALOFT_DOCKER_INSTALL_SCRIPT_URL="${APPALOFT_DOCKER_INSTALL_SCRIPT_URL:-https://get.docker.com}"
+APPALOFT_FORCE_COLOR="${APPALOFT_FORCE_COLOR:-0}"
+appaloft_color_reset=""
+appaloft_color_bold=""
+appaloft_color_dim=""
+appaloft_color_green=""
+appaloft_color_cyan=""
+appaloft_color_yellow=""
+appaloft_color_red=""
 
 say() {
   printf '%s\n' "$*"
 }
 
 warn() {
-  printf 'appaloft install: %s\n' "$*" >&2
+  printf '%sappaloft install:%s %s\n' "$appaloft_color_yellow" "$appaloft_color_reset" "$*" >&2
+}
+
+step() {
+  printf '\n%s==>%s %s%s%s\n' \
+    "$appaloft_color_cyan" \
+    "$appaloft_color_reset" \
+    "$appaloft_color_bold" \
+    "$*" \
+    "$appaloft_color_reset"
 }
 
 fail() {
-  warn "$*"
+  printf '%sappaloft install failed:%s %s\n' "$appaloft_color_red" "$appaloft_color_reset" "$*" >&2
   exit 1
+}
+
+init_color() {
+  case "$APPALOFT_FORCE_COLOR" in
+    1 | true | TRUE | yes | YES | on | ON) ;;
+    *)
+      [ -z "${NO_COLOR:-}" ] || return 0
+      [ -t 1 ] || return 0
+      ;;
+  esac
+
+  appaloft_color_reset="$(printf '\033[0m')"
+  appaloft_color_bold="$(printf '\033[1m')"
+  appaloft_color_dim="$(printf '\033[2m')"
+  appaloft_color_green="$(printf '\033[32m')"
+  appaloft_color_cyan="$(printf '\033[36m')"
+  appaloft_color_yellow="$(printf '\033[33m')"
+  appaloft_color_red="$(printf '\033[31m')"
+}
+
+print_success_banner() {
+  printf '\n%s' "$appaloft_color_green"
+  cat <<'BANNER'
+
+      _       PPPP   PPPP       _       L       OOOO   FFFFF  TTTTT
+     / \      P   P  P   P     / \      L      O    O  F        T
+    / _ \     PPPP   PPPP     / _ \     L      O    O  FFF      T
+   / ___ \    P      P       / ___ \    L      O    O  F        T
+  /_/   \_\   P      P      /_/   \_\   LLLLL   OOOO   F        T
+
+                 Self-host console is ready.
+
+BANNER
+  printf '%s' "$appaloft_color_reset"
+}
+
+print_next_steps() {
+  logs_command="$1"
+
+  step "Next steps"
+  printf '  %sOpen console:%s %s\n' "$appaloft_color_bold" "$appaloft_color_reset" "$appaloft_web_origin"
+  printf '  %sWatch logs:%s    %s\n' "$appaloft_color_bold" "$appaloft_color_reset" "$logs_command"
+  printf '  %sUpdate/repair:%s rerun the same install command; existing config and data are reused.\n' \
+    "$appaloft_color_bold" \
+    "$appaloft_color_reset"
+  if [ -n "$APPALOFT_CONSOLE_DOMAIN" ]; then
+    printf '  %sDNS:%s           keep %s pointed at this server.\n' \
+      "$appaloft_color_bold" \
+      "$appaloft_color_reset" \
+      "$APPALOFT_CONSOLE_DOMAIN"
+  fi
+  printf '  %sGitHub Action:%s use this console URL when switching deployments to self-hosted server mode.\n' \
+    "$appaloft_color_bold" \
+    "$appaloft_color_reset"
 }
 
 usage() {
@@ -89,8 +160,12 @@ Environment:
   APPALOFT_SWARM_ADVERTISE_ADDR
   APPALOFT_SKIP_DOCKER_INSTALL=1
   APPALOFT_INSTALL_DRY_RUN=1
+  APPALOFT_FORCE_COLOR=1
+  NO_COLOR=1
 USAGE
 }
+
+init_color
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -573,6 +648,37 @@ read_existing_env_value() {
   sed -n "s/^$key=//p" "$file" | head -n 1
 }
 
+docker_network_label() {
+  network_name="$1"
+  label_name="$2"
+
+  docker_stdout network inspect --format "{{ index .Labels \"$label_name\" }}" "$network_name" 2>/dev/null
+}
+
+detect_compose_edge_network_mode() {
+  appaloft_edge_network_external=0
+
+  if [ "$APPALOFT_SELF_HOST_PROXY" != "traefik" ] ||
+    [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" != "compose" ]; then
+    return
+  fi
+
+  network_label="$(docker_network_label "$APPALOFT_EDGE_NETWORK_NAME" "com.docker.compose.network" || true)"
+  if [ -z "$network_label" ]; then
+    if docker_command_succeeds network inspect "$APPALOFT_EDGE_NETWORK_NAME"; then
+      appaloft_edge_network_external=1
+      say "Using existing Docker network $APPALOFT_EDGE_NETWORK_NAME as external"
+    fi
+    return
+  fi
+
+  project_label="$(docker_network_label "$APPALOFT_EDGE_NETWORK_NAME" "com.docker.compose.project" || true)"
+  if [ "$network_label" != "appaloft-edge" ] || [ "$project_label" != "$APPALOFT_COMPOSE_PROJECT_NAME" ]; then
+    appaloft_edge_network_external=1
+    say "Using existing Docker network $APPALOFT_EDGE_NETWORK_NAME as external"
+  fi
+}
+
 write_compose_file() {
   destination="$1"
 
@@ -795,6 +901,12 @@ networks:
   appaloft-edge:
     name: ${APPALOFT_EDGE_NETWORK_NAME}
 COMPOSE
+
+  if [ "${appaloft_edge_network_external:-0}" = "1" ]; then
+    cat >>"$destination" <<'COMPOSE'
+    external: true
+COMPOSE
+  fi
 }
 
 write_env_file() {
@@ -946,6 +1058,8 @@ if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
   ensure_swarm_manager
 fi
 
+detect_compose_edge_network_mode
+
 if [ "$APPALOFT_SELF_HOST_DATABASE" = "postgres" ]; then
   existing_postgres_password="$(read_existing_env_value POSTGRES_PASSWORD "$env_file" || true)"
   if [ -n "$APPALOFT_POSTGRES_PASSWORD" ]; then
@@ -963,10 +1077,7 @@ write_compose_file "$tmp_compose"
 write_env_file "$tmp_env"
 
 run_maybe_root mkdir -p "$appaloft_home"
-install_file "$tmp_compose" "$compose_file" 0644
-install_file "$tmp_env" "$env_file" 0600
-
-say "Installing Appaloft Docker stack"
+step "Installing Appaloft Docker stack"
 say "Home: $appaloft_home"
 say "Image: $appaloft_image_ref"
 say "HTTP: $appaloft_web_origin"
@@ -977,16 +1088,27 @@ say "Database: $APPALOFT_SELF_HOST_DATABASE"
 say "Orchestrator: $APPALOFT_SELF_HOST_ORCHESTRATOR"
 say "Proxy: $APPALOFT_SELF_HOST_PROXY"
 
+step "Writing Appaloft configuration"
+install_file "$tmp_compose" "$compose_file" 0644
+install_file "$tmp_env" "$env_file" 0600
+say "Compose file: $compose_file"
+say "Environment file: $env_file"
+
 if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
-  docker_stack_deploy
+  step "Deploying Docker Swarm stack"
+  docker_stack_deploy || fail "Docker Swarm failed to deploy the Appaloft stack; check Docker stack errors above and rerun the same install command"
+  appaloft_logs_command="docker service logs -f ${APPALOFT_SWARM_STACK_NAME}_app"
 else
-  docker_compose pull
-  docker_compose up -d
+  step "Pulling Appaloft Docker images"
+  docker_compose pull ||
+    fail "Docker Compose failed to pull Appaloft images; check registry access and network connectivity, then rerun the same install command"
+
+  step "Starting Appaloft containers"
+  docker_compose up -d ||
+    fail "Docker Compose failed to start Appaloft; check Docker errors above and rerun the same install command"
+  appaloft_logs_command="docker compose --env-file $env_file -p $APPALOFT_COMPOSE_PROJECT_NAME -f $compose_file logs -f"
 fi
 
-say "Appaloft is starting at $appaloft_web_origin"
-if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
-  say "Logs: docker service logs -f ${APPALOFT_SWARM_STACK_NAME}_app"
-else
-  say "Logs: docker compose --env-file $env_file -p $APPALOFT_COMPOSE_PROJECT_NAME -f $compose_file logs -f"
-fi
+step "Appaloft install completed"
+print_success_banner
+print_next_steps "$appaloft_logs_command"
