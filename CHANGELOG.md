@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.7](https://github.com/appaloft/appaloft/compare/v0.9.6...v0.9.7) (2026-05-09)
+
+
+### Features
+
+* support self-hosted deployment context config ([#210](https://github.com/appaloft/appaloft/issues/210)) ([980e561](https://github.com/appaloft/appaloft/commit/980e56105e2bb480fe87d062656946818a070106))
+
+
+### Bug Fixes
+
+* include self-host runtime deploy prerequisites ([#211](https://github.com/appaloft/appaloft/issues/211)) ([31c1c38](https://github.com/appaloft/appaloft/commit/31c1c385d585e47d988d24d060914755df117623))
+* run self-hosted migrations before serving ([fd3b77b](https://github.com/appaloft/appaloft/commit/fd3b77b60f0ec5c2b932309e24919db4cd84f977))
+* run self-hosted migrations before serving ([b4591b5](https://github.com/appaloft/appaloft/commit/b4591b5a66d704aa8f39c481695733fe407b2f45))
+
 ## [0.9.6](https://github.com/appaloft/appaloft/compare/v0.9.5...v0.9.6) (2026-05-09)
 
 
