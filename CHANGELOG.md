@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.6](https://github.com/appaloft/appaloft/compare/v0.9.5...v0.9.6) (2026-05-09)
+
+
+### Bug Fixes
+
+* reuse existing installer traefik proxy ([cc294dc](https://github.com/appaloft/appaloft/commit/cc294dc272285757901112ad223331398cac42cf))
+* reuse existing installer traefik proxy ([c77a413](https://github.com/appaloft/appaloft/commit/c77a41308924ea731196285c443925e748e5676b))
+
 ## [0.9.5](https://github.com/appaloft/appaloft/compare/v0.9.4...v0.9.5) (2026-05-09)
 
 
