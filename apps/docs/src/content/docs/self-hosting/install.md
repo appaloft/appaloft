@@ -44,6 +44,18 @@ PGlite 模式会把 Appaloft 状态放在挂载到 `/appaloft-data` 的持久 Do
 数据库密码、GitHub token、SSH key 或部署身份值写进仓库配置；这些值应放在主机、CI secret
 store，或安装后的 Appaloft server 内。
 
+默认安装还会启动一个 Appaloft 自己管理的 Traefik edge proxy。没有配置域名时，console 可以通过
+服务器的 `3721` 端口访问。要把 console 绑定到域名，先把 DNS 指向这台服务器，并开放 `80` 和
+`443`，然后传 `--domain`：
+
+```sh
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --domain console.example.com
+```
+
+这个域名是 Appaloft instance 自己的 console bootstrap route，不是项目资源的自定义域名，也不会
+创建 deployment snapshot 或 DomainBinding。之后如果要换 console 域名，可以用新的 `--domain`
+重新运行安装器。只有在外部反向代理已经负责公开入口时，才使用 `--proxy none`。
+
 如果主机已经是 Docker Swarm manager，可以把 console 安装成 Swarm stack：
 
 ```sh

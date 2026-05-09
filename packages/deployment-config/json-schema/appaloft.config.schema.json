@@ -36,6 +36,10 @@
               "type": "string",
               "enum": ["compose", "swarm"]
             },
+            "proxy": {
+              "type": "string",
+              "enum": ["traefik", "none"]
+            },
             "httpHost": {
               "type": "string",
               "minLength": 1

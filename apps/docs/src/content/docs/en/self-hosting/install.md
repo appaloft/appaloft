@@ -43,6 +43,19 @@ PGlite mode stores Appaloft state in a durable Docker volume mounted at `/appalo
 database passwords, GitHub tokens, SSH keys, or deployment identity values in repository config; keep
 those values in the host, CI secret store, or the Appaloft server after it is installed.
 
+The default install also starts an Appaloft-managed Traefik edge proxy. Without a domain, the
+console is reachable on the server's `3721` port. To bind the console to a domain, point DNS at the
+server, open `80` and `443`, and pass `--domain`:
+
+```sh
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --domain console.example.com
+```
+
+This domain is the Appaloft instance's own console bootstrap route. It is not a project resource
+custom domain, deployment snapshot, or DomainBinding. To change the console domain later, rerun the
+installer with the new `--domain`. Use `--proxy none` only when an external reverse proxy already
+owns public routing.
+
 When the host is already a Docker Swarm manager, install the console as a Swarm stack:
 
 ```sh
