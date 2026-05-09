@@ -655,6 +655,20 @@ docker_network_label() {
   docker_stdout network inspect --format "{{ index .Labels \"$label_name\" }}" "$network_name" 2>/dev/null
 }
 
+docker_container_label() {
+  container_name="$1"
+  label_name="$2"
+
+  docker_stdout container inspect --format "{{ index .Config.Labels \"$label_name\" }}" "$container_name" 2>/dev/null
+}
+
+docker_container_state() {
+  container_name="$1"
+  state_field="$2"
+
+  docker_stdout container inspect --format "{{ .State.$state_field }}" "$container_name" 2>/dev/null
+}
+
 detect_compose_edge_network_mode() {
   appaloft_edge_network_external=0
 
@@ -677,6 +691,43 @@ detect_compose_edge_network_mode() {
     appaloft_edge_network_external=1
     say "Using existing Docker network $APPALOFT_EDGE_NETWORK_NAME as external"
   fi
+}
+
+detect_compose_traefik_service_mode() {
+  appaloft_traefik_service_external=0
+
+  if [ "$APPALOFT_SELF_HOST_PROXY" != "traefik" ] ||
+    [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" != "compose" ]; then
+    return
+  fi
+
+  if ! docker_command_succeeds container inspect appaloft-traefik; then
+    return
+  fi
+
+  service_label="$(docker_container_label appaloft-traefik "com.docker.compose.service" || true)"
+  project_label="$(docker_container_label appaloft-traefik "com.docker.compose.project" || true)"
+  if [ "$service_label" = "traefik" ] && [ "$project_label" = "$APPALOFT_COMPOSE_PROJECT_NAME" ]; then
+    return
+  fi
+
+  appaloft_traefik_service_external=1
+  say "Using existing appaloft-traefik container as external proxy"
+}
+
+ensure_external_compose_traefik_proxy() {
+  if [ "${appaloft_traefik_service_external:-0}" != "1" ]; then
+    return
+  fi
+
+  traefik_running="$(docker_container_state appaloft-traefik "Running" || true)"
+  if [ "$traefik_running" = "true" ]; then
+    return
+  fi
+
+  say "Starting existing appaloft-traefik container"
+  run_maybe_root docker start appaloft-traefik >/dev/null ||
+    fail "existing appaloft-traefik container could not be started; inspect it with: docker logs appaloft-traefik"
 }
 
 write_compose_file() {
@@ -847,6 +898,10 @@ write_proxy_service_compose_section() {
     return
   fi
 
+  if [ "${appaloft_traefik_service_external:-0}" = "1" ]; then
+    return
+  fi
+
   cat >>"$destination" <<'COMPOSE'
 
   traefik:
@@ -894,9 +949,14 @@ write_proxy_footer_compose_section() {
     return
   fi
 
-  cat >>"$destination" <<'COMPOSE'
+  if [ "${appaloft_traefik_service_external:-0}" != "1" ]; then
+    cat >>"$destination" <<'COMPOSE'
   traefik-acme:
 
+COMPOSE
+  fi
+
+  cat >>"$destination" <<'COMPOSE'
 networks:
   appaloft-edge:
     name: ${APPALOFT_EDGE_NETWORK_NAME}
@@ -997,6 +1057,108 @@ docker_stack_deploy() {
     docker stack deploy -c "$compose_file" "$APPALOFT_SWARM_STACK_NAME"
 }
 
+docker_service_value() {
+  docker_stdout service "$@"
+}
+
+docker_object_value() {
+  object_name="$1"
+  template="$2"
+
+  docker_stdout inspect --format "$template" "$object_name" 2>/dev/null
+}
+
+compose_app_container_id() {
+  docker_compose ps -q app 2>/dev/null | head -n 1
+}
+
+print_compose_app_diagnostics() {
+  container_id="$(compose_app_container_id || true)"
+  if [ -n "$container_id" ]; then
+    status="$(docker_object_value "$container_id" "{{.State.Status}}" || true)"
+    exit_code="$(docker_object_value "$container_id" "{{.State.ExitCode}}" || true)"
+    health_status="$(docker_object_value "$container_id" "{{if .State.Health}}{{.State.Health.Status}}{{end}}" || true)"
+    warn "app container: id=$container_id status=${status:-unknown} exit=${exit_code:-unknown} health=${health_status:-none}"
+  fi
+
+  docker_compose logs --tail=80 app >&2 || true
+}
+
+wait_for_compose_app_health() {
+  say "Waiting for Appaloft console health"
+  attempts=0
+  max_attempts=60
+
+  while [ "$attempts" -lt "$max_attempts" ]; do
+    attempts=$((attempts + 1))
+    container_id="$(compose_app_container_id || true)"
+
+    if [ -n "$container_id" ]; then
+      status="$(docker_object_value "$container_id" "{{.State.Status}}" || true)"
+      health_status="$(docker_object_value "$container_id" "{{if .State.Health}}{{.State.Health.Status}}{{end}}" || true)"
+
+      if [ "$health_status" = "healthy" ]; then
+        say "Appaloft console health is ready"
+        return
+      fi
+
+      if [ "$health_status" = "unhealthy" ]; then
+        print_compose_app_diagnostics
+        fail "Appaloft console became unhealthy; check the app container diagnostics above"
+      fi
+
+      if [ -z "$health_status" ] && [ "$status" = "running" ] &&
+        command -v curl >/dev/null 2>&1 &&
+        curl -fsS --max-time 2 "http://127.0.0.1:$APPALOFT_HTTP_PORT/api/health" >/dev/null 2>&1; then
+        say "Appaloft console health is ready"
+        return
+      fi
+    fi
+
+    sleep 2
+  done
+
+  print_compose_app_diagnostics
+  fail "Appaloft console did not become healthy within 120 seconds; check the app container diagnostics above"
+}
+
+print_swarm_app_diagnostics() {
+  service_name="${APPALOFT_SWARM_STACK_NAME}_app"
+  warn "app service tasks:"
+  docker_service_value ps "$service_name" --no-trunc >&2 || true
+  docker_service_value logs --tail=80 "$service_name" >&2 || true
+}
+
+wait_for_swarm_app_health() {
+  service_name="${APPALOFT_SWARM_STACK_NAME}_app"
+  say "Waiting for Appaloft console health"
+  attempts=0
+  max_attempts=60
+
+  while [ "$attempts" -lt "$max_attempts" ]; do
+    attempts=$((attempts + 1))
+    replicas="$(docker_service_value ls --filter "name=$service_name" --format "{{.Replicas}}" 2>/dev/null | head -n 1 || true)"
+
+    case "$replicas" in
+      */*)
+        ready="${replicas%%/*}"
+        desired="${replicas#*/}"
+        if [ "$desired" != "0" ] && [ "$ready" = "$desired" ] &&
+          command -v curl >/dev/null 2>&1 &&
+          curl -fsS --max-time 2 "http://127.0.0.1:$APPALOFT_HTTP_PORT/api/health" >/dev/null 2>&1; then
+          say "Appaloft console health is ready"
+          return
+        fi
+        ;;
+    esac
+
+    sleep 2
+  done
+
+  print_swarm_app_diagnostics
+  fail "Appaloft console did not become healthy within 120 seconds; check the app service diagnostics above"
+}
+
 validate_port
 validate_database
 validate_orchestrator
@@ -1059,6 +1221,7 @@ if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
 fi
 
 detect_compose_edge_network_mode
+detect_compose_traefik_service_mode
 
 if [ "$APPALOFT_SELF_HOST_DATABASE" = "postgres" ]; then
   existing_postgres_password="$(read_existing_env_value POSTGRES_PASSWORD "$env_file" || true)"
@@ -1087,6 +1250,9 @@ fi
 say "Database: $APPALOFT_SELF_HOST_DATABASE"
 say "Orchestrator: $APPALOFT_SELF_HOST_ORCHESTRATOR"
 say "Proxy: $APPALOFT_SELF_HOST_PROXY"
+if [ "${appaloft_traefik_service_external:-0}" = "1" ]; then
+  say "Traefik: existing appaloft-traefik container"
+fi
 
 step "Writing Appaloft configuration"
 install_file "$tmp_compose" "$compose_file" 0644
@@ -1097,8 +1263,11 @@ say "Environment file: $env_file"
 if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
   step "Deploying Docker Swarm stack"
   docker_stack_deploy || fail "Docker Swarm failed to deploy the Appaloft stack; check Docker stack errors above and rerun the same install command"
+  wait_for_swarm_app_health
   appaloft_logs_command="docker service logs -f ${APPALOFT_SWARM_STACK_NAME}_app"
 else
+  ensure_external_compose_traefik_proxy
+
   step "Pulling Appaloft Docker images"
   docker_compose pull ||
     fail "Docker Compose failed to pull Appaloft images; check registry access and network connectivity, then rerun the same install command"
@@ -1106,6 +1275,7 @@ else
   step "Starting Appaloft containers"
   docker_compose up -d ||
     fail "Docker Compose failed to start Appaloft; check Docker errors above and rerun the same install command"
+  wait_for_compose_app_health
   appaloft_logs_command="docker compose --env-file $env_file -p $APPALOFT_COMPOSE_PROJECT_NAME -f $compose_file logs -f"
 fi
 
