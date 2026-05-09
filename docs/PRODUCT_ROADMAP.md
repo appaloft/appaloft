@@ -1742,6 +1742,10 @@ Required:
   candidate retention, preview-owned artifact cleanup, no-volume-by-default safety, and audit and
   diagnostic output.
 - [ ] Add audit/event read surfaces with retention policy and redaction rules.
+- [ ] Add self-hosted Action API authentication: installer-generated deploy token, bearer-token
+  verification on action mutation endpoints, token rotation/revocation, and clear 401/403 errors.
+- [ ] Add product auth baseline: first admin account bootstrap, login/session hardening, and
+  organization/team membership for multiple operators sharing one Appaloft instance.
 - [ ] Add terminal session list/show/attach/close/expire if terminal sessions remain public.
 - [ ] Ensure provider/plugin/system operations expose capability details and configuration
   diagnostics without leaking provider SDK types or secrets.
@@ -1854,6 +1858,12 @@ work below before GA.
   mutation. Spec Round is
   [Action Server Config Deploy](./specs/050-action-server-config-deploy/spec.md), with workflow
   contract in [Action Server Config Deploy](./workflows/action-server-config-deploy.md).
+- [ ] Self-hosted Action API auth: action mutation endpoints require an Appaloft deploy token or
+  future OIDC exchange, and rejected requests fail before source-link, resource, route, or
+  deployment mutation.
+- [ ] Auth/org/team: self-hosted install can bootstrap a default admin, operators can invite or
+  add team members into an organization, and project/resource access is scoped by membership before
+  deployment APIs are considered production-secure.
 - [ ] Product-grade preview deployment: create from PR event, list/show/update policy/delete on
   close, scoped env, GitHub App status/comments, and cleanup retries.
 - [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs. Spec Round

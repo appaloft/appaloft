@@ -17,6 +17,34 @@
           "type": "string",
           "minLength": 1
         },
+        "deploymentContext": {
+          "description": "Non-secret deployment identity for explicitly bootstrapping or relinking this repository to an Appaloft server context.",
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environmentId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "resourceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "serverId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "destinationId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["projectId", "environmentId", "resourceId", "serverId"],
+          "additionalProperties": false
+        },
         "install": {
           "type": "object",
           "properties": {

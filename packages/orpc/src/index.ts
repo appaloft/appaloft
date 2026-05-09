@@ -535,7 +535,16 @@ const actionServerConfigDeployBodySchema = z
     configPath: z.string().trim().min(1),
     sourceRoot: z.string().trim().min(1),
     sourcePackage: sourcePackageManifestSchema,
+    environmentVariables: z.record(z.string().trim().min(1), z.string()).optional(),
     resolvedSecrets: z.record(z.string().trim().min(1), z.string()).optional(),
+    previewRoute: z
+      .object({
+        host: z.string().trim().min(1),
+        pathPrefix: z.string().trim().min(1).default("/"),
+        tlsMode: z.enum(["auto", "disabled"]).default("disabled"),
+      })
+      .strict()
+      .optional(),
     preview: z
       .object({
         kind: z.literal("pull-request"),
@@ -4237,6 +4246,16 @@ function validateActionServerConfigDeployBody(
     });
   }
 
+  if (body.previewRoute && body.preview?.kind !== "pull-request") {
+    return domainError.validation(
+      "Action server config previewRoute requires pull request preview context",
+      {
+        phase: "preview-config-resolution",
+        field: "previewRoute",
+      },
+    );
+  }
+
   return undefined;
 }
 
@@ -4479,6 +4498,46 @@ function orderedActionServerConfigDomains(
     }
     return left.host.localeCompare(right.host);
   });
+}
+
+function effectiveActionServerConfigForRequest(input: {
+  config: AppaloftDeploymentConfig;
+  environmentVariables?: Record<string, string>;
+  preview?: ActionServerConfigDeployBody["preview"];
+  previewRoute?: ActionServerConfigDeployBody["previewRoute"];
+}): AppaloftDeploymentConfig {
+  const mergedEnv = {
+    ...(input.config.env ?? {}),
+    ...(input.environmentVariables ?? {}),
+  };
+  const configWithRuntimeEnv: AppaloftDeploymentConfig = {
+    ...input.config,
+    ...(Object.keys(mergedEnv).length > 0 ? { env: mergedEnv } : {}),
+  };
+
+  if (!input.preview) {
+    return configWithRuntimeEnv;
+  }
+
+  const previewConfig: AppaloftDeploymentConfig = { ...configWithRuntimeEnv };
+  delete previewConfig.access;
+
+  if (!input.previewRoute) {
+    return previewConfig;
+  }
+
+  return {
+    ...previewConfig,
+    access: {
+      domains: [
+        {
+          host: input.previewRoute.host,
+          pathPrefix: input.previewRoute.pathPrefix,
+          tlsMode: input.previewRoute.tlsMode,
+        },
+      ],
+    },
+  };
 }
 
 async function resolveActionServerConfigDomainContext(input: {
@@ -4887,7 +4946,16 @@ async function handleActionServerConfigDeploymentRoute(input: {
     );
   }
 
-  if (actionServerConfigHasUnsupportedProfileApplication(parsedConfig.data)) {
+  const effectiveConfig = effectiveActionServerConfigForRequest({
+    config: parsedConfig.data,
+    ...(body.data.environmentVariables
+      ? { environmentVariables: body.data.environmentVariables }
+      : {}),
+    ...(body.data.preview ? { preview: body.data.preview } : {}),
+    ...(body.data.previewRoute ? { previewRoute: body.data.previewRoute } : {}),
+  });
+
+  if (actionServerConfigHasUnsupportedProfileApplication(effectiveConfig)) {
     return domainErrorHttpResponse(
       domainError.validation(
         "Action server config deployment endpoint validated the config, but source profile application is not enabled in this build",
@@ -4920,7 +4988,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
   const profileApplied = await applyActionServerConfigProfileCommands({
     context,
     executionContext,
-    config: parsedConfig.data,
+    config: effectiveConfig,
     ...(body.data.resolvedSecrets ? { resolvedSecrets: body.data.resolvedSecrets } : {}),
     target: target.value,
   });

@@ -83,6 +83,11 @@ describe("Appaloft deployment config schema", () => {
         "controlPlane:",
         "  mode: self-hosted",
         "  url: https://console.example.com/",
+        "  deploymentContext:",
+        "    projectId: prj_www",
+        "    environmentId: env_prod",
+        "    resourceId: res_www",
+        "    serverId: srv_console",
         "runtime:",
         "  strategy: static",
       ].join("\n"),
@@ -94,6 +99,12 @@ describe("Appaloft deployment config schema", () => {
       expect(parsed.data.controlPlane).toEqual({
         mode: "self-hosted",
         url: "https://console.example.com",
+        deploymentContext: {
+          projectId: "prj_www",
+          environmentId: "env_prod",
+          resourceId: "res_www",
+          serverId: "srv_console",
+        },
       });
     }
   });
@@ -132,7 +143,7 @@ describe("Appaloft deployment config schema", () => {
     }
   });
 
-  test("[CONTROL-PLANE-MODE-011] rejects control-plane identity and secret fields", () => {
+  test("[CONTROL-PLANE-MODE-011] rejects unsupported control-plane identity and secret fields", () => {
     const identity = parseAppaloftDeploymentConfig({
       controlPlane: {
         mode: "self-hosted",
