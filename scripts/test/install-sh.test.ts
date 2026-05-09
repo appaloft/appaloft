@@ -30,6 +30,7 @@ async function createFakeDocker(tempRoot: string): Promise<{ binDir: string; log
   const binDir = join(tempRoot, "bin");
   const logPath = join(tempRoot, "docker.log");
   const dockerPath = join(binDir, "docker");
+  const curlPath = join(binDir, "curl");
 
   await mkdir(binDir, { recursive: true });
   await writeFile(
@@ -50,6 +51,20 @@ case "$1" in
     exit 0
     ;;
   compose)
+    case "$*" in
+      *" ps -q app"*) printf 'appaloft-app-1\\n' ;;
+    esac
+    exit 0
+    ;;
+  inspect)
+    if [ "$1" = "inspect" ] && [ "$2" = "--format" ]; then
+      case "$3" in
+        *State.Health*) printf '%s\\n' "\${APPALOFT_FAKE_DOCKER_APP_HEALTH_STATUS:-healthy}" ;;
+        *State.Status*) printf '%s\\n' "\${APPALOFT_FAKE_DOCKER_APP_STATUS:-running}" ;;
+        *State.ExitCode*) printf '%s\\n' "\${APPALOFT_FAKE_DOCKER_APP_EXIT_CODE:-0}" ;;
+      esac
+      exit 0
+    fi
     exit 0
     ;;
   network)
@@ -65,6 +80,32 @@ case "$1" in
     fi
     exit 0
     ;;
+  container)
+    if [ "$2" = "inspect" ]; then
+      container_name="$3"
+      format=""
+      if [ "$3" = "--format" ]; then
+        format="$4"
+        container_name="$5"
+      fi
+      if [ "$container_name" = "appaloft-traefik" ] && [ "$APPALOFT_FAKE_DOCKER_TRAEFIK_CONTAINER_EXISTS" = "1" ]; then
+        case "$format" in
+          *com.docker.compose.service*) printf '%s\\n' "$APPALOFT_FAKE_DOCKER_TRAEFIK_SERVICE_LABEL" ;;
+          *com.docker.compose.project*) printf '%s\\n' "$APPALOFT_FAKE_DOCKER_TRAEFIK_PROJECT_LABEL" ;;
+        esac
+        exit 0
+      fi
+      exit 1
+    fi
+    exit 0
+    ;;
+  service)
+    if [ "$2" = "ls" ]; then
+      printf '%s\\n' "\${APPALOFT_FAKE_DOCKER_SERVICE_REPLICAS:-1/1}"
+      exit 0
+    fi
+    exit 0
+    ;;
   stack | swarm)
     exit 0
     ;;
@@ -73,6 +114,13 @@ exit 0
 `,
   );
   await chmod(dockerPath, 0o755);
+  await writeFile(
+    curlPath,
+    `#!/usr/bin/env sh
+exit 0
+`,
+  );
+  await chmod(curlPath, 0o755);
 
   return { binDir, logPath };
 }
@@ -356,6 +404,58 @@ test("install.sh reuses an unmanaged existing Compose edge network", async () =>
 
     const dockerLog = await Bun.file(logPath).text();
     expect(dockerLog).toContain("network inspect --format");
+    expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh reuses an unmanaged existing Compose Traefik container", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--domain",
+        "console.appaloft.example.test",
+        "--postgres-password",
+        "fixture-password",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_EDGE_NETWORK_EXISTS: "1",
+        APPALOFT_FAKE_DOCKER_EDGE_NETWORK_LABEL: "",
+        APPALOFT_FAKE_DOCKER_EDGE_PROJECT_LABEL: "",
+        APPALOFT_FAKE_DOCKER_TRAEFIK_CONTAINER_EXISTS: "1",
+        APPALOFT_FAKE_DOCKER_TRAEFIK_SERVICE_LABEL: "",
+        APPALOFT_FAKE_DOCKER_TRAEFIK_PROJECT_LABEL: "",
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+    expect(install.stdout).toContain("Using existing Docker network appaloft-edge as external");
+    expect(install.stdout).toContain("Using existing appaloft-traefik container as external proxy");
+    expect(install.stdout).toContain("Traefik: existing appaloft-traefik container");
+
+    const compose = await Bun.file(join(home, "docker-compose.yml")).text();
+    expect(compose).toContain("traefik.http.routers.appaloft-console.rule");
+    expect(compose).toContain("external: true");
+    expect(compose).not.toContain("container_name: appaloft-traefik");
+    expect(compose).not.toContain("traefik-acme:");
+
+    const dockerLog = await Bun.file(logPath).text();
+    expect(dockerLog).toContain("container inspect appaloft-traefik");
+    expect(dockerLog).toContain("container inspect --format");
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
