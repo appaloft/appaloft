@@ -5,10 +5,15 @@ APPALOFT_VERSION="${APPALOFT_VERSION:-latest}"
 APPALOFT_IMAGE="${APPALOFT_IMAGE:-ghcr.io/appaloft/appaloft}"
 APPALOFT_HOME="${APPALOFT_HOME:-}"
 APPALOFT_HTTP_HOST="${APPALOFT_HTTP_HOST:-0.0.0.0}"
-APPALOFT_HTTP_PORT="${APPALOFT_HTTP_PORT:-3001}"
+APPALOFT_HTTP_PORT="${APPALOFT_HTTP_PORT:-3721}"
 APPALOFT_WEB_ORIGIN="${APPALOFT_WEB_ORIGIN:-}"
+APPALOFT_PUBLIC_HOST="${APPALOFT_PUBLIC_HOST:-}"
+APPALOFT_CONSOLE_DOMAIN="${APPALOFT_CONSOLE_DOMAIN:-}"
 APPALOFT_SELF_HOST_DATABASE="${APPALOFT_SELF_HOST_DATABASE:-postgres}"
 APPALOFT_SELF_HOST_ORCHESTRATOR="${APPALOFT_SELF_HOST_ORCHESTRATOR:-compose}"
+APPALOFT_SELF_HOST_PROXY="${APPALOFT_SELF_HOST_PROXY:-traefik}"
+APPALOFT_EDGE_NETWORK_NAME="${APPALOFT_EDGE_NETWORK_NAME:-appaloft-edge}"
+APPALOFT_TRAEFIK_IMAGE="${APPALOFT_TRAEFIK_IMAGE:-traefik:v3.6.2}"
 APPALOFT_POSTGRES_IMAGE="${APPALOFT_POSTGRES_IMAGE:-postgres:16}"
 APPALOFT_POSTGRES_PASSWORD="${APPALOFT_POSTGRES_PASSWORD:-}"
 APPALOFT_COMPOSE_PROJECT_NAME="${APPALOFT_COMPOSE_PROJECT_NAME:-appaloft}"
@@ -45,10 +50,13 @@ Options:
   --image <image>                  Image repository or full image ref. Defaults to ghcr.io/appaloft/appaloft.
   --home <dir>                     Install directory. Defaults to /opt/appaloft on Linux.
   --host <host>                    Host bind address. Defaults to 0.0.0.0.
-  --port <port>                    Host HTTP port. Defaults to 3001.
-  --web-origin <url>               Public console origin. Defaults to http://localhost:<port>.
+  --port <port>                    Host HTTP port for direct-IP access. Defaults to 3721.
+  --public-host <host>             Hostname or IP used for fallback origin when --domain is absent.
+  --web-origin <url>               Public console origin. Defaults to https://<domain> or http://<public-host>:<port>.
+  --domain <domain>                Public console domain. Enables the managed Traefik console route.
   --database <postgres|pglite>      Persistence backend. Defaults to postgres.
   --orchestrator <compose|swarm>    Docker orchestrator. Defaults to compose.
+  --proxy <traefik|none>            Managed self-host proxy. Defaults to traefik.
   --postgres-password <password>   PostgreSQL password. Existing installs reuse .env.
   --postgres-image <image>         PostgreSQL image. Defaults to postgres:16.
   --project-name <name>            Docker Compose project name. Defaults to appaloft.
@@ -66,8 +74,13 @@ Environment:
   APPALOFT_HTTP_HOST
   APPALOFT_HTTP_PORT
   APPALOFT_WEB_ORIGIN
+  APPALOFT_PUBLIC_HOST
+  APPALOFT_CONSOLE_DOMAIN
   APPALOFT_SELF_HOST_DATABASE=postgres|pglite
   APPALOFT_SELF_HOST_ORCHESTRATOR=compose|swarm
+  APPALOFT_SELF_HOST_PROXY=traefik|none
+  APPALOFT_EDGE_NETWORK_NAME
+  APPALOFT_TRAEFIK_IMAGE
   APPALOFT_POSTGRES_IMAGE
   APPALOFT_POSTGRES_PASSWORD
   APPALOFT_COMPOSE_PROJECT_NAME
@@ -121,6 +134,14 @@ while [ "$#" -gt 0 ]; do
     --port=*)
       APPALOFT_HTTP_PORT="${1#--port=}"
       ;;
+    --public-host)
+      shift
+      [ "$#" -gt 0 ] || fail "--public-host requires a value"
+      APPALOFT_PUBLIC_HOST="$1"
+      ;;
+    --public-host=*)
+      APPALOFT_PUBLIC_HOST="${1#--public-host=}"
+      ;;
     --web-origin)
       shift
       [ "$#" -gt 0 ] || fail "--web-origin requires a value"
@@ -128,6 +149,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --web-origin=*)
       APPALOFT_WEB_ORIGIN="${1#--web-origin=}"
+      ;;
+    --domain)
+      shift
+      [ "$#" -gt 0 ] || fail "--domain requires a value"
+      APPALOFT_CONSOLE_DOMAIN="$1"
+      ;;
+    --domain=*)
+      APPALOFT_CONSOLE_DOMAIN="${1#--domain=}"
       ;;
     --database)
       shift
@@ -144,6 +173,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --orchestrator=*)
       APPALOFT_SELF_HOST_ORCHESTRATOR="${1#--orchestrator=}"
+      ;;
+    --proxy)
+      shift
+      [ "$#" -gt 0 ] || fail "--proxy requires a value"
+      APPALOFT_SELF_HOST_PROXY="$1"
+      ;;
+    --proxy=*)
+      APPALOFT_SELF_HOST_PROXY="${1#--proxy=}"
       ;;
     --postgres-password)
       shift
@@ -294,6 +331,76 @@ validate_orchestrator() {
     compose | swarm) return 0 ;;
     *) fail "--orchestrator must be compose or swarm" ;;
   esac
+}
+
+validate_proxy() {
+  APPALOFT_SELF_HOST_PROXY="$(printf '%s' "$APPALOFT_SELF_HOST_PROXY" | tr '[:upper:]' '[:lower:]')"
+
+  case "$APPALOFT_SELF_HOST_PROXY" in
+    traefik | none) return 0 ;;
+    *) fail "--proxy must be traefik or none" ;;
+  esac
+}
+
+sanitize_domain() {
+  value="$1"
+  case "$value" in
+    http://*) value="${value#http://}" ;;
+    https://*) value="${value#https://}" ;;
+  esac
+  value="${value%%/*}"
+  printf '%s\n' "$value"
+}
+
+validate_domain() {
+  if [ -z "$APPALOFT_CONSOLE_DOMAIN" ]; then
+    return
+  fi
+
+  case "$APPALOFT_CONSOLE_DOMAIN" in
+    *[!A-Za-z0-9.-]* | .* | *. | *..*)
+      fail "--domain must be a hostname without scheme, path, port, spaces, or wildcards"
+      ;;
+  esac
+}
+
+detect_public_host() {
+  if [ -n "$APPALOFT_PUBLIC_HOST" ]; then
+    printf '%s\n' "$APPALOFT_PUBLIC_HOST"
+    return
+  fi
+
+  if ! truthy "$APPALOFT_INSTALL_DRY_RUN" && command -v curl >/dev/null 2>&1; then
+    detected="$(curl -fsS --max-time 2 https://api.ipify.org 2>/dev/null || true)"
+    if [ -n "$detected" ]; then
+      printf '%s\n' "$detected"
+      return
+    fi
+  fi
+
+  if command -v hostname >/dev/null 2>&1; then
+    detected="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+    if [ -n "$detected" ]; then
+      printf '%s\n' "$detected"
+      return
+    fi
+  fi
+
+  printf 'localhost\n'
+}
+
+resolve_web_origin() {
+  if [ -n "$APPALOFT_WEB_ORIGIN" ]; then
+    printf '%s\n' "$APPALOFT_WEB_ORIGIN"
+    return
+  fi
+
+  if [ -n "$APPALOFT_CONSOLE_DOMAIN" ]; then
+    printf 'https://%s\n' "$APPALOFT_CONSOLE_DOMAIN"
+    return
+  fi
+
+  printf 'http://%s:%s\n' "$(detect_public_host)" "$APPALOFT_HTTP_PORT"
 }
 
 run_as_root() {
@@ -490,14 +597,24 @@ services:
       - "${APPALOFT_HTTP_HOST}:${APPALOFT_HTTP_PORT}:3001"
     volumes:
       - appaloft-data:/appaloft-data
+COMPOSE
+    write_app_proxy_compose_section "$destination"
+    cat >>"$destination" <<'COMPOSE'
     deploy:
+COMPOSE
+    write_app_proxy_deploy_labels_compose_section "$destination"
+    cat >>"$destination" <<'COMPOSE'
       placement:
         constraints:
           - node.role == manager
 
+COMPOSE
+    write_proxy_service_compose_section "$destination"
+    cat >>"$destination" <<'COMPOSE'
 volumes:
   appaloft-data:
 COMPOSE
+    write_proxy_footer_compose_section "$destination"
     return
   fi
 
@@ -517,10 +634,16 @@ services:
       APPALOFT_WEB_ORIGIN: ${APPALOFT_WEB_ORIGIN}
     ports:
       - "${APPALOFT_HTTP_HOST}:${APPALOFT_HTTP_PORT}:3001"
+COMPOSE
+  write_app_proxy_compose_section "$destination"
+  cat >>"$destination" <<'COMPOSE'
     depends_on:
       postgres:
         condition: service_healthy
     deploy:
+COMPOSE
+  write_app_proxy_deploy_labels_compose_section "$destination"
+  cat >>"$destination" <<'COMPOSE'
       placement:
         constraints:
           - node.role == manager
@@ -544,8 +667,133 @@ services:
         constraints:
           - node.role == manager
 
+COMPOSE
+  write_proxy_service_compose_section "$destination"
+  cat >>"$destination" <<'COMPOSE'
 volumes:
   postgres-data:
+COMPOSE
+  write_proxy_footer_compose_section "$destination"
+}
+
+write_app_proxy_compose_section() {
+  destination="$1"
+
+  if [ "$APPALOFT_SELF_HOST_PROXY" != "traefik" ]; then
+    return
+  fi
+
+  if [ -n "$APPALOFT_CONSOLE_DOMAIN" ]; then
+    cat >>"$destination" <<'COMPOSE'
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${APPALOFT_EDGE_NETWORK_NAME}
+      traefik.http.routers.appaloft-console.rule: Host(`${APPALOFT_CONSOLE_DOMAIN}`)
+      traefik.http.routers.appaloft-console.entrypoints: websecure
+      traefik.http.routers.appaloft-console.tls: "true"
+      traefik.http.routers.appaloft-console.tls.certresolver: appaloft
+      traefik.http.routers.appaloft-console.service: appaloft-console
+      traefik.http.routers.appaloft-console-http.rule: Host(`${APPALOFT_CONSOLE_DOMAIN}`)
+      traefik.http.routers.appaloft-console-http.entrypoints: web
+      traefik.http.routers.appaloft-console-http.middlewares: appaloft-console-https
+      traefik.http.routers.appaloft-console-http.service: appaloft-console
+      traefik.http.middlewares.appaloft-console-https.redirectscheme.scheme: https
+      traefik.http.services.appaloft-console.loadbalancer.server.port: "3001"
+COMPOSE
+  fi
+
+  cat >>"$destination" <<'COMPOSE'
+    networks:
+      - default
+      - appaloft-edge
+COMPOSE
+}
+
+write_app_proxy_deploy_labels_compose_section() {
+  destination="$1"
+
+  if [ "$APPALOFT_SELF_HOST_PROXY" != "traefik" ] || [ -z "$APPALOFT_CONSOLE_DOMAIN" ]; then
+    return
+  fi
+
+  cat >>"$destination" <<'COMPOSE'
+      labels:
+        traefik.enable: "true"
+        traefik.docker.network: ${APPALOFT_EDGE_NETWORK_NAME}
+        traefik.http.routers.appaloft-console.rule: Host(`${APPALOFT_CONSOLE_DOMAIN}`)
+        traefik.http.routers.appaloft-console.entrypoints: websecure
+        traefik.http.routers.appaloft-console.tls: "true"
+        traefik.http.routers.appaloft-console.tls.certresolver: appaloft
+        traefik.http.routers.appaloft-console.service: appaloft-console
+        traefik.http.routers.appaloft-console-http.rule: Host(`${APPALOFT_CONSOLE_DOMAIN}`)
+        traefik.http.routers.appaloft-console-http.entrypoints: web
+        traefik.http.routers.appaloft-console-http.middlewares: appaloft-console-https
+        traefik.http.routers.appaloft-console-http.service: appaloft-console
+        traefik.http.middlewares.appaloft-console-https.redirectscheme.scheme: https
+        traefik.http.services.appaloft-console.loadbalancer.server.port: "3001"
+COMPOSE
+}
+
+write_proxy_service_compose_section() {
+  destination="$1"
+
+  if [ "$APPALOFT_SELF_HOST_PROXY" != "traefik" ]; then
+    return
+  fi
+
+  cat >>"$destination" <<'COMPOSE'
+
+  traefik:
+    image: ${APPALOFT_TRAEFIK_IMAGE}
+    container_name: appaloft-traefik
+    restart: unless-stopped
+    command:
+COMPOSE
+
+  if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
+    cat >>"$destination" <<'COMPOSE'
+      - --providers.swarm=true
+      - --providers.swarm.exposedbydefault=false
+      - --providers.swarm.network=${APPALOFT_EDGE_NETWORK_NAME}
+COMPOSE
+  else
+    cat >>"$destination" <<'COMPOSE'
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=${APPALOFT_EDGE_NETWORK_NAME}
+COMPOSE
+  fi
+
+  cat >>"$destination" <<'COMPOSE'
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.appaloft.acme.httpchallenge=true
+      - --certificatesresolvers.appaloft.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.appaloft.acme.storage=/letsencrypt/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-acme:/letsencrypt
+    networks:
+      - appaloft-edge
+COMPOSE
+}
+
+write_proxy_footer_compose_section() {
+  destination="$1"
+
+  if [ "$APPALOFT_SELF_HOST_PROXY" != "traefik" ]; then
+    return
+  fi
+
+  cat >>"$destination" <<'COMPOSE'
+  traefik-acme:
+
+networks:
+  appaloft-edge:
+    name: ${APPALOFT_EDGE_NETWORK_NAME}
 COMPOSE
 }
 
@@ -559,8 +807,12 @@ APPALOFT_APP_VERSION=$appaloft_version
 APPALOFT_HTTP_HOST=$APPALOFT_HTTP_HOST
 APPALOFT_HTTP_PORT=$APPALOFT_HTTP_PORT
 APPALOFT_WEB_ORIGIN=$appaloft_web_origin
+APPALOFT_CONSOLE_DOMAIN=$APPALOFT_CONSOLE_DOMAIN
 APPALOFT_SELF_HOST_DATABASE=pglite
 APPALOFT_SELF_HOST_ORCHESTRATOR=$APPALOFT_SELF_HOST_ORCHESTRATOR
+APPALOFT_SELF_HOST_PROXY=$APPALOFT_SELF_HOST_PROXY
+APPALOFT_EDGE_NETWORK_NAME=$APPALOFT_EDGE_NETWORK_NAME
+APPALOFT_TRAEFIK_IMAGE=$APPALOFT_TRAEFIK_IMAGE
 APPALOFT_SWARM_STACK_NAME=$APPALOFT_SWARM_STACK_NAME
 ENV
     return
@@ -572,8 +824,12 @@ APPALOFT_APP_VERSION=$appaloft_version
 APPALOFT_HTTP_HOST=$APPALOFT_HTTP_HOST
 APPALOFT_HTTP_PORT=$APPALOFT_HTTP_PORT
 APPALOFT_WEB_ORIGIN=$appaloft_web_origin
+APPALOFT_CONSOLE_DOMAIN=$APPALOFT_CONSOLE_DOMAIN
 APPALOFT_SELF_HOST_DATABASE=postgres
 APPALOFT_SELF_HOST_ORCHESTRATOR=$APPALOFT_SELF_HOST_ORCHESTRATOR
+APPALOFT_SELF_HOST_PROXY=$APPALOFT_SELF_HOST_PROXY
+APPALOFT_EDGE_NETWORK_NAME=$APPALOFT_EDGE_NETWORK_NAME
+APPALOFT_TRAEFIK_IMAGE=$APPALOFT_TRAEFIK_IMAGE
 APPALOFT_SWARM_STACK_NAME=$APPALOFT_SWARM_STACK_NAME
 APPALOFT_POSTGRES_IMAGE=$APPALOFT_POSTGRES_IMAGE
 POSTGRES_DB=appaloft
@@ -617,7 +873,11 @@ docker_stack_deploy() {
     APPALOFT_HTTP_HOST="$APPALOFT_HTTP_HOST" \
     APPALOFT_HTTP_PORT="$APPALOFT_HTTP_PORT" \
     APPALOFT_WEB_ORIGIN="$appaloft_web_origin" \
+    APPALOFT_CONSOLE_DOMAIN="$APPALOFT_CONSOLE_DOMAIN" \
     APPALOFT_SELF_HOST_DATABASE="$APPALOFT_SELF_HOST_DATABASE" \
+    APPALOFT_SELF_HOST_PROXY="$APPALOFT_SELF_HOST_PROXY" \
+    APPALOFT_EDGE_NETWORK_NAME="$APPALOFT_EDGE_NETWORK_NAME" \
+    APPALOFT_TRAEFIK_IMAGE="$APPALOFT_TRAEFIK_IMAGE" \
     APPALOFT_POSTGRES_IMAGE="$APPALOFT_POSTGRES_IMAGE" \
     POSTGRES_DB="appaloft" \
     POSTGRES_USER="appaloft" \
@@ -628,10 +888,17 @@ docker_stack_deploy() {
 validate_port
 validate_database
 validate_orchestrator
+validate_proxy
+raw_appaloft_console_domain="$APPALOFT_CONSOLE_DOMAIN"
+APPALOFT_CONSOLE_DOMAIN="$(sanitize_domain "$APPALOFT_CONSOLE_DOMAIN")"
+if [ -n "$raw_appaloft_console_domain" ] && [ -z "$APPALOFT_CONSOLE_DOMAIN" ]; then
+  fail "--domain must be a hostname without scheme, path, port, spaces, or wildcards"
+fi
+validate_domain
 appaloft_version="$(normalize_version "$APPALOFT_VERSION")"
 appaloft_image_ref="$(image_ref "$appaloft_version")"
 appaloft_home="$(choose_home)"
-appaloft_web_origin="${APPALOFT_WEB_ORIGIN:-http://localhost:$APPALOFT_HTTP_PORT}"
+appaloft_web_origin="$(resolve_web_origin)"
 compose_file="$appaloft_home/docker-compose.yml"
 env_file="$appaloft_home/.env"
 
@@ -654,6 +921,10 @@ if [ "$APPALOFT_INSTALL_DRY_RUN" = "1" ]; then
   fi
   say "bind: $APPALOFT_HTTP_HOST:$APPALOFT_HTTP_PORT"
   say "web origin: $appaloft_web_origin"
+  if [ -n "$APPALOFT_CONSOLE_DOMAIN" ]; then
+    say "console domain: $APPALOFT_CONSOLE_DOMAIN"
+  fi
+  say "proxy: $APPALOFT_SELF_HOST_PROXY"
   say "database: $APPALOFT_SELF_HOST_DATABASE"
   if truthy "$APPALOFT_SKIP_DOCKER_INSTALL"; then
     say "install docker: no"
@@ -699,8 +970,12 @@ say "Installing Appaloft Docker stack"
 say "Home: $appaloft_home"
 say "Image: $appaloft_image_ref"
 say "HTTP: $appaloft_web_origin"
+if [ -n "$APPALOFT_CONSOLE_DOMAIN" ]; then
+  say "Console domain: $APPALOFT_CONSOLE_DOMAIN"
+fi
 say "Database: $APPALOFT_SELF_HOST_DATABASE"
 say "Orchestrator: $APPALOFT_SELF_HOST_ORCHESTRATOR"
+say "Proxy: $APPALOFT_SELF_HOST_PROXY"
 
 if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
   docker_stack_deploy

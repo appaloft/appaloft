@@ -66,6 +66,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-039: Scheduled Task Resource Ownership](./ADR-039-scheduled-task-resource-ownership.md) | Accepted | Defines Resource-owned scheduled tasks, run attempts, logs, scheduler admission, and deployment-boundary separation. |
 | [ADR-040: Dependency Binding Runtime Injection Boundary](./ADR-040-dependency-binding-runtime-injection-boundary.md) | Accepted | Defines how Resource dependency bindings become runtime inputs through deployment admission and runtime target adapters without adding dependency fields to `deployments.create`. |
 | [ADR-041: Dependency Runtime Secret Value Resolution](./ADR-041-dependency-runtime-secret-value-resolution.md) | Accepted | Defines store-backed dependency connection value storage, runtime resolution, and runtime target materialization for injected dependencies. |
+| [ADR-042: Self-Hosted Instance Bootstrap Proxy](./ADR-042-self-hosted-instance-bootstrap-proxy.md) | Accepted | Defines installer-owned console bootstrap routing, default self-host port, resident Traefik ownership, and separation from project resource routes. |
 
 ## Authoring Rules
 

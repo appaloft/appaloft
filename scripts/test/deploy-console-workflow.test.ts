@@ -18,8 +18,8 @@ test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow installs self-hosted A
   );
 });
 
-test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow defaults to durable PGlite mode", () => {
-  expect(workflow).toContain("default: pglite");
+test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow defaults to production Postgres mode", () => {
+  expect(workflow).toContain("default: postgres");
   expect(workflow).toContain(`console-database: ${expression("inputs.database")}`);
   expect(workflow).toContain(`console-url: ${expression("vars.APPALOFT_CONSOLE_ORIGIN")}`);
   expect(workflow).toContain(`url: ${expression("steps.console.outputs.console-url")}`);
