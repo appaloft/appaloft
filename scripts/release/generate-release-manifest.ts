@@ -103,6 +103,11 @@ const manifest: ReleaseManifest = {
       name: "ghcr.io/appaloft/appaloft",
       file: `ghcr.io/appaloft/appaloft:${version}`,
     },
+    {
+      kind: "container-image",
+      name: "ghcr.io/appaloft/appaloft",
+      file: `ghcr.io/appaloft/appaloft:${tag}`,
+    },
   ],
 };
 
