@@ -547,6 +547,7 @@ describe("DefaultRuntimePlanResolver", () => {
         "preview.mode": "pull-request",
         "access.routeSource": "server-applied-config-domain",
         "access.hostname": "14.preview.appaloft.com",
+        "workspace.baseImage": pinnedBunAlpineImage,
       }),
     );
   });
