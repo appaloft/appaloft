@@ -478,6 +478,19 @@ export const appaloftDeploymentControlPlaneConfigSchema = z
   .object({
     mode: z.enum(["none", "auto", "cloud", "self-hosted"]),
     url: nonEmptyStringSchema.refine(isSafeControlPlaneUrl, controlPlaneUrlError).optional(),
+    deploymentContext: z
+      .object({
+        projectId: nonEmptyStringSchema,
+        environmentId: nonEmptyStringSchema,
+        resourceId: nonEmptyStringSchema,
+        serverId: nonEmptyStringSchema,
+        destinationId: nonEmptyStringSchema.optional(),
+      })
+      .strict()
+      .optional()
+      .describe(
+        "Non-secret deployment identity for explicitly bootstrapping or relinking this repository to an Appaloft server context.",
+      ),
     install: z
       .object({
         url: nonEmptyStringSchema.refine(isSafeControlPlaneUrl, controlPlaneUrlError).optional(),
@@ -597,6 +610,9 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
   }
 
   const root = String(path[0]);
+  if (root === "controlPlane" && path[1] === "deploymentContext") {
+    return false;
+  }
   return (
     root === "runtime" ||
     root === "deployment" ||

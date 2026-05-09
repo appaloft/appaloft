@@ -54,12 +54,20 @@ The default for repository config deploys remains `none` unless a trusted contro
 explicitly supplied. Appaloft must not silently connect to Cloud or move state into a control plane
 because a new CLI release or action wrapper is used.
 
-Repository config may select control-plane connection policy, but it must not select durable
-Appaloft identity:
+Repository config may select control-plane connection policy. For self-hosted server config
+deploys, repository config may also carry a narrow non-secret deployment context that binds the
+repository to an already-created Appaloft project/environment/resource/server. This is an explicit
+operator-authored adoption/configuration choice, not a secret or authentication credential:
 
 ```yaml
 controlPlane:
-  mode: none
+  mode: self-hosted
+  url: https://console.example.com
+  deploymentContext:
+    projectId: prj_www
+    environmentId: env_prod
+    resourceId: res_www
+    serverId: srv_prod
 ```
 
 Allowed mode values are:
@@ -72,8 +80,9 @@ Allowed mode values are:
 | `self-hosted` | Use a user-operated Appaloft control plane. Requires a trusted URL and authentication or an explicitly anonymous self-host policy. |
 
 `controlPlane.url` may be present for `self-hosted` or future private Cloud endpoints because it is
-connection metadata, not project identity. Raw tokens, SSH keys, database URLs, project ids,
-resource ids, server ids, credential ids, and secret values remain rejected from committed
+connection metadata. `controlPlane.deploymentContext` may include only project, environment,
+resource, server, and optional destination ids. Raw tokens, SSH keys, database URLs, credential ids,
+organization/tenant ids, provider account ids, and secret values remain rejected from committed
 repository config.
 
 Control-plane identity selection comes from trusted sources outside committed config:
@@ -86,8 +95,11 @@ Control-plane identity selection comes from trusted sources outside committed co
   future MCP tool parameters;
 - explicit `source-links.relink` or a future control-plane source-link command.
 
-Changing `appaloft.yml` must not be sufficient to move a deployment to another Appaloft project,
-resource, server, destination, credential, tenant, or organization.
+Changing `appaloft.yml` may intentionally move a self-hosted server config deploy to another
+project, environment, resource, server, or destination only through
+`controlPlane.deploymentContext` and only after server-side authorization accepts the caller. It
+must not be sufficient to move a deployment to another credential, tenant, organization, provider
+account, or secret scope.
 
 ## Control-Plane Mode Contract
 
@@ -207,7 +219,7 @@ Every user-visible implementation slice must decide all first-class surfaces tog
 
 | Surface | Required contract |
 | --- | --- |
-| Repository config | Accept `controlPlane.mode` and optional non-secret `controlPlane.url`. Reject raw tokens, database URLs, project/resource/server/destination/credential ids, and secret material. |
+| Repository config | Accept `controlPlane.mode`, optional non-secret `controlPlane.url`, and optional self-hosted `controlPlane.deploymentContext` ids for explicit repository-to-resource binding. Reject raw tokens, database URLs, credential ids, organization/tenant ids, provider account ids, and secret material. |
 | CLI | Offer flags or environment variables for `control-plane-mode`, `control-plane-url`, token/login selection, and state backend override. CLI flags win over config. |
 | GitHub Action | Offer wrapper inputs for control-plane mode, URL, token/OIDC behavior, and execution mode while preserving pure SSH defaults. New CLI releases must not require wrapper releases unless wrapper behavior changes. |
 | Web | Show the active control-plane/state owner and offer a select/radio choice only in flows that can actually run the selected mode. A Web surface must not present Cloud/self-host selection as implemented until authentication and API behavior exist. |

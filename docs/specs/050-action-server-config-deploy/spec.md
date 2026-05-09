@@ -46,11 +46,13 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| ACTION-SERVER-CONFIG-SPEC-001 | Server applies repository config | `control-plane-mode: self-hosted` is selected, the Action has a compatible server URL/token, and a source package manifest includes a safe config path | The Action submits the server config deploy request | The server validates the package manifest and config, resolves identity from trusted context/source links, applies resource profile and env reference changes through explicit operations, then dispatches ids-only `deployments.create`. |
+| ACTION-SERVER-CONFIG-SPEC-001 | Server applies repository config | `control-plane-mode: self-hosted` is selected, the Action has a compatible server URL/token or currently accepted anonymous self-host policy, and a source package manifest includes a safe config path | The Action submits the server config deploy request | The server validates the package manifest and config, resolves identity from trusted context/source links or `controlPlane.deploymentContext`, applies resource profile and env reference changes through explicit operations, then dispatches ids-only `deployments.create`. |
 | ACTION-SERVER-CONFIG-SPEC-002 | Runner does not mutate Appaloft state | A self-hosted server config deploy is requested | The Action runs | The Action does not install or invoke the CLI, open SSH, select `state-backend`, or read/write SSH-server PGlite. It only performs handshake, package preparation/upload or reference handoff, API request, output, and feedback steps. |
-| ACTION-SERVER-CONFIG-SPEC-003 | Committed config cannot select identity | `appaloft.yml` contains project/resource/server/destination/credential ids, organization ids, tokens, database URLs, or secret values | The server parses the config | The request fails before mutation with structured validation details and no source link, resource profile, route, or deployment mutation. |
+| ACTION-SERVER-CONFIG-SPEC-003 | Committed config can only select narrow self-hosted deployment context | `appaloft.yml` contains `controlPlane.deploymentContext` with project/environment/resource/server and optional destination ids | The Action/server parses the config | The ids are treated as non-secret explicit deployment context for this repository and may bootstrap a missing source link after authorization. |
+| ACTION-SERVER-CONFIG-SPEC-003A | Committed config cannot select secrets or broad identity | `appaloft.yml` contains credential ids, organization ids, tenant ids, provider account ids, tokens, database URLs, or secret values | The server parses the config | The request fails before mutation with structured validation details and no source link, resource profile, route, or deployment mutation. |
 | ACTION-SERVER-CONFIG-SPEC-004 | Existing trigger mode remains supported | A repository already uses the source-link trigger mode for an existing resource profile | The wrapper and server are upgraded | The old `from-source-link` request shape continues to work, while server config deploy is selected only by an explicit supported input or endpoint. |
 | ACTION-SERVER-CONFIG-SPEC-005 | Preview context is scoped by trusted event facts | `preview=pull-request` and `preview-id` are supplied by a user-authored PR workflow | Server-side config bootstrap runs | The server uses a preview-scoped source fingerprint and trusted preview context; root production config domains or secrets are not reused as preview route or secret policy unless an accepted preview-safe config/overlay selects them. |
+| ACTION-SERVER-CONFIG-SPEC-005A | Preview Action inputs remain transient | A pull request preview workflow selects `server-config-deploy` and supplies `environment-variables`, `preview-domain-template`, `preview-tls-mode`, or `require-preview-url` | The Action submits the server config deploy request | The Action sends those values as transient API payload, the server applies preview environment values after committed `env` values, and preview route application binds only the trusted preview route instead of committed production `access.domains[]`. |
 | ACTION-SERVER-CONFIG-SPEC-006 | Incompatible feature fails before upload mutation | The server handshake does not advertise source package or server-side config bootstrap support | The Action starts | The Action fails in `control-plane-handshake` or `control-plane-capability` before source upload, source-link mutation, resource mutation, route mutation, or deployment creation. |
 | ACTION-SERVER-CONFIG-SPEC-007 | Source package is bounded and verifiable | A source package is prepared by the Action | The server accepts the package or reference | The server records safe package metadata, verifies checksum/size/path boundaries, rejects parent traversal or untrusted config paths, and does not persist raw secrets or oversized package content as read-model data. |
 | ACTION-SERVER-CONFIG-SPEC-008 | CI secret references stay runner-scoped and server-applied | Committed config declares `secrets.KEY.from: ci-env:NAME` and the workflow maps `secret-variables: KEY=ci-env:NAME` from GitHub Secrets into the runner environment | The Action submits the server config deploy request | The Action sends only transient resolved secret values to the self-hosted server API, the server applies them through environment commands as runtime secrets, missing required references fail before mutation with sanitized details, and pure SSH CLI mode still handles `--secret` directly. |
@@ -78,8 +80,10 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
   defaults remain pure SSH `none` or existing self-hosted source-link trigger when selected.
 - Web/UI: Web may link to the accepted deployment detail and source package diagnostics; Web mode
   selection remains separate.
-- Config: committed config may carry non-secret profile, `ci-env:` secret references, and
-  control-plane connection policy only. It must not carry identity or raw secret material.
+- Config: committed config may carry non-secret profile, `ci-env:` secret references,
+  control-plane connection policy, and the narrow self-hosted `controlPlane.deploymentContext`.
+  It must not carry credentials, org/tenant/provider account identity, tokens, database URLs, or
+  raw secret material.
 - Events: Code Round must define any new source package accepted/rejected events or process-state
   records before adding workers.
 - Public docs/help: docs must keep distinguishing pure Action/SSH, self-hosted source-link trigger,
@@ -115,12 +119,19 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
 - Existing server trigger mode does not read/apply repository config, upload source packages,
   apply runner-side resource profile inputs, or perform product-grade preview orchestration.
 - The first Action Server Config Deploy code slices validate package metadata, read
-  `server-github-fetch` config files from GitHub raw content, reject committed identity/secrets,
+  `server-github-fetch` config files from GitHub raw content, accept the narrow
+  `controlPlane.deploymentContext`, reject broad committed identity/secrets,
   resolve/bootstrap source-link context, apply runtime/network/health profile fields through
   explicit resource commands, apply plain `env` values through `environments.set-variable`, apply
   `access.domains[]` through managed `domain-bindings.create` commands when trusted
   resource/destination/server proxy context is available, apply `ci-env:` secret references from
-  transient Action-supplied values through `environments.set-variable`, and dispatch ids-only
-  deployment admission. Inline archive transport, remote archive URL transport, source package
+  transient Action-supplied values through `environments.set-variable`, accept transient
+  Action-supplied preview `environmentVariables` and `previewRoute` for pull request previews, and
+  dispatch ids-only deployment admission. Pull request previews do not reuse committed production
+  `access.domains[]`; when a preview route is supplied, it is the only route intent applied for
+  that request. Inline archive transport, remote archive URL transport, source package
   storage, diagnostics, cleanup, source profile application, non-`ci-env:` secret resolvers, and
   product-grade preview orchestration remain migration gaps.
+- The next auth hardening slice must make Action mutation endpoints require an installer-generated
+  deploy token or future OIDC exchange, return clear 401/403 errors, and fail before source-link,
+  resource, route, or deployment mutation.

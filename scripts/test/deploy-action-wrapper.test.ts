@@ -389,6 +389,93 @@ describe("deploy-action wrapper reference", () => {
     }
   });
 
+  test("[CONTROL-PLANE-HANDSHAKE-014] self-hosted deploy reads deployment context from appaloft.yml", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-config-context-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const payloadPath = join(workspace, "payload.json");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      join(workspace, "appaloft.yml"),
+      [
+        "controlPlane:",
+        "  mode: self-hosted",
+        "  url: https://console.example.com",
+        "  deploymentContext:",
+        "    projectId: prj_www",
+        "    environmentId: env_prod",
+        "    resourceId: res_www",
+        "    serverId: srv_prod",
+        "runtime:",
+        "  strategy: static",
+      ].join("\n"),
+    );
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'args="$*"',
+        'payload_file=""',
+        'while [ "$#" -gt 0 ]; do',
+        '  if [ "$1" = "--data-binary" ]; then',
+        "    shift",
+        '    payload_file="$1"',
+        "    payload_file=\"$(printf '%s' \"$payload_file\" | sed 's/^@//')\"",
+        "  fi",
+        "  shift || true",
+        "done",
+        'case "$args" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackage":true,"serverSideConfigBootstrap":true}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        '    cp "$payload_file" "$APPALOFT_TEST_PAYLOAD_PATH"',
+        '    printf \'{"id":"dep_config_context","deploymentHref":"/deployments/dep_config_context"}\'',
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        APPALOFT_TEST_PAYLOAD_PATH: payloadPath,
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.yml",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(readFileSync(payloadPath, "utf8"));
+      expect(payload.trustedContext).toMatchObject({
+        projectId: "prj_www",
+        environmentId: "env_prod",
+        resourceId: "res_www",
+        serverId: "srv_prod",
+      });
+      expect(readFileSync(outputPath, "utf8")).toContain(
+        "deployment-url=https://console.example.com/deployments/dep_config_context",
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   test("[CONTROL-PLANE-HANDSHAKE-014] self-hosted server config deploy sends resolved ci-env secrets to the server API", () => {
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-secrets-"));
     const outputPath = join(workspace, "github-output.txt");
@@ -799,6 +886,116 @@ describe("deploy-action wrapper reference", () => {
       expect(output).toContain(
         "deployment-url=https://console.example.com/deployments/dep_server_mode",
       );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] self-hosted server config preview sends transient env and route payload", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-preview-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const payloadPath = join(workspace, "payload.json");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'case "$*" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackage":true,"serverSideConfigBootstrap":true}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        '    payload=""',
+        '    previous=""',
+        '    for arg in "$@"; do',
+        '      if [ "$previous" = "--data-binary" ]; then',
+        '        payload="$arg"',
+        "      fi",
+        '      previous="$arg"',
+        "    done",
+        "    payload_file=\"$(printf '%s' \"$payload\" | sed 's/^@//')\"",
+        '    cat "$payload_file" > "$APPALOFT_CAPTURED_PAYLOAD"',
+        '    printf \'{"id":"dep_server_preview","deploymentHref":"/deployments/dep_server_preview"}\'',
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        APPALOFT_BETTER_AUTH_SECRET: "resolved-secret",
+        APPALOFT_CAPTURED_PAYLOAD: payloadPath,
+        GITHUB_BASE_REF: "main",
+        GITHUB_HEAD_REF: "feature-preview",
+        GITHUB_OUTPUT: outputPath,
+        GITHUB_REPOSITORY: "appaloft/www",
+        GITHUB_REPOSITORY_ID: "123456",
+        GITHUB_SHA: "abc123",
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.preview.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_ENVIRONMENT_VARIABLES:
+          "HOST=0.0.0.0\nPORT=4321\nAPPALOFT_BETTER_AUTH_URL=http://pr-42.preview.example.com",
+        INPUT_PREVIEW: "pull-request",
+        INPUT_PREVIEW_ID: "pr-42",
+        INPUT_PREVIEW_DOMAIN_TEMPLATE: "pr-42.preview.example.com",
+        INPUT_PREVIEW_TLS_MODE: "disabled",
+        INPUT_REQUIRE_PREVIEW_URL: "true",
+        INPUT_SECRET_VARIABLES: "APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_BETTER_AUTH_SECRET",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const output = readFileSync(outputPath, "utf8");
+      expect(output).toContain("deployment-id=dep_server_preview");
+      expect(output).toContain("preview-id=pr-42");
+      expect(output).toContain("preview-url=http://pr-42.preview.example.com");
+      const payload = JSON.parse(readFileSync(payloadPath, "utf8"));
+      expect(payload).toMatchObject({
+        configPath: "appaloft.preview.yml",
+        environmentVariables: {
+          HOST: "0.0.0.0",
+          PORT: "4321",
+          APPALOFT_BETTER_AUTH_URL: "http://pr-42.preview.example.com",
+        },
+        preview: {
+          kind: "pull-request",
+          previewId: "pr-42",
+          pullRequestNumber: 42,
+          baseRef: "main",
+          headRef: "feature-preview",
+        },
+        previewRoute: {
+          host: "pr-42.preview.example.com",
+          pathPrefix: "/",
+          tlsMode: "disabled",
+        },
+        resolvedSecrets: {
+          APPALOFT_BETTER_AUTH_SECRET: "resolved-secret",
+        },
+        trustedContext: {
+          repositoryFullName: "appaloft/www",
+          repositoryId: "123456",
+          revision: "abc123",
+        },
+      });
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }

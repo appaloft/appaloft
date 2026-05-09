@@ -1401,6 +1401,153 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommands[2]).toBeInstanceOf(CreateDeploymentCommand);
   });
 
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config preview applies transient env and preview route only", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommands.push(command as Command<unknown>);
+        return ok({
+          id:
+            command instanceof CreateDeploymentCommand
+              ? "dep_preview_config"
+              : `cmd_${capturedCommands.length}`,
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        if (query instanceof ShowServerQuery) {
+          return ok({
+            schemaVersion: "servers.show/v1",
+            server: {
+              id: "srv_prod",
+              name: "prod",
+              host: "203.0.113.10",
+              port: 22,
+              providerKey: "ssh",
+              targetKind: "single-server",
+              lifecycleStatus: "active",
+              edgeProxy: {
+                kind: "traefik",
+                status: "ready",
+              },
+              createdAt: "2026-05-08T00:00:00.000Z",
+            },
+            generatedAt: "2026-05-08T00:00:00.000Z",
+          } as T);
+        }
+        return ok({} as T);
+      },
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "env:",
+            "  HOST: 127.0.0.1",
+            "  PUBLIC_SITE: https://www.example.com",
+            "access:",
+            "  domains:",
+            "    - host: www.example.com",
+            "      pathPrefix: /",
+            "      tlsMode: auto",
+          ].join("\n"),
+          fileName: "appaloft.preview.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:preview%3Apr%3A42:github:provider-repository%3A123456:.:appaloft.preview.yml",
+          configPath: "appaloft.preview.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:preview%3Apr%3A42:github:provider-repository%3A123456:.:appaloft.preview.yml",
+            configPath: "appaloft.preview.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          environmentVariables: {
+            HOST: "0.0.0.0",
+            APPALOFT_BETTER_AUTH_URL: "http://pr-42.preview.example.com",
+          },
+          preview: {
+            kind: "pull-request",
+            previewId: "pr-42",
+            pullRequestNumber: 42,
+          },
+          previewRoute: {
+            host: "pr-42.preview.example.com",
+            pathPrefix: "/",
+            tlsMode: "disabled",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_preview",
+            resourceId: "res_preview",
+            serverId: "srv_prod",
+            destinationId: "dst_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    const environmentCommands = capturedCommands.filter(
+      (command) => command instanceof SetEnvironmentVariableCommand,
+    );
+    const domainCommands = capturedCommands.filter(
+      (command) => command instanceof CreateDomainBindingCommand,
+    );
+    expect(environmentCommands).toHaveLength(3);
+    expect(environmentCommands).toContainEqual(
+      expect.objectContaining({
+        environmentId: "env_preview",
+        key: "HOST",
+        value: "0.0.0.0",
+        kind: "plain-config",
+      }),
+    );
+    expect(environmentCommands).toContainEqual(
+      expect.objectContaining({
+        key: "APPALOFT_BETTER_AUTH_URL",
+        value: "http://pr-42.preview.example.com",
+      }),
+    );
+    expect(domainCommands).toHaveLength(1);
+    expect(domainCommands[0]).toMatchObject({
+      projectId: "prj_console",
+      environmentId: "env_preview",
+      resourceId: "res_preview",
+      serverId: "srv_prod",
+      destinationId: "dst_prod",
+      domainName: "pr-42.preview.example.com",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+      tlsMode: "disabled",
+    });
+    expect(domainCommands[0]).not.toMatchObject({
+      domainName: "www.example.com",
+    });
+    expect(capturedCommands.at(-1)).toBeInstanceOf(CreateDeploymentCommand);
+  });
+
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint fails before mutation when unsupported source profile application is required", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
