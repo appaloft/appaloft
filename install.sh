@@ -23,22 +23,89 @@ APPALOFT_SWARM_ADVERTISE_ADDR="${APPALOFT_SWARM_ADVERTISE_ADDR:-}"
 APPALOFT_SKIP_DOCKER_INSTALL="${APPALOFT_SKIP_DOCKER_INSTALL:-0}"
 APPALOFT_INSTALL_DRY_RUN="${APPALOFT_INSTALL_DRY_RUN:-0}"
 APPALOFT_DOCKER_INSTALL_SCRIPT_URL="${APPALOFT_DOCKER_INSTALL_SCRIPT_URL:-https://get.docker.com}"
+APPALOFT_FORCE_COLOR="${APPALOFT_FORCE_COLOR:-0}"
+appaloft_color_reset=""
+appaloft_color_bold=""
+appaloft_color_dim=""
+appaloft_color_green=""
+appaloft_color_cyan=""
+appaloft_color_yellow=""
+appaloft_color_red=""
 
 say() {
   printf '%s\n' "$*"
 }
 
 warn() {
-  printf 'appaloft install: %s\n' "$*" >&2
+  printf '%sappaloft install:%s %s\n' "$appaloft_color_yellow" "$appaloft_color_reset" "$*" >&2
 }
 
 step() {
-  printf '\n==> %s\n' "$*"
+  printf '\n%s==>%s %s%s%s\n' \
+    "$appaloft_color_cyan" \
+    "$appaloft_color_reset" \
+    "$appaloft_color_bold" \
+    "$*" \
+    "$appaloft_color_reset"
 }
 
 fail() {
-  warn "ERROR: $*"
+  printf '%sappaloft install failed:%s %s\n' "$appaloft_color_red" "$appaloft_color_reset" "$*" >&2
   exit 1
+}
+
+init_color() {
+  case "$APPALOFT_FORCE_COLOR" in
+    1 | true | TRUE | yes | YES | on | ON) ;;
+    *)
+      [ -z "${NO_COLOR:-}" ] || return 0
+      [ -t 1 ] || return 0
+      ;;
+  esac
+
+  appaloft_color_reset="$(printf '\033[0m')"
+  appaloft_color_bold="$(printf '\033[1m')"
+  appaloft_color_dim="$(printf '\033[2m')"
+  appaloft_color_green="$(printf '\033[32m')"
+  appaloft_color_cyan="$(printf '\033[36m')"
+  appaloft_color_yellow="$(printf '\033[33m')"
+  appaloft_color_red="$(printf '\033[31m')"
+}
+
+print_success_banner() {
+  printf '\n%s' "$appaloft_color_green"
+  cat <<'BANNER'
+
+      _       PPPP   PPPP       _       L       OOOO   FFFFF  TTTTT
+     / \      P   P  P   P     / \      L      O    O  F        T
+    / _ \     PPPP   PPPP     / _ \     L      O    O  FFF      T
+   / ___ \    P      P       / ___ \    L      O    O  F        T
+  /_/   \_\   P      P      /_/   \_\   LLLLL   OOOO   F        T
+
+                 Self-host console is ready.
+
+BANNER
+  printf '%s' "$appaloft_color_reset"
+}
+
+print_next_steps() {
+  logs_command="$1"
+
+  step "Next steps"
+  printf '  %sOpen console:%s %s\n' "$appaloft_color_bold" "$appaloft_color_reset" "$appaloft_web_origin"
+  printf '  %sWatch logs:%s    %s\n' "$appaloft_color_bold" "$appaloft_color_reset" "$logs_command"
+  printf '  %sUpdate/repair:%s rerun the same install command; existing config and data are reused.\n' \
+    "$appaloft_color_bold" \
+    "$appaloft_color_reset"
+  if [ -n "$APPALOFT_CONSOLE_DOMAIN" ]; then
+    printf '  %sDNS:%s           keep %s pointed at this server.\n' \
+      "$appaloft_color_bold" \
+      "$appaloft_color_reset" \
+      "$APPALOFT_CONSOLE_DOMAIN"
+  fi
+  printf '  %sGitHub Action:%s use this console URL when switching deployments to self-hosted server mode.\n' \
+    "$appaloft_color_bold" \
+    "$appaloft_color_reset"
 }
 
 usage() {
@@ -93,8 +160,12 @@ Environment:
   APPALOFT_SWARM_ADVERTISE_ADDR
   APPALOFT_SKIP_DOCKER_INSTALL=1
   APPALOFT_INSTALL_DRY_RUN=1
+  APPALOFT_FORCE_COLOR=1
+  NO_COLOR=1
 USAGE
 }
+
+init_color
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -1026,6 +1097,7 @@ say "Environment file: $env_file"
 if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
   step "Deploying Docker Swarm stack"
   docker_stack_deploy || fail "Docker Swarm failed to deploy the Appaloft stack; check Docker stack errors above and rerun the same install command"
+  appaloft_logs_command="docker service logs -f ${APPALOFT_SWARM_STACK_NAME}_app"
 else
   step "Pulling Appaloft Docker images"
   docker_compose pull ||
@@ -1034,12 +1106,9 @@ else
   step "Starting Appaloft containers"
   docker_compose up -d ||
     fail "Docker Compose failed to start Appaloft; check Docker errors above and rerun the same install command"
+  appaloft_logs_command="docker compose --env-file $env_file -p $APPALOFT_COMPOSE_PROJECT_NAME -f $compose_file logs -f"
 fi
 
 step "Appaloft install completed"
-say "Console: $appaloft_web_origin"
-if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
-  say "Logs: docker service logs -f ${APPALOFT_SWARM_STACK_NAME}_app"
-else
-  say "Logs: docker compose --env-file $env_file -p $APPALOFT_COMPOSE_PROJECT_NAME -f $compose_file logs -f"
-fi
+print_success_banner
+print_next_steps "$appaloft_logs_command"
