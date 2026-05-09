@@ -6,6 +6,11 @@ RUN apt-get update \
 COPY .bun-version ./
 RUN BUN_VERSION="$(cat .bun-version)" \
   && curl -fsSL https://bun.com/install | bash -s "bun-v${BUN_VERSION}" \
+  && if [ "$(uname -m)" = "x86_64" ]; then \
+    curl -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64-baseline.zip" -o /tmp/bun-linux-x64-baseline.zip \
+    && unzip -q /tmp/bun-linux-x64-baseline.zip -d /tmp \
+    && cp /tmp/bun-linux-x64-baseline/bun /root/.bun/bin/bun; \
+  fi \
   && /root/.bun/bin/bun --version | grep -x "${BUN_VERSION}"
 
 FROM debian:bookworm-slim AS builder
@@ -46,5 +51,7 @@ ENV APPALOFT_WEB_STATIC_DIR=/app/web
 ENV APPALOFT_DOCS_STATIC_DIR=/app/docs
 
 EXPOSE 3001
+
+HEALTHCHECK --interval=5s --timeout=3s --start-period=20s --retries=12 CMD ["bun", "-e", "const port = process.env.APPALOFT_HTTP_PORT || '3001'; fetch(`http://127.0.0.1:${port}/api/health`).then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1));"]
 
 CMD ["bun", "/app/appaloft", "serve"]
