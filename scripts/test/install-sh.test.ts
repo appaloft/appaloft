@@ -52,6 +52,19 @@ case "$1" in
   compose)
     exit 0
     ;;
+  network)
+    if [ "$2" = "inspect" ]; then
+      if [ "$APPALOFT_FAKE_DOCKER_EDGE_NETWORK_EXISTS" = "1" ]; then
+        case "$4" in
+          *com.docker.compose.network*) printf '%s\\n' "$APPALOFT_FAKE_DOCKER_EDGE_NETWORK_LABEL" ;;
+          *com.docker.compose.project*) printf '%s\\n' "$APPALOFT_FAKE_DOCKER_EDGE_PROJECT_LABEL" ;;
+        esac
+        exit 0
+      fi
+      exit 1
+    fi
+    exit 0
+    ;;
   stack | swarm)
     exit 0
     ;;
@@ -186,9 +199,14 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     );
 
     expect(install.exitCode).toBe(0);
-    expect(install.stdout).toContain("Installing Appaloft Docker stack");
+    expect(install.stdout).toContain("==> Installing Appaloft Docker stack");
     expect(install.stdout).toContain("Image: ghcr.io/appaloft/appaloft:9.8.7");
     expect(install.stdout).toContain("HTTP: https://appaloft.example.test");
+    expect(install.stdout).toContain("==> Appaloft install completed");
+    expect(install.stdout).toContain("PPPP   PPPP");
+    expect(install.stdout).toContain("Open console: https://appaloft.example.test");
+    expect(install.stdout).toContain("Watch logs:");
+    expect(install.stdout).toContain("Update/repair:");
 
     const compose = await Bun.file(join(home, "docker-compose.yml")).text();
     expect(compose).toContain("image: $" + "{APPALOFT_IMAGE_REF}");
@@ -206,6 +224,42 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     expect(dockerLog).toContain("compose --env-file");
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} pull`);
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh can force colored progress and success output", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--web-origin",
+        "https://appaloft.example.test",
+        "--postgres-password",
+        "fixture-password",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        APPALOFT_FORCE_COLOR: "1",
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+    expect(install.stdout).toContain("\u001b[36m==>\u001b[0m");
+    expect(install.stdout).toContain("\u001b[32m\n      _       PPPP   PPPP");
+    expect(install.stdout).toContain("\u001b[1mOpen console:\u001b[0m");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
@@ -259,6 +313,50 @@ test("install.sh configures Traefik console domain bootstrap when a domain is su
     expect(env).toContain("APPALOFT_CONSOLE_DOMAIN=console.appaloft.example.test");
     expect(env).toContain("APPALOFT_SELF_HOST_PROXY=traefik");
     expect(env).toContain("APPALOFT_EDGE_NETWORK_NAME=appaloft-edge");
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh reuses an unmanaged existing Compose edge network", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--domain",
+        "console.appaloft.example.test",
+        "--postgres-password",
+        "fixture-password",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_EDGE_NETWORK_EXISTS: "1",
+        APPALOFT_FAKE_DOCKER_EDGE_NETWORK_LABEL: "",
+        APPALOFT_FAKE_DOCKER_EDGE_PROJECT_LABEL: "",
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+    expect(install.stdout).toContain("Using existing Docker network appaloft-edge as external");
+
+    const compose = await Bun.file(join(home, "docker-compose.yml")).text();
+    expect(compose).toContain("appaloft-edge:");
+    expect(compose).toContain("external: true");
+
+    const dockerLog = await Bun.file(logPath).text();
+    expect(dockerLog).toContain("network inspect --format");
+    expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
@@ -344,7 +442,7 @@ test("install.sh writes a Docker Swarm PGlite stack and deploys it", async () =>
 
     expect(install.exitCode).toBe(0);
     expect(install.stdout).toContain("Orchestrator: swarm");
-    expect(install.stdout).toContain("Logs: docker service logs -f appaloft-console_app");
+    expect(install.stdout).toContain("Watch logs:    docker service logs -f appaloft-console_app");
 
     const compose = await Bun.file(join(home, "docker-compose.yml")).text();
     expect(compose).toContain("APPALOFT_DATABASE_DRIVER: pglite");
