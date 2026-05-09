@@ -32,8 +32,12 @@ warn() {
   printf 'appaloft install: %s\n' "$*" >&2
 }
 
+step() {
+  printf '\n==> %s\n' "$*"
+}
+
 fail() {
-  warn "$*"
+  warn "ERROR: $*"
   exit 1
 }
 
@@ -573,6 +577,37 @@ read_existing_env_value() {
   sed -n "s/^$key=//p" "$file" | head -n 1
 }
 
+docker_network_label() {
+  network_name="$1"
+  label_name="$2"
+
+  docker_stdout network inspect --format "{{ index .Labels \"$label_name\" }}" "$network_name" 2>/dev/null
+}
+
+detect_compose_edge_network_mode() {
+  appaloft_edge_network_external=0
+
+  if [ "$APPALOFT_SELF_HOST_PROXY" != "traefik" ] ||
+    [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" != "compose" ]; then
+    return
+  fi
+
+  network_label="$(docker_network_label "$APPALOFT_EDGE_NETWORK_NAME" "com.docker.compose.network" || true)"
+  if [ -z "$network_label" ]; then
+    if docker_command_succeeds network inspect "$APPALOFT_EDGE_NETWORK_NAME"; then
+      appaloft_edge_network_external=1
+      say "Using existing Docker network $APPALOFT_EDGE_NETWORK_NAME as external"
+    fi
+    return
+  fi
+
+  project_label="$(docker_network_label "$APPALOFT_EDGE_NETWORK_NAME" "com.docker.compose.project" || true)"
+  if [ "$network_label" != "appaloft-edge" ] || [ "$project_label" != "$APPALOFT_COMPOSE_PROJECT_NAME" ]; then
+    appaloft_edge_network_external=1
+    say "Using existing Docker network $APPALOFT_EDGE_NETWORK_NAME as external"
+  fi
+}
+
 write_compose_file() {
   destination="$1"
 
@@ -795,6 +830,12 @@ networks:
   appaloft-edge:
     name: ${APPALOFT_EDGE_NETWORK_NAME}
 COMPOSE
+
+  if [ "${appaloft_edge_network_external:-0}" = "1" ]; then
+    cat >>"$destination" <<'COMPOSE'
+    external: true
+COMPOSE
+  fi
 }
 
 write_env_file() {
@@ -946,6 +987,8 @@ if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
   ensure_swarm_manager
 fi
 
+detect_compose_edge_network_mode
+
 if [ "$APPALOFT_SELF_HOST_DATABASE" = "postgres" ]; then
   existing_postgres_password="$(read_existing_env_value POSTGRES_PASSWORD "$env_file" || true)"
   if [ -n "$APPALOFT_POSTGRES_PASSWORD" ]; then
@@ -963,10 +1006,7 @@ write_compose_file "$tmp_compose"
 write_env_file "$tmp_env"
 
 run_maybe_root mkdir -p "$appaloft_home"
-install_file "$tmp_compose" "$compose_file" 0644
-install_file "$tmp_env" "$env_file" 0600
-
-say "Installing Appaloft Docker stack"
+step "Installing Appaloft Docker stack"
 say "Home: $appaloft_home"
 say "Image: $appaloft_image_ref"
 say "HTTP: $appaloft_web_origin"
@@ -977,14 +1017,27 @@ say "Database: $APPALOFT_SELF_HOST_DATABASE"
 say "Orchestrator: $APPALOFT_SELF_HOST_ORCHESTRATOR"
 say "Proxy: $APPALOFT_SELF_HOST_PROXY"
 
+step "Writing Appaloft configuration"
+install_file "$tmp_compose" "$compose_file" 0644
+install_file "$tmp_env" "$env_file" 0600
+say "Compose file: $compose_file"
+say "Environment file: $env_file"
+
 if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
-  docker_stack_deploy
+  step "Deploying Docker Swarm stack"
+  docker_stack_deploy || fail "Docker Swarm failed to deploy the Appaloft stack; check Docker stack errors above and rerun the same install command"
 else
-  docker_compose pull
-  docker_compose up -d
+  step "Pulling Appaloft Docker images"
+  docker_compose pull ||
+    fail "Docker Compose failed to pull Appaloft images; check registry access and network connectivity, then rerun the same install command"
+
+  step "Starting Appaloft containers"
+  docker_compose up -d ||
+    fail "Docker Compose failed to start Appaloft; check Docker errors above and rerun the same install command"
 fi
 
-say "Appaloft is starting at $appaloft_web_origin"
+step "Appaloft install completed"
+say "Console: $appaloft_web_origin"
 if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
   say "Logs: docker service logs -f ${APPALOFT_SWARM_STACK_NAME}_app"
 else
