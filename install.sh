@@ -747,6 +747,7 @@ services:
       APPALOFT_WEB_STATIC_DIR: /app/web
       APPALOFT_DOCS_STATIC_DIR: /app/docs
       APPALOFT_DATABASE_DRIVER: pglite
+      APPALOFT_AUTO_MIGRATE: "true"
       APPALOFT_DATA_DIR: /appaloft-data
       APPALOFT_PGLITE_DATA_DIR: /appaloft-data/pglite
       APPALOFT_WEB_ORIGIN: ${APPALOFT_WEB_ORIGIN}
@@ -787,6 +788,7 @@ services:
       APPALOFT_HTTP_PORT: 3001
       APPALOFT_WEB_STATIC_DIR: /app/web
       APPALOFT_DOCS_STATIC_DIR: /app/docs
+      APPALOFT_AUTO_MIGRATE: "true"
       APPALOFT_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       APPALOFT_WEB_ORIGIN: ${APPALOFT_WEB_ORIGIN}
     ports:

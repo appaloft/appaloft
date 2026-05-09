@@ -84,6 +84,23 @@ describe("resolveConfig", () => {
     expect(config.databaseUrl).toBe("postgres://postgres:postgres@127.0.0.1:5432/appaloft");
   });
 
+  test("keeps automatic migrations opt-in for Postgres runtime startup", () => {
+    const defaults = resolveConfig({
+      env: {
+        APPALOFT_DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5432/appaloft",
+      },
+    });
+    const configured = resolveConfig({
+      env: {
+        APPALOFT_AUTO_MIGRATE: "true",
+        APPALOFT_DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5432/appaloft",
+      },
+    });
+
+    expect(defaults.autoMigrate).toBe(false);
+    expect(configured.autoMigrate).toBe(true);
+  });
+
   test("derives pglite storage from explicit data dir", () => {
     const config = resolveConfig({
       env: {
