@@ -545,6 +545,12 @@ export function createHttpApp(input: {
   function staticAssetResponse(pathname: string, source: StaticAssetSource): Response | null {
     const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
     const embeddedPath = `/${relativePath}`;
+    const cleanUrlHtmlPath =
+      relativePath &&
+      !relativePath.endsWith("/") &&
+      !(relativePath.split("/").pop() ?? "").includes(".")
+        ? `${relativePath}.html`
+        : null;
 
     if (source.staticDir) {
       const candidate = resolve(source.staticDir, relativePath);
@@ -562,9 +568,28 @@ export function createHttpApp(input: {
         return new Response(Bun.file(routeIndexFile));
       }
 
+      if (cleanUrlHtmlPath) {
+        const cleanUrlHtmlFile = resolve(source.staticDir, cleanUrlHtmlPath);
+        if (
+          cleanUrlHtmlFile !== source.staticDir &&
+          cleanUrlHtmlFile.startsWith(`${source.staticDir}${sep}`) &&
+          existsSync(cleanUrlHtmlFile) &&
+          statSync(cleanUrlHtmlFile).isFile()
+        ) {
+          return new Response(Bun.file(cleanUrlHtmlFile));
+        }
+      }
+
       if (source.fallbackToRootIndex) {
+        const fallbackFile = join(source.staticDir, "200.html");
+        if (existsSync(fallbackFile) && statSync(fallbackFile).isFile()) {
+          return new Response(Bun.file(fallbackFile));
+        }
+
         const indexFile = join(source.staticDir, "index.html");
-        return existsSync(indexFile) ? new Response(Bun.file(indexFile)) : null;
+        return existsSync(indexFile) && statSync(indexFile).isFile()
+          ? new Response(Bun.file(indexFile))
+          : null;
       }
 
       return null;
@@ -583,11 +608,19 @@ export function createHttpApp(input: {
       return new Response(embeddedRouteIndex);
     }
 
+    if (cleanUrlHtmlPath) {
+      const embeddedCleanUrlHtml = source.embeddedAssets[`/${cleanUrlHtmlPath}`];
+      if (embeddedCleanUrlHtml) {
+        return new Response(embeddedCleanUrlHtml);
+      }
+    }
+
     if (!source.fallbackToRootIndex) {
       return null;
     }
 
-    const embeddedIndex = source.embeddedAssets["/index.html"];
+    const embeddedIndex =
+      source.embeddedAssets["/200.html"] ?? source.embeddedAssets["/index.html"];
     return embeddedIndex ? new Response(embeddedIndex) : null;
   }
 
