@@ -66,12 +66,12 @@ function runCommandFor(packageManager: NodePackageManager, script: string): stri
   }
 }
 
-function nodeBaseImage(inspection?: SourceInspectionSnapshot): string {
-  if (inspection?.packageManager === "bun") {
+function nodeBaseImage(input: WorkspacePlannerInput): string {
+  if (input.source.inspection?.packageManager === "bun" || commandMentions(input, ["bun"])) {
     return pinnedBunAlpineImage;
   }
 
-  const version = inspection?.runtimeVersion ?? "22";
+  const version = input.source.inspection?.runtimeVersion ?? "22";
   return `node:${version}-alpine`;
 }
 
@@ -128,7 +128,7 @@ export const nodeWorkspacePlanner: WorkspaceRuntimePlanner = {
       return err(startCommand.error);
     }
 
-    const baseImage = nodeBaseImage(input.source.inspection);
+    const baseImage = nodeBaseImage(input);
     const installCommand = nodeInstallCommand(input, packageManager);
     const buildCommand = nodeBuildCommand(input, packageManager);
 
@@ -160,7 +160,11 @@ export const nodeWorkspacePlanner: WorkspaceRuntimePlanner = {
   },
 
   dockerBuild(input: WorkspaceDockerfileInput) {
-    const baseImage = input.execution.metadata?.["workspace.baseImage"] ?? nodeBaseImage(input.sourceInspection);
+    const baseImage =
+      input.execution.metadata?.["workspace.baseImage"] ??
+      (input.sourceInspection?.packageManager === "bun"
+        ? pinnedBunAlpineImage
+        : `node:${input.sourceInspection?.runtimeVersion ?? "22"}-alpine`);
 
     return dockerBuildFromExecution({
       baseImage,
