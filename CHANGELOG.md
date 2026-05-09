@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.4](https://github.com/appaloft/appaloft/compare/v0.9.3...v0.9.4) (2026-05-09)
+
+
+### Features
+
+* add self-hosted console proxy bootstrap ([bc154e0](https://github.com/appaloft/appaloft/commit/bc154e03dfde668ca038e21e415e20b71445e736))
+* add self-hosted console proxy bootstrap ([b384a79](https://github.com/appaloft/appaloft/commit/b384a79106bc52fa25934cde4883856cdfc008b1))
+
 ## [0.9.3](https://github.com/appaloft/appaloft/compare/v0.9.2...v0.9.3) (2026-05-08)
 
 
