@@ -53,6 +53,10 @@ function trustedContextFromParsed(trustedContext?: {
   resourceId?: string | undefined;
   serverId?: string | undefined;
   destinationId?: string | undefined;
+  repositoryFullName?: string | undefined;
+  repositoryId?: string | undefined;
+  ref?: string | undefined;
+  revision?: string | undefined;
 }): TrustedActionServerConfigDeploymentContext | undefined {
   if (!trustedContext) {
     return undefined;
