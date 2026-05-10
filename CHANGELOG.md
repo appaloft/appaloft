@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.8](https://github.com/appaloft/appaloft/compare/v0.9.7...v0.9.8) (2026-05-10)
+
+
+### Bug Fixes
+
+* **console:** suppress cleaned preview access routes ([#215](https://github.com/appaloft/appaloft/issues/215)) ([510cb85](https://github.com/appaloft/appaloft/commit/510cb8531b1f16e8980f261af6c0bd68e6671d5a))
+* **http:** serve console deep links from static assets ([#214](https://github.com/appaloft/appaloft/issues/214)) ([17b7321](https://github.com/appaloft/appaloft/commit/17b732177a3411286e187c7eb84654369af03aee))
+
 ## [0.9.7](https://github.com/appaloft/appaloft/compare/v0.9.6...v0.9.7) (2026-05-09)
 
 
