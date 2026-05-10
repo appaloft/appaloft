@@ -12,6 +12,10 @@ export const resolveActionServerConfigDeploymentTargetCommandInputSchema = z
         resourceId: nonEmptyTrimmedString("Resource id").optional(),
         serverId: nonEmptyTrimmedString("Server id").optional(),
         destinationId: nonEmptyTrimmedString("Destination id").optional(),
+        repositoryFullName: nonEmptyTrimmedString("Repository full name").optional(),
+        repositoryId: nonEmptyTrimmedString("Repository id").optional(),
+        ref: nonEmptyTrimmedString("Source ref").optional(),
+        revision: nonEmptyTrimmedString("Source revision").optional(),
       })
       .strict()
       .optional(),
