@@ -14,6 +14,7 @@ import {
   HealthCheckStartPeriodSeconds,
   HealthCheckTimeoutSeconds,
   HealthCheckTypeValue,
+  ok,
   PortNumber,
   ProjectId,
   Resource,
@@ -355,6 +356,43 @@ describe("Resource", () => {
         });
       }
     }
+  });
+
+  test("[SRC-AUTO-ENTRY-002] resolves generic signed webhook secret through Resource behavior", () => {
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("application"),
+      sourceBinding: {
+        kind: SourceKindValue.rehydrate("git-public"),
+        locator: SourceLocator.rehydrate("https://github.com/appaloft/demo"),
+        displayName: DisplayNameText.rehydrate("appaloft/demo"),
+        gitRef: GitRefText.rehydrate("main"),
+      },
+    })._unsafeUnwrap();
+
+    resource
+      .setVariable({
+        key: ConfigKey.rehydrate("APPALOFT_WEBHOOK_SECRET"),
+        value: ConfigValueText.rehydrate("correct-secret"),
+        kind: VariableKindValue.rehydrate("secret"),
+        exposure: VariableExposureValue.rehydrate("runtime"),
+        isSecret: true,
+        updatedAt: UpdatedAt.rehydrate("2026-01-01T00:03:01.000Z"),
+      })
+      ._unsafeUnwrap();
+    resource
+      .configureAutoDeployPolicy({
+        triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate("generic-signed-webhook"),
+        refs: [GitRefText.rehydrate("main")],
+        eventKinds: [SourceEventKindValue.rehydrate("push")],
+        genericWebhookSecretRef: ResourceAutoDeploySecretRef.create(
+          "resource-secret:APPALOFT_WEBHOOK_SECRET",
+        )._unsafeUnwrap(),
+        configuredAt: UpdatedAt.rehydrate("2026-01-01T00:03:02.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    expect(resource.genericSignedWebhookSecretValue()).toEqual(ok("correct-secret"));
   });
 
   test("[SRC-AUTO-POLICY-002] rejects auto-deploy when source binding is missing", () => {

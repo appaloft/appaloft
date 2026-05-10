@@ -56,6 +56,7 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
 | ACTION-SERVER-CONFIG-SPEC-006 | Incompatible feature fails before upload mutation | The server handshake does not advertise source package or server-side config bootstrap support | The Action starts | The Action fails in `control-plane-handshake` or `control-plane-capability` before source upload, source-link mutation, resource mutation, route mutation, or deployment creation. |
 | ACTION-SERVER-CONFIG-SPEC-007 | Source package is bounded and verifiable | A source package is prepared by the Action | The server accepts the package or reference | The server records safe package metadata, verifies checksum/size/path boundaries, rejects parent traversal or untrusted config paths, and does not persist raw secrets or oversized package content as read-model data. |
 | ACTION-SERVER-CONFIG-SPEC-008 | CI secret references stay runner-scoped and server-applied | Committed config declares `secrets.KEY.from: ci-env:NAME` and the workflow maps `secret-variables: KEY=ci-env:NAME` from GitHub Secrets into the runner environment | The Action submits the server config deploy request | The Action sends only transient resolved secret values to the self-hosted server API, the server applies them through environment commands as runtime secrets, missing required references fail before mutation with sanitized details, and pure SSH CLI mode still handles `--secret` directly. |
+| ACTION-SERVER-CONFIG-SPEC-009 | Source-link resolution is an application command | A source-link or server-config Action request reaches oRPC | The route needs deployment target context | The route dispatches `CreateActionSourceLinkDeploymentCommand` or `ResolveActionServerConfigDeploymentTargetCommand`; repository lookup/upsert and conflict policy are not embedded in the transport route. |
 
 ## Domain Ownership
 
@@ -74,6 +75,10 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
   reserves `POST /api/action/deployments/from-config-package` as the dedicated workflow endpoint.
   It remains separate from strict `deployments.create` and must reuse application command/query
   schemas internally.
+  Source-link target resolution uses internal application commands documented in
+  [action-source-link-deployment.create](../../commands/action-source-link-deployment.create.md)
+  and
+  [action-server-config-deployment-target.resolve](../../commands/action-server-config-deployment-target.resolve.md).
 - CLI: no new CLI command in this Spec Round. Pure SSH CLI mode remains the default and continues
   to own the local/SSH config workflow.
 - GitHub Action: future wrapper inputs may select server config deploy and source package behavior;

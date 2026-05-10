@@ -81,9 +81,9 @@ POST /api/resources/{resourceId}/source-events/generic-signed
 
 The route:
 
-1. Locates the Resource auto-deploy policy.
-2. Resolves `genericWebhookSecretRef` in the `resource-secret:<KEY>` family against the same
-   Resource's runtime secret variables.
+1. Dispatches the internal `ResolveGenericSignedSourceEventSecretQuery`.
+2. The query loads the Resource aggregate, and the Resource resolves `genericWebhookSecretRef` in the
+   `resource-secret:<KEY>` family against its runtime secret variables.
 3. Verifies the raw request body with HMAC SHA-256 from `X-Appaloft-Signature`.
 4. Normalizes safe JSON fields into this command input.
 5. Dispatches this command with `scopeResourceId = resourceId`.

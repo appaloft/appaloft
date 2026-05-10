@@ -247,6 +247,12 @@ export const tokens = {
   ),
   listSourceEventsQueryService: Symbol.for("appaloft.list_source_events_query_service"),
   showSourceEventQueryService: Symbol.for("appaloft.show_source_event_query_service"),
+  resolveGenericSignedSourceEventSecretQueryService: Symbol.for(
+    "appaloft.resolve_generic_signed_source_event_secret_query_service",
+  ),
+  resolvePreviewPullRequestContextQueryService: Symbol.for(
+    "appaloft.resolve_preview_pull_request_context_query_service",
+  ),
   configurePreviewPolicyUseCase: Symbol.for("appaloft.configure_preview_policy_use_case"),
   showPreviewPolicyQueryService: Symbol.for("appaloft.show_preview_policy_query_service"),
   listPreviewEnvironmentsQueryService: Symbol.for(
@@ -266,6 +272,12 @@ export const tokens = {
   promoteEnvironmentUseCase: Symbol.for("appaloft.promote_environment_use_case"),
   applyActionPreviewRouteUseCase: Symbol.for("appaloft.apply_action_preview_route_use_case"),
   confirmActionPreviewRouteUseCase: Symbol.for("appaloft.confirm_action_preview_route_use_case"),
+  createActionSourceLinkDeploymentUseCase: Symbol.for(
+    "appaloft.create_action_source_link_deployment_use_case",
+  ),
+  resolveActionServerConfigDeploymentTargetUseCase: Symbol.for(
+    "appaloft.resolve_action_server_config_deployment_target_use_case",
+  ),
   createDeploymentUseCase: Symbol.for("appaloft.create_deployment_use_case"),
   retryDeploymentUseCase: Symbol.for("appaloft.retry_deployment_use_case"),
   redeployDeploymentUseCase: Symbol.for("appaloft.redeploy_deployment_use_case"),

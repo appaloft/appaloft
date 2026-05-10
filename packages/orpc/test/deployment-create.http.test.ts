@@ -11,6 +11,7 @@ import {
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   ConfirmActionPreviewRouteCommand,
+  CreateActionSourceLinkDeploymentCommand,
   CreateDeploymentCommand,
   CreateDomainBindingCommand,
   createExecutionContext,
@@ -19,16 +20,13 @@ import {
   type Query,
   type QueryBus,
   RedeployDeploymentCommand,
+  ResolveActionServerConfigDeploymentTargetCommand,
   RestartResourceRuntimeCommand,
   RetryDeploymentCommand,
   RollbackDeploymentCommand,
   SetEnvironmentVariableCommand,
   ShowResourceQuery,
   ShowServerQuery,
-  type SourceLinkRecord,
-  type SourceLinkRepository,
-  type SourceLinkSelectionSpec,
-  type SourceLinkUpsertSpec,
   StartResourceRuntimeCommand,
   StopResourceRuntimeCommand,
 } from "@appaloft/application";
@@ -53,6 +51,21 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       actor: input.actor,
     });
   }
+}
+
+function actionServerConfigTarget(command: ResolveActionServerConfigDeploymentTargetCommand) {
+  return {
+    sourceFingerprint: command.sourceFingerprint,
+    projectId: command.trustedContext?.projectId ?? "prj_console",
+    environmentId: command.trustedContext?.environmentId ?? "env_prod",
+    resourceId: command.trustedContext?.resourceId ?? "res_www",
+    serverId: command.trustedContext?.serverId ?? "srv_prod",
+    ...(command.trustedContext?.destinationId
+      ? { destinationId: command.trustedContext.destinationId }
+      : {}),
+    updatedAt: "2026-05-08T00:00:00.000Z",
+    reason: "test-source-link",
+  };
 }
 
 describe("deployment create HTTP route", () => {
@@ -183,27 +196,11 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const sourceLinkRepository = {
-      findOne: async (_spec: SourceLinkSelectionSpec) =>
-        ok({
-          sourceFingerprint:
-            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
-          projectId: "prj_console",
-          environmentId: "env_prod",
-          resourceId: "res_www",
-          serverId: "srv_prod",
-          destinationId: "dst_prod",
-          updatedAt: "2026-05-07T00:00:00.000Z",
-        }),
-      upsert: async (_record: SourceLinkRecord, _spec: SourceLinkUpsertSpec) => ok(_record),
-      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
-    } as SourceLinkRepository;
     const app = mountAppaloftOrpcRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
       queryBus,
-      sourceLinkRepository,
     });
 
     const response = await app.handle(
@@ -224,19 +221,15 @@ describe("deployment create HTTP route", () => {
       id: "dep_from_source_link",
       deploymentHref: "/deployments/dep_from_source_link",
     });
-    expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommand).toBeInstanceOf(CreateActionSourceLinkDeploymentCommand);
     expect(capturedCommand).toMatchObject({
-      projectId: "prj_console",
-      environmentId: "env_prod",
-      resourceId: "res_www",
-      serverId: "srv_prod",
-      destinationId: "dst_prod",
+      sourceFingerprint:
+        "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
     });
   });
 
   test("[CONTROL-PLANE-HANDSHAKE-010] Action server-mode explicit ids bootstrap source link", async () => {
     let capturedCommand: Command<unknown> | undefined;
-    let createdLink: SourceLinkRecord | undefined;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
         capturedCommand = command as Command<unknown>;
@@ -247,20 +240,11 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const sourceLinkRepository = {
-      findOne: async (_spec: SourceLinkSelectionSpec) => ok(null),
-      upsert: async (record: SourceLinkRecord, _spec: SourceLinkUpsertSpec) => {
-        createdLink = record;
-        return ok(record);
-      },
-      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
-    } as SourceLinkRepository;
     const app = mountAppaloftOrpcRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
       queryBus,
-      sourceLinkRepository,
     });
 
     const response = await app.handle(
@@ -286,15 +270,8 @@ describe("deployment create HTTP route", () => {
       id: "dep_bootstrap_source_link",
       deploymentHref: "/deployments/dep_bootstrap_source_link",
     });
-    expect(capturedCommand).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommand).toBeInstanceOf(CreateActionSourceLinkDeploymentCommand);
     expect(capturedCommand).toMatchObject({
-      projectId: "prj_console",
-      environmentId: "env_prod",
-      resourceId: "res_www",
-      serverId: "srv_prod",
-      destinationId: "dst_prod",
-    });
-    expect(createdLink).toMatchObject({
       sourceFingerprint:
         "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
       projectId: "prj_console",
@@ -302,7 +279,6 @@ describe("deployment create HTTP route", () => {
       resourceId: "res_www",
       serverId: "srv_prod",
       destinationId: "dst_prod",
-      reason: "github-action-source-link-bootstrap",
     });
   });
 
@@ -310,6 +286,9 @@ describe("deployment create HTTP route", () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok(actionServerConfigTarget(command) as T);
+        }
         capturedCommand = command as Command<unknown>;
         return ok({ id: "dep_unexpected" } as T);
       },
@@ -318,25 +297,11 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const sourceLinkRepository = {
-      findOne: async (_spec: SourceLinkSelectionSpec) =>
-        ok({
-          sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
-          projectId: "prj_console",
-          environmentId: "env_prod",
-          resourceId: "res_www",
-          serverId: "srv_prod",
-          updatedAt: "2026-05-07T00:00:00.000Z",
-        }),
-      upsert: async (_record: SourceLinkRecord, _spec: SourceLinkUpsertSpec) => ok(_record),
-      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
-    } as SourceLinkRepository;
     const app = mountAppaloftOrpcRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
       queryBus,
-      sourceLinkRepository,
     });
 
     const response = await app.handle(
@@ -355,14 +320,21 @@ describe("deployment create HTTP route", () => {
       }),
     );
 
-    expect(response.status).toBe(400);
-    expect(capturedCommand).toBeUndefined();
+    expect(response.status).toBe(202);
+    expect(capturedCommand).toBeInstanceOf(CreateActionSourceLinkDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+      resourceId: "res_other",
+    });
   });
 
   test("[CONTROL-PLANE-HANDSHAKE-008] Action server-mode source-link deployment fails without link", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok(actionServerConfigTarget(command) as T);
+        }
         capturedCommand = command as Command<unknown>;
         return ok({ id: "dep_unexpected" } as T);
       },
@@ -371,17 +343,11 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const sourceLinkRepository = {
-      findOne: async (_spec: SourceLinkSelectionSpec) => ok(null),
-      upsert: async (_record: SourceLinkRecord, _spec: SourceLinkUpsertSpec) => ok(_record),
-      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
-    } as SourceLinkRepository;
     const app = mountAppaloftOrpcRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
       queryBus,
-      sourceLinkRepository,
     });
 
     const response = await app.handle(
@@ -396,8 +362,8 @@ describe("deployment create HTTP route", () => {
       }),
     );
 
-    expect(response.status).toBe(404);
-    expect(capturedCommand).toBeUndefined();
+    expect(response.status).toBe(202);
+    expect(capturedCommand).toBeInstanceOf(CreateActionSourceLinkDeploymentCommand);
   });
 
   test("[CONTROL-PLANE-HANDSHAKE-015] Action server config endpoint rejects unsafe package paths before mutation", async () => {
@@ -674,6 +640,9 @@ describe("deployment create HTTP route", () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok(actionServerConfigTarget(command) as T);
+        }
         capturedCommand = command as Command<unknown>;
         return ok({ id: "dep_from_config_package" } as T);
       },
@@ -747,27 +716,20 @@ describe("deployment create HTTP route", () => {
 
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint resolves existing source-link context without trusted ids", async () => {
     let capturedCommand: Command<unknown> | undefined;
-    const sourceLinkRecord = {
-      sourceFingerprint:
-        "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
-      projectId: "prj_linked",
-      environmentId: "env_linked",
-      resourceId: "res_linked",
-      serverId: "srv_linked",
-      destinationId: "dst_linked",
-      updatedAt: "2026-05-08T00:00:00.000Z",
-      reason: "test-source-link",
-    } satisfies SourceLinkRecord;
-    const sourceLinkRepository = {
-      findOne: async (_spec: SourceLinkSelectionSpec) => ok(sourceLinkRecord),
-      upsert: async (
-        record: SourceLinkRecord,
-        _spec: SourceLinkUpsertSpec,
-      ): Promise<Result<SourceLinkRecord>> => ok(record),
-      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
-    } satisfies SourceLinkRepository;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok({
+            sourceFingerprint: command.sourceFingerprint,
+            projectId: "prj_linked",
+            environmentId: "env_linked",
+            resourceId: "res_linked",
+            serverId: "srv_linked",
+            destinationId: "dst_linked",
+            updatedAt: "2026-05-08T00:00:00.000Z",
+            reason: "test-source-link",
+          } as T);
+        }
         capturedCommand = command as Command<unknown>;
         return ok({ id: "dep_from_source_link_config_package" } as T);
       },
@@ -791,7 +753,6 @@ describe("deployment create HTTP route", () => {
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
       queryBus,
-      sourceLinkRepository,
     });
 
     const response = await app.handle(
@@ -835,20 +796,21 @@ describe("deployment create HTTP route", () => {
 
   test("[CONFIG-FILE-ENTRY-028] Action server config endpoint bootstraps source-link context from trusted ids", async () => {
     let capturedCommand: Command<unknown> | undefined;
-    let upsertedRecord: SourceLinkRecord | undefined;
-    const sourceLinkRepository = {
-      findOne: async (_spec: SourceLinkSelectionSpec) => ok(null),
-      upsert: async (
-        record: SourceLinkRecord,
-        _spec: SourceLinkUpsertSpec,
-      ): Promise<Result<SourceLinkRecord>> => {
-        upsertedRecord = record;
-        return ok(record);
-      },
-      deleteOne: async (_spec: SourceLinkSelectionSpec) => ok(false),
-    } satisfies SourceLinkRepository;
+    let targetCommand: ResolveActionServerConfigDeploymentTargetCommand | undefined;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          targetCommand = command;
+          return ok({
+            sourceFingerprint: command.sourceFingerprint,
+            projectId: command.trustedContext?.projectId ?? "prj_console",
+            environmentId: command.trustedContext?.environmentId ?? "env_prod",
+            resourceId: command.trustedContext?.resourceId ?? "res_www",
+            serverId: command.trustedContext?.serverId ?? "srv_prod",
+            updatedAt: "2026-05-08T00:00:00.000Z",
+            reason: "github-action-server-config-bootstrap",
+          } as T);
+        }
         capturedCommand = command as Command<unknown>;
         return ok({ id: "dep_bootstrapped_config_package" } as T);
       },
@@ -872,7 +834,6 @@ describe("deployment create HTTP route", () => {
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
       queryBus,
-      sourceLinkRepository,
     });
 
     const response = await app.handle(
@@ -913,14 +874,15 @@ describe("deployment create HTTP route", () => {
       resourceId: "res_www",
       serverId: "srv_prod",
     });
-    expect(upsertedRecord).toMatchObject({
+    expect(targetCommand).toMatchObject({
       sourceFingerprint:
         "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
-      projectId: "prj_console",
-      environmentId: "env_prod",
-      resourceId: "res_www",
-      serverId: "srv_prod",
-      reason: "github-action-server-config-bootstrap",
+      trustedContext: {
+        projectId: "prj_console",
+        environmentId: "env_prod",
+        resourceId: "res_www",
+        serverId: "srv_prod",
+      },
     });
   });
 
@@ -928,6 +890,9 @@ describe("deployment create HTTP route", () => {
     const capturedCommands: Command<unknown>[] = [];
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok(actionServerConfigTarget(command) as T);
+        }
         capturedCommands.push(command as Command<unknown>);
         return ok({
           id: command instanceof CreateDeploymentCommand ? "dep_profile_config" : "res_www",
@@ -1036,6 +1001,9 @@ describe("deployment create HTTP route", () => {
     const capturedCommands: Command<unknown>[] = [];
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok(actionServerConfigTarget(command) as T);
+        }
         capturedCommands.push(command as Command<unknown>);
         return ok(
           (command instanceof CreateDeploymentCommand ? { id: "dep_env_config" } : null) as T,
@@ -1122,6 +1090,9 @@ describe("deployment create HTTP route", () => {
     const capturedCommands: Command<unknown>[] = [];
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok(actionServerConfigTarget(command) as T);
+        }
         capturedCommands.push(command as Command<unknown>);
         return ok(
           (command instanceof CreateDeploymentCommand ? { id: "dep_secret_config" } : null) as T,
@@ -1206,6 +1177,9 @@ describe("deployment create HTTP route", () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok(actionServerConfigTarget(command) as T);
+        }
         capturedCommand = command as Command<unknown>;
         return ok({ id: "dep_unexpected" } as T);
       },
@@ -1283,6 +1257,9 @@ describe("deployment create HTTP route", () => {
     const capturedCommands: Command<unknown>[] = [];
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok(actionServerConfigTarget(command) as T);
+        }
         capturedCommands.push(command as Command<unknown>);
         if (command instanceof ConfirmActionPreviewRouteCommand) {
           return ok({ previewUrl: "http://pr-42.preview.example.com" } as T);
@@ -1431,6 +1408,9 @@ describe("deployment create HTTP route", () => {
     const capturedCommands: Command<unknown>[] = [];
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok(actionServerConfigTarget(command) as T);
+        }
         capturedCommands.push(command as Command<unknown>);
         if (command instanceof ConfirmActionPreviewRouteCommand) {
           return ok({ previewUrl: "http://pr-42.preview.example.com" } as T);
