@@ -36,7 +36,6 @@ export class PgDiagnostics implements DiagnosticsPort {
       details: {
         databaseDriver: this.descriptor.driver,
         databaseMode: this.descriptor.mode,
-        databaseLocation: this.descriptor.location,
       },
     } as const;
   }

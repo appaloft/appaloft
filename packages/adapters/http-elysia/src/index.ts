@@ -25,7 +25,11 @@ import {
   toRepositoryContext,
 } from "@appaloft/application";
 import { type AppConfig } from "@appaloft/config";
-import { apiVersion, type ConsoleOverviewResponse } from "@appaloft/contracts";
+import {
+  apiVersion,
+  type ConsoleOverviewResponse,
+  type ReadinessResponse,
+} from "@appaloft/contracts";
 import { type Result } from "@appaloft/core";
 import { appaloftDeploymentConfigJsonSchema } from "@appaloft/deployment-config";
 import {
@@ -123,6 +127,23 @@ interface StaticAssetSource {
   embeddedAssets: EmbeddedStaticAssets;
   fallbackToRootIndex: boolean;
   staticDir: string | null;
+}
+
+function publicReadiness(readiness: ReadinessResponse): ReadinessResponse {
+  const details: Record<string, string> = {};
+
+  if (readiness.details?.databaseDriver) {
+    details.databaseDriver = readiness.details.databaseDriver;
+  }
+  if (readiness.details?.databaseMode) {
+    details.databaseMode = readiness.details.databaseMode;
+  }
+
+  return {
+    status: readiness.status,
+    checks: readiness.checks,
+    ...(Object.keys(details).length > 0 ? { details } : {}),
+  };
 }
 
 function readErrorMessage(error: unknown): string {
@@ -497,7 +518,7 @@ export function createHttpApp(input: {
       input.queryBus.execute(context, unwrapResult(context, ListServersQuery.create())),
       input.queryBus.execute(context, unwrapResult(context, ListDeploymentsQuery.create({}))),
     ]);
-    const readiness = unwrapResult(context, doctorResult).readiness;
+    const readiness = publicReadiness(unwrapResult(context, doctorResult).readiness);
     const projects = unwrapResult(context, projectsResult).items;
     const environments = unwrapResult(context, environmentsResult).items;
     const resources = unwrapResult(context, resourcesResult).items;
@@ -968,7 +989,7 @@ export function createHttpApp(input: {
       });
       const doctor = unwrapResult(context, DoctorQuery.create());
       const result = await input.queryBus.execute(context, doctor);
-      return unwrapResult(context, result).readiness;
+      return publicReadiness(unwrapResult(context, result).readiness);
     })
     .get("/api/version", () => ({
       name: input.config.appName,
