@@ -60,6 +60,8 @@
   resource/destination/server proxy context, applies `ci-env:` secret references through
   `environments.set-variable` from transient Action-supplied values, and rejects unsupported source
   profile application before mutation.
+- [x] Move source-link lookup/bootstrap policy behind internal application commands so oRPC only
+  dispatches command/query messages and does not import repository ports.
 - [ ] Add safe source package diagnostics/read-model output if needed for Web and support.
 
 ## Entrypoints And Docs

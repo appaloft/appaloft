@@ -1,4 +1,6 @@
 import {
+  ApplyActionPreviewRouteCommandHandler,
+  ApplyActionPreviewRouteUseCase,
   ArchiveEnvironmentCommandHandler,
   ArchiveEnvironmentUseCase,
   ArchiveProjectCommandHandler,
@@ -48,7 +50,11 @@ import {
   ConfigureServerCredentialUseCase,
   ConfigureServerEdgeProxyCommandHandler,
   ConfigureServerEdgeProxyUseCase,
+  ConfirmActionPreviewRouteCommandHandler,
+  ConfirmActionPreviewRouteUseCase,
   ConfirmDomainBindingOwnershipUseCase,
+  CreateActionSourceLinkDeploymentCommandHandler,
+  CreateActionSourceLinkDeploymentUseCase,
   CreateDependencyResourceBackupCommandHandler,
   CreateDependencyResourceBackupUseCase,
   CreateDeploymentSourceEventDispatcher,
@@ -200,6 +206,12 @@ import {
   RenameServerUseCase,
   RenameStorageVolumeCommandHandler,
   RenameStorageVolumeUseCase,
+  ResolveActionServerConfigDeploymentTargetCommandHandler,
+  ResolveActionServerConfigDeploymentTargetUseCase,
+  ResolveGenericSignedSourceEventSecretQueryHandler,
+  ResolveGenericSignedSourceEventSecretQueryService,
+  ResolvePreviewPullRequestContextQueryHandler,
+  ResolvePreviewPullRequestContextQueryService,
   ResourceAccessFailureEvidenceLookupQueryHandler,
   ResourceAccessFailureEvidenceLookupQueryService,
   ResourceDiagnosticSummaryQueryService,
@@ -461,6 +473,9 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
   container.registerSingleton(ResourceAccessFailureEvidenceLookupQueryHandler);
   container.registerSingleton(EnvironmentEffectivePrecedenceQueryHandler);
+  container.registerSingleton(ApplyActionPreviewRouteCommandHandler);
+  container.registerSingleton(ConfirmActionPreviewRouteCommandHandler);
+  container.registerSingleton(CreateActionSourceLinkDeploymentCommandHandler);
   container.registerSingleton(ShowDeploymentQueryHandler);
   container.registerSingleton(DeploymentPlanQueryHandler);
   container.registerSingleton(DeploymentRecoveryReadinessQueryHandler);
@@ -478,6 +493,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(DeleteCertificateCommandHandler);
   container.registerSingleton(RetryDomainBindingVerificationCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
+  container.registerSingleton(ResolveActionServerConfigDeploymentTargetCommandHandler);
   container.registerSingleton(RenameProjectCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
   container.registerSingleton(ShowCertificateQueryHandler);
@@ -495,6 +511,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ShowResourceDependencyBindingQueryHandler);
   container.registerSingleton(ListSourceEventsQueryHandler);
   container.registerSingleton(ShowSourceEventQueryHandler);
+  container.registerSingleton(ResolveGenericSignedSourceEventSecretQueryHandler);
+  container.registerSingleton(ResolvePreviewPullRequestContextQueryHandler);
   container.registerSingleton(ProvisionPostgresDependencyResourceCommandHandler);
   container.registerSingleton(ImportPostgresDependencyResourceCommandHandler);
   container.registerSingleton(ProvisionRedisDependencyResourceCommandHandler);
@@ -703,6 +721,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
   );
   container.registerSingleton(tokens.listSourceEventsQueryService, ListSourceEventsQueryService);
   container.registerSingleton(tokens.showSourceEventQueryService, ShowSourceEventQueryService);
+  container.registerSingleton(
+    tokens.resolveGenericSignedSourceEventSecretQueryService,
+    ResolveGenericSignedSourceEventSecretQueryService,
+  );
+  container.registerSingleton(
+    tokens.resolvePreviewPullRequestContextQueryService,
+    ResolvePreviewPullRequestContextQueryService,
+  );
   container.registerSingleton(tokens.createStorageVolumeUseCase, CreateStorageVolumeUseCase);
   container.registerSingleton(tokens.renameStorageVolumeUseCase, RenameStorageVolumeUseCase);
   container.registerSingleton(tokens.deleteStorageVolumeUseCase, DeleteStorageVolumeUseCase);
@@ -782,6 +808,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.deploymentContextResolver, DeploymentContextResolver);
   container.registerSingleton(tokens.deploymentFactory, DeploymentFactory);
   container.registerSingleton(tokens.deploymentLifecycleService, DeploymentLifecycleService);
+  container.registerSingleton(
+    tokens.applyActionPreviewRouteUseCase,
+    ApplyActionPreviewRouteUseCase,
+  );
+  container.registerSingleton(
+    tokens.confirmActionPreviewRouteUseCase,
+    ConfirmActionPreviewRouteUseCase,
+  );
   container.registerSingleton(tokens.createDeploymentUseCase, CreateDeploymentUseCase);
   container.registerSingleton(tokens.retryDeploymentUseCase, RetryDeploymentUseCase);
   container.registerSingleton(tokens.redeployDeploymentUseCase, RedeployDeploymentUseCase);
@@ -853,7 +887,15 @@ export function registerApplicationServices(container: DependencyContainer): voi
     ResourceRuntimeLogsQueryService,
   );
   container.registerSingleton(tokens.openTerminalSessionUseCase, OpenTerminalSessionUseCase);
+  container.registerSingleton(
+    tokens.createActionSourceLinkDeploymentUseCase,
+    CreateActionSourceLinkDeploymentUseCase,
+  );
   container.registerSingleton(tokens.relinkSourceLinkUseCase, RelinkSourceLinkUseCase);
+  container.registerSingleton(
+    tokens.resolveActionServerConfigDeploymentTargetUseCase,
+    ResolveActionServerConfigDeploymentTargetUseCase,
+  );
   container.registerSingleton(
     tokens.resourceProxyConfigurationPreviewQueryService,
     ResourceProxyConfigurationPreviewQueryService,

@@ -1221,6 +1221,7 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
       fi
       deployment_url="$(printf '%s\n' "$deploy_response" | sed -n 's/.*"deploymentUrl"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
       deployment_href="$(printf '%s\n' "$deploy_response" | sed -n 's/.*"deploymentHref"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+      preview_url_from_server="$(printf '%s\n' "$deploy_response" | sed -n 's/.*"previewUrl"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
       if [ -z "$deployment_url" ] && [ -n "$deployment_href" ]; then
         deployment_url="$(console_href_url "$control_plane_url" "$deployment_href")"
       fi
@@ -1237,12 +1238,15 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
   fi
   preview_url=""
   if truthy "$server_config_deploy" && [ -n "$preview_domain_template" ]; then
-    if [ "$preview_tls_mode" = "disabled" ]; then
-      preview_url="http://${preview_domain_template}"
+    if [ -n "${preview_url_from_server:-}" ]; then
+      preview_url="$preview_url_from_server"
     else
-      preview_url="https://${preview_domain_template}"
+      error "server-config-deploy did not confirm the requested preview domain; upgrade the self-hosted Appaloft server and retry"
+      exit 1
     fi
-    echo "preview-url=$preview_url" >> "${GITHUB_OUTPUT:-/dev/null}"
+    if [ -n "$preview_url" ]; then
+      echo "preview-url=$preview_url" >> "${GITHUB_OUTPUT:-/dev/null}"
+    fi
   fi
   echo "console-url=$control_plane_url" >> "${GITHUB_OUTPUT:-/dev/null}"
   append_step_summary

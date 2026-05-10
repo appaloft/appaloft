@@ -22,6 +22,7 @@ import { PlanStepText } from "../shared/text-values";
 import { ScalarValueObject } from "../shared/value-object";
 import { type DeploymentDependencyBindingReferenceState } from "./dependency-binding-snapshot-reference";
 import {
+  type AccessRouteExpectation,
   type DeploymentLogEntry,
   type ExecutionResult,
   RollbackPlan,
@@ -333,6 +334,10 @@ export class Deployment extends AggregateRoot<DeploymentState> {
 
   requiresRuntimeCancellationForSupersede(): boolean {
     return this.state.status.requiresRuntimeCancellationForSupersede();
+  }
+
+  hasRealizedAccessRoute(expectation: AccessRouteExpectation): boolean {
+    return this.state.runtimePlan.hasAccessRoute(expectation);
   }
 
   toState(): DeploymentState {

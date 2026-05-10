@@ -1,5 +1,6 @@
 import {
   type AppLogger,
+  ApplyActionPreviewRouteCommand,
   ArchiveEnvironmentCommand,
   ArchiveProjectCommand,
   ArchiveResourceCommand,
@@ -30,7 +31,9 @@ import {
   ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   ConfigureServerEdgeProxyCommand,
+  ConfirmActionPreviewRouteCommand,
   ConfirmDomainBindingOwnershipCommand,
+  CreateActionSourceLinkDeploymentCommand,
   CreateDependencyResourceBackupCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
@@ -176,12 +179,15 @@ import {
   RenameProjectCommand,
   RenameServerCommand,
   RenameStorageVolumeCommand,
+  ResolveActionServerConfigDeploymentTargetCommand,
+  type ResolveActionServerConfigDeploymentTargetResponse,
+  ResolveGenericSignedSourceEventSecretQuery,
+  ResolvePreviewPullRequestContextQuery,
   ResourceAccessFailureEvidenceLookupQuery,
   ResourceDiagnosticSummaryQuery,
   ResourceEffectiveConfigQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
-  type ResourceRepository,
   type ResourceRuntimeLogEvent,
   ResourceRuntimeLogsQuery,
   type ResourceRuntimeLogsQueryInput,
@@ -242,11 +248,7 @@ import {
   ShowSourceEventQuery,
   ShowSshCredentialQuery,
   ShowStorageVolumeQuery,
-  type SourceEventPolicyReader,
   type SourceEventVerificationPort,
-  SourceLinkBySourceFingerprintSpec,
-  type SourceLinkRecord,
-  type SourceLinkRepository,
   StartResourceRuntimeCommand,
   StopResourceRuntimeCommand,
   StreamDeploymentEventsQuery,
@@ -280,12 +282,10 @@ import {
   TestServerConnectivityCommand,
   testDraftServerConnectivityCommandInputSchema,
   testRegisteredServerConnectivityCommandInputSchema,
-  toRepositoryContext,
   UnbindResourceDependencyCommand,
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
   UnsetResourceVariableCommand,
-  UpsertSourceLinkSpec,
   unbindResourceDependencyCommandInputSchema,
   unlockEnvironmentCommandInputSchema,
   unsetEnvironmentVariableCommandInputSchema,
@@ -419,15 +419,7 @@ import {
   unlockEnvironmentResponseSchema,
   unsetResourceVariableResponseSchema,
 } from "@appaloft/contracts";
-import {
-  type DomainError,
-  domainError,
-  err,
-  ok,
-  ResourceByIdSpec,
-  ResourceId,
-  type Result,
-} from "@appaloft/core";
+import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import {
   type AppaloftDeploymentConfig,
   parseAppaloftDeploymentConfigText,
@@ -446,12 +438,9 @@ export interface AppaloftOrpcContext {
   queryBus: QueryBus;
   logger: AppLogger;
   deploymentProgressObserver?: DeploymentProgressObserver;
-  resourceRepository?: ResourceRepository;
-  sourceLinkRepository?: SourceLinkRepository;
   sourceEventVerificationPort?: SourceEventVerificationPort;
   githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
-  sourceEventPolicyReader?: SourceEventPolicyReader;
   githubWebhookSecret?: string;
   actionSourcePackageConfigReader?: ActionSourcePackageConfigReader;
 }
@@ -3651,101 +3640,6 @@ function trustedPreviewContextFromHeaders(
   });
 }
 
-function githubRepositoryLocator(repositoryFullName: string): string {
-  return `https://github.com/${repositoryFullName}.git`;
-}
-
-function previewRefMatches(candidateRef: string, baseRef: string): boolean {
-  return candidateRef === baseRef || candidateRef === `refs/heads/${baseRef}`;
-}
-
-async function mappedPreviewContextFromSourcePolicy(input: {
-  context: AppaloftOrpcContext;
-  executionContext: ExecutionContext;
-  event: {
-    repositoryFullName: string;
-    providerRepositoryId?: string;
-    installationId?: string;
-    baseRef: string;
-  };
-}): Promise<Result<PreviewPullRequestContextSelection>> {
-  const policyReader = input.context.sourceEventPolicyReader;
-  if (!policyReader) {
-    return err(
-      domainError.validation("Preview pull request context headers are required", {
-        phase: "preview-event-ingestion",
-      }),
-    );
-  }
-
-  const candidates = await policyReader.listCandidates(
-    toRepositoryContext(input.executionContext),
-    {
-      sourceKind: "github",
-      sourceIdentity: {
-        locator: githubRepositoryLocator(input.event.repositoryFullName),
-        repositoryFullName: input.event.repositoryFullName,
-        ...(input.event.providerRepositoryId
-          ? { providerRepositoryId: input.event.providerRepositoryId }
-          : {}),
-      },
-    },
-  );
-  const eligibleCandidates = candidates.filter(
-    (candidate) =>
-      candidate.status === "enabled" &&
-      Boolean(candidate.serverId) &&
-      Boolean(candidate.destinationId) &&
-      Boolean(candidate.sourceBindingFingerprint) &&
-      candidate.refs.some((ref) => previewRefMatches(ref, input.event.baseRef)),
-  );
-
-  if (eligibleCandidates.length === 0) {
-    return err(
-      domainError.validation("No preview context matched the GitHub pull request repository", {
-        phase: "preview-event-ingestion",
-        provider: "github",
-        repositoryFullName: input.event.repositoryFullName,
-        baseRef: input.event.baseRef,
-        ...(input.event.installationId ? { installationId: input.event.installationId } : {}),
-      }),
-    );
-  }
-
-  if (eligibleCandidates.length > 1) {
-    return err(
-      domainError.conflict("GitHub pull request preview context is ambiguous", {
-        phase: "preview-event-ingestion",
-        provider: "github",
-        repositoryFullName: input.event.repositoryFullName,
-        baseRef: input.event.baseRef,
-        matchCount: eligibleCandidates.length,
-        ...(input.event.installationId ? { installationId: input.event.installationId } : {}),
-      }),
-    );
-  }
-
-  const candidate = eligibleCandidates[0];
-  if (!candidate?.serverId || !candidate.destinationId || !candidate.sourceBindingFingerprint) {
-    return err(
-      domainError.validation("GitHub pull request preview context is incomplete", {
-        phase: "preview-event-ingestion",
-        provider: "github",
-        repositoryFullName: input.event.repositoryFullName,
-      }),
-    );
-  }
-
-  return ok({
-    projectId: candidate.projectId,
-    environmentId: candidate.environmentId,
-    resourceId: candidate.resourceId,
-    serverId: candidate.serverId,
-    destinationId: candidate.destinationId,
-    sourceBindingFingerprint: candidate.sourceBindingFingerprint,
-  });
-}
-
 async function resolvePreviewPullRequestContext(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
@@ -3766,11 +3660,12 @@ async function resolvePreviewPullRequestContext(input: {
     return err(trustedHeaders.error);
   }
 
-  if (!input.context.sourceEventPolicyReader) {
-    return err(trustedHeaders.error);
+  const query = ResolvePreviewPullRequestContextQuery.create(input.event);
+  if (query.isErr()) {
+    return err(query.error);
   }
 
-  return mappedPreviewContextFromSourcePolicy(input);
+  return input.context.queryBus.execute(input.executionContext, query.value);
 }
 
 function parseGenericSignedSourceEventBody(
@@ -3802,70 +3697,6 @@ function parseGenericSignedSourceEventBody(
   return ok(parsed.data);
 }
 
-async function resolveGenericSignedSecretValue(
-  context: ExecutionContext,
-  resourceRepository: ResourceRepository,
-  resourceIdValue: string,
-): Promise<Result<string>> {
-  const resourceId = ResourceId.create(resourceIdValue);
-  if (resourceId.isErr()) {
-    return err(resourceId.error);
-  }
-
-  const resource = await resourceRepository.findOne(
-    toRepositoryContext(context),
-    ResourceByIdSpec.create(resourceId.value),
-  );
-  if (!resource) {
-    return err(domainError.notFound("resource", resourceId.value.value));
-  }
-
-  const state = resource.toState();
-  const secretRef = state.autoDeployPolicy?.genericWebhookSecretRef;
-  if (
-    !state.autoDeployPolicy ||
-    state.autoDeployPolicy.triggerKind.value !== "generic-signed-webhook" ||
-    !secretRef
-  ) {
-    return err(
-      domainError.resourceAutoDeploySecretUnavailable(
-        "Generic signed webhook secret is unavailable",
-        {
-          phase: "source-event-verification",
-          resourceId: resourceId.value.value,
-          refFamily: "resource-secret",
-        },
-      ),
-    );
-  }
-
-  const secretKey = secretRef.resourceVariableKey();
-  const variable = state.variables
-    .toState()
-    .find(
-      (candidate) =>
-        candidate.key.equals(secretKey) &&
-        candidate.scope.value === "resource" &&
-        candidate.exposure.value === "runtime" &&
-        (candidate.isSecret || candidate.kind.value === "secret"),
-    );
-
-  if (!variable) {
-    return err(
-      domainError.resourceAutoDeploySecretUnavailable(
-        "Generic signed webhook secret is unavailable",
-        {
-          phase: "source-event-verification",
-          resourceId: resourceId.value.value,
-          refFamily: "resource-secret",
-        },
-      ),
-    );
-  }
-
-  return ok(variable.value.value);
-}
-
 async function handleGenericSignedSourceEventRoute(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
@@ -3873,7 +3704,7 @@ async function handleGenericSignedSourceEventRoute(input: {
   resourceId: string;
 }): Promise<Response> {
   const { context, executionContext, request, resourceId } = input;
-  if (!context.resourceRepository || !context.sourceEventVerificationPort) {
+  if (!context.sourceEventVerificationPort) {
     return sourceEventRouteUnavailableResponse();
   }
 
@@ -3884,11 +3715,12 @@ async function handleGenericSignedSourceEventRoute(input: {
     return domainErrorHttpResponse(body.error, executionContext);
   }
 
-  const secretValue = await resolveGenericSignedSecretValue(
-    executionContext,
-    context.resourceRepository,
-    resourceId,
-  );
+  const secretQuery = ResolveGenericSignedSourceEventSecretQuery.create({ resourceId });
+  if (secretQuery.isErr()) {
+    return domainErrorHttpResponse(secretQuery.error, executionContext);
+  }
+
+  const secretValue = await context.queryBus.execute(executionContext, secretQuery.value);
   if (secretValue.isErr()) {
     return domainErrorHttpResponse(secretValue.error, executionContext);
   }
@@ -3910,7 +3742,7 @@ async function handleGenericSignedSourceEventRoute(input: {
     revision: body.value.revision,
     rawBody,
     signature,
-    secretValue: secretValue.value,
+    secretValue: secretValue.value.secretValue,
     method: "generic-hmac",
     ...(body.value.deliveryId ? { deliveryId: body.value.deliveryId } : {}),
     ...(body.value.idempotencyKey ? { idempotencyKey: body.value.idempotencyKey } : {}),
@@ -4019,15 +3851,6 @@ async function handleActionSourceLinkDeploymentRoute(input: {
   request: Request;
 }): Promise<Response> {
   const { context, executionContext, request } = input;
-  if (!context.sourceLinkRepository) {
-    return domainErrorHttpResponse(
-      domainError.validation("Source link repository is unavailable", {
-        phase: "action-source-link-deployment",
-      }),
-      executionContext,
-    );
-  }
-
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(await request.text());
@@ -4051,94 +3874,13 @@ async function handleActionSourceLinkDeploymentRoute(input: {
     );
   }
 
-  const link = await context.sourceLinkRepository.findOne(
-    SourceLinkBySourceFingerprintSpec.create(body.data.sourceFingerprint),
-  );
-  if (link.isErr()) {
-    return domainErrorHttpResponse(link.error, executionContext);
-  }
-
-  const hasExplicitContext = Boolean(
-    body.data.projectId ||
-      body.data.environmentId ||
-      body.data.resourceId ||
-      body.data.serverId ||
-      body.data.destinationId,
-  );
-  if (
-    hasExplicitContext &&
-    (!body.data.projectId ||
-      !body.data.environmentId ||
-      !body.data.resourceId ||
-      !body.data.serverId)
-  ) {
-    return domainErrorHttpResponse(
-      domainError.validation(
-        "Action deployment source-link bootstrap requires project, environment, resource, and server ids",
-        {
-          phase: "action-source-link-deployment",
-          sourceFingerprint: body.data.sourceFingerprint,
-        },
-      ),
-      executionContext,
-    );
-  }
-
-  if (!link.value && !hasExplicitContext) {
-    return domainErrorHttpResponse(
-      domainError.notFound("Source link", body.data.sourceFingerprint),
-      executionContext,
-    );
-  }
-
-  if (link.value && hasExplicitContext) {
-    const conflict =
-      link.value.projectId !== body.data.projectId ||
-      link.value.environmentId !== body.data.environmentId ||
-      link.value.resourceId !== body.data.resourceId ||
-      link.value.serverId !== body.data.serverId ||
-      Boolean(body.data.destinationId && link.value.destinationId !== body.data.destinationId);
-    if (conflict) {
-      return domainErrorHttpResponse(
-        domainError.validation(
-          "Action deployment explicit context conflicts with existing source link; relink the source before deploying",
-          {
-            phase: "action-source-link-deployment",
-            sourceFingerprint: body.data.sourceFingerprint,
-          },
-        ),
-        executionContext,
-      );
-    }
-  }
-
-  const target = link.value ?? {
+  const command = CreateActionSourceLinkDeploymentCommand.create({
     sourceFingerprint: body.data.sourceFingerprint,
-    projectId: body.data.projectId ?? "",
-    environmentId: body.data.environmentId ?? "",
-    resourceId: body.data.resourceId ?? "",
-    serverId: body.data.serverId,
+    ...(body.data.projectId ? { projectId: body.data.projectId } : {}),
+    ...(body.data.environmentId ? { environmentId: body.data.environmentId } : {}),
+    ...(body.data.resourceId ? { resourceId: body.data.resourceId } : {}),
+    ...(body.data.serverId ? { serverId: body.data.serverId } : {}),
     ...(body.data.destinationId ? { destinationId: body.data.destinationId } : {}),
-    updatedAt: new Date().toISOString(),
-    reason: "github-action-source-link-bootstrap",
-  };
-
-  if (!target.serverId) {
-    return domainErrorHttpResponse(
-      domainError.validation("Source link does not include a deployment target", {
-        phase: "action-source-link-deployment",
-        sourceFingerprint: body.data.sourceFingerprint,
-      }),
-      executionContext,
-    );
-  }
-
-  const command = CreateDeploymentCommand.create({
-    projectId: target.projectId,
-    environmentId: target.environmentId,
-    resourceId: target.resourceId,
-    serverId: target.serverId,
-    ...(target.destinationId ? { destinationId: target.destinationId } : {}),
   });
   if (command.isErr()) {
     return domainErrorHttpResponse(command.error, executionContext);
@@ -4147,26 +3889,6 @@ async function handleActionSourceLinkDeploymentRoute(input: {
   const result = await context.commandBus.execute(executionContext, command.value);
   if (result.isErr()) {
     return domainErrorHttpResponse(result.error, executionContext);
-  }
-
-  if (!link.value) {
-    const record = {
-      sourceFingerprint: target.sourceFingerprint,
-      projectId: target.projectId,
-      environmentId: target.environmentId,
-      resourceId: target.resourceId,
-      updatedAt: target.updatedAt,
-      reason: "github-action-source-link-bootstrap",
-      ...(target.serverId ? { serverId: target.serverId } : {}),
-      ...(target.destinationId ? { destinationId: target.destinationId } : {}),
-    } satisfies SourceLinkRecord;
-    const persisted = await context.sourceLinkRepository.upsert(
-      record,
-      UpsertSourceLinkSpec.fromRecord(record),
-    );
-    if (persisted.isErr()) {
-      return domainErrorHttpResponse(persisted.error, executionContext);
-    }
   }
 
   return Response.json(
@@ -4521,29 +4243,13 @@ function effectiveActionServerConfigForRequest(input: {
 
   const previewConfig: AppaloftDeploymentConfig = { ...configWithRuntimeEnv };
   delete previewConfig.access;
-
-  if (!input.previewRoute) {
-    return previewConfig;
-  }
-
-  return {
-    ...previewConfig,
-    access: {
-      domains: [
-        {
-          host: input.previewRoute.host,
-          pathPrefix: input.previewRoute.pathPrefix,
-          tlsMode: input.previewRoute.tlsMode,
-        },
-      ],
-    },
-  };
+  return previewConfig;
 }
 
 async function resolveActionServerConfigDomainContext(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
-  target: SourceLinkRecord;
+  target: ResolveActionServerConfigDeploymentTargetResponse;
 }): Promise<Result<{ destinationId: string; proxyKind: "traefik" | "caddy"; serverId: string }>> {
   const { context, executionContext, target } = input;
   const serverId = target.serverId;
@@ -4624,10 +4330,20 @@ async function applyActionServerConfigProfileCommands(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
   config: AppaloftDeploymentConfig;
+  sourceFingerprint: string;
   resolvedSecrets?: Record<string, string>;
-  target: SourceLinkRecord;
+  previewRoute?: ActionServerConfigDeployBody["previewRoute"];
+  target: ResolveActionServerConfigDeploymentTargetResponse;
 }): Promise<Result<void>> {
-  const { context, executionContext, config, resolvedSecrets, target } = input;
+  const {
+    context,
+    executionContext,
+    config,
+    previewRoute,
+    resolvedSecrets,
+    sourceFingerprint,
+    target,
+  } = input;
 
   const runtimeProfile = runtimeProfileFromActionServerConfig(config);
   if (runtimeProfile) {
@@ -4756,118 +4472,44 @@ async function applyActionServerConfigProfileCommands(input: {
     }
   }
 
+  if (previewRoute) {
+    const command = ApplyActionPreviewRouteCommand.create({
+      sourceFingerprint,
+      projectId: target.projectId,
+      environmentId: target.environmentId,
+      resourceId: target.resourceId,
+      ...(target.serverId ? { serverId: target.serverId } : {}),
+      ...(target.destinationId ? { destinationId: target.destinationId } : {}),
+      host: previewRoute.host,
+      pathPrefix: previewRoute.pathPrefix,
+      tlsMode: previewRoute.tlsMode,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
+
   return ok(undefined);
-}
-
-function hasTrustedActionServerConfigDeploymentContext(
-  trustedContext: ActionServerConfigDeployBody["trustedContext"],
-): boolean {
-  return Boolean(
-    trustedContext?.projectId ||
-      trustedContext?.environmentId ||
-      trustedContext?.resourceId ||
-      trustedContext?.serverId ||
-      trustedContext?.destinationId,
-  );
-}
-
-function hasCompleteTrustedActionServerConfigDeploymentContext(
-  trustedContext: ActionServerConfigDeployBody["trustedContext"],
-): boolean {
-  return Boolean(
-    trustedContext?.projectId &&
-      trustedContext.environmentId &&
-      trustedContext.resourceId &&
-      trustedContext.serverId,
-  );
 }
 
 async function resolveActionServerConfigDeploymentTarget(input: {
   context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
   body: ActionServerConfigDeployBody;
-}): Promise<Result<SourceLinkRecord>> {
-  const { context, body } = input;
-  const trustedContext = body.trustedContext;
-  const hasExplicitContext = hasTrustedActionServerConfigDeploymentContext(trustedContext);
-
-  if (
-    hasExplicitContext &&
-    !hasCompleteTrustedActionServerConfigDeploymentContext(trustedContext)
-  ) {
-    return err(
-      domainError.validation(
-        "Action server config deploy source-link bootstrap requires project, environment, resource, and server ids",
-        {
-          phase: "source-link-resolution",
-          sourceFingerprint: body.sourceFingerprint,
-        },
-      ),
-    );
+}): Promise<Result<ResolveActionServerConfigDeploymentTargetResponse>> {
+  const command = ResolveActionServerConfigDeploymentTargetCommand.create({
+    sourceFingerprint: input.body.sourceFingerprint,
+    ...(input.body.trustedContext ? { trustedContext: input.body.trustedContext } : {}),
+  });
+  if (command.isErr()) {
+    return err(command.error);
   }
 
-  let link: SourceLinkRecord | null = null;
-  if (context.sourceLinkRepository) {
-    const found = await context.sourceLinkRepository.findOne(
-      SourceLinkBySourceFingerprintSpec.create(body.sourceFingerprint),
-    );
-    if (found.isErr()) {
-      return err(found.error);
-    }
-    link = found.value;
-  }
-
-  if (link && hasExplicitContext) {
-    const conflict =
-      link.projectId !== trustedContext?.projectId ||
-      link.environmentId !== trustedContext.environmentId ||
-      link.resourceId !== trustedContext.resourceId ||
-      link.serverId !== trustedContext.serverId ||
-      Boolean(trustedContext.destinationId && link.destinationId !== trustedContext.destinationId);
-    if (conflict) {
-      return err(
-        domainError.validation(
-          "Action server config deploy explicit context conflicts with existing source link; relink the source before deploying",
-          {
-            phase: "source-link-resolution",
-            sourceFingerprint: body.sourceFingerprint,
-          },
-        ),
-      );
-    }
-  }
-
-  if (link) {
-    return ok(link);
-  }
-
-  if (!hasExplicitContext || !trustedContext?.serverId) {
-    return err(domainError.notFound("Source link", body.sourceFingerprint));
-  }
-
-  const target = {
-    sourceFingerprint: body.sourceFingerprint,
-    projectId: trustedContext.projectId ?? "",
-    environmentId: trustedContext.environmentId ?? "",
-    resourceId: trustedContext.resourceId ?? "",
-    serverId: trustedContext.serverId,
-    ...(trustedContext.destinationId ? { destinationId: trustedContext.destinationId } : {}),
-    updatedAt: new Date().toISOString(),
-    reason: "github-action-server-config-bootstrap",
-  } satisfies SourceLinkRecord;
-
-  if (!context.sourceLinkRepository) {
-    return ok(target);
-  }
-
-  const persisted = await context.sourceLinkRepository.upsert(
-    target,
-    UpsertSourceLinkSpec.fromRecord(target),
-  );
-  if (persisted.isErr()) {
-    return err(persisted.error);
-  }
-
-  return ok(persisted.value);
+  return input.context.commandBus.execute(input.executionContext, command.value);
 }
 
 async function handleActionServerConfigDeploymentRoute(input: {
@@ -4969,6 +4611,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
 
   const target = await resolveActionServerConfigDeploymentTarget({
     context,
+    executionContext,
     body: body.data,
   });
   if (target.isErr()) {
@@ -4989,7 +4632,9 @@ async function handleActionServerConfigDeploymentRoute(input: {
     context,
     executionContext,
     config: effectiveConfig,
+    sourceFingerprint: body.data.sourceFingerprint,
     ...(body.data.resolvedSecrets ? { resolvedSecrets: body.data.resolvedSecrets } : {}),
+    ...(body.data.previewRoute ? { previewRoute: body.data.previewRoute } : {}),
     target: target.value,
   });
   if (profileApplied.isErr()) {
@@ -5012,9 +4657,31 @@ async function handleActionServerConfigDeploymentRoute(input: {
     return domainErrorHttpResponse(result.error, executionContext);
   }
 
+  const previewRoute = body.data.previewRoute;
+  const previewRouteVerification = previewRoute
+    ? await (async () => {
+        const command = ConfirmActionPreviewRouteCommand.create({
+          deploymentId: result.value.id,
+          host: previewRoute.host,
+          pathPrefix: previewRoute.pathPrefix,
+          tlsMode: previewRoute.tlsMode,
+        });
+        if (command.isErr()) {
+          return err(command.error);
+        }
+        return context.commandBus.execute(executionContext, command.value);
+      })()
+    : ok(undefined);
+  if (previewRouteVerification.isErr()) {
+    return domainErrorHttpResponse(previewRouteVerification.error, executionContext);
+  }
+
   return Response.json(
     {
       ...result.value,
+      ...(previewRouteVerification.value
+        ? { previewUrl: previewRouteVerification.value.previewUrl }
+        : {}),
       deploymentHref: `/deployments/${result.value.id}`,
     },
     { status: 202 },

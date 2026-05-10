@@ -7,8 +7,8 @@ import {
   DeploymentLogsQuery,
   DeploymentPlanQuery,
   DeploymentRecoveryReadinessQuery,
-  type DeploymentSummary,
   ListDeploymentsQuery,
+  publicPreviewUrlsFromDeploymentSummary,
   RedeployDeploymentCommand,
   RetryDeploymentCommand,
   RollbackDeploymentCommand,
@@ -817,25 +817,6 @@ function releaseDeploymentStateSession(session: RemoteStateSession) {
   });
 }
 
-function publicPreviewUrlsFromDeployment(deployment: DeploymentSummary): string[] {
-  const accessRoutes = deployment.runtimePlan.execution.accessRoutes ?? [];
-  const urls: string[] = [];
-
-  for (const route of accessRoutes) {
-    if (route.routeBehavior === "redirect") {
-      continue;
-    }
-
-    const scheme = route.tlsMode === "disabled" ? "http" : "https";
-    const path = route.pathPrefix && route.pathPrefix !== "/" ? route.pathPrefix : "";
-    for (const domain of route.domains) {
-      urls.push(`${scheme}://${domain}${path}`);
-    }
-  }
-
-  return urls;
-}
-
 interface PreviewAccessResolution {
   deploymentId: string;
   resourceId: string;
@@ -927,7 +908,7 @@ function resolvePreviewAccessForDeployment(input: {
       };
     }
 
-    const previewUrls = publicPreviewUrlsFromDeployment(deployment);
+    const previewUrls = publicPreviewUrlsFromDeploymentSummary(deployment);
     if (input.requirePreviewUrl && previewUrls.length === 0) {
       return yield* Effect.fail(
         domainError.validation("Preview URL is required but no public route was resolved", {
