@@ -27,14 +27,12 @@ import {
   type PreviewCleanupRetryScheduler,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
-  type ResourceRepository,
   type ScheduledTaskRunWorker,
   type ScheduledTaskScheduler,
   ServerAppliedRouteStateByRouteSetIdSpec,
   ServerAppliedRouteStateBySourceFingerprintSpec,
   ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
-  type SourceEventPolicyReader,
   type SourceEventVerificationPort,
   SourceLinkBySourceFingerprintSpec,
   type SourceLinkRecord,
@@ -362,17 +360,9 @@ export async function createAppComposition(
   const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
   const commandBus = resolveToken<CommandBus>(childContainer, tokens.commandBus);
   const queryBus = resolveToken<QueryBus>(childContainer, tokens.queryBus);
-  const resourceRepository = resolveToken<ResourceRepository>(
-    childContainer,
-    tokens.resourceRepository,
-  );
   const sourceEventVerificationPort = resolveToken<SourceEventVerificationPort>(
     childContainer,
     tokens.sourceEventVerificationPort,
-  );
-  const sourceEventPolicyReader = resolveToken<SourceEventPolicyReader>(
-    childContainer,
-    tokens.sourceEventPolicyReader,
   );
   const githubSourceEventWebhookVerifier = resolveToken<GitHubSourceEventWebhookVerifier>(
     childContainer,
@@ -466,9 +456,6 @@ export async function createAppComposition(
     certificateHttpChallengeTokenStore,
     resourceAccessFailureEvidenceRecorder,
     resourceAccessRouteContextLookup,
-    resourceRepository,
-    sourceLinkRepository,
-    sourceEventPolicyReader,
     sourceEventVerificationPort,
     githubSourceEventWebhookVerifier,
     githubPreviewPullRequestWebhookVerifier,

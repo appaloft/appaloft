@@ -264,11 +264,12 @@ GitHub Action
 
 In this slice the Action must not install or invoke the CLI, open SSH, select `state-backend`,
 create or configure resource profile state, upload source archives, or mutate SSH-server PGlite.
-The source-link API route may resolve project/environment/resource/server context from existing
-server-owned source-link state. If trusted ids are supplied by the Action for deploy, the server
-may bootstrap a missing source link; if ids are omitted and no link exists, deployment fails before
-mutation. Preview cleanup must resolve context from preview source-link state. Config bootstrap,
-source package, and broader preview workflow contracts remain later server-side work.
+The source-link API route dispatches the internal
+`CreateActionSourceLinkDeploymentCommand` to resolve project/environment/resource/server context
+from existing server-owned source-link state. If trusted ids are supplied by the Action for deploy,
+the server may bootstrap a missing source link; if ids are omitted and no link exists, deployment
+fails before mutation. Preview cleanup must resolve context from preview source-link state. Config
+bootstrap, source package, and broader preview workflow contracts remain later server-side work.
 
 The next accepted-candidate `0.9.x` slice is
 [Action Server Config Deploy](../workflows/action-server-config-deploy.md), coordinated by the
@@ -276,8 +277,9 @@ The next accepted-candidate `0.9.x` slice is
 That slice keeps the same state-owner boundary but lets the Action hand a bounded source package
 reference and selected config path to the self-hosted server. The server, not the runner, validates
 the package manifest, parses repository config, applies resource/environment/profile changes
-through explicit operations, resolves source links from trusted context, and dispatches ids-only
-deployment admission. It must fail before source package mutation or state mutation when the
+through explicit operations, resolves source links from trusted context through the internal
+`ResolveActionServerConfigDeploymentTargetCommand`, and dispatches ids-only deployment admission.
+It must fail before source package mutation or state mutation when the
 handshake does not advertise source package and server-side config bootstrap support.
 
 ### Web

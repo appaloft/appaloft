@@ -653,6 +653,8 @@ async function seedSourceLinkContext(
   db: Kysely<Database>,
   suffix: string,
   input?: {
+    environmentKind?: "local" | "preview" | "production" | "staging" | "development";
+    environmentName?: string;
     lifecycleStatus?: string;
     archivedAt?: string;
   },
@@ -720,8 +722,8 @@ async function seedSourceLinkContext(
     .values({
       id: environmentId,
       project_id: projectId,
-      name: "production",
-      kind: "production",
+      name: input?.environmentName ?? "production",
+      kind: input?.environmentKind ?? "production",
       parent_environment_id: null,
       created_at: createdAt,
     })
@@ -800,6 +802,7 @@ async function insertDeploymentSnapshot(
     tlsMode?: "auto" | "disabled";
     proxyKind?: "traefik" | "caddy";
     targetPort?: number;
+    sourceFingerprint?: string;
   },
 ): Promise<void> {
   await db
@@ -837,6 +840,9 @@ async function insertDeploymentSnapshot(
             "access.routeSource": input.routeSource,
             "access.hostname": input.hostname,
             "access.scheme": (input.tlsMode ?? "disabled") === "auto" ? "https" : "http",
+            ...(input.sourceFingerprint
+              ? { "context.sourceFingerprint": input.sourceFingerprint }
+              : {}),
           },
         },
         target: {
@@ -2495,6 +2501,83 @@ describe("pglite persistence integration", () => {
           providerKey: "traefik",
         },
       });
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-008][DEF-ACCESS-QRY-006] pglite does not project cleaned preview routes as current access", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-cleaned-preview-access-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgResourceReadModel } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A25";
+      const target = await seedSourceLinkContext(database.db, "cleaned_preview", {
+        environmentKind: "preview",
+        environmentName: "preview",
+      });
+      await enableReverseProxyResource(database.db, target.resourceId);
+      await insertDeploymentSnapshot(database.db, target, {
+        id: "dep_cleaned_preview",
+        createdAt: "2026-01-01T00:03:00.000Z",
+        routeSource: "generated-default",
+        hostname: "25.preview.example.test",
+        sourceFingerprint,
+      });
+
+      const context = createTestExecutionContext();
+      const resourceReadModel = new PgResourceReadModel(database.db);
+      const listResourcesQueryService = new ListResourcesQueryService(
+        resourceReadModel,
+        new EmptyDestinationRepository(),
+        new EmptyServerRepository(),
+        new DisabledDefaultAccessDomainProvider(),
+      );
+
+      const cleaned = await listResourcesQueryService.execute(context, {
+        projectId: target.projectId,
+      });
+      const cleanedResource = cleaned.items.find((item) => item.id === target.resourceId);
+      expect(cleanedResource?.deploymentCount).toBe(1);
+      expect(cleanedResource?.lastDeploymentStatus).toBe("succeeded");
+      expect(cleanedResource?.accessSummary).toBeUndefined();
+
+      await database.db
+        .insertInto("source_links")
+        .values({
+          source_fingerprint: sourceFingerprint,
+          project_id: target.projectId,
+          environment_id: target.environmentId,
+          resource_id: target.resourceId,
+          server_id: target.serverId,
+          destination_id: target.destinationId,
+          updated_at: "2026-01-01T00:04:00.000Z",
+          reason: "preview-open",
+          metadata: {},
+        })
+        .execute();
+
+      const active = await listResourcesQueryService.execute(context, {
+        projectId: target.projectId,
+      });
+      const activeResource = active.items.find((item) => item.id === target.resourceId);
+      expect(activeResource?.accessSummary?.latestGeneratedAccessRoute).toMatchObject({
+        hostname: "25.preview.example.test",
+        deploymentId: "dep_cleaned_preview",
+      });
+      expect(activeResource?.accessSummary?.proxyRouteStatus).toBe("ready");
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });

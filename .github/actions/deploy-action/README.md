@@ -319,9 +319,11 @@ inputs. In `server-config-deploy` mode, pull request previews may keep using
 for per-run values such as PR ports, callback URLs, and preview hostnames. Those values are sent as
 transient API payload; they do not need to be committed to `appaloft.yml`. Production config
 domains from `appaloft.yml` are not reused for pull request preview routing unless a later
-preview-safe policy explicitly selects them. `runtime-name` remains a pure SSH CLI input and is not
-accepted by server config deploy. In `server-config-deploy` mode, `secret-variables` is reserved
-for resolving committed `ci-env:` secret references before the API request.
+preview-safe policy explicitly selects them. When a preview domain is supplied, the server must
+confirm that the resulting deployment uses that domain before the action writes `preview-url`.
+`runtime-name` remains a pure SSH CLI input and is not accepted by server config deploy. In
+`server-config-deploy` mode, `secret-variables` is reserved for resolving committed `ci-env:`
+secret references before the API request.
 
 ```yaml
 - uses: appaloft/deploy-action@v1

@@ -40,7 +40,7 @@ import {
   type ResourceNetworkProtocolValue,
   type ResourceServiceKindValue,
   type RuntimePlanStrategyValue,
-  type VariableExposureValue,
+  VariableExposureValue,
   type VariableKindValue,
 } from "../shared/state-machine";
 import {
@@ -1776,6 +1776,43 @@ export class Resource extends AggregateRoot<ResourceState> {
     );
 
     return ok(cloneResourceAutoDeployPolicyState(this.state.autoDeployPolicy));
+  }
+
+  genericSignedWebhookSecretValue(): Result<string> {
+    const unavailable = () =>
+      domainError.resourceAutoDeploySecretUnavailable(
+        "Generic signed webhook secret is unavailable",
+        {
+          phase: "source-event-verification",
+          resourceId: this.state.id.value,
+          refFamily: "resource-secret",
+        },
+      );
+
+    const policy = this.state.autoDeployPolicy;
+    const secretRef = policy?.genericWebhookSecretRef;
+    if (!policy || policy.triggerKind.value !== "generic-signed-webhook" || !secretRef) {
+      return err(unavailable());
+    }
+
+    const secretKey = secretRef.resourceVariableKey();
+    const resourceScope = ConfigScopeValue.rehydrate("resource");
+    const runtimeExposure = VariableExposureValue.rehydrate("runtime");
+    const variable = this.state.variables.find(
+      (candidate) =>
+        candidate.matchesVariable({
+          key: secretKey,
+          exposure: runtimeExposure,
+          scope: resourceScope,
+        }) &&
+        (candidate.isSecret || candidate.kind === "secret"),
+    );
+
+    if (!variable) {
+      return err(unavailable());
+    }
+
+    return ok(variable.value);
   }
 
   accept<TContext, TResult>(

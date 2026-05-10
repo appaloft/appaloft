@@ -77,8 +77,9 @@ auto-deploy settings, and Resource repository persistence exist. Source-event co
 handling, generic signed source-event verification, durable source-event dedupe/read-model
 persistence, policy matching for ignored ref outcomes, and active CLI/HTTP/oRPC source event read
 surfaces also exist. Matching source events can dispatch through the existing deployment admission
-use case at the application boundary. The Resource-scoped generic signed HTTP route now resolves
-`resource-secret:<KEY>`, verifies `X-Appaloft-Signature`, dispatches `source-events.ingest` with
+use case at the application boundary. The Resource-scoped generic signed HTTP route now dispatches
+the internal `ResolveGenericSignedSourceEventSecretQuery`, which asks the Resource aggregate to
+resolve `resource-secret:<KEY>`, verifies `X-Appaloft-Signature`, dispatches `source-events.ingest` with
 `scopeResourceId`, and keeps dedupe scoped to the route Resource. Event dispatch, dedupe, Web
 auto-deploy settings, Web source-event diagnostics, public help-link coverage, and operation
 coverage rows are now bound to automation. GitHub push webhook route verification, normalization,

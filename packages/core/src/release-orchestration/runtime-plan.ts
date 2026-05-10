@@ -262,6 +262,12 @@ export interface AccessRouteState {
   redirectStatus?: CanonicalRedirectStatusCode;
 }
 
+export interface AccessRouteExpectation {
+  host: PublicDomainName;
+  pathPrefix: RoutePathPrefix;
+  tlsMode: TlsModeValue;
+}
+
 export interface RuntimeVerificationStepState {
   kind: RuntimeVerificationStepKindValue;
   label: PlanStepText;
@@ -790,6 +796,14 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
     return this.state.redirectStatus?.value;
   }
 
+  matchesExpectation(expectation: AccessRouteExpectation): boolean {
+    return (
+      this.state.domains.some((domain) => domain.equals(expectation.host)) &&
+      this.state.pathPrefix.equals(expectation.pathPrefix) &&
+      this.state.tlsMode.equals(expectation.tlsMode)
+    );
+  }
+
   toState(): AccessRouteState {
     return {
       proxyKind: this.state.proxyKind,
@@ -1083,6 +1097,10 @@ export class RuntimeExecutionPlan extends ValueObject<RuntimeExecutionPlanState>
     });
   }
 
+  hasAccessRoute(expectation: AccessRouteExpectation): boolean {
+    return (this.state.accessRoutes ?? []).some((route) => route.matchesExpectation(expectation));
+  }
+
   withVerificationSteps(verificationSteps: RuntimeVerificationStep[]): RuntimeExecutionPlan {
     return RuntimeExecutionPlan.rehydrate({
       ...this.state,
@@ -1192,6 +1210,10 @@ export class RuntimePlan extends ValueObject<RuntimePlanState> {
 
   withExecutionMetadata(metadata: Record<string, string>): RuntimePlan {
     return this.withExecution(this.state.execution.withMetadata(metadata));
+  }
+
+  hasAccessRoute(expectation: AccessRouteExpectation): boolean {
+    return this.state.execution.hasAccessRoute(expectation);
   }
 
   toState(): RuntimePlanState {

@@ -186,4 +186,24 @@ describe("ListResourcesQueryService access profile projection", () => {
       routePurpose: "default-resource-access",
     });
   });
+
+  test("[DEF-ACCESS-QRY-001] omits planned generated access after deployment history exists", async () => {
+    const { provider, service } = createService(
+      resourceSummary({
+        deploymentCount: 1,
+        lastDeploymentId: "dep_old",
+        lastDeploymentStatus: "succeeded",
+      }),
+    );
+
+    const result = await service.execute(
+      createExecutionContext({
+        requestId: "req_list_resources_access_after_deploy_test",
+        entrypoint: "system",
+      }),
+    );
+
+    expect(result.items[0]?.accessSummary?.plannedGeneratedAccessRoute).toBeUndefined();
+    expect(provider.calls).toHaveLength(0);
+  });
 });

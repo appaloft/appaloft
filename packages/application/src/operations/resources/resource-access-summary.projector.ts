@@ -24,6 +24,11 @@ export interface ResourceAccessSummaryDeployment {
   };
 }
 
+export interface ResourceAccessSummaryProjectionOptions {
+  activePreviewSourceFingerprints?: ReadonlySet<string>;
+  previewEnvironment?: boolean;
+}
+
 export interface ResourceAccessSummaryDomainBinding {
   id: string;
   status: DomainBindingStatus;
@@ -32,6 +37,42 @@ export interface ResourceAccessSummaryDomainBinding {
   pathPrefix: string;
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
+}
+
+function deploymentSourceFingerprint(
+  deployment: ResourceAccessSummaryDeployment,
+): string | undefined {
+  const metadata = deployment.runtimePlan.execution.metadata ?? {};
+
+  return metadata["access.sourceFingerprint"] ?? metadata["context.sourceFingerprint"];
+}
+
+function isPreviewSourceFingerprint(sourceFingerprint: string): boolean {
+  return sourceFingerprint.startsWith("source-fingerprint:v1:preview%3A");
+}
+
+function isCurrentPreviewDeployment(
+  deployment: ResourceAccessSummaryDeployment,
+  options: ResourceAccessSummaryProjectionOptions,
+): boolean {
+  if (!options.previewEnvironment) {
+    return true;
+  }
+
+  const activePreviewSourceFingerprints = options.activePreviewSourceFingerprints;
+  if (!activePreviewSourceFingerprints || activePreviewSourceFingerprints.size === 0) {
+    return false;
+  }
+
+  const sourceFingerprint = deploymentSourceFingerprint(deployment);
+  if (!sourceFingerprint) {
+    return true;
+  }
+
+  return (
+    !isPreviewSourceFingerprint(sourceFingerprint) ||
+    activePreviewSourceFingerprints.has(sourceFingerprint)
+  );
 }
 
 function routeUrl(input: {
@@ -65,10 +106,11 @@ function proxyRouteStatusFor(
 export function projectResourceAccessSummary(
   deployments: ResourceAccessSummaryDeployment[],
   domainBindings: ResourceAccessSummaryDomainBinding[] = [],
+  options: ResourceAccessSummaryProjectionOptions = {},
 ): ResourceAccessSummary | undefined {
-  const sortedDeployments = [...deployments].sort((left, right) =>
-    right.createdAt.localeCompare(left.createdAt),
-  );
+  const sortedDeployments = deployments
+    .filter((deployment) => isCurrentPreviewDeployment(deployment, options))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   let latestRoute:
     | {

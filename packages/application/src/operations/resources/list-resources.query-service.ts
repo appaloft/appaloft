@@ -38,13 +38,22 @@ export class ListResourcesQueryService {
     const repositoryContext = toRepositoryContext(context);
     const resources = await this.readModel.list(repositoryContext, input);
     const items = await Promise.all(
-      resources.map(async (resource) => ({
-        ...resource,
-        accessSummary: {
+      resources.map(async (resource) => {
+        const accessSummary = {
           ...(resource.accessSummary ?? {}),
           ...(await this.plannedGeneratedAccessRoute(context, resource)),
-        },
-      })),
+        };
+
+        if (Object.keys(accessSummary).length === 0) {
+          const { accessSummary: _accessSummary, ...resourceWithoutAccessSummary } = resource;
+          return resourceWithoutAccessSummary;
+        }
+
+        return {
+          ...resource,
+          accessSummary,
+        };
+      }),
     );
 
     return { items };
@@ -61,6 +70,7 @@ export class ListResourcesQueryService {
   > {
     if (
       resource.accessProfile?.generatedAccessMode === "disabled" ||
+      resource.deploymentCount > 0 ||
       !resource.destinationId ||
       resource.networkProfile?.exposureMode !== "reverse-proxy" ||
       !resource.networkProfile.internalPort

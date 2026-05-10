@@ -114,7 +114,7 @@ Self-hosted server mode can also trigger PR preview deploys:
     server-id: ${{ secrets.APPALOFT_SERVER_ID }}
 ```
 
-Server-mode preview deploys use a preview-scoped source fingerprint and write `preview-id`, `deployment-id`, and `console-url` outputs. They do not apply `preview-domain-template`, `preview-tls-mode`, `require-preview-url`, `runtime-name`, `environment-variables`, or `secret-variables`; those policies need server-side ownership before they move into this path.
+Server-mode preview deploys use a preview-scoped source fingerprint and write `preview-id`, `deployment-id`, `console-url`, and, when configured, `preview-url` outputs. `preview-domain-template` and `preview-tls-mode` are applied as server-side preview route intent; `environment-variables` and `secret-variables` can carry preview-specific runtime values.
 
 The non-secret control-plane connection policy may also live in `appaloft.yml`:
 

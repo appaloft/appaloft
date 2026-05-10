@@ -12,32 +12,9 @@ import {
   IngestSourceEventCommand,
   type Query,
   type QueryBus,
-  type RepositoryContext,
-  type ResourceRepository,
+  ResolveGenericSignedSourceEventSecretQuery,
 } from "@appaloft/application";
-import {
-  ConfigKey,
-  ConfigValueText,
-  CreatedAt,
-  DisplayNameText,
-  EnvironmentId,
-  GitRefText,
-  ok,
-  ProjectId,
-  Resource,
-  ResourceAutoDeploySecretRef,
-  ResourceAutoDeployTriggerKindValue,
-  ResourceId,
-  ResourceKindValue,
-  ResourceName,
-  type Result,
-  SourceEventKindValue,
-  SourceKindValue,
-  SourceLocator,
-  UpdatedAt,
-  VariableExposureValue,
-  VariableKindValue,
-} from "@appaloft/core";
+import { ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
 
 import { mountAppaloftOrpcRoutes } from "../src";
@@ -60,19 +37,6 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
   }
 }
 
-class SingleResourceRepository implements ResourceRepository {
-  constructor(private readonly resource: Resource) {}
-
-  async findOne(
-    _context: RepositoryContext,
-    _spec: Parameters<ResourceRepository["findOne"]>[1],
-  ): Promise<Resource | null> {
-    return this.resource;
-  }
-
-  async upsert(): Promise<void> {}
-}
-
 async function hmacSha256Hex(secretValue: string, body: string): Promise<string> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -87,47 +51,6 @@ async function hmacSha256Hex(secretValue: string, body: string): Promise<string>
   );
   const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
   return [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function resourceWithGenericSignedPolicy(): Resource {
-  const resource = Resource.create({
-    id: ResourceId.rehydrate("res_web"),
-    projectId: ProjectId.rehydrate("prj_demo"),
-    environmentId: EnvironmentId.rehydrate("env_prod"),
-    name: ResourceName.rehydrate("web"),
-    kind: ResourceKindValue.rehydrate("application"),
-    sourceBinding: {
-      kind: SourceKindValue.rehydrate("git-public"),
-      locator: SourceLocator.rehydrate("https://github.com/appaloft/demo"),
-      displayName: DisplayNameText.rehydrate("appaloft/demo"),
-      gitRef: GitRefText.rehydrate("main"),
-    },
-    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
-  })._unsafeUnwrap();
-
-  resource
-    .setVariable({
-      key: ConfigKey.rehydrate("APPALOFT_WEBHOOK_SECRET"),
-      value: ConfigValueText.rehydrate("correct-secret"),
-      kind: VariableKindValue.rehydrate("secret"),
-      exposure: VariableExposureValue.rehydrate("runtime"),
-      isSecret: true,
-      updatedAt: UpdatedAt.rehydrate("2026-01-01T00:00:01.000Z"),
-    })
-    ._unsafeUnwrap();
-  resource
-    .configureAutoDeployPolicy({
-      triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate("generic-signed-webhook"),
-      refs: [GitRefText.rehydrate("main")],
-      eventKinds: [SourceEventKindValue.rehydrate("push")],
-      genericWebhookSecretRef: ResourceAutoDeploySecretRef.create(
-        "resource-secret:APPALOFT_WEBHOOK_SECRET",
-      )._unsafeUnwrap(),
-      configuredAt: UpdatedAt.rehydrate("2026-01-01T00:00:02.000Z"),
-    })
-    ._unsafeUnwrap();
-
-  return resource;
 }
 
 describe("generic signed source event HTTP route", () => {
@@ -146,15 +69,18 @@ describe("generic signed source event HTTP route", () => {
       },
     } as CommandBus;
     const queryBus = {
-      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
-        ok({} as T),
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> =>
+        ok(
+          query instanceof ResolveGenericSignedSourceEventSecretQuery
+            ? ({ secretValue: "correct-secret" } as T)
+            : ({} as T),
+        ),
     } as QueryBus;
     const app = mountAppaloftOrpcRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
       queryBus,
-      resourceRepository: new SingleResourceRepository(resourceWithGenericSignedPolicy()),
       sourceEventVerificationPort: new GenericSignedSourceEventVerifier(),
     });
     const body = {
@@ -211,15 +137,18 @@ describe("generic signed source event HTTP route", () => {
       },
     } as CommandBus;
     const queryBus = {
-      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
-        ok({} as T),
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> =>
+        ok(
+          query instanceof ResolveGenericSignedSourceEventSecretQuery
+            ? ({ secretValue: "correct-secret" } as T)
+            : ({} as T),
+        ),
     } as QueryBus;
     const app = mountAppaloftOrpcRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
       queryBus,
-      resourceRepository: new SingleResourceRepository(resourceWithGenericSignedPolicy()),
       sourceEventVerificationPort: new GenericSignedSourceEventVerifier(),
     });
     const rawBody = JSON.stringify({

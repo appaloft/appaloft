@@ -917,7 +917,7 @@ describe("deploy-action wrapper reference", () => {
         "    done",
         "    payload_file=\"$(printf '%s' \"$payload\" | sed 's/^@//')\"",
         '    cat "$payload_file" > "$APPALOFT_CAPTURED_PAYLOAD"',
-        '    printf \'{"id":"dep_server_preview","deploymentHref":"/deployments/dep_server_preview"}\'',
+        '    printf \'{"id":"dep_server_preview","deploymentHref":"/deployments/dep_server_preview","previewUrl":"http://pr-42.preview.example.com"}\'',
         "    ;;",
         "  *)",
         "    echo 'unexpected curl call' >&2",
@@ -996,6 +996,68 @@ describe("deploy-action wrapper reference", () => {
           revision: "abc123",
         },
       });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] self-hosted server config preview fails without server-confirmed route", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-preview-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'case "$*" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackage":true,"serverSideConfigBootstrap":true}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        '    printf \'{"id":"dep_server_preview","deploymentHref":"/deployments/dep_server_preview"}\'',
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        GITHUB_OUTPUT: outputPath,
+        GITHUB_REPOSITORY: "appaloft/www",
+        GITHUB_REPOSITORY_ID: "123456",
+        GITHUB_SHA: "abc123",
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.preview.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_PREVIEW: "pull-request",
+        INPUT_PREVIEW_ID: "pr-42",
+        INPUT_PREVIEW_DOMAIN_TEMPLATE: "pr-42.preview.example.com",
+        INPUT_PREVIEW_TLS_MODE: "disabled",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).toContain("did not confirm the requested preview domain");
+      expect(existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "").not.toContain(
+        "preview-url=",
+      );
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }

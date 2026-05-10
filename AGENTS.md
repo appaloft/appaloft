@@ -76,6 +76,7 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
   - [docs/errors/model.md](/Users/nichenqin/projects/appaloft/docs/errors/model.md)
   - [docs/errors/neverthrow-conventions.md](/Users/nichenqin/projects/appaloft/docs/errors/neverthrow-conventions.md)
   - [docs/architecture/async-lifecycle-and-acceptance.md](/Users/nichenqin/projects/appaloft/docs/architecture/async-lifecycle-and-acceptance.md)
+  - [docs/architecture/adapter-command-query-boundary.md](/Users/nichenqin/projects/appaloft/docs/architecture/adapter-command-query-boundary.md)
 - formal source-of-truth semantics for business operations live in `docs/decisions/**`, global contracts under `docs/errors/**` and `docs/architecture/**`, and local specs under `docs/commands/**`, `docs/events/**`, `docs/workflows/**`, and `docs/testing/**`
 - docs/ai/** contains background analysis and migration context only; it must not override ADRs, global contracts, or normative local specs
 - if a behavior is absent from `docs/BUSINESS_OPERATION_MAP.md`, add or position it there in a Spec Round before writing local specs or implementation code
@@ -84,6 +85,8 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - new business capabilities must update both `docs/CORE_OPERATIONS.md` and `packages/application/src/operation-catalog.ts` in the same change
 - transport input parameters must reuse the matching command/query input schema, not redefine parallel transport-only input shapes
 - adapters dispatch through `CommandBus` or `QueryBus`, not by calling application services directly
+- adapters must not import application repository ports, core repository specs, or call repository `findOne`/`upsert` for business workflows; see [docs/architecture/adapter-command-query-boundary.md](/Users/nichenqin/projects/appaloft/docs/architecture/adapter-command-query-boundary.md)
+- adapters and application services must not peel aggregate `toState()` for business predicates when a core aggregate/value object method can answer the rule
 - handlers are registered with `@CommandHandler(...)` or `@QueryHandler(...)`
 - handlers may call a use case or application service, but must not embed persistence or transport logic
 - read models stay query-shaped; aggregate repositories stay write-side oriented

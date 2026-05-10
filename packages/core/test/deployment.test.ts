@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AccessRoute,
   BuildStrategyKindValue,
   ConfigScopeValue,
   CreatedAt,
@@ -13,6 +14,7 @@ import {
   DestinationId,
   DetectSummary,
   DisplayNameText,
+  EdgeProxyKindValue,
   EnvironmentConfigSnapshot,
   EnvironmentId,
   EnvironmentSnapshotId,
@@ -26,6 +28,7 @@ import {
   PlanStepText,
   ProjectId,
   ProviderKey,
+  PublicDomainName,
   ResourceBindingId,
   ResourceBindingScopeValue,
   ResourceBindingTargetName,
@@ -33,6 +36,7 @@ import {
   ResourceInjectionModeValue,
   ResourceInstanceId,
   ResourceInstanceKindValue,
+  RoutePathPrefix,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
@@ -41,6 +45,7 @@ import {
   SourceLocator,
   StartedAt,
   TargetKindValue,
+  TlsModeValue,
 } from "../src";
 
 function runtimePlan() {
@@ -115,6 +120,19 @@ function createDeployment(input?: { runtimePlan?: RuntimePlan }) {
   });
 }
 
+function accessRoute(input: {
+  domains: string[];
+  pathPrefix: string;
+  tlsMode: "auto" | "disabled";
+}) {
+  return AccessRoute.create({
+    proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
+    domains: input.domains.map((domain) => PublicDomainName.rehydrate(domain)),
+    pathPrefix: RoutePathPrefix.rehydrate(input.pathPrefix),
+    tlsMode: TlsModeValue.rehydrate(input.tlsMode),
+  })._unsafeUnwrap();
+}
+
 describe("Deployment", () => {
   test("[DMBH-DEPLOY-001] answers execution-continuation decisions", () => {
     expect(deployment({ status: "running" }).resolveExecutionContinuation()).toEqual({
@@ -171,6 +189,34 @@ describe("Deployment", () => {
       base: "image",
       phase: "execute",
     });
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-017] answers whether a runtime plan realized an access route", () => {
+    const plan = runtimePlan().withExecution(
+      runtimePlan().execution.withAccessRoutes([
+        accessRoute({
+          domains: ["pr-42.preview.example.com"],
+          pathPrefix: "/",
+          tlsMode: "disabled",
+        }),
+      ]),
+    );
+    const deployment = createDeployment({ runtimePlan: plan })._unsafeUnwrap();
+
+    expect(
+      deployment.hasRealizedAccessRoute({
+        host: PublicDomainName.rehydrate("pr-42.preview.example.com"),
+        pathPrefix: RoutePathPrefix.rehydrate("/"),
+        tlsMode: TlsModeValue.rehydrate("disabled"),
+      }),
+    ).toBe(true);
+    expect(
+      deployment.hasRealizedAccessRoute({
+        host: PublicDomainName.rehydrate("generated.203.0.113.10.sslip.io"),
+        pathPrefix: RoutePathPrefix.rehydrate("/"),
+        tlsMode: TlsModeValue.rehydrate("disabled"),
+      }),
+    ).toBe(false);
   });
 
   test("[DEP-RETRY-001] records recovery trigger metadata on lifecycle events", () => {

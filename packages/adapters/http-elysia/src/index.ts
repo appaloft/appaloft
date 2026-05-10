@@ -19,10 +19,7 @@ import {
   ListServersQuery,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
-  type ResourceRepository,
-  type SourceEventPolicyReader,
   type SourceEventVerificationPort,
-  type SourceLinkRepository,
   type TerminalSession,
   type TerminalSessionGateway,
   toRepositoryContext,
@@ -461,9 +458,6 @@ export function createHttpApp(input: {
   certificateHttpChallengeTokenStore?: CertificateHttpChallengeTokenStore;
   resourceAccessFailureEvidenceRecorder?: ResourceAccessFailureEvidenceRecorder;
   resourceAccessRouteContextLookup?: AutomaticRouteContextLookup;
-  resourceRepository?: ResourceRepository;
-  sourceLinkRepository?: SourceLinkRepository;
-  sourceEventPolicyReader?: SourceEventPolicyReader;
   sourceEventVerificationPort?: SourceEventVerificationPort;
   githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
@@ -1139,16 +1133,9 @@ export function createHttpApp(input: {
     executionContextFactory: input.executionContextFactory,
     queryBus: input.queryBus,
     logger: input.logger,
-    ...(input.resourceRepository ? { resourceRepository: input.resourceRepository } : {}),
-    ...(input.sourceLinkRepository ? { sourceLinkRepository: input.sourceLinkRepository } : {}),
     ...(input.sourceEventVerificationPort
       ? {
           sourceEventVerificationPort: input.sourceEventVerificationPort,
-        }
-      : {}),
-    ...(input.sourceEventPolicyReader
-      ? {
-          sourceEventPolicyReader: input.sourceEventPolicyReader,
         }
       : {}),
     ...(input.githubSourceEventWebhookVerifier

@@ -939,6 +939,8 @@ COMPOSE
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik-acme:/letsencrypt
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - appaloft-edge
 COMPOSE

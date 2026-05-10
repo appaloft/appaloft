@@ -353,6 +353,7 @@ test("install.sh configures Traefik console domain bootstrap when a domain is su
     expect(compose).toContain("Host(`$" + "{APPALOFT_CONSOLE_DOMAIN}`)");
     expect(compose).toContain("traefik.http.routers.appaloft-console.tls.certresolver: appaloft");
     expect(compose).toContain("traefik.http.services.appaloft-console.loadbalancer.server.port");
+    expect(compose).toContain('"host.docker.internal:host-gateway"');
     expect(compose).toContain("traefik-acme:");
     expect(compose).toContain("appaloft-edge:");
 
