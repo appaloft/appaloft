@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.10](https://github.com/appaloft/appaloft/compare/v0.9.9...v0.9.10) (2026-05-10)
+
+
+### Bug Fixes
+
+* accept action trusted source metadata ([8b5b827](https://github.com/appaloft/appaloft/commit/8b5b8273da5dd74f7eec95d340afba5c230dd2c4))
+* accept action trusted source metadata ([8b5b827](https://github.com/appaloft/appaloft/commit/8b5b8273da5dd74f7eec95d340afba5c230dd2c4))
+* accept action trusted source metadata ([eaa2ce1](https://github.com/appaloft/appaloft/commit/eaa2ce1e4a1490ea7cf08a3e05d60d4dd8873b01))
+
 ## [0.9.9](https://github.com/appaloft/appaloft/compare/v0.9.8...v0.9.9) (2026-05-10)
 
 
