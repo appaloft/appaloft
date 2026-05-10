@@ -1709,14 +1709,76 @@ Exit criteria:
   cluster path without changing the public deployment admission surface.
 - [x] Rollback/redeploy are no longer rebuild-required if they are exposed.
 
-## Phase 8: Operator/Internal State Closure And Interface Parity
+## Phase 8: Self-Hosted Auth And Organization Bootstrap
+
+Target: `0.10.0`.
+
+Release rule:
+
+- [ ] Select `0.10.0` only when all required Phase 8 items, earlier phase items, and exit criteria
+  are checked. If any Phase 8 item remains unchecked, release a `0.9.x` patch or an explicitly
+  requested prerelease instead.
+
+Already done:
+
+- [x] Better Auth compatible user, session, account, verification, organization, member, and
+  invitation tables exist in the PostgreSQL/PGlite migration set.
+- [x] Web already has an auth-session query surface and UI test fixtures for Better Auth session
+  responses.
+- [x] The identity governance test matrix exists for foundational organization membership behavior
+  before public organization operations are exposed.
+
+Required:
+
+- [ ] Add self-hosted Action API authentication: installer-generated deploy token, bearer-token
+  verification on action mutation endpoints, token rotation/revocation, and clear 401/403 errors.
+- [ ] Add scoped deploy tokens that can be limited to a project, environment, resource, source
+  repository, or preview workflow, so multiple repositories can share one self-hosted instance
+  without sharing a global mutation secret.
+- [ ] Add product auth baseline: first admin account bootstrap, login/session hardening, and
+  organization/team membership for multiple operators sharing one Appaloft instance.
+- [ ] Make first self-hosted install usable without any external OAuth provider: support an
+  installer-driven local admin bootstrap through explicit flags, config file, or environment input;
+  support a generated one-time admin password when no password is supplied; redact bootstrap
+  secrets from logs; and require the bootstrap path to be idempotent after the first admin exists.
+- [ ] Add optional OAuth login configuration for self-hosted installs, including Google, GitHub, and
+  generic OIDC provider settings; provider login must be disabled unless the required client id,
+  client secret, callback URL, and trusted origin are configured.
+- [ ] Add an install/update UX that prints the console login URL, first-admin bootstrap status,
+  configured login methods, and safe next steps for adding OAuth later without requiring users to
+  understand Better Auth internals.
+- [ ] Add organization/team operations and read models for first organization creation, member list,
+  invitation, role update, remove member, and current-user/current-organization context.
+- [ ] Add authorization policy gates for console and HTTP/oRPC mutation endpoints: unauthenticated
+  users get 401, authenticated users outside the organization or without the required role get 403,
+  and public health/version/readiness endpoints remain explicitly public.
+- [ ] Add Web onboarding surfaces for first admin setup, login, current organization switch/context,
+  member invitation, and token management without hardcoded UI copy.
+- [ ] Add CLI and public docs coverage for first install login, local admin bootstrap, OAuth setup,
+  deploy token rotation, and GitHub Action self-hosted server mode configuration.
+
+Exit criteria:
+
+- [ ] A new self-hosted user can run `install.sh`, open the printed console URL, log in with a
+  local first-admin account, and deploy through the console or GitHub Action server mode without
+  manually editing database rows.
+- [ ] OAuth is optional rather than required: users can add Google/GitHub/OIDC later, and missing
+  OAuth config never blocks first login through the local bootstrap path.
+- [ ] GitHub Actions can no longer mutate a self-hosted server endpoint without a valid deploy
+  token, and failures include actionable 401/403 messages.
+- [ ] Multiple operators can share one Appaloft instance through organization/team membership with
+  role-aware access to projects, environments, resources, deployment targets, and tokens.
+- [ ] Install, upgrade, HTTP/oRPC, Web, CLI, docs, and test matrices agree on the first-admin,
+  OAuth, organization/team, and deploy-token behavior.
+
+## Phase 9: Operator/Internal State Closure And Interface Parity
 
 Target: `1.0.0-rc`.
 
 Release rule:
 
-- [ ] Select `1.0.0-rc` only when all required Phase 8 items, earlier phase items, and exit criteria
-  are checked. If any Phase 8 item remains unchecked, release a `0.9.x` patch or an explicitly
+- [ ] Select `1.0.0-rc` only when all required Phase 9 items, earlier phase items, and exit criteria
+  are checked. If any Phase 9 item remains unchecked, release a `0.10.x` patch or an explicitly
   requested prerelease instead.
 
 Already done:
@@ -1742,10 +1804,6 @@ Required:
   candidate retention, preview-owned artifact cleanup, no-volume-by-default safety, and audit and
   diagnostic output.
 - [ ] Add audit/event read surfaces with retention policy and redaction rules.
-- [ ] Add self-hosted Action API authentication: installer-generated deploy token, bearer-token
-  verification on action mutation endpoints, token rotation/revocation, and clear 401/403 errors.
-- [ ] Add product auth baseline: first admin account bootstrap, login/session hardening, and
-  organization/team membership for multiple operators sharing one Appaloft instance.
 - [ ] Add terminal session list/show/attach/close/expire if terminal sessions remain public.
 - [ ] Ensure provider/plugin/system operations expose capability details and configuration
   diagnostics without leaking provider SDK types or secrets.
