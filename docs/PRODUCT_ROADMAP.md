@@ -43,10 +43,10 @@ Version selection rules:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-05-10, the latest public release is `v0.9.8`; root package
-  and Release Please manifest on `main` are `0.9.8`; the release PR target is
-  `0.9.9`.
-- [x] On 2026-05-10, the roadmap gate allows `Release-As: 0.9.9` because
+- [x] On 2026-05-10, the latest public release is `v0.9.9`; root package
+  and Release Please manifest on `main` are `0.9.9`; the release PR target is
+  `0.9.10`.
+- [x] On 2026-05-10, the roadmap gate allows `Release-As: 0.9.10` because
   Phase 0 through Phase 7 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
