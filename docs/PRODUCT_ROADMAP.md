@@ -93,6 +93,7 @@ Internal governing sources:
 - [x] [Quick Deploy Test Matrix](./testing/quick-deploy-test-matrix.md)
 - [x] [Deployment Runtime Substrate Plan](./implementation/deployment-runtime-substrate-plan.md)
 - [x] [Static Site Deployment Plan](./implementation/static-site-deployment-plan.md)
+- [x] [AI-Native Resource Template And MCP Roadmap](./implementation/ai-native-resource-template-roadmap.md)
 
 Product constraints:
 
@@ -1843,6 +1844,61 @@ Exit criteria:
 - [ ] No active `1.0.0` feature relies on an undocumented migration gap.
 - [ ] New users can complete the v1 minimum loop from install to reachable deployed app and day-two
   recovery without private workarounds.
+
+## Future AI-Native Resource Template And MCP Tracks
+
+Target: post-`1.0.0` planning by default.
+
+These tracks are recorded so future Spec Rounds do not model MCP servers, AI tool servers, or
+template-backed software as a separate deployment engine. They are not current release blockers and
+do not authorize runtime code before their own ADR/spec/test gates.
+
+Governing planning document:
+
+- [AI-Native Resource Template And MCP Roadmap](./implementation/ai-native-resource-template-roadmap.md)
+
+Roadmap principles:
+
+- [ ] Preserve Appaloft's existing Resource, Workload, ResourceInstance, ResourceBinding,
+  Deployment, RuntimePlan, EnvironmentSnapshot, Provider, Strategy, Integration, Plugin, command/
+  query, and operation-catalog boundaries.
+- [ ] Define a generic Resource Template / Workload Profile foundation before MCP-specific
+  behavior. Templates describe deployable intent and must not be Docker Compose-only.
+- [ ] Resolve template/profile deployment into existing application operations and deployment
+  planning instead of bypassing the application layer.
+- [ ] Add a template catalog/registry layer for local, repository, git, official, private, and
+  licensed distribution modes without making curated catalogs a prerequisite for community use.
+- [ ] Treat AI tool-server / MCP support as capability/profile metadata, generated outputs, docs,
+  safe defaults, and gateway compatibility over the generic foundation.
+- [ ] Plan Appaloft-as-MCP as a future interface over existing operations, using the same operation
+  catalog, command/query schemas, neverthrow errors, operation ids, and correlation ids as CLI,
+  HTTP/oRPC, and Web.
+- [ ] Plan Appaloft-hosted MCP server templates as deployable Resources or dependency-backed
+  workloads on user-owned infrastructure, not as a new MCP-specific deployment path.
+- [ ] Defer MCP Gateway / Tool Gateway governance until template/tool-server foundations exist; the
+  gateway is a policy, audit, identity, rate-limit, approval, redaction, and correlation layer above
+  hosted tool servers.
+- [ ] Keep AI-native observability, AgentOps, cost governance, eval hooks, model gateway, and agent
+  runtime as long-term themes rather than initial template/MCP dependencies.
+
+Candidate sequencing:
+
+- [ ] Post-1.0 Track 1: Resource Template / Workload Profile Foundation. If maintainers deliberately
+  pull this before GA, it must come after the reserved `0.10.0` self-hosted auth phase; treat it as
+  a possible `0.11.0+` candidate only after updating this roadmap first.
+- [ ] Post-1.0 Track 2: Template Resolution And Deployment Planning. Possible pulled-forward
+  `0.12.0+` candidate only after Track 1 is specified.
+- [ ] Post-1.0 Track 3: Template Catalog / Registry. Possible pulled-forward `0.13.0+` candidate
+  only after resolution semantics are specified.
+- [ ] Post-1.0 Track 4: AI Tool Server / MCP Capability. Possible pulled-forward `0.14.0+`
+  candidate only as capability/profile metadata over the generic template layer.
+- [ ] Post-1.0 Track 5: Appaloft-as-MCP Interface Planning. Possible pulled-forward `0.15.0+`
+  candidate only through the existing operation catalog and application buses.
+- [ ] Post-1.0 Track 6: Curated AI Tool Server Templates. Possible pulled-forward `0.16.0+`
+  candidate only after edition, trust, secret, health, docs, and generated-client-config questions
+  are answered.
+- [ ] Post-1.0 Track 7: MCP Gateway / Tool Gateway. Possible pulled-forward `0.17.0+` or later
+  candidate only after gateway audit/redaction/identity/policy decisions are accepted.
 
 ## Resource And Internal State Coverage Ledger
 
