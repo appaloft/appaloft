@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.10.0](https://github.com/appaloft/appaloft/compare/v0.9.10...v0.10.0) (2026-05-11)
+
+
+### Features
+
+* guide first admin setup from console ([#225](https://github.com/appaloft/appaloft/issues/225)) ([648c2fb](https://github.com/appaloft/appaloft/commit/648c2fb7e0fc80215514beb0dfe07b5ab124e642))
+
+
+### Documentation
+
+* add AI-native template roadmap ([bc3735c](https://github.com/appaloft/appaloft/commit/bc3735cd5bad2dbb4376141181d70d78cdce0afb))
+* add sdk interface parity plan ([#223](https://github.com/appaloft/appaloft/issues/223)) ([3ad4103](https://github.com/appaloft/appaloft/commit/3ad41035c2d6f94138769918dfedab5962295f8f))
+* move self-hosted auth to 0.10 roadmap ([13b3414](https://github.com/appaloft/appaloft/commit/13b3414f3bc97fb894ffd524c3ca670bb6710c70))
+* move self-hosted auth to 0.10 roadmap ([6acb647](https://github.com/appaloft/appaloft/commit/6acb647c79d48a149bea09984828b11fcfb0ed9e))
+
 ## [0.9.10](https://github.com/appaloft/appaloft/compare/v0.9.9...v0.9.10) (2026-05-10)
 
 
