@@ -668,7 +668,107 @@ export interface ScheduledTaskRunLogsTable {
   message: string;
 }
 
+export interface DeployTokenScopeJson {
+  deploymentTargetIds: string[];
+  environmentIds: string[];
+  projectIds: string[];
+  repositoryFullNames: string[];
+  resourceIds: string[];
+  workflowCommands: string[];
+}
+
+export interface DeployTokensTable {
+  id: string;
+  organization_id: string;
+  display_name: string;
+  verifier_digest: string;
+  secret_suffix: string;
+  status: string;
+  scope: ColumnType<DeployTokenScopeJson, DeployTokenScopeJson, DeployTokenScopeJson>;
+  created_at: TimestampColumn;
+  expires_at: NullableUpdatableTimestampColumn;
+  last_used_at: NullableUpdatableTimestampColumn;
+  rotated_at: NullableUpdatableTimestampColumn;
+  revoked_at: NullableUpdatableTimestampColumn;
+}
+
+export interface BetterAuthUsersTable {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  image: string | null;
+  createdAt: TimestampColumn;
+  updatedAt: UpdatableTimestampColumn;
+}
+
+export interface BetterAuthSessionsTable {
+  id: string;
+  expiresAt: string;
+  token: string;
+  createdAt: TimestampColumn;
+  updatedAt: UpdatableTimestampColumn;
+  ipAddress: string | null;
+  userAgent: string | null;
+  userId: string;
+  activeOrganizationId: string | null;
+}
+
+export interface BetterAuthAccountsTable {
+  id: string;
+  accountId: string;
+  providerId: string;
+  userId: string;
+  accessToken: string | null;
+  refreshToken: string | null;
+  idToken: string | null;
+  accessTokenExpiresAt: string | null;
+  refreshTokenExpiresAt: string | null;
+  scope: string | null;
+  password: string | null;
+  createdAt: TimestampColumn;
+  updatedAt: UpdatableTimestampColumn;
+}
+
+export interface BetterAuthVerificationTable {
+  id: string;
+  identifier: string;
+  value: string;
+  expiresAt: string;
+  createdAt: TimestampColumn;
+  updatedAt: UpdatableTimestampColumn;
+}
+
+export interface BetterAuthOrganizationsTable {
+  id: string;
+  name: string;
+  slug: string;
+  logo: string | null;
+  createdAt: string;
+  metadata: string | null;
+}
+
+export interface BetterAuthMembersTable {
+  id: string;
+  organizationId: string;
+  userId: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface BetterAuthInvitationsTable {
+  id: string;
+  organizationId: string;
+  email: string;
+  role: string | null;
+  status: string;
+  expiresAt: string;
+  createdAt: TimestampColumn;
+  inviterId: string;
+}
+
 export interface Database {
+  account: BetterAuthAccountsTable;
   projects: ProjectsTable;
   servers: ServersTable;
   ssh_credentials: SshCredentialsTable;
@@ -706,4 +806,11 @@ export interface Database {
   scheduled_task_definitions: ScheduledTaskDefinitionsTable;
   scheduled_task_run_attempts: ScheduledTaskRunAttemptsTable;
   scheduled_task_run_logs: ScheduledTaskRunLogsTable;
+  deploy_tokens: DeployTokensTable;
+  invitation: BetterAuthInvitationsTable;
+  member: BetterAuthMembersTable;
+  organization: BetterAuthOrganizationsTable;
+  session: BetterAuthSessionsTable;
+  user: BetterAuthUsersTable;
+  verification: BetterAuthVerificationTable;
 }

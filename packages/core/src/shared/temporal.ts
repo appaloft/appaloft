@@ -86,6 +86,57 @@ export class RotatedAt extends DateTimeValue {
   }
 }
 
+const revokedAtBrand: unique symbol = Symbol("RevokedAt");
+export class RevokedAt extends DateTimeValue {
+  private [revokedAtBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string | Date): Result<RevokedAt> {
+    return createDateTimeValue(value, "RevokedAt", (normalized) => new RevokedAt(normalized));
+  }
+
+  static rehydrate(value: string): RevokedAt {
+    return new RevokedAt(new Date(value).toISOString());
+  }
+}
+
+const expiresAtBrand: unique symbol = Symbol("ExpiresAt");
+export class ExpiresAt extends DateTimeValue {
+  private [expiresAtBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string | Date): Result<ExpiresAt> {
+    return createDateTimeValue(value, "ExpiresAt", (normalized) => new ExpiresAt(normalized));
+  }
+
+  static rehydrate(value: string): ExpiresAt {
+    return new ExpiresAt(new Date(value).toISOString());
+  }
+}
+
+const lastUsedAtBrand: unique symbol = Symbol("LastUsedAt");
+export class LastUsedAt extends DateTimeValue {
+  private [lastUsedAtBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string | Date): Result<LastUsedAt> {
+    return createDateTimeValue(value, "LastUsedAt", (normalized) => new LastUsedAt(normalized));
+  }
+
+  static rehydrate(value: string): LastUsedAt {
+    return new LastUsedAt(new Date(value).toISOString());
+  }
+}
+
 const archivedAtBrand: unique symbol = Symbol("ArchivedAt");
 export class ArchivedAt extends DateTimeValue {
   private [archivedAtBrand]!: void;

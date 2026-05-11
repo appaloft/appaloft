@@ -82,6 +82,15 @@ describe("CLI docs help links", () => {
     expect(cliDocsHrefs.dependencyRuntimeInjection).toBe(
       "/docs/resources/dependencies/#dependency-runtime-injection",
     );
+    expect(cliDocsHrefs.selfHostedOrganizationTeam).toBe(
+      "/docs/self-hosting/organization-team-management/#self-hosting-organization-team-management",
+    );
+    expect(cliDocsHrefs.selfHostedFirstAdmin).toBe(
+      "/docs/self-hosting/first-admin-bootstrap/#self-hosting-first-admin-bootstrap",
+    );
+    expect(cliDocsHrefs.selfHostedActionDeployToken).toBe(
+      "/docs/self-hosting/action-deploy-token-auth/#self-hosting-action-deploy-token-auth",
+    );
 
     expect(cliCommandDescriptions.serverCredential).toContain(cliDocsHrefs.serverSshCredential);
     expect(cliCommandDescriptions.serverRegister).toContain(cliDocsHrefs.serverDockerSwarmTarget);
@@ -159,6 +168,37 @@ describe("CLI docs help links", () => {
     );
     expect(cliCommandDescriptions.resourceDependencyRotateSecret).toContain(
       cliDocsHrefs.dependencyResourceLifecycle,
+    );
+    expect(cliCommandDescriptions.organization).toContain(cliDocsHrefs.selfHostedOrganizationTeam);
+    expect(cliCommandDescriptions.organizationContext).toContain(
+      cliDocsHrefs.selfHostedOrganizationTeam,
+    );
+    expect(cliCommandDescriptions.organizationSwitch).toContain(
+      cliDocsHrefs.selfHostedOrganizationTeam,
+    );
+    expect(cliCommandDescriptions.organizationMemberInvite).toContain(
+      cliDocsHrefs.selfHostedOrganizationTeam,
+    );
+    expect(cliCommandDescriptions.organizationMemberRole).toContain(
+      cliDocsHrefs.selfHostedOrganizationTeam,
+    );
+    expect(cliCommandDescriptions.organizationMemberRemove).toContain(
+      cliDocsHrefs.selfHostedOrganizationTeam,
+    );
+    expect(cliCommandDescriptions.auth).toContain(cliDocsHrefs.selfHostedFirstAdmin);
+    expect(cliCommandDescriptions.authBootstrapStatus).toContain(cliDocsHrefs.selfHostedFirstAdmin);
+    expect(cliCommandDescriptions.authBootstrapFirstAdmin).toContain(
+      cliDocsHrefs.selfHostedFirstAdmin,
+    );
+    expect(cliCommandDescriptions.deployToken).toContain(cliDocsHrefs.selfHostedActionDeployToken);
+    expect(cliCommandDescriptions.deployTokenCreate).toContain(
+      cliDocsHrefs.selfHostedActionDeployToken,
+    );
+    expect(cliCommandDescriptions.deployTokenRotate).toContain(
+      cliDocsHrefs.selfHostedActionDeployToken,
+    );
+    expect(cliCommandDescriptions.deployTokenRevoke).toContain(
+      cliDocsHrefs.selfHostedActionDeployToken,
     );
   });
 });

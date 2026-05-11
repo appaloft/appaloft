@@ -537,12 +537,14 @@ Owns:
 - `Organization`
 - `Member`
 - `Role`
+- `DeployToken`
 - quota and billing policy
 
 Implemented now:
 - foundational `Organization`
 - foundational `OrganizationMember`
 - foundational `OrganizationPlan`
+- foundational `DeployToken`
 
 ### Extensibility
 
@@ -573,6 +575,7 @@ Implemented now:
 - `Release`
 - `Deployment`
 - `Organization`
+- `DeployToken`
 - `ProviderConnection`
 - `IntegrationConnection`
 - `PluginInstallation`
@@ -952,10 +955,38 @@ Rules:
 - plan changes cannot invalidate the current member count
 - membership identity is owned by `OrganizationMember`; seat capacity is owned by
   `OrganizationPlan`; `Organization` coordinates those rules across its owned members and plan
+- Phase 8 deploy-token authorization is organization-scoped. A deploy token is a machine credential
+  for automation, not a Better Auth user session, and it must not be stored in repository config or
+  deployment input.
 
 Current scope:
 - foundational aggregate in `core`
 - identity provider integration is still future work
+- deploy-token lifecycle and scoped authorization are accepted candidate behavior under
+  [ADR-043](./decisions/ADR-043-self-hosted-action-deploy-token-authorization.md) and
+  [Self-Hosted Action Deploy Token Auth](./specs/052-self-hosted-action-deploy-token-auth/spec.md)
+- post-bootstrap organization/team operations are accepted candidate behavior under
+  [ADR-045](./decisions/ADR-045-self-hosted-organization-team-operations.md) and
+  [Self-Hosted Organization Team Operations](./specs/054-self-hosted-organization-team-operations/spec.md)
+
+### DeployToken
+
+Meaning:
+- organization-owned machine credential metadata for trusted automation calling self-hosted Action
+  mutation endpoints
+
+Rules:
+- raw token material is never part of the aggregate state; only verifier digest, safe secret suffix,
+  lifecycle status, and safe scope metadata are modeled
+- workflow-command scope must be non-empty
+- revoked deploy tokens cannot be rotated or used for future Action authentication
+- scope checks are admission checks only; deployment, source-link, route, and preview cleanup
+  business policy remains in the owning bounded contexts
+
+Current scope:
+- foundational aggregate in `core`
+- persistence, installer one-time raw output, rotate/revoke operations, and public token management
+  entrypoints are Phase 8 follow-up Code Round work
 
 ### ProviderConnection / IntegrationConnection / PluginInstallation
 

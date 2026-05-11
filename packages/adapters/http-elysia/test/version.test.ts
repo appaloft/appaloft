@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  type ActionDeployTokenAuthorizationPort,
   type AppLogger,
   type CommandBus,
   createExecutionContext,
@@ -20,6 +21,7 @@ class SilentLogger implements AppLogger {
 }
 
 function createTestApp(input?: {
+  actionDeployTokenAuthorizationPort?: ActionDeployTokenAuthorizationPort;
   actionSourcePackageConfigReader?: ActionSourcePackageConfigReader;
 }) {
   return createHttpApp({
@@ -43,6 +45,11 @@ function createTestApp(input?: {
           actionSourcePackageConfigReader: input.actionSourcePackageConfigReader,
         }
       : {}),
+    ...(input?.actionDeployTokenAuthorizationPort
+      ? {
+          actionDeployTokenAuthorizationPort: input.actionDeployTokenAuthorizationPort,
+        }
+      : {}),
   });
 }
 
@@ -56,6 +63,7 @@ describe("HTTP version endpoint", () => {
     expect(await withoutReaderResponse.json()).toMatchObject({
       features: {
         actionServerConfigDeploy: false,
+        actionDeployTokenAuth: false,
         sourcePackages: true,
         serverSideConfigBootstrap: false,
       },
@@ -71,8 +79,31 @@ describe("HTTP version endpoint", () => {
     expect(await withReaderResponse.json()).toMatchObject({
       features: {
         actionServerConfigDeploy: true,
+        actionDeployTokenAuth: false,
         sourcePackages: true,
         serverSideConfigBootstrap: true,
+      },
+    });
+  });
+
+  test("[SELF-AUTH-ACTION-003] advertises Action deploy-token auth when a verifier is wired", async () => {
+    const app = createTestApp({
+      actionDeployTokenAuthorizationPort: {
+        authorize: async () =>
+          ok({
+            actor: {
+              kind: "deploy-token",
+              id: "dtok_test",
+            },
+          }),
+      },
+    });
+
+    const response = await app.handle(new Request("http://localhost/api/version"));
+
+    expect(await response.json()).toMatchObject({
+      features: {
+        actionDeployTokenAuth: true,
       },
     });
   });

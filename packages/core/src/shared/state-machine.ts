@@ -5,6 +5,7 @@ import {
   deploymentStatuses,
   deploymentTargetCredentialKinds,
   deploymentTargetLifecycleStatuses,
+  deployTokenStatuses,
   destinationKinds,
   edgeProxyKinds,
   edgeProxyStatuses,
@@ -39,6 +40,7 @@ export {
   deploymentStatuses,
   deploymentTargetCredentialKinds,
   deploymentTargetLifecycleStatuses,
+  deployTokenStatuses,
   destinationKinds,
   edgeProxyKinds,
   edgeProxyStatuses,
@@ -1339,6 +1341,10 @@ export class OrganizationRoleValue extends EnumValueObject<
   ): OrganizationRoleValue {
     return new OrganizationRoleValue(value);
   }
+
+  isOwner(): boolean {
+    return this.value === "owner";
+  }
 }
 
 const organizationPlanTierBrand: unique symbol = Symbol("OrganizationPlanTierValue");
@@ -1362,6 +1368,46 @@ export class OrganizationPlanTierValue extends EnumValueObject<
 
   static rehydrate(value: "community" | "team" | "enterprise"): OrganizationPlanTierValue {
     return new OrganizationPlanTierValue(value);
+  }
+}
+
+const deployTokenStatusBrand: unique symbol = Symbol("DeployTokenStatusValue");
+export class DeployTokenStatusValue extends StateMachineValueObject<
+  (typeof deployTokenStatuses)[number]
+> {
+  private [deployTokenStatusBrand]!: void;
+
+  private constructor(value: (typeof deployTokenStatuses)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<DeployTokenStatusValue> {
+    return createEnumValue(
+      value,
+      deployTokenStatuses,
+      "Deploy token status",
+      (validated) => new DeployTokenStatusValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof deployTokenStatuses)[number]): DeployTokenStatusValue {
+    return new DeployTokenStatusValue(value);
+  }
+
+  static active(): DeployTokenStatusValue {
+    return new DeployTokenStatusValue("active");
+  }
+
+  revoke(): DeployTokenStatusValue {
+    return new DeployTokenStatusValue("revoked");
+  }
+
+  isActive(): boolean {
+    return this.value === "active";
+  }
+
+  isRevoked(): boolean {
+    return this.value === "revoked";
   }
 }
 

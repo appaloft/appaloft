@@ -500,7 +500,11 @@ post_json() {
   chmod 600 "$payload_file"
   printf '%s' "$payload" > "$payload_file"
   set +e
-  curl "${curl_args[@]}" -X POST "$endpoint" -H "Content-Type: application/json" --data-binary "@$payload_file"
+  if [ "$wrapper_command" = "preview-cleanup" ]; then
+    curl "${curl_args[@]}" -H "X-Appaloft-Action-Command: preview-cleanup" -X POST "$endpoint" -H "Content-Type: application/json" --data-binary "@$payload_file"
+  else
+    curl "${curl_args[@]}" -X POST "$endpoint" -H "Content-Type: application/json" --data-binary "@$payload_file"
+  fi
   status=$?
   set -e
   rm -f "$payload_file"

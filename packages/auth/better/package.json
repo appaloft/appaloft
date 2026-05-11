@@ -6,7 +6,10 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "better-auth": "^1.6.1"
+    "@appaloft/application": "workspace:*",
+    "@appaloft/core": "workspace:*",
+    "better-auth": "^1.6.1",
+    "reflect-metadata": "^0.2.2"
   },
   "scripts": {
     "lint": "biome check .",

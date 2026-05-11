@@ -248,6 +248,9 @@ const sidebar = [
         label: "Run Appaloft",
         items: [
           { slug: "self-hosting/install" },
+          { slug: "self-hosting/first-admin-bootstrap" },
+          { slug: "self-hosting/organization-team-management" },
+          { slug: "self-hosting/action-deploy-token-auth" },
           { slug: "self-hosting/static-assets" },
           { slug: "self-hosting/database" },
           { slug: "self-hosting/upgrades" },

@@ -1,4 +1,7 @@
 import {
+  type ActionDeployTokenAuthorizationPort,
+  type ActionDeployTokenRequestedScope,
+  type ActionDeployTokenWorkflow,
   type AppLogger,
   ApplyActionPreviewRouteCommand,
   ArchiveEnvironmentCommand,
@@ -10,9 +13,12 @@ import {
   archiveResourceCommandInputSchema,
   attachResourceStorageCommandInputSchema,
   BindResourceDependencyCommand,
+  BootstrapFirstAdminCommand,
   BootstrapServerProxyCommand,
   bindResourceDependencyCommandInputSchema,
+  bootstrapFirstAdminCommandInputSchema,
   bootstrapServerProxyCommandInputSchema,
+  ChangeOrganizationMemberRoleCommand,
   CheckDomainBindingDeleteSafetyQuery,
   CheckServerDeleteSafetyQuery,
   CleanupPreviewCommand,
@@ -37,6 +43,7 @@ import {
   CreateDependencyResourceBackupCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
+  CreateDeployTokenCommand,
   CreateDomainBindingCommand,
   CreateEnvironmentCommand,
   CreateProjectCommand,
@@ -44,6 +51,7 @@ import {
   CreateScheduledTaskCommand,
   CreateSshCredentialCommand,
   CreateStorageVolumeCommand,
+  changeOrganizationMemberRoleCommandInputSchema,
   checkDomainBindingDeleteSafetyQueryInputSchema,
   checkServerDeleteSafetyQueryInputSchema,
   cleanupPreviewCommandInputSchema,
@@ -63,6 +71,7 @@ import {
   confirmDomainBindingOwnershipCommandInputSchema,
   createDependencyResourceBackupCommandInputSchema,
   createDeploymentCommandInputSchema,
+  createDeployTokenCommandInputSchema,
   createDomainBindingCommandInputSchema,
   createEnvironmentCommandInputSchema,
   createProjectCommandInputSchema,
@@ -104,32 +113,42 @@ import {
   detachResourceStorageCommandInputSchema,
   diffEnvironmentsQueryInputSchema,
   EnvironmentEffectivePrecedenceQuery,
+  type ExecutionActor,
   type ExecutionContext,
   type ExecutionContextFactory,
   environmentEffectivePrecedenceQueryInputSchema,
+  GetAuthBootstrapStatusQuery,
+  GetCurrentOrganizationContextQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
+  getAuthBootstrapStatusQueryInputSchema,
+  getCurrentOrganizationContextQueryInputSchema,
   ImportCertificateCommand,
   ImportPostgresDependencyResourceCommand,
   ImportRedisDependencyResourceCommand,
   ImportResourceVariablesCommand,
   IngestPreviewPullRequestEventCommand,
   IngestSourceEventCommand,
+  InviteOrganizationMemberCommand,
   IssueOrRenewCertificateCommand,
   importCertificateCommandInputSchema,
   importPostgresDependencyResourceCommandInputSchema,
   importRedisDependencyResourceCommandInputSchema,
   importResourceVariablesCommandInputSchema,
+  inviteOrganizationMemberCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
   ListCertificatesQuery,
   ListDefaultAccessDomainPoliciesQuery,
   ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
   ListDeploymentsQuery,
+  ListDeployTokensQuery,
   ListDomainBindingsQuery,
   ListEnvironmentsQuery,
   ListGitHubRepositoriesQuery,
   ListOperatorWorkQuery,
+  ListOrganizationInvitationsQuery,
+  ListOrganizationMembersQuery,
   ListPluginsQuery,
   ListPreviewEnvironmentsQuery,
   ListProjectsQuery,
@@ -148,10 +167,13 @@ import {
   listDependencyResourceBackupsQueryInputSchema,
   listDependencyResourcesQueryInputSchema,
   listDeploymentsQueryInputSchema,
+  listDeployTokensQueryInputSchema,
   listDomainBindingsQueryInputSchema,
   listEnvironmentsQueryInputSchema,
   listGitHubRepositoriesQueryInputSchema,
   listOperatorWorkQueryInputSchema,
+  listOrganizationInvitationsQueryInputSchema,
+  listOrganizationMembersQueryInputSchema,
   listPreviewEnvironmentsQueryInputSchema,
   listResourceDependencyBindingsQueryInputSchema,
   listResourcesQueryInputSchema,
@@ -163,6 +185,8 @@ import {
   lockEnvironmentCommandInputSchema,
   OpenTerminalSessionCommand,
   openTerminalSessionCommandInputSchema,
+  type ProductOrganizationRole,
+  type ProductSessionAuthorizationPort,
   PromoteEnvironmentCommand,
   ProvisionPostgresDependencyResourceCommand,
   ProvisionRedisDependencyResourceCommand,
@@ -174,6 +198,7 @@ import {
   RedeployDeploymentCommand,
   RegisterServerCommand,
   RelinkSourceLinkCommand,
+  RemoveOrganizationMemberCommand,
   RenameDependencyResourceCommand,
   RenameEnvironmentCommand,
   RenameProjectCommand,
@@ -198,13 +223,16 @@ import {
   RetryDeploymentCommand,
   RetryDomainBindingVerificationCommand,
   RevokeCertificateCommand,
+  RevokeDeployTokenCommand,
   RollbackDeploymentCommand,
+  RotateDeployTokenCommand,
   RotateResourceDependencyBindingSecretCommand,
   RotateSshCredentialCommand,
   RunScheduledTaskNowCommand,
   redeployDeploymentCommandInputSchema,
   registerServerCommandInputSchema,
   relinkSourceLinkCommandInputSchema,
+  removeOrganizationMemberCommandInputSchema,
   renameDependencyResourceCommandInputSchema,
   renameEnvironmentCommandInputSchema,
   renameProjectCommandInputSchema,
@@ -222,7 +250,9 @@ import {
   retryDeploymentCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
   revokeCertificateCommandInputSchema,
+  revokeDeployTokenCommandInputSchema,
   rollbackDeploymentCommandInputSchema,
+  rotateDeployTokenCommandInputSchema,
   rotateResourceDependencyBindingSecretCommandInputSchema,
   rotateSshCredentialCommandInputSchema,
   runScheduledTaskNowCommandInputSchema,
@@ -234,6 +264,7 @@ import {
   ShowDependencyResourceBackupQuery,
   ShowDependencyResourceQuery,
   ShowDeploymentQuery,
+  ShowDeployTokenQuery,
   ShowDomainBindingQuery,
   ShowEnvironmentQuery,
   ShowOperatorWorkQuery,
@@ -254,6 +285,7 @@ import {
   StreamDeploymentEventsQuery,
   type StreamDeploymentEventsQueryInput,
   type StreamDeploymentEventsResult,
+  SwitchCurrentOrganizationCommand,
   scheduledTaskRunLogsQueryInputSchema,
   setEnvironmentVariableCommandInputSchema,
   setResourceVariableCommandInputSchema,
@@ -262,6 +294,7 @@ import {
   showDependencyResourceBackupQueryInputSchema,
   showDependencyResourceQueryInputSchema,
   showDeploymentQueryInputSchema,
+  showDeployTokenQueryInputSchema,
   showDomainBindingQueryInputSchema,
   showEnvironmentQueryInputSchema,
   showOperatorWorkQueryInputSchema,
@@ -279,6 +312,7 @@ import {
   startResourceRuntimeCommandInputSchema,
   stopResourceRuntimeCommandInputSchema,
   streamDeploymentEventsQueryInputSchema,
+  switchCurrentOrganizationCommandInputSchema,
   TestServerConnectivityCommand,
   testDraftServerConnectivityCommandInputSchema,
   testRegisteredServerConnectivityCommandInputSchema,
@@ -298,6 +332,7 @@ import {
   attachResourceStorageResponseSchema,
   bindResourceDependencyResponseSchema,
   bootstrapServerProxyResponseSchema,
+  changeOrganizationMemberRoleResponseSchema,
   checkDomainBindingDeleteSafetyResponseSchema,
   checkServerDeleteSafetyResponseSchema,
   cleanupPreviewResponseSchema,
@@ -314,12 +349,14 @@ import {
   configureServerEdgeProxyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
   createDeploymentResponseSchema,
+  createDeployTokenResponseSchema,
   createDomainBindingResponseSchema,
   createEnvironmentResponseSchema,
   createProjectResponseSchema,
   createResourceResponseSchema,
   createSshCredentialResponseSchema,
   createStorageVolumeResponseSchema,
+  currentOrganizationContextResponseSchema,
   deactivateServerResponseSchema,
   deleteCertificateResponseSchema,
   deleteDomainBindingResponseSchema,
@@ -343,16 +380,20 @@ import {
   environmentSummarySchema,
   importCertificateResponseSchema,
   importResourceVariablesResponseSchema,
+  inviteOrganizationMemberResponseSchema,
   issueOrRenewCertificateResponseSchema,
   listCertificatesResponseSchema,
   listDefaultAccessDomainPoliciesResponseSchema,
   listDependencyResourceBackupsResponseSchema,
   listDependencyResourcesResponseSchema,
   listDeploymentsResponseSchema,
+  listDeployTokensResponseSchema,
   listDomainBindingsResponseSchema,
   listEnvironmentsResponseSchema,
   listGitHubRepositoriesResponseSchema,
   listOperatorWorkResponseSchema,
+  listOrganizationInvitationsResponseSchema,
+  listOrganizationMembersResponseSchema,
   listPluginsResponseSchema,
   listPreviewEnvironmentsResponseSchema,
   listProjectsResponseSchema,
@@ -370,6 +411,7 @@ import {
   proxyConfigurationViewSchema,
   redeployDeploymentResponseSchema,
   registerServerResponseSchema,
+  removeOrganizationMemberResponseSchema,
   renameEnvironmentResponseSchema,
   renameProjectResponseSchema,
   renameServerResponseSchema,
@@ -387,7 +429,9 @@ import {
   retryDeploymentResponseSchema,
   retryDomainBindingVerificationResponseSchema,
   revokeCertificateResponseSchema,
+  revokeDeployTokenResponseSchema,
   rollbackDeploymentResponseSchema,
+  rotateDeployTokenResponseSchema,
   rotateResourceDependencyBindingSecretResponseSchema,
   rotateSshCredentialResponseSchema,
   runScheduledTaskNowResponseSchema,
@@ -399,6 +443,7 @@ import {
   showDependencyResourceBackupResponseSchema,
   showDependencyResourceResponseSchema,
   showDeploymentResponseSchema,
+  showDeployTokenResponseSchema,
   showDomainBindingResponseSchema,
   showOperatorWorkResponseSchema,
   showPreviewEnvironmentResponseSchema,
@@ -442,10 +487,13 @@ export interface AppaloftOrpcContext {
   githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
   githubWebhookSecret?: string;
+  actionDeployTokenAuthorizationPort?: ActionDeployTokenAuthorizationPort;
   actionSourcePackageConfigReader?: ActionSourcePackageConfigReader;
+  productSessionAuthorizationPort?: ProductSessionAuthorizationPort;
 }
 
 interface AppaloftOrpcRequestContext extends AppaloftOrpcContext {
+  currentRequest?: Request;
   executionContext: ExecutionContext;
 }
 
@@ -576,6 +624,37 @@ const relinkSourceLinkResponseSchema = z.object({
 const base = os.$context<AppaloftOrpcRequestContext>();
 const emptyResponseSchema = z.null();
 export const createDeploymentDocsHref = resolvePublicDocsHelpHref("deployment.source");
+
+const productLoginMethodStatusSchema = z.object({
+  key: z.enum(["local-password", "github", "google", "oidc"]),
+  configured: z.boolean(),
+  enabled: z.boolean(),
+  reason: z.string().optional(),
+});
+
+const authBootstrapStatusResponseSchema = z.object({
+  bootstrapRequired: z.boolean(),
+  firstAdminConfigured: z.boolean(),
+  organizationConfigured: z.boolean(),
+  loginMethods: z.array(productLoginMethodStatusSchema),
+  firstAdminEmail: z.string().optional(),
+  loginUrl: z.string().optional(),
+  organizationId: z.string().optional(),
+  organizationSlug: z.string().optional(),
+  nextSteps: z.array(z.string()).optional(),
+});
+
+const bootstrapFirstAdminResponseSchema = z.object({
+  bootstrapRequired: z.literal(false),
+  created: z.boolean(),
+  email: z.string(),
+  loginMethods: z.array(productLoginMethodStatusSchema),
+  organizationId: z.string(),
+  organizationSlug: z.string(),
+  userId: z.string(),
+  generatedPassword: z.string().optional(),
+  loginUrl: z.string().optional(),
+});
 
 function routeDescription(
   summary: string,
@@ -1258,6 +1337,29 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
           locale: context.locale,
         },
       });
+    case "action_auth_missing":
+    case "action_auth_invalid":
+    case "first_admin_bootstrap_required":
+    case "product_auth_invalid":
+    case "product_auth_missing":
+      return new ORPCError("UNAUTHORIZED", {
+        message,
+        status: 401,
+        data: {
+          domainCode: error.code,
+          locale: context.locale,
+        },
+      });
+    case "action_auth_forbidden":
+    case "product_auth_forbidden":
+      return new ORPCError("FORBIDDEN", {
+        message,
+        status: 403,
+        data: {
+          domainCode: error.code,
+          locale: context.locale,
+        },
+      });
     case "validation_error":
     case "invariant_violation":
       return new ORPCError("BAD_REQUEST", {
@@ -1322,16 +1424,156 @@ function unwrapResult<T>(context: ExecutionContext, result: Result<T>): T {
   );
 }
 
+const productMutationRequiredRole: ProductOrganizationRole = "admin";
+const publicBootstrapCommandNames = new Set(["BootstrapFirstAdminCommand"]);
+
+function readOrganizationIdFromMessage(message: unknown): string | undefined {
+  if (!message || typeof message !== "object" || !("organizationId" in message)) {
+    return undefined;
+  }
+
+  const organizationId = message.organizationId;
+  return typeof organizationId === "string" && organizationId.trim() ? organizationId : undefined;
+}
+
+async function authorizeProductSessionForOperation(input: {
+  context: AppaloftOrpcRequestContext;
+  operationName: string;
+  organizationId?: string;
+  requiredRole: ProductOrganizationRole;
+}): Promise<ExecutionActor | null> {
+  const { context } = input;
+  if (!context.currentRequest || !context.productSessionAuthorizationPort) {
+    return null;
+  }
+  if (context.executionContext.actor) {
+    return null;
+  }
+
+  const url = new URL(context.currentRequest.url);
+  const authorized = await context.productSessionAuthorizationPort.authorizeProductSession(
+    context.executionContext,
+    {
+      method: context.currentRequest.method,
+      path: url.pathname,
+      requiredRole: input.requiredRole,
+      ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+      ...(context.currentRequest.headers.get("authorization")
+        ? { authorizationHeader: context.currentRequest.headers.get("authorization") as string }
+        : {}),
+      ...(context.currentRequest.headers.get("cookie")
+        ? { cookieHeader: context.currentRequest.headers.get("cookie") as string }
+        : {}),
+    },
+  );
+
+  if (authorized.isErr()) {
+    throw toOrpcError(authorized.error, context.executionContext);
+  }
+
+  context.logger.debug("product_session_authorized", {
+    actorId: authorized.value.actor.id,
+    operationName: input.operationName,
+    organizationId: authorized.value.organizationId,
+    requiredRole: input.requiredRole,
+    role: authorized.value.role,
+  });
+
+  return authorized.value.actor;
+}
+
+async function authorizeProductSessionForCommand(
+  context: AppaloftOrpcRequestContext,
+  command: Command<unknown>,
+): Promise<ExecutionActor | null> {
+  if (publicBootstrapCommandNames.has(command.constructor.name)) {
+    return null;
+  }
+
+  return authorizeProductSessionForOperation({
+    context,
+    operationName: command.constructor.name,
+    requiredRole: productRequiredRoleForCommand(command),
+    ...(readOrganizationIdFromMessage(command)
+      ? { organizationId: readOrganizationIdFromMessage(command) as string }
+      : {}),
+  });
+}
+
+function productRequiredRoleForCommand(command: Command<unknown>): ProductOrganizationRole {
+  if (command instanceof SwitchCurrentOrganizationCommand) {
+    return "member";
+  }
+
+  return productMutationRequiredRole;
+}
+
+async function authorizeProductSessionForQuery(
+  context: AppaloftOrpcRequestContext,
+  query: Query<unknown>,
+): Promise<ExecutionActor | null> {
+  const requiredRole = productRequiredRoleForQuery(query);
+  if (!requiredRole) {
+    return null;
+  }
+
+  return authorizeProductSessionForOperation({
+    context,
+    operationName: query.constructor.name,
+    requiredRole,
+    ...(readOrganizationIdFromMessage(query)
+      ? { organizationId: readOrganizationIdFromMessage(query) as string }
+      : {}),
+  });
+}
+
+function productRequiredRoleForQuery(query: Query<unknown>): ProductOrganizationRole | null {
+  if (
+    query instanceof GetCurrentOrganizationContextQuery ||
+    query instanceof ListProjectsQuery ||
+    query instanceof ShowProjectQuery ||
+    query instanceof ListEnvironmentsQuery ||
+    query instanceof ShowEnvironmentQuery ||
+    query instanceof ListResourcesQuery ||
+    query instanceof ShowResourceQuery ||
+    query instanceof ListServersQuery ||
+    query instanceof ShowServerQuery ||
+    query instanceof ListDeploymentsQuery ||
+    query instanceof ShowDeploymentQuery
+  ) {
+    return "member";
+  }
+
+  if (
+    query instanceof ListDeployTokensQuery ||
+    query instanceof ShowDeployTokenQuery ||
+    query instanceof ListOrganizationMembersQuery ||
+    query instanceof ListOrganizationInvitationsQuery
+  ) {
+    return productMutationRequiredRole;
+  }
+
+  return null;
+}
+
 async function executeCommand<TMessage extends Command<TResult>, TResult>(
   context: AppaloftOrpcRequestContext,
   message: Result<TMessage>,
 ): Promise<TResult> {
+  const command = unwrapResult(context.executionContext, message);
+  const productActor = await authorizeProductSessionForCommand(context, command);
+  const executionContext = productActor
+    ? createRequestExecutionContext(
+        context.executionContextFactory,
+        context.executionContext.entrypoint === "rpc" ? "rpc" : "http",
+        context.currentRequest as Request,
+        productActor,
+      )
+    : context.executionContext;
+
   return unwrapResult(
-    context.executionContext,
-    await context.commandBus.execute(
-      context.executionContext,
-      unwrapResult(context.executionContext, message),
-    ),
+    executionContext,
+    await context.commandBus.execute(executionContext, command),
   );
 }
 
@@ -1339,13 +1581,18 @@ async function executeQuery<TMessage extends Query<TResult>, TResult>(
   context: AppaloftOrpcRequestContext,
   message: Result<TMessage>,
 ): Promise<TResult> {
-  return unwrapResult(
-    context.executionContext,
-    await context.queryBus.execute(
-      context.executionContext,
-      unwrapResult(context.executionContext, message),
-    ),
-  );
+  const query = unwrapResult(context.executionContext, message);
+  const productActor = await authorizeProductSessionForQuery(context, query);
+  const executionContext = productActor
+    ? createRequestExecutionContext(
+        context.executionContextFactory,
+        context.executionContext.entrypoint === "rpc" ? "rpc" : "http",
+        context.currentRequest as Request,
+        productActor,
+      )
+    : context.executionContext;
+
+  return unwrapResult(executionContext, await context.queryBus.execute(executionContext, query));
 }
 
 function createDeploymentStream(
@@ -1536,10 +1783,22 @@ function createRequestExecutionContext(
   executionContextFactory: ExecutionContextFactory,
   entrypoint: "http" | "rpc",
   request: Request,
+  actor?: ExecutionActor,
 ): ReturnType<ExecutionContextFactory["create"]> {
   const requestId = request.headers.get("x-request-id");
+  const authorizationHeader = request.headers.get("authorization");
+  const cookieHeader = request.headers.get("cookie");
 
   return executionContextFactory.create({
+    ...(actor ? { actor } : {}),
+    ...(authorizationHeader || cookieHeader
+      ? {
+          auth: {
+            ...(authorizationHeader ? { authorizationHeader } : {}),
+            ...(cookieHeader ? { cookieHeader } : {}),
+          },
+        }
+      : {}),
     entrypoint,
     locale: resolveAppaloftLocaleFromHeaders(request.headers),
     ...(requestId ? { requestId } : {}),
@@ -1554,6 +1813,170 @@ export const listProjectsProcedure = base
   })
   .output(listProjectsResponseSchema)
   .handler(async ({ context }) => executeQuery(context, ListProjectsQuery.create()));
+
+export const authBootstrapStatusProcedure = base
+  .route({
+    method: "GET",
+    path: "/bootstrap/auth/status",
+    successStatus: 200,
+  })
+  .input(getAuthBootstrapStatusQueryInputSchema)
+  .output(authBootstrapStatusResponseSchema)
+  .handler(async ({ context }) => executeQuery(context, GetAuthBootstrapStatusQuery.create({})));
+
+export const authBootstrapFirstAdminProcedure = base
+  .route({
+    method: "POST",
+    path: "/bootstrap/auth/first-admin",
+    successStatus: 201,
+  })
+  .input(bootstrapFirstAdminCommandInputSchema)
+  .output(bootstrapFirstAdminResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, BootstrapFirstAdminCommand.create(input)),
+  );
+
+export const createDeployTokenProcedure = base
+  .route({
+    method: "POST",
+    path: "/deploy-tokens",
+    successStatus: 201,
+  })
+  .input(createDeployTokenCommandInputSchema)
+  .output(createDeployTokenResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateDeployTokenCommand.create(input)),
+  );
+
+export const listDeployTokensProcedure = base
+  .route({
+    method: "GET",
+    path: "/deploy-tokens",
+    successStatus: 200,
+  })
+  .input(listDeployTokensQueryInputSchema)
+  .output(listDeployTokensResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListDeployTokensQuery.create(input)),
+  );
+
+export const showDeployTokenProcedure = base
+  .route({
+    method: "GET",
+    path: "/deploy-tokens/{tokenId}",
+    successStatus: 200,
+  })
+  .input(showDeployTokenQueryInputSchema)
+  .output(showDeployTokenResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowDeployTokenQuery.create(input)));
+
+export const rotateDeployTokenProcedure = base
+  .route({
+    method: "POST",
+    path: "/deploy-tokens/{tokenId}/rotate",
+    successStatus: 200,
+  })
+  .input(rotateDeployTokenCommandInputSchema)
+  .output(rotateDeployTokenResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RotateDeployTokenCommand.create(input)),
+  );
+
+export const revokeDeployTokenProcedure = base
+  .route({
+    method: "POST",
+    path: "/deploy-tokens/{tokenId}/revoke",
+    successStatus: 200,
+  })
+  .input(revokeDeployTokenCommandInputSchema)
+  .output(revokeDeployTokenResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RevokeDeployTokenCommand.create(input)),
+  );
+
+export const currentOrganizationContextProcedure = base
+  .route({
+    method: "GET",
+    path: "/organizations/current-context",
+    successStatus: 200,
+  })
+  .input(getCurrentOrganizationContextQueryInputSchema)
+  .output(currentOrganizationContextResponseSchema)
+  .handler(async ({ context }) =>
+    executeQuery(context, GetCurrentOrganizationContextQuery.create({})),
+  );
+
+export const switchCurrentOrganizationProcedure = base
+  .route({
+    method: "POST",
+    path: "/organizations/current-context/switch",
+    successStatus: 200,
+  })
+  .input(switchCurrentOrganizationCommandInputSchema)
+  .output(currentOrganizationContextResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, SwitchCurrentOrganizationCommand.create(input)),
+  );
+
+export const listOrganizationMembersProcedure = base
+  .route({
+    method: "GET",
+    path: "/organizations/{organizationId}/members",
+    successStatus: 200,
+  })
+  .input(listOrganizationMembersQueryInputSchema)
+  .output(listOrganizationMembersResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListOrganizationMembersQuery.create(input)),
+  );
+
+export const listOrganizationInvitationsProcedure = base
+  .route({
+    method: "GET",
+    path: "/organizations/{organizationId}/invitations",
+    successStatus: 200,
+  })
+  .input(listOrganizationInvitationsQueryInputSchema)
+  .output(listOrganizationInvitationsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListOrganizationInvitationsQuery.create(input)),
+  );
+
+export const inviteOrganizationMemberProcedure = base
+  .route({
+    method: "POST",
+    path: "/organizations/{organizationId}/invitations",
+    successStatus: 201,
+  })
+  .input(inviteOrganizationMemberCommandInputSchema)
+  .output(inviteOrganizationMemberResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, InviteOrganizationMemberCommand.create(input)),
+  );
+
+export const changeOrganizationMemberRoleProcedure = base
+  .route({
+    method: "POST",
+    path: "/organizations/{organizationId}/members/{memberId}/role",
+    successStatus: 200,
+  })
+  .input(changeOrganizationMemberRoleCommandInputSchema)
+  .output(changeOrganizationMemberRoleResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ChangeOrganizationMemberRoleCommand.create(input)),
+  );
+
+export const removeOrganizationMemberProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/organizations/{organizationId}/members/{memberId}",
+    successStatus: 200,
+  })
+  .input(removeOrganizationMemberCommandInputSchema)
+  .output(removeOrganizationMemberResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RemoveOrganizationMemberCommand.create(input)),
+  );
 
 export const createProjectProcedure = base
   .route({
@@ -2585,9 +3008,36 @@ export const cleanupPreviewProcedure = base
   })
   .input(cleanupPreviewCommandInputSchema)
   .output(cleanupPreviewResponseSchema)
-  .handler(async ({ input, context }) =>
-    executeCommand(context, CleanupPreviewCommand.create(input)),
-  );
+  .handler(async ({ input, context }) => {
+    const request = context.currentRequest;
+    if (request?.headers.get("x-appaloft-action-command")?.trim() === "preview-cleanup") {
+      const authorized = await authorizeActionDeployToken({
+        context,
+        executionContext: context.executionContext,
+        request,
+        workflow: "preview-cleanup",
+      });
+      if (authorized.isErr()) {
+        throw toOrpcError(authorized.error, context.executionContext);
+      }
+
+      const executionContext = createRequestExecutionContext(
+        context.executionContextFactory,
+        "http",
+        request,
+        authorized.value,
+      );
+      return executeCommand(
+        {
+          ...context,
+          executionContext,
+        },
+        CleanupPreviewCommand.create(input),
+      );
+    }
+
+    return executeCommand(context, CleanupPreviewCommand.create(input));
+  });
 
 export const retryDeploymentProcedure = base
   .route({
@@ -3307,6 +3757,26 @@ export const listGitHubRepositoriesProcedure = base
   );
 
 export const appaloftOrpcRouter = {
+  auth: {
+    bootstrapStatus: authBootstrapStatusProcedure,
+    bootstrapFirstAdmin: authBootstrapFirstAdminProcedure,
+  },
+  deployTokens: {
+    create: createDeployTokenProcedure,
+    list: listDeployTokensProcedure,
+    show: showDeployTokenProcedure,
+    rotate: rotateDeployTokenProcedure,
+    revoke: revokeDeployTokenProcedure,
+  },
+  organizations: {
+    currentContext: currentOrganizationContextProcedure,
+    switchCurrent: switchCurrentOrganizationProcedure,
+    listMembers: listOrganizationMembersProcedure,
+    listInvitations: listOrganizationInvitationsProcedure,
+    inviteMember: inviteOrganizationMemberProcedure,
+    updateMemberRole: changeOrganizationMemberRoleProcedure,
+    removeMember: removeOrganizationMemberProcedure,
+  },
   projects: {
     list: listProjectsProcedure,
     create: createProjectProcedure,
@@ -3555,6 +4025,163 @@ function sourceEventRouteUnavailableResponse(): Response {
       status: 503,
     },
   );
+}
+
+function actionAuthHttpResponse(input: {
+  code: "action_auth_forbidden" | "action_auth_invalid" | "action_auth_missing";
+  details?: Record<string, string>;
+  message: string;
+}): Response {
+  return Response.json(
+    {
+      error: {
+        code: input.code,
+        category: "user",
+        message: input.message,
+        retryable: false,
+        ...(input.details ? { details: input.details } : {}),
+      },
+    },
+    {
+      status: input.code === "action_auth_forbidden" ? 403 : 401,
+    },
+  );
+}
+
+function extractBearerToken(request: Request): string | undefined {
+  const authorization = request.headers.get("authorization")?.trim();
+  if (!authorization) {
+    return undefined;
+  }
+
+  const [scheme, token, extra] = authorization.split(/\s+/);
+  if (extra || scheme?.toLowerCase() !== "bearer" || !token) {
+    return undefined;
+  }
+
+  return token;
+}
+
+async function authorizeActionDeployToken(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  request: Request;
+  requestedScope?: ActionDeployTokenRequestedScope;
+  workflow: ActionDeployTokenWorkflow;
+}): Promise<Result<ExecutionActor>> {
+  const url = new URL(input.request.url);
+  const token = extractBearerToken(input.request);
+  if (!token) {
+    return err({
+      code: "action_auth_missing",
+      category: "user",
+      message: "Action deployment requests require a deploy token",
+      retryable: false,
+      details: {
+        endpoint: url.pathname,
+        phase: "action-authentication",
+        requiredCredential: "deploy-token",
+        workflow: input.workflow,
+      },
+    });
+  }
+
+  const authorizationPort = input.context.actionDeployTokenAuthorizationPort;
+  if (!authorizationPort) {
+    return err({
+      code: "action_auth_invalid",
+      category: "user",
+      message: "Action deploy token authorization is not configured",
+      retryable: false,
+      details: {
+        endpoint: url.pathname,
+        phase: "action-authentication",
+        reasonCode: "verifier-unavailable",
+        workflow: input.workflow,
+      },
+    });
+  }
+
+  const authorized = await authorizationPort.authorize(input.executionContext, {
+    method: input.request.method,
+    path: url.pathname,
+    ...(input.requestedScope ? { requestedScope: input.requestedScope } : {}),
+    token,
+    workflow: input.workflow,
+  });
+
+  if (authorized.isErr()) {
+    return err(authorized.error);
+  }
+
+  return ok(authorized.value.actor);
+}
+
+function actionSourceLinkDeploymentRequestedScope(
+  body: z.infer<typeof actionSourceLinkDeploymentBodySchema>,
+): ActionDeployTokenRequestedScope | undefined {
+  return compactActionDeployTokenRequestedScope({
+    ...(body.projectId ? { projectId: body.projectId } : {}),
+    ...(body.environmentId ? { environmentId: body.environmentId } : {}),
+    ...(body.resourceId ? { resourceId: body.resourceId } : {}),
+    ...(body.serverId ? { serverId: body.serverId } : {}),
+  });
+}
+
+function actionServerConfigDeploymentRequestedScope(
+  body: ActionServerConfigDeployBody,
+): ActionDeployTokenRequestedScope | undefined {
+  return compactActionDeployTokenRequestedScope({
+    ...(body.trustedContext?.projectId ? { projectId: body.trustedContext.projectId } : {}),
+    ...(body.trustedContext?.environmentId
+      ? { environmentId: body.trustedContext.environmentId }
+      : {}),
+    ...(body.trustedContext?.resourceId ? { resourceId: body.trustedContext.resourceId } : {}),
+    ...(body.trustedContext?.serverId ? { serverId: body.trustedContext.serverId } : {}),
+    ...(body.trustedContext?.repositoryFullName
+      ? { repositoryFullName: body.trustedContext.repositoryFullName }
+      : body.sourcePackage.repositoryFullName
+        ? { repositoryFullName: body.sourcePackage.repositoryFullName }
+        : {}),
+  });
+}
+
+function compactActionDeployTokenRequestedScope(
+  scope: ActionDeployTokenRequestedScope,
+): ActionDeployTokenRequestedScope | undefined {
+  return Object.keys(scope).length > 0 ? scope : undefined;
+}
+
+function actionAuthErrorResponse(error: DomainError): Response {
+  if (error.code === "action_auth_forbidden") {
+    return actionAuthHttpResponse({
+      code: "action_auth_forbidden",
+      message: error.message,
+      ...(error.details ? { details: actionAuthDetails(error.details) } : {}),
+    });
+  }
+
+  if (error.code === "action_auth_missing") {
+    return actionAuthHttpResponse({
+      code: "action_auth_missing",
+      message: error.message,
+      ...(error.details ? { details: actionAuthDetails(error.details) } : {}),
+    });
+  }
+
+  return actionAuthHttpResponse({
+    code: "action_auth_invalid",
+    message: error.message,
+    ...(error.details ? { details: actionAuthDetails(error.details) } : {}),
+  });
+}
+
+function actionAuthDetails(details: DomainError["details"]): Record<string, string> {
+  const output: Record<string, string> = {};
+  for (const [key, value] of Object.entries(details ?? {})) {
+    output[key] = Array.isArray(value) ? value.join(",") : String(value);
+  }
+  return output;
 }
 
 function requiredPreviewContextHeader(
@@ -3872,6 +4499,18 @@ async function handleActionSourceLinkDeploymentRoute(input: {
       }),
       executionContext,
     );
+  }
+
+  const requestedScope = actionSourceLinkDeploymentRequestedScope(body.data);
+  const authorizedScope = await authorizeActionDeployToken({
+    context,
+    executionContext,
+    request,
+    ...(requestedScope ? { requestedScope } : {}),
+    workflow: "source-link-deploy",
+  });
+  if (authorizedScope.isErr()) {
+    return actionAuthErrorResponse(authorizedScope.error);
   }
 
   const command = CreateActionSourceLinkDeploymentCommand.create({
@@ -4546,6 +5185,18 @@ async function handleActionServerConfigDeploymentRoute(input: {
     return domainErrorHttpResponse(validationError, executionContext);
   }
 
+  const requestedScope = actionServerConfigDeploymentRequestedScope(body.data);
+  const authorizedScope = await authorizeActionDeployToken({
+    context,
+    executionContext,
+    request,
+    ...(requestedScope ? { requestedScope } : {}),
+    workflow: "server-config-deploy",
+  });
+  if (authorizedScope.isErr()) {
+    return actionAuthErrorResponse(authorizedScope.error);
+  }
+
   if (!context.actionSourcePackageConfigReader) {
     return domainErrorHttpResponse(
       domainError.validation(
@@ -4792,6 +5443,7 @@ export function mountAppaloftOrpcRoutes(
           prefix: "/api",
           context: {
             ...context,
+            currentRequest: request,
             executionContext,
           },
         }),
@@ -4828,6 +5480,7 @@ export function mountAppaloftOrpcRoutes(
           prefix: "/api/rpc",
           context: {
             ...context,
+            currentRequest: request,
             executionContext,
           },
         }),
@@ -4911,10 +5564,26 @@ export function mountAppaloftOrpcRoutes(
   };
 
   const actionSourceLinkDeploymentRouteHandler = async ({ request }: { request: Request }) => {
+    const unauthenticatedContext = createRequestExecutionContext(
+      context.executionContextFactory,
+      "http",
+      request,
+    );
+    const authorized = await authorizeActionDeployToken({
+      context,
+      executionContext: unauthenticatedContext,
+      request,
+      workflow: "source-link-deploy",
+    });
+    if (authorized.isErr()) {
+      return actionAuthErrorResponse(authorized.error);
+    }
+
     const executionContext = createRequestExecutionContext(
       context.executionContextFactory,
       "http",
       request,
+      authorized.value,
     );
     const run = createRequestRunner(request, executionContext, context.requestContextRunner);
 
@@ -4937,10 +5606,26 @@ export function mountAppaloftOrpcRoutes(
   };
 
   const actionServerConfigDeploymentRouteHandler = async ({ request }: { request: Request }) => {
+    const unauthenticatedContext = createRequestExecutionContext(
+      context.executionContextFactory,
+      "http",
+      request,
+    );
+    const authorized = await authorizeActionDeployToken({
+      context,
+      executionContext: unauthenticatedContext,
+      request,
+      workflow: "server-config-deploy",
+    });
+    if (authorized.isErr()) {
+      return actionAuthErrorResponse(authorized.error);
+    }
+
     const executionContext = createRequestExecutionContext(
       context.executionContextFactory,
       "http",
       request,
+      authorized.value,
     );
     const run = createRequestRunner(request, executionContext, context.requestContextRunner);
 
@@ -4963,6 +5648,18 @@ export function mountAppaloftOrpcRoutes(
   };
 
   const routes = [
+    "/api/bootstrap/auth/status",
+    "/api/bootstrap/auth/first-admin",
+    "/api/deploy-tokens",
+    "/api/deploy-tokens/:tokenId",
+    "/api/deploy-tokens/:tokenId/rotate",
+    "/api/deploy-tokens/:tokenId/revoke",
+    "/api/organizations/current-context",
+    "/api/organizations/current-context/switch",
+    "/api/organizations/:organizationId/members",
+    "/api/organizations/:organizationId/invitations",
+    "/api/organizations/:organizationId/members/:memberId/role",
+    "/api/organizations/:organizationId/members/:memberId",
     "/api/projects",
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",

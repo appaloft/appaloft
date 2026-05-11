@@ -42,6 +42,7 @@ import {
   type EventHandlerContract,
   type ExecutionContext,
   eventHandlerTypesFor,
+  type FirstAdminPasswordIssuer,
   type IdGenerator,
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
@@ -60,7 +61,7 @@ import {
   type SourceLinkSelectionSpec,
   tokens,
 } from "@appaloft/application";
-import { type AuthRuntime } from "@appaloft/auth-better";
+import { type AuthRuntime, BetterAuthDeployTokenMaterialIssuer } from "@appaloft/auth-better";
 import { type AppConfig } from "@appaloft/config";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { InMemoryIntegrationRegistry } from "@appaloft/integration-core";
@@ -74,6 +75,7 @@ import {
 import { gitlabIntegration } from "@appaloft/integration-gitlab";
 import {
   type DatabaseConnection,
+  PgAuthBootstrapStatusReader,
   PgCertificateReadModel,
   PgCertificateRepository,
   PgCertificateRetryCandidateReader,
@@ -88,6 +90,8 @@ import {
   PgDependencyResourceSecretStore,
   PgDeploymentReadModel,
   PgDeploymentRepository,
+  PgDeployTokenReadModel,
+  PgDeployTokenRepository,
   PgDestinationRepository,
   PgDiagnostics,
   PgDomainBindingReadModel,
@@ -165,6 +169,14 @@ const generateIdSuffix = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 
 class NanoIdGenerator implements IdGenerator {
   next(prefix: string): string {
     return `${prefix}_${generateIdSuffix()}`;
+  }
+}
+
+class NanoIdFirstAdminPasswordIssuer implements FirstAdminPasswordIssuer {
+  async issue(_context: ExecutionContext) {
+    return ok({
+      password: `aplt-admin-${generateIdSuffix()}-${generateIdSuffix()}`,
+    });
   }
 }
 
@@ -876,6 +888,47 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       () => new PgResourceDependencyBindingRepository(input.database.db),
     ),
+  });
+  container.register(tokens.deployTokenRepository, {
+    useFactory: instanceCachingFactory(() => new PgDeployTokenRepository(input.database.db)),
+  });
+  container.register(tokens.deployTokenMaterialIssuer, {
+    useFactory: instanceCachingFactory(() => new BetterAuthDeployTokenMaterialIssuer()),
+  });
+  container.register(tokens.deployTokenReadModel, {
+    useFactory: instanceCachingFactory(() => new PgDeployTokenReadModel(input.database.db)),
+  });
+  container.register(tokens.authBootstrapStatusReader, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new PgAuthBootstrapStatusReader(input.database.db, {
+          githubConfigured: Boolean(
+            input.config.githubClientId &&
+              input.config.githubClientSecret &&
+              input.config.githubRedirectUri &&
+              input.config.webOrigin,
+          ),
+          googleConfigured: Boolean(
+            input.config.googleClientId &&
+              input.config.googleClientSecret &&
+              input.config.googleRedirectUri &&
+              input.config.webOrigin,
+          ),
+          oidcConfigured: Boolean(
+            input.config.oidcClientId &&
+              input.config.oidcClientSecret &&
+              input.config.oidcDiscoveryUrl &&
+              input.config.oidcRedirectUri &&
+              input.config.webOrigin,
+          ),
+          loginUrl: `${input.config.webOrigin.replace(/\/+$/g, "")}/login`,
+        }),
+    ),
+  });
+  container.registerInstance(tokens.firstAdminBootstrapper, input.authRuntime);
+  container.registerInstance(tokens.organizationTeamManagementPort, input.authRuntime);
+  container.register(tokens.firstAdminPasswordIssuer, {
+    useFactory: instanceCachingFactory(() => new NanoIdFirstAdminPasswordIssuer()),
   });
   container.register(tokens.dependencyResourceDeleteSafetyReader, {
     useFactory: instanceCachingFactory(

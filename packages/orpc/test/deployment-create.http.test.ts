@@ -2,6 +2,7 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
+  type ActionDeployTokenAuthorizationPort,
   type AppLogger,
   ApplyActionPreviewRouteCommand,
   CleanupPreviewCommand,
@@ -30,7 +31,7 @@ import {
   StartResourceRuntimeCommand,
   StopResourceRuntimeCommand,
 } from "@appaloft/application";
-import { ok, type Result } from "@appaloft/core";
+import { err, ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
 
 import { type ActionSourcePackageConfigReader, mountAppaloftOrpcRoutes } from "../src";
@@ -51,6 +52,46 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       actor: input.actor,
     });
   }
+}
+
+const actionDeployToken = "test_action_deploy_token";
+const actionDeployTokenHeaders = {
+  authorization: `Bearer ${actionDeployToken}`,
+} as const;
+
+const testActionDeployTokenAuthorizationPort: ActionDeployTokenAuthorizationPort = {
+  authorize: async (_context, input) => {
+    if (input.token !== actionDeployToken) {
+      return err({
+        code: "action_auth_invalid",
+        category: "user",
+        message: "Action deploy token is invalid",
+        retryable: false,
+        details: {
+          phase: "action-authentication",
+          workflow: input.workflow,
+        },
+      });
+    }
+
+    return ok({
+      actor: {
+        kind: "deploy-token",
+        id: "dtok_test",
+        label: "Test deploy token",
+      },
+    });
+  },
+};
+
+function mountDeploymentCreateHttpRoutes(
+  app: Elysia,
+  context: Parameters<typeof mountAppaloftOrpcRoutes>[1],
+) {
+  return mountAppaloftOrpcRoutes(app, {
+    actionDeployTokenAuthorizationPort: testActionDeployTokenAuthorizationPort,
+    ...context,
+  });
 }
 
 function actionServerConfigTarget(command: ResolveActionServerConfigDeploymentTargetCommand) {
@@ -102,7 +143,7 @@ describe("deployment create HTTP route", () => {
             : ({} as T),
         ),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -149,7 +190,7 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -184,19 +225,19 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommand).toBeUndefined();
   });
 
-  test("[CONTROL-PLANE-HANDSHAKE-008] dispatches Action server-mode deployment from source link", async () => {
+  test("[SELF-AUTH-ACTION-001] Action deployment rejects missing deploy token before command dispatch", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
         capturedCommand = command as Command<unknown>;
-        return ok({ id: "dep_from_source_link" } as T);
+        return ok({ id: "dep_unexpected" } as T);
       },
     } as CommandBus;
     const queryBus = {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -216,6 +257,191 @@ describe("deployment create HTTP route", () => {
       }),
     );
 
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "action_auth_missing",
+        details: {
+          workflow: "source-link-deploy",
+        },
+      },
+    });
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[SELF-AUTH-ACTION-002] Action deployment rejects invalid deploy token before command dispatch", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-source-link", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer invalid_action_deploy_token",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "action_auth_invalid",
+        details: {
+          workflow: "source-link-deploy",
+        },
+      },
+    });
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[SELF-AUTH-ACTION-004] Action deployment rejects scope mismatch before command dispatch", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let capturedRequestedProjectId: string | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      actionDeployTokenAuthorizationPort: {
+        authorize: async (_context, input) => {
+          if (input.token !== actionDeployToken) {
+            return err({
+              code: "action_auth_invalid",
+              category: "user",
+              message: "Action deploy token is invalid",
+              retryable: false,
+              details: {
+                endpoint: input.path,
+                phase: "action-authentication",
+                reasonCode: "unknown",
+                workflow: input.workflow,
+              },
+            });
+          }
+
+          capturedRequestedProjectId = input.requestedScope?.projectId;
+          if (input.requestedScope?.projectId === "prj_blocked") {
+            return err({
+              code: "action_auth_forbidden",
+              category: "user",
+              message: "Action deploy token is not authorized for this request",
+              retryable: false,
+              details: {
+                endpoint: input.path,
+                missingScope: "project",
+                phase: "action-authorization",
+                projectId: input.requestedScope.projectId,
+                workflow: input.workflow,
+              },
+            });
+          }
+
+          return ok({
+            actor: {
+              kind: "deploy-token",
+              id: "dtok_scoped",
+            },
+          });
+        },
+      },
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-source-link", {
+        method: "POST",
+        headers: {
+          ...actionDeployTokenHeaders,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          projectId: "prj_blocked",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "action_auth_forbidden",
+        details: {
+          missingScope: "project",
+          phase: "action-authorization",
+          projectId: "prj_blocked",
+          workflow: "source-link-deploy",
+        },
+      },
+    });
+    expect(capturedRequestedProjectId).toBe("prj_blocked");
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-008][SELF-AUTH-ACTION-003] dispatches Action server-mode deployment from source link", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let capturedContext: ExecutionContext | undefined;
+    const commandBus = {
+      execute: async <T>(context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedContext = context;
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_from_source_link" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-source-link", {
+        method: "POST",
+        headers: {
+          ...actionDeployTokenHeaders,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+        }),
+      }),
+    );
+
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({
       id: "dep_from_source_link",
@@ -225,6 +451,11 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommand).toMatchObject({
       sourceFingerprint:
         "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+    });
+    expect(capturedContext?.actor).toEqual({
+      kind: "deploy-token",
+      id: "dtok_test",
+      label: "Test deploy token",
     });
   });
 
@@ -240,7 +471,7 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -251,6 +482,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-source-link", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -297,7 +529,7 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -308,6 +540,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-source-link", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -343,7 +576,7 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -354,6 +587,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-source-link", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -364,6 +598,67 @@ describe("deployment create HTTP route", () => {
 
     expect(response.status).toBe(202);
     expect(capturedCommand).toBeInstanceOf(CreateActionSourceLinkDeploymentCommand);
+  });
+
+  test("[SELF-AUTH-ACTION-001][SELF-AUTH-ACTION-006] Action server config deployment rejects missing deploy token before mutation", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            environmentId: "env_prod",
+            projectId: "prj_console",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "action_auth_missing",
+        details: {
+          workflow: "server-config-deploy",
+        },
+      },
+    });
+    expect(capturedCommand).toBeUndefined();
   });
 
   test("[CONTROL-PLANE-HANDSHAKE-015] Action server config endpoint rejects unsafe package paths before mutation", async () => {
@@ -378,7 +673,7 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -389,6 +684,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -444,7 +740,7 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -455,6 +751,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -515,7 +812,7 @@ describe("deployment create HTTP route", () => {
         });
       },
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -527,6 +824,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -590,7 +888,7 @@ describe("deployment create HTTP route", () => {
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -602,6 +900,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -664,7 +963,7 @@ describe("deployment create HTTP route", () => {
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -676,6 +975,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -751,7 +1051,7 @@ describe("deployment create HTTP route", () => {
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -763,6 +1063,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -832,7 +1133,7 @@ describe("deployment create HTTP route", () => {
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -844,6 +1145,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -925,7 +1227,7 @@ describe("deployment create HTTP route", () => {
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -937,6 +1239,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -1025,7 +1328,7 @@ describe("deployment create HTTP route", () => {
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -1037,6 +1340,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -1119,7 +1423,7 @@ describe("deployment create HTTP route", () => {
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -1131,6 +1435,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -1203,7 +1508,7 @@ describe("deployment create HTTP route", () => {
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -1215,6 +1520,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -1341,7 +1647,7 @@ describe("deployment create HTTP route", () => {
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -1353,6 +1659,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -1447,7 +1754,7 @@ describe("deployment create HTTP route", () => {
           fileName: "appaloft.preview.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -1459,6 +1766,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -1575,7 +1883,7 @@ describe("deployment create HTTP route", () => {
           fileName: "appaloft.yml",
         }),
     } satisfies ActionSourcePackageConfigReader;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
@@ -1587,6 +1895,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/action/deployments/from-config-package", {
         method: "POST",
         headers: {
+          ...actionDeployTokenHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -1637,7 +1946,7 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -1679,7 +1988,7 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -1721,7 +2030,7 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -1772,7 +2081,7 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -1855,7 +2164,7 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
@@ -1889,6 +2198,97 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommand).toMatchObject({
       sourceFingerprint:
         "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
+    });
+  });
+
+  test("[SELF-AUTH-ACTION-001][SELF-AUTH-ACTION-007] Action preview cleanup rejects missing deploy token before command dispatch", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ status: "cleaned" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments/cleanup-preview", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-appaloft-action-command": "preview-cleanup",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.text()).toContain("action_auth_missing");
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[SELF-AUTH-ACTION-007] Action preview cleanup dispatches after deploy token auth", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let capturedContext: ExecutionContext | undefined;
+    const commandBus = {
+      execute: async <T>(context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedContext = context;
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          sourceFingerprint:
+            "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
+          status: "cleaned",
+          cleanedRuntime: true,
+          cleanedArtifacts: true,
+          removedServerAppliedRoute: true,
+          removedSourceLink: true,
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments/cleanup-preview", {
+        method: "POST",
+        headers: {
+          ...actionDeployTokenHeaders,
+          "content-type": "application/json",
+          "x-appaloft-action-command": "preview-cleanup",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(capturedCommand).toBeInstanceOf(CleanupPreviewCommand);
+    expect(capturedContext?.actor).toEqual({
+      kind: "deploy-token",
+      id: "dtok_test",
+      label: "Test deploy token",
     });
   });
 });

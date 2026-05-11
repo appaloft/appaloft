@@ -16,11 +16,18 @@ APPALOFT_EDGE_NETWORK_NAME="${APPALOFT_EDGE_NETWORK_NAME:-appaloft-edge}"
 APPALOFT_TRAEFIK_IMAGE="${APPALOFT_TRAEFIK_IMAGE:-traefik:v3.6.2}"
 APPALOFT_POSTGRES_IMAGE="${APPALOFT_POSTGRES_IMAGE:-postgres:16}"
 APPALOFT_POSTGRES_PASSWORD="${APPALOFT_POSTGRES_PASSWORD:-}"
+APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE="${APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE:-/tmp/appaloft-bootstrap/deploy-token.json}"
+APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE="${APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE:-/tmp/appaloft-bootstrap/first-admin.json}"
+APPALOFT_BETTER_AUTH_SECRET="${APPALOFT_BETTER_AUTH_SECRET:-}"
+APPALOFT_FIRST_ADMIN_EMAIL="${APPALOFT_FIRST_ADMIN_EMAIL:-}"
+APPALOFT_FIRST_ADMIN_DISPLAY_NAME="${APPALOFT_FIRST_ADMIN_DISPLAY_NAME:-}"
+APPALOFT_FIRST_ADMIN_PASSWORD="${APPALOFT_FIRST_ADMIN_PASSWORD:-}"
 APPALOFT_COMPOSE_PROJECT_NAME="${APPALOFT_COMPOSE_PROJECT_NAME:-appaloft}"
 APPALOFT_SWARM_STACK_NAME="${APPALOFT_SWARM_STACK_NAME:-appaloft}"
 APPALOFT_SWARM_INIT="${APPALOFT_SWARM_INIT:-0}"
 APPALOFT_SWARM_ADVERTISE_ADDR="${APPALOFT_SWARM_ADVERTISE_ADDR:-}"
 APPALOFT_SKIP_DOCKER_INSTALL="${APPALOFT_SKIP_DOCKER_INSTALL:-0}"
+APPALOFT_SKIP_IMAGE_PULL="${APPALOFT_SKIP_IMAGE_PULL:-0}"
 APPALOFT_INSTALL_DRY_RUN="${APPALOFT_INSTALL_DRY_RUN:-0}"
 APPALOFT_DOCKER_INSTALL_SCRIPT_URL="${APPALOFT_DOCKER_INSTALL_SCRIPT_URL:-https://get.docker.com}"
 APPALOFT_FORCE_COLOR="${APPALOFT_FORCE_COLOR:-0}"
@@ -97,6 +104,9 @@ print_next_steps() {
   printf '  %sUpdate/repair:%s rerun the same install command; existing config and data are reused.\n' \
     "$appaloft_color_bold" \
     "$appaloft_color_reset"
+  printf '  %sOAuth later:%s configure GitHub, Google, or OIDC client settings and rerun; local first-admin login keeps working until then.\n' \
+    "$appaloft_color_bold" \
+    "$appaloft_color_reset"
   if [ -n "$APPALOFT_CONSOLE_DOMAIN" ]; then
     printf '  %sDNS:%s           keep %s pointed at this server.\n' \
       "$appaloft_color_bold" \
@@ -129,12 +139,17 @@ Options:
   --orchestrator <compose|swarm>    Docker orchestrator. Defaults to compose.
   --proxy <traefik|none>            Managed self-host proxy. Defaults to traefik.
   --postgres-password <password>   PostgreSQL password. Existing installs reuse .env.
+  --auth-secret <secret>           Product auth session secret. Existing installs reuse .env.
+  --first-admin-email <email>       Create the first local admin during install.
+  --first-admin-name <name>         Display name for the first local admin.
+  --first-admin-password <password> Password for the first local admin. Generated if omitted.
   --postgres-image <image>         PostgreSQL image. Defaults to postgres:16.
   --project-name <name>            Docker Compose project name. Defaults to appaloft.
   --stack-name <name>              Docker Swarm stack name. Defaults to appaloft.
   --swarm-init                     Initialize a single-node Swarm manager when none is active.
   --swarm-advertise-addr <addr>    Optional address passed to docker swarm init.
   --skip-docker-install            Require an existing Docker Engine installation.
+  --skip-image-pull                Skip Docker Compose image pull; use only when images already exist locally.
   --dry-run                        Print the selected Docker stack without installing.
   -h, --help                       Show this help.
 
@@ -154,11 +169,18 @@ Environment:
   APPALOFT_TRAEFIK_IMAGE
   APPALOFT_POSTGRES_IMAGE
   APPALOFT_POSTGRES_PASSWORD
+  APPALOFT_BETTER_AUTH_SECRET
+  APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE
+  APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE
+  APPALOFT_FIRST_ADMIN_EMAIL
+  APPALOFT_FIRST_ADMIN_DISPLAY_NAME
+  APPALOFT_FIRST_ADMIN_PASSWORD
   APPALOFT_COMPOSE_PROJECT_NAME
   APPALOFT_SWARM_STACK_NAME
   APPALOFT_SWARM_INIT=1
   APPALOFT_SWARM_ADVERTISE_ADDR
   APPALOFT_SKIP_DOCKER_INSTALL=1
+  APPALOFT_SKIP_IMAGE_PULL=1
   APPALOFT_INSTALL_DRY_RUN=1
   APPALOFT_FORCE_COLOR=1
   NO_COLOR=1
@@ -265,6 +287,38 @@ while [ "$#" -gt 0 ]; do
     --postgres-password=*)
       APPALOFT_POSTGRES_PASSWORD="${1#--postgres-password=}"
       ;;
+    --auth-secret | --better-auth-secret)
+      shift
+      [ "$#" -gt 0 ] || fail "--auth-secret requires a value"
+      APPALOFT_BETTER_AUTH_SECRET="$1"
+      ;;
+    --auth-secret=* | --better-auth-secret=*)
+      APPALOFT_BETTER_AUTH_SECRET="${1#*=}"
+      ;;
+    --first-admin-email)
+      shift
+      [ "$#" -gt 0 ] || fail "--first-admin-email requires a value"
+      APPALOFT_FIRST_ADMIN_EMAIL="$1"
+      ;;
+    --first-admin-email=*)
+      APPALOFT_FIRST_ADMIN_EMAIL="${1#--first-admin-email=}"
+      ;;
+    --first-admin-name)
+      shift
+      [ "$#" -gt 0 ] || fail "--first-admin-name requires a value"
+      APPALOFT_FIRST_ADMIN_DISPLAY_NAME="$1"
+      ;;
+    --first-admin-name=*)
+      APPALOFT_FIRST_ADMIN_DISPLAY_NAME="${1#--first-admin-name=}"
+      ;;
+    --first-admin-password)
+      shift
+      [ "$#" -gt 0 ] || fail "--first-admin-password requires a value"
+      APPALOFT_FIRST_ADMIN_PASSWORD="$1"
+      ;;
+    --first-admin-password=*)
+      APPALOFT_FIRST_ADMIN_PASSWORD="${1#--first-admin-password=}"
+      ;;
     --postgres-image)
       shift
       [ "$#" -gt 0 ] || fail "--postgres-image requires a value"
@@ -302,6 +356,9 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-docker-install | --no-install-docker)
       APPALOFT_SKIP_DOCKER_INSTALL=1
+      ;;
+    --skip-image-pull)
+      APPALOFT_SKIP_IMAGE_PULL=1
       ;;
     --dry-run)
       APPALOFT_INSTALL_DRY_RUN=1
@@ -751,6 +808,12 @@ services:
       APPALOFT_DATA_DIR: /appaloft-data
       APPALOFT_PGLITE_DATA_DIR: /appaloft-data/pglite
       APPALOFT_WEB_ORIGIN: ${APPALOFT_WEB_ORIGIN}
+      APPALOFT_BETTER_AUTH_SECRET: ${APPALOFT_BETTER_AUTH_SECRET}
+      APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE: ${APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE}
+      APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE: ${APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE}
+      APPALOFT_FIRST_ADMIN_EMAIL: ${APPALOFT_FIRST_ADMIN_EMAIL}
+      APPALOFT_FIRST_ADMIN_DISPLAY_NAME: ${APPALOFT_FIRST_ADMIN_DISPLAY_NAME}
+      APPALOFT_FIRST_ADMIN_PASSWORD: ${APPALOFT_FIRST_ADMIN_PASSWORD}
     ports:
       - "${APPALOFT_HTTP_HOST}:${APPALOFT_HTTP_PORT}:3001"
     volumes:
@@ -791,6 +854,12 @@ services:
       APPALOFT_AUTO_MIGRATE: "true"
       APPALOFT_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       APPALOFT_WEB_ORIGIN: ${APPALOFT_WEB_ORIGIN}
+      APPALOFT_BETTER_AUTH_SECRET: ${APPALOFT_BETTER_AUTH_SECRET}
+      APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE: ${APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE}
+      APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE: ${APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE}
+      APPALOFT_FIRST_ADMIN_EMAIL: ${APPALOFT_FIRST_ADMIN_EMAIL}
+      APPALOFT_FIRST_ADMIN_DISPLAY_NAME: ${APPALOFT_FIRST_ADMIN_DISPLAY_NAME}
+      APPALOFT_FIRST_ADMIN_PASSWORD: ${APPALOFT_FIRST_ADMIN_PASSWORD}
     ports:
       - "${APPALOFT_HTTP_HOST}:${APPALOFT_HTTP_PORT}:3001"
 COMPOSE
@@ -983,6 +1052,7 @@ APPALOFT_APP_VERSION=$appaloft_version
 APPALOFT_HTTP_HOST=$APPALOFT_HTTP_HOST
 APPALOFT_HTTP_PORT=$APPALOFT_HTTP_PORT
 APPALOFT_WEB_ORIGIN=$appaloft_web_origin
+APPALOFT_BETTER_AUTH_SECRET=$appaloft_better_auth_secret
 APPALOFT_CONSOLE_DOMAIN=$APPALOFT_CONSOLE_DOMAIN
 APPALOFT_SELF_HOST_DATABASE=pglite
 APPALOFT_SELF_HOST_ORCHESTRATOR=$APPALOFT_SELF_HOST_ORCHESTRATOR
@@ -990,6 +1060,11 @@ APPALOFT_SELF_HOST_PROXY=$APPALOFT_SELF_HOST_PROXY
 APPALOFT_EDGE_NETWORK_NAME=$APPALOFT_EDGE_NETWORK_NAME
 APPALOFT_TRAEFIK_IMAGE=$APPALOFT_TRAEFIK_IMAGE
 APPALOFT_SWARM_STACK_NAME=$APPALOFT_SWARM_STACK_NAME
+APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE=$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE
+APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE=$APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE
+APPALOFT_FIRST_ADMIN_EMAIL=$APPALOFT_FIRST_ADMIN_EMAIL
+APPALOFT_FIRST_ADMIN_DISPLAY_NAME=$APPALOFT_FIRST_ADMIN_DISPLAY_NAME
+APPALOFT_FIRST_ADMIN_PASSWORD=$APPALOFT_FIRST_ADMIN_PASSWORD
 ENV
     return
   fi
@@ -1000,6 +1075,7 @@ APPALOFT_APP_VERSION=$appaloft_version
 APPALOFT_HTTP_HOST=$APPALOFT_HTTP_HOST
 APPALOFT_HTTP_PORT=$APPALOFT_HTTP_PORT
 APPALOFT_WEB_ORIGIN=$appaloft_web_origin
+APPALOFT_BETTER_AUTH_SECRET=$appaloft_better_auth_secret
 APPALOFT_CONSOLE_DOMAIN=$APPALOFT_CONSOLE_DOMAIN
 APPALOFT_SELF_HOST_DATABASE=postgres
 APPALOFT_SELF_HOST_ORCHESTRATOR=$APPALOFT_SELF_HOST_ORCHESTRATOR
@@ -1008,6 +1084,11 @@ APPALOFT_EDGE_NETWORK_NAME=$APPALOFT_EDGE_NETWORK_NAME
 APPALOFT_TRAEFIK_IMAGE=$APPALOFT_TRAEFIK_IMAGE
 APPALOFT_SWARM_STACK_NAME=$APPALOFT_SWARM_STACK_NAME
 APPALOFT_POSTGRES_IMAGE=$APPALOFT_POSTGRES_IMAGE
+APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE=$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE
+APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE=$APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE
+APPALOFT_FIRST_ADMIN_EMAIL=$APPALOFT_FIRST_ADMIN_EMAIL
+APPALOFT_FIRST_ADMIN_DISPLAY_NAME=$APPALOFT_FIRST_ADMIN_DISPLAY_NAME
+APPALOFT_FIRST_ADMIN_PASSWORD=$APPALOFT_FIRST_ADMIN_PASSWORD
 POSTGRES_DB=appaloft
 POSTGRES_USER=appaloft
 POSTGRES_PASSWORD=$appaloft_postgres_password
@@ -1054,6 +1135,11 @@ docker_stack_deploy() {
     APPALOFT_SELF_HOST_PROXY="$APPALOFT_SELF_HOST_PROXY" \
     APPALOFT_EDGE_NETWORK_NAME="$APPALOFT_EDGE_NETWORK_NAME" \
     APPALOFT_TRAEFIK_IMAGE="$APPALOFT_TRAEFIK_IMAGE" \
+    APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE="$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE" \
+    APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE="$APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE" \
+    APPALOFT_FIRST_ADMIN_EMAIL="$APPALOFT_FIRST_ADMIN_EMAIL" \
+    APPALOFT_FIRST_ADMIN_DISPLAY_NAME="$APPALOFT_FIRST_ADMIN_DISPLAY_NAME" \
+    APPALOFT_FIRST_ADMIN_PASSWORD="$APPALOFT_FIRST_ADMIN_PASSWORD" \
     APPALOFT_POSTGRES_IMAGE="$APPALOFT_POSTGRES_IMAGE" \
     POSTGRES_DB="appaloft" \
     POSTGRES_USER="appaloft" \
@@ -1163,6 +1249,61 @@ wait_for_swarm_app_health() {
   fail "Appaloft console did not become healthy within 120 seconds; check the app service diagnostics above"
 }
 
+swarm_app_container_id() {
+  docker_stdout ps --filter "name=${APPALOFT_SWARM_STACK_NAME}_app" --filter "status=running" -q 2>/dev/null |
+    head -n 1
+}
+
+read_bootstrap_deploy_token_output() {
+  step "Reading deploy token bootstrap output"
+  bootstrap_reader='file="$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE"; if [ -r "$file" ]; then cat "$file"; rm -f "$file"; fi'
+
+  if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
+    container_id="$(swarm_app_container_id || true)"
+    [ -n "$container_id" ] ||
+      fail "could not find the running Appaloft app task to read bootstrap output"
+    bootstrap_output="$(docker_stdout exec "$container_id" sh -c "$bootstrap_reader" 2>/dev/null || true)"
+  else
+    bootstrap_output="$(docker_compose exec -T app sh -c "$bootstrap_reader" 2>/dev/null || true)"
+  fi
+
+  [ -n "$bootstrap_output" ] ||
+    fail "could not read deploy token bootstrap output from the Appaloft app container"
+
+  printf '%s\n' "$bootstrap_output"
+  say "Store the token value in GitHub Secrets as APPALOFT_TOKEN. It is shown only during bootstrap."
+}
+
+read_bootstrap_first_admin_output() {
+  step "Reading first-admin bootstrap output"
+  bootstrap_reader='file="$APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE"; if [ -r "$file" ]; then cat "$file"; rm -f "$file"; fi'
+
+  if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
+    container_id="$(swarm_app_container_id || true)"
+    [ -n "$container_id" ] ||
+      fail "could not find the running Appaloft app task to read first-admin bootstrap output"
+    bootstrap_output="$(docker_stdout exec "$container_id" sh -c "$bootstrap_reader" 2>/dev/null || true)"
+  else
+    bootstrap_output="$(docker_compose exec -T app sh -c "$bootstrap_reader" 2>/dev/null || true)"
+  fi
+
+  [ -n "$bootstrap_output" ] ||
+    fail "could not read first-admin bootstrap output from the Appaloft app container"
+
+  printf '%s\n' "$bootstrap_output"
+  case "$bootstrap_output" in
+    *'"generatedPassword"'*)
+      say "Use the generated first-admin password above for the first console login. It is shown only during bootstrap."
+      ;;
+    *'"bootstrapRequired":true'* | *'"bootstrapRequired": true'*)
+      say "Set APPALOFT_FIRST_ADMIN_EMAIL and rerun the installer to create a local first admin."
+      ;;
+    *)
+      say "First-admin bootstrap status is shown above. Supplied passwords are never printed."
+      ;;
+  esac
+}
+
 validate_port
 validate_database
 validate_orchestrator
@@ -1238,6 +1379,15 @@ if [ "$APPALOFT_SELF_HOST_DATABASE" = "postgres" ]; then
   fi
 fi
 
+existing_better_auth_secret="$(read_existing_env_value APPALOFT_BETTER_AUTH_SECRET "$env_file" || true)"
+if [ -n "$APPALOFT_BETTER_AUTH_SECRET" ]; then
+  appaloft_better_auth_secret="$APPALOFT_BETTER_AUTH_SECRET"
+elif [ -n "$existing_better_auth_secret" ]; then
+  appaloft_better_auth_secret="$existing_better_auth_secret"
+else
+  appaloft_better_auth_secret="$(generate_password)"
+fi
+
 tmp_compose="$tmpdir/docker-compose.yml"
 tmp_env="$tmpdir/.env"
 write_compose_file "$tmp_compose"
@@ -1268,18 +1418,26 @@ if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
   step "Deploying Docker Swarm stack"
   docker_stack_deploy || fail "Docker Swarm failed to deploy the Appaloft stack; check Docker stack errors above and rerun the same install command"
   wait_for_swarm_app_health
+  read_bootstrap_deploy_token_output
+  read_bootstrap_first_admin_output
   appaloft_logs_command="docker service logs -f ${APPALOFT_SWARM_STACK_NAME}_app"
 else
   ensure_external_compose_traefik_proxy
 
-  step "Pulling Appaloft Docker images"
-  docker_compose pull ||
-    fail "Docker Compose failed to pull Appaloft images; check registry access and network connectivity, then rerun the same install command"
+  if [ "$APPALOFT_SKIP_IMAGE_PULL" = "1" ]; then
+    step "Skipping Appaloft Docker image pull"
+  else
+    step "Pulling Appaloft Docker images"
+    docker_compose pull ||
+      fail "Docker Compose failed to pull Appaloft images; check registry access and network connectivity, then rerun the same install command"
+  fi
 
   step "Starting Appaloft containers"
   docker_compose up -d ||
     fail "Docker Compose failed to start Appaloft; check Docker errors above and rerun the same install command"
   wait_for_compose_app_health
+  read_bootstrap_deploy_token_output
+  read_bootstrap_first_admin_output
   appaloft_logs_command="docker compose --env-file $env_file -p $APPALOFT_COMPOSE_PROJECT_NAME -f $compose_file logs -f"
 fi
 

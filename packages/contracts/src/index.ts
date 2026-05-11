@@ -27,6 +27,7 @@ export const versionResponseSchema = z.object({
   mode: z.enum(["hosted-control-plane", "self-hosted"]),
   features: z
     .object({
+      actionDeployTokenAuth: z.boolean().optional(),
       actionServerConfigDeploy: z.boolean().optional(),
       sourcePackages: z.boolean().optional(),
       serverSideConfigBootstrap: z.boolean().optional(),
@@ -35,7 +36,7 @@ export const versionResponseSchema = z.object({
 });
 
 export const authProviderStatusSchema = z.object({
-  key: z.literal("github"),
+  key: z.enum(["github", "google", "oidc"]),
   title: z.string(),
   configured: z.boolean(),
   connected: z.boolean(),
@@ -52,6 +53,159 @@ export const authSessionResponseSchema = z.object({
   deferredAuth: z.boolean(),
   session: z.unknown().nullable(),
   providers: z.array(authProviderStatusSchema),
+});
+
+export const deployTokenScopeSummarySchema = z.object({
+  deploymentTargetIds: z.array(z.string()),
+  environmentIds: z.array(z.string()),
+  projectIds: z.array(z.string()),
+  repositoryFullNames: z.array(z.string()),
+  resourceIds: z.array(z.string()),
+  workflowCommands: z.array(
+    z.enum(["source-link-deploy", "server-config-deploy", "preview-cleanup"]),
+  ),
+});
+
+export const deployTokenSummarySchema = z.object({
+  tokenId: z.string(),
+  organizationId: z.string(),
+  displayName: z.string(),
+  status: z.enum(["active", "revoked"]),
+  secretSuffix: z.string(),
+  scope: deployTokenScopeSummarySchema,
+  createdAt: z.string(),
+  expiresAt: z.string().optional(),
+  lastUsedAt: z.string().optional(),
+  rotatedAt: z.string().optional(),
+  revokedAt: z.string().optional(),
+});
+
+export const createDeployTokenResponseSchema = z.object({
+  tokenId: z.string(),
+  token: z.string(),
+  organizationId: z.string(),
+  displayName: z.string(),
+  secretSuffix: z.string(),
+  scopes: deployTokenScopeSummarySchema,
+  createdAt: z.string(),
+  expiresAt: z.string().optional(),
+});
+
+export const listDeployTokensResponseSchema = z.object({
+  items: z.array(deployTokenSummarySchema),
+});
+
+export const showDeployTokenResponseSchema = deployTokenSummarySchema;
+
+export const rotateDeployTokenResponseSchema = z.object({
+  tokenId: z.string(),
+  token: z.string(),
+  rotatedAt: z.string(),
+  scopes: deployTokenScopeSummarySchema,
+});
+
+export const revokeDeployTokenResponseSchema = z.object({
+  tokenId: z.string(),
+  revokedAt: z.string(),
+});
+
+export const organizationTeamRoleSchema = z.enum([
+  "admin",
+  "billing",
+  "developer",
+  "owner",
+  "viewer",
+]);
+
+export const organizationInvitationStatusSchema = z.enum([
+  "accepted",
+  "expired",
+  "pending",
+  "revoked",
+]);
+
+export const organizationCurrentUserSummarySchema = z.object({
+  userId: z.string(),
+  email: z.string(),
+  displayName: z.string().optional(),
+  avatarUrl: z.string().optional(),
+});
+
+export const organizationContextOrganizationSummarySchema = z.object({
+  organizationId: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  role: organizationTeamRoleSchema,
+});
+
+export const organizationContextPermissionsSchema = z.object({
+  canInviteMembers: z.boolean(),
+  canListMembers: z.boolean(),
+  canManageDeployTokens: z.boolean(),
+  canRemoveMembers: z.boolean(),
+  canUpdateMemberRoles: z.boolean(),
+});
+
+export const productLoginMethodStatusSchema = z.object({
+  key: z.enum(["local-password", "github", "google", "oidc"]),
+  configured: z.boolean(),
+  enabled: z.boolean(),
+  reason: z.string().optional(),
+});
+
+export const currentOrganizationContextResponseSchema = z.object({
+  user: organizationCurrentUserSummarySchema,
+  currentOrganization: organizationContextOrganizationSummarySchema,
+  organizations: z.array(organizationContextOrganizationSummarySchema),
+  loginMethods: z.array(productLoginMethodStatusSchema),
+  permissions: organizationContextPermissionsSchema.optional(),
+});
+
+export const organizationMemberSummarySchema = z.object({
+  memberId: z.string(),
+  userId: z.string(),
+  role: organizationTeamRoleSchema,
+  joinedAt: z.string(),
+  avatarUrl: z.string().optional(),
+  displayName: z.string().optional(),
+  email: z.string().optional(),
+  status: z.enum(["active", "deactivated"]).optional(),
+});
+
+export const organizationInvitationSummarySchema = z.object({
+  invitationId: z.string(),
+  organizationId: z.string(),
+  email: z.string(),
+  role: organizationTeamRoleSchema,
+  status: organizationInvitationStatusSchema,
+  createdAt: z.string(),
+  expiresAt: z.string().optional(),
+  inviter: z
+    .object({
+      userId: z.string(),
+      displayName: z.string().optional(),
+      email: z.string().optional(),
+    })
+    .optional(),
+});
+
+export const listOrganizationMembersResponseSchema = z.object({
+  items: z.array(organizationMemberSummarySchema),
+  nextCursor: z.string().optional(),
+});
+
+export const listOrganizationInvitationsResponseSchema = z.object({
+  items: z.array(organizationInvitationSummarySchema),
+  nextCursor: z.string().optional(),
+});
+
+export const inviteOrganizationMemberResponseSchema = organizationInvitationSummarySchema;
+export const changeOrganizationMemberRoleResponseSchema = organizationMemberSummarySchema;
+
+export const removeOrganizationMemberResponseSchema = z.object({
+  memberId: z.string(),
+  organizationId: z.string(),
+  removedAt: z.string(),
 });
 
 export const pluginSummarySchema = z.object({
@@ -4325,6 +4479,39 @@ export type ShowDomainBindingInput = z.infer<typeof showDomainBindingInputSchema
 export type ShowDomainBindingResponse = z.infer<typeof showDomainBindingResponseSchema>;
 export type DomainBindingDeleteBlocker = z.infer<typeof domainBindingDeleteBlockerSchema>;
 export type DomainBindingDeleteSafety = z.infer<typeof domainBindingDeleteSafetySchema>;
+export type DeployTokenScopeSummary = z.infer<typeof deployTokenScopeSummarySchema>;
+export type DeployTokenSummary = z.infer<typeof deployTokenSummarySchema>;
+export type CreateDeployTokenResponse = z.infer<typeof createDeployTokenResponseSchema>;
+export type ListDeployTokensResponse = z.infer<typeof listDeployTokensResponseSchema>;
+export type ShowDeployTokenResponse = z.infer<typeof showDeployTokenResponseSchema>;
+export type RotateDeployTokenResponse = z.infer<typeof rotateDeployTokenResponseSchema>;
+export type RevokeDeployTokenResponse = z.infer<typeof revokeDeployTokenResponseSchema>;
+export type OrganizationTeamRole = z.infer<typeof organizationTeamRoleSchema>;
+export type OrganizationInvitationStatus = z.infer<typeof organizationInvitationStatusSchema>;
+export type ProductLoginMethodStatus = z.infer<typeof productLoginMethodStatusSchema>;
+export type OrganizationCurrentUserSummary = z.infer<typeof organizationCurrentUserSummarySchema>;
+export type OrganizationContextOrganizationSummary = z.infer<
+  typeof organizationContextOrganizationSummarySchema
+>;
+export type OrganizationContextPermissions = z.infer<typeof organizationContextPermissionsSchema>;
+export type CurrentOrganizationContextResponse = z.infer<
+  typeof currentOrganizationContextResponseSchema
+>;
+export type OrganizationMemberSummary = z.infer<typeof organizationMemberSummarySchema>;
+export type OrganizationInvitationSummary = z.infer<typeof organizationInvitationSummarySchema>;
+export type ListOrganizationMembersResponse = z.infer<typeof listOrganizationMembersResponseSchema>;
+export type ListOrganizationInvitationsResponse = z.infer<
+  typeof listOrganizationInvitationsResponseSchema
+>;
+export type InviteOrganizationMemberResponse = z.infer<
+  typeof inviteOrganizationMemberResponseSchema
+>;
+export type ChangeOrganizationMemberRoleResponse = z.infer<
+  typeof changeOrganizationMemberRoleResponseSchema
+>;
+export type RemoveOrganizationMemberResponse = z.infer<
+  typeof removeOrganizationMemberResponseSchema
+>;
 export type ConfigureDomainBindingRouteInput = z.infer<
   typeof configureDomainBindingRouteInputSchema
 >;

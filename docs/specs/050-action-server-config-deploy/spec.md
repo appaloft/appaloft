@@ -30,6 +30,7 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
 - [Action Server Config Deploy Workflow](../../workflows/action-server-config-deploy.md)
 - [Deployment Config File Test Matrix](../../testing/deployment-config-file-test-matrix.md)
 - [Control-Plane Modes Test Matrix](../../testing/control-plane-modes-test-matrix.md)
+- [Self-Hosted Action Deploy Token Auth](../052-self-hosted-action-deploy-token-auth/spec.md)
 - [Error Model](../../errors/model.md)
 
 ## Ubiquitous Language
@@ -139,4 +140,5 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
   product-grade preview orchestration remain migration gaps.
 - The next auth hardening slice must make Action mutation endpoints require an installer-generated
   deploy token or future OIDC exchange, return clear 401/403 errors, and fail before source-link,
-  resource, route, or deployment mutation.
+  resource, route, or deployment mutation. This is now positioned by
+  [Self-Hosted Action Deploy Token Auth](../052-self-hosted-action-deploy-token-auth/spec.md).
