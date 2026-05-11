@@ -8,6 +8,7 @@ import {
   type RoutingDomainTlsFixture,
 } from "./support/routing-domain-tls-fixture";
 import {
+  createShellHttpAdminSession,
   expectCliSuccess,
   fixturePath,
   parseJson,
@@ -130,6 +131,7 @@ describe("certificates.import command e2e", () => {
     const privateKey = await Bun.file(privateKeyFixture).text();
 
     try {
+      const auth = await createShellHttpAdminSession(httpServer.baseUrl);
       const created = await fetch(`${httpServer.baseUrl}/api/domain-bindings`, {
         body: JSON.stringify({
           destinationId: context.destinationId,
@@ -144,6 +146,7 @@ describe("certificates.import command e2e", () => {
           certificatePolicy: "manual",
         }),
         headers: {
+          ...auth.headers,
           "content-type": "application/json",
         },
         method: "POST",
@@ -156,6 +159,7 @@ describe("certificates.import command e2e", () => {
         {
           body: JSON.stringify({ domainBindingId, verificationMode: "manual" }),
           headers: {
+            ...auth.headers,
             "content-type": "application/json",
           },
           method: "POST",
@@ -170,6 +174,7 @@ describe("certificates.import command e2e", () => {
           privateKey,
         }),
         headers: {
+          ...auth.headers,
           "content-type": "application/json",
         },
         method: "POST",
@@ -186,6 +191,7 @@ describe("certificates.import command e2e", () => {
 
       const listed = await fetch(
         `${httpServer.baseUrl}/api/certificates?domainBindingId=${domainBindingId}`,
+        { headers: auth.headers },
       );
       expect(listed.status).toBe(200);
       const certificate = findCertificate({
@@ -202,6 +208,7 @@ describe("certificates.import command e2e", () => {
 
       const bindings = await fetch(
         `${httpServer.baseUrl}/api/domain-bindings?resourceId=${context.resourceId}`,
+        { headers: auth.headers },
       );
       expect(bindings.status).toBe(200);
       expect(

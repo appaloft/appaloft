@@ -6,6 +6,7 @@ import {
   type RoutingDomainTlsFixture,
 } from "./support/routing-domain-tls-fixture";
 import {
+  createShellHttpAdminSession,
   expectCliSuccess,
   parseJson,
   runShellCli,
@@ -79,6 +80,7 @@ describe("certificates.issue-or-renew command e2e", () => {
     const httpServer = await startShellHttpServer(fixture.cliOptions);
 
     try {
+      const auth = await createShellHttpAdminSession(httpServer.baseUrl);
       const created = await fetch(`${httpServer.baseUrl}/api/domain-bindings`, {
         body: JSON.stringify({
           destinationId: context.destinationId,
@@ -92,6 +94,7 @@ describe("certificates.issue-or-renew command e2e", () => {
           tlsMode: "auto",
         }),
         headers: {
+          ...auth.headers,
           "content-type": "application/json",
         },
         method: "POST",
@@ -104,6 +107,7 @@ describe("certificates.issue-or-renew command e2e", () => {
         {
           body: JSON.stringify({ domainBindingId, verificationMode: "manual" }),
           headers: {
+            ...auth.headers,
             "content-type": "application/json",
           },
           method: "POST",
@@ -117,6 +121,7 @@ describe("certificates.issue-or-renew command e2e", () => {
           reason: "issue",
         }),
         headers: {
+          ...auth.headers,
           "content-type": "application/json",
         },
         method: "POST",
@@ -136,6 +141,7 @@ describe("certificates.issue-or-renew command e2e", () => {
           baseUrl: httpServer.baseUrl,
           certificateId: certificateResult.certificateId,
           domainBindingId,
+          headers: auth.headers,
         }),
         certificateResult,
         domainBindingId,
@@ -258,12 +264,14 @@ async function waitForHttpCertificateProviderUnavailable(input: {
   baseUrl: string;
   certificateId: string;
   domainBindingId: string;
+  headers: HeadersInit;
 }): Promise<CertificateSummary> {
   let lastOutput = "";
 
   for (let attempt = 0; attempt < 120; attempt += 1) {
     const listed = await fetch(
       `${input.baseUrl}/api/certificates?domainBindingId=${input.domainBindingId}`,
+      { headers: input.headers },
     );
     expect(listed.ok).toBe(true);
     lastOutput = await listed.text();
