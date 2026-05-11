@@ -10,18 +10,18 @@ import {
   organizationTeamRoleSchema,
 } from "./organization-team.schema";
 
-export const updateOrganizationMemberRoleCommandInputSchema = z.object({
+export const changeOrganizationMemberRoleCommandInputSchema = z.object({
   organizationId: organizationIdSchema,
   memberId: organizationMemberIdSchema,
   role: organizationTeamRoleSchema,
   idempotencyKey: nonEmptyTrimmedString("idempotencyKey").optional(),
 });
 
-export type UpdateOrganizationMemberRoleCommandInput = z.input<
-  typeof updateOrganizationMemberRoleCommandInputSchema
+export type ChangeOrganizationMemberRoleCommandInput = z.input<
+  typeof changeOrganizationMemberRoleCommandInputSchema
 >;
 
-export class UpdateOrganizationMemberRoleCommand extends Command<OrganizationMemberSummary> {
+export class ChangeOrganizationMemberRoleCommand extends Command<OrganizationMemberSummary> {
   constructor(
     public readonly organizationId: string,
     public readonly memberId: string,
@@ -32,11 +32,11 @@ export class UpdateOrganizationMemberRoleCommand extends Command<OrganizationMem
   }
 
   static create(
-    input: UpdateOrganizationMemberRoleCommandInput,
-  ): Result<UpdateOrganizationMemberRoleCommand> {
-    return parseOperationInput(updateOrganizationMemberRoleCommandInputSchema, input).map(
+    input: ChangeOrganizationMemberRoleCommandInput,
+  ): Result<ChangeOrganizationMemberRoleCommand> {
+    return parseOperationInput(changeOrganizationMemberRoleCommandInputSchema, input).map(
       (parsed) =>
-        new UpdateOrganizationMemberRoleCommand(
+        new ChangeOrganizationMemberRoleCommand(
           parsed.organizationId,
           parsed.memberId,
           parsed.role,

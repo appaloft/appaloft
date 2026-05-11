@@ -21,7 +21,7 @@ relatedOperations:
   - "organizations.list-members"
   - "organizations.list-invitations"
   - "organizations.invite-member"
-  - "organizations.update-member-role"
+  - "organizations.change-member-role"
   - "organizations.remove-member"
 sidebar:
   label: "Team"

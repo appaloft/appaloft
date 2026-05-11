@@ -48,7 +48,7 @@ async function createCommandCaptureHarness(requestId: string) {
           createdAt: "2026-01-01T00:00:00.000Z",
         } as T);
       }
-      if (command.constructor.name === "UpdateOrganizationMemberRoleCommand") {
+      if (command.constructor.name === "ChangeOrganizationMemberRoleCommand") {
         return ok({
           memberId: "mem_operator",
           userId: "usr_operator",
@@ -268,7 +268,7 @@ describe("CLI organization commands", () => {
     const {
       InviteOrganizationMemberCommand,
       RemoveOrganizationMemberCommand,
-      UpdateOrganizationMemberRoleCommand,
+      ChangeOrganizationMemberRoleCommand,
     } = await import("@appaloft/application");
     const { commands, program } = await createCommandCaptureHarness(
       "req_cli_organization_member_mutation_test",
@@ -317,7 +317,7 @@ describe("CLI organization commands", () => {
       email: "operator@example.com",
       role: "developer",
     });
-    expect(commands[1]).toBeInstanceOf(UpdateOrganizationMemberRoleCommand);
+    expect(commands[1]).toBeInstanceOf(ChangeOrganizationMemberRoleCommand);
     expect(commands[1]).toMatchObject({
       organizationId: "org_self_hosted",
       memberId: "mem_operator",

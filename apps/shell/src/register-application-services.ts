@@ -21,6 +21,8 @@ import {
   type CertificateProviderSelectionInput,
   type CertificateProviderSelectionPolicy,
   CertificateRetryScheduler,
+  ChangeOrganizationMemberRoleCommandHandler,
+  ChangeOrganizationMemberRoleUseCase,
   CheckDomainBindingDeleteSafetyQueryHandler,
   CheckDomainBindingDeleteSafetyQueryService,
   CheckServerDeleteSafetyQueryHandler,
@@ -323,8 +325,6 @@ import {
   UnsetEnvironmentVariableUseCase,
   UnsetResourceVariableCommandHandler,
   UnsetResourceVariableUseCase,
-  UpdateOrganizationMemberRoleCommandHandler,
-  UpdateOrganizationMemberRoleUseCase,
 } from "@appaloft/application";
 import { type DomainError, ok, type Result } from "@appaloft/core";
 import { type DependencyContainer } from "tsyringe";
@@ -566,7 +566,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ListOrganizationInvitationsQueryHandler);
   container.registerSingleton(InviteOrganizationMemberCommandHandler);
   container.registerSingleton(SwitchCurrentOrganizationCommandHandler);
-  container.registerSingleton(UpdateOrganizationMemberRoleCommandHandler);
+  container.registerSingleton(ChangeOrganizationMemberRoleCommandHandler);
   container.registerSingleton(RemoveOrganizationMemberCommandHandler);
   container.registerSingleton(CreateDeployTokenCommandHandler);
   container.registerSingleton(RotateDeployTokenCommandHandler);
@@ -609,8 +609,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
     SwitchCurrentOrganizationUseCase,
   );
   container.registerSingleton(
-    tokens.updateOrganizationMemberRoleUseCase,
-    UpdateOrganizationMemberRoleUseCase,
+    tokens.changeOrganizationMemberRoleUseCase,
+    ChangeOrganizationMemberRoleUseCase,
   );
   container.registerSingleton(
     tokens.removeOrganizationMemberUseCase,

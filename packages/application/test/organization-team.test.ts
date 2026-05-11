@@ -4,6 +4,10 @@ import { describe, expect, test } from "bun:test";
 import { ok, type Result } from "@appaloft/core";
 
 import {
+  ChangeOrganizationMemberRoleCommand,
+  ChangeOrganizationMemberRoleCommandHandler,
+  type ChangeOrganizationMemberRoleInput,
+  ChangeOrganizationMemberRoleUseCase,
   type CurrentOrganizationContext,
   createExecutionContext,
   type ExecutionContext,
@@ -34,10 +38,6 @@ import {
   SwitchCurrentOrganizationCommandHandler,
   type SwitchCurrentOrganizationInput,
   SwitchCurrentOrganizationUseCase,
-  UpdateOrganizationMemberRoleCommand,
-  UpdateOrganizationMemberRoleCommandHandler,
-  type UpdateOrganizationMemberRoleInput,
-  UpdateOrganizationMemberRoleUseCase,
 } from "../src";
 
 const context = createExecutionContext({ entrypoint: "http" });
@@ -145,7 +145,7 @@ class CapturingOrganizationTeamManagementPort implements OrganizationTeamManagem
 
   async updateMemberRole(
     _context: ExecutionContext,
-    input: UpdateOrganizationMemberRoleInput,
+    input: ChangeOrganizationMemberRoleInput,
   ): Promise<Result<OrganizationMemberSummary>> {
     this.calls.push("updateMemberRole");
     this.inputs.push(input);
@@ -303,11 +303,11 @@ describe("organization/team application boundary", () => {
         role: "developer",
       })._unsafeUnwrap(),
     );
-    const role = await new UpdateOrganizationMemberRoleCommandHandler(
-      new UpdateOrganizationMemberRoleUseCase(port),
+    const role = await new ChangeOrganizationMemberRoleCommandHandler(
+      new ChangeOrganizationMemberRoleUseCase(port),
     ).handle(
       context,
-      UpdateOrganizationMemberRoleCommand.create({
+      ChangeOrganizationMemberRoleCommand.create({
         organizationId: "org_self_hosted",
         memberId: "om_operator",
         role: "admin",
@@ -344,7 +344,7 @@ describe("organization/team application boundary", () => {
       "organizations.list-members",
       "organizations.list-invitations",
       "organizations.invite-member",
-      "organizations.update-member-role",
+      "organizations.change-member-role",
       "organizations.remove-member",
     ]);
     expect(entries.map((entry) => entry.transports.orpc?.path)).toEqual([

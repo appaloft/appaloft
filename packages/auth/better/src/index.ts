@@ -2,6 +2,7 @@ import {
   type ActionDeployTokenAuthorizationInput,
   type ActionDeployTokenAuthorizationPort,
   type ActionDeployTokenAuthorizationResult,
+  type ChangeOrganizationMemberRoleInput,
   type Clock,
   type CurrentOrganizationContext,
   type DeployTokenMaterial,
@@ -26,7 +27,6 @@ import {
   type RemoveOrganizationMemberInput,
   type SwitchCurrentOrganizationInput,
   toRepositoryContext,
-  type UpdateOrganizationMemberRoleInput,
 } from "@appaloft/application";
 import {
   ActiveDeployTokenByVerifierDigestSpec,
@@ -644,7 +644,7 @@ export class BetterAuthRuntime implements AuthRuntime {
 
   async updateMemberRole(
     context: ExecutionContext,
-    input: UpdateOrganizationMemberRoleInput,
+    input: ChangeOrganizationMemberRoleInput,
   ): Promise<Result<OrganizationMemberSummary>> {
     const headers = contextAuthHeaders(context);
     if (!headers) {
@@ -670,7 +670,7 @@ export class BetterAuthRuntime implements AuthRuntime {
       return err(
         productAuthForbidden(
           organizationTeamAuthInput("POST", "organization-role", input.organizationId),
-          "update-member-role-failed",
+          "change-member-role-failed",
         ),
       );
     }

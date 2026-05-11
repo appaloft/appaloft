@@ -1,11 +1,11 @@
 import {
+  ChangeOrganizationMemberRoleCommand,
   GetCurrentOrganizationContextQuery,
   InviteOrganizationMemberCommand,
   ListOrganizationInvitationsQuery,
   ListOrganizationMembersQuery,
   RemoveOrganizationMemberCommand,
   SwitchCurrentOrganizationCommand,
-  UpdateOrganizationMemberRoleCommand,
 } from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
@@ -119,7 +119,7 @@ const memberRoleCommand = EffectCommand.make(
   },
   ({ idempotencyKey, memberId, organizationId, role }) =>
     runCommand(
-      UpdateOrganizationMemberRoleCommand.create({
+      ChangeOrganizationMemberRoleCommand.create({
         organizationId,
         memberId,
         role,

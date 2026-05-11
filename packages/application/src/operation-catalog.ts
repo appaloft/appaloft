@@ -62,13 +62,13 @@ import { unlockEnvironmentCommandInputSchema } from "./operations/environments/u
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { listOperatorWorkQueryInputSchema } from "./operations/operator-work/list-operator-work.query";
 import { showOperatorWorkQueryInputSchema } from "./operations/operator-work/show-operator-work.query";
+import { changeOrganizationMemberRoleCommandInputSchema } from "./operations/organizations/change-organization-member-role.command";
 import { getCurrentOrganizationContextQueryInputSchema } from "./operations/organizations/get-current-organization-context.query";
 import { inviteOrganizationMemberCommandInputSchema } from "./operations/organizations/invite-organization-member.command";
 import { listOrganizationInvitationsQueryInputSchema } from "./operations/organizations/list-organization-invitations.query";
 import { listOrganizationMembersQueryInputSchema } from "./operations/organizations/list-organization-members.query";
 import { removeOrganizationMemberCommandInputSchema } from "./operations/organizations/remove-organization-member.command";
 import { switchCurrentOrganizationCommandInputSchema } from "./operations/organizations/switch-current-organization.command";
-import { updateOrganizationMemberRoleCommandInputSchema } from "./operations/organizations/update-organization-member-role.command";
 import { configurePreviewPolicyCommandInputSchema } from "./operations/preview-deployments/configure-preview-policy.command";
 import { deletePreviewEnvironmentCommandInputSchema } from "./operations/preview-deployments/delete-preview-environment.command";
 import { listPreviewEnvironmentsQueryInputSchema } from "./operations/preview-deployments/list-preview-environments.query";
@@ -304,14 +304,14 @@ export const operationCatalog = [
     },
   },
   {
-    key: "organizations.update-member-role",
+    key: "organizations.change-member-role",
     kind: "command",
     domain: "organizations",
-    messageName: "UpdateOrganizationMemberRoleCommand",
-    handlerName: "UpdateOrganizationMemberRoleCommandHandler",
-    serviceName: "UpdateOrganizationMemberRoleUseCase",
-    inputSchema: updateOrganizationMemberRoleCommandInputSchema,
-    serviceToken: tokens.updateOrganizationMemberRoleUseCase,
+    messageName: "ChangeOrganizationMemberRoleCommand",
+    handlerName: "ChangeOrganizationMemberRoleCommandHandler",
+    serviceName: "ChangeOrganizationMemberRoleUseCase",
+    inputSchema: changeOrganizationMemberRoleCommandInputSchema,
+    serviceToken: tokens.changeOrganizationMemberRoleUseCase,
     transports: {
       cli: "appaloft organization member role <memberId>",
       orpc: {

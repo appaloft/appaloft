@@ -4,6 +4,7 @@ import {
   type ArchiveResourceCommandInput,
   type BootstrapFirstAdminCommandInput,
   type BootstrapServerProxyCommandInput,
+  type ChangeOrganizationMemberRoleCommandInput,
   type CheckDomainBindingDeleteSafetyQueryInput,
   type CheckServerDeleteSafetyQueryInput,
   type CleanupPreviewCommandInput,
@@ -118,13 +119,13 @@ import {
   type UnlockEnvironmentCommandInput,
   type UnsetEnvironmentVariableCommandInput,
   type UnsetResourceVariableCommandInput,
-  type UpdateOrganizationMemberRoleCommandInput,
 } from "@appaloft/application/schemas";
 import {
   type ArchiveEnvironmentResponse,
   type ArchiveProjectResponse,
   type ArchiveResourceResponse,
   type BootstrapServerProxyResponse,
+  type ChangeOrganizationMemberRoleResponse,
   type CheckDomainBindingDeleteSafetyResponse,
   type CheckServerDeleteSafetyResponse,
   type CleanupPreviewResponse,
@@ -240,7 +241,6 @@ import {
   type TestServerConnectivityResponse,
   type UnlockEnvironmentResponse,
   type UnsetResourceVariableResponse,
-  type UpdateOrganizationMemberRoleResponse,
 } from "@appaloft/contracts";
 import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 
@@ -368,8 +368,8 @@ export type AppaloftOrpcClientContract = {
     >;
     updateMemberRole: Client<
       AppaloftClientContext,
-      UpdateOrganizationMemberRoleCommandInput,
-      UpdateOrganizationMemberRoleResponse,
+      ChangeOrganizationMemberRoleCommandInput,
+      ChangeOrganizationMemberRoleResponse,
       AppaloftClientError
     >;
     removeMember: Client<

@@ -28,6 +28,9 @@ apps/desktop/*
 
 **/.astro
 **/.appaloft
+!.appaloft/
+!.appaloft/docker-build/
+!.appaloft/docker-build/**
 **/.*.bun-build
 **/.svelte-kit
 **/.turbo

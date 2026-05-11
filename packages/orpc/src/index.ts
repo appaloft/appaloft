@@ -18,6 +18,7 @@ import {
   bindResourceDependencyCommandInputSchema,
   bootstrapFirstAdminCommandInputSchema,
   bootstrapServerProxyCommandInputSchema,
+  ChangeOrganizationMemberRoleCommand,
   CheckDomainBindingDeleteSafetyQuery,
   CheckServerDeleteSafetyQuery,
   CleanupPreviewCommand,
@@ -50,6 +51,7 @@ import {
   CreateScheduledTaskCommand,
   CreateSshCredentialCommand,
   CreateStorageVolumeCommand,
+  changeOrganizationMemberRoleCommandInputSchema,
   checkDomainBindingDeleteSafetyQueryInputSchema,
   checkServerDeleteSafetyQueryInputSchema,
   cleanupPreviewCommandInputSchema,
@@ -318,12 +320,10 @@ import {
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
   UnsetResourceVariableCommand,
-  UpdateOrganizationMemberRoleCommand,
   unbindResourceDependencyCommandInputSchema,
   unlockEnvironmentCommandInputSchema,
   unsetEnvironmentVariableCommandInputSchema,
   unsetResourceVariableCommandInputSchema,
-  updateOrganizationMemberRoleCommandInputSchema,
 } from "@appaloft/application";
 import {
   archiveEnvironmentResponseSchema,
@@ -332,6 +332,7 @@ import {
   attachResourceStorageResponseSchema,
   bindResourceDependencyResponseSchema,
   bootstrapServerProxyResponseSchema,
+  changeOrganizationMemberRoleResponseSchema,
   checkDomainBindingDeleteSafetyResponseSchema,
   checkServerDeleteSafetyResponseSchema,
   cleanupPreviewResponseSchema,
@@ -462,7 +463,6 @@ import {
   unbindResourceDependencyResponseSchema,
   unlockEnvironmentResponseSchema,
   unsetResourceVariableResponseSchema,
-  updateOrganizationMemberRoleResponseSchema,
 } from "@appaloft/contracts";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import {
@@ -1954,16 +1954,16 @@ export const inviteOrganizationMemberProcedure = base
     executeCommand(context, InviteOrganizationMemberCommand.create(input)),
   );
 
-export const updateOrganizationMemberRoleProcedure = base
+export const changeOrganizationMemberRoleProcedure = base
   .route({
     method: "POST",
     path: "/organizations/{organizationId}/members/{memberId}/role",
     successStatus: 200,
   })
-  .input(updateOrganizationMemberRoleCommandInputSchema)
-  .output(updateOrganizationMemberRoleResponseSchema)
+  .input(changeOrganizationMemberRoleCommandInputSchema)
+  .output(changeOrganizationMemberRoleResponseSchema)
   .handler(async ({ input, context }) =>
-    executeCommand(context, UpdateOrganizationMemberRoleCommand.create(input)),
+    executeCommand(context, ChangeOrganizationMemberRoleCommand.create(input)),
   );
 
 export const removeOrganizationMemberProcedure = base
@@ -3774,7 +3774,7 @@ export const appaloftOrpcRouter = {
     listMembers: listOrganizationMembersProcedure,
     listInvitations: listOrganizationInvitationsProcedure,
     inviteMember: inviteOrganizationMemberProcedure,
-    updateMemberRole: updateOrganizationMemberRoleProcedure,
+    updateMemberRole: changeOrganizationMemberRoleProcedure,
     removeMember: removeOrganizationMemberProcedure,
   },
   projects: {

@@ -36,7 +36,7 @@
 - [x] Position organization/team operations in `docs/BUSINESS_OPERATION_MAP.md`.
 - [x] Add accepted-candidate organization/team operations to `docs/CORE_OPERATIONS.md`.
 - [x] Add command/query specs for current context, member list, invitation list, invite member,
-  update member role, and remove member.
+  change member role, and remove member.
 - [x] Add command spec for current organization switching.
 - [x] Extend self-hosted product-auth and identity-governance test matrices.
 
@@ -48,7 +48,7 @@
 - [x] Add current-context query service and message/handler.
 - [x] Add switch-current use case and message/handler.
 - [x] Add list-members and list-invitations query services and messages/handlers.
-- [x] Add invite-member, update-member-role, and remove-member use cases plus messages/handlers.
+- [x] Add invite-member, change-member-role, and remove-member use cases plus messages/handlers.
 - [x] Implement organization/team ports in `@appaloft/auth-better`.
 - [x] Add safe persistence/read-model adapters where the auth adapter does not already own the read.
 - [x] Add operation-catalog entries and application exports.

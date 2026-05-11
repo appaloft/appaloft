@@ -3,6 +3,7 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 import { describe, expect, test } from "bun:test";
 import {
   type AppLogger,
+  ChangeOrganizationMemberRoleCommand,
   type Command,
   type CommandBus,
   createExecutionContext,
@@ -18,7 +19,6 @@ import {
   type QueryBus,
   RemoveOrganizationMemberCommand,
   SwitchCurrentOrganizationCommand,
-  UpdateOrganizationMemberRoleCommand,
 } from "@appaloft/application";
 import { err, ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
@@ -335,7 +335,7 @@ describe("organization/team HTTP/oRPC routes", () => {
           if (command instanceof InviteOrganizationMemberCommand) {
             return ok(invitationSummary() as T);
           }
-          if (command instanceof UpdateOrganizationMemberRoleCommand) {
+          if (command instanceof ChangeOrganizationMemberRoleCommand) {
             return ok(memberSummary({ role: "developer" }) as T);
           }
           if (command instanceof RemoveOrganizationMemberCommand) {
@@ -411,7 +411,7 @@ describe("organization/team HTTP/oRPC routes", () => {
     });
     expect(capturedCommands).toEqual([
       "InviteOrganizationMemberCommand",
-      "UpdateOrganizationMemberRoleCommand",
+      "ChangeOrganizationMemberRoleCommand",
       "RemoveOrganizationMemberCommand",
     ]);
   });

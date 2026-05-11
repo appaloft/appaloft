@@ -79,6 +79,10 @@ export * from "./operations/environments/unset-environment-variable.schema";
 export * from "./operations/operator-work/list-operator-work.schema";
 export * from "./operations/operator-work/show-operator-work.schema";
 export {
+  type ChangeOrganizationMemberRoleCommandInput,
+  changeOrganizationMemberRoleCommandInputSchema,
+} from "./operations/organizations/change-organization-member-role.command";
+export {
   type GetCurrentOrganizationContextQueryInput,
   getCurrentOrganizationContextQueryInputSchema,
 } from "./operations/organizations/get-current-organization-context.query";
@@ -102,10 +106,6 @@ export {
   type SwitchCurrentOrganizationCommandInput,
   switchCurrentOrganizationCommandInputSchema,
 } from "./operations/organizations/switch-current-organization.command";
-export {
-  type UpdateOrganizationMemberRoleCommandInput,
-  updateOrganizationMemberRoleCommandInputSchema,
-} from "./operations/organizations/update-organization-member-role.command";
 export {
   type ConfigurePreviewPolicyCommandInput,
   configurePreviewPolicyCommandInputSchema,

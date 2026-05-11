@@ -4646,7 +4646,7 @@ export interface InviteOrganizationMemberInput {
   idempotencyKey?: string;
 }
 
-export interface UpdateOrganizationMemberRoleInput {
+export interface ChangeOrganizationMemberRoleInput {
   organizationId: string;
   memberId: string;
   role: OrganizationTeamRole;
@@ -4684,7 +4684,7 @@ export interface OrganizationTeamManagementPort {
   ): Promise<Result<OrganizationInvitationSummary>>;
   updateMemberRole(
     context: ExecutionContext,
-    input: UpdateOrganizationMemberRoleInput,
+    input: ChangeOrganizationMemberRoleInput,
   ): Promise<Result<OrganizationMemberSummary>>;
   removeMember(
     context: ExecutionContext,

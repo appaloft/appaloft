@@ -127,8 +127,8 @@ export const tokens = {
   revokeDeployTokenUseCase: Symbol.for("appaloft.revoke_deploy_token_use_case"),
   rotateDeployTokenUseCase: Symbol.for("appaloft.rotate_deploy_token_use_case"),
   showDeployTokenQueryService: Symbol.for("appaloft.show_deploy_token_query_service"),
-  updateOrganizationMemberRoleUseCase: Symbol.for(
-    "appaloft.update_organization_member_role_use_case",
+  changeOrganizationMemberRoleUseCase: Symbol.for(
+    "appaloft.change_organization_member_role_use_case",
   ),
   listProjectsQueryService: Symbol.for("appaloft.list_projects_query_service"),
   renameProjectUseCase: Symbol.for("appaloft.rename_project_use_case"),

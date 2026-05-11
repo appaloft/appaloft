@@ -22,7 +22,7 @@
   - add command/query messages, handlers, and use cases/query services for
     `organizations.current-context`, `organizations.switch-current`,
     `organizations.list-members`, `organizations.list-invitations`, `organizations.invite-member`,
-    `organizations.update-member-role`, and `organizations.remove-member`;
+    `organizations.change-member-role`, and `organizations.remove-member`;
   - keep Better Auth out of application types and only depend on stable ports/tokens.
 - Auth adapter:
   - implement the application ports in `@appaloft/auth-better` with Better Auth organization,

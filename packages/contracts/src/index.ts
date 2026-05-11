@@ -200,7 +200,7 @@ export const listOrganizationInvitationsResponseSchema = z.object({
 });
 
 export const inviteOrganizationMemberResponseSchema = organizationInvitationSummarySchema;
-export const updateOrganizationMemberRoleResponseSchema = organizationMemberSummarySchema;
+export const changeOrganizationMemberRoleResponseSchema = organizationMemberSummarySchema;
 
 export const removeOrganizationMemberResponseSchema = z.object({
   memberId: z.string(),
@@ -4506,8 +4506,8 @@ export type ListOrganizationInvitationsResponse = z.infer<
 export type InviteOrganizationMemberResponse = z.infer<
   typeof inviteOrganizationMemberResponseSchema
 >;
-export type UpdateOrganizationMemberRoleResponse = z.infer<
-  typeof updateOrganizationMemberRoleResponseSchema
+export type ChangeOrganizationMemberRoleResponse = z.infer<
+  typeof changeOrganizationMemberRoleResponseSchema
 >;
 export type RemoveOrganizationMemberResponse = z.infer<
   typeof removeOrganizationMemberResponseSchema

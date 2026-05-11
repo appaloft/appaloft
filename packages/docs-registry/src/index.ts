@@ -2454,7 +2454,7 @@ export const publicDocsOperationCoverage = [
     topicId: "self-hosting.organization-team-management",
   },
   {
-    operationKey: "organizations.update-member-role",
+    operationKey: "organizations.change-member-role",
     status: "documented",
     topicId: "self-hosting.organization-team-management",
   },

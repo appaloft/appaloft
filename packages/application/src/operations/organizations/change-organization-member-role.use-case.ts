@@ -2,19 +2,19 @@ import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext } from "../../execution-context";
 import {
+  type ChangeOrganizationMemberRoleInput,
   type OrganizationTeamManagementPort,
-  type UpdateOrganizationMemberRoleInput,
 } from "../../ports";
 import { tokens } from "../../tokens";
 
 @injectable()
-export class UpdateOrganizationMemberRoleUseCase {
+export class ChangeOrganizationMemberRoleUseCase {
   constructor(
     @inject(tokens.organizationTeamManagementPort)
     private readonly organizationTeamManagement: OrganizationTeamManagementPort,
   ) {}
 
-  execute(context: ExecutionContext, input: UpdateOrganizationMemberRoleInput) {
+  execute(context: ExecutionContext, input: ChangeOrganizationMemberRoleInput) {
     return this.organizationTeamManagement.updateMemberRole(context, input);
   }
 }
