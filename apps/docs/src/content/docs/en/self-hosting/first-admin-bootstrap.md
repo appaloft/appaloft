@@ -51,9 +51,11 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- \
 The installer does not echo a supplied password. Do not place passwords in repository config, shell
 history, CI logs, issues, pull request comments, or deployment output.
 
-You can also open `/bootstrap/auth/first-admin` on the console after install. The page reads
-bootstrap status first; if the instance already has an admin, it sends you to `/login` instead of
-creating another account.
+If the installer did not receive a first-admin email, open the printed console URL after install.
+The console checks bootstrap status and sends first-time visitors to
+`/bootstrap/auth/first-admin`. You can also open that setup path directly. The page reads bootstrap
+status first; if the instance already has an admin, it sends you to `/login` instead of creating
+another account.
 
 CLI bootstrap uses the same application command/query path:
 

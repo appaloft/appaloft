@@ -532,6 +532,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     "/api/rpc/auth/bootstrapStatus": () => ({
       json: selfHostedAuthE2eBootstrapStatus(),
     }),
+    "/api/bootstrap/auth/status": () => selfHostedAuthE2eBootstrapStatus(),
     "/api/rpc/auth/bootstrapFirstAdmin": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as {
         displayName?: string;
@@ -2054,8 +2055,9 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/bootstrap/auth/first-admin`);
+      await view.navigate(`${previewUrl}/`);
 
+      await expectLocation(view, "/bootstrap/auth/first-admin");
       await expectAnyText(view, ["First admin setup", "首次管理员设置"]);
       await setInputValue(view, "input[type='email']", "admin@example.com");
       await setInputValue(view, "input[autocomplete='name']", "Admin User");

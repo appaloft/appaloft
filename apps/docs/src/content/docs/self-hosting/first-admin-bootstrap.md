@@ -51,8 +51,9 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- \
 安装器不会把你提供的密码回显到输出里。不要把密码写进仓库配置、shell history、CI 日志、issue、
 PR 评论或部署输出。
 
-也可以在安装后打开 console 的 `/bootstrap/auth/first-admin` 页面完成首次管理员设置。该页面会先读取
-bootstrap status；如果实例已经有管理员，会引导你去 `/login` 登录，而不会再次创建账号。
+如果安装器没有收到 first-admin email，安装后打开打印出来的 console URL 即可。console 会检查
+bootstrap status，并把首次访问者引导到 `/bootstrap/auth/first-admin`。你也可以直接打开这个设置路径。
+该页面会先读取 bootstrap status；如果实例已经有管理员，会引导你去 `/login` 登录，而不会再次创建账号。
 
 CLI bootstrap 走同一条 application command/query 路径：
 
