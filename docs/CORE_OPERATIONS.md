@@ -972,12 +972,14 @@ revoke now have application message handlers plus CLI and admin-protected HTTP/o
 operation-catalog transports. Web `/organization` now exposes deploy-token list/create/rotate/
 revoke through the same contracts. Future MCP token management remains a Phase 8 gap.
 
-Docker self-host installer bootstrap is a narrow install-time entrypoint over the existing
+Docker self-host installer bootstrap is a narrow optional install-time entrypoint over the existing
 `deploy-tokens.create` application command, not a public deploy-token management surface.
-`install.sh` configures a container-local `APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE`; Shell
-startup uses `ListDeployTokensQuery` and `CreateDeployTokenCommand` to write one-time raw token
-handoff output only when no active `org_self_hosted` deploy token exists, and the installer reads
-and removes that file before printing the token to trusted install output.
+`install.sh --bootstrap-deploy-token` configures a container-local
+`APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE`; Shell startup uses `ListDeployTokensQuery` and
+`CreateDeployTokenCommand` to write one-time raw token handoff output only when no active
+`org_self_hosted` deploy token exists, and the installer reads and removes that file before
+printing the token to trusted install output. Plain SSH install does not need or create a machine
+deploy token; admins can create one later from the console or CLI.
 
 Accepted candidate operations for Phase 8:
 - first-admin bootstrap and admin authorization policy

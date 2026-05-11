@@ -1761,9 +1761,11 @@ Current verification notes:
   `deploy-tokens.rotate`, and `deploy-tokens.revoke` command/handler classes plus operation-catalog
   entries. A read-side slice added `deploy-tokens.list` and `deploy-tokens.show` query/handler
   classes plus safe read-model catalog entries. A follow-up installer bootstrap slice added
-  `APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE` handoff support so Docker self-host installs create
-  an initial deploy token through application command/query dispatch, print the raw token once from
-  trusted install output, and stay idempotent after an active token exists. A follow-up lifecycle
+  optional `APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE` handoff support so Docker self-host installs
+  can explicitly create an initial deploy token through application command/query dispatch with
+  `--bootstrap-deploy-token`, print the raw token once from trusted install output, and stay
+  idempotent after an active token exists. Plain SSH install does not create a deploy token by
+  default. A follow-up lifecycle
   transport slice activated admin-protected HTTP/oRPC routes for deploy-token create/list/show/
   rotate/revoke, updated operation-catalog transport declarations, typed client contracts, public
   docs, and entrypoint tests. A follow-up CLI lifecycle slice added
@@ -1846,9 +1848,10 @@ Current verification notes:
   follow-up Action
   server-mode deploy probe in the same smoke signs in with the bootstrapped first-admin session,
   switches to the bootstrapped organization, creates project/environment/local-shell target/resource
-  context through the product HTTP API, submits a console deployment, then uses the
-  installer-generated deploy token against the self-hosted Action source-link endpoint and verifies
-  it returns `202 Accepted` with a `dep_...` deployment id instead of an `action_auth_*` failure.
+  context through the product HTTP API, submits a console deployment, then uses the explicitly
+  enabled installer-generated deploy token against the self-hosted Action source-link endpoint and
+  verifies it returns `202 Accepted` with a `dep_...` deployment id instead of an
+  `action_auth_*` failure.
   The smoke build skips runtime OpenSSH installation through a test-only Docker build argument. A
   normal default Dockerfile build was attempted on 2026-05-11 and reached shell/Web/docs/PGlite
   packaging, then was cancelled after the runtime `apt-get install openssh-client` layer stayed
@@ -1859,8 +1862,9 @@ Current verification notes:
 
 Required:
 
-- [x] Add self-hosted Action API authentication: installer-generated deploy token, bearer-token
-  verification on action mutation endpoints, token rotation/revocation, and clear 401/403 errors.
+- [x] Add self-hosted Action API authentication: optional installer-generated deploy token,
+  bearer-token verification on action mutation endpoints, token rotation/revocation, and clear
+  401/403 errors.
 - [x] Add scoped deploy tokens that can be limited to a project, environment, resource, source
   repository, or preview workflow, so multiple repositories can share one self-hosted instance
   without sharing a global mutation secret.

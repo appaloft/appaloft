@@ -29,6 +29,10 @@ installer/runtime config
 - Existing first-admin state makes bootstrap idempotent and suppresses raw password output.
 - Public product health/version/readiness endpoints remain public; ordinary product mutations become
   protected by product-session and organization-role policy after this gate is implemented.
+- When bootstrap is required, the HTTP adapter gates console document navigation before serving the
+  SPA shell. The gate redirects browser document requests for console routes to
+  `/bootstrap/auth/first-admin` and must not redirect API endpoints, docs routes, static assets,
+  ACME challenges, or the first-admin route itself.
 
 ## Error Phases
 

@@ -8,13 +8,16 @@ protects GitHub Action mutation endpoints with Appaloft deploy tokens.
 The installer/bootstrap subflow is:
 
 ```text
-install.sh
+install.sh --bootstrap-deploy-token
   -> starts the self-hosted app container with APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE
   -> Shell startup queries active deploy tokens for org_self_hosted
   -> if none exists, dispatches CreateDeployTokenCommand
   -> writes one-time raw token handoff output to the configured container-local file
   -> install.sh reads and removes that file, then prints the token in trusted install output
 ```
+
+Plain SSH install does not create a deploy token by default. Operators create one later from the
+console/CLI, or opt into this one-time handoff with `--bootstrap-deploy-token`.
 
 When an active token already exists, the handoff output must omit raw token material and report safe
 metadata only.

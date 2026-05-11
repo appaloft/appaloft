@@ -98,6 +98,26 @@ test("[SELF-AUTH-TOKEN-001] installer bootstrap writes one-time deploy token out
   }
 });
 
+test("[SELF-AUTH-TOKEN-001] installer bootstrap skips deploy token when no handoff file is configured", async () => {
+  const result = await writeBootstrapDeployTokenOutput({
+    config: resolveConfig({}),
+    commandBus: {
+      execute: async () => {
+        throw new Error("command bus should not run without deploy-token bootstrap output file");
+      },
+    } as unknown as CommandBus,
+    queryBus: {
+      execute: async () => {
+        throw new Error("query bus should not run without deploy-token bootstrap output file");
+      },
+    } as unknown as QueryBus,
+    executionContextFactory,
+  });
+
+  expect(result.isOk()).toBe(true);
+  expect(result._unsafeUnwrap()).toBeNull();
+});
+
 test("[SELF-AUTH-TOKEN-001] installer bootstrap is idempotent after an active token exists", async () => {
   const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-deploy-token-bootstrap-"));
 

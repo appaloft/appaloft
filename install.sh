@@ -16,7 +16,8 @@ APPALOFT_EDGE_NETWORK_NAME="${APPALOFT_EDGE_NETWORK_NAME:-appaloft-edge}"
 APPALOFT_TRAEFIK_IMAGE="${APPALOFT_TRAEFIK_IMAGE:-traefik:v3.6.2}"
 APPALOFT_POSTGRES_IMAGE="${APPALOFT_POSTGRES_IMAGE:-postgres:16}"
 APPALOFT_POSTGRES_PASSWORD="${APPALOFT_POSTGRES_PASSWORD:-}"
-APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE="${APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE:-/tmp/appaloft-bootstrap/deploy-token.json}"
+APPALOFT_BOOTSTRAP_DEPLOY_TOKEN="${APPALOFT_BOOTSTRAP_DEPLOY_TOKEN:-0}"
+APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE="${APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE:-}"
 APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE="${APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE:-/tmp/appaloft-bootstrap/first-admin.json}"
 APPALOFT_BETTER_AUTH_SECRET="${APPALOFT_BETTER_AUTH_SECRET:-}"
 APPALOFT_FIRST_ADMIN_EMAIL="${APPALOFT_FIRST_ADMIN_EMAIL:-}"
@@ -107,6 +108,9 @@ print_next_steps() {
   printf '  %sOAuth later:%s configure GitHub, Google, or OIDC client settings and rerun; local first-admin login keeps working until then.\n' \
     "$appaloft_color_bold" \
     "$appaloft_color_reset"
+  printf '  %sGitHub Action token:%s create one later in the console, or rerun with --bootstrap-deploy-token to print a one-time APPALOFT_TOKEN handoff.\n' \
+    "$appaloft_color_bold" \
+    "$appaloft_color_reset"
   if [ -n "$APPALOFT_CONSOLE_DOMAIN" ]; then
     printf '  %sDNS:%s           keep %s pointed at this server.\n' \
       "$appaloft_color_bold" \
@@ -140,6 +144,7 @@ Options:
   --proxy <traefik|none>            Managed self-host proxy. Defaults to traefik.
   --postgres-password <password>   PostgreSQL password. Existing installs reuse .env.
   --auth-secret <secret>           Product auth session secret. Existing installs reuse .env.
+  --bootstrap-deploy-token         Create an initial GitHub Action deploy token and print it once.
   --first-admin-email <email>       Create the first local admin during install.
   --first-admin-name <name>         Display name for the first local admin.
   --first-admin-password <password> Password for the first local admin. Generated if omitted.
@@ -170,6 +175,7 @@ Environment:
   APPALOFT_POSTGRES_IMAGE
   APPALOFT_POSTGRES_PASSWORD
   APPALOFT_BETTER_AUTH_SECRET
+  APPALOFT_BOOTSTRAP_DEPLOY_TOKEN=1
   APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE
   APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE
   APPALOFT_FIRST_ADMIN_EMAIL
@@ -294,6 +300,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --auth-secret=* | --better-auth-secret=*)
       APPALOFT_BETTER_AUTH_SECRET="${1#*=}"
+      ;;
+    --bootstrap-deploy-token)
+      APPALOFT_BOOTSTRAP_DEPLOY_TOKEN=1
+      if [ -z "$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE" ]; then
+        APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE="/tmp/appaloft-bootstrap/deploy-token.json"
+      fi
       ;;
     --first-admin-email)
       shift
@@ -1060,6 +1072,7 @@ APPALOFT_SELF_HOST_PROXY=$APPALOFT_SELF_HOST_PROXY
 APPALOFT_EDGE_NETWORK_NAME=$APPALOFT_EDGE_NETWORK_NAME
 APPALOFT_TRAEFIK_IMAGE=$APPALOFT_TRAEFIK_IMAGE
 APPALOFT_SWARM_STACK_NAME=$APPALOFT_SWARM_STACK_NAME
+APPALOFT_BOOTSTRAP_DEPLOY_TOKEN=$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN
 APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE=$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE
 APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE=$APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE
 APPALOFT_FIRST_ADMIN_EMAIL=$APPALOFT_FIRST_ADMIN_EMAIL
@@ -1084,6 +1097,7 @@ APPALOFT_EDGE_NETWORK_NAME=$APPALOFT_EDGE_NETWORK_NAME
 APPALOFT_TRAEFIK_IMAGE=$APPALOFT_TRAEFIK_IMAGE
 APPALOFT_SWARM_STACK_NAME=$APPALOFT_SWARM_STACK_NAME
 APPALOFT_POSTGRES_IMAGE=$APPALOFT_POSTGRES_IMAGE
+APPALOFT_BOOTSTRAP_DEPLOY_TOKEN=$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN
 APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE=$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE
 APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE=$APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE
 APPALOFT_FIRST_ADMIN_EMAIL=$APPALOFT_FIRST_ADMIN_EMAIL
@@ -1255,7 +1269,8 @@ swarm_app_container_id() {
 }
 
 read_bootstrap_deploy_token_output() {
-  step "Reading deploy token bootstrap output"
+  [ "$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN" = "1" ] || return 0
+
   bootstrap_reader='file="$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE"; if [ -r "$file" ]; then cat "$file"; rm -f "$file"; fi'
 
   if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
@@ -1270,12 +1285,10 @@ read_bootstrap_deploy_token_output() {
   [ -n "$bootstrap_output" ] ||
     fail "could not read deploy token bootstrap output from the Appaloft app container"
 
-  printf '%s\n' "$bootstrap_output"
-  say "Store the token value in GitHub Secrets as APPALOFT_TOKEN. It is shown only during bootstrap."
+  appaloft_bootstrap_deploy_token_output="$bootstrap_output"
 }
 
 read_bootstrap_first_admin_output() {
-  step "Reading first-admin bootstrap output"
   bootstrap_reader='file="$APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE"; if [ -r "$file" ]; then cat "$file"; rm -f "$file"; fi'
 
   if [ "$APPALOFT_SELF_HOST_ORCHESTRATOR" = "swarm" ]; then
@@ -1290,8 +1303,17 @@ read_bootstrap_first_admin_output() {
   [ -n "$bootstrap_output" ] ||
     fail "could not read first-admin bootstrap output from the Appaloft app container"
 
-  printf '%s\n' "$bootstrap_output"
-  case "$bootstrap_output" in
+  appaloft_bootstrap_first_admin_output="$bootstrap_output"
+}
+
+print_first_use_handoff() {
+  step "First-use handoff"
+
+  if [ -n "${appaloft_bootstrap_first_admin_output:-}" ]; then
+    printf '%s\n' "$appaloft_bootstrap_first_admin_output"
+  fi
+
+  case "${appaloft_bootstrap_first_admin_output:-}" in
     *'"generatedPassword"'*)
       say "Use the generated first-admin password above for the first console login. It is shown only during bootstrap."
       ;;
@@ -1302,12 +1324,34 @@ read_bootstrap_first_admin_output() {
       say "First-admin bootstrap status is shown above. Supplied passwords are never printed."
       ;;
   esac
+
+  if [ -n "${appaloft_bootstrap_deploy_token_output:-}" ]; then
+    printf '%s\n' "$appaloft_bootstrap_deploy_token_output"
+    say "Store the token value in GitHub Secrets as APPALOFT_TOKEN. It is shown only during bootstrap."
+  else
+    say "No GitHub Action deploy token was created during install. Create one later in the console or rerun with --bootstrap-deploy-token."
+  fi
 }
 
 validate_port
 validate_database
 validate_orchestrator
 validate_proxy
+case "$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN" in
+  1 | true | TRUE | yes | YES | on | ON)
+    APPALOFT_BOOTSTRAP_DEPLOY_TOKEN=1
+    if [ -z "$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE" ]; then
+      APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE="/tmp/appaloft-bootstrap/deploy-token.json"
+    fi
+    ;;
+  "" | 0 | false | FALSE | no | NO | off | OFF)
+    APPALOFT_BOOTSTRAP_DEPLOY_TOKEN=0
+    APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE=""
+    ;;
+  *)
+    fail "APPALOFT_BOOTSTRAP_DEPLOY_TOKEN must be 1 or 0"
+    ;;
+esac
 raw_appaloft_console_domain="$APPALOFT_CONSOLE_DOMAIN"
 APPALOFT_CONSOLE_DOMAIN="$(sanitize_domain "$APPALOFT_CONSOLE_DOMAIN")"
 if [ -n "$raw_appaloft_console_domain" ] && [ -z "$APPALOFT_CONSOLE_DOMAIN" ]; then
@@ -1443,4 +1487,5 @@ fi
 
 step "Appaloft install completed"
 print_success_banner
+print_first_use_handoff
 print_next_steps "$appaloft_logs_command"

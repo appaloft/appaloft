@@ -32,7 +32,10 @@ and it should not be committed to repository config, workflow file text, URL que
 <h2 id="self-hosting-action-token-setup">Save the GitHub Secret after install</h2>
 
 The Docker installer prints bootstrap JSON after the Appaloft container becomes healthy. The
-`token` field appears only when the token is created:
+Plain SSH install does not create an Action deploy token by default. If you need GitHub Action
+server API mode immediately, pass `--bootstrap-deploy-token` during install. The installer prints a
+bootstrap JSON after the Appaloft container is healthy, and the `token` field appears only when the
+token is created:
 
 ```json
 {

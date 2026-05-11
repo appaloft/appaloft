@@ -376,6 +376,7 @@ async function runFullInstallSmoke(): Promise<void> {
         "--project-name",
         projectName,
         "--skip-docker-install",
+        "--bootstrap-deploy-token",
         "--first-admin-email",
         "admin@example.com",
         "--first-admin-name",

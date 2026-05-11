@@ -130,12 +130,13 @@ workflows without requiring external OAuth or an interactive user session.
   operation-catalog transport declarations, typed client contract coverage, and admin-protected
   HTTP/oRPC routes, CLI commands, and Web `/organization` management surfaces. They return safe
   deploy-token summaries without raw token or verifier values.
-- Docker self-host installer bootstrap now configures
-  `APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE`. Shell startup treats that file as an installer-only
-  handoff, queries for an existing active `org_self_hosted` deploy token, dispatches
-  `CreateDeployTokenCommand` only when one does not exist, writes raw token material to the handoff
-  once, and lets `install.sh` read, remove, and print it to trusted install output. Existing active
-  tokens produce safe metadata without raw token material.
+- Docker self-host installer bootstrap can opt into deploy-token handoff with
+  `--bootstrap-deploy-token`, which configures `APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE`. Shell
+  startup treats that file as an installer-only handoff, queries for an existing active
+  `org_self_hosted` deploy token, dispatches `CreateDeployTokenCommand` only when one does not
+  exist, writes raw token material to the handoff once, and lets `install.sh` read, remove, and
+  print it to trusted install output. Existing active tokens produce safe metadata without raw token
+  material. Plain SSH install does not create a deploy token by default.
 - Concrete future MCP token management descriptors remain a named Phase 8 migration gap.
 - Public docs now cover installer bootstrap output, `APPALOFT_TOKEN` GitHub Secret wiring,
   deploy-token scope meaning, `401`/`403` recovery, and CLI plus admin-protected lifecycle

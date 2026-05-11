@@ -32,7 +32,9 @@ string 或日志。
 
 <h2 id="self-hosting-action-token-setup">安装后保存 GitHub Secret</h2>
 
-Docker 安装器会在 Appaloft 容器健康后打印一次 bootstrap JSON。`token` 字段只在首次创建时出现：
+普通 SSH 安装不会自动创建 Action deploy token。需要立刻接入 GitHub Action server API 模式时，
+安装时传 `--bootstrap-deploy-token`，Docker 安装器会在 Appaloft 容器健康后打印一次 bootstrap
+JSON。`token` 字段只在首次创建时出现：
 
 ```json
 {

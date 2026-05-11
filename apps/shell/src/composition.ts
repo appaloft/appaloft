@@ -411,14 +411,16 @@ export async function createAppComposition(
     idGenerator,
     tracer: telemetry.tracer,
   });
-  const bootstrapDeployTokenOutput = await writeBootstrapDeployTokenOutput({
-    config,
-    commandBus,
-    queryBus,
-    executionContextFactory,
-  });
-  if (bootstrapDeployTokenOutput.isErr()) {
-    throw new Error(bootstrapDeployTokenOutput.error.message);
+  if (config.bootstrapDeployTokenOutputFile) {
+    const bootstrapDeployTokenOutput = await writeBootstrapDeployTokenOutput({
+      config,
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+    if (bootstrapDeployTokenOutput.isErr()) {
+      throw new Error(bootstrapDeployTokenOutput.error.message);
+    }
   }
   const bootstrapFirstAdminOutput = await writeBootstrapFirstAdminOutput({
     config,
