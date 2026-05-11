@@ -2,6 +2,7 @@ import {
   type ArchiveEnvironmentCommandInput,
   type ArchiveProjectCommandInput,
   type ArchiveResourceCommandInput,
+  type BootstrapFirstAdminCommandInput,
   type BootstrapServerProxyCommandInput,
   type CheckDomainBindingDeleteSafetyQueryInput,
   type CheckServerDeleteSafetyQueryInput,
@@ -21,6 +22,7 @@ import {
   type ConfigureServerEdgeProxyCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
   type CreateDeploymentCommandInput,
+  type CreateDeployTokenCommandInput,
   type CreateDomainBindingCommandInput,
   type CreateEnvironmentCommandInput,
   type CreateProjectCommandInput,
@@ -40,16 +42,22 @@ import {
   type DeploymentRecoveryReadinessQueryInput,
   type DiffEnvironmentsQueryInput,
   type EnvironmentEffectivePrecedenceQueryInput,
+  type GetAuthBootstrapStatusQueryInput,
+  type GetCurrentOrganizationContextQueryInput,
   type ImportCertificateCommandInput,
   type ImportResourceVariablesCommandInput,
+  type InviteOrganizationMemberCommandInput,
   type IssueOrRenewCertificateCommandInput,
   type ListCertificatesQueryInput,
   type ListDefaultAccessDomainPoliciesQueryInput,
   type ListDeploymentsQueryInput,
+  type ListDeployTokensQueryInput,
   type ListDomainBindingsQueryInput,
   type ListEnvironmentsQueryInput,
   type ListGitHubRepositoriesQueryInput,
   type ListOperatorWorkQueryInput,
+  type ListOrganizationInvitationsQueryInput,
+  type ListOrganizationMembersQueryInput,
   type ListPreviewEnvironmentsQueryInput,
   type ListResourcesQueryInput,
   type ListScheduledTaskRunsQueryInput,
@@ -62,6 +70,7 @@ import {
   type RedeployDeploymentCommandInput,
   type RegisterServerCommandInput,
   type RelinkSourceLinkCommandInput,
+  type RemoveOrganizationMemberCommandInput,
   type RenameEnvironmentCommandInput,
   type RenameProjectCommandInput,
   type RenameServerCommandInput,
@@ -76,7 +85,9 @@ import {
   type RetryDeploymentCommandInput,
   type RetryDomainBindingVerificationCommandInput,
   type RevokeCertificateCommandInput,
+  type RevokeDeployTokenCommandInput,
   type RollbackDeploymentCommandInput,
+  type RotateDeployTokenCommandInput,
   type RotateSshCredentialCommandInput,
   type RunScheduledTaskNowCommandInput,
   type ScheduledTaskRunLogsQueryInput,
@@ -85,6 +96,7 @@ import {
   type ShowCertificateQueryInput,
   type ShowDefaultAccessDomainPolicyQueryInput,
   type ShowDeploymentQueryInput,
+  type ShowDeployTokenQueryInput,
   type ShowDomainBindingQueryInput,
   type ShowEnvironmentQueryInput,
   type ShowOperatorWorkQueryInput,
@@ -100,11 +112,13 @@ import {
   type StartResourceRuntimeCommandInput,
   type StopResourceRuntimeCommandInput,
   type StreamDeploymentEventsQueryInput,
+  type SwitchCurrentOrganizationCommandInput,
   type TestDraftServerConnectivityCommandInput,
   type TestRegisteredServerConnectivityCommandInput,
   type UnlockEnvironmentCommandInput,
   type UnsetEnvironmentVariableCommandInput,
   type UnsetResourceVariableCommandInput,
+  type UpdateOrganizationMemberRoleCommandInput,
 } from "@appaloft/application/schemas";
 import {
   type ArchiveEnvironmentResponse,
@@ -127,11 +141,13 @@ import {
   type ConfigureServerEdgeProxyResponse,
   type ConfirmDomainBindingOwnershipResponse,
   type CreateDeploymentResponse,
+  type CreateDeployTokenResponse,
   type CreateDomainBindingResponse,
   type CreateEnvironmentResponse,
   type CreateProjectResponse,
   type CreateResourceResponse,
   type CreateSshCredentialResponse,
+  type CurrentOrganizationContextResponse,
   type DeactivateServerResponse,
   type DeleteCertificateResponse,
   type DeleteDomainBindingResponse,
@@ -152,14 +168,18 @@ import {
   type EnvironmentSummary,
   type ImportCertificateResponse,
   type ImportResourceVariablesResponse,
+  type InviteOrganizationMemberResponse,
   type IssueOrRenewCertificateResponse,
   type ListCertificatesResponse,
   type ListDefaultAccessDomainPoliciesResponse,
   type ListDeploymentsResponse,
+  type ListDeployTokensResponse,
   type ListDomainBindingsResponse,
   type ListEnvironmentsResponse,
   type ListGitHubRepositoriesResponse,
   type ListOperatorWorkResponse,
+  type ListOrganizationInvitationsResponse,
+  type ListOrganizationMembersResponse,
   type ListPluginsResponse,
   type ListPreviewEnvironmentsResponse,
   type ListProjectsResponse,
@@ -175,6 +195,7 @@ import {
   type ProxyConfigurationView,
   type RedeployDeploymentResponse,
   type RegisterServerResponse,
+  type RemoveOrganizationMemberResponse,
   type RenameEnvironmentResponse,
   type RenameProjectResponse,
   type RenameServerResponse,
@@ -191,7 +212,9 @@ import {
   type RetryDeploymentResponse,
   type RetryDomainBindingVerificationResponse,
   type RevokeCertificateResponse,
+  type RevokeDeployTokenResponse,
   type RollbackDeploymentResponse,
+  type RotateDeployTokenResponse,
   type RotateSshCredentialResponse,
   type RunScheduledTaskNowResponse,
   type ScheduledTaskCommandResponse,
@@ -200,6 +223,7 @@ import {
   type ShowCertificateResponse,
   type ShowDefaultAccessDomainPolicyResponse,
   type ShowDeploymentResponse,
+  type ShowDeployTokenResponse,
   type ShowDomainBindingResponse,
   type ShowOperatorWorkResponse,
   type ShowPreviewEnvironmentResponse,
@@ -216,6 +240,7 @@ import {
   type TestServerConnectivityResponse,
   type UnlockEnvironmentResponse,
   type UnsetResourceVariableResponse,
+  type UpdateOrganizationMemberRoleResponse,
 } from "@appaloft/contracts";
 import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 
@@ -230,7 +255,130 @@ export interface RelinkSourceLinkResponse {
   destinationId?: string;
 }
 
+export type ProductLoginMethodKey = "local-password" | "github" | "google" | "oidc";
+
+export interface ProductLoginMethodStatus {
+  key: ProductLoginMethodKey;
+  configured: boolean;
+  enabled: boolean;
+  reason?: string;
+}
+
+export interface AuthBootstrapStatusResponse {
+  bootstrapRequired: boolean;
+  firstAdminConfigured: boolean;
+  organizationConfigured: boolean;
+  loginMethods: ProductLoginMethodStatus[];
+  firstAdminEmail?: string;
+  loginUrl?: string;
+  organizationId?: string;
+  organizationSlug?: string;
+  nextSteps?: string[];
+}
+
+export interface BootstrapFirstAdminResponse {
+  bootstrapRequired: false;
+  created: boolean;
+  email: string;
+  loginMethods: ProductLoginMethodStatus[];
+  organizationId: string;
+  organizationSlug: string;
+  userId: string;
+  generatedPassword?: string;
+  loginUrl?: string;
+}
+
 export type AppaloftOrpcClientContract = {
+  auth: {
+    bootstrapStatus: Client<
+      AppaloftClientContext,
+      GetAuthBootstrapStatusQueryInput,
+      AuthBootstrapStatusResponse,
+      AppaloftClientError
+    >;
+    bootstrapFirstAdmin: Client<
+      AppaloftClientContext,
+      BootstrapFirstAdminCommandInput,
+      BootstrapFirstAdminResponse,
+      AppaloftClientError
+    >;
+  };
+  deployTokens: {
+    create: Client<
+      AppaloftClientContext,
+      CreateDeployTokenCommandInput,
+      CreateDeployTokenResponse,
+      AppaloftClientError
+    >;
+    list: Client<
+      AppaloftClientContext,
+      ListDeployTokensQueryInput,
+      ListDeployTokensResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowDeployTokenQueryInput,
+      ShowDeployTokenResponse,
+      AppaloftClientError
+    >;
+    rotate: Client<
+      AppaloftClientContext,
+      RotateDeployTokenCommandInput,
+      RotateDeployTokenResponse,
+      AppaloftClientError
+    >;
+    revoke: Client<
+      AppaloftClientContext,
+      RevokeDeployTokenCommandInput,
+      RevokeDeployTokenResponse,
+      AppaloftClientError
+    >;
+  };
+  organizations: {
+    currentContext: Client<
+      AppaloftClientContext,
+      GetCurrentOrganizationContextQueryInput,
+      CurrentOrganizationContextResponse,
+      AppaloftClientError
+    >;
+    switchCurrent: Client<
+      AppaloftClientContext,
+      SwitchCurrentOrganizationCommandInput,
+      CurrentOrganizationContextResponse,
+      AppaloftClientError
+    >;
+    listMembers: Client<
+      AppaloftClientContext,
+      ListOrganizationMembersQueryInput,
+      ListOrganizationMembersResponse,
+      AppaloftClientError
+    >;
+    listInvitations: Client<
+      AppaloftClientContext,
+      ListOrganizationInvitationsQueryInput,
+      ListOrganizationInvitationsResponse,
+      AppaloftClientError
+    >;
+    inviteMember: Client<
+      AppaloftClientContext,
+      InviteOrganizationMemberCommandInput,
+      InviteOrganizationMemberResponse,
+      AppaloftClientError
+    >;
+    updateMemberRole: Client<
+      AppaloftClientContext,
+      UpdateOrganizationMemberRoleCommandInput,
+      UpdateOrganizationMemberRoleResponse,
+      AppaloftClientError
+    >;
+    removeMember: Client<
+      AppaloftClientContext,
+      RemoveOrganizationMemberCommandInput,
+      RemoveOrganizationMemberResponse,
+      AppaloftClientError
+    >;
+  };
   projects: {
     list: Client<AppaloftClientContext, undefined, ListProjectsResponse, AppaloftClientError>;
     create: Client<

@@ -1,3 +1,11 @@
+export {
+  type BootstrapFirstAdminCommandInput,
+  bootstrapFirstAdminCommandInputSchema,
+} from "./operations/auth/bootstrap-first-admin.schema";
+export {
+  type GetAuthBootstrapStatusQueryInput,
+  getAuthBootstrapStatusQueryInputSchema,
+} from "./operations/auth/get-auth-bootstrap-status.query";
 export * from "./operations/certificates/delete-certificate.schema";
 export * from "./operations/certificates/import-certificate.schema";
 export * from "./operations/certificates/issue-or-renew-certificate.schema";
@@ -16,6 +24,26 @@ export * from "./operations/dependency-resources/provision-postgres-dependency-r
 export * from "./operations/dependency-resources/provision-redis-dependency-resource.schema";
 export * from "./operations/dependency-resources/rename-dependency-resource.schema";
 export * from "./operations/dependency-resources/show-dependency-resource.schema";
+export {
+  type CreateDeployTokenCommandInput,
+  createDeployTokenCommandInputSchema,
+} from "./operations/deploy-tokens/create-deploy-token.schema";
+export {
+  type ListDeployTokensQueryInput,
+  listDeployTokensQueryInputSchema,
+} from "./operations/deploy-tokens/list-deploy-tokens.schema";
+export {
+  type RevokeDeployTokenCommandInput,
+  revokeDeployTokenCommandInputSchema,
+} from "./operations/deploy-tokens/revoke-deploy-token.schema";
+export {
+  type RotateDeployTokenCommandInput,
+  rotateDeployTokenCommandInputSchema,
+} from "./operations/deploy-tokens/rotate-deploy-token.schema";
+export {
+  type ShowDeployTokenQueryInput,
+  showDeployTokenQueryInputSchema,
+} from "./operations/deploy-tokens/show-deploy-token.schema";
 export * from "./operations/deployments/cleanup-preview.schema";
 export * from "./operations/deployments/create-deployment.schema";
 export * from "./operations/deployments/deployment-logs.schema";
@@ -50,6 +78,34 @@ export * from "./operations/environments/unlock-environment.schema";
 export * from "./operations/environments/unset-environment-variable.schema";
 export * from "./operations/operator-work/list-operator-work.schema";
 export * from "./operations/operator-work/show-operator-work.schema";
+export {
+  type GetCurrentOrganizationContextQueryInput,
+  getCurrentOrganizationContextQueryInputSchema,
+} from "./operations/organizations/get-current-organization-context.query";
+export {
+  type InviteOrganizationMemberCommandInput,
+  inviteOrganizationMemberCommandInputSchema,
+} from "./operations/organizations/invite-organization-member.command";
+export {
+  type ListOrganizationInvitationsQueryInput,
+  listOrganizationInvitationsQueryInputSchema,
+} from "./operations/organizations/list-organization-invitations.query";
+export {
+  type ListOrganizationMembersQueryInput,
+  listOrganizationMembersQueryInputSchema,
+} from "./operations/organizations/list-organization-members.query";
+export {
+  type RemoveOrganizationMemberCommandInput,
+  removeOrganizationMemberCommandInputSchema,
+} from "./operations/organizations/remove-organization-member.command";
+export {
+  type SwitchCurrentOrganizationCommandInput,
+  switchCurrentOrganizationCommandInputSchema,
+} from "./operations/organizations/switch-current-organization.command";
+export {
+  type UpdateOrganizationMemberRoleCommandInput,
+  updateOrganizationMemberRoleCommandInputSchema,
+} from "./operations/organizations/update-organization-member-role.command";
 export {
   type ConfigurePreviewPolicyCommandInput,
   configurePreviewPolicyCommandInputSchema,

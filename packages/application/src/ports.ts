@@ -19,6 +19,11 @@ import {
   type DeploymentStatus,
   type DeploymentTargetState,
   type DeploymentTriggerKind,
+  type DeployToken,
+  type DeployTokenMutationSpec,
+  type DeployTokenSecretSuffix,
+  type DeployTokenSelectionSpec,
+  type DeployTokenVerifierDigest,
   type Destination,
   type DestinationKind,
   type DestinationMutationSpec,
@@ -90,7 +95,11 @@ import {
   type VariableExposure,
   type VariableKind,
 } from "@appaloft/core";
-import { type ExecutionContext, type RepositoryContext } from "./execution-context";
+import {
+  type ExecutionActor,
+  type ExecutionContext,
+  type RepositoryContext,
+} from "./execution-context";
 import {
   type AppliedRouteContextMetadata,
   type ResourceAccessFailureDiagnostic,
@@ -508,6 +517,62 @@ export interface ResourceDependencyBindingRepository {
     resourceBinding: ResourceBinding,
     spec: ResourceBindingMutationSpec,
   ): Promise<void>;
+}
+
+export interface DeployTokenRepository {
+  findOne(context: RepositoryContext, spec: DeployTokenSelectionSpec): Promise<DeployToken | null>;
+  upsert(
+    context: RepositoryContext,
+    deployToken: DeployToken,
+    spec: DeployTokenMutationSpec,
+  ): Promise<void>;
+  updateOne(
+    context: RepositoryContext,
+    deployToken: DeployToken,
+    spec: DeployTokenMutationSpec,
+  ): Promise<boolean>;
+}
+
+export interface DeployTokenScopeSummary {
+  deploymentTargetIds: string[];
+  environmentIds: string[];
+  projectIds: string[];
+  repositoryFullNames: string[];
+  resourceIds: string[];
+  workflowCommands: ActionDeployTokenWorkflow[];
+}
+
+export interface DeployTokenSummary {
+  tokenId: string;
+  organizationId: string;
+  displayName: string;
+  status: "active" | "revoked";
+  secretSuffix: string;
+  scope: DeployTokenScopeSummary;
+  createdAt: string;
+  expiresAt?: string;
+  lastUsedAt?: string;
+  rotatedAt?: string;
+  revokedAt?: string;
+}
+
+export interface DeployTokenListInput {
+  organizationId: string;
+  limit?: number;
+  repositoryFullName?: string;
+  resourceId?: string;
+  status?: "active" | "revoked";
+}
+
+export interface DeployTokenReadModel {
+  list(context: RepositoryContext, input: DeployTokenListInput): Promise<DeployTokenSummary[]>;
+  findOne(
+    context: RepositoryContext,
+    input: {
+      organizationId: string;
+      tokenId: string;
+    },
+  ): Promise<DeployTokenSummary | null>;
 }
 
 export type DependencyResourceDeleteBlockerKind =
@@ -4442,6 +4507,201 @@ export interface SourceEventVerificationPort {
   ): Promise<Result<VerifiedSourceEventInput>>;
 }
 
+export type ActionDeployTokenWorkflow =
+  | "preview-cleanup"
+  | "server-config-deploy"
+  | "source-link-deploy";
+
+export interface ActionDeployTokenRequestedScope {
+  environmentId?: string;
+  projectId?: string;
+  repositoryFullName?: string;
+  resourceId?: string;
+  serverId?: string;
+}
+
+export interface ActionDeployTokenAuthorizationInput {
+  method: string;
+  path: string;
+  requestedScope?: ActionDeployTokenRequestedScope;
+  token: string;
+  workflow: ActionDeployTokenWorkflow;
+}
+
+export interface ActionDeployTokenAuthorizationResult {
+  actor: ExecutionActor;
+  organizationId?: string;
+}
+
+export interface ActionDeployTokenAuthorizationPort {
+  authorize(
+    context: ExecutionContext,
+    input: ActionDeployTokenAuthorizationInput,
+  ): Promise<Result<ActionDeployTokenAuthorizationResult>>;
+}
+
+export type ProductOrganizationRole = "admin" | "member" | "owner";
+
+export interface ProductSessionAuthorizationInput {
+  authorizationHeader?: string;
+  cookieHeader?: string;
+  method: string;
+  organizationId?: string;
+  path: string;
+  requiredRole: ProductOrganizationRole;
+}
+
+export interface ProductSessionAuthorizationResult {
+  actor: ExecutionActor;
+  email?: string;
+  organizationId: string;
+  role: ProductOrganizationRole;
+  userId: string;
+}
+
+export interface ProductSessionAuthorizationPort {
+  authorizeProductSession(
+    context: ExecutionContext,
+    input: ProductSessionAuthorizationInput,
+  ): Promise<Result<ProductSessionAuthorizationResult>>;
+}
+
+export type OrganizationTeamRole = "admin" | "billing" | "developer" | "owner" | "viewer";
+
+export interface OrganizationCurrentUserSummary {
+  userId: string;
+  email: string;
+  displayName?: string;
+  avatarUrl?: string;
+}
+
+export interface OrganizationContextOrganizationSummary {
+  organizationId: string;
+  name: string;
+  slug: string;
+  role: OrganizationTeamRole;
+}
+
+export interface OrganizationContextPermissions {
+  canInviteMembers: boolean;
+  canListMembers: boolean;
+  canManageDeployTokens: boolean;
+  canRemoveMembers: boolean;
+  canUpdateMemberRoles: boolean;
+}
+
+export interface CurrentOrganizationContext {
+  user: OrganizationCurrentUserSummary;
+  currentOrganization: OrganizationContextOrganizationSummary;
+  organizations: OrganizationContextOrganizationSummary[];
+  loginMethods: ProductLoginMethodStatus[];
+  permissions?: OrganizationContextPermissions;
+}
+
+export interface OrganizationMemberSummary {
+  memberId: string;
+  userId: string;
+  role: OrganizationTeamRole;
+  joinedAt: string;
+  avatarUrl?: string;
+  displayName?: string;
+  email?: string;
+  status?: "active" | "deactivated";
+}
+
+export type OrganizationInvitationStatus = "accepted" | "expired" | "pending" | "revoked";
+
+export interface OrganizationInvitationSummary {
+  invitationId: string;
+  organizationId: string;
+  email: string;
+  role: OrganizationTeamRole;
+  status: OrganizationInvitationStatus;
+  createdAt: string;
+  expiresAt?: string;
+  inviter?: {
+    userId: string;
+    displayName?: string;
+    email?: string;
+  };
+}
+
+export interface OrganizationMemberListInput {
+  organizationId: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface OrganizationInvitationListInput {
+  organizationId: string;
+  status?: OrganizationInvitationStatus;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface InviteOrganizationMemberInput {
+  organizationId: string;
+  email: string;
+  role: OrganizationTeamRole;
+  idempotencyKey?: string;
+}
+
+export interface UpdateOrganizationMemberRoleInput {
+  organizationId: string;
+  memberId: string;
+  role: OrganizationTeamRole;
+  idempotencyKey?: string;
+}
+
+export interface RemoveOrganizationMemberInput {
+  organizationId: string;
+  memberId: string;
+  idempotencyKey?: string;
+}
+
+export interface SwitchCurrentOrganizationInput {
+  organizationId: string;
+  idempotencyKey?: string;
+}
+
+export interface OrganizationTeamManagementPort {
+  getCurrentContext(context: ExecutionContext): Promise<Result<CurrentOrganizationContext>>;
+  switchCurrentOrganization(
+    context: ExecutionContext,
+    input: SwitchCurrentOrganizationInput,
+  ): Promise<Result<CurrentOrganizationContext>>;
+  listMembers(
+    context: ExecutionContext,
+    input: OrganizationMemberListInput,
+  ): Promise<Result<{ items: OrganizationMemberSummary[]; nextCursor?: string }>>;
+  listInvitations(
+    context: ExecutionContext,
+    input: OrganizationInvitationListInput,
+  ): Promise<Result<{ items: OrganizationInvitationSummary[]; nextCursor?: string }>>;
+  inviteMember(
+    context: ExecutionContext,
+    input: InviteOrganizationMemberInput,
+  ): Promise<Result<OrganizationInvitationSummary>>;
+  updateMemberRole(
+    context: ExecutionContext,
+    input: UpdateOrganizationMemberRoleInput,
+  ): Promise<Result<OrganizationMemberSummary>>;
+  removeMember(
+    context: ExecutionContext,
+    input: RemoveOrganizationMemberInput,
+  ): Promise<Result<{ memberId: string; organizationId: string; removedAt: string }>>;
+}
+
+export interface DeployTokenMaterial {
+  token: string;
+  verifierDigest: DeployTokenVerifierDigest;
+  secretSuffix: DeployTokenSecretSuffix;
+}
+
+export interface DeployTokenMaterialIssuer {
+  issue(context: ExecutionContext): Promise<Result<DeployTokenMaterial>>;
+}
+
 export interface GitHubSourceEventWebhookVerificationInput {
   eventName: string;
   rawBody: string;
@@ -5625,6 +5885,61 @@ export interface IntegrationRegistry {
 
 export interface IntegrationAuthPort {
   getProviderAccessToken(context: ExecutionContext, providerKey: "github"): Promise<string | null>;
+}
+
+export type ProductLoginMethodKey = "local-password" | "github" | "google" | "oidc";
+
+export interface ProductLoginMethodStatus {
+  key: ProductLoginMethodKey;
+  configured: boolean;
+  enabled: boolean;
+  reason?: string;
+}
+
+export interface AuthBootstrapStatus {
+  bootstrapRequired: boolean;
+  firstAdminConfigured: boolean;
+  organizationConfigured: boolean;
+  loginMethods: ProductLoginMethodStatus[];
+  firstAdminEmail?: string;
+  loginUrl?: string;
+  organizationId?: string;
+  organizationSlug?: string;
+  nextSteps?: string[];
+}
+
+export interface AuthBootstrapStatusReader {
+  getStatus(context: RepositoryContext): Promise<Result<AuthBootstrapStatus>>;
+}
+
+export interface FirstAdminBootstrapRequest {
+  displayName: string;
+  email: string;
+  organizationName: string;
+  organizationSlug?: string;
+  password: string;
+}
+
+export interface FirstAdminBootstrapRecord {
+  email: string;
+  organizationId: string;
+  organizationSlug: string;
+  userId: string;
+}
+
+export interface FirstAdminBootstrapper {
+  bootstrapFirstAdmin(
+    context: ExecutionContext,
+    request: FirstAdminBootstrapRequest,
+  ): Promise<Result<FirstAdminBootstrapRecord>>;
+}
+
+export interface FirstAdminPasswordMaterial {
+  password: string;
+}
+
+export interface FirstAdminPasswordIssuer {
+  issue(context: ExecutionContext): Promise<Result<FirstAdminPasswordMaterial>>;
 }
 
 export interface GitHubRepositorySummary {

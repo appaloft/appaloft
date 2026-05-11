@@ -104,6 +104,10 @@ export class OrganizationMember extends Entity<OrganizationMemberState> {
     this.state.role = role;
   }
 
+  isOwner(): boolean {
+    return this.state.role.isOwner();
+  }
+
   belongsToUser(userId: UserId): boolean {
     return this.state.userId.equals(userId);
   }
@@ -208,6 +212,56 @@ export class Organization extends AggregateRoot<OrganizationState> {
     });
   }
 
+  changeMemberRole(input: {
+    memberId: OrganizationMemberId;
+    role: OrganizationRoleValue;
+    changedAt: OccurredAt;
+  }): Result<void> {
+    const member = this.findMember(input.memberId);
+
+    if (member === undefined) {
+      return err(domainError.notFound("organization_member", input.memberId.value));
+    }
+
+    if (member.isOwner() && !input.role.isOwner() && this.ownerCount() <= 1) {
+      return err(
+        domainError.invariant("Organization must keep at least one owner", {
+          memberId: input.memberId.value,
+        }),
+      );
+    }
+
+    member.changeRole(input.role);
+    this.recordDomainEvent("organization.member_role_changed", input.changedAt, {
+      memberId: input.memberId.value,
+      role: input.role.value,
+    });
+    return ok(undefined);
+  }
+
+  removeMember(input: { memberId: OrganizationMemberId; removedAt: OccurredAt }): Result<void> {
+    const member = this.findMember(input.memberId);
+
+    if (member === undefined) {
+      return err(domainError.notFound("organization_member", input.memberId.value));
+    }
+
+    if (member.isOwner() && this.ownerCount() <= 1) {
+      return err(
+        domainError.invariant("Organization must keep at least one owner", {
+          memberId: input.memberId.value,
+        }),
+      );
+    }
+
+    this.state.members = this.state.members.filter((existing) => existing !== member);
+    this.recordDomainEvent("organization.member_removed", input.removedAt, {
+      memberId: input.memberId.value,
+      userId: member.toState().userId.value,
+    });
+    return ok(undefined);
+  }
+
   changePlan(planState: OrganizationPlanState, changedAt: OccurredAt): Result<void> {
     const organization = this;
 
@@ -240,12 +294,24 @@ export class Organization extends AggregateRoot<OrganizationState> {
     return this.state.members.some((existing) => existing.belongsToUser(userId));
   }
 
+  hasMember(memberId: OrganizationMemberId): boolean {
+    return this.findMember(memberId) !== undefined;
+  }
+
+  ownerCount(): number {
+    return this.state.members.filter((existing) => existing.isOwner()).length;
+  }
+
   canAcceptAnotherMember(): boolean {
     return this.state.plan.canAcceptMemberCount(this.memberCount());
   }
 
   canChangeToPlan(plan: OrganizationPlan): boolean {
     return plan.canCoverMemberCount(this.memberCount());
+  }
+
+  private findMember(memberId: OrganizationMemberId): OrganizationMember | undefined {
+    return this.state.members.find((existing) => existing.id.equals(memberId));
   }
 
   toState(): OrganizationState {

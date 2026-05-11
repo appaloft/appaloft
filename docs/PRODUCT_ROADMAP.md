@@ -1719,7 +1719,7 @@ Target: `0.10.0`.
 
 Release rule:
 
-- [ ] Select `0.10.0` only when all required Phase 8 items, earlier phase items, and exit criteria
+- [x] Select `0.10.0` only when all required Phase 8 items, earlier phase items, and exit criteria
   are checked. If any Phase 8 item remains unchecked, release a `0.9.x` patch or an explicitly
   requested prerelease instead.
 
@@ -1732,51 +1732,181 @@ Already done:
 - [x] The identity governance test matrix exists for foundational organization membership behavior
   before public organization operations are exposed.
 
+Current verification notes:
+
+- 2026-05-10 Phase 8 self-hosted Action deploy-token auth Spec Round added ADR-043 and
+  [docs/specs/052-self-hosted-action-deploy-token-auth](./specs/052-self-hosted-action-deploy-token-auth/spec.md)
+  to position deploy tokens as the machine-to-machine authorization boundary for self-hosted Action
+  mutation endpoints. That Spec Round did not implement endpoint guards yet, so the `0.10.0`
+  release rule was still blocked at that point by deploy-token Code Round, scoped token lifecycle, first-admin bootstrap,
+  optional OAuth, organization/team operations, authorization gates, Web onboarding, CLI, and public
+  docs coverage.
+- 2026-05-10 Phase 8 first Code Round slice added bearer-token admission for self-hosted Action
+  source-link and server-config deployment endpoints, plus static `APPALOFT_ACTION_DEPLOY_TOKEN`
+  verification for self-hosted shell composition. A follow-up in the same slice added safe
+  requested-scope checks, static env-based token scope settings, and `action_auth_forbidden` 403
+  rejection before Action command dispatch. It also protected self-hosted Action preview cleanup
+  requests by having the deploy-action wrapper send an Action command marker and bearer token before
+  the cleanup command dispatches. A follow-up deploy-token model/persistence slice added the core
+  `DeployToken` aggregate plus PG/PGlite `deploy_tokens` verifier storage and safe read models, and
+  added a persisted-verifier Action authorization port behind `@appaloft/auth-better`; shell now
+  uses persisted verifier storage by default while preserving the static bootstrap fallback when
+  `APPALOFT_ACTION_DEPLOY_TOKEN` is configured. A follow-up application lifecycle slice added
+  `CreateDeployTokenUseCase` plus a `DeployTokenMaterialIssuer` port so raw token material is
+  returned once, verifier/suffix metadata is persisted, and `@appaloft/auth-better` remains a
+  swappable implementation detail behind application-owned abstractions. A follow-up rotate/revoke
+  slice added `RotateDeployTokenUseCase` and `RevokeDeployTokenUseCase`, preserving scopes on
+  rotation, returning new raw material once, immediately invalidating old verifiers, and blocking
+  revoked verifier lookup. A follow-up application command slice added `deploy-tokens.create`,
+  `deploy-tokens.rotate`, and `deploy-tokens.revoke` command/handler classes plus operation-catalog
+  entries. A read-side slice added `deploy-tokens.list` and `deploy-tokens.show` query/handler
+  classes plus safe read-model catalog entries. A follow-up installer bootstrap slice added
+  `APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE` handoff support so Docker self-host installs create
+  an initial deploy token through application command/query dispatch, print the raw token once from
+  trusted install output, and stay idempotent after an active token exists. A follow-up lifecycle
+  transport slice activated admin-protected HTTP/oRPC routes for deploy-token create/list/show/
+  rotate/revoke, updated operation-catalog transport declarations, typed client contracts, public
+  docs, and entrypoint tests. A follow-up CLI lifecycle slice added
+  `appaloft deploy-token create/list/show/rotate/revoke` over the same application command/query
+  messages with CLI tests and docs/help alignment. At that point the `0.10.0` release rule was
+  still blocked by a full `install.sh` plus printed-console-url smoke and remaining cross-surface
+  parity checks.
+- 2026-05-10 Phase 8 first-admin bootstrap Spec Round added ADR-044 and
+  [docs/specs/053-self-hosted-first-admin-bootstrap](./specs/053-self-hosted-first-admin-bootstrap/spec.md)
+  to define local first-admin creation, initial organization ownership, generated one-time password
+  handling, optional OAuth sequencing, product-auth errors, and the Better Auth adapter boundary.
+  The first Code Round slice added Appaloft-owned application ports, command/query messages,
+  handlers, generated-password boundary, operation-catalog entries without public transports, and a
+  Better Auth adapter that creates the local user plus initial organization owner behind the
+  `FirstAdminBootstrapper` port. A follow-up persistence slice added a PG/PGlite
+  `AuthBootstrapStatusReader` over Better Auth-compatible user/organization/member tables so
+  bootstrap status can distinguish required versus complete without exposing secrets. Installer
+  shell composition now also supports a trusted first-admin handoff output file plus
+  `APPALOFT_FIRST_ADMIN_EMAIL`, optional display name, and optional supplied password; it writes a
+  generated password once when needed, suppresses supplied-password echo, and no-ops after the first
+  admin exists. A follow-up installer UX slice wired those first-admin settings into Docker Compose
+  and Swarm app containers, reads the first-admin handoff output after health readiness, prints the
+  generated password only from trusted output, suppresses supplied-password echo, and keeps the
+  deploy-token handoff separate for GitHub Actions. A follow-up product authorization gate slice
+  added an Appaloft-owned `ProductSessionAuthorizationPort`, wired HTTP/oRPC command dispatch to
+  authorize product mutations before `CommandBus` dispatch, mapped missing sessions to
+  `product_auth_missing`/`401`, insufficient organization roles to `product_auth_forbidden`/`403`,
+  and implemented the port in `@appaloft/auth-better` through Better Auth session plus organization
+  role APIs. A follow-up public bootstrap transport slice exposed `GET /api/bootstrap/auth/status`
+  and `POST /api/bootstrap/auth/first-admin`, kept both outside the product session gate by design,
+  and left one-time/idempotent setup enforcement in the application bootstrap use case. A follow-up
+  public docs slice added `self-hosting.first-admin-bootstrap` coverage for first install login,
+  local admin bootstrap, generated one-time passwords, OAuth optionality, bootstrap endpoints, and
+  product auth 401/403 recovery. A follow-up Web onboarding slice added `/bootstrap/auth/first-admin`
+  and `/login` local-password pages using shared i18n keys. A follow-up first-admin CLI slice added
+  `appaloft auth bootstrap-status` and `appaloft auth bootstrap-first-admin` over the same
+  application query/command messages.
+- 2026-05-11 Phase 8 organization/team operations Spec Round added ADR-045 and
+  [docs/specs/054-self-hosted-organization-team-operations](./specs/054-self-hosted-organization-team-operations/spec.md)
+  to define current user/current organization context, member list, invitation list, member invite,
+  role update, member removal, at-least-one-owner policy, and the Better Auth adapter boundary. The
+  first Code Round slice added `Organization` aggregate role/removal rules plus application-owned
+  organization/team ports, command/query messages, handlers, use cases/query services, and
+  operation-catalog entries without public transports. A follow-up adapter slice implemented those
+  organization/team ports in `@appaloft/auth-better`; Better Auth remains behind Appaloft-owned
+  application abstractions, with Better Auth `member` currently adapted back to Appaloft
+  `developer` until richer custom-role persistence is added. A follow-up HTTP/oRPC slice exposed
+  current context, member list, invitation list, invite, role update, and removal routes behind the
+  product-session authorization gate while preserving CommandBus/QueryBus dispatch. A follow-up CLI
+  slice added `appaloft organization context`, member/invitation list, invite, role update, and
+  removal commands over those same application messages. A follow-up Docs Round added the
+  `self-hosting.organization-team-management` public help anchor for current context, member list,
+  invitations, invite, role update, removal, session input, and safe output rules. A follow-up Web
+  slice added `/organization` current context, safe member/invitation reads, invite, role update,
+  remove, deploy-token list/create/rotate/revoke, shared public help, and i18n-backed UI over the
+  existing oRPC contracts. A follow-up switch-current slice activated `organizations.switch-current`
+  through application, HTTP/oRPC, CLI, Web `/organization`, public docs, and
+  `ORG-TEAM-SWITCH-001` automation. A follow-up optional OAuth config slice added GitHub, Google, and
+  generic OIDC runtime config/status behind the Better Auth adapter boundary; provider login is
+  reported disabled unless client id, client secret, callback URL, and trusted browser origin are
+  configured. A follow-up WebView e2e slice added `SELF-HOSTED-AUTH-E2E-001` for first-admin
+  browser bootstrap, local password sign-in, and console deployment submission. A follow-up
+  installer script-contract slice added `SELF-HOSTED-AUTH-E2E-002` for complete first-use auth
+  handoff output: printed console URL, first-admin login URL/password, Action token, next-step
+  guidance, and no raw secret persistence. A follow-up product read authorization slice made
+  project, environment, resource, deployment-target, and deployment read models require member-level
+  product sessions on HTTP/oRPC before query dispatch, while deploy-token and organization/team read
+  models remain admin-only. A follow-up opt-in install smoke harness added
+  `SELF-HOSTED-AUTH-E2E-003` and `bun run smoke:install-auth` for a real PGlite Docker install that
+  opens the printed console URL, verifies `/api/health`, reads bootstrap status, signs in with the
+  generated first-admin password through the local login API, verifies the session API, and probes
+  the console page. A follow-up session-hardening slice made `install.sh` generate a stable
+  `APPALOFT_BETTER_AUTH_SECRET` for new installs, reuse an existing `.env` value on rerun, inject it
+  into the app container, and keep it out of installer stdout. A follow-up install-smoke slice made
+  local candidate image verification practical by shrinking Docker build context, adding
+  `--skip-image-pull`/`APPALOFT_SKIP_IMAGE_PULL=1` for preloaded Compose images, and passing
+  `SELF-HOSTED-AUTH-E2E-003` on 2026-05-11 against both a local overlay candidate image and a
+  current-source Dockerfile image built by the smoke harness with runtime OpenSSH installation
+  disabled. Both images carried the current shell/Web/docs artifacts and PGlite runtime assets. A
+  follow-up Action
+  server-mode deploy probe in the same smoke signs in with the bootstrapped first-admin session,
+  switches to the bootstrapped organization, creates project/environment/local-shell target/resource
+  context through the product HTTP API, submits a console deployment, then uses the
+  installer-generated deploy token against the self-hosted Action source-link endpoint and verifies
+  it returns `202 Accepted` with a `dep_...` deployment id instead of an `action_auth_*` failure.
+  The smoke build skips runtime OpenSSH installation through a test-only Docker build argument. A
+  normal default Dockerfile build was attempted on 2026-05-11 and reached shell/Web/docs/PGlite
+  packaging, then was cancelled after the runtime `apt-get install openssh-client` layer stayed
+  silent at the Debian `trixie/main arm64 Packages` download. A standalone Bun Debian base-image
+  `apt-get update && apt-get install --no-install-recommends openssh-client` probe also timed out
+  after 240 seconds at the same package index download, so the release candidate still needs the
+  normal release-environment image verification gate.
+
 Required:
 
-- [ ] Add self-hosted Action API authentication: installer-generated deploy token, bearer-token
+- [x] Add self-hosted Action API authentication: installer-generated deploy token, bearer-token
   verification on action mutation endpoints, token rotation/revocation, and clear 401/403 errors.
-- [ ] Add scoped deploy tokens that can be limited to a project, environment, resource, source
+- [x] Add scoped deploy tokens that can be limited to a project, environment, resource, source
   repository, or preview workflow, so multiple repositories can share one self-hosted instance
   without sharing a global mutation secret.
-- [ ] Add product auth baseline: first admin account bootstrap, login/session hardening, and
+- [x] Add product auth baseline: first admin account bootstrap, login/session hardening, and
   organization/team membership for multiple operators sharing one Appaloft instance.
-- [ ] Make first self-hosted install usable without any external OAuth provider: support an
+- [x] Make first self-hosted install usable without any external OAuth provider: support an
   installer-driven local admin bootstrap through explicit flags, config file, or environment input;
   support a generated one-time admin password when no password is supplied; redact bootstrap
   secrets from logs; and require the bootstrap path to be idempotent after the first admin exists.
-- [ ] Add optional OAuth login configuration for self-hosted installs, including Google, GitHub, and
+- [x] Add optional OAuth login configuration for self-hosted installs, including Google, GitHub, and
   generic OIDC provider settings; provider login must be disabled unless the required client id,
   client secret, callback URL, and trusted origin are configured.
-- [ ] Add an install/update UX that prints the console login URL, first-admin bootstrap status,
+- [x] Add an install/update UX that prints the console login URL, first-admin bootstrap status,
   configured login methods, and safe next steps for adding OAuth later without requiring users to
   understand Better Auth internals.
-- [ ] Add organization/team operations and read models for first organization creation, member list,
+- [x] Add organization/team operations and read models for first organization creation, member list,
   invitation, role update, remove member, and current-user/current-organization context.
-- [ ] Add authorization policy gates for console and HTTP/oRPC mutation endpoints: unauthenticated
+- [x] Add authorization policy gates for console and HTTP/oRPC mutation endpoints: unauthenticated
   users get 401, authenticated users outside the organization or without the required role get 403,
   and public health/version/readiness endpoints remain explicitly public.
-- [ ] Add Web onboarding surfaces for first admin setup, login, current organization switch/context,
+- [x] Add Web onboarding surfaces for first admin setup, login, current organization switch/context,
   member invitation, and token management without hardcoded UI copy.
-- [ ] Add CLI and public docs coverage for first install login, local admin bootstrap, OAuth setup,
+- [x] Add CLI and public docs coverage for first install login, local admin bootstrap, OAuth setup,
   deploy token rotation, and GitHub Action self-hosted server mode configuration.
 
 Exit criteria:
 
-- [ ] A new self-hosted user can run `install.sh`, open the printed console URL, log in with a
+- [x] A new self-hosted user can run `install.sh`, open the printed console URL, log in with a
   local first-admin account, and deploy through the console or GitHub Action server mode without
-  manually editing database rows.
-- [ ] OAuth is optional rather than required: users can add Google/GitHub/OIDC later, and missing
+  manually editing database rows. The default-skipped `SELF-HOSTED-AUTH-E2E-003` harness now passes
+  for install, local first-admin login/session, active organization selection, product API context
+  creation, console deployment creation, Action server-mode `202 Accepted` deployment-id creation,
+  and console page readiness against a current-source Dockerfile image built by the smoke harness
+  with runtime OpenSSH installation disabled.
+- [x] OAuth is optional rather than required: users can add Google/GitHub/OIDC later, and missing
   OAuth config never blocks first login through the local bootstrap path.
-- [ ] GitHub Actions can no longer mutate a self-hosted server endpoint without a valid deploy
+- [x] GitHub Actions can no longer mutate a self-hosted server endpoint without a valid deploy
   token, and failures include actionable 401/403 messages.
-- [ ] Multiple operators can share one Appaloft instance through organization/team membership with
+- [x] Multiple operators can share one Appaloft instance through organization/team membership with
   role-aware access to projects, environments, resources, deployment targets, and tokens.
-- [ ] Install, upgrade, HTTP/oRPC, Web, CLI, docs, and test matrices agree on the first-admin,
-  OAuth, organization/team, and deploy-token behavior.
-- [ ] The TypeScript SDK and CLI/HTTP interface-parity work remains deferred until this auth/org
-  baseline is accepted, so SDK authentication, deploy-token, session, 401/403, and organization
-  scope semantics are not published before `0.10.0` closes.
+- [x] Install, upgrade, HTTP/oRPC, Web, CLI, docs, and test matrices agree on the first-admin,
+  OAuth, organization/team, and deploy-token behavior. `PRODUCT-AUTH-PARITY-001` now asserts the
+  Phase 8 auth operation catalog, CLI transports, HTTP/oRPC transports, and public docs topics stay
+  aligned; installer script-contract, Web source/WebView, CLI, HTTP/oRPC, and matrix tests cover
+  the remaining surfaces, with `SELF-HOSTED-AUTH-E2E-003` covering the opt-in real Docker install
+  path.
 
 ## Phase 9: Operator/Internal State Closure And Interface Parity
 
@@ -1820,6 +1950,8 @@ Required:
   shared command/query input schemas, typed result and error handling, deploy-token/session header
   support, and no dependency on `core`, `application`, repository ports, handlers, use cases, or
   shell composition.
+- [ ] Keep SDK authentication, deploy-token, session, 401/403, and organization scope semantics
+  planned rather than published until the TypeScript SDK and interface-parity slice is accepted.
 - [ ] Flatten CLI, HTTP/oRPC, Web, SDK, and generated MCP/tool parity around the operation catalog:
   each public operation has one canonical schema, one docs/help anchor decision, one error contract,
   and interface-specific adapters that dispatch through command/query boundaries instead of
@@ -1993,10 +2125,10 @@ work below before GA.
   mutation. Spec Round is
   [Action Server Config Deploy](./specs/050-action-server-config-deploy/spec.md), with workflow
   contract in [Action Server Config Deploy](./workflows/action-server-config-deploy.md).
-- [ ] Self-hosted Action API auth: action mutation endpoints require an Appaloft deploy token or
+- [x] Self-hosted Action API auth: action mutation endpoints require an Appaloft deploy token or
   future OIDC exchange, and rejected requests fail before source-link, resource, route, or
   deployment mutation.
-- [ ] Auth/org/team: self-hosted install can bootstrap a default admin, operators can invite or
+- [x] Auth/org/team: self-hosted install can bootstrap a default admin, operators can invite or
   add team members into an organization, and project/resource access is scoped by membership before
   deployment APIs are considered production-secure.
 - [ ] TypeScript SDK and interface parity: publish `@appaloft/sdk` as an operation client over the

@@ -89,6 +89,7 @@
     { href: "/servers", labelKey: i18nKeys.console.nav.servers, icon: Server },
     { href: "/domain-bindings", labelKey: i18nKeys.console.nav.domainBindings, icon: Globe2 },
     { href: "/deployments", labelKey: i18nKeys.console.nav.deployments, icon: Rocket },
+    { href: "/organization", labelKey: i18nKeys.console.nav.organization, icon: UserRound },
     {
       href: "/preview-environments",
       labelKey: i18nKeys.console.nav.previewEnvironments,
@@ -452,9 +453,9 @@
             <GitBranch class="size-4" />
             {githubConnected ? `GitHub ${$t(i18nKeys.common.status.connected)}` : $t(i18nKeys.common.actions.connectGitHub)}
           </DropdownMenuItem>
-          <DropdownMenuItem onclick={() => navigateTo("/projects")}>
-            <FolderOpen class="size-4" />
-            {$t(i18nKeys.console.nav.settings)}
+          <DropdownMenuItem onclick={() => navigateTo("/organization")}>
+            <UserRound class="size-4" />
+            {$t(i18nKeys.console.nav.organization)}
           </DropdownMenuItem>
           <DropdownMenuItem onclick={() => navigateTo("/deployments")}>
             <Rocket class="size-4" />

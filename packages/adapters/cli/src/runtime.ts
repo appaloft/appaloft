@@ -61,6 +61,18 @@ function readCliLocale(): string | undefined {
   return process.env.APPALOFT_LOCALE ?? process.env.LANG;
 }
 
+function readCliAuth() {
+  const authorizationHeader = process.env.APPALOFT_AUTHORIZATION;
+  const cookieHeader = process.env.APPALOFT_AUTH_COOKIE;
+
+  return authorizationHeader || cookieHeader
+    ? {
+        ...(authorizationHeader ? { authorizationHeader } : {}),
+        ...(cookieHeader ? { cookieHeader } : {}),
+      }
+    : undefined;
+}
+
 export class CliRuntime extends Context.Tag("CliRuntime")<
   CliRuntime,
   {
@@ -85,9 +97,11 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
     startServer: input.startServer,
     executeCommand: async <T>(message: AppCommand<T>, options?: ExecuteCommandOptions) => {
       const locale = readCliLocale();
+      const auth = readCliAuth();
       const context = input.executionContextFactory.create({
         entrypoint: "cli",
         ...(locale ? { locale } : {}),
+        ...(auth ? { auth } : {}),
         actor: {
           kind: "system",
           id: "cli",
@@ -111,11 +125,13 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
     },
     executeQuery: <T>(message: AppQuery<T>) => {
       const locale = readCliLocale();
+      const auth = readCliAuth();
 
       return input.queryBus.execute(
         input.executionContextFactory.create({
           entrypoint: "cli",
           ...(locale ? { locale } : {}),
+          ...(auth ? { auth } : {}),
           actor: {
             kind: "system",
             id: "cli",

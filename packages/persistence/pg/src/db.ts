@@ -65,6 +65,7 @@ import { previewPolicyQuotaExpiryMigration } from "./migrations/057_preview_poli
 import { previewFeedbackRecordsMigration } from "./migrations/058_preview_feedback_records";
 import { previewCleanupAttemptsMigration } from "./migrations/059_preview_cleanup_attempts";
 import { dependencyResourceSecretsMigration } from "./migrations/060_dependency_resource_secrets";
+import { deployTokensMigration } from "./migrations/061_deploy_tokens";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -221,6 +222,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "058_preview_feedback_records": previewFeedbackRecordsMigration,
       "059_preview_cleanup_attempts": previewCleanupAttemptsMigration,
       "060_dependency_resource_secrets": dependencyResourceSecretsMigration,
+      "061_deploy_tokens": deployTokensMigration,
     };
   }
 }

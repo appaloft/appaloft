@@ -9,6 +9,7 @@
     "@appaloft/application": "workspace:*",
     "@appaloft/cli-logging": "workspace:*",
     "@appaloft/contracts": "workspace:*",
+    "@appaloft/core": "workspace:*",
     "@appaloft/deployment-config": "workspace:*",
     "@appaloft/docs-registry": "workspace:*",
     "@effect/cli": "^0.75.0",

@@ -15,9 +15,14 @@ export type TraceAttributes = Record<string, TraceAttributeValue | undefined>;
 export type AppEntrypoint = "cli" | "http" | "rpc" | "system";
 
 export interface ExecutionActor {
-  kind: "system" | "user";
+  kind: "deploy-token" | "system" | "user";
   id: string;
   label?: string;
+}
+
+export interface ExecutionAuthContext {
+  authorizationHeader?: string;
+  cookieHeader?: string;
 }
 
 export interface AppSpan {
@@ -40,6 +45,7 @@ export interface AppTracer {
 
 export interface ExecutionContext {
   actor?: ExecutionActor;
+  auth?: ExecutionAuthContext;
   entrypoint: AppEntrypoint;
   locale: AppaloftLocale;
   requestId: string;
@@ -59,6 +65,7 @@ export interface RepositoryContext {
 export interface ExecutionContextFactory {
   create(input: {
     actor?: ExecutionActor;
+    auth?: ExecutionAuthContext;
     entrypoint: AppEntrypoint;
     locale?: string;
     requestId?: string;
@@ -90,6 +97,7 @@ function createRequestId(): string {
 
 export function createExecutionContext(input: {
   actor?: ExecutionActor;
+  auth?: ExecutionAuthContext;
   entrypoint: AppEntrypoint;
   locale?: string;
   requestId?: string;
@@ -106,6 +114,7 @@ export function createExecutionContext(input: {
     t,
     tracer: input.tracer ?? noopTracer,
     ...(input.actor ? { actor: input.actor } : {}),
+    ...(input.auth ? { auth: input.auth } : {}),
   };
 }
 

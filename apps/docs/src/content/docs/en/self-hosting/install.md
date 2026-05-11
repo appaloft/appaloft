@@ -44,9 +44,17 @@ migration fails, the container will not pass health checks, and the installer wi
 failure with the container logs. After fixing the database or image issue, rerun the same install
 command.
 
+For advanced or offline installs, pass `--image` to use a preloaded Appaloft image. Add
+`--skip-image-pull` only when the image already exists in the local Docker daemon and should not be
+pulled from a registry.
+
 PGlite mode stores Appaloft state in a durable Docker volume mounted at `/appaloft-data`. Do not put
 database passwords, GitHub tokens, SSH keys, or deployment identity values in repository config; keep
 those values in the host, CI secret store, or the Appaloft server after it is installed.
+
+The installer also generates and reuses a stable secret for product login sessions. It is stored in
+the install directory's `.env` file and injected into the Appaloft container. Keep that value when
+upgrading or repairing the install, otherwise existing login sessions will be invalidated.
 
 The default install also starts an Appaloft-managed Traefik edge proxy. Without a domain, the
 console is reachable on the server's `3721` port. To bind the console to a domain, point DNS at the
@@ -60,6 +68,10 @@ This domain is the Appaloft instance's own console bootstrap route. It is not a 
 custom domain, deployment snapshot, or DomainBinding. To change the console domain later, rerun the
 installer with the new `--domain`. Use `--proxy none` only when an external reverse proxy already
 owns public routing.
+
+After the first install, create a local admin and log in to the console. See
+[First admin bootstrap](/docs/en/self-hosting/first-admin-bootstrap/) for admin email, generated
+one-time passwords, optional OAuth, and recovery steps.
 
 When the host is already a Docker Swarm manager, install the console as a Swarm stack:
 

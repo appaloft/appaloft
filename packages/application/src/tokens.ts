@@ -38,6 +38,13 @@ export const tokens = {
   resourceDependencyBindingRepository: Symbol.for(
     "appaloft.resource_dependency_binding_repository",
   ),
+  deployTokenMaterialIssuer: Symbol.for("appaloft.deploy_token_material_issuer"),
+  deployTokenRepository: Symbol.for("appaloft.deploy_token_repository"),
+  deployTokenReadModel: Symbol.for("appaloft.deploy_token_read_model"),
+  authBootstrapStatusReader: Symbol.for("appaloft.auth_bootstrap_status_reader"),
+  firstAdminBootstrapper: Symbol.for("appaloft.first_admin_bootstrapper"),
+  firstAdminPasswordIssuer: Symbol.for("appaloft.first_admin_password_issuer"),
+  organizationTeamManagementPort: Symbol.for("appaloft.organization_team_management_port"),
   dependencyResourceDeleteSafetyReader: Symbol.for(
     "appaloft.dependency_resource_delete_safety_reader",
   ),
@@ -99,6 +106,30 @@ export const tokens = {
   sshCredentialUsageReader: Symbol.for("appaloft.ssh_credential_usage_reader"),
   archiveProjectUseCase: Symbol.for("appaloft.archive_project_use_case"),
   createProjectUseCase: Symbol.for("appaloft.create_project_use_case"),
+  createDeployTokenUseCase: Symbol.for("appaloft.create_deploy_token_use_case"),
+  bootstrapFirstAdminUseCase: Symbol.for("appaloft.bootstrap_first_admin_use_case"),
+  getAuthBootstrapStatusQueryService: Symbol.for(
+    "appaloft.get_auth_bootstrap_status_query_service",
+  ),
+  getCurrentOrganizationContextQueryService: Symbol.for(
+    "appaloft.get_current_organization_context_query_service",
+  ),
+  inviteOrganizationMemberUseCase: Symbol.for("appaloft.invite_organization_member_use_case"),
+  switchCurrentOrganizationUseCase: Symbol.for("appaloft.switch_current_organization_use_case"),
+  listDeployTokensQueryService: Symbol.for("appaloft.list_deploy_tokens_query_service"),
+  listOrganizationInvitationsQueryService: Symbol.for(
+    "appaloft.list_organization_invitations_query_service",
+  ),
+  listOrganizationMembersQueryService: Symbol.for(
+    "appaloft.list_organization_members_query_service",
+  ),
+  removeOrganizationMemberUseCase: Symbol.for("appaloft.remove_organization_member_use_case"),
+  revokeDeployTokenUseCase: Symbol.for("appaloft.revoke_deploy_token_use_case"),
+  rotateDeployTokenUseCase: Symbol.for("appaloft.rotate_deploy_token_use_case"),
+  showDeployTokenQueryService: Symbol.for("appaloft.show_deploy_token_query_service"),
+  updateOrganizationMemberRoleUseCase: Symbol.for(
+    "appaloft.update_organization_member_role_use_case",
+  ),
   listProjectsQueryService: Symbol.for("appaloft.list_projects_query_service"),
   renameProjectUseCase: Symbol.for("appaloft.rename_project_use_case"),
   showProjectQueryService: Symbol.for("appaloft.show_project_query_service"),

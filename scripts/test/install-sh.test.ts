@@ -37,6 +37,16 @@ async function createFakeDocker(tempRoot: string): Promise<{ binDir: string; log
     dockerPath,
     `#!/usr/bin/env sh
 printf '%s\\n' "$*" >> "$APPALOFT_FAKE_DOCKER_LOG"
+print_bootstrap_output() {
+  case "$*" in
+    *APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE*)
+      printf '%s\\n' "\${APPALOFT_FAKE_DOCKER_FIRST_ADMIN_BOOTSTRAP_OUTPUT:-{\\"schemaVersion\\":\\"first-admin.bootstrap/v1\\",\\"bootstrapRequired\\":true,\\"created\\":false,\\"loginMethods\\":[{\\"key\\":\\"local-password\\",\\"configured\\":true,\\"enabled\\":true}],\\"loginUrl\\":\\"https://appaloft.example.test/login\\"}}"
+      ;;
+    *)
+      printf '%s\\n' "\${APPALOFT_FAKE_DOCKER_DEPLOY_TOKEN_BOOTSTRAP_OUTPUT:-\${APPALOFT_FAKE_DOCKER_BOOTSTRAP_OUTPUT:-{\\"schemaVersion\\":\\"deploy-token.bootstrap/v1\\",\\"created\\":true,\\"organizationId\\":\\"org_self_hosted\\",\\"actionSecretName\\":\\"APPALOFT_TOKEN\\",\\"tokenId\\":\\"dpt_install\\",\\"secretSuffix\\":\\"00000000\\",\\"token\\":\\"aplt_dt_installtoken00000000\\"}}}"
+      ;;
+  esac
+}
 case "$1" in
   version)
     exit 0
@@ -53,7 +63,20 @@ case "$1" in
   compose)
     case "$*" in
       *" ps -q app"*) printf 'appaloft-app-1\\n' ;;
+      *" exec -T app sh -c "*)
+        print_bootstrap_output "$*"
+        ;;
     esac
+    exit 0
+    ;;
+  ps)
+    if [ "$1" = "ps" ] && [ "$2" = "--filter" ]; then
+      printf 'appaloft-swarm-app-1\\n'
+    fi
+    exit 0
+    ;;
+  exec)
+    print_bootstrap_output "$*"
     exit 0
     ;;
   inspect)
@@ -252,13 +275,26 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     expect(install.stdout).toContain("HTTP: https://appaloft.example.test");
     expect(install.stdout).toContain("==> Appaloft install completed");
     expect(install.stdout).toContain("PPPP   PPPP");
+    expect(install.stdout).toContain('"schemaVersion":"deploy-token.bootstrap/v1"');
+    expect(install.stdout).toContain('"actionSecretName":"APPALOFT_TOKEN"');
+    expect(install.stdout).toContain('"token":"aplt_dt_installtoken00000000"');
+    expect(install.stdout).toContain('"schemaVersion":"first-admin.bootstrap/v1"');
+    expect(install.stdout).toContain('"bootstrapRequired":true');
+    expect(install.stdout).toContain(
+      "Set APPALOFT_FIRST_ADMIN_EMAIL and rerun the installer to create a local first admin.",
+    );
     expect(install.stdout).toContain("Open console: https://appaloft.example.test");
     expect(install.stdout).toContain("Watch logs:");
     expect(install.stdout).toContain("Update/repair:");
+    expect(install.stdout).toContain(
+      "OAuth later: configure GitHub, Google, or OIDC client settings and rerun; local first-admin login keeps working until then.",
+    );
+    expect(install.stdout).not.toContain("Better Auth");
 
     const compose = await Bun.file(join(home, "docker-compose.yml")).text();
     expect(compose).toContain("image: $" + "{APPALOFT_IMAGE_REF}");
     expect(compose).toContain('APPALOFT_AUTO_MIGRATE: "true"');
+    expect(compose).toContain("APPALOFT_BETTER_AUTH_SECRET: $" + "{APPALOFT_BETTER_AUTH_SECRET}");
     expect(compose).toContain("postgres-data:/var/lib/postgresql/data");
     expect(compose).toContain('"$' + "{APPALOFT_HTTP_HOST}:$" + '{APPALOFT_HTTP_PORT}:3001"');
     expect(compose).not.toContain("build:");
@@ -267,12 +303,261 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     expect(env).toContain("APPALOFT_IMAGE_REF=ghcr.io/appaloft/appaloft:9.8.7");
     expect(env).toContain("APPALOFT_HTTP_PORT=3900");
     expect(env).toContain("APPALOFT_WEB_ORIGIN=https://appaloft.example.test");
+    expect(env).toContain(
+      "APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE=/tmp/appaloft-bootstrap/deploy-token.json",
+    );
+    expect(env).toContain(
+      "APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE=/tmp/appaloft-bootstrap/first-admin.json",
+    );
+    const authSecretMatch = env.match(/^APPALOFT_BETTER_AUTH_SECRET=([0-9a-f]{48})$/m);
+    expect(authSecretMatch?.[1]).toHaveLength(48);
+    expect(install.stdout).not.toContain(authSecretMatch?.[1] ?? "missing-auth-secret");
     expect(env).toContain("POSTGRES_PASSWORD=fixture-password");
+    expect(env).not.toContain("aplt_dt_installtoken00000000");
 
     const dockerLog = await Bun.file(logPath).text();
     expect(dockerLog).toContain("compose --env-file");
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} pull`);
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
+    expect(dockerLog).toContain("exec -T app sh -c");
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh reuses an existing product auth session secret", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+    await mkdir(home, { recursive: true });
+    await writeFile(
+      join(home, ".env"),
+      "APPALOFT_BETTER_AUTH_SECRET=existing-product-auth-secret\n",
+    );
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--web-origin",
+        "https://appaloft.example.test",
+        "--postgres-password",
+        "fixture-password",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+
+    const env = await Bun.file(join(home, ".env")).text();
+    expect(env).toContain("APPALOFT_BETTER_AUTH_SECRET=existing-product-auth-secret");
+    expect(install.stdout).not.toContain("existing-product-auth-secret");
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh can skip compose image pull for local candidate image smoke", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--image",
+        "appaloft:auth-smoke-overlay",
+        "--home",
+        home,
+        "--web-origin",
+        "http://127.0.0.1:47321",
+        "--database",
+        "pglite",
+        "--proxy",
+        "none",
+        "--skip-docker-install",
+        "--skip-image-pull",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode, install.stderr).toBe(0);
+    expect(install.stdout).toContain("Skipping Appaloft Docker image pull");
+
+    const dockerLog = await Bun.file(logPath).text();
+    expect(dockerLog).not.toContain(" pull");
+    expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh prints generated first-admin credentials only from bootstrap output", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--web-origin",
+        "https://appaloft.example.test",
+        "--postgres-password",
+        "fixture-password",
+        "--first-admin-email",
+        "admin@example.com",
+        "--first-admin-name",
+        "Admin User",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_FIRST_ADMIN_BOOTSTRAP_OUTPUT:
+          '{"schemaVersion":"first-admin.bootstrap/v1","bootstrapRequired":false,"created":true,"email":"admin@example.com","generatedPassword":"generated-admin-password","loginMethods":[{"key":"local-password","configured":true,"enabled":true}],"loginUrl":"https://appaloft.example.test/login","organizationId":"org_self_hosted","organizationSlug":"self-hosted-appaloft"}',
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+    expect(install.stdout).toContain('"schemaVersion":"first-admin.bootstrap/v1"');
+    expect(install.stdout).toContain('"email":"admin@example.com"');
+    expect(install.stdout).toContain('"generatedPassword":"generated-admin-password"');
+    expect(install.stdout).toContain(
+      "Use the generated first-admin password above for the first console login.",
+    );
+
+    const env = await Bun.file(join(home, ".env")).text();
+    expect(env).toContain("APPALOFT_FIRST_ADMIN_EMAIL=admin@example.com");
+    expect(env).toContain("APPALOFT_FIRST_ADMIN_DISPLAY_NAME=Admin User");
+    expect(env).not.toContain("generated-admin-password");
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("[SELF-HOSTED-AUTH-E2E-002] install.sh prints complete first-use auth handoff", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--web-origin",
+        "https://appaloft.example.test",
+        "--postgres-password",
+        "fixture-password",
+        "--first-admin-email",
+        "admin@example.com",
+        "--first-admin-name",
+        "Admin User",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_DEPLOY_TOKEN_BOOTSTRAP_OUTPUT:
+          '{"schemaVersion":"deploy-token.bootstrap/v1","created":true,"organizationId":"org_self_hosted","actionSecretName":"APPALOFT_TOKEN","tokenId":"dpt_install","secretSuffix":"00000000","token":"aplt_dt_installtoken00000000"}',
+        APPALOFT_FAKE_DOCKER_FIRST_ADMIN_BOOTSTRAP_OUTPUT:
+          '{"schemaVersion":"first-admin.bootstrap/v1","bootstrapRequired":false,"created":true,"email":"admin@example.com","generatedPassword":"generated-admin-password","loginMethods":[{"key":"local-password","configured":true,"enabled":true}],"loginUrl":"https://appaloft.example.test/login","organizationId":"org_self_hosted","organizationSlug":"self-hosted-appaloft"}',
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+    expect(install.stdout).toContain("Open console: https://appaloft.example.test");
+    expect(install.stdout).toContain('"loginUrl":"https://appaloft.example.test/login"');
+    expect(install.stdout).toContain('"generatedPassword":"generated-admin-password"');
+    expect(install.stdout).toContain('"actionSecretName":"APPALOFT_TOKEN"');
+    expect(install.stdout).toContain('"token":"aplt_dt_installtoken00000000"');
+    expect(install.stdout).toContain(
+      "Use the generated first-admin password above for the first console login.",
+    );
+    expect(install.stdout).toContain("Store the token value in GitHub Secrets as APPALOFT_TOKEN.");
+    expect(install.stdout).toContain(
+      "GitHub Action: use this console URL when switching deployments to self-hosted server mode.",
+    );
+    expect(install.stdout).not.toContain("Better Auth");
+
+    const env = await Bun.file(join(home, ".env")).text();
+    expect(env).toContain("APPALOFT_WEB_ORIGIN=https://appaloft.example.test");
+    expect(env).toContain("APPALOFT_FIRST_ADMIN_EMAIL=admin@example.com");
+    expect(env).not.toContain("generated-admin-password");
+    expect(env).not.toContain("aplt_dt_installtoken00000000");
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh does not echo a supplied first-admin password", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--web-origin",
+        "https://appaloft.example.test",
+        "--postgres-password",
+        "fixture-password",
+        "--first-admin-email",
+        "admin@example.com",
+        "--first-admin-password",
+        "supplied-admin-password",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_FIRST_ADMIN_BOOTSTRAP_OUTPUT:
+          '{"schemaVersion":"first-admin.bootstrap/v1","bootstrapRequired":false,"created":true,"email":"admin@example.com","loginMethods":[{"key":"local-password","configured":true,"enabled":true}],"loginUrl":"https://appaloft.example.test/login","organizationId":"org_self_hosted","organizationSlug":"self-hosted-appaloft"}',
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+    expect(install.stdout).toContain('"schemaVersion":"first-admin.bootstrap/v1"');
+    expect(install.stdout).toContain('"email":"admin@example.com"');
+    expect(install.stdout).not.toContain("supplied-admin-password");
+    expect(install.stdout).toContain("Supplied passwords are never printed.");
+
+    const compose = await Bun.file(join(home, "docker-compose.yml")).text();
+    expect(compose).toContain(
+      "APPALOFT_FIRST_ADMIN_PASSWORD: $" + "{APPALOFT_FIRST_ADMIN_PASSWORD}",
+    );
+    expect(compose).not.toContain("supplied-admin-password");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
@@ -545,6 +830,7 @@ test("install.sh writes a Docker Swarm PGlite stack and deploys it", async () =>
 
     expect(install.exitCode).toBe(0);
     expect(install.stdout).toContain("Orchestrator: swarm");
+    expect(install.stdout).toContain('"token":"aplt_dt_installtoken00000000"');
     expect(install.stdout).toContain("Watch logs:    docker service logs -f appaloft-console_app");
 
     const compose = await Bun.file(join(home, "docker-compose.yml")).text();
@@ -563,6 +849,8 @@ test("install.sh writes a Docker Swarm PGlite stack and deploys it", async () =>
     expect(dockerLog).toContain(
       `stack deploy -c ${join(home, "docker-compose.yml")} appaloft-console`,
     );
+    expect(dockerLog).toContain("ps --filter name=appaloft-console_app --filter status=running -q");
+    expect(dockerLog).toContain("exec appaloft-swarm-app-1 sh -c");
     expect(dockerLog).not.toContain("compose --env-file");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
