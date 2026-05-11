@@ -16,6 +16,48 @@ type RecordedApiRequest = {
   body: unknown;
 };
 
+const selfHostedAuthE2eGeneratedPassword = "generated-local-admin-password";
+let selfHostedAuthE2eAdminCreated = false;
+let selfHostedAuthE2eSignedIn = false;
+
+function resetSelfHostedAuthE2eState(): void {
+  selfHostedAuthE2eAdminCreated = false;
+  selfHostedAuthE2eSignedIn = false;
+}
+
+function selfHostedAuthE2eLoginMethods() {
+  return [
+    {
+      key: "local-password",
+      configured: true,
+      enabled: true,
+    },
+    {
+      key: "github",
+      configured: false,
+      enabled: false,
+      reason: "Configure GitHub OAuth to enable import.",
+    },
+  ];
+}
+
+function selfHostedAuthE2eBootstrapStatus() {
+  return {
+    bootstrapRequired: !selfHostedAuthE2eAdminCreated,
+    firstAdminConfigured: selfHostedAuthE2eAdminCreated,
+    organizationConfigured: selfHostedAuthE2eAdminCreated,
+    loginMethods: selfHostedAuthE2eLoginMethods(),
+    ...(selfHostedAuthE2eAdminCreated
+      ? {
+          firstAdminEmail: "admin@example.com",
+          organizationId: "org_self_hosted",
+          organizationSlug: "self-hosted-appaloft",
+        }
+      : {}),
+    loginUrl: "/login",
+  };
+}
+
 function deploymentDetailFixture(input: {
   deploymentId: string;
   projectId: string;
@@ -462,12 +504,19 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       apiVersion: "v1",
       mode: "self-hosted",
     },
-    "/api/auth/session": {
+    "/api/auth/session": () => ({
       enabled: true,
       provider: "better-auth",
       loginRequired: false,
       deferredAuth: true,
-      session: null,
+      session: selfHostedAuthE2eSignedIn
+        ? {
+            user: {
+              name: "Admin User",
+              email: "admin@example.com",
+            },
+          }
+        : null,
       providers: [
         {
           key: "github",
@@ -479,6 +528,63 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
           reason: "Configure GitHub OAuth to enable import.",
         },
       ],
+    }),
+    "/api/rpc/auth/bootstrapStatus": () => ({
+      json: selfHostedAuthE2eBootstrapStatus(),
+    }),
+    "/api/rpc/auth/bootstrapFirstAdmin": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        displayName?: string;
+        email?: string;
+        organizationName?: string;
+        organizationSlug?: string;
+      } | null;
+      selfHostedAuthE2eAdminCreated = true;
+
+      return {
+        json: {
+          bootstrapRequired: false,
+          created: true,
+          email: input?.email ?? "admin@example.com",
+          generatedPassword: selfHostedAuthE2eGeneratedPassword,
+          loginMethods: selfHostedAuthE2eLoginMethods(),
+          loginUrl: "/login",
+          organizationId: "org_self_hosted",
+          organizationSlug: input?.organizationSlug ?? "self-hosted-appaloft",
+          userId: "usr_admin",
+        },
+      };
+    },
+    "/api/auth/sign-in/email": (_request: Request, body: unknown) => {
+      const input = isRecord(body) ? body : {};
+      if (
+        selfHostedAuthE2eAdminCreated &&
+        input.email === "admin@example.com" &&
+        input.password === selfHostedAuthE2eGeneratedPassword
+      ) {
+        selfHostedAuthE2eSignedIn = true;
+        return respondJson(
+          {
+            user: {
+              email: "admin@example.com",
+              name: "Admin User",
+            },
+          },
+          {
+            headers: {
+              "set-cookie": "better-auth.session_token=test-admin-session; Path=/; HttpOnly",
+            },
+          },
+        );
+      }
+
+      return respondJson(
+        {
+          code: "invalid_credentials",
+          message: "Invalid email or password",
+        },
+        { status: 401 },
+      );
     },
     "/api/rpc/projects/list": {
       json: {
@@ -1570,11 +1676,32 @@ async function waitForPreview(url: string): Promise<void> {
   throw new Error(`Vite preview did not start at ${url}\n${previewLogs}`);
 }
 
+function startTestServer(
+  fetch: (request: Request) => Response | Promise<Response>,
+): ReturnType<typeof Bun.serve> {
+  const basePort = 30_000 + Math.floor(Math.random() * 20_000);
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    try {
+      return Bun.serve({
+        port: basePort + attempt,
+        fetch,
+      });
+    } catch (error) {
+      const errorCode =
+        typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorCode !== "EADDRINUSE" && !errorMessage.includes("EADDRINUSE")) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("Could not start a test server on an available local port.");
+}
+
 function reservePort(): number {
-  const server = Bun.serve({
-    port: 0,
-    fetch: () => new Response("reserved"),
-  });
+  const server = startTestServer(() => new Response("reserved"));
   const { port } = server;
   server.stop(true);
 
@@ -1586,46 +1713,43 @@ function reservePort(): number {
 }
 
 async function setupWebApp(): Promise<void> {
-  apiServer = Bun.serve({
-    port: 0,
-    async fetch(request) {
-      if (request.method === "OPTIONS") {
-        return respondJson(null);
-      }
+  apiServer = startTestServer(async (request) => {
+    if (request.method === "OPTIONS") {
+      return respondJson(null);
+    }
 
-      const { pathname } = new URL(request.url);
-      const requestBody = await readRequestBody(request);
-      recordedApiRequests.push({
-        method: request.method,
-        pathname,
-        body: requestBody,
+    const { pathname } = new URL(request.url);
+    const requestBody = await readRequestBody(request);
+    recordedApiRequests.push({
+      method: request.method,
+      pathname,
+      body: requestBody,
+    });
+
+    if (pathname.startsWith("/api/deployment-progress/")) {
+      return new Response("", {
+        headers: {
+          "access-control-allow-origin": "*",
+          "content-type": "text/event-stream",
+        },
       });
+    }
 
-      if (pathname.startsWith("/api/deployment-progress/")) {
-        return new Response("", {
-          headers: {
-            "access-control-allow-origin": "*",
-            "content-type": "text/event-stream",
-          },
-        });
-      }
+    const configuredRoute = apiResponses[activeScenario][pathname];
 
-      const configuredRoute = apiResponses[activeScenario][pathname];
+    if (configuredRoute === undefined) {
+      return respondJson({ error: `Unhandled test API route: ${pathname}` }, { status: 404 });
+    }
 
-      if (configuredRoute === undefined) {
-        return respondJson({ error: `Unhandled test API route: ${pathname}` }, { status: 404 });
-      }
+    const response = isApiRouteHandler(configuredRoute)
+      ? await configuredRoute(request, requestBody)
+      : configuredRoute;
 
-      const response = isApiRouteHandler(configuredRoute)
-        ? await configuredRoute(request, requestBody)
-        : configuredRoute;
+    if (response instanceof Response) {
+      return response;
+    }
 
-      if (response instanceof Response) {
-        return response;
-      }
-
-      return respondJson(response);
-    },
+    return respondJson(response);
   });
 
   const previewPort = reservePort();
@@ -1921,6 +2045,61 @@ describe("console e2e with Bun.WebView", () => {
       "GitHub OAuth is not configured on the backend.",
       "后端尚未配置 GitHub OAuth",
     ]);
+  }, 45_000);
+
+  test("[SELF-HOSTED-AUTH-E2E-001] bootstraps first admin, signs in locally, and deploys from console", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    resetSelfHostedAuthE2eState();
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/bootstrap/auth/first-admin`);
+
+      await expectAnyText(view, ["First admin setup", "首次管理员设置"]);
+      await setInputValue(view, "input[type='email']", "admin@example.com");
+      await setInputValue(view, "input[autocomplete='name']", "Admin User");
+      await clickFormSubmit(view, "form");
+
+      await expectText(view, selfHostedAuthE2eGeneratedPassword);
+      const bootstrapRequest = await waitForRecordedRequest("/api/rpc/auth/bootstrapFirstAdmin");
+      expect(readOrpcJsonPayload(bootstrapRequest.body)).toEqual({
+        displayName: "Admin User",
+        email: "admin@example.com",
+      });
+
+      await clickButtonByAnyText(view, ["Go to login", "前往登录"]);
+      await expectLocation(view, "/login");
+      await setInputValue(view, "input[type='email']", "admin@example.com");
+      await setInputValue(view, "input[type='password']", selfHostedAuthE2eGeneratedPassword);
+      await clickFormSubmit(view, "form");
+      await expectLocation(view, "/");
+
+      const loginRequest = await waitForRecordedRequest("/api/auth/sign-in/email");
+      expect(loginRequest.body).toEqual({
+        callbackURL: "/",
+        email: "admin@example.com",
+        password: selfHostedAuthE2eGeneratedPassword,
+      });
+
+      await view.navigate(
+        `${previewUrl}/projects/prj_demo/environments/env_demo/resources/res_demo/deployments/new`,
+      );
+      await expectAnyText(view, ["New deployment", "新部署"]);
+      await clickButtonByAnyText(view, ["Create deployment", "创建部署"]);
+
+      const deploymentRequest = await waitForRecordedRequest("/api/deployments");
+      expect(deploymentRequest.body).toEqual(
+        expect.objectContaining({
+          environmentId: "env_demo",
+          projectId: "prj_demo",
+          resourceId: "res_demo",
+          serverId: "srv_demo",
+        }),
+      );
+    } finally {
+      resetSelfHostedAuthE2eState();
+    }
   }, 45_000);
 
   test("[PROJ-LIFE-ENTRY-005][PROJ-LIFE-ENTRY-006] manages project settings through named operations", async () => {

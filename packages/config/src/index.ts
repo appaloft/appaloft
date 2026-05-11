@@ -51,6 +51,20 @@ export interface DockerSwarmExecutionConfig {
   edgeNetworkName?: string;
 }
 
+export type ActionDeployTokenWorkflow =
+  | "preview-cleanup"
+  | "server-config-deploy"
+  | "source-link-deploy";
+
+export interface ActionDeployTokenScopeConfig {
+  environmentId?: string;
+  projectId?: string;
+  repositoryFullName?: string;
+  resourceId?: string;
+  serverId?: string;
+  workflows?: ActionDeployTokenWorkflow[];
+}
+
 export interface AppConfig {
   appName: string;
   appVersion: string;
@@ -58,8 +72,24 @@ export interface AppConfig {
   authProvider: "better-auth" | "none";
   betterAuthBaseUrl: string;
   betterAuthSecret: string;
+  actionDeployToken?: string;
+  actionDeployTokenScope?: ActionDeployTokenScopeConfig;
+  bootstrapDeployTokenOutputFile?: string;
+  bootstrapFirstAdminOutputFile?: string;
+  firstAdminDisplayName?: string;
+  firstAdminEmail?: string;
+  firstAdminPassword?: string;
   githubClientId?: string;
   githubClientSecret?: string;
+  githubRedirectUri?: string;
+  googleClientId?: string;
+  googleClientSecret?: string;
+  googleRedirectUri?: string;
+  oidcClientId?: string;
+  oidcClientSecret?: string;
+  oidcDiscoveryUrl?: string;
+  oidcIssuer?: string;
+  oidcRedirectUri?: string;
   githubWebhookSecret?: string;
   githubPreviewFeedbackToken?: string;
   httpHost: string;
@@ -270,6 +300,34 @@ function normalizeHttpUrl(value: string | undefined): string | undefined {
   }
 }
 
+function actionDeployTokenScopeFromEnv(env: ConfigEnv): ActionDeployTokenScopeConfig | undefined {
+  const workflows = env.APPALOFT_ACTION_DEPLOY_TOKEN_WORKFLOWS?.split(",")
+    .map((workflow) => workflow.trim())
+    .filter((workflow): workflow is ActionDeployTokenWorkflow =>
+      ["preview-cleanup", "server-config-deploy", "source-link-deploy"].includes(workflow),
+    );
+  const scope: ActionDeployTokenScopeConfig = {
+    ...(env.APPALOFT_ACTION_DEPLOY_TOKEN_ENVIRONMENT_ID
+      ? { environmentId: env.APPALOFT_ACTION_DEPLOY_TOKEN_ENVIRONMENT_ID }
+      : {}),
+    ...(env.APPALOFT_ACTION_DEPLOY_TOKEN_PROJECT_ID
+      ? { projectId: env.APPALOFT_ACTION_DEPLOY_TOKEN_PROJECT_ID }
+      : {}),
+    ...(env.APPALOFT_ACTION_DEPLOY_TOKEN_REPOSITORY_FULL_NAME
+      ? { repositoryFullName: env.APPALOFT_ACTION_DEPLOY_TOKEN_REPOSITORY_FULL_NAME }
+      : {}),
+    ...(env.APPALOFT_ACTION_DEPLOY_TOKEN_RESOURCE_ID
+      ? { resourceId: env.APPALOFT_ACTION_DEPLOY_TOKEN_RESOURCE_ID }
+      : {}),
+    ...(env.APPALOFT_ACTION_DEPLOY_TOKEN_SERVER_ID
+      ? { serverId: env.APPALOFT_ACTION_DEPLOY_TOKEN_SERVER_ID }
+      : {}),
+    ...(workflows && workflows.length > 0 ? { workflows } : {}),
+  };
+
+  return Object.keys(scope).length > 0 ? scope : undefined;
+}
+
 export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
   const env = source.env ?? process.env;
   const fileConfig = readConfigFile(source.configFilePath);
@@ -323,6 +381,10 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     (env.APPALOFT_DEFAULT_ACCESS_DOMAIN_SCHEME as
       | DefaultAccessDomainConfig["scheme"]
       | undefined) ?? defaultAccessDomain.scheme;
+  const actionDeployTokenScope =
+    source.flags?.actionDeployTokenScope ??
+    actionDeployTokenScopeFromEnv(env) ??
+    fileConfig.actionDeployTokenScope;
   const certificateProvider =
     source.flags?.certificateProvider ??
     fileConfig.certificateProvider ??
@@ -438,6 +500,67 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       env.APPALOFT_BETTER_AUTH_SECRET ??
       fileConfig.betterAuthSecret ??
       defaults.betterAuthSecret,
+    ...(source.flags?.actionDeployToken ||
+    env.APPALOFT_ACTION_DEPLOY_TOKEN ||
+    fileConfig.actionDeployToken
+      ? {
+          actionDeployToken:
+            source.flags?.actionDeployToken ??
+            env.APPALOFT_ACTION_DEPLOY_TOKEN ??
+            fileConfig.actionDeployToken,
+        }
+      : {}),
+    ...(actionDeployTokenScope ? { actionDeployTokenScope } : {}),
+    ...(source.flags?.bootstrapDeployTokenOutputFile ||
+    env.APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE ||
+    fileConfig.bootstrapDeployTokenOutputFile
+      ? {
+          bootstrapDeployTokenOutputFile:
+            source.flags?.bootstrapDeployTokenOutputFile ??
+            env.APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE ??
+            fileConfig.bootstrapDeployTokenOutputFile,
+        }
+      : {}),
+    ...(source.flags?.bootstrapFirstAdminOutputFile ||
+    env.APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE ||
+    fileConfig.bootstrapFirstAdminOutputFile
+      ? {
+          bootstrapFirstAdminOutputFile:
+            source.flags?.bootstrapFirstAdminOutputFile ??
+            env.APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE ??
+            fileConfig.bootstrapFirstAdminOutputFile,
+        }
+      : {}),
+    ...(source.flags?.firstAdminEmail ||
+    env.APPALOFT_FIRST_ADMIN_EMAIL ||
+    fileConfig.firstAdminEmail
+      ? {
+          firstAdminEmail:
+            source.flags?.firstAdminEmail ??
+            env.APPALOFT_FIRST_ADMIN_EMAIL ??
+            fileConfig.firstAdminEmail,
+        }
+      : {}),
+    ...(source.flags?.firstAdminDisplayName ||
+    env.APPALOFT_FIRST_ADMIN_DISPLAY_NAME ||
+    fileConfig.firstAdminDisplayName
+      ? {
+          firstAdminDisplayName:
+            source.flags?.firstAdminDisplayName ??
+            env.APPALOFT_FIRST_ADMIN_DISPLAY_NAME ??
+            fileConfig.firstAdminDisplayName,
+        }
+      : {}),
+    ...(source.flags?.firstAdminPassword ||
+    env.APPALOFT_FIRST_ADMIN_PASSWORD ||
+    fileConfig.firstAdminPassword
+      ? {
+          firstAdminPassword:
+            source.flags?.firstAdminPassword ??
+            env.APPALOFT_FIRST_ADMIN_PASSWORD ??
+            fileConfig.firstAdminPassword,
+        }
+      : {}),
     ...(source.flags?.githubClientId || env.APPALOFT_GITHUB_CLIENT_ID || fileConfig.githubClientId
       ? {
           githubClientId:
@@ -454,6 +577,85 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
             source.flags?.githubClientSecret ??
             env.APPALOFT_GITHUB_CLIENT_SECRET ??
             fileConfig.githubClientSecret,
+        }
+      : {}),
+    ...(source.flags?.githubRedirectUri ||
+    env.APPALOFT_GITHUB_REDIRECT_URI ||
+    fileConfig.githubRedirectUri
+      ? {
+          githubRedirectUri:
+            source.flags?.githubRedirectUri ??
+            env.APPALOFT_GITHUB_REDIRECT_URI ??
+            fileConfig.githubRedirectUri,
+        }
+      : {}),
+    ...(source.flags?.googleClientId || env.APPALOFT_GOOGLE_CLIENT_ID || fileConfig.googleClientId
+      ? {
+          googleClientId:
+            source.flags?.googleClientId ??
+            env.APPALOFT_GOOGLE_CLIENT_ID ??
+            fileConfig.googleClientId,
+        }
+      : {}),
+    ...(source.flags?.googleClientSecret ||
+    env.APPALOFT_GOOGLE_CLIENT_SECRET ||
+    fileConfig.googleClientSecret
+      ? {
+          googleClientSecret:
+            source.flags?.googleClientSecret ??
+            env.APPALOFT_GOOGLE_CLIENT_SECRET ??
+            fileConfig.googleClientSecret,
+        }
+      : {}),
+    ...(source.flags?.googleRedirectUri ||
+    env.APPALOFT_GOOGLE_REDIRECT_URI ||
+    fileConfig.googleRedirectUri
+      ? {
+          googleRedirectUri:
+            source.flags?.googleRedirectUri ??
+            env.APPALOFT_GOOGLE_REDIRECT_URI ??
+            fileConfig.googleRedirectUri,
+        }
+      : {}),
+    ...(source.flags?.oidcClientId || env.APPALOFT_OIDC_CLIENT_ID || fileConfig.oidcClientId
+      ? {
+          oidcClientId:
+            source.flags?.oidcClientId ?? env.APPALOFT_OIDC_CLIENT_ID ?? fileConfig.oidcClientId,
+        }
+      : {}),
+    ...(source.flags?.oidcClientSecret ||
+    env.APPALOFT_OIDC_CLIENT_SECRET ||
+    fileConfig.oidcClientSecret
+      ? {
+          oidcClientSecret:
+            source.flags?.oidcClientSecret ??
+            env.APPALOFT_OIDC_CLIENT_SECRET ??
+            fileConfig.oidcClientSecret,
+        }
+      : {}),
+    ...(source.flags?.oidcDiscoveryUrl ||
+    env.APPALOFT_OIDC_DISCOVERY_URL ||
+    fileConfig.oidcDiscoveryUrl
+      ? {
+          oidcDiscoveryUrl:
+            source.flags?.oidcDiscoveryUrl ??
+            env.APPALOFT_OIDC_DISCOVERY_URL ??
+            fileConfig.oidcDiscoveryUrl,
+        }
+      : {}),
+    ...(source.flags?.oidcIssuer || env.APPALOFT_OIDC_ISSUER || fileConfig.oidcIssuer
+      ? {
+          oidcIssuer: source.flags?.oidcIssuer ?? env.APPALOFT_OIDC_ISSUER ?? fileConfig.oidcIssuer,
+        }
+      : {}),
+    ...(source.flags?.oidcRedirectUri ||
+    env.APPALOFT_OIDC_REDIRECT_URI ||
+    fileConfig.oidcRedirectUri
+      ? {
+          oidcRedirectUri:
+            source.flags?.oidcRedirectUri ??
+            env.APPALOFT_OIDC_REDIRECT_URI ??
+            fileConfig.oidcRedirectUri,
         }
       : {}),
     ...(source.flags?.githubWebhookSecret ||

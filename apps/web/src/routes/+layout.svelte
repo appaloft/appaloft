@@ -1,4 +1,5 @@
 <script lang="ts">
+	import 'reflect-metadata';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 
 	import './layout.css';

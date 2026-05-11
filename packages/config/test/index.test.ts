@@ -144,6 +144,64 @@ describe("resolveConfig", () => {
     expect(config.githubWebhookSecret).toBe("github-webhook-secret");
   });
 
+  test("reads the self-hosted Action deploy token from runtime configuration", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_ACTION_DEPLOY_TOKEN: "action-deploy-token",
+      },
+    });
+
+    expect(config.actionDeployToken).toBe("action-deploy-token");
+  });
+
+  test("reads the self-hosted Action deploy token scope from runtime configuration", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_ACTION_DEPLOY_TOKEN_ENVIRONMENT_ID: "env_prod",
+        APPALOFT_ACTION_DEPLOY_TOKEN_PROJECT_ID: "prj_console",
+        APPALOFT_ACTION_DEPLOY_TOKEN_REPOSITORY_FULL_NAME: "appaloft/www",
+        APPALOFT_ACTION_DEPLOY_TOKEN_RESOURCE_ID: "res_www",
+        APPALOFT_ACTION_DEPLOY_TOKEN_SERVER_ID: "srv_prod",
+        APPALOFT_ACTION_DEPLOY_TOKEN_WORKFLOWS: "source-link-deploy,server-config-deploy",
+      },
+    });
+
+    expect(config.actionDeployTokenScope).toEqual({
+      environmentId: "env_prod",
+      projectId: "prj_console",
+      repositoryFullName: "appaloft/www",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+      workflows: ["source-link-deploy", "server-config-deploy"],
+    });
+  });
+
+  test("reads the installer deploy-token bootstrap output file from runtime configuration", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE: "/tmp/appaloft-bootstrap/deploy-token.json",
+      },
+    });
+
+    expect(config.bootstrapDeployTokenOutputFile).toBe("/tmp/appaloft-bootstrap/deploy-token.json");
+  });
+
+  test("reads the installer first-admin bootstrap settings from runtime configuration", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE: "/tmp/appaloft-bootstrap/first-admin.json",
+        APPALOFT_FIRST_ADMIN_DISPLAY_NAME: "Admin User",
+        APPALOFT_FIRST_ADMIN_EMAIL: "admin@example.com",
+        APPALOFT_FIRST_ADMIN_PASSWORD: "local-admin-password",
+      },
+    });
+
+    expect(config.bootstrapFirstAdminOutputFile).toBe("/tmp/appaloft-bootstrap/first-admin.json");
+    expect(config.firstAdminDisplayName).toBe("Admin User");
+    expect(config.firstAdminEmail).toBe("admin@example.com");
+    expect(config.firstAdminPassword).toBe("local-admin-password");
+  });
+
   test("reads the GitHub preview feedback worker token from runtime configuration", () => {
     const config = resolveConfig({
       env: {
@@ -152,6 +210,41 @@ describe("resolveConfig", () => {
     });
 
     expect(config.githubPreviewFeedbackToken).toBe("github-preview-worker-token");
+  });
+
+  test("[FIRST-ADMIN-BOOTSTRAP-005] reads optional OAuth provider settings from runtime configuration", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_GOOGLE_CLIENT_ID: "google-client-id",
+        APPALOFT_GOOGLE_CLIENT_SECRET: "google-client-secret",
+        APPALOFT_GOOGLE_REDIRECT_URI: "https://appaloft.example.com/api/auth/callback/google",
+        APPALOFT_GITHUB_CLIENT_ID: "github-client-id",
+        APPALOFT_GITHUB_CLIENT_SECRET: "github-client-secret",
+        APPALOFT_GITHUB_REDIRECT_URI: "https://appaloft.example.com/api/auth/callback/github",
+        APPALOFT_OIDC_CLIENT_ID: "oidc-client-id",
+        APPALOFT_OIDC_CLIENT_SECRET: "oidc-client-secret",
+        APPALOFT_OIDC_DISCOVERY_URL:
+          "https://identity.example.com/.well-known/openid-configuration",
+        APPALOFT_OIDC_ISSUER: "https://identity.example.com",
+        APPALOFT_OIDC_REDIRECT_URI: "https://appaloft.example.com/api/auth/oauth2/callback/oidc",
+      },
+    });
+
+    expect(config.googleClientId).toBe("google-client-id");
+    expect(config.googleClientSecret).toBe("google-client-secret");
+    expect(config.googleRedirectUri).toBe("https://appaloft.example.com/api/auth/callback/google");
+    expect(config.githubClientId).toBe("github-client-id");
+    expect(config.githubClientSecret).toBe("github-client-secret");
+    expect(config.githubRedirectUri).toBe("https://appaloft.example.com/api/auth/callback/github");
+    expect(config.oidcClientId).toBe("oidc-client-id");
+    expect(config.oidcClientSecret).toBe("oidc-client-secret");
+    expect(config.oidcDiscoveryUrl).toBe(
+      "https://identity.example.com/.well-known/openid-configuration",
+    );
+    expect(config.oidcIssuer).toBe("https://identity.example.com");
+    expect(config.oidcRedirectUri).toBe(
+      "https://appaloft.example.com/api/auth/oauth2/callback/oidc",
+    );
   });
 
   test("enables Docker Swarm execution by default and accepts explicit shell opt-out", () => {

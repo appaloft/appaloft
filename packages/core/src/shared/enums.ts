@@ -200,3 +200,7 @@ export type LogLevel = (typeof logLevels)[number];
 export const deploymentLogSources = ["appaloft", "application"] as const;
 
 export type DeploymentLogSource = (typeof deploymentLogSources)[number];
+
+export const deployTokenStatuses = ["active", "revoked"] as const;
+
+export type DeployTokenStatus = (typeof deployTokenStatuses)[number];

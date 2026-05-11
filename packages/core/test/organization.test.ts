@@ -25,7 +25,7 @@ function ownerMember() {
 function member(input: {
   id: string;
   userId: string;
-  role?: "admin" | "developer" | "viewer" | "billing";
+  role?: "owner" | "admin" | "developer" | "viewer" | "billing";
 }) {
   return {
     id: OrganizationMemberId.rehydrate(input.id),
@@ -117,5 +117,89 @@ describe("Organization", () => {
     });
     expect(plan.canCoverMemberCount(2)).toBe(true);
     expect(plan.canCoverMemberCount(3)).toBe(false);
+  });
+
+  test("[IDENTITY-DOMAIN-002] changes member roles while preserving an organization owner", () => {
+    const org = organization({ seatLimit: 4 });
+    org.addMember(member({ id: "om_admin", userId: "usr_admin", role: "admin" }))._unsafeUnwrap();
+
+    expect(org.ownerCount()).toBe(1);
+
+    const blocked = org.changeMemberRole({
+      memberId: OrganizationMemberId.rehydrate("om_owner"),
+      role: OrganizationRoleValue.rehydrate("admin"),
+      changedAt: OccurredAt.rehydrate("2026-01-01T00:03:00.000Z"),
+    });
+    expect(blocked.isErr()).toBe(true);
+    if (blocked.isErr()) {
+      expect(blocked.error.code).toBe("invariant_violation");
+      expect(blocked.error.details?.memberId).toBe("om_owner");
+    }
+
+    org
+      .changeMemberRole({
+        memberId: OrganizationMemberId.rehydrate("om_admin"),
+        role: OrganizationRoleValue.rehydrate("owner"),
+        changedAt: OccurredAt.rehydrate("2026-01-01T00:04:00.000Z"),
+      })
+      ._unsafeUnwrap();
+    expect(org.ownerCount()).toBe(2);
+
+    const changed = org.changeMemberRole({
+      memberId: OrganizationMemberId.rehydrate("om_owner"),
+      role: OrganizationRoleValue.rehydrate("admin"),
+      changedAt: OccurredAt.rehydrate("2026-01-01T00:05:00.000Z"),
+    });
+    expect(changed.isOk()).toBe(true);
+    expect(org.ownerCount()).toBe(1);
+
+    const roleEvents = org
+      .pullDomainEvents()
+      .filter((event) => event.type === "organization.member_role_changed");
+    expect(roleEvents).toHaveLength(2);
+  });
+
+  test("[IDENTITY-DOMAIN-002] removes members while keeping at least one owner", () => {
+    const org = organization({ seatLimit: 4 });
+    org
+      .addMember(member({ id: "om_owner_2", userId: "usr_owner_2", role: "owner" }))
+      ._unsafeUnwrap();
+    org
+      .addMember(member({ id: "om_developer", userId: "usr_developer", role: "developer" }))
+      ._unsafeUnwrap();
+
+    expect(org.memberCount()).toBe(3);
+
+    org
+      .removeMember({
+        memberId: OrganizationMemberId.rehydrate("om_developer"),
+        removedAt: OccurredAt.rehydrate("2026-01-01T00:03:00.000Z"),
+      })
+      ._unsafeUnwrap();
+    expect(org.memberCount()).toBe(2);
+    expect(org.hasMember(OrganizationMemberId.rehydrate("om_developer"))).toBe(false);
+
+    org
+      .removeMember({
+        memberId: OrganizationMemberId.rehydrate("om_owner_2"),
+        removedAt: OccurredAt.rehydrate("2026-01-01T00:04:00.000Z"),
+      })
+      ._unsafeUnwrap();
+    expect(org.ownerCount()).toBe(1);
+
+    const blocked = org.removeMember({
+      memberId: OrganizationMemberId.rehydrate("om_owner"),
+      removedAt: OccurredAt.rehydrate("2026-01-01T00:05:00.000Z"),
+    });
+    expect(blocked.isErr()).toBe(true);
+    if (blocked.isErr()) {
+      expect(blocked.error.code).toBe("invariant_violation");
+      expect(blocked.error.details?.memberId).toBe("om_owner");
+    }
+
+    const removedEvents = org
+      .pullDomainEvents()
+      .filter((event) => event.type === "organization.member_removed");
+    expect(removedEvents).toHaveLength(2);
   });
 });

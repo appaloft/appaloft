@@ -49,7 +49,7 @@ to an explicit application operation.
 
 ## Business Capability Model
 
-The current Appaloft core is organized into eight capability groups:
+The current Appaloft core is organized into eight implemented capability groups:
 
 - Projects
 - Deployment Targets
@@ -61,6 +61,10 @@ The current Appaloft core is organized into eight capability groups:
 - System operations
 
 Each group below lists the currently implemented business operations.
+Identity governance and self-hosted auth are Phase 8 accepted-candidate capability groups; their
+operations must not be treated as active until they are added to this document and
+[`operation-catalog.ts`](/Users/nichenqin/projects/appaloft/packages/application/src/operation-catalog.ts)
+in the same Code Round.
 
 ## Projects
 
@@ -76,8 +80,8 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Create project | Command | `projects.create` | `CreateProjectCommand` | `CreateProjectCommandInput` | `appaloft project create` | `POST /api/projects` |
-| List projects | Query | `projects.list` | `ListProjectsQuery` | `ListProjectsQueryInput` | `appaloft project list` | `GET /api/projects` |
-| Show project | Query | `projects.show` | `ShowProjectQuery` | `ShowProjectQueryInput` | `appaloft project show <projectId>` | `GET /api/projects/{projectId}` |
+| List projects | Product-session member query | `projects.list` | `ListProjectsQuery` | `ListProjectsQueryInput` | `appaloft project list` | `GET /api/projects` |
+| Show project | Product-session member query | `projects.show` | `ShowProjectQuery` | `ShowProjectQueryInput` | `appaloft project show <projectId>` | `GET /api/projects/{projectId}` |
 | Rename project | Command | `projects.rename` | `RenameProjectCommand` | `RenameProjectCommandInput` | `appaloft project rename <projectId> --name <name>` | `POST /api/projects/{projectId}/rename` |
 | Archive project | Command | `projects.archive` | `ArchiveProjectCommand` | `ArchiveProjectCommandInput` | `appaloft project archive <projectId>` | `POST /api/projects/{projectId}/archive` |
 
@@ -129,8 +133,8 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | Register deployment target | Command | `servers.register` | `RegisterServerCommand` | `RegisterServerCommandInput` | `appaloft server register` | `POST /api/servers` |
 | Configure deployment target credential | Command | `servers.configure-credential` | `ConfigureServerCredentialCommand` | `ConfigureServerCredentialCommandInput` | `appaloft server credential <serverId>` | `POST /api/servers/{serverId}/credentials` |
-| List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `appaloft server list` | `GET /api/servers` |
-| Show deployment target | Query | `servers.show` | `ShowServerQuery` | `ShowServerQueryInput` | `appaloft server show <serverId>` | `GET /api/servers/{serverId}` |
+| List deployment targets | Product-session member query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `appaloft server list` | `GET /api/servers` |
+| Show deployment target | Product-session member query | `servers.show` | `ShowServerQuery` | `ShowServerQueryInput` | `appaloft server show <serverId>` | `GET /api/servers/{serverId}` |
 | Inspect deployment target capacity | Query | `servers.capacity.inspect` | `InspectServerCapacityQuery` | `InspectServerCapacityQueryInput` | `appaloft server capacity inspect <serverId>` | `GET /api/servers/{serverId}/capacity` |
 | Rename deployment target | Command | `servers.rename` | `RenameServerCommand` | `RenameServerCommandInput` | `appaloft server rename <serverId> --name <name>` | `POST /api/servers/{serverId}/rename` |
 | Configure deployment target edge proxy | Command | `servers.configure-edge-proxy` | `ConfigureServerEdgeProxyCommand` | `ConfigureServerEdgeProxyCommandInput` | `appaloft server proxy configure <serverId> --kind none\|traefik\|caddy` | `POST /api/servers/{serverId}/edge-proxy/configuration` |
@@ -220,8 +224,8 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Create environment | Command | `environments.create` | `CreateEnvironmentCommand` | `CreateEnvironmentCommandInput` | `appaloft env create` | `POST /api/environments` |
-| List environments | Query | `environments.list` | `ListEnvironmentsQuery` | `ListEnvironmentsQueryInput` | `appaloft env list` | `GET /api/environments` |
-| Show environment | Query | `environments.show` | `ShowEnvironmentQuery` | `ShowEnvironmentQueryInput` | `appaloft env show <environmentId>` | `GET /api/environments/{environmentId}` |
+| List environments | Product-session member query | `environments.list` | `ListEnvironmentsQuery` | `ListEnvironmentsQueryInput` | `appaloft env list` | `GET /api/environments` |
+| Show environment | Product-session member query | `environments.show` | `ShowEnvironmentQuery` | `ShowEnvironmentQueryInput` | `appaloft env show <environmentId>` | `GET /api/environments/{environmentId}` |
 | Rename environment | Command | `environments.rename` | `RenameEnvironmentCommand` | `RenameEnvironmentCommandInput` | `appaloft env rename <environmentId> --name <name>` | `POST /api/environments/{environmentId}/rename` |
 | Set environment variable | Command | `environments.set-variable` | `SetEnvironmentVariableCommand` | `SetEnvironmentVariableCommandInput` | `appaloft env set <environmentId> <key> <value>` | `POST /api/environments/{environmentId}/variables` |
 | Unset environment variable | Command | `environments.unset-variable` | `UnsetEnvironmentVariableCommand` | `UnsetEnvironmentVariableCommandInput` | `appaloft env unset <environmentId> <key>` | `DELETE /api/environments/{environmentId}/variables/{key}` |
@@ -278,8 +282,8 @@ Implemented operations:
 | Unset resource variable | Command | `resources.unset-variable` | `UnsetResourceVariableCommand` | `UnsetResourceVariableCommandInput` | `appaloft resource unset-variable <resourceId> <key>` | `DELETE /api/resources/{resourceId}/variables/{key}` |
 | Archive resource | Command | `resources.archive` | `ArchiveResourceCommand` | `ArchiveResourceCommandInput` | `appaloft resource archive <resourceId>` | `POST /api/resources/{resourceId}/archive` |
 | Delete resource | Command | `resources.delete` | `DeleteResourceCommand` | `DeleteResourceCommandInput` | `appaloft resource delete <resourceId> --confirm-slug <slug>` | `DELETE /api/resources/{resourceId}` |
-| List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
-| Show resource profile | Query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
+| List resources | Product-session member query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
+| Show resource profile | Product-session member query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
 | Read resource effective configuration | Query | `resources.effective-config` | `ResourceEffectiveConfigQuery` | `ResourceEffectiveConfigQueryInput` | `appaloft resource effective-config <resourceId>` | `GET /api/resources/{resourceId}/effective-config` |
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
 | Stop resource runtime | Command | `resources.runtime.stop` | `StopResourceRuntimeCommand` | `StopResourceRuntimeCommandInput` | `appaloft resource runtime stop <resourceId>` | `POST /api/resources/{resourceId}/runtime/stop` |
@@ -637,8 +641,8 @@ Implemented operations:
 | Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `appaloft deploy [path-or-source]` or ids-only flags | `POST /api/deployments` |
 | Cleanup preview deployment | Command | `deployments.cleanup-preview` | `CleanupPreviewCommand` | `CleanupPreviewCommandInput` | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` | `POST /api/deployments/cleanup-preview` |
 | Preview deployment plan | Query | `deployments.plan` | `DeploymentPlanQuery` | `DeploymentPlanQueryInput` | `appaloft deployments plan --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` | `GET /api/deployments/plan` |
-| List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
-| Show deployment detail | Query | `deployments.show` | `ShowDeploymentQuery` | `ShowDeploymentQueryInput` | `appaloft deployments show <deploymentId>` | `GET /api/deployments/{deploymentId}` |
+| List deployments | Product-session member query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
+| Show deployment detail | Product-session member query | `deployments.show` | `ShowDeploymentQuery` | `ShowDeploymentQueryInput` | `appaloft deployments show <deploymentId>` | `GET /api/deployments/{deploymentId}` |
 | Read deployment recovery readiness | Query | `deployments.recovery-readiness` | `DeploymentRecoveryReadinessQuery` | `DeploymentRecoveryReadinessQueryInput` | `appaloft deployments recovery-readiness <deploymentId>` | `GET /api/deployments/{deploymentId}/recovery-readiness` |
 | Retry deployment attempt | Command | `deployments.retry` | `RetryDeploymentCommand` | `RetryDeploymentCommandInput` | `appaloft deployments retry <deploymentId>` | `POST /api/deployments/{deploymentId}/retry` |
 | Redeploy current resource profile | Command | `deployments.redeploy` | `RedeployDeploymentCommand` | `RedeployDeploymentCommandInput` | `appaloft deployments redeploy <resourceId>` | `POST /api/resources/{resourceId}/redeploy` |
@@ -942,6 +946,92 @@ Core next operations expected here:
 - `deployments.retry`
 - `deployments.redeploy`
 - `deployments.rollback`
+
+## Identity Governance And Self-Hosted Auth
+
+Business meaning:
+- identity governance owns organizations, membership, and machine credentials for self-hosted and
+  future hosted control-plane operation
+- deploy tokens are machine credentials for automation, not Better Auth user sessions
+- Action mutation endpoints must be authenticated and authorized before they can reach source-link,
+  config bootstrap, preview cleanup, route, resource, or deployment commands
+
+Implemented operations:
+
+| Operation | Status | Operation key | Message | Input model | CLI | HTTP/oRPC |
+| --- | --- | --- | --- | --- | --- | --- |
+| Create deploy token | Admin/operator-protected lifecycle command | `deploy-tokens.create` | `CreateDeployTokenCommand` | `CreateDeployTokenCommandInput` | `appaloft deploy-token create` | `POST /api/deploy-tokens` |
+| List deploy tokens | Admin/operator-protected lifecycle query | `deploy-tokens.list` | `ListDeployTokensQuery` | `ListDeployTokensQueryInput` | `appaloft deploy-token list` | `GET /api/deploy-tokens` |
+| Show deploy token | Admin/operator-protected lifecycle query | `deploy-tokens.show` | `ShowDeployTokenQuery` | `ShowDeployTokenQueryInput` | `appaloft deploy-token show <tokenId>` | `GET /api/deploy-tokens/{tokenId}` |
+| Rotate deploy token | Admin/operator-protected lifecycle command | `deploy-tokens.rotate` | `RotateDeployTokenCommand` | `RotateDeployTokenCommandInput` | `appaloft deploy-token rotate <tokenId> --confirm <tokenId>` | `POST /api/deploy-tokens/{tokenId}/rotate` |
+| Revoke deploy token | Admin/operator-protected lifecycle command | `deploy-tokens.revoke` | `RevokeDeployTokenCommand` | `RevokeDeployTokenCommandInput` | `appaloft deploy-token revoke <tokenId> --confirm <tokenId>` | `POST /api/deploy-tokens/{tokenId}/revoke` |
+
+The foundational `Organization` aggregate exists in `packages/core`, Better Auth-compatible tables
+exist in persistence, Web can read auth-session status, and deploy-token create/list/show/rotate/
+revoke now have application message handlers plus CLI and admin-protected HTTP/oRPC
+operation-catalog transports. Web `/organization` now exposes deploy-token list/create/rotate/
+revoke through the same contracts. Future MCP token management remains a Phase 8 gap.
+
+Docker self-host installer bootstrap is a narrow install-time entrypoint over the existing
+`deploy-tokens.create` application command, not a public deploy-token management surface.
+`install.sh` configures a container-local `APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE`; Shell
+startup uses `ListDeployTokensQuery` and `CreateDeployTokenCommand` to write one-time raw token
+handoff output only when no active `org_self_hosted` deploy token exists, and the installer reads
+and removes that file before printing the token to trusted install output.
+
+Accepted candidate operations for Phase 8:
+- first-admin bootstrap and admin authorization policy
+- organization/team membership management
+
+Accepted-candidate first-admin operations are governed by
+[ADR-044: Self-Hosted First Admin Bootstrap](./decisions/ADR-044-self-hosted-first-admin-bootstrap.md)
+and [Self-Hosted First Admin Bootstrap](./specs/053-self-hosted-first-admin-bootstrap/spec.md):
+
+| Operation | Status | Operation key | Message | Input model | CLI | HTTP/oRPC |
+| --- | --- | --- | --- | --- | --- | --- |
+| Read first-admin bootstrap status | Public bootstrap query | `auth.bootstrap-status` | `GetAuthBootstrapStatusQuery` | `GetAuthBootstrapStatusQueryInput` | `appaloft auth bootstrap-status`; installer also reads safe handoff output | `GET /api/bootstrap/auth/status` |
+| Bootstrap first admin | Public one-time bootstrap command | `auth.bootstrap-first-admin` | `BootstrapFirstAdminCommand` | `BootstrapFirstAdminCommandInput` | `appaloft auth bootstrap-first-admin`; installer can also drive setup through trusted config/handoff | `POST /api/bootstrap/auth/first-admin`; application status check keeps it one-time/idempotent |
+
+These operations must use Appaloft-owned application ports so `@appaloft/auth-better` can implement
+local email/password user creation and initial organization ownership without leaking Better Auth
+types into core or application.
+
+Accepted-candidate organization/team operations are governed by
+[ADR-045: Self-Hosted Organization Team Operations](./decisions/ADR-045-self-hosted-organization-team-operations.md)
+and
+[Self-Hosted Organization Team Operations](./specs/054-self-hosted-organization-team-operations/spec.md):
+
+| Operation | Status | Operation key | Message | Input model | CLI | HTTP/oRPC |
+| --- | --- | --- | --- | --- | --- | --- |
+| Read current organization context | Product-session protected query | `organizations.current-context` | `GetCurrentOrganizationContextQuery` | `GetCurrentOrganizationContextQueryInput` | `appaloft organization context` | `GET /api/organizations/current-context` |
+| Switch current organization | Product-session protected command | `organizations.switch-current` | `SwitchCurrentOrganizationCommand` | `SwitchCurrentOrganizationCommandInput` | `appaloft organization switch <organizationId>` | `POST /api/organizations/current-context/switch` |
+| List organization members | Admin/operator-protected query | `organizations.list-members` | `ListOrganizationMembersQuery` | `ListOrganizationMembersQueryInput` | `appaloft organization members list` | `GET /api/organizations/{organizationId}/members` |
+| List organization invitations | Admin/operator-protected query | `organizations.list-invitations` | `ListOrganizationInvitationsQuery` | `ListOrganizationInvitationsQueryInput` | `appaloft organization invitations list` | `GET /api/organizations/{organizationId}/invitations` |
+| Invite organization member | Admin/operator-protected command | `organizations.invite-member` | `InviteOrganizationMemberCommand` | `InviteOrganizationMemberCommandInput` | `appaloft organization member invite` | `POST /api/organizations/{organizationId}/invitations` |
+| Change organization member role | Admin/operator-protected command | `organizations.change-member-role` | `ChangeOrganizationMemberRoleCommand` | `ChangeOrganizationMemberRoleCommandInput` | `appaloft organization member role <memberId>` | `POST /api/organizations/{organizationId}/members/{memberId}/role` |
+| Remove organization member | Admin/operator-protected command | `organizations.remove-member` | `RemoveOrganizationMemberCommand` | `RemoveOrganizationMemberCommandInput` | `appaloft organization member remove <memberId>` | `DELETE /api/organizations/{organizationId}/members/{memberId}` |
+
+These operations now have application message/handler/service boundaries, `@appaloft/auth-better`
+adapter implementations, operation-catalog transports, authorization-gated HTTP/oRPC routes, and
+CLI commands. Public docs/help coverage is active under
+`self-hosting.organization-team-management`; Web `/organization` exposes current context, safe
+current organization switching, member and invitation reads, invite, role update, removal, and
+deploy-token controls through the same oRPC contracts. Concrete future MCP tool descriptors remain
+Phase 8 follow-up work.
+
+Current boundary:
+- self-hosted Action deploy-token authentication is an admission gate over existing Action
+  workflows, not a new deployment operation
+- `POST /api/action/deployments/from-source-link`,
+  `POST /api/action/deployments/from-config-package`, and self-hosted Action
+  `POST /api/deployments/cleanup-preview` must require bearer deploy-token authorization before
+  mutation when ADR-043 enters Code Round
+- deploy tokens must never be accepted from repository config, query strings, source packages, or
+  `deployments.create` input
+- raw token values are one-time output only; list/show/readiness/log surfaces expose safe metadata
+  and scope summaries only
+- deploy-token lifecycle operations are public through CLI, HTTP/oRPC, and Web `/organization`;
+  concrete future MCP descriptors remain a named Phase 8 gap
 
 ## Operator Work
 

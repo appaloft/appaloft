@@ -66,6 +66,19 @@ Current status:
   Self-hosted Docker install docs now describe the PostgreSQL default, `install.sh --database
   pglite` escape hatch, direct `3721` access, and `--domain` Appaloft instance console route under
   the stable `self-hosting/install#self-hosting-install-docker` anchor.
+  Self-hosted Action deploy-token docs now describe installer bootstrap output, GitHub Secret
+  wiring through `appaloft-token`, 401/403 recovery, scope meaning, CLI lifecycle commands, and
+  admin-protected HTTP/API lifecycle endpoints under
+  `self-hosting/action-deploy-token-auth#self-hosting-action-deploy-token-auth`.
+  Self-hosted first-admin docs now describe installer-driven local admin bootstrap, generated
+  one-time passwords, login URL expectations, public bootstrap status/setup endpoints, OAuth
+  optionality, required OAuth provider settings, callback URL expectations, trusted origin
+  configuration, and product auth 401/403 recovery under
+  `self-hosting/first-admin-bootstrap#self-hosting-first-admin-bootstrap`.
+  Self-hosted organization/team docs now describe current context, current organization switching,
+  member and invitation lists, member invitation, role updates, removal, CLI session handoff, safe
+  outputs, and product auth 401/403 recovery under
+  `self-hosting/organization-team-management#self-hosting-organization-team-management`.
   Repository config docs now describe `controlPlane.mode` and safe `controlPlane.url` usage under
   `environments/reference/config-file#environment-config-file-control-plane`.
 - `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
@@ -86,6 +99,15 @@ Current status:
   sessions, and resource detail/profile editing closure for source/runtime/network/access/health/
   configuration sections. Server registration provider help now points at the Docker Swarm runtime
   target anchor for cluster-target readiness and unsupported-field recovery.
+  Self-hosted Action deploy-token auth is covered as an installer, GitHub Action, CLI lifecycle,
+  HTTP/API error, admin-protected lifecycle API, and future MCP/tool help topic; Web lifecycle
+  management surfaces remain later Phase 8 work.
+  Self-hosted first-admin bootstrap is covered as an installer, Web onboarding/login, public
+  bootstrap HTTP/API, product auth error recovery, and future member/token management help topic.
+  Organization/team operation contracts are now covered by the stable
+  `self-hosting.organization-team-management` help topic for HTTP/API routes, CLI commands, session
+  input, safe outputs, owner-retention recovery, current organization switching, and apps/web
+  `/organization` member/deploy-token management.
 - `PUB-DOCS-011` has expanded CLI coverage for high-confusion operations including deployment
   source, preview cleanup, source relink, SSH credentials, server connectivity, terminal sessions,
   project lifecycle, resource profiles, environment variables, domains, certificates, logs, health,
@@ -124,8 +146,12 @@ Current status:
   traceability is recorded as a target-help anchor with deferred execution UI. Scheduled task
   traceability is recorded for active CLI/HTTP/API/Web/future MCP help links. Preview deployment
   traceability is recorded for Action-only CLI/repository-config guidance and future
-  Cloud/self-hosted product-grade preview surfaces. Dependency runtime injection traceability is
-  recorded for safe bind-to-deploy behavior and plan/show blocked readiness.
+  Cloud/self-hosted product-grade preview surfaces. Self-hosted Action deploy-token auth
+  traceability is recorded for installer bootstrap output, GitHub Action secret wiring, and
+  HTTP/API 401/403 recovery. Organization/team management traceability is recorded for HTTP/API
+  routes, CLI commands, apps/web `/organization`, and product session 401/403 recovery. Dependency
+  runtime injection traceability is recorded for safe bind-to-deploy
+  behavior and plan/show blocked readiness.
 - `PUB-DOCS-017` is covered for registered public error guides by
   `packages/docs-registry/test/help-topics.test.ts`.
 

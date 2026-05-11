@@ -2,6 +2,10 @@ import { publicDocsBasePath, resolvePublicDocsHelpHref } from "@appaloft/docs-re
 
 export const webDocsHrefs = {
   docsHome: `${publicDocsBasePath}/`,
+  firstAdminBootstrap: resolvePublicDocsHelpHref("self-hosting.first-admin-bootstrap"),
+  organizationTeamManagement: resolvePublicDocsHelpHref(
+    "self-hosting.organization-team-management",
+  ),
   deploymentLifecycle: resolvePublicDocsHelpHref("deployment.lifecycle"),
   deploymentPlanPreview: resolvePublicDocsHelpHref("deployment.plan-preview"),
   productGradePreviews: resolvePublicDocsHelpHref("deployment.product-grade-previews"),

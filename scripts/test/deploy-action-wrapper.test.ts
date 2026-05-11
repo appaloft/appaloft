@@ -343,6 +343,67 @@ describe("deploy-action wrapper reference", () => {
     }
   });
 
+  test("[SELF-AUTH-ACTION-007] self-hosted preview cleanup sends Action auth marker and bearer token", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-cleanup-auth-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const curlArgsPath = join(workspace, "curl-args.txt");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'printf "%s\\n" "$*" >> "$APPALOFT_TEST_CURL_ARGS_PATH"',
+        'case "$*" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackages":true}}\'',
+        "    ;;",
+        '  *"/api/deployments/cleanup-preview"*)',
+        '    printf \'{"status":"cleaned"}\'',
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        APPALOFT_TEST_CURL_ARGS_PATH: curlArgsPath,
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_APPALOFT_TOKEN: "action-token-fixture",
+        INPUT_COMMAND: "preview-cleanup",
+        INPUT_CONFIG: "appaloft.preview.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_PREVIEW: "pull-request",
+        INPUT_PREVIEW_ID: "pr-42",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const curlArgs = readFileSync(curlArgsPath, "utf8");
+      expect(curlArgs).toContain("Authorization: Bearer action-token-fixture");
+      expect(curlArgs).toContain("X-Appaloft-Action-Command: preview-cleanup");
+      expect(readFileSync(outputPath, "utf8")).toContain("preview-cleanup-status=cleaned");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   test("[CONTROL-PLANE-HANDSHAKE-012] self-hosted preview deploy calls the server deployment API", () => {
     const result = runDeploy({
       INPUT_CONFIG: "appaloft.preview.yml",

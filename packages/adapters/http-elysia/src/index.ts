@@ -1,6 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import {
+  type ActionDeployTokenAuthorizationPort,
   type AppLogger,
   type AutomaticRouteContextLookup,
   type CertificateHttpChallengeTokenStore,
@@ -17,6 +18,7 @@ import {
   ListProjectsQuery,
   ListResourcesQuery,
   ListServersQuery,
+  type ProductSessionAuthorizationPort,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
   type SourceEventVerificationPort,
@@ -65,7 +67,7 @@ interface SystemPluginRuntime {
   listHttpRoutes(): SystemPluginHttpRoute[];
 }
 
-interface AuthRuntime {
+interface AuthRuntime extends ProductSessionAuthorizationPort {
   getSessionStatus(request: Request): Promise<{
     enabled: boolean;
     provider: "none" | "better-auth";
@@ -73,7 +75,7 @@ interface AuthRuntime {
     deferredAuth: boolean;
     session: unknown | null;
     providers: Array<{
-      key: "github";
+      key: "github" | "google" | "oidc";
       title: string;
       configured: boolean;
       connected: boolean;
@@ -482,6 +484,7 @@ export function createHttpApp(input: {
   sourceEventVerificationPort?: SourceEventVerificationPort;
   githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
+  actionDeployTokenAuthorizationPort?: ActionDeployTokenAuthorizationPort;
   actionSourcePackageConfigReader?: ActionSourcePackageConfigReader;
 }) {
   const pluginMiddlewares = input.pluginRuntime?.listHttpMiddlewares() ?? [];
@@ -997,6 +1000,7 @@ export function createHttpApp(input: {
       apiVersion,
       mode: input.config.runtimeMode,
       features: {
+        actionDeployTokenAuth: Boolean(input.actionDeployTokenAuthorizationPort),
         actionServerConfigDeploy: Boolean(input.actionSourcePackageConfigReader),
         sourcePackages: true,
         serverSideConfigBootstrap: Boolean(input.actionSourcePackageConfigReader),
@@ -1169,9 +1173,19 @@ export function createHttpApp(input: {
           githubPreviewPullRequestWebhookVerifier: input.githubPreviewPullRequestWebhookVerifier,
         }
       : {}),
+    ...(input.actionDeployTokenAuthorizationPort
+      ? {
+          actionDeployTokenAuthorizationPort: input.actionDeployTokenAuthorizationPort,
+        }
+      : {}),
     ...(input.actionSourcePackageConfigReader
       ? {
           actionSourcePackageConfigReader: input.actionSourcePackageConfigReader,
+        }
+      : {}),
+    ...(input.authRuntime
+      ? {
+          productSessionAuthorizationPort: input.authRuntime,
         }
       : {}),
     ...(input.config.githubWebhookSecret

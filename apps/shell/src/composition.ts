@@ -11,11 +11,14 @@ import {
 } from "@appaloft/adapter-cli";
 import { createHttpApp } from "@appaloft/adapter-http-elysia";
 import {
+  type ActionDeployTokenAuthorizationPort,
   type AppLogger,
   type AutomaticRouteContextLookup,
   type CertificateHttpChallengeTokenStore,
   type CertificateRetryScheduler,
+  type Clock,
   type CommandBus,
+  type DeployTokenRepository,
   type ExecutionContext,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
@@ -42,7 +45,11 @@ import {
   UpsertServerAppliedRouteDesiredStateSpec,
   UpsertSourceLinkSpec,
 } from "@appaloft/application";
-import { createBetterAuthRuntime } from "@appaloft/auth-better";
+import {
+  createBetterAuthRuntime,
+  PersistedActionDeployTokenAuthorizationPort,
+  StaticActionDeployTokenAuthorizationPort,
+} from "@appaloft/auth-better";
 import { type AppConfig, resolveConfig } from "@appaloft/config";
 import { domainError, err, ok } from "@appaloft/core";
 import { createGitHubActionSourcePackageConfigReader } from "@appaloft/integration-github";
@@ -60,7 +67,9 @@ import {
 import { type LocalPluginHost } from "@appaloft/plugin-host";
 import { container, type DependencyContainer } from "tsyringe";
 import { createCertificateRetrySchedulerRunner } from "./certificate-retry-scheduler-runner";
+import { writeBootstrapDeployTokenOutput } from "./deploy-token-bootstrap";
 import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
+import { writeBootstrapFirstAdminOutput } from "./first-admin-bootstrap";
 import { adoptLegacyPgliteState } from "./legacy-pglite-state-adoption";
 import {
   createDisabledPreviewCleanupRetrySchedulerRunner,
@@ -328,6 +337,16 @@ export async function createAppComposition(
     },
     ...(config.githubClientId ? { githubClientId: config.githubClientId } : {}),
     ...(config.githubClientSecret ? { githubClientSecret: config.githubClientSecret } : {}),
+    ...(config.githubRedirectUri ? { githubRedirectUri: config.githubRedirectUri } : {}),
+    ...(config.googleClientId ? { googleClientId: config.googleClientId } : {}),
+    ...(config.googleClientSecret ? { googleClientSecret: config.googleClientSecret } : {}),
+    ...(config.googleRedirectUri ? { googleRedirectUri: config.googleRedirectUri } : {}),
+    ...(config.oidcClientId ? { oidcClientId: config.oidcClientId } : {}),
+    ...(config.oidcClientSecret ? { oidcClientSecret: config.oidcClientSecret } : {}),
+    ...(config.oidcDiscoveryUrl ? { oidcDiscoveryUrl: config.oidcDiscoveryUrl } : {}),
+    ...(config.oidcIssuer ? { oidcIssuer: config.oidcIssuer } : {}),
+    ...(config.oidcRedirectUri ? { oidcRedirectUri: config.oidcRedirectUri } : {}),
+    trustedOrigins: [config.webOrigin],
   });
   const childContainer = container.createChildContainer();
 
@@ -373,10 +392,43 @@ export async function createAppComposition(
       childContainer,
       tokens.githubPreviewPullRequestWebhookVerifier,
     );
+  const deployTokenRepository = resolveToken<DeployTokenRepository>(
+    childContainer,
+    tokens.deployTokenRepository,
+  );
+  const clock = resolveToken<Clock>(childContainer, tokens.clock);
+  const actionDeployTokenAuthorizationPort: ActionDeployTokenAuthorizationPort | undefined =
+    config.actionDeployToken
+      ? new StaticActionDeployTokenAuthorizationPort({
+          ...(config.actionDeployTokenScope ? { scope: config.actionDeployTokenScope } : {}),
+          token: config.actionDeployToken,
+        })
+      : new PersistedActionDeployTokenAuthorizationPort({
+          clock,
+          repository: deployTokenRepository,
+        });
   const executionContextFactory = createExecutionContextFactory({
     idGenerator,
     tracer: telemetry.tracer,
   });
+  const bootstrapDeployTokenOutput = await writeBootstrapDeployTokenOutput({
+    config,
+    commandBus,
+    queryBus,
+    executionContextFactory,
+  });
+  if (bootstrapDeployTokenOutput.isErr()) {
+    throw new Error(bootstrapDeployTokenOutput.error.message);
+  }
+  const bootstrapFirstAdminOutput = await writeBootstrapFirstAdminOutput({
+    config,
+    commandBus,
+    queryBus,
+    executionContextFactory,
+  });
+  if (bootstrapFirstAdminOutput.isErr()) {
+    throw new Error(bootstrapFirstAdminOutput.error.message);
+  }
   const pluginRuntime = resolveToken<LocalPluginHost>(childContainer, tokens.pluginRegistry);
   const requestContextRunner = resolveToken<RequestContextRunner>(
     childContainer,
@@ -459,6 +511,7 @@ export async function createAppComposition(
     sourceEventVerificationPort,
     githubSourceEventWebhookVerifier,
     githubPreviewPullRequestWebhookVerifier,
+    ...(actionDeployTokenAuthorizationPort ? { actionDeployTokenAuthorizationPort } : {}),
     actionSourcePackageConfigReader: createGitHubActionSourcePackageConfigReader(),
     pluginRuntime,
     authRuntime,

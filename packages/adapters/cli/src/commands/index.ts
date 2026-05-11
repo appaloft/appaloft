@@ -1,15 +1,18 @@
 import { Command as EffectCommand } from "@effect/cli";
 
+import { authCommand } from "./auth.js";
 import { certificateCommand } from "./certificate.js";
 import { dbCommand } from "./db.js";
 import { defaultAccessCommand } from "./default-access.js";
 import { dependencyCommand } from "./dependency.js";
+import { deployTokenCommand } from "./deploy-token.js";
 import { deployCommand, deploymentsCommand, logsCommand, previewCommand } from "./deployment.js";
 import { domainBindingCommand } from "./domain-binding.js";
 import { envCommand } from "./environment.js";
 import { pluginsCommand, providersCommand } from "./integrations.js";
 import { doctorCommand, initCommand, serveCommand, versionCommand } from "./lifecycle.js";
 import { operatorWorkCommand } from "./operator-work.js";
+import { organizationCommand } from "./organization.js";
 import { projectCommand } from "./project.js";
 import { remoteStateCommand } from "./remote-state.js";
 import { resourceCommand } from "./resource.js";
@@ -27,10 +30,13 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     initCommand,
     doctorCommand,
     dbCommand,
+    authCommand,
     defaultAccessCommand,
     projectCommand,
     resourceCommand,
     dependencyCommand,
+    deployTokenCommand,
+    organizationCommand,
     scheduledTaskCommand,
     storageCommand,
     serverCommand,

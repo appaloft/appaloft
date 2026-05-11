@@ -472,6 +472,27 @@ export class OrganizationMemberId extends IdentifierValue {
   }
 }
 
+const deployTokenIdBrand: unique symbol = Symbol("DeployTokenId");
+export class DeployTokenId extends IdentifierValue {
+  private [deployTokenIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DeployTokenId> {
+    return createIdentifierValue(
+      value,
+      "Deploy token ID",
+      (normalized) => new DeployTokenId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): DeployTokenId {
+    return new DeployTokenId(value.trim());
+  }
+}
+
 const userIdBrand: unique symbol = Symbol("UserId");
 export class UserId extends IdentifierValue {
   private [userIdBrand]!: void;

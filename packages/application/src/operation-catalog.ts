@@ -1,4 +1,6 @@
 import { type ZodTypeAny } from "zod";
+import { bootstrapFirstAdminCommandInputSchema } from "./operations/auth/bootstrap-first-admin.schema";
+import { getAuthBootstrapStatusQueryInputSchema } from "./operations/auth/get-auth-bootstrap-status.query";
 import { deleteCertificateCommandInputSchema } from "./operations/certificates/delete-certificate.command";
 import { importCertificateCommandInputSchema } from "./operations/certificates/import-certificate.command";
 import { issueOrRenewCertificateCommandInputSchema } from "./operations/certificates/issue-or-renew-certificate.command";
@@ -21,6 +23,11 @@ import { renameDependencyResourceCommandInputSchema } from "./operations/depende
 import { restoreDependencyResourceBackupCommandInputSchema } from "./operations/dependency-resources/restore-dependency-resource-backup.command";
 import { showDependencyResourceQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource.query";
 import { showDependencyResourceBackupQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource-backup.query";
+import { createDeployTokenCommandInputSchema } from "./operations/deploy-tokens/create-deploy-token.schema";
+import { listDeployTokensQueryInputSchema } from "./operations/deploy-tokens/list-deploy-tokens.schema";
+import { revokeDeployTokenCommandInputSchema } from "./operations/deploy-tokens/revoke-deploy-token.schema";
+import { rotateDeployTokenCommandInputSchema } from "./operations/deploy-tokens/rotate-deploy-token.schema";
+import { showDeployTokenQueryInputSchema } from "./operations/deploy-tokens/show-deploy-token.schema";
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
@@ -55,6 +62,13 @@ import { unlockEnvironmentCommandInputSchema } from "./operations/environments/u
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { listOperatorWorkQueryInputSchema } from "./operations/operator-work/list-operator-work.query";
 import { showOperatorWorkQueryInputSchema } from "./operations/operator-work/show-operator-work.query";
+import { changeOrganizationMemberRoleCommandInputSchema } from "./operations/organizations/change-organization-member-role.command";
+import { getCurrentOrganizationContextQueryInputSchema } from "./operations/organizations/get-current-organization-context.query";
+import { inviteOrganizationMemberCommandInputSchema } from "./operations/organizations/invite-organization-member.command";
+import { listOrganizationInvitationsQueryInputSchema } from "./operations/organizations/list-organization-invitations.query";
+import { listOrganizationMembersQueryInputSchema } from "./operations/organizations/list-organization-members.query";
+import { removeOrganizationMemberCommandInputSchema } from "./operations/organizations/remove-organization-member.command";
+import { switchCurrentOrganizationCommandInputSchema } from "./operations/organizations/switch-current-organization.command";
 import { configurePreviewPolicyCommandInputSchema } from "./operations/preview-deployments/configure-preview-policy.command";
 import { deletePreviewEnvironmentCommandInputSchema } from "./operations/preview-deployments/delete-preview-environment.command";
 import { listPreviewEnvironmentsQueryInputSchema } from "./operations/preview-deployments/list-preview-environments.query";
@@ -147,6 +161,9 @@ type OperationDomain =
   | "scheduled-tasks"
   | "scheduled-task-runs"
   | "storage-volumes"
+  | "deploy-tokens"
+  | "auth"
+  | "organizations"
   | "deployments"
   | "operator-work"
   | "preview-policies"
@@ -188,6 +205,205 @@ export interface OperationCatalogEntry {
 // Source of truth for business operations.
 // CLI, oRPC, HTTP, and future MCP tools must dispatch these messages instead of bypassing application handlers.
 export const operationCatalog = [
+  {
+    key: "auth.bootstrap-status",
+    kind: "query",
+    domain: "auth",
+    messageName: "GetAuthBootstrapStatusQuery",
+    handlerName: "GetAuthBootstrapStatusQueryHandler",
+    serviceName: "GetAuthBootstrapStatusQueryService",
+    inputSchema: getAuthBootstrapStatusQueryInputSchema,
+    serviceToken: tokens.getAuthBootstrapStatusQueryService,
+    transports: {
+      cli: "appaloft auth bootstrap-status",
+      orpc: { method: "GET", path: "/api/bootstrap/auth/status" },
+    },
+  },
+  {
+    key: "auth.bootstrap-first-admin",
+    kind: "command",
+    domain: "auth",
+    messageName: "BootstrapFirstAdminCommand",
+    handlerName: "BootstrapFirstAdminCommandHandler",
+    serviceName: "BootstrapFirstAdminUseCase",
+    inputSchema: bootstrapFirstAdminCommandInputSchema,
+    serviceToken: tokens.bootstrapFirstAdminUseCase,
+    transports: {
+      cli: "appaloft auth bootstrap-first-admin",
+      orpc: { method: "POST", path: "/api/bootstrap/auth/first-admin" },
+    },
+  },
+  {
+    key: "organizations.current-context",
+    kind: "query",
+    domain: "organizations",
+    messageName: "GetCurrentOrganizationContextQuery",
+    handlerName: "GetCurrentOrganizationContextQueryHandler",
+    serviceName: "GetCurrentOrganizationContextQueryService",
+    inputSchema: getCurrentOrganizationContextQueryInputSchema,
+    serviceToken: tokens.getCurrentOrganizationContextQueryService,
+    transports: {
+      cli: "appaloft organization context",
+      orpc: { method: "GET", path: "/api/organizations/current-context" },
+    },
+  },
+  {
+    key: "organizations.switch-current",
+    kind: "command",
+    domain: "organizations",
+    messageName: "SwitchCurrentOrganizationCommand",
+    handlerName: "SwitchCurrentOrganizationCommandHandler",
+    serviceName: "SwitchCurrentOrganizationUseCase",
+    inputSchema: switchCurrentOrganizationCommandInputSchema,
+    serviceToken: tokens.switchCurrentOrganizationUseCase,
+    transports: {
+      cli: "appaloft organization switch <organizationId>",
+      orpc: { method: "POST", path: "/api/organizations/current-context/switch" },
+    },
+  },
+  {
+    key: "organizations.list-members",
+    kind: "query",
+    domain: "organizations",
+    messageName: "ListOrganizationMembersQuery",
+    handlerName: "ListOrganizationMembersQueryHandler",
+    serviceName: "ListOrganizationMembersQueryService",
+    inputSchema: listOrganizationMembersQueryInputSchema,
+    serviceToken: tokens.listOrganizationMembersQueryService,
+    transports: {
+      cli: "appaloft organization members list",
+      orpc: { method: "GET", path: "/api/organizations/{organizationId}/members" },
+    },
+  },
+  {
+    key: "organizations.list-invitations",
+    kind: "query",
+    domain: "organizations",
+    messageName: "ListOrganizationInvitationsQuery",
+    handlerName: "ListOrganizationInvitationsQueryHandler",
+    serviceName: "ListOrganizationInvitationsQueryService",
+    inputSchema: listOrganizationInvitationsQueryInputSchema,
+    serviceToken: tokens.listOrganizationInvitationsQueryService,
+    transports: {
+      cli: "appaloft organization invitations list",
+      orpc: { method: "GET", path: "/api/organizations/{organizationId}/invitations" },
+    },
+  },
+  {
+    key: "organizations.invite-member",
+    kind: "command",
+    domain: "organizations",
+    messageName: "InviteOrganizationMemberCommand",
+    handlerName: "InviteOrganizationMemberCommandHandler",
+    serviceName: "InviteOrganizationMemberUseCase",
+    inputSchema: inviteOrganizationMemberCommandInputSchema,
+    serviceToken: tokens.inviteOrganizationMemberUseCase,
+    transports: {
+      cli: "appaloft organization member invite",
+      orpc: { method: "POST", path: "/api/organizations/{organizationId}/invitations" },
+    },
+  },
+  {
+    key: "organizations.change-member-role",
+    kind: "command",
+    domain: "organizations",
+    messageName: "ChangeOrganizationMemberRoleCommand",
+    handlerName: "ChangeOrganizationMemberRoleCommandHandler",
+    serviceName: "ChangeOrganizationMemberRoleUseCase",
+    inputSchema: changeOrganizationMemberRoleCommandInputSchema,
+    serviceToken: tokens.changeOrganizationMemberRoleUseCase,
+    transports: {
+      cli: "appaloft organization member role <memberId>",
+      orpc: {
+        method: "POST",
+        path: "/api/organizations/{organizationId}/members/{memberId}/role",
+      },
+    },
+  },
+  {
+    key: "organizations.remove-member",
+    kind: "command",
+    domain: "organizations",
+    messageName: "RemoveOrganizationMemberCommand",
+    handlerName: "RemoveOrganizationMemberCommandHandler",
+    serviceName: "RemoveOrganizationMemberUseCase",
+    inputSchema: removeOrganizationMemberCommandInputSchema,
+    serviceToken: tokens.removeOrganizationMemberUseCase,
+    transports: {
+      cli: "appaloft organization member remove <memberId>",
+      orpc: { method: "DELETE", path: "/api/organizations/{organizationId}/members/{memberId}" },
+    },
+  },
+  {
+    key: "deploy-tokens.create",
+    kind: "command",
+    domain: "deploy-tokens",
+    messageName: "CreateDeployTokenCommand",
+    handlerName: "CreateDeployTokenCommandHandler",
+    serviceName: "CreateDeployTokenUseCase",
+    inputSchema: createDeployTokenCommandInputSchema,
+    serviceToken: tokens.createDeployTokenUseCase,
+    transports: {
+      cli: "appaloft deploy-token create",
+      orpc: { method: "POST", path: "/api/deploy-tokens" },
+    },
+  },
+  {
+    key: "deploy-tokens.list",
+    kind: "query",
+    domain: "deploy-tokens",
+    messageName: "ListDeployTokensQuery",
+    handlerName: "ListDeployTokensQueryHandler",
+    serviceName: "ListDeployTokensQueryService",
+    inputSchema: listDeployTokensQueryInputSchema,
+    serviceToken: tokens.listDeployTokensQueryService,
+    transports: {
+      cli: "appaloft deploy-token list",
+      orpc: { method: "GET", path: "/api/deploy-tokens" },
+    },
+  },
+  {
+    key: "deploy-tokens.show",
+    kind: "query",
+    domain: "deploy-tokens",
+    messageName: "ShowDeployTokenQuery",
+    handlerName: "ShowDeployTokenQueryHandler",
+    serviceName: "ShowDeployTokenQueryService",
+    inputSchema: showDeployTokenQueryInputSchema,
+    serviceToken: tokens.showDeployTokenQueryService,
+    transports: {
+      cli: "appaloft deploy-token show <tokenId>",
+      orpc: { method: "GET", path: "/api/deploy-tokens/{tokenId}" },
+    },
+  },
+  {
+    key: "deploy-tokens.rotate",
+    kind: "command",
+    domain: "deploy-tokens",
+    messageName: "RotateDeployTokenCommand",
+    handlerName: "RotateDeployTokenCommandHandler",
+    serviceName: "RotateDeployTokenUseCase",
+    inputSchema: rotateDeployTokenCommandInputSchema,
+    serviceToken: tokens.rotateDeployTokenUseCase,
+    transports: {
+      cli: "appaloft deploy-token rotate <tokenId> --confirm <tokenId>",
+      orpc: { method: "POST", path: "/api/deploy-tokens/{tokenId}/rotate" },
+    },
+  },
+  {
+    key: "deploy-tokens.revoke",
+    kind: "command",
+    domain: "deploy-tokens",
+    messageName: "RevokeDeployTokenCommand",
+    handlerName: "RevokeDeployTokenCommandHandler",
+    serviceName: "RevokeDeployTokenUseCase",
+    inputSchema: revokeDeployTokenCommandInputSchema,
+    serviceToken: tokens.revokeDeployTokenUseCase,
+    transports: {
+      cli: "appaloft deploy-token revoke <tokenId> --confirm <tokenId>",
+      orpc: { method: "POST", path: "/api/deploy-tokens/{tokenId}/revoke" },
+    },
+  },
   {
     key: "preview-policies.configure",
     kind: "command",

@@ -38,6 +38,7 @@ class DefaultExecutionContextFactory implements ExecutionContextFactory {
       t: createAppaloftTranslator({ locale }),
       tracer: this.tracer,
       ...(input.actor ? { actor: input.actor } : {}),
+      ...(input.auth ? { auth: input.auth } : {}),
     };
   }
 }

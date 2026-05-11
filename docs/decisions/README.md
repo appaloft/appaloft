@@ -67,6 +67,9 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-040: Dependency Binding Runtime Injection Boundary](./ADR-040-dependency-binding-runtime-injection-boundary.md) | Accepted | Defines how Resource dependency bindings become runtime inputs through deployment admission and runtime target adapters without adding dependency fields to `deployments.create`. |
 | [ADR-041: Dependency Runtime Secret Value Resolution](./ADR-041-dependency-runtime-secret-value-resolution.md) | Accepted | Defines store-backed dependency connection value storage, runtime resolution, and runtime target materialization for injected dependencies. |
 | [ADR-042: Self-Hosted Instance Bootstrap Proxy](./ADR-042-self-hosted-instance-bootstrap-proxy.md) | Accepted | Defines installer-owned console bootstrap routing, default self-host port, resident Traefik ownership, and separation from project resource routes. |
+| [ADR-043: Self-Hosted Action Deploy Token Authorization](./ADR-043-self-hosted-action-deploy-token-authorization.md) | Accepted | Defines deploy tokens as the machine-to-machine authorization boundary for self-hosted Action mutation endpoints before source-link, config, route, preview, or deployment mutation. |
+| [ADR-044: Self-Hosted First Admin Bootstrap](./ADR-044-self-hosted-first-admin-bootstrap.md) | Accepted | Defines local first-admin bootstrap, initial organization ownership, optional OAuth sequencing, and the Better Auth adapter boundary for product auth. |
+| [ADR-045: Self-Hosted Organization Team Operations](./ADR-045-self-hosted-organization-team-operations.md) | Accepted | Defines organization/team command/query ownership, current context, invitation, member role, member removal, and the Better Auth adapter boundary for post-bootstrap product auth. |
 
 ## Authoring Rules
 

@@ -25,6 +25,7 @@ This matrix inherits:
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Deployment Config File Test Matrix](./deployment-config-file-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
+- [Self-Hosted Auth Test Matrix](./self-hosted-auth-test-matrix.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
@@ -143,3 +144,6 @@ mode `none`; it is not evidence of Cloud/self-hosted control-plane handshake or 
 
 Cloud/self-hosted API rows beyond existing-resource/no-profile deployment remain target coverage
 until source package storage, adoption, profile application, and broader API mode contracts exist.
+Self-hosted Action deploy-token authentication and authorization coverage is tracked separately in
+[Self-Hosted Auth Test Matrix](./self-hosted-auth-test-matrix.md); existing server-mode Action rows
+are not evidence that Action mutation endpoints are protected.

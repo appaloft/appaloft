@@ -8,6 +8,12 @@ import {
 } from "../src";
 
 describe("public docs operation coverage", () => {
+  function requireCatalogOperation(operationKey: string) {
+    const operation = operationCatalog.find((entry) => entry.key === operationKey);
+    expect(operation, operationKey).toBeDefined();
+    return operation;
+  }
+
   test("[PUB-DOCS-002] every operation catalog entry has exactly one public docs coverage decision", () => {
     const catalogKeys = operationCatalog.map((operation) => operation.key);
     const coverageKeys = publicDocsOperationCoverage.map((coverage) => coverage.operationKey);
@@ -402,5 +408,104 @@ describe("public docs operation coverage", () => {
       ]),
     );
     expect(topic.webSurfaces?.join("\n")).toContain("Web controls deferred");
+  });
+
+  test("[PRODUCT-AUTH-DOCS-001] first-admin bootstrap operations record public docs coverage", () => {
+    const topic = publicDocsHelpTopics["self-hosting.first-admin-bootstrap"];
+
+    expect(getPublicDocsOperationCoverage("auth.bootstrap-status")).toMatchObject({
+      operationKey: "auth.bootstrap-status",
+      status: "documented",
+      topicId: "self-hosting.first-admin-bootstrap",
+    });
+    expect(getPublicDocsOperationCoverage("auth.bootstrap-first-admin")).toMatchObject({
+      operationKey: "auth.bootstrap-first-admin",
+      status: "documented",
+      topicId: "self-hosting.first-admin-bootstrap",
+    });
+    expect(topic.surfaces).toEqual(expect.arrayContaining(["web", "cli", "http-api", "mcp"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/decisions/ADR-044-self-hosted-first-admin-bootstrap.md",
+        "docs/specs/053-self-hosted-first-admin-bootstrap/spec.md",
+        "docs/workflows/self-hosted-first-admin-bootstrap.md",
+        "docs/errors/self-hosted-product-auth.md",
+        "docs/testing/self-hosted-product-auth-test-matrix.md",
+      ]),
+    );
+    expect(topic.webSurfaces?.join("\n")).toContain("public bootstrap status/setup endpoints");
+  });
+
+  test("[PRODUCT-AUTH-PARITY-001] Phase 8 auth operations keep CLI, HTTP/oRPC, and docs coverage aligned", () => {
+    const operationsByTopic = {
+      "self-hosting.first-admin-bootstrap": ["auth.bootstrap-status", "auth.bootstrap-first-admin"],
+      "self-hosting.organization-team-management": [
+        "organizations.current-context",
+        "organizations.switch-current",
+        "organizations.list-members",
+        "organizations.list-invitations",
+        "organizations.invite-member",
+        "organizations.change-member-role",
+        "organizations.remove-member",
+      ],
+      "self-hosting.action-deploy-token-auth": [
+        "deploy-tokens.create",
+        "deploy-tokens.list",
+        "deploy-tokens.show",
+        "deploy-tokens.rotate",
+        "deploy-tokens.revoke",
+      ],
+    } as const;
+
+    for (const [topicId, operationKeys] of Object.entries(operationsByTopic)) {
+      const topic = publicDocsHelpTopics[topicId];
+      expect(topic, topicId).toBeDefined();
+      expect(topic.surfaces, topicId).toEqual(
+        expect.arrayContaining(["cli", "http-api", "web", "mcp"]),
+      );
+
+      for (const operationKey of operationKeys) {
+        const operation = requireCatalogOperation(operationKey);
+        expect(operation.transports.cli, operationKey).toBeDefined();
+        expect(operation.transports.orpc, operationKey).toBeDefined();
+        expect(getPublicDocsOperationCoverage(operationKey)).toMatchObject({
+          operationKey,
+          status: "documented",
+          topicId,
+        });
+      }
+    }
+  });
+
+  test("[ORG-TEAM-DOCS-001] organization/team operations record public docs coverage", () => {
+    const topic = publicDocsHelpTopics["self-hosting.organization-team-management"];
+
+    for (const operationKey of [
+      "organizations.current-context",
+      "organizations.switch-current",
+      "organizations.list-members",
+      "organizations.list-invitations",
+      "organizations.invite-member",
+      "organizations.change-member-role",
+      "organizations.remove-member",
+    ] as const) {
+      expect(getPublicDocsOperationCoverage(operationKey)).toMatchObject({
+        operationKey,
+        status: "documented",
+        topicId: "self-hosting.organization-team-management",
+      });
+    }
+
+    expect(topic.surfaces).toEqual(expect.arrayContaining(["cli", "http-api", "web", "mcp"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/decisions/ADR-045-self-hosted-organization-team-operations.md",
+        "docs/specs/054-self-hosted-organization-team-operations/spec.md",
+        "docs/errors/self-hosted-product-auth.md",
+        "docs/testing/self-hosted-product-auth-test-matrix.md",
+      ]),
+    );
+    expect(topic.anchor).toBe("self-hosting-organization-team-management");
+    expect(topic.webSurfaces?.join("\n")).toContain("apps/web /organization");
   });
 });

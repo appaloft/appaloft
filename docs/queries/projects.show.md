@@ -15,6 +15,10 @@
 
 `projects.show` is the source-of-truth query for one project detail surface.
 
+In HTTP/oRPC product surfaces, `projects.show` requires an authenticated product session with at
+least member-level organization access before query dispatch. CLI and internal system entrypoints
+continue to dispatch through their normal execution context.
+
 It is read-only. It must not create environments, create resources, create deployments, rename or
 archive the project, or synthesize resource-owned deployment actions as project-owned behavior.
 

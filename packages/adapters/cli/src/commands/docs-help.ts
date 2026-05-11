@@ -53,6 +53,11 @@ export const cliDocsHrefs = {
   sourceAutoDeployIgnoredEvents: resolvePublicDocsHelpHref("source.auto-deploy-ignored-events"),
   sourceAutoDeployRecovery: resolvePublicDocsHelpHref("source.auto-deploy-recovery"),
   scheduledTaskLifecycle: resolvePublicDocsHelpHref("scheduled-task.resource-lifecycle"),
+  selfHostedActionDeployToken: resolvePublicDocsHelpHref("self-hosting.action-deploy-token-auth"),
+  selfHostedFirstAdmin: resolvePublicDocsHelpHref("self-hosting.first-admin-bootstrap"),
+  selfHostedOrganizationTeam: resolvePublicDocsHelpHref(
+    "self-hosting.organization-team-management",
+  ),
 } as const;
 
 export const cliCommandDescriptions = {
@@ -306,6 +311,86 @@ export const cliCommandDescriptions = {
   storageVolumeShow: withDocs("Show storage volume detail", "storage.volume-lifecycle"),
   storageVolumeRename: withDocs("Rename a storage volume", "storage.volume-lifecycle"),
   storageVolumeDelete: withDocs("Delete an unattached storage volume", "storage.volume-lifecycle"),
+  deployToken: withDocs(
+    "Self-hosted Action deploy-token management",
+    "self-hosting.action-deploy-token-auth",
+  ),
+  deployTokenCreate: withDocs(
+    "Create a self-hosted Action deploy token and print the raw value once",
+    "self-hosting.action-deploy-token-auth",
+  ),
+  deployTokenList: withDocs(
+    "List safe self-hosted Action deploy-token metadata",
+    "self-hosting.action-deploy-token-auth",
+  ),
+  deployTokenShow: withDocs(
+    "Show one self-hosted Action deploy token without raw secret material",
+    "self-hosting.action-deploy-token-auth",
+  ),
+  deployTokenRotate: withDocs(
+    "Rotate a self-hosted Action deploy token and print the new raw value once",
+    "self-hosting.action-deploy-token-auth",
+  ),
+  deployTokenRevoke: withDocs(
+    "Revoke a self-hosted Action deploy token",
+    "self-hosting.action-deploy-token-auth",
+  ),
+  auth: withDocs(
+    "Self-hosted product auth bootstrap operations",
+    "self-hosting.first-admin-bootstrap",
+  ),
+  authBootstrapStatus: withDocs(
+    "Show safe first-admin bootstrap status",
+    "self-hosting.first-admin-bootstrap",
+  ),
+  authBootstrapFirstAdmin: withDocs(
+    "Create the first local admin when bootstrap is required",
+    "self-hosting.first-admin-bootstrap",
+  ),
+  organization: withDocs(
+    "Organization and team operations",
+    "self-hosting.organization-team-management",
+  ),
+  organizationContext: withDocs(
+    "Show the signed-in user and current organization context",
+    "self-hosting.organization-team-management",
+  ),
+  organizationSwitch: withDocs(
+    "Switch the current organization for the signed-in product session",
+    "self-hosting.organization-team-management",
+  ),
+  organizationMembers: withDocs(
+    "Organization member operations",
+    "self-hosting.organization-team-management",
+  ),
+  organizationMembersList: withDocs(
+    "List organization members",
+    "self-hosting.organization-team-management",
+  ),
+  organizationInvitations: withDocs(
+    "Organization invitation operations",
+    "self-hosting.organization-team-management",
+  ),
+  organizationInvitationsList: withDocs(
+    "List organization invitations",
+    "self-hosting.organization-team-management",
+  ),
+  organizationMember: withDocs(
+    "Organization member mutation commands",
+    "self-hosting.organization-team-management",
+  ),
+  organizationMemberInvite: withDocs(
+    "Invite an operator to an organization",
+    "self-hosting.organization-team-management",
+  ),
+  organizationMemberRole: withDocs(
+    "Update an organization member role",
+    "self-hosting.organization-team-management",
+  ),
+  organizationMemberRemove: withDocs(
+    "Remove an organization member",
+    "self-hosting.organization-team-management",
+  ),
   dependency: withDocs("Dependency resource operations", "dependency.resource-lifecycle"),
   dependencyPostgres: withDocs(
     "Postgres dependency resource operations",

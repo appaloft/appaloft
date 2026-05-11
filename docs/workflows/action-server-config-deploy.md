@@ -17,8 +17,10 @@ The supported shape is:
 GitHub Action
   -> resolve control-plane-mode self-hosted
   -> call /api/version compatibility check
+  -> send deploy token on the Action mutation request
   -> prepare or reference a bounded source package
   -> POST /api/action/deployments/from-config-package
+  -> self-hosted server authenticates and authorizes the deploy token
   -> self-hosted server validates package manifest and config
   -> self-hosted server resolves source link and trusted context
   -> self-hosted server applies resource/environment/profile changes through explicit commands
@@ -42,8 +44,10 @@ This workflow inherits:
 - [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
 - [Control-Plane Mode Selection And Adoption](./control-plane-mode-selection-and-adoption.md)
 - [Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md)
+- [Self-Hosted Action API Authentication](./self-hosted-action-api-authentication.md)
 - [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
 - [Control-Plane Modes Test Matrix](../testing/control-plane-modes-test-matrix.md)
+- [Self-Hosted Auth Test Matrix](../testing/self-hosted-auth-test-matrix.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -75,7 +79,9 @@ POST /api/action/deployments/from-config-package
 ```
 
 The route is an Action/control-plane workflow endpoint. It is not the public strict deployment
-admission endpoint. Internally it may dispatch multiple existing commands before `deployments.create`.
+admission endpoint. It requires deploy-token authentication and authorization before package
+validation or mutation. Internally it may dispatch multiple existing commands before
+`deployments.create`.
 
 Logical request shape:
 

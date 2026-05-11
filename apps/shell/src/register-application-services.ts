@@ -12,6 +12,8 @@ import {
   AutomaticRouteContextLookupService,
   BindResourceDependencyCommandHandler,
   BindResourceDependencyUseCase,
+  BootstrapFirstAdminCommandHandler,
+  BootstrapFirstAdminUseCase,
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
   BootstrapServerProxyCommandHandler,
   BootstrapServerProxyUseCase,
@@ -19,6 +21,8 @@ import {
   type CertificateProviderSelectionInput,
   type CertificateProviderSelectionPolicy,
   CertificateRetryScheduler,
+  ChangeOrganizationMemberRoleCommandHandler,
+  ChangeOrganizationMemberRoleUseCase,
   CheckDomainBindingDeleteSafetyQueryHandler,
   CheckDomainBindingDeleteSafetyQueryService,
   CheckServerDeleteSafetyQueryHandler,
@@ -59,6 +63,8 @@ import {
   CreateDependencyResourceBackupUseCase,
   CreateDeploymentSourceEventDispatcher,
   CreateDeploymentUseCase,
+  CreateDeployTokenCommandHandler,
+  CreateDeployTokenUseCase,
   CreateDomainBindingUseCase,
   CreateEnvironmentUseCase,
   CreateProjectUseCase,
@@ -114,6 +120,10 @@ import {
   EnvironmentEffectivePrecedenceQueryService,
   type ExecutionContext,
   GenericSignedSourceEventVerifier,
+  GetAuthBootstrapStatusQueryHandler,
+  GetAuthBootstrapStatusQueryService,
+  GetCurrentOrganizationContextQueryHandler,
+  GetCurrentOrganizationContextQueryService,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
   ImportPostgresDependencyResourceCommandHandler,
@@ -126,6 +136,8 @@ import {
   IngestSourceEventUseCase,
   InspectServerCapacityQueryHandler,
   InspectServerCapacityQueryService,
+  InviteOrganizationMemberCommandHandler,
+  InviteOrganizationMemberUseCase,
   IssueCertificateOnCertificateRequestedHandler,
   IssueOrRenewCertificateCommandHandler,
   IssueOrRenewCertificateUseCase,
@@ -138,10 +150,16 @@ import {
   ListDependencyResourcesQueryHandler,
   ListDependencyResourcesQueryService,
   ListDeploymentsQueryService,
+  ListDeployTokensQueryHandler,
+  ListDeployTokensQueryService,
   ListDomainBindingsQueryService,
   ListEnvironmentsQueryService,
   ListGitHubRepositoriesQueryService,
   ListOperatorWorkQueryHandler,
+  ListOrganizationInvitationsQueryHandler,
+  ListOrganizationInvitationsQueryService,
+  ListOrganizationMembersQueryHandler,
+  ListOrganizationMembersQueryService,
   ListPluginsQueryService,
   ListPreviewEnvironmentsQueryHandler,
   ListPreviewEnvironmentsQueryService,
@@ -196,6 +214,8 @@ import {
   RegisterServerUseCase,
   RelinkSourceLinkCommandHandler,
   RelinkSourceLinkUseCase,
+  RemoveOrganizationMemberCommandHandler,
+  RemoveOrganizationMemberUseCase,
   RenameDependencyResourceCommandHandler,
   RenameDependencyResourceUseCase,
   RenameEnvironmentCommandHandler,
@@ -232,8 +252,12 @@ import {
   RetryDomainBindingVerificationUseCase,
   RevokeCertificateCommandHandler,
   RevokeCertificateUseCase,
+  RevokeDeployTokenCommandHandler,
+  RevokeDeployTokenUseCase,
   RollbackDeploymentCommandHandler,
   RollbackDeploymentUseCase,
+  RotateDeployTokenCommandHandler,
+  RotateDeployTokenUseCase,
   RotateResourceDependencyBindingSecretCommandHandler,
   RotateResourceDependencyBindingSecretUseCase,
   RotateSshCredentialCommandHandler,
@@ -259,6 +283,8 @@ import {
   ShowDependencyResourceQueryService,
   ShowDeploymentQueryHandler,
   ShowDeploymentQueryService,
+  ShowDeployTokenQueryHandler,
+  ShowDeployTokenQueryService,
   ShowDomainBindingQueryHandler,
   ShowDomainBindingQueryService,
   ShowEnvironmentQueryService,
@@ -288,6 +314,8 @@ import {
   StopResourceRuntimeCommandHandler,
   StreamDeploymentEventsQueryHandler,
   StreamDeploymentEventsQueryService,
+  SwitchCurrentOrganizationCommandHandler,
+  SwitchCurrentOrganizationUseCase,
   TestServerConnectivityUseCase,
   tokens,
   UnbindResourceDependencyCommandHandler,
@@ -499,6 +527,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ShowCertificateQueryHandler);
   container.registerSingleton(ListOperatorWorkQueryHandler);
   container.registerSingleton(ShowOperatorWorkQueryHandler);
+  container.registerSingleton(ListDeployTokensQueryHandler);
+  container.registerSingleton(ShowDeployTokenQueryHandler);
   container.registerSingleton(ShowProjectQueryHandler);
   container.registerSingleton(ShowDomainBindingQueryHandler);
   container.registerSingleton(ShowSshCredentialQueryHandler);
@@ -529,6 +559,18 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(DeleteStorageVolumeCommandHandler);
   container.registerSingleton(ListStorageVolumesQueryHandler);
   container.registerSingleton(ShowStorageVolumeQueryHandler);
+  container.registerSingleton(BootstrapFirstAdminCommandHandler);
+  container.registerSingleton(GetAuthBootstrapStatusQueryHandler);
+  container.registerSingleton(GetCurrentOrganizationContextQueryHandler);
+  container.registerSingleton(ListOrganizationMembersQueryHandler);
+  container.registerSingleton(ListOrganizationInvitationsQueryHandler);
+  container.registerSingleton(InviteOrganizationMemberCommandHandler);
+  container.registerSingleton(SwitchCurrentOrganizationCommandHandler);
+  container.registerSingleton(ChangeOrganizationMemberRoleCommandHandler);
+  container.registerSingleton(RemoveOrganizationMemberCommandHandler);
+  container.registerSingleton(CreateDeployTokenCommandHandler);
+  container.registerSingleton(RotateDeployTokenCommandHandler);
+  container.registerSingleton(RevokeDeployTokenCommandHandler);
   container.registerSingleton(
     tokens.certificateProviderSelectionPolicy,
     ShellCertificateProviderSelectionPolicy,
@@ -541,6 +583,44 @@ export function registerApplicationServices(container: DependencyContainer): voi
   );
   container.registerSingleton(tokens.domainOwnershipVerifier, PublicDnsDomainOwnershipVerifier);
   container.registerSingleton(tokens.archiveProjectUseCase, ArchiveProjectUseCase);
+  container.registerSingleton(tokens.bootstrapFirstAdminUseCase, BootstrapFirstAdminUseCase);
+  container.registerSingleton(
+    tokens.getAuthBootstrapStatusQueryService,
+    GetAuthBootstrapStatusQueryService,
+  );
+  container.registerSingleton(
+    tokens.getCurrentOrganizationContextQueryService,
+    GetCurrentOrganizationContextQueryService,
+  );
+  container.registerSingleton(
+    tokens.listOrganizationMembersQueryService,
+    ListOrganizationMembersQueryService,
+  );
+  container.registerSingleton(
+    tokens.listOrganizationInvitationsQueryService,
+    ListOrganizationInvitationsQueryService,
+  );
+  container.registerSingleton(
+    tokens.inviteOrganizationMemberUseCase,
+    InviteOrganizationMemberUseCase,
+  );
+  container.registerSingleton(
+    tokens.switchCurrentOrganizationUseCase,
+    SwitchCurrentOrganizationUseCase,
+  );
+  container.registerSingleton(
+    tokens.changeOrganizationMemberRoleUseCase,
+    ChangeOrganizationMemberRoleUseCase,
+  );
+  container.registerSingleton(
+    tokens.removeOrganizationMemberUseCase,
+    RemoveOrganizationMemberUseCase,
+  );
+  container.registerSingleton(tokens.createDeployTokenUseCase, CreateDeployTokenUseCase);
+  container.registerSingleton(tokens.listDeployTokensQueryService, ListDeployTokensQueryService);
+  container.registerSingleton(tokens.revokeDeployTokenUseCase, RevokeDeployTokenUseCase);
+  container.registerSingleton(tokens.rotateDeployTokenUseCase, RotateDeployTokenUseCase);
+  container.registerSingleton(tokens.showDeployTokenQueryService, ShowDeployTokenQueryService);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);
