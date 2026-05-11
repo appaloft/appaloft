@@ -28,6 +28,11 @@ export interface CliResult {
   stdout: string;
 }
 
+export interface ShellHttpAdminSession {
+  cookie: string;
+  headers: HeadersInit;
+}
+
 export function fixturePath(name: string): string {
   return new URL(`../../fixtures/${name}`, import.meta.url).pathname;
 }
@@ -149,6 +154,15 @@ export function parseJson<T>(raw: string): T {
   throw new SyntaxError("Unterminated JSON payload");
 }
 
+async function expectHttpStatus(response: Response, status: number): Promise<void> {
+  if (response.status === status) {
+    return;
+  }
+
+  const body = await response.text();
+  expect(response.status, body).toBe(status);
+}
+
 export async function waitForHttpHealth(url: string): Promise<void> {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
@@ -201,6 +215,65 @@ export async function startShellHttpServer(options: ShellCliOptions): Promise<{
       serverProcess.kill();
       await serverProcess.exited;
     },
+  };
+}
+
+export async function createShellHttpAdminSession(baseUrl: string): Promise<ShellHttpAdminSession> {
+  const suffix = crypto.randomUUID().slice(0, 8);
+  const email = `admin-${suffix}@example.test`;
+  const password = `admin-password-${suffix}`;
+  const organizationSlug = `e2e-${suffix}`;
+
+  const bootstrapped = await fetch(`${baseUrl}/api/bootstrap/auth/first-admin`, {
+    body: JSON.stringify({
+      displayName: "E2E Admin",
+      email,
+      organizationName: "E2E Organization",
+      organizationSlug,
+      password,
+    }),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  await expectHttpStatus(bootstrapped, 201);
+  const bootstrapResult = (await bootstrapped.json()) as { organizationId: string };
+
+  const signedIn = await fetch(`${baseUrl}/api/auth/sign-in/email`, {
+    body: JSON.stringify({
+      callbackURL: "/",
+      email,
+      password,
+    }),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  await expectHttpStatus(signedIn, 200);
+
+  const setCookie = signedIn.headers.get("set-cookie") ?? "";
+  const sessionCookie = setCookie.match(/better-auth\.session_token=[^;,]+/)?.[0];
+  expect(sessionCookie, setCookie).toBeTruthy();
+
+  const headers = {
+    cookie: sessionCookie ?? "",
+  };
+
+  const switched = await fetch(`${baseUrl}/api/organizations/current-context/switch`, {
+    body: JSON.stringify({ organizationId: bootstrapResult.organizationId }),
+    headers: {
+      ...headers,
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  await expectHttpStatus(switched, 200);
+
+  return {
+    cookie: sessionCookie ?? "",
+    headers,
   };
 }
 
