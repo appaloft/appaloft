@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   cleanupWorkspace,
   createShellE2eWorkspace,
+  createShellHttpAdminSession,
   parseJson,
   runShellCli,
   startShellHttpServer,
@@ -85,6 +86,7 @@ describe("servers.register command e2e", () => {
       expect(migration.exitCode).toBe(0);
 
       httpServer = await startShellHttpServer(workspace.cliOptions);
+      const auth = await createShellHttpAdminSession(httpServer.baseUrl);
 
       const suffix = crypto.randomUUID().slice(0, 6);
       const serverName = `http-server-${suffix}`;
@@ -96,6 +98,7 @@ describe("servers.register command e2e", () => {
           proxyKind: "none",
         }),
         headers: {
+          ...auth.headers,
           "content-type": "application/json",
         },
         method: "POST",
@@ -103,7 +106,9 @@ describe("servers.register command e2e", () => {
       expect(register.status).toBe(201);
 
       const serverId = ((await register.json()) as { id: string }).id;
-      const apiList = await fetch(`${httpServer.baseUrl}/api/servers`);
+      const apiList = await fetch(`${httpServer.baseUrl}/api/servers`, {
+        headers: auth.headers,
+      });
       expect(apiList.ok).toBe(true);
       expect(((await apiList.json()) as ServerListResponse).items).toEqual(
         expect.arrayContaining([serverSummary({ id: serverId, name: serverName })]),
