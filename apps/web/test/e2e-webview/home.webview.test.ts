@@ -17,12 +17,13 @@ type RecordedApiRequest = {
 };
 
 const selfHostedAuthE2eGeneratedPassword = "generated-local-admin-password";
-let selfHostedAuthE2eAdminCreated = false;
-let selfHostedAuthE2eSignedIn = false;
+let selfHostedAuthE2eAdminCreated = true;
+let selfHostedAuthE2eSignedIn = true;
 
-function resetSelfHostedAuthE2eState(): void {
-  selfHostedAuthE2eAdminCreated = false;
-  selfHostedAuthE2eSignedIn = false;
+function resetSelfHostedAuthE2eState(input: { bootstrapRequired?: boolean } = {}): void {
+  const bootstrapRequired = input.bootstrapRequired ?? false;
+  selfHostedAuthE2eAdminCreated = !bootstrapRequired;
+  selfHostedAuthE2eSignedIn = !bootstrapRequired;
 }
 
 function selfHostedAuthE2eLoginMethods() {
@@ -2051,7 +2052,7 @@ describe("console e2e with Bun.WebView", () => {
   test("[SELF-HOSTED-AUTH-E2E-001] bootstraps first admin, signs in locally, and deploys from console", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
-    resetSelfHostedAuthE2eState();
+    resetSelfHostedAuthE2eState({ bootstrapRequired: true });
 
     try {
       await using view = createWebView();
