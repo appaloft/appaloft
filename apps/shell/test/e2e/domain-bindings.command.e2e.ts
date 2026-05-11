@@ -9,6 +9,7 @@ import {
   waitForCliDurableRoute,
 } from "./support/routing-domain-tls-fixture";
 import {
+  createShellHttpAdminSession,
   expectCliSuccess,
   parseJson,
   runShellCli,
@@ -136,6 +137,7 @@ describe("domain-bindings command e2e", () => {
     const httpServer = await startShellHttpServer(fixture.cliOptions);
 
     try {
+      const auth = await createShellHttpAdminSession(httpServer.baseUrl);
       const created = await fetch(`${httpServer.baseUrl}/api/domain-bindings`, {
         body: JSON.stringify({
           destinationId: context.destinationId,
@@ -149,6 +151,7 @@ describe("domain-bindings command e2e", () => {
           tlsMode: "auto",
         }),
         headers: {
+          ...auth.headers,
           "content-type": "application/json",
         },
         method: "POST",
@@ -166,6 +169,7 @@ describe("domain-bindings command e2e", () => {
             verificationMode: "manual",
           }),
           headers: {
+            ...auth.headers,
             "content-type": "application/json",
           },
           method: "POST",
@@ -179,6 +183,7 @@ describe("domain-bindings command e2e", () => {
 
       const listed = await fetch(
         `${httpServer.baseUrl}/api/domain-bindings?resourceId=${context.resourceId}`,
+        { headers: auth.headers },
       );
       expect(listed.ok).toBe(true);
       expectDomainBindingSummary({
