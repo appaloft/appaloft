@@ -24,8 +24,7 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
 - [x] Include the current roadmap alignment in the Release Please PR before publishing a release.
 - [x] Use this roadmap to choose the release version.
 - [x] Before the next release, verify package manifests, Release Please state, and the latest
-  published release agree on the current version line. The roadmap starts from the current public
-  line `0.6.x` because the current release is `0.6.0`.
+  published release agree on the current version line.
 
 Version selection rules:
 
@@ -40,14 +39,29 @@ Version selection rules:
 - [x] If planned work is intentionally deferred, leave it unchecked and add or update the release
   note/migration gap that explains why the version can still ship.
 
+Version plan:
+
+- [x] `0.10.0` is Phase 8: Self-Hosted Auth And Organization Bootstrap.
+- [x] `0.10.x` is the Phase 8 hardening line: installer/auth fixes, release packaging fixes, and
+  backwards-compatible corrections only.
+- [ ] `0.11.0` is Phase 9: Operator/Internal State Closure And Interface Parity.
+- [ ] `1.0.0-rc` is the GA release-candidate gate after Phase 9, not a separate feature phase.
+- [ ] `1.0.0` is GA.
+- [x] Post-`1.0.0` tracks do not reserve `0.x` versions. If maintainers deliberately pull a
+  post-`1.0.0` track before GA, first retarget this roadmap by adding or replacing an explicit
+  pre-GA phase; do not leave contradictory `post-1.0` and `0.x` labels on the same work.
+
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-05-11, the latest public release is `v0.9.10`; root package
-  and Release Please manifest on `main` are `0.9.10`; the release PR target is
-  `0.10.0`.
-- [x] On 2026-05-11, the roadmap gate allows `Release-As: 0.10.0` because
-  Phase 0 through Phase 8 release rules, required items, and exit criteria are checked.
+- [x] On 2026-05-11, the latest public release is `v0.10.0`; root package and Release
+  Please manifest are `0.10.0`.
+- [x] The current stable development line is `0.10.x`; patch releases on this line are limited to
+  Phase 8 hardening, installer/auth fixes, release packaging fixes, and other backwards-compatible
+  corrections that do not claim Phase 9 completion.
+- [x] The next minor target is `0.11.0` for Phase 9 Operator/Internal State Closure And Interface
+  Parity. `1.0.0-rc` is a separate release-candidate hardening gate after Phase 9 is complete, not
+  the Phase 9 target itself.
 <!-- release-alignment:end -->
 
 Historical alignment notes:
@@ -1914,13 +1928,15 @@ Exit criteria:
 
 ## Phase 9: Operator/Internal State Closure And Interface Parity
 
-Target: `1.0.0-rc`.
+Target: `0.11.0`.
 
 Release rule:
 
-- [ ] Select `1.0.0-rc` only when all required Phase 9 items, earlier phase items, and exit criteria
+- [ ] Select `0.11.0` only when all required Phase 9 items, earlier phase items, and exit criteria
   are checked. If any Phase 9 item remains unchecked, release a `0.10.x` patch or an explicitly
   requested prerelease instead.
+- [ ] Do not select `1.0.0-rc` directly for Phase 9 work. The release-candidate line starts only
+  after Phase 9 has shipped or has been explicitly retargeted as complete.
 
 Already done:
 
@@ -1974,7 +1990,36 @@ Exit criteria:
 - [ ] TypeScript SDK, CLI, HTTP/oRPC, Web, and generated MCP/tool contracts are verified from the
   same operation catalog after auth/org rules are active, with no SDK-only business operations or
   transport-only business schemas.
-- [ ] The release candidate passes local, PGlite, PostgreSQL, Docker, and opt-in SSH smoke suites.
+- [ ] Phase 9 release readiness passes the local, PGlite, PostgreSQL, Docker, and opt-in SSH smoke
+  suites required for a `0.11.0` minor release.
+
+## 1.0.0 Release Candidate
+
+Target: `1.0.0-rc`.
+
+Release rule:
+
+- [ ] Select `1.0.0-rc` only after Phase 9 is complete, no unchecked Phase 9 release blocker
+  remains, and the candidate is being used for GA hardening rather than new feature scope.
+- [ ] If release-candidate verification finds feature gaps, return the gap to the owning roadmap
+  phase or release a `0.11.x` patch instead of expanding `1.0.0-rc` scope.
+
+Required:
+
+- [ ] Re-run the full `1.0.0 Definition Of Done` against current implementation, specs, operation
+  catalog, docs, migration gaps, and release artifacts.
+- [ ] Verify installer, upgrade, static console serving, docs packaging, CLI, HTTP/oRPC, Web,
+  generated SDK, and generated MCP/tool contract surfaces use the same operation catalog semantics.
+- [ ] Verify all GA-blocking smoke suites pass or have accepted release notes and explicit
+  migration gaps.
+- [ ] Freeze release-candidate scope to hardening, compatibility, packaging, documentation,
+  migration, and support-readiness fixes only.
+
+Exit criteria:
+
+- [ ] The release candidate can be promoted to `1.0.0` without adding new product behavior.
+- [ ] Remaining gaps are either closed or explicitly accepted as non-GA-blocking in the roadmap,
+  specs, public docs, and release notes.
 
 ## 1.0.0 GA
 
@@ -2041,21 +2086,24 @@ Roadmap principles:
 Candidate sequencing:
 
 - [ ] Post-1.0 Track 1: Resource Template / Workload Profile Foundation. If maintainers deliberately
-  pull this before GA, it must come after the reserved `0.10.0` self-hosted auth phase; treat it as
-  a possible `0.11.0+` candidate only after updating this roadmap first.
-- [ ] Post-1.0 Track 2: Template Resolution And Deployment Planning. Possible pulled-forward
-  `0.12.0+` candidate only after Track 1 is specified.
-- [ ] Post-1.0 Track 3: Template Catalog / Registry. Possible pulled-forward `0.13.0+` candidate
-  only after resolution semantics are specified.
-- [ ] Post-1.0 Track 4: AI Tool Server / MCP Capability. Possible pulled-forward `0.14.0+`
-  candidate only as capability/profile metadata over the generic template layer.
-- [ ] Post-1.0 Track 5: Appaloft-as-MCP Interface Planning. Possible pulled-forward `0.15.0+`
-  candidate only through the existing operation catalog and application buses.
-- [ ] Post-1.0 Track 6: Curated AI Tool Server Templates. Possible pulled-forward `0.16.0+`
-  candidate only after edition, trust, secret, health, docs, and generated-client-config questions
-  are answered.
-- [ ] Post-1.0 Track 7: MCP Gateway / Tool Gateway. Possible pulled-forward `0.17.0+` or later
-  candidate only after gateway audit/redaction/identity/policy decisions are accepted.
+  pull this before GA, first update the version plan with an explicit pre-GA phase and explain which
+  existing GA blocker is being replaced or deferred.
+- [ ] Post-1.0 Track 2: Template Resolution And Deployment Planning. This depends on Track 1 being
+  specified and must not reserve a `0.x` version while it remains post-`1.0.0` work.
+- [ ] Post-1.0 Track 3: Template Catalog / Registry. This depends on resolution semantics and must
+  not reserve a `0.x` version while it remains post-`1.0.0` work.
+- [ ] Post-1.0 Track 4: AI Tool Server / MCP Capability. This is capability/profile metadata over
+  the generic template layer and must not reserve a `0.x` version while it remains post-`1.0.0`
+  work.
+- [ ] Post-1.0 Track 5: Appaloft-as-MCP Interface Planning. This goes through the existing operation
+  catalog and application buses and must not reserve a `0.x` version while it remains post-`1.0.0`
+  work.
+- [ ] Post-1.0 Track 6: Curated AI Tool Server Templates. This depends on edition, trust, secret,
+  health, docs, and generated-client-config decisions and must not reserve a `0.x` version while it
+  remains post-`1.0.0` work.
+- [ ] Post-1.0 Track 7: MCP Gateway / Tool Gateway. This depends on gateway audit/redaction/
+  identity/policy decisions and must not reserve a `0.x` version while it remains post-`1.0.0`
+  work.
 
 ## Resource And Internal State Coverage Ledger
 
