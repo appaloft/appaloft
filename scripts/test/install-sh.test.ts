@@ -275,14 +275,15 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     expect(install.stdout).toContain("HTTP: https://appaloft.example.test");
     expect(install.stdout).toContain("==> Appaloft install completed");
     expect(install.stdout).toContain("PPPP   PPPP");
-    expect(install.stdout).toContain('"schemaVersion":"deploy-token.bootstrap/v1"');
-    expect(install.stdout).toContain('"actionSecretName":"APPALOFT_TOKEN"');
-    expect(install.stdout).toContain('"token":"aplt_dt_installtoken00000000"');
+    expect(install.stdout).not.toContain('"schemaVersion":"deploy-token.bootstrap/v1"');
+    expect(install.stdout).not.toContain('"actionSecretName":"APPALOFT_TOKEN"');
+    expect(install.stdout).not.toContain('"token":"aplt_dt_installtoken00000000"');
     expect(install.stdout).toContain('"schemaVersion":"first-admin.bootstrap/v1"');
     expect(install.stdout).toContain('"bootstrapRequired":true');
     expect(install.stdout).toContain(
       "Set APPALOFT_FIRST_ADMIN_EMAIL and rerun the installer to create a local first admin.",
     );
+    expect(install.stdout).toContain("No GitHub Action deploy token was created during install.");
     expect(install.stdout).toContain("Open console: https://appaloft.example.test");
     expect(install.stdout).toContain("Watch logs:");
     expect(install.stdout).toContain("Update/repair:");
@@ -303,9 +304,8 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     expect(env).toContain("APPALOFT_IMAGE_REF=ghcr.io/appaloft/appaloft:9.8.7");
     expect(env).toContain("APPALOFT_HTTP_PORT=3900");
     expect(env).toContain("APPALOFT_WEB_ORIGIN=https://appaloft.example.test");
-    expect(env).toContain(
-      "APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE=/tmp/appaloft-bootstrap/deploy-token.json",
-    );
+    expect(env).toContain("APPALOFT_BOOTSTRAP_DEPLOY_TOKEN=0");
+    expect(env).toContain("APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE=");
     expect(env).toContain(
       "APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE=/tmp/appaloft-bootstrap/first-admin.json",
     );
@@ -426,6 +426,7 @@ test("install.sh prints generated first-admin credentials only from bootstrap ou
         "https://appaloft.example.test",
         "--postgres-password",
         "fixture-password",
+        "--bootstrap-deploy-token",
         "--first-admin-email",
         "admin@example.com",
         "--first-admin-name",
@@ -475,6 +476,7 @@ test("[SELF-HOSTED-AUTH-E2E-002] install.sh prints complete first-use auth hando
         "https://appaloft.example.test",
         "--postgres-password",
         "fixture-password",
+        "--bootstrap-deploy-token",
         "--first-admin-email",
         "admin@example.com",
         "--first-admin-name",
@@ -492,6 +494,12 @@ test("[SELF-HOSTED-AUTH-E2E-002] install.sh prints complete first-use auth hando
 
     expect(install.exitCode).toBe(0);
     expect(install.stdout).toContain("Open console: https://appaloft.example.test");
+    expect(
+      install.stdout.indexOf("Store the token value in GitHub Secrets as APPALOFT_TOKEN."),
+    ).toBeGreaterThan(install.stdout.indexOf("==> Appaloft install completed"));
+    expect(install.stdout.indexOf('"token":"aplt_dt_installtoken00000000"')).toBeGreaterThan(
+      install.stdout.indexOf("==> Appaloft install completed"),
+    );
     expect(install.stdout).toContain('"loginUrl":"https://appaloft.example.test/login"');
     expect(install.stdout).toContain('"generatedPassword":"generated-admin-password"');
     expect(install.stdout).toContain('"actionSecretName":"APPALOFT_TOKEN"');
@@ -830,7 +838,8 @@ test("install.sh writes a Docker Swarm PGlite stack and deploys it", async () =>
 
     expect(install.exitCode).toBe(0);
     expect(install.stdout).toContain("Orchestrator: swarm");
-    expect(install.stdout).toContain('"token":"aplt_dt_installtoken00000000"');
+    expect(install.stdout).not.toContain('"token":"aplt_dt_installtoken00000000"');
+    expect(install.stdout).toContain("No GitHub Action deploy token was created during install.");
     expect(install.stdout).toContain("Watch logs:    docker service logs -f appaloft-console_app");
 
     const compose = await Bun.file(join(home, "docker-compose.yml")).text();

@@ -11,6 +11,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   enrichResourceAccessFailureDiagnosticWithRouteContext,
+  GetAuthBootstrapStatusQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
   ListDeploymentsQuery,
@@ -130,6 +131,8 @@ interface StaticAssetSource {
   fallbackToRootIndex: boolean;
   staticDir: string | null;
 }
+
+const firstAdminBootstrapPath = "/bootstrap/auth/first-admin";
 
 function publicReadiness(readiness: ReadinessResponse): ReadinessResponse {
   const details: Record<string, string> = {};
@@ -265,8 +268,54 @@ function isApiPath(pathname: string): boolean {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
+function isDocsPath(pathname: string): boolean {
+  return pathname === "/docs" || pathname.startsWith("/docs/");
+}
+
 function isBackendLogPath(pathname: string): boolean {
   return isApiPath(pathname) || pathname.startsWith("/.well-known/acme-challenge/");
+}
+
+function isFirstAdminBootstrapPath(pathname: string): boolean {
+  return pathname === firstAdminBootstrapPath || pathname.startsWith(`${firstAdminBootstrapPath}/`);
+}
+
+function hasStaticAssetExtension(pathname: string): boolean {
+  return (pathname.split("/").pop() ?? "").includes(".");
+}
+
+function isHtmlNavigationRequest(request: Request): boolean {
+  const secFetchMode = request.headers.get("sec-fetch-mode")?.toLowerCase();
+  if (secFetchMode === "navigate") {
+    return true;
+  }
+
+  const accept = request.headers.get("accept")?.toLowerCase() ?? "";
+  return accept.includes("text/html") || accept.includes("application/xhtml+xml");
+}
+
+function isConsoleNavigationPath(pathname: string): boolean {
+  if (
+    isApiPath(pathname) ||
+    isDocsPath(pathname) ||
+    isFirstAdminBootstrapPath(pathname) ||
+    pathname.startsWith("/_app/") ||
+    pathname.startsWith("/.well-known/acme-challenge/") ||
+    pathname === "/.appaloft/resource-access-failure" ||
+    hasStaticAssetExtension(pathname)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function shouldGateFirstAdminBootstrapNavigation(request: Request): boolean {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return false;
+  }
+
+  return isHtmlNavigationRequest(request) && isConsoleNavigationPath(readRequestPathname(request));
 }
 
 function readRequestPathname(request: Request): string {
@@ -497,6 +546,7 @@ export function createHttpApp(input: {
   const terminalSessionsBySocket = new WeakMap<object, TerminalSession>();
   const terminalSessionsBySessionId = new Map<string, TerminalSession>();
   const requestStartTimes = new WeakMap<Request, number>();
+  let firstAdminBootstrapCompleted = false;
 
   async function consoleOverview(request: Request): Promise<ConsoleOverviewResponse> {
     const requestId = request.headers.get("x-request-id");
@@ -651,7 +701,7 @@ export function createHttpApp(input: {
   }
 
   function docsStaticResponse(pathname: string): Response | null {
-    if (pathname !== "/docs" && !pathname.startsWith("/docs/")) {
+    if (!isDocsPath(pathname)) {
       return null;
     }
 
@@ -663,6 +713,70 @@ export function createHttpApp(input: {
       embeddedAssets: embeddedDocsAssets,
       fallbackToRootIndex: false,
     });
+  }
+
+  async function firstAdminBootstrapRedirectResponse(request: Request): Promise<Response | null> {
+    if (!shouldGateFirstAdminBootstrapNavigation(request)) {
+      return null;
+    }
+
+    if (firstAdminBootstrapCompleted) {
+      return null;
+    }
+
+    const requestId = request.headers.get("x-request-id");
+    const context = input.executionContextFactory.create({
+      entrypoint: "http",
+      locale: resolveAppaloftLocaleFromHeaders(request.headers),
+      ...(requestId ? { requestId } : {}),
+    });
+    const query = GetAuthBootstrapStatusQuery.create({});
+
+    if (query.isErr()) {
+      input.logger.warn("first_admin_bootstrap_navigation_gate_query_invalid", {
+        requestId: context.requestId,
+        errorCode: query.error.code,
+        message: query.error.message,
+      });
+      return null;
+    }
+
+    const result = await input.queryBus.execute(context, query.value);
+
+    return result.match(
+      (status) => {
+        if (!status.bootstrapRequired) {
+          firstAdminBootstrapCompleted = true;
+          return null;
+        }
+
+        return new Response(null, {
+          status: 302,
+          headers: {
+            location: firstAdminBootstrapPath,
+            "cache-control": "no-store",
+            vary: "Accept, Sec-Fetch-Mode",
+          },
+        });
+      },
+      (error) => {
+        input.logger.warn("first_admin_bootstrap_navigation_gate_failed", {
+          requestId: context.requestId,
+          errorCode: error.code,
+          message: error.message,
+        });
+        return null;
+      },
+    );
+  }
+
+  async function webConsoleResponse(request: Request, fallback: Response): Promise<Response> {
+    const redirect = await firstAdminBootstrapRedirectResponse(request);
+    if (redirect) {
+      return redirect;
+    }
+
+    return webStaticResponse(new URL(request.url).pathname) ?? fallback;
   }
 
   function deploymentProgressStream(request: Request, requestId: string): Response {
@@ -1201,7 +1315,9 @@ export function createHttpApp(input: {
   });
 
   return app
-    .get("/", () => webStaticResponse("/") ?? new Response("Appaloft backend is running"))
+    .get("/", ({ request }) =>
+      webConsoleResponse(request, new Response("Appaloft backend is running")),
+    )
     .get(
       "/docs",
       ({ request }) =>
@@ -1220,10 +1336,7 @@ export function createHttpApp(input: {
         webStaticResponse(new URL(request.url).pathname) ??
         new Response("Not found", { status: 404 }),
     )
-    .get(
-      "/*",
-      ({ request }) =>
-        webStaticResponse(new URL(request.url).pathname) ??
-        new Response("Not found", { status: 404 }),
+    .get("/*", ({ request }) =>
+      webConsoleResponse(request, new Response("Not found", { status: 404 })),
     );
 }

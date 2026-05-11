@@ -471,6 +471,12 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       env.APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL ??
       fileConfig.resourceAccessFailureRendererUrl,
   );
+  const bootstrapDeployTokenEnabled = parseBoolean(env.APPALOFT_BOOTSTRAP_DEPLOY_TOKEN) ?? true;
+  const bootstrapDeployTokenOutputFile = bootstrapDeployTokenEnabled
+    ? (source.flags?.bootstrapDeployTokenOutputFile ??
+      env.APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE ??
+      fileConfig.bootstrapDeployTokenOutputFile)
+    : undefined;
 
   return {
     appName:
@@ -511,16 +517,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
         }
       : {}),
     ...(actionDeployTokenScope ? { actionDeployTokenScope } : {}),
-    ...(source.flags?.bootstrapDeployTokenOutputFile ||
-    env.APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE ||
-    fileConfig.bootstrapDeployTokenOutputFile
-      ? {
-          bootstrapDeployTokenOutputFile:
-            source.flags?.bootstrapDeployTokenOutputFile ??
-            env.APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE ??
-            fileConfig.bootstrapDeployTokenOutputFile,
-        }
-      : {}),
+    ...(bootstrapDeployTokenOutputFile ? { bootstrapDeployTokenOutputFile } : {}),
     ...(source.flags?.bootstrapFirstAdminOutputFile ||
     env.APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE ||
     fileConfig.bootstrapFirstAdminOutputFile
