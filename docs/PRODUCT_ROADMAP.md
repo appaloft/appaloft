@@ -120,6 +120,9 @@ The 1.0.0 product is ready only when all of these are checked:
 - [ ] Every long-running internal state has list/show plus retry/cancel/prune/recovery where it can
   block or confuse operators.
 - [ ] Web, CLI, and HTTP/oRPC all dispatch the same command/query schemas.
+- [ ] A published TypeScript SDK consumes the same HTTP/oRPC operation contracts as Web and
+  external automation, without importing `core`, `application`, repositories, handlers, or use
+  cases.
 - [x] Future MCP/tool contracts can be generated from the same operation catalog without inventing
   parallel behavior.
 - [ ] Framework/runtime detection covers the mainstream self-hosted web catalog with deterministic
@@ -1771,6 +1774,9 @@ Exit criteria:
   role-aware access to projects, environments, resources, deployment targets, and tokens.
 - [ ] Install, upgrade, HTTP/oRPC, Web, CLI, docs, and test matrices agree on the first-admin,
   OAuth, organization/team, and deploy-token behavior.
+- [ ] The TypeScript SDK and CLI/HTTP interface-parity work remains deferred until this auth/org
+  baseline is accepted, so SDK authentication, deploy-token, session, 401/403, and organization
+  scope semantics are not published before `0.10.0` closes.
 
 ## Phase 9: Operator/Internal State Closure And Interface Parity
 
@@ -1809,6 +1815,18 @@ Required:
 - [ ] Ensure provider/plugin/system operations expose capability details and configuration
   diagnostics without leaking provider SDK types or secrets.
 - [x] Verify CLI, HTTP/oRPC, Web, and generated MCP/tool contracts against `operation-catalog.ts`.
+- [ ] Add a published TypeScript SDK as a public operation client after the Phase 8 auth/org
+  baseline: methods generated from the OpenAPI SDK contract plus Appaloft operation metadata,
+  shared command/query input schemas, typed result and error handling, deploy-token/session header
+  support, and no dependency on `core`, `application`, repository ports, handlers, use cases, or
+  shell composition.
+- [ ] Flatten CLI, HTTP/oRPC, Web, SDK, and generated MCP/tool parity around the operation catalog:
+  each public operation has one canonical schema, one docs/help anchor decision, one error contract,
+  and interface-specific adapters that dispatch through command/query boundaries instead of
+  duplicating business behavior.
+- [ ] Let internal black-box and smoke tests use the published SDK against a running Appaloft
+  server, while lower-level domain/application tests continue to use direct domain objects,
+  handlers, use cases, buses, and testkit fixtures where that is the behavior under test.
 - [ ] Harden install/upgrade/release: migrations, backup/recovery, all-in-one packaging, binary
   release, static console asset serving, and smoke tests.
 
@@ -1817,6 +1835,9 @@ Exit criteria:
 - [ ] Operators can see and repair stuck work through Appaloft operations.
 - [ ] Historical attempts, logs, events, remote state backups, runtime artifacts, source
   workspaces, and build cache have documented retention/prune behavior.
+- [ ] TypeScript SDK, CLI, HTTP/oRPC, Web, and generated MCP/tool contracts are verified from the
+  same operation catalog after auth/org rules are active, with no SDK-only business operations or
+  transport-only business schemas.
 - [ ] The release candidate passes local, PGlite, PostgreSQL, Docker, and opt-in SSH smoke suites.
 
 ## 1.0.0 GA
@@ -1978,6 +1999,10 @@ work below before GA.
 - [ ] Auth/org/team: self-hosted install can bootstrap a default admin, operators can invite or
   add team members into an organization, and project/resource access is scoped by membership before
   deployment APIs are considered production-secure.
+- [ ] TypeScript SDK and interface parity: publish `@appaloft/sdk` as an operation client over the
+  authenticated HTTP/oRPC contract, keep CLI and HTTP as sibling adapters over the same
+  command/query schemas, and allow internal black-box tests to use the SDK only where a running
+  server boundary is the subject.
 - [ ] Product-grade preview deployment: create from PR event, list/show/update policy/delete on
   close, scoped env, GitHub App status/comments, and cleanup retries.
 - [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs. Spec Round
