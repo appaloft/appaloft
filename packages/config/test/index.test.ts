@@ -177,6 +177,9 @@ describe("resolveConfig", () => {
   });
 
   test("reads the installer deploy-token bootstrap output file from runtime configuration", () => {
+    const defaultConfig = resolveConfig({});
+    expect(defaultConfig.bootstrapDeployTokenOutputFile).toBeUndefined();
+
     const config = resolveConfig({
       env: {
         APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE: "/tmp/appaloft-bootstrap/deploy-token.json",

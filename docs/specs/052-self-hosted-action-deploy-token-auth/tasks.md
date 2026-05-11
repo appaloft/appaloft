@@ -131,12 +131,13 @@
   They return safe deploy-token summaries without raw token or verifier values.
 - Shell composition now uses persisted verifier storage by default and keeps
   `APPALOFT_ACTION_DEPLOY_TOKEN` as the operator-provided bootstrap fallback when configured.
-- Docker self-host installs set `APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE`; Shell startup uses
-  `ListDeployTokensQuery` and `CreateDeployTokenCommand` to create an initial deploy token only when
-  no active token exists for `org_self_hosted`, writes the raw token to the container-local handoff
-  file once, and the installer reads and removes that file before printing the token in trusted
-  install output. Reinstall output is idempotent and omits raw token material when an active token
-  already exists.
+- Docker self-host installs can opt into deploy-token handoff with `--bootstrap-deploy-token`,
+  setting `APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE`; Shell startup uses `ListDeployTokensQuery`
+  and `CreateDeployTokenCommand` to create an initial deploy token only when no active token exists
+  for `org_self_hosted`, writes the raw token to the container-local handoff file once, and the
+  installer reads and removes that file before printing the token in trusted install output.
+  Reinstall output is idempotent and omits raw token material when an active token already exists.
+  Plain SSH install does not create a deploy token by default.
 - Public docs now cover installer bootstrap output, GitHub Secret wiring through `appaloft-token`,
   scope meaning, 401/403 recovery, and CLI plus admin-protected HTTP/oRPC lifecycle endpoints under
   `self-hosting/action-deploy-token-auth#self-hosting-action-deploy-token-auth`. Web and future MCP

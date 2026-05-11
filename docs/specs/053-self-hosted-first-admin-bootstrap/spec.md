@@ -32,6 +32,7 @@ role-aware product mutations.
 | FIRST-ADMIN-SPEC-004 | Idempotent after first admin exists | A first admin or organization owner already exists | Bootstrap runs again | The workflow returns safe existing status and does not create another user, organization, member, or raw password output. |
 | FIRST-ADMIN-SPEC-005 | OAuth optional | No OAuth provider is configured | First-admin bootstrap and login are attempted | Local email/password login remains available and OAuth providers are reported disabled with safe setup hints. |
 | FIRST-ADMIN-SPEC-006 | Admin gate foundation | A product mutation endpoint is not explicitly public | Request lacks a valid product session | The adapter returns `401` before dispatch; if a session exists but lacks organization role, it returns `403`. |
+| FIRST-ADMIN-SPEC-007 | Navigation gate before console boot | A self-hosted instance has no first admin | A browser requests a console document route such as `/` or a project/resource deep link | The HTTP adapter redirects directly to `/bootstrap/auth/first-admin` before serving the SPA shell; API endpoints, docs routes, static assets, ACME challenges, and the first-admin route itself are not redirected. |
 
 ## Domain Ownership
 
@@ -49,7 +50,9 @@ role-aware product mutations.
   status, configured login methods, and generated one-time password when applicable. Operators can
   also call `appaloft auth bootstrap-status` and `appaloft auth bootstrap-first-admin` through the
   same application messages.
-- Web/UI: first-admin onboarding is a Phase 8 Web surface and must use i18n keys.
+- Web/UI: first-admin onboarding is a Phase 8 Web surface and must use i18n keys. Production
+  console document navigation is gated by the backend before the SPA shell is served; local
+  Vite dev/preview uses the same bootstrap-status endpoint as a server middleware gate.
 - Config: local first-admin email/name/password, optional output file, OAuth provider settings, and
   trusted browser origin are runtime config only. Password values and OAuth client secrets are
   secrets.
