@@ -20,6 +20,9 @@ repair proxy routes, or redeploy a resource.
 - Retry creates a new verification attempt id.
 - Existing attempts remain historical state.
 - DNS observation returns to a waitable pending state when expected targets are known.
+- Accepted retry attempts are mirrored into the durable process attempt journal for
+  `operator-work.*` visibility with DomainBinding, Resource, server, and safe domain/DNS
+  expectation metadata.
 - Retry is accepted only while the binding is pending verification or not ready from domain/route
   readiness state.
 - Certificate retry remains certificate lifecycle work.

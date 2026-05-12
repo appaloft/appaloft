@@ -21,6 +21,8 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import {
   type Clock,
   type IdGenerator,
+  type ProcessAttemptClaimer,
+  type ProcessAttemptCompleter,
   type ScheduledTaskDefinitionRepository,
   type ScheduledTaskRunAttemptRepository,
   type ScheduledTaskRunLogRecord,
@@ -28,6 +30,10 @@ import {
   type ScheduledTaskRunSummary,
   type ScheduledTaskRuntimePort,
 } from "../../ports";
+import {
+  EmptyProcessAttemptClaimer,
+  EmptyProcessAttemptCompleter,
+} from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 
 export interface ScheduledTaskRunWorkerInput {
@@ -35,6 +41,8 @@ export interface ScheduledTaskRunWorkerInput {
   taskId?: string;
   resourceId?: string;
   environment?: Record<string, string>;
+  processAttemptId?: string;
+  workerId?: string;
 }
 
 export interface ScheduledTaskRunWorkerResult {
@@ -82,6 +90,10 @@ export class ScheduledTaskRunWorker {
     private readonly idGenerator: IdGenerator,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.processAttemptClaimer)
+    private readonly processAttemptClaimer: ProcessAttemptClaimer = new EmptyProcessAttemptClaimer(),
+    @inject(tokens.processAttemptCompleter)
+    private readonly processAttemptCompleter: ProcessAttemptCompleter = new EmptyProcessAttemptCompleter(),
   ) {}
 
   async run(
@@ -93,6 +105,8 @@ export class ScheduledTaskRunWorker {
       clock,
       idGenerator,
       logRecorder,
+      processAttemptClaimer,
+      processAttemptCompleter,
       runAttemptRepository,
       runtimePort,
       taskDefinitionRepository,
@@ -132,7 +146,32 @@ export class ScheduledTaskRunWorker {
         return err(domainError.notFound("scheduled task", runState.taskId.value));
       }
 
-      yield* runAttempt.start({ startedAt: StartedAt.rehydrate(clock.now()) });
+      const workerStartedAt = clock.now();
+      if (input.processAttemptId) {
+        const claimResult = yield* await processAttemptClaimer.claimDue(repositoryContext, {
+          attemptId: input.processAttemptId,
+          workerId: input.workerId ?? "scheduled-task-run-worker",
+          claimedAt: workerStartedAt,
+          safeDetails: {
+            runId: runState.id.value,
+            taskId: runState.taskId.value,
+            resourceId: runState.resourceId.value,
+          },
+        });
+
+        if (claimResult.status !== "claimed") {
+          return err(
+            domainError.conflict("Scheduled task durable process attempt could not be claimed", {
+              phase: "scheduled-task-run-worker",
+              runId: runState.id.value,
+              processAttemptId: input.processAttemptId,
+              claimStatus: claimResult.status,
+            }),
+          );
+        }
+      }
+
+      yield* runAttempt.start({ startedAt: StartedAt.rehydrate(workerStartedAt) });
       await runAttemptRepository.upsert(
         repositoryContext,
         runAttempt,
@@ -150,8 +189,9 @@ export class ScheduledTaskRunWorker {
       });
 
       if (runtimeResult.isErr()) {
+        const failedAt = clock.now();
         yield* runAttempt.markFailed({
-          finishedAt: FinishedAt.rehydrate(clock.now()),
+          finishedAt: FinishedAt.rehydrate(failedAt),
           exitCode: ScheduledTaskRunExitCode.rehydrate(1),
           failureSummary: fallbackFailureSummary(),
         });
@@ -160,6 +200,25 @@ export class ScheduledTaskRunWorker {
           runAttempt,
           UpsertScheduledTaskRunAttemptSpec.fromRunAttempt(runAttempt),
         );
+        if (input.processAttemptId) {
+          yield* await processAttemptCompleter.complete(repositoryContext, {
+            attemptId: input.processAttemptId,
+            status: "retry-scheduled",
+            completedAt: failedAt,
+            phase: "scheduled-task-run",
+            step: "runtime-execution",
+            errorCode: runtimeResult.error.code,
+            errorCategory: "async-processing",
+            retriable: true,
+            nextEligibleAt: failedAt,
+            nextActions: ["retry", "manual-review"],
+            safeDetails: {
+              runId: runState.id.value,
+              taskId: runState.taskId.value,
+              resourceId: runState.resourceId.value,
+            },
+          });
+        }
         return err(runtimeResult.error);
       }
 
@@ -197,6 +256,33 @@ export class ScheduledTaskRunWorker {
         runAttempt,
         UpsertScheduledTaskRunAttemptSpec.fromRunAttempt(runAttempt),
       );
+      if (input.processAttemptId) {
+        const processAttemptStatus =
+          runtimeResult.value.status === "succeeded" ? "succeeded" : "retry-scheduled";
+        yield* await processAttemptCompleter.complete(repositoryContext, {
+          attemptId: input.processAttemptId,
+          status: processAttemptStatus,
+          completedAt: runtimeResult.value.finishedAt,
+          phase: "scheduled-task-run",
+          step: "runtime-execution",
+          ...(runtimeResult.value.status === "succeeded"
+            ? {}
+            : {
+                errorCode: "scheduled_task_run_failed",
+                errorCategory: "async-processing",
+                retriable: true,
+                nextEligibleAt: clock.now(),
+              }),
+          nextActions:
+            runtimeResult.value.status === "succeeded" ? ["no-action"] : ["retry", "manual-review"],
+          safeDetails: {
+            runId: runState.id.value,
+            taskId: runState.taskId.value,
+            resourceId: runState.resourceId.value,
+            exitCode: runtimeResult.value.exitCode,
+          },
+        });
+      }
 
       return ok({
         run: runSummaryFromAttempt(runAttempt),

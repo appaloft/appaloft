@@ -1,0 +1,34 @@
+# Runtime Target Capacity Test Matrix
+
+## Scope
+
+This matrix governs runtime target capacity diagnostics and prune behavior for deployment
+target/server capacity operations.
+
+## Matrix
+
+| ID | Behavior | Level | Automation |
+| --- | --- | --- | --- |
+| RT-CAP-INSPECT-001 | `servers.capacity.inspect` dispatches a read-only application query from CLI. | CLI | Automated in `packages/adapters/cli/test/server-command.test.ts`. |
+| RT-CAP-PRUNE-001 | `servers.capacity.prune` defaults to dry-run and deletes nothing. | Application | Automated in `packages/application/test/server-capacity-prune.test.ts`. |
+| RT-CAP-PRUNE-002 | Destructive prune deletes only matched safe categories. | Application | Automated in `packages/application/test/server-capacity-prune.test.ts`. |
+| RT-CAP-PRUNE-003 | Runtime adapter reports active-runtime, rollback, volume, state-root, and cutoff skips/exclusions. | Adapter | Automated in `packages/adapters/runtime/test/runtime-target-capacity-prune.test.ts`. |
+| RT-CAP-PRUNE-004 | Unsupported provider returns `runtime_target_unsupported` without mutation. | Adapter | Automated in `packages/adapters/runtime/test/runtime-target-capacity-prune.test.ts`. |
+| RT-CAP-PRUNE-005 | CLI and HTTP/oRPC dispatch `PruneServerCapacityCommand` through shared schema. | Entrypoint | Automated in CLI and oRPC tests. |
+| RT-CAP-PRUNE-006 | Destructive `servers.capacity.prune` with pruned candidates records one safe aggregate-scoped audit row; dry-run and destructive no-op do not. | Application/persistence | Automated in `packages/application/test/server-capacity-prune.test.ts` and `packages/persistence/pg/test/audit-event-read-model.pglite.test.ts`. |
+| RT-CAP-PRUNE-007 | Docker build-cache and unused-image prune categories are explicit opt-in, use filtered Docker prune commands, and never run broad `docker system prune` or Docker volume prune. | Application/adapter/CLI | Automated in `packages/application/test/server-capacity-prune.test.ts`, `packages/adapters/runtime/test/runtime-target-capacity-prune.test.ts`, and `packages/adapters/cli/test/server-command.test.ts`. |
+| RT-CAP-SCHED-001 | Scheduled runtime prune policy selection follows `defaults < system < organization < project < environment < deployment snapshot` and exposes only safe/masked policy readback. | Application/persistence/config | Application resolver and configure/list/show readback automated in `packages/application/test/scheduled-runtime-prune.test.ts`; persistence-backed policy storage/readback, including `deployment-snapshot` scope, automated in `packages/persistence/pg/test/scheduled-runtime-prune-policy-read-model.pglite.test.ts`; repository config `retention.runtimePrune` parsing/readback automated in `packages/deployment-config/test/appaloft-config.test.ts` and `packages/adapters/filesystem/test/deployment-config-reader.test.ts`; deployment config bootstrap materialization automated in `packages/application/test/create-deployment.test.ts`. |
+| RT-CAP-SCHED-002 | Scheduled runtime prune defaults to dry-run when policy does not explicitly enable destructive prune. | Application/shell | Application service slice automated in `packages/application/test/scheduled-runtime-prune.test.ts`; shell runner policy discovery handoff automated in `apps/shell/test/scheduled-runtime-prune-runner.test.ts`. |
+| RT-CAP-SCHED-003 | Destructive scheduled prune is policy-gated and dispatches the existing `servers.capacity.prune` command with ADR-047/ADR-050 safety boundaries. | Application/shell | Application service slice automated in `packages/application/test/scheduled-runtime-prune.test.ts`; shell runner policy discovery handoff automated in `apps/shell/test/scheduled-runtime-prune-runner.test.ts`. |
+| RT-CAP-SCHED-004 | Accepted scheduled prune work records a durable process attempt before runtime adapter work begins. | Application/operator work | Application service slice automated in `packages/application/test/scheduled-runtime-prune.test.ts`; shell runner dispatch for explicitly supplied and read-model-discovered policies automated in `apps/shell/test/scheduled-runtime-prune-runner.test.ts`; persistence-backed policy-to-process-attempt handoff automated in `packages/persistence/pg/test/scheduled-runtime-prune-policy-read-model.pglite.test.ts`. |
+| RT-CAP-SCHED-005 | Scheduled prune worker failure is visible through operator work as failed, retry-scheduled, canceled, recovered, or dead-lettered state without raw runtime output or secrets. | Application/operator work | Retry-scheduled failure path automated in `packages/application/test/scheduled-runtime-prune.test.ts`; shell runner error logging automated in `apps/shell/test/scheduled-runtime-prune-runner.test.ts`; scheduled prune dead-letter/recovery safe-details visibility automated in `packages/application/test/operator-work-dead-letter.test.ts` and `packages/application/test/operator-work-mark-recovered.test.ts`; persistence-backed worker handoff visibility automated in `packages/persistence/pg/test/scheduled-runtime-prune-policy-read-model.pglite.test.ts`. |
+| RT-CAP-SCHED-006 | Destructive scheduled prune with deleted candidates records the same safe aggregate-scoped audit row shape as manual destructive prune. | Application/persistence | Application service boundary automated in `packages/application/test/scheduled-runtime-prune.test.ts`; persistence-backed policy/process-attempt/audit handoff automated in `packages/persistence/pg/test/scheduled-runtime-prune-policy-read-model.pglite.test.ts`. |
+| RT-CAP-SCHED-007 | Scheduled prune scheduler and policy entrypoints dispatch commands/queries through buses and never call runtime adapters, repositories, or prune use cases directly. | Shell/entrypoint | Application service dispatch through a bus-like command boundary and policy configure/list/show command/query surfaces are automated in `packages/application/test/scheduled-runtime-prune.test.ts`; shell runner service handoff and policy discovery through an injected read model are automated in `apps/shell/test/scheduled-runtime-prune-runner.test.ts`; persistence-backed handoff is automated in `packages/persistence/pg/test/scheduled-runtime-prune-policy-read-model.pglite.test.ts`; config parsing is automated in `packages/config/test/index.test.ts`; CLI policy entrypoints are automated in `packages/adapters/cli/test/server-command.test.ts`; HTTP/oRPC policy entrypoints are automated in `packages/orpc/test/scheduled-runtime-prune-policy.http.test.ts`. |
+
+## Current Gaps
+
+- Real Docker and SSH prune smoke tests are opt-in because they mutate external runtime targets.
+- Docker build-cache and unused-image deletion are explicit opt-in categories; scheduled prune
+  automation is implemented behind ADR-055 policy-gated command-bus dispatch.
+- Runtime prune audit output records retained audit rows only; domain event stream/outbox
+  publication remains deferred.

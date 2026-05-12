@@ -1,4 +1,5 @@
 export * from "./operations/resources/archive-resource.handler";
+export * from "./operations/resources/archive-resource-runtime-logs.handler";
 export * from "./operations/resources/attach-resource-storage.handler";
 export * from "./operations/resources/attach-resource-storage.use-case";
 export * from "./operations/resources/bind-resource-dependency.handler";
@@ -16,7 +17,9 @@ export * from "./operations/resources/detach-resource-storage.handler";
 export * from "./operations/resources/detach-resource-storage.use-case";
 export * from "./operations/resources/import-resource-variables.handler";
 export * from "./operations/resources/list-resource-dependency-bindings.handler";
+export * from "./operations/resources/list-resource-runtime-log-archives.handler";
 export * from "./operations/resources/list-resources.handler";
+export * from "./operations/resources/prune-resource-runtime-log-archives.handler";
 export * from "./operations/resources/resource-access-failure-evidence-lookup.handler";
 export * from "./operations/resources/resource-diagnostic-summary.handler";
 export * from "./operations/resources/resource-effective-config.handler";
@@ -30,6 +33,7 @@ export * from "./operations/resources/rotate-resource-dependency-binding-secret.
 export * from "./operations/resources/set-resource-variable.handler";
 export * from "./operations/resources/show-resource.handler";
 export * from "./operations/resources/show-resource-dependency-binding.handler";
+export * from "./operations/resources/show-resource-runtime-log-archive.handler";
 export * from "./operations/resources/start-resource-runtime.handler";
 export * from "./operations/resources/stop-resource-runtime.handler";
 export * from "./operations/resources/unbind-resource-dependency.handler";

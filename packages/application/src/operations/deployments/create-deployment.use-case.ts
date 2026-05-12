@@ -32,6 +32,8 @@ import {
   type EventBus,
   type ExecutionBackend,
   type MutationCoordinator,
+  type ProcessAttemptNextAction,
+  type ProcessAttemptRecorder,
   type RequestedDeploymentConfig,
   type ResourceDependencyBindingReadModel,
   type RuntimePlanResolver,
@@ -43,6 +45,7 @@ import {
   ServerAppliedRouteStateByTargetSpec,
   type SourceDetector,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
@@ -469,6 +472,72 @@ function requiredRuntimeTargetCapabilities(runtimePlan: {
   return capabilities;
 }
 
+function deploymentProcessNextActions(status: string): ProcessAttemptNextAction[] {
+  return status === "failed" ? ["diagnostic", "manual-review"] : ["no-action"];
+}
+
+async function recordDeploymentProcessAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  context: ExecutionContext;
+  deployment: Deployment;
+  operationKey: "deployments.create" | "deployments.redeploy";
+}): Promise<void> {
+  const state = input.deployment.toState();
+  const runtimePlan = state.runtimePlan;
+  const runtimePlanState = runtimePlan.toState();
+  const execution = runtimePlan.execution;
+  const executionMetadata = execution.metadata ?? {};
+  const status = state.status.value;
+  const processStatus =
+    status === "failed" ? "failed" : status === "succeeded" ? "succeeded" : "running";
+  const errorCode =
+    executionMetadata.errorCode ?? (status === "failed" ? "deployment_failed" : undefined);
+  const updatedAt = state.finishedAt?.value ?? state.startedAt?.value ?? state.createdAt.value;
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: state.id.value,
+    kind: "deployment",
+    status: processStatus,
+    operationKey: input.operationKey,
+    dedupeKey: `deployment:${state.id.value}`,
+    correlationId: input.context.requestId,
+    requestId: input.context.requestId,
+    phase: "deployment-execution",
+    step: status,
+    projectId: state.projectId.value,
+    resourceId: state.resourceId.value,
+    deploymentId: state.id.value,
+    serverId: state.serverId.value,
+    startedAt: state.startedAt?.value ?? state.createdAt.value,
+    updatedAt,
+    ...(state.finishedAt ? { finishedAt: state.finishedAt.value } : {}),
+    ...(errorCode ? { errorCode, errorCategory: "async-processing" } : {}),
+    ...(processStatus === "failed" ? { retriable: true } : {}),
+    nextActions: deploymentProcessNextActions(status),
+    safeDetails: {
+      triggerKind: state.triggerKind.value,
+      deploymentStatus: status,
+      buildStrategy: runtimePlan.buildStrategy,
+      packagingMode: runtimePlan.packagingMode,
+      executionKind: execution.kind,
+      targetKind: runtimePlan.target.kind,
+      targetProviderKey: runtimePlan.target.providerKey,
+      stepCount: runtimePlanState.steps.length,
+      ...(state.sourceDeploymentId ? { sourceDeploymentId: state.sourceDeploymentId.value } : {}),
+      ...(state.supersedesDeploymentId
+        ? { supersedesDeploymentId: state.supersedesDeploymentId.value }
+        : {}),
+      ...(executionMetadata.phase ? { failurePhase: executionMetadata.phase } : {}),
+      ...(executionMetadata.step ? { failureStep: executionMetadata.step } : {}),
+      ...(executionMetadata.safeAdapterErrorCode
+        ? { safeAdapterErrorCode: executionMetadata.safeAdapterErrorCode }
+        : {}),
+    },
+  });
+
+  void result;
+}
+
 @injectable()
 export class CreateDeploymentUseCase {
   constructor(
@@ -510,6 +579,8 @@ export class CreateDeploymentUseCase {
     private readonly resourceDependencyBindingReadModel?: ResourceDependencyBindingReadModel,
     @inject(tokens.dependencyResourceSecretStore)
     private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   private async persistDeployment(
@@ -657,6 +728,7 @@ export class CreateDeploymentUseCase {
       mutationCoordinator,
       resourceDependencyBindingReadModel,
       runtimeTargetBackendRegistry,
+      processAttemptRecorder,
       deploymentProgressReporter,
       dependencyResourceSecretStore,
       runtimePlanResolutionInputBuilder,
@@ -935,6 +1007,13 @@ export class CreateDeploymentUseCase {
       });
       const deployment = yield* admittedDeploymentResult;
       const deploymentId = deployment.toState().id.value;
+      await recordDeploymentProcessAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        context,
+        deployment,
+        operationKey: recovery?.ownerLabel ?? "deployments.create",
+      });
 
       reportDeploymentProgress(deploymentProgressReporter, context, {
         deploymentId,
@@ -964,6 +1043,13 @@ export class CreateDeploymentUseCase {
           return ok({ id: deployment.toState().id.value });
         }
         await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
+        await recordDeploymentProcessAttempt({
+          recorder: processAttemptRecorder,
+          repositoryContext,
+          context,
+          deployment,
+          operationKey: recovery?.ownerLabel ?? "deployments.create",
+        });
 
         return ok({ id: deployment.toState().id.value });
       }
@@ -981,6 +1067,13 @@ export class CreateDeploymentUseCase {
         execution.deployment,
         undefined,
       );
+      await recordDeploymentProcessAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        context,
+        deployment: execution.deployment,
+        operationKey: recovery?.ownerLabel ?? "deployments.create",
+      });
 
       return ok({ id: execution.deployment.toState().id.value });
     });

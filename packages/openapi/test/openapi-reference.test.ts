@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import {
+  type OperationCatalogEntry,
+  operationCatalog,
+} from "@appaloft/application/operation-catalog";
 import { type OpenAPI } from "@orpc/openapi";
 
 import {
@@ -69,6 +73,7 @@ describe("Appaloft OpenAPI reference package", () => {
     expect(spec.paths?.["/deployments/{deploymentId}/events"]?.get?.tags).toEqual([
       "Observability",
     ]);
+    expect(spec.paths?.["/domain-events/prune"]?.post?.tags).toEqual(["Observability"]);
     expect(spec.paths?.["/integrations/github/repositories"]?.get?.tags).toEqual(["Integrations"]);
   });
 
@@ -96,6 +101,71 @@ describe("Appaloft OpenAPI reference package", () => {
       },
       idempotencyKey: "configure-source-res-web-console",
     });
+  });
+
+  test("[TS-SDK-OPENAPI-001] annotates catalog-backed OpenAPI operations with Appaloft SDK metadata", async () => {
+    const spec = await createAppaloftOpenApiSpec();
+    const createProject = spec.paths?.["/projects"]?.post;
+    const replayDeploymentEvents = spec.paths?.["/deployments/{deploymentId}/events"]?.get;
+    const streamDeploymentEvents = spec.paths?.["/deployments/{deploymentId}/events/stream"]?.get;
+
+    expect(createProject).toBeDefined();
+    expect(createProject).toMatchObject({
+      "x-appaloft-operation-key": "projects.create",
+      "x-appaloft-operation-kind": "command",
+      "x-appaloft-operation-domain": "projects",
+      "x-appaloft-message-name": "CreateProjectCommand",
+      "x-appaloft-docs-href": "/docs/resources/projects/#concept-project",
+      "x-appaloft-auth-policy": "product-session",
+      "x-appaloft-error-family": "structured-platform-error",
+      "x-appaloft-streaming": false,
+    });
+
+    expect(replayDeploymentEvents).toMatchObject({
+      "x-appaloft-operation-key": "deployments.stream-events",
+      "x-appaloft-operation-kind": "query",
+      "x-appaloft-operation-domain": "deployments",
+      "x-appaloft-message-name": "StreamDeploymentEventsQuery",
+      "x-appaloft-docs-href": "/docs/deploy/lifecycle/#deployment-lifecycle",
+      "x-appaloft-auth-policy": "product-session",
+      "x-appaloft-error-family": "structured-platform-error",
+      "x-appaloft-streaming": false,
+    });
+
+    expect(streamDeploymentEvents).toMatchObject({
+      "x-appaloft-operation-key": "deployments.stream-events",
+      "x-appaloft-streaming": true,
+    });
+  });
+
+  test("[TS-SDK-OPENAPI-002][TS-SDK-OPENAPI-003] keeps OpenAPI SDK operations synchronized with the operation catalog", async () => {
+    const spec = await createAppaloftOpenApiSpec();
+    const openApiOperations = collectAppaloftOpenApiOperations(spec);
+    const operationsByRoute = new Map(
+      openApiOperations.map((operation) => [routeKey(operation.method, operation.path), operation]),
+    );
+
+    for (const entry of operationCatalog) {
+      for (const route of operationCatalogHttpRoutes(entry)) {
+        const operation = operationsByRoute.get(
+          routeKey(route.method.toLowerCase(), stripApiPrefix(route.path)),
+        );
+
+        expect(operation, `${entry.key} ${route.method} ${route.path}`).toBeDefined();
+        expect(operation?.operation["x-appaloft-operation-key"], entry.key).toBe(entry.key);
+        expect(operation?.operation["x-appaloft-operation-kind"], entry.key).toBe(entry.kind);
+      }
+    }
+
+    const catalogKeys = new Set<string>(operationCatalog.map((entry) => entry.key));
+    const annotatedKeys = openApiOperations
+      .map((operation) => operation.operation["x-appaloft-operation-key"])
+      .filter((key): key is string => typeof key === "string");
+
+    expect(annotatedKeys.length).toBeGreaterThan(0);
+    for (const key of annotatedKeys) {
+      expect(catalogKeys.has(key), key).toBe(true);
+    }
   });
 
   test("returns JSON and Scalar HTML responses without binding to Elysia", async () => {
@@ -182,4 +252,53 @@ function getExampleValue(
 
 function isReferenceObject(value: unknown): value is OpenAPI.ReferenceObject {
   return typeof value === "object" && value !== null && "$ref" in value;
+}
+
+function collectAppaloftOpenApiOperations(spec: OpenAPI.Document): {
+  method: string;
+  path: string;
+  operation: OpenAPI.OperationObject & Record<string, unknown>;
+}[] {
+  const operations: {
+    method: string;
+    path: string;
+    operation: OpenAPI.OperationObject & Record<string, unknown>;
+  }[] = [];
+
+  for (const [path, pathItem] of Object.entries(spec.paths ?? {})) {
+    if (!pathItem || isReferenceObject(pathItem)) {
+      continue;
+    }
+
+    for (const method of ["get", "post", "delete"] as const) {
+      const operation = pathItem[method];
+
+      if (operation) {
+        operations.push({ method, path, operation });
+      }
+    }
+  }
+
+  return operations;
+}
+
+function operationCatalogHttpRoutes(entry: OperationCatalogEntry): {
+  method: string;
+  path: string;
+}[] {
+  return [
+    ...("orpc" in entry.transports && entry.transports.orpc ? [entry.transports.orpc] : []),
+    ...(entry.transports.orpcAdditional ?? []),
+    ...("orpcStream" in entry.transports && entry.transports.orpcStream
+      ? [entry.transports.orpcStream]
+      : []),
+  ];
+}
+
+function routeKey(method: string, path: string): string {
+  return `${method.toUpperCase()} ${path}`;
+}
+
+function stripApiPrefix(path: string): string {
+  return path.replace(/^\/api(?=\/)/, "");
 }

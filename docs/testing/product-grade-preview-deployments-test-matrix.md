@@ -143,6 +143,10 @@ route, source-link, provider metadata, and feedback cleanup with safe source-sco
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves retryable
 cleanup failures record `retry-scheduled` attempt state with owner, new `pcln_*` attempt ids per
 run, safe failure phase, provider error code, next retry time, and no provider error text.
+The same coverage now proves preview cleanup mirrors successful and retry-scheduled cleanup
+outcomes into the process attempt journal with stable preview cleanup dedupe keys, request/
+correlation ids, safe preview scope details, retry/manual-review operator actions, and no provider
+error text, so `operator-work.*` can see and repair the cleanup work.
 `PG-PREVIEW-CLEANUP-002` now also has Postgres/PGlite persistence coverage in
 `packages/persistence/pg/test/preview-cleanup-attempt.pglite.test.ts`. The coverage proves durable
 cleanup attempt rows retain attempt id, preview environment id, Resource id, source fingerprint,

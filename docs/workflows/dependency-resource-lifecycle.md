@@ -78,7 +78,7 @@ capability under
 The workflow lets operators:
 
 1. Provision an Appaloft-managed Postgres dependency resource record with provider-native
-   realization state.
+   realization state and operator-visible process-attempt projection.
 2. Import an external Postgres dependency resource without exposing raw connection secrets later.
 3. List and show dependency resources with ownership, status, connection exposure policy, future
    binding readiness, and backup relationship metadata.
@@ -92,7 +92,8 @@ The workflow lets operators:
 9. Rotate a binding-scoped secret reference for future deployment snapshots without changing
    historical deployments.
 10. Register Redis dependency resources as safe records, realize managed Redis records through the
-    provider capability, and copy ready Redis bindings into safe deployment snapshot references.
+    provider capability with operator-visible process-attempt projection, and copy ready Redis
+    bindings into safe deployment snapshot references.
 11. Materialize active ready dependency bindings into runtime environment injection snapshots after
     the runtime injection Code Round.
 12. Create safe backup restore points and restore them in place after explicit acknowledgement.
@@ -239,8 +240,10 @@ before mutation when:
 - deployment snapshots or other retained references are reported by the safety reader.
 
 Failure uses stable structured errors and safe blocker details. Imported external delete never
-deletes the external database. Realized Appaloft-managed Postgres delete calls the managed provider
-cleanup only after explicit provider delete safety and cleanup succeeds.
+deletes the external database. Realized Appaloft-managed Postgres or Redis delete calls the managed
+provider cleanup only after explicit provider delete safety and cleanup succeeds, and provider
+cleanup attempts are mirrored into operator-visible process-attempt state with safe dependency and
+provider metadata.
 
 ## Backup And Restore
 
@@ -304,9 +307,11 @@ snapshot references. Binding secret rotation updates binding-scoped safe secret 
 future deployment snapshots only. Redis dependency resource lifecycle records are implemented as
 provider-neutral safe metadata, and ready imported Redis records can bind to Resources and appear as
 safe deployment snapshot references. Provider-native Postgres and Redis realization are implemented
-with hermetic provider capabilities. Dependency resource backup/restore is implemented with a hermetic
-provider capability, safe backup read models, restore attempt metadata, lifecycle events, and
-delete-safety blockers. Dependency binding runtime injection is specified by ADR-040, and
+with hermetic provider capabilities and safe operator-visible process-attempt projection for
+realization/delete attempts. Dependency resource backup/restore is implemented with a hermetic
+provider capability, safe backup read models, restore attempt metadata, lifecycle events,
+operator-visible process-attempt projection, and delete-safety blockers. Dependency binding runtime
+injection is specified by ADR-040, and
 store-backed dependency runtime secret value resolution is implemented for imported Postgres,
 imported Redis, managed Postgres Appaloft-owned refs, single-server runtimes, Docker Swarm, and
 retained rotated binding refs through
@@ -316,6 +321,6 @@ runtime cleanup remain future work.
 
 ## Open Questions
 
-- Whether the first provider-native Code Round uses synchronous fake-provider completion or durable
-  background processing remains an implementation choice, but read models must expose the same safe
-  realization status shape either way.
+- Provider-native realization/delete still executes inline through the command use cases after
+  `ResourceInstance` realization state is persisted. A full process-attempt atomic
+  claim/completion worker remains a future durable-delivery opt-in slice.

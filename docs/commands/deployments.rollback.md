@@ -16,9 +16,11 @@ readiness, error, test matrix, implementation plan, public docs/help, `CORE_OPER
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 - [Deployment Recovery Readiness Spec](../specs/012-deployment-recovery-readiness/spec.md)
 - [Deployment Rollback](../specs/041-deployment-rollback/spec.md)
+- [Durable Process Delivery Baseline](../specs/060-durable-process-delivery-baseline/spec.md)
 - [deployments.recovery-readiness Query Spec](../queries/deployments.recovery-readiness.md)
 - [Deployment Recovery Readiness Error Spec](../errors/deployment-recovery-readiness.md)
 - [Deployment Recovery Readiness Test Matrix](../testing/deployment-recovery-readiness-test-matrix.md)
+- [Durable Process Delivery Test Matrix](../testing/durable-process-delivery-test-matrix.md)
 
 ## Intent
 
@@ -60,8 +62,15 @@ successful deployment selected by the user/tool.
 
 ## Accepted Result
 
-The command returns accepted async work with a new rollback attempt id. Completion or failure is
-observed through `deployments.show`, `deployments.stream-events`, logs, and future readiness reads.
+The command returns accepted async work with a new rollback attempt id. Running, completion, and
+failure outcomes are also mirrored into the durable process attempt journal for `operator-work.*`
+visibility with safe Deployment, Resource, server, runtime plan, target backend, source deployment
+lineage, and rollback candidate lineage metadata.
+
+Rollback execution still runs inline through the rollback use case after admission/start state is
+persisted. It is not claimed or completed by a process-attempt worker yet. Completion or failure is
+observed through `deployments.show`, `deployments.stream-events`, logs, operator work, and future
+readiness reads.
 
 ## Events
 

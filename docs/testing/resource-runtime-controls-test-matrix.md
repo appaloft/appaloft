@@ -2,13 +2,13 @@
 
 ## Status
 
-Application, persistence, and runtime adapter slices for Phase 7 / `0.9.0`.
+Accepted and active for Phase 9 / `0.11.0`.
 
 Runtime stop/start/restart command schemas, handlers, use case orchestration, coordination
 policies, provider-neutral target port contract, attempt-recorder contract, PG/PGlite attempt
 persistence/readback, Docker/Compose adapter command mapping, local/generic-SSH executor wiring,
-and shell-internal DI registrations exist. No runtime stop/start/restart operation is active in
-CLI, HTTP/oRPC, Web, `CORE_OPERATIONS.md`, or `operation-catalog.ts` yet.
+shell-internal DI registrations, `CORE_OPERATIONS.md`, `operation-catalog.ts`, CLI, HTTP/oRPC, and
+Web Resource detail controls are active.
 
 ## Governing Sources
 
@@ -52,7 +52,7 @@ CLI, HTTP/oRPC, Web, `CORE_OPERATIONS.md`, or `operation-catalog.ts` yet.
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `RUNTIME-CTRL-SURFACE-001` | CLI, HTTP/oRPC, Web, and future MCP/tool controls. | Entrypoints reuse the same command schemas, blocked reason vocabulary, and docs links. | `packages/orpc/test/deployment-create.http.test.ts`; `packages/adapters/cli/src/commands/resource.ts`; `apps/web/src/routes/resources/[resourceId]/+page.svelte` | HTTP passing; CLI/Web typecheck coverage |
+| `RUNTIME-CTRL-SURFACE-001` | CLI, HTTP/oRPC, Web, and future MCP/tool controls. | Entrypoints reuse the same command schemas, blocked reason vocabulary, and docs links. | `packages/orpc/test/deployment-create.http.test.ts`; `packages/adapters/cli/src/commands/resource.ts`; `apps/web/src/routes/resources/[resourceId]/+page.svelte`; `packages/docs-registry/test/help-topics.test.ts` | HTTP passing; docs-registry passing; CLI/Web typecheck coverage |
 | `RUNTIME-CTRL-SURFACE-002` | User compares restart and redeploy. | Public docs and UI copy state that restart does not pick up source/config/profile changes. | `packages/docs-registry/test/help-topics.test.ts`; `apps/web/src/routes/resources/[resourceId]/+page.svelte` | Passing |
 | `RUNTIME-CTRL-DOCS-001` | Public help registry resolves runtime-control anchors. | Registered docs topics resolve `resource-runtime-controls`, `runtime-restart-vs-redeploy`, and `runtime-control-blocked-start` anchors in both locales. | `packages/docs-registry/test/help-topics.test.ts` | Passing |
 

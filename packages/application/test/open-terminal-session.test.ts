@@ -13,7 +13,13 @@ import {
 } from "@appaloft/core";
 
 import { createExecutionContext, type ExecutionContext, type RepositoryContext } from "../src";
-import { OpenTerminalSessionCommand } from "../src/messages";
+import {
+  CloseTerminalSessionCommand,
+  ExpireTerminalSessionsCommand,
+  ListTerminalSessionsQuery,
+  OpenTerminalSessionCommand,
+  ShowTerminalSessionQuery,
+} from "../src/messages";
 import {
   type DeploymentLogSummary,
   type DeploymentReadModel,
@@ -27,8 +33,9 @@ import {
   type TerminalSessionDescriptor,
   type TerminalSessionGateway,
   type TerminalSessionOpenRequest,
+  type TerminalSessionSummary,
 } from "../src/ports";
-import { OpenTerminalSessionUseCase } from "../src/use-cases";
+import { OpenTerminalSessionUseCase, TerminalSessionLifecycleService } from "../src/use-cases";
 
 class StaticIdGenerator implements IdGenerator {
   next(prefix: string): string {
@@ -113,6 +120,8 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
 
 class RecordingTerminalSessionGateway implements TerminalSessionGateway {
   readonly calls: TerminalSessionOpenRequest[] = [];
+  readonly summaries = new Map<string, TerminalSessionSummary>();
+  readonly closedSessionIds: string[] = [];
 
   async open(
     _context: ExecutionContext,
@@ -120,7 +129,7 @@ class RecordingTerminalSessionGateway implements TerminalSessionGateway {
   ): Promise<Result<TerminalSessionDescriptor>> {
     this.calls.push(request);
 
-    return ok({
+    const descriptor: TerminalSessionDescriptor = {
       sessionId: request.sessionId,
       scope: request.scope.kind,
       serverId: request.scope.server.id,
@@ -142,11 +151,67 @@ class RecordingTerminalSessionGateway implements TerminalSessionGateway {
         ? { workingDirectory: request.scope.workingDirectory }
         : {}),
       createdAt: "2026-04-16T00:00:00.000Z",
+    };
+    this.summaries.set(request.sessionId, {
+      ...descriptor,
+      status: "active",
     });
+
+    return ok(descriptor);
   }
 
   attach(): Result<TerminalSession> {
     return err(domainError.terminalSessionNotFound("Terminal session was not found"));
+  }
+
+  list(input?: Parameters<TerminalSessionGateway["list"]>[0]): TerminalSessionSummary[] {
+    return [...this.summaries.values()]
+      .filter((summary) => (input?.scope ? summary.scope === input.scope : true))
+      .filter((summary) => (input?.serverId ? summary.serverId === input.serverId : true))
+      .filter((summary) => (input?.resourceId ? summary.resourceId === input.resourceId : true))
+      .filter((summary) =>
+        input?.deploymentId ? summary.deploymentId === input.deploymentId : true,
+      )
+      .slice(0, input?.limit ?? 50);
+  }
+
+  show(sessionId: string): Result<TerminalSessionSummary> {
+    const summary = this.summaries.get(sessionId);
+    return summary
+      ? ok(summary)
+      : err(domainError.terminalSessionNotFound("Terminal session was not found", { sessionId }));
+  }
+
+  async close(sessionId: string) {
+    if (!this.summaries.has(sessionId)) {
+      return err(
+        domainError.terminalSessionNotFound("Terminal session was not found", { sessionId }),
+      );
+    }
+
+    this.summaries.delete(sessionId);
+    this.closedSessionIds.push(sessionId);
+    return ok({
+      sessionId,
+      closed: true,
+      status: "closed" as const,
+    });
+  }
+
+  async expire(input?: Parameters<TerminalSessionGateway["expire"]>[0]) {
+    const cutoff = input?.olderThan ? Date.parse(input.olderThan) : Date.now();
+    const candidates = [...this.summaries.values()]
+      .filter((summary) => Date.parse(summary.createdAt) < cutoff)
+      .slice(0, input?.limit ?? 200);
+
+    for (const summary of candidates) {
+      await this.close(summary.sessionId);
+    }
+
+    return ok({
+      expiredCount: candidates.length,
+      sessionIds: candidates.map((summary) => summary.sessionId),
+    });
   }
 }
 
@@ -452,5 +517,127 @@ describe("OpenTerminalSessionUseCase", () => {
 
     expect(result.isErr()).toBe(true);
     expect(result._unsafeUnwrapErr().code).toBe("terminal_session_workspace_unavailable");
+  });
+
+  test("[TERM-SESSION-LIFE-001] [TERM-SESSION-LIFE-002] lists and shows active sessions with safe metadata", async () => {
+    const context = createExecutionContext({ entrypoint: "http" });
+    const { gateway, useCase } = createUseCase();
+    const lifecycle = new TerminalSessionLifecycleService(gateway);
+    const openCommand = OpenTerminalSessionCommand.create({
+      scope: {
+        kind: "resource",
+        resourceId: "res_web",
+      },
+    })._unsafeUnwrap();
+
+    await useCase.execute(context, openCommand);
+
+    const list = lifecycle.list(
+      ListTerminalSessionsQuery.create({ scope: "resource" })._unsafeUnwrap(),
+    );
+    const show = lifecycle.show(
+      ShowTerminalSessionQuery.create({ sessionId: "term_test" })._unsafeUnwrap(),
+    );
+
+    expect(list).toMatchObject({
+      schemaVersion: "terminal-sessions.list/v1",
+      items: [
+        {
+          sessionId: "term_test",
+          scope: "resource",
+          resourceId: "res_web",
+          deploymentId: "dep_new",
+          status: "active",
+        },
+      ],
+    });
+    expect(show.isOk()).toBe(true);
+    expect(show._unsafeUnwrap().item).toMatchObject({
+      sessionId: "term_test",
+      serverId: "srv_demo",
+      providerKey: "local-shell",
+    });
+    expect(JSON.stringify(list)).not.toContain("PRIVATE KEY");
+    expect(JSON.stringify(list)).not.toContain("accessToken");
+    expect(JSON.stringify(list)).not.toContain("command");
+  });
+
+  test("[TERM-SESSION-LIFE-003] [TERM-SESSION-LIFE-004] closes active sessions and rejects missing sessions", async () => {
+    const context = createExecutionContext({ entrypoint: "http" });
+    const { gateway, useCase } = createUseCase();
+    const lifecycle = new TerminalSessionLifecycleService(gateway);
+    await useCase.execute(
+      context,
+      OpenTerminalSessionCommand.create({
+        scope: {
+          kind: "server",
+          serverId: "srv_demo",
+        },
+      })._unsafeUnwrap(),
+    );
+
+    const closed = await lifecycle.close(
+      CloseTerminalSessionCommand.create({ sessionId: "term_test" })._unsafeUnwrap(),
+    );
+    const missing = await lifecycle.close(
+      CloseTerminalSessionCommand.create({ sessionId: "ter_missing" })._unsafeUnwrap(),
+    );
+
+    expect(closed.isOk()).toBe(true);
+    expect(closed._unsafeUnwrap()).toEqual({
+      sessionId: "term_test",
+      closed: true,
+      status: "closed",
+    });
+    expect(gateway.closedSessionIds).toEqual(["term_test"]);
+    expect(lifecycle.list(ListTerminalSessionsQuery.create()._unsafeUnwrap()).items).toEqual([]);
+    expect(missing.isErr()).toBe(true);
+    expect(missing._unsafeUnwrapErr().code).toBe("terminal_session_not_found");
+  });
+
+  test("[TERM-SESSION-LIFE-005] expires only sessions older than the cutoff", async () => {
+    const { gateway } = createUseCase();
+    const lifecycle = new TerminalSessionLifecycleService(gateway);
+    gateway.summaries.set("ter_old", {
+      sessionId: "ter_old",
+      scope: "server",
+      serverId: "srv_demo",
+      transport: {
+        kind: "websocket",
+        path: "/api/terminal-sessions/ter_old/attach",
+      },
+      providerKey: "local-shell",
+      createdAt: "2026-04-16T00:00:00.000Z",
+      status: "active",
+    });
+    gateway.summaries.set("ter_new", {
+      sessionId: "ter_new",
+      scope: "server",
+      serverId: "srv_demo",
+      transport: {
+        kind: "websocket",
+        path: "/api/terminal-sessions/ter_new/attach",
+      },
+      providerKey: "local-shell",
+      createdAt: "2026-04-17T00:00:00.000Z",
+      status: "active",
+    });
+
+    const result = await lifecycle.expire(
+      ExpireTerminalSessionsCommand.create({
+        olderThan: "2026-04-16T12:00:00.000Z",
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({
+      expiredCount: 1,
+      sessionIds: ["ter_old"],
+    });
+    expect(lifecycle.list(ListTerminalSessionsQuery.create()._unsafeUnwrap()).items).toEqual([
+      expect.objectContaining({
+        sessionId: "ter_new",
+      }),
+    ]);
   });
 });

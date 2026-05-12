@@ -167,13 +167,16 @@ Deployment terminal events currently flow through `deployment.finished` with sta
 
 Server/proxy bootstrap currently starts from `deployment_target.registered`; the source-of-truth workflow introduces `server-connected` and `proxy-bootstrap-requested` as formal lifecycle/orchestration events.
 
-The current event bus is in-memory and fire-and-forget. Durable outbox/inbox, dedupe, retry state, and handler-status read models are not yet established.
+The current event bus is in-memory and fire-and-forget. ADR-054 defines durable process delivery
+as Appaloft's first outbox/inbox-equivalent baseline, but workflow-specific workers, atomic claim
+ports, retry execution, and handler-status read models are still migration work until each workflow
+opts in.
 
 Current read models expose parts of deployment and server/proxy state, but some target lifecycle states may need new persisted process state or derived read-model fields.
 
 ## Open Questions
 
-- Which workflows require durable outbox/inbox before they are used in production automation?
+- Which workflow should be the first Code Round for ADR-054 durable process delivery?
 - Should attempt state be stored inside aggregates, separate process tables, or both?
 - Which derived read-model statuses should be promoted into write-side invariants?
 - What is the standard retention policy for historical failed attempts?

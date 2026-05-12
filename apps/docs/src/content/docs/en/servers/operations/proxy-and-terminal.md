@@ -39,6 +39,8 @@ appaloft server proxy repair srv_primary
 
 Terminal sessions are controlled troubleshooting tools, not the normal deployment path.
 
+Use terminal session lifecycle operations to list active sessions, show one session's safe metadata, close one active session, or expire old active sessions. These operations return session ids, scope, target ids, provider key, transport path, timestamps, and status only. They do not expose terminal input, terminal output, raw commands, private keys, access tokens, or environment secret values.
+
 <h2 id="server-terminal-safe-copy">Copy output safely</h2>
 
 Terminal output can contain paths, environment details, or runtime data. Prefer diagnostic summaries before sharing output.

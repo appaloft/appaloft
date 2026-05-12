@@ -1,3 +1,4 @@
+export * from "./operations/audit-events/audit-events.schema";
 export {
   type BootstrapFirstAdminCommandInput,
   bootstrapFirstAdminCommandInputSchema,
@@ -46,6 +47,7 @@ export {
 } from "./operations/deploy-tokens/show-deploy-token.schema";
 export * from "./operations/deployments/cleanup-preview.schema";
 export * from "./operations/deployments/create-deployment.schema";
+export * from "./operations/deployments/deployment-log-retention.schema";
 export * from "./operations/deployments/deployment-logs.schema";
 export * from "./operations/deployments/deployment-plan.schema";
 export * from "./operations/deployments/deployment-recovery-readiness.schema";
@@ -77,6 +79,8 @@ export * from "./operations/environments/show-environment.schema";
 export * from "./operations/environments/unlock-environment.schema";
 export * from "./operations/environments/unset-environment-variable.schema";
 export * from "./operations/operator-work/list-operator-work.schema";
+export * from "./operations/operator-work/prune-operator-work.schema";
+export * from "./operations/operator-work/retry-operator-work.schema";
 export * from "./operations/operator-work/show-operator-work.schema";
 export {
   type ChangeOrganizationMemberRoleCommandInput,
@@ -134,6 +138,7 @@ export * from "./operations/projects/archive-project.schema";
 export * from "./operations/projects/create-project.schema";
 export * from "./operations/projects/rename-project.schema";
 export * from "./operations/projects/show-project.schema";
+export * from "./operations/provider-job-logs/provider-job-logs.schema";
 export * from "./operations/resources/archive-resource.schema";
 export * from "./operations/resources/configure-resource-access.schema";
 export * from "./operations/resources/configure-resource-auto-deploy.schema";
@@ -151,6 +156,7 @@ export * from "./operations/resources/resource-effective-config.schema";
 export * from "./operations/resources/resource-health.schema";
 export * from "./operations/resources/resource-proxy-configuration-preview.schema";
 export * from "./operations/resources/resource-runtime-control.schema";
+export * from "./operations/resources/resource-runtime-log-archives.schema";
 export * from "./operations/resources/resource-runtime-logs.schema";
 export * from "./operations/resources/set-resource-variable.schema";
 export * from "./operations/resources/show-resource.schema";
@@ -176,3 +182,4 @@ export * from "./operations/source-events/show-source-event.schema";
 export * from "./operations/source-links/relink-source-link.schema";
 export * from "./operations/system/list-github-repositories.schema";
 export * from "./operations/terminal-sessions/open-terminal-session.schema";
+export * from "./operations/terminal-sessions/terminal-session-lifecycle.schema";

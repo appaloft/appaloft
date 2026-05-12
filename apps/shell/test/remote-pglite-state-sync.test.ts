@@ -74,6 +74,15 @@ function testConfig(
       intervalSeconds: 60,
       batchSize: 25,
     },
+    scheduledRuntimePruneRunner: {
+      enabled: false,
+      intervalSeconds: 3600,
+      batchSize: 25,
+    },
+    scheduledHistoryRetentionRunner: {
+      enabled: false,
+      intervalSeconds: 3600,
+    },
     enabledSystemPlugins: [],
   };
 }

@@ -15,6 +15,8 @@ const version = normalizeReleaseVersion(
 const releaseDir = resolve(stringArg(args, "release-dir") ?? join(root, "dist", "release"));
 const tempDir = join(root, "dist", ".tmp-npm-binaries");
 const mainPackageDir = join(root, "packages", "npm", "cli");
+const sdkPackageDir = join(root, "packages", "sdk");
+const sdkOnly = args.get("sdk-only") === true;
 
 async function readPackageJson(path: string): Promise<Record<string, unknown>> {
   return JSON.parse(await Bun.file(path).text()) as Record<string, unknown>;
@@ -75,10 +77,57 @@ async function prepareMainPackage(): Promise<void> {
   await chmodExecutable(join(mainPackageDir, "bin", "appaloft.js"));
 }
 
-await resetDir(tempDir);
-for (const target of releaseBinaryTargets) {
-  await preparePlatformPackage(target);
+function assertPublishablePackageJson(
+  packageJson: Record<string, unknown>,
+  packageDir: string,
+): void {
+  if (packageJson.private === true) {
+    throw new Error(`${packageDir} is marked private and cannot be published`);
+  }
+
+  for (const section of ["dependencies", "optionalDependencies", "peerDependencies"] as const) {
+    const dependencies = packageJson[section];
+    if (!dependencies || typeof dependencies !== "object" || Array.isArray(dependencies)) {
+      continue;
+    }
+
+    for (const [name, range] of Object.entries(dependencies)) {
+      if (typeof range === "string" && range.startsWith("workspace:")) {
+        throw new Error(`${packageDir} ${section}.${name} uses non-publishable ${range}`);
+      }
+    }
+  }
 }
-await prepareMainPackage();
+
+async function prepareSdkPackage(): Promise<void> {
+  const packageJsonPath = join(sdkPackageDir, "package.json");
+  const packageJson = await readPackageJson(packageJsonPath);
+  packageJson.version = version;
+  assertPublishablePackageJson(packageJson, sdkPackageDir);
+  await writePackageJson(packageJsonPath, packageJson);
+
+  await run(["bun", "run", "--cwd", sdkPackageDir, "build"], root);
+
+  for (const file of [
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/generated-operations.js",
+    "dist/generated-operations.d.ts",
+  ]) {
+    const path = join(sdkPackageDir, file);
+    if (!(await Bun.file(path).exists())) {
+      throw new Error(`Missing SDK release output ${path}`);
+    }
+  }
+}
+
+await resetDir(tempDir);
+if (!sdkOnly) {
+  for (const target of releaseBinaryTargets) {
+    await preparePlatformPackage(target);
+  }
+  await prepareMainPackage();
+}
+await prepareSdkPackage();
 
 console.log(`prepared npm packages for Appaloft ${version}`);

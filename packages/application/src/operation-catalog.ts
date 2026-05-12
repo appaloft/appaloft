@@ -1,4 +1,17 @@
 import { type ZodTypeAny } from "zod";
+import { configureAuditEventLegalHoldCommandInputSchema } from "./operations/audit-events/configure-audit-event-legal-hold.command";
+import { createAuditEventArchiveCommandInputSchema } from "./operations/audit-events/create-audit-event-archive.command";
+import { exportAuditEventsQueryInputSchema } from "./operations/audit-events/export-audit-events.query";
+import { exportGlobalAuditEventsQueryInputSchema } from "./operations/audit-events/export-global-audit-events.query";
+import { listAuditEventArchivesQueryInputSchema } from "./operations/audit-events/list-audit-event-archives.query";
+import { listAuditEventLegalHoldsQueryInputSchema } from "./operations/audit-events/list-audit-event-legal-holds.query";
+import { listAuditEventsQueryInputSchema } from "./operations/audit-events/list-audit-events.query";
+import { pruneAuditEventArchivesCommandInputSchema } from "./operations/audit-events/prune-audit-event-archives.command";
+import { pruneAuditEventsCommandInputSchema } from "./operations/audit-events/prune-audit-events.command";
+import { releaseAuditEventLegalHoldCommandInputSchema } from "./operations/audit-events/release-audit-event-legal-hold.command";
+import { showAuditEventQueryInputSchema } from "./operations/audit-events/show-audit-event.query";
+import { showAuditEventArchiveQueryInputSchema } from "./operations/audit-events/show-audit-event-archive.query";
+import { showAuditEventLegalHoldQueryInputSchema } from "./operations/audit-events/show-audit-event-legal-hold.query";
 import { bootstrapFirstAdminCommandInputSchema } from "./operations/auth/bootstrap-first-admin.schema";
 import { getAuthBootstrapStatusQueryInputSchema } from "./operations/auth/get-auth-bootstrap-status.query";
 import { deleteCertificateCommandInputSchema } from "./operations/certificates/delete-certificate.command";
@@ -34,6 +47,7 @@ import { deploymentLogsQueryInputSchema } from "./operations/deployments/deploym
 import { deploymentPlanQueryInputSchema } from "./operations/deployments/deployment-plan.query";
 import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deployments/deployment-recovery-readiness.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
+import { pruneDeploymentLogsCommandInputSchema } from "./operations/deployments/prune-deployment-logs.command";
 import { redeployDeploymentCommandInputSchema } from "./operations/deployments/redeploy-deployment.command";
 import { retryDeploymentCommandInputSchema } from "./operations/deployments/retry-deployment.command";
 import { rollbackDeploymentCommandInputSchema } from "./operations/deployments/rollback-deployment.command";
@@ -47,6 +61,7 @@ import { deleteDomainBindingCommandInputSchema } from "./operations/domain-bindi
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
 import { retryDomainBindingVerificationCommandInputSchema } from "./operations/domain-bindings/retry-domain-binding-verification.command";
 import { showDomainBindingQueryInputSchema } from "./operations/domain-bindings/show-domain-binding.query";
+import { pruneDomainEventsCommandInputSchema } from "./operations/domain-events/prune-domain-events.command";
 import { archiveEnvironmentCommandInputSchema } from "./operations/environments/archive-environment.command";
 import { cloneEnvironmentCommandInputSchema } from "./operations/environments/clone-environment.command";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
@@ -60,7 +75,12 @@ import { setEnvironmentVariableCommandInputSchema } from "./operations/environme
 import { showEnvironmentQueryInputSchema } from "./operations/environments/show-environment.query";
 import { unlockEnvironmentCommandInputSchema } from "./operations/environments/unlock-environment.command";
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
+import { cancelOperatorWorkCommandInputSchema } from "./operations/operator-work/cancel-operator-work.command";
+import { deadLetterOperatorWorkCommandInputSchema } from "./operations/operator-work/dead-letter-operator-work.command";
 import { listOperatorWorkQueryInputSchema } from "./operations/operator-work/list-operator-work.query";
+import { markOperatorWorkRecoveredCommandInputSchema } from "./operations/operator-work/mark-operator-work-recovered.command";
+import { pruneOperatorWorkCommandInputSchema } from "./operations/operator-work/prune-operator-work.command";
+import { retryOperatorWorkCommandInputSchema } from "./operations/operator-work/retry-operator-work.command";
 import { showOperatorWorkQueryInputSchema } from "./operations/operator-work/show-operator-work.query";
 import { changeOrganizationMemberRoleCommandInputSchema } from "./operations/organizations/change-organization-member-role.command";
 import { getCurrentOrganizationContextQueryInputSchema } from "./operations/organizations/get-current-organization-context.query";
@@ -79,6 +99,7 @@ import { createProjectCommandInputSchema } from "./operations/projects/create-pr
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
 import { renameProjectCommandInputSchema } from "./operations/projects/rename-project.command";
 import { showProjectQueryInputSchema } from "./operations/projects/show-project.query";
+import { pruneProviderJobLogsCommandInputSchema } from "./operations/provider-job-logs/prune-provider-job-logs.command";
 import { archiveResourceCommandInputSchema } from "./operations/resources/archive-resource.command";
 import { attachResourceStorageCommandInputSchema } from "./operations/resources/attach-resource-storage.command";
 import { bindResourceDependencyCommandInputSchema } from "./operations/resources/bind-resource-dependency.command";
@@ -104,6 +125,12 @@ import {
   startResourceRuntimeCommandInputSchema,
   stopResourceRuntimeCommandInputSchema,
 } from "./operations/resources/resource-runtime-control.schema";
+import {
+  archiveResourceRuntimeLogsCommandInputSchema,
+  listResourceRuntimeLogArchivesQueryInputSchema,
+  pruneResourceRuntimeLogArchivesCommandInputSchema,
+  showResourceRuntimeLogArchiveQueryInputSchema,
+} from "./operations/resources/resource-runtime-log-archives.schema";
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
 import { rotateResourceDependencyBindingSecretCommandInputSchema } from "./operations/resources/rotate-resource-dependency-binding-secret.command";
 import { setResourceVariableCommandInputSchema } from "./operations/resources/set-resource-variable.command";
@@ -111,6 +138,9 @@ import { showResourceQueryInputSchema } from "./operations/resources/show-resour
 import { showResourceDependencyBindingQueryInputSchema } from "./operations/resources/show-resource-dependency-binding.query";
 import { unbindResourceDependencyCommandInputSchema } from "./operations/resources/unbind-resource-dependency.command";
 import { unsetResourceVariableCommandInputSchema } from "./operations/resources/unset-resource-variable.command";
+import { configureRetentionDefaultsCommandInputSchema } from "./operations/retention-defaults/configure-retention-defaults.command";
+import { listRetentionDefaultsQueryInputSchema } from "./operations/retention-defaults/list-retention-defaults.query";
+import { showRetentionDefaultQueryInputSchema } from "./operations/retention-defaults/show-retention-default.query";
 import { createScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/create-scheduled-task.command";
 import { deleteScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/delete-scheduled-task.command";
 import { listScheduledTaskRunsQueryInputSchema } from "./operations/scheduled-tasks/list-scheduled-task-runs.query";
@@ -122,6 +152,7 @@ import { showScheduledTaskRunQueryInputSchema } from "./operations/scheduled-tas
 import { configureScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/update-scheduled-task.command";
 import { bootstrapServerProxyCommandInputSchema } from "./operations/servers/bootstrap-server-proxy.command";
 import { checkServerDeleteSafetyQueryInputSchema } from "./operations/servers/check-server-delete-safety.query";
+import { configureScheduledRuntimePrunePolicyCommandInputSchema } from "./operations/servers/configure-scheduled-runtime-prune-policy.command";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { configureServerEdgeProxyCommandInputSchema } from "./operations/servers/configure-server-edge-proxy.command";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
@@ -129,11 +160,14 @@ import { deactivateServerCommandInputSchema } from "./operations/servers/deactiv
 import { deleteServerCommandInputSchema } from "./operations/servers/delete-server.command";
 import { deleteSshCredentialCommandInputSchema } from "./operations/servers/delete-ssh-credential.command";
 import { inspectServerCapacityQueryInputSchema } from "./operations/servers/inspect-server-capacity.query";
+import { listScheduledRuntimePrunePoliciesQueryInputSchema } from "./operations/servers/list-scheduled-runtime-prune-policies.query";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
+import { pruneServerCapacityCommandInputSchema } from "./operations/servers/prune-server-capacity.command";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
 import { renameServerCommandInputSchema } from "./operations/servers/rename-server.command";
 import { rotateSshCredentialCommandInputSchema } from "./operations/servers/rotate-ssh-credential.command";
+import { showScheduledRuntimePrunePolicyQueryInputSchema } from "./operations/servers/show-scheduled-runtime-prune-policy.query";
 import { showServerQueryInputSchema } from "./operations/servers/show-server.query";
 import { showSshCredentialQueryInputSchema } from "./operations/servers/show-ssh-credential.query";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
@@ -147,7 +181,11 @@ import { listStorageVolumesQueryInputSchema } from "./operations/storage-volumes
 import { renameStorageVolumeCommandInputSchema } from "./operations/storage-volumes/rename-storage-volume.command";
 import { showStorageVolumeQueryInputSchema } from "./operations/storage-volumes/show-storage-volume.query";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
+import { closeTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/close-terminal-session.command";
+import { expireTerminalSessionsCommandInputSchema } from "./operations/terminal-sessions/expire-terminal-sessions.command";
+import { listTerminalSessionsQueryInputSchema } from "./operations/terminal-sessions/list-terminal-sessions.query";
 import { openTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/open-terminal-session.command";
+import { showTerminalSessionQueryInputSchema } from "./operations/terminal-sessions/show-terminal-session.query";
 import { tokens } from "./tokens";
 
 type OperationKind = "command" | "query";
@@ -163,6 +201,10 @@ type OperationDomain =
   | "storage-volumes"
   | "deploy-tokens"
   | "auth"
+  | "audit-events"
+  | "domain-events"
+  | "provider-job-logs"
+  | "retention-defaults"
   | "organizations"
   | "deployments"
   | "operator-work"
@@ -688,6 +730,62 @@ export const operationCatalog = [
     },
   },
   {
+    key: "servers.capacity.prune",
+    kind: "command",
+    domain: "servers",
+    messageName: "PruneServerCapacityCommand",
+    handlerName: "PruneServerCapacityCommandHandler",
+    serviceName: "PruneServerCapacityUseCase",
+    inputSchema: pruneServerCapacityCommandInputSchema,
+    serviceToken: tokens.pruneServerCapacityUseCase,
+    transports: {
+      cli: "appaloft server capacity prune <serverId> --before <iso>",
+      orpc: { method: "POST", path: "/api/servers/{serverId}/capacity/prune" },
+    },
+  },
+  {
+    key: "scheduled-runtime-prune-policies.configure",
+    kind: "command",
+    domain: "servers",
+    messageName: "ConfigureScheduledRuntimePrunePolicyCommand",
+    handlerName: "ConfigureScheduledRuntimePrunePolicyCommandHandler",
+    serviceName: "ConfigureScheduledRuntimePrunePolicyUseCase",
+    inputSchema: configureScheduledRuntimePrunePolicyCommandInputSchema,
+    serviceToken: tokens.configureScheduledRuntimePrunePolicyUseCase,
+    transports: {
+      cli: "appaloft server capacity policy configure --scope <scope> --retention-days <days>",
+      orpc: { method: "POST", path: "/api/servers/capacity/policies" },
+    },
+  },
+  {
+    key: "scheduled-runtime-prune-policies.list",
+    kind: "query",
+    domain: "servers",
+    messageName: "ListScheduledRuntimePrunePoliciesQuery",
+    handlerName: "ListScheduledRuntimePrunePoliciesQueryHandler",
+    serviceName: "ListScheduledRuntimePrunePoliciesQueryService",
+    inputSchema: listScheduledRuntimePrunePoliciesQueryInputSchema,
+    serviceToken: tokens.listScheduledRuntimePrunePoliciesQueryService,
+    transports: {
+      cli: "appaloft server capacity policy list",
+      orpc: { method: "GET", path: "/api/servers/capacity/policies" },
+    },
+  },
+  {
+    key: "scheduled-runtime-prune-policies.show",
+    kind: "query",
+    domain: "servers",
+    messageName: "ShowScheduledRuntimePrunePolicyQuery",
+    handlerName: "ShowScheduledRuntimePrunePolicyQueryHandler",
+    serviceName: "ShowScheduledRuntimePrunePolicyQueryService",
+    inputSchema: showScheduledRuntimePrunePolicyQueryInputSchema,
+    serviceToken: tokens.showScheduledRuntimePrunePolicyQueryService,
+    transports: {
+      cli: "appaloft server capacity policy show <policyId>",
+      orpc: { method: "GET", path: "/api/servers/capacity/policies/{policyId}" },
+    },
+  },
+  {
     key: "servers.rename",
     kind: "command",
     domain: "servers",
@@ -1055,6 +1153,62 @@ export const operationCatalog = [
     },
   },
   {
+    key: "resources.runtime-logs.archive",
+    kind: "command",
+    domain: "resources",
+    messageName: "ArchiveResourceRuntimeLogsCommand",
+    handlerName: "ArchiveResourceRuntimeLogsCommandHandler",
+    serviceName: "ArchiveResourceRuntimeLogsUseCase",
+    inputSchema: archiveResourceRuntimeLogsCommandInputSchema,
+    serviceToken: tokens.archiveResourceRuntimeLogsUseCase,
+    transports: {
+      cli: "appaloft resource log-archives archive <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime-log-archives" },
+    },
+  },
+  {
+    key: "resources.runtime-log-archives.list",
+    kind: "query",
+    domain: "resources",
+    messageName: "ListResourceRuntimeLogArchivesQuery",
+    handlerName: "ListResourceRuntimeLogArchivesQueryHandler",
+    serviceName: "ListResourceRuntimeLogArchivesQueryService",
+    inputSchema: listResourceRuntimeLogArchivesQueryInputSchema,
+    serviceToken: tokens.listResourceRuntimeLogArchivesQueryService,
+    transports: {
+      cli: "appaloft resource log-archives list",
+      orpc: { method: "GET", path: "/api/resources/runtime-log-archives" },
+    },
+  },
+  {
+    key: "resources.runtime-log-archives.show",
+    kind: "query",
+    domain: "resources",
+    messageName: "ShowResourceRuntimeLogArchiveQuery",
+    handlerName: "ShowResourceRuntimeLogArchiveQueryHandler",
+    serviceName: "ShowResourceRuntimeLogArchiveQueryService",
+    inputSchema: showResourceRuntimeLogArchiveQueryInputSchema,
+    serviceToken: tokens.showResourceRuntimeLogArchiveQueryService,
+    transports: {
+      cli: "appaloft resource log-archives show <archiveId>",
+      orpc: { method: "GET", path: "/api/resources/runtime-log-archives/{archiveId}" },
+    },
+  },
+  {
+    key: "resources.runtime-log-archives.prune",
+    kind: "command",
+    domain: "resources",
+    messageName: "PruneResourceRuntimeLogArchivesCommand",
+    handlerName: "PruneResourceRuntimeLogArchivesCommandHandler",
+    serviceName: "PruneResourceRuntimeLogArchivesUseCase",
+    inputSchema: pruneResourceRuntimeLogArchivesCommandInputSchema,
+    serviceToken: tokens.pruneResourceRuntimeLogArchivesUseCase,
+    transports: {
+      cli: "appaloft resource log-archives prune --before <iso>",
+      orpc: { method: "POST", path: "/api/resources/runtime-log-archives/prune" },
+    },
+  },
+  {
     key: "terminal-sessions.open",
     kind: "command",
     domain: "terminal-sessions",
@@ -1066,6 +1220,62 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server terminal <serverId>; appaloft resource terminal <resourceId>",
       orpc: { method: "POST", path: "/api/terminal-sessions" },
+    },
+  },
+  {
+    key: "terminal-sessions.list",
+    kind: "query",
+    domain: "terminal-sessions",
+    messageName: "ListTerminalSessionsQuery",
+    handlerName: "ListTerminalSessionsQueryHandler",
+    serviceName: "TerminalSessionLifecycleService",
+    inputSchema: listTerminalSessionsQueryInputSchema,
+    serviceToken: tokens.terminalSessionLifecycleService,
+    transports: {
+      cli: "appaloft terminal-session list",
+      orpc: { method: "GET", path: "/api/terminal-sessions" },
+    },
+  },
+  {
+    key: "terminal-sessions.show",
+    kind: "query",
+    domain: "terminal-sessions",
+    messageName: "ShowTerminalSessionQuery",
+    handlerName: "ShowTerminalSessionQueryHandler",
+    serviceName: "TerminalSessionLifecycleService",
+    inputSchema: showTerminalSessionQueryInputSchema,
+    serviceToken: tokens.terminalSessionLifecycleService,
+    transports: {
+      cli: "appaloft terminal-session show <sessionId>",
+      orpc: { method: "GET", path: "/api/terminal-sessions/{sessionId}" },
+    },
+  },
+  {
+    key: "terminal-sessions.close",
+    kind: "command",
+    domain: "terminal-sessions",
+    messageName: "CloseTerminalSessionCommand",
+    handlerName: "CloseTerminalSessionCommandHandler",
+    serviceName: "TerminalSessionLifecycleService",
+    inputSchema: closeTerminalSessionCommandInputSchema,
+    serviceToken: tokens.terminalSessionLifecycleService,
+    transports: {
+      cli: "appaloft terminal-session close <sessionId>",
+      orpc: { method: "POST", path: "/api/terminal-sessions/{sessionId}/close" },
+    },
+  },
+  {
+    key: "terminal-sessions.expire",
+    kind: "command",
+    domain: "terminal-sessions",
+    messageName: "ExpireTerminalSessionsCommand",
+    handlerName: "ExpireTerminalSessionsCommandHandler",
+    serviceName: "TerminalSessionLifecycleService",
+    inputSchema: expireTerminalSessionsCommandInputSchema,
+    serviceToken: tokens.terminalSessionLifecycleService,
+    transports: {
+      cli: "appaloft terminal-session expire",
+      orpc: { method: "POST", path: "/api/terminal-sessions/expire" },
     },
   },
   {
@@ -1933,6 +2143,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "deployments.logs.prune",
+    kind: "command",
+    domain: "deployments",
+    messageName: "PruneDeploymentLogsCommand",
+    handlerName: "PruneDeploymentLogsCommandHandler",
+    serviceName: "PruneDeploymentLogsUseCase",
+    inputSchema: pruneDeploymentLogsCommandInputSchema,
+    serviceToken: tokens.pruneDeploymentLogsUseCase,
+    transports: {
+      cli: "appaloft deployments logs prune --before <iso>",
+      orpc: { method: "POST", path: "/api/deployments/logs/prune" },
+    },
+  },
+  {
     key: "deployments.stream-events",
     kind: "query",
     domain: "deployments",
@@ -1976,6 +2200,76 @@ export const operationCatalog = [
     },
   },
   {
+    key: "operator-work.mark-recovered",
+    kind: "command",
+    domain: "operator-work",
+    messageName: "MarkOperatorWorkRecoveredCommand",
+    handlerName: "MarkOperatorWorkRecoveredCommandHandler",
+    serviceName: "MarkOperatorWorkRecoveredUseCase",
+    inputSchema: markOperatorWorkRecoveredCommandInputSchema,
+    serviceToken: tokens.markOperatorWorkRecoveredUseCase,
+    transports: {
+      cli: "appaloft work mark-recovered <workId>",
+      orpc: { method: "POST", path: "/api/operator-work/{workId}/mark-recovered" },
+    },
+  },
+  {
+    key: "operator-work.dead-letter",
+    kind: "command",
+    domain: "operator-work",
+    messageName: "DeadLetterOperatorWorkCommand",
+    handlerName: "DeadLetterOperatorWorkCommandHandler",
+    serviceName: "DeadLetterOperatorWorkUseCase",
+    inputSchema: deadLetterOperatorWorkCommandInputSchema,
+    serviceToken: tokens.deadLetterOperatorWorkUseCase,
+    transports: {
+      cli: "appaloft work dead-letter <workId>",
+      orpc: { method: "POST", path: "/api/operator-work/{workId}/dead-letter" },
+    },
+  },
+  {
+    key: "operator-work.cancel",
+    kind: "command",
+    domain: "operator-work",
+    messageName: "CancelOperatorWorkCommand",
+    handlerName: "CancelOperatorWorkCommandHandler",
+    serviceName: "CancelOperatorWorkUseCase",
+    inputSchema: cancelOperatorWorkCommandInputSchema,
+    serviceToken: tokens.cancelOperatorWorkUseCase,
+    transports: {
+      cli: "appaloft work cancel <workId>",
+      orpc: { method: "POST", path: "/api/operator-work/{workId}/cancel" },
+    },
+  },
+  {
+    key: "operator-work.retry",
+    kind: "command",
+    domain: "operator-work",
+    messageName: "RetryOperatorWorkCommand",
+    handlerName: "RetryOperatorWorkCommandHandler",
+    serviceName: "RetryOperatorWorkUseCase",
+    inputSchema: retryOperatorWorkCommandInputSchema,
+    serviceToken: tokens.retryOperatorWorkUseCase,
+    transports: {
+      cli: "appaloft work retry <workId>",
+      orpc: { method: "POST", path: "/api/operator-work/{workId}/retry" },
+    },
+  },
+  {
+    key: "operator-work.prune",
+    kind: "command",
+    domain: "operator-work",
+    messageName: "PruneOperatorWorkCommand",
+    handlerName: "PruneOperatorWorkCommandHandler",
+    serviceName: "PruneOperatorWorkUseCase",
+    inputSchema: pruneOperatorWorkCommandInputSchema,
+    serviceToken: tokens.pruneOperatorWorkUseCase,
+    transports: {
+      cli: "appaloft work prune --before <iso>",
+      orpc: { method: "POST", path: "/api/operator-work/prune" },
+    },
+  },
+  {
     key: "source-links.relink",
     kind: "command",
     domain: "source-links",
@@ -1987,6 +2281,258 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft source-links relink",
       orpc: { method: "POST", path: "/api/source-links/relink" },
+    },
+  },
+  {
+    key: "audit-events.list",
+    kind: "query",
+    domain: "audit-events",
+    messageName: "ListAuditEventsQuery",
+    handlerName: "ListAuditEventsQueryHandler",
+    serviceName: "ListAuditEventsQueryService",
+    inputSchema: listAuditEventsQueryInputSchema,
+    serviceToken: tokens.listAuditEventsQueryService,
+    transports: {
+      cli: "appaloft audit-event list --aggregate <aggregateId>",
+      orpc: { method: "GET", path: "/api/audit-events" },
+    },
+  },
+  {
+    key: "audit-events.show",
+    kind: "query",
+    domain: "audit-events",
+    messageName: "ShowAuditEventQuery",
+    handlerName: "ShowAuditEventQueryHandler",
+    serviceName: "ShowAuditEventQueryService",
+    inputSchema: showAuditEventQueryInputSchema,
+    serviceToken: tokens.showAuditEventQueryService,
+    transports: {
+      cli: "appaloft audit-event show <auditEventId> --aggregate <aggregateId>",
+      orpc: { method: "GET", path: "/api/audit-events/{auditEventId}" },
+    },
+  },
+  {
+    key: "audit-events.prune",
+    kind: "command",
+    domain: "audit-events",
+    messageName: "PruneAuditEventsCommand",
+    handlerName: "PruneAuditEventsCommandHandler",
+    serviceName: "PruneAuditEventsUseCase",
+    inputSchema: pruneAuditEventsCommandInputSchema,
+    serviceToken: tokens.pruneAuditEventsUseCase,
+    transports: {
+      cli: "appaloft audit-event prune --before <iso>",
+      orpc: { method: "POST", path: "/api/audit-events/prune" },
+    },
+  },
+  {
+    key: "audit-events.export",
+    kind: "query",
+    domain: "audit-events",
+    messageName: "ExportAuditEventsQuery",
+    handlerName: "ExportAuditEventsQueryHandler",
+    serviceName: "ExportAuditEventsQueryService",
+    inputSchema: exportAuditEventsQueryInputSchema,
+    serviceToken: tokens.exportAuditEventsQueryService,
+    transports: {
+      cli: "appaloft audit-event export --aggregate <aggregateId>",
+      orpc: { method: "GET", path: "/api/audit-events/export" },
+    },
+  },
+  {
+    key: "audit-events.export-global",
+    kind: "query",
+    domain: "audit-events",
+    messageName: "ExportGlobalAuditEventsQuery",
+    handlerName: "ExportGlobalAuditEventsQueryHandler",
+    serviceName: "ExportGlobalAuditEventsQueryService",
+    inputSchema: exportGlobalAuditEventsQueryInputSchema,
+    serviceToken: tokens.exportGlobalAuditEventsQueryService,
+    transports: {
+      cli: "appaloft audit-event export-global --from <iso> --to <iso>",
+      orpc: { method: "GET", path: "/api/audit-events/export-global" },
+    },
+  },
+  {
+    key: "audit-events.archives.create",
+    kind: "command",
+    domain: "audit-events",
+    messageName: "CreateAuditEventArchiveCommand",
+    handlerName: "CreateAuditEventArchiveCommandHandler",
+    serviceName: "CreateAuditEventArchiveUseCase",
+    inputSchema: createAuditEventArchiveCommandInputSchema,
+    serviceToken: tokens.createAuditEventArchiveUseCase,
+    transports: {
+      cli: "appaloft audit-event archive create",
+      orpc: { method: "POST", path: "/api/audit-events/archives" },
+    },
+  },
+  {
+    key: "audit-events.archives.list",
+    kind: "query",
+    domain: "audit-events",
+    messageName: "ListAuditEventArchivesQuery",
+    handlerName: "ListAuditEventArchivesQueryHandler",
+    serviceName: "ListAuditEventArchivesQueryService",
+    inputSchema: listAuditEventArchivesQueryInputSchema,
+    serviceToken: tokens.listAuditEventArchivesQueryService,
+    transports: {
+      cli: "appaloft audit-event archive list",
+      orpc: { method: "GET", path: "/api/audit-events/archives" },
+    },
+  },
+  {
+    key: "audit-events.archives.show",
+    kind: "query",
+    domain: "audit-events",
+    messageName: "ShowAuditEventArchiveQuery",
+    handlerName: "ShowAuditEventArchiveQueryHandler",
+    serviceName: "ShowAuditEventArchiveQueryService",
+    inputSchema: showAuditEventArchiveQueryInputSchema,
+    serviceToken: tokens.showAuditEventArchiveQueryService,
+    transports: {
+      cli: "appaloft audit-event archive show <archiveId>",
+      orpc: { method: "GET", path: "/api/audit-events/archives/{archiveId}" },
+    },
+  },
+  {
+    key: "audit-events.archives.prune",
+    kind: "command",
+    domain: "audit-events",
+    messageName: "PruneAuditEventArchivesCommand",
+    handlerName: "PruneAuditEventArchivesCommandHandler",
+    serviceName: "PruneAuditEventArchivesUseCase",
+    inputSchema: pruneAuditEventArchivesCommandInputSchema,
+    serviceToken: tokens.pruneAuditEventArchivesUseCase,
+    transports: {
+      cli: "appaloft audit-event archive prune --before <iso>",
+      orpc: { method: "POST", path: "/api/audit-events/archives/prune" },
+    },
+  },
+  {
+    key: "audit-events.legal-holds.configure",
+    kind: "command",
+    domain: "audit-events",
+    messageName: "ConfigureAuditEventLegalHoldCommand",
+    handlerName: "ConfigureAuditEventLegalHoldCommandHandler",
+    serviceName: "ConfigureAuditEventLegalHoldUseCase",
+    inputSchema: configureAuditEventLegalHoldCommandInputSchema,
+    serviceToken: tokens.configureAuditEventLegalHoldUseCase,
+    transports: {
+      cli: "appaloft audit-event legal-hold configure",
+      orpc: { method: "POST", path: "/api/audit-events/legal-holds" },
+    },
+  },
+  {
+    key: "audit-events.legal-holds.list",
+    kind: "query",
+    domain: "audit-events",
+    messageName: "ListAuditEventLegalHoldsQuery",
+    handlerName: "ListAuditEventLegalHoldsQueryHandler",
+    serviceName: "ListAuditEventLegalHoldsQueryService",
+    inputSchema: listAuditEventLegalHoldsQueryInputSchema,
+    serviceToken: tokens.listAuditEventLegalHoldsQueryService,
+    transports: {
+      cli: "appaloft audit-event legal-hold list",
+      orpc: { method: "GET", path: "/api/audit-events/legal-holds" },
+    },
+  },
+  {
+    key: "audit-events.legal-holds.show",
+    kind: "query",
+    domain: "audit-events",
+    messageName: "ShowAuditEventLegalHoldQuery",
+    handlerName: "ShowAuditEventLegalHoldQueryHandler",
+    serviceName: "ShowAuditEventLegalHoldQueryService",
+    inputSchema: showAuditEventLegalHoldQueryInputSchema,
+    serviceToken: tokens.showAuditEventLegalHoldQueryService,
+    transports: {
+      cli: "appaloft audit-event legal-hold show <holdId>",
+      orpc: { method: "GET", path: "/api/audit-events/legal-holds/{holdId}" },
+    },
+  },
+  {
+    key: "audit-events.legal-holds.release",
+    kind: "command",
+    domain: "audit-events",
+    messageName: "ReleaseAuditEventLegalHoldCommand",
+    handlerName: "ReleaseAuditEventLegalHoldCommandHandler",
+    serviceName: "ReleaseAuditEventLegalHoldUseCase",
+    inputSchema: releaseAuditEventLegalHoldCommandInputSchema,
+    serviceToken: tokens.releaseAuditEventLegalHoldUseCase,
+    transports: {
+      cli: "appaloft audit-event legal-hold release <holdId>",
+      orpc: { method: "POST", path: "/api/audit-events/legal-holds/{holdId}/release" },
+    },
+  },
+  {
+    key: "retention-defaults.configure",
+    kind: "command",
+    domain: "retention-defaults",
+    messageName: "ConfigureRetentionDefaultsCommand",
+    handlerName: "ConfigureRetentionDefaultsCommandHandler",
+    serviceName: "ConfigureRetentionDefaultsUseCase",
+    inputSchema: configureRetentionDefaultsCommandInputSchema,
+    serviceToken: tokens.configureRetentionDefaultsUseCase,
+    transports: {
+      cli: "appaloft retention-default configure --category <category> --retention-days <days>",
+      orpc: { method: "POST", path: "/api/retention-defaults" },
+    },
+  },
+  {
+    key: "retention-defaults.list",
+    kind: "query",
+    domain: "retention-defaults",
+    messageName: "ListRetentionDefaultsQuery",
+    handlerName: "ListRetentionDefaultsQueryHandler",
+    serviceName: "ListRetentionDefaultsQueryService",
+    inputSchema: listRetentionDefaultsQueryInputSchema,
+    serviceToken: tokens.listRetentionDefaultsQueryService,
+    transports: {
+      cli: "appaloft retention-default list",
+      orpc: { method: "GET", path: "/api/retention-defaults" },
+    },
+  },
+  {
+    key: "retention-defaults.show",
+    kind: "query",
+    domain: "retention-defaults",
+    messageName: "ShowRetentionDefaultQuery",
+    handlerName: "ShowRetentionDefaultQueryHandler",
+    serviceName: "ShowRetentionDefaultQueryService",
+    inputSchema: showRetentionDefaultQueryInputSchema,
+    serviceToken: tokens.showRetentionDefaultQueryService,
+    transports: {
+      cli: "appaloft retention-default show <category>",
+      orpc: { method: "GET", path: "/api/retention-defaults/{category}" },
+    },
+  },
+  {
+    key: "domain-events.prune",
+    kind: "command",
+    domain: "domain-events",
+    messageName: "PruneDomainEventsCommand",
+    handlerName: "PruneDomainEventsCommandHandler",
+    serviceName: "PruneDomainEventsUseCase",
+    inputSchema: pruneDomainEventsCommandInputSchema,
+    serviceToken: tokens.pruneDomainEventsUseCase,
+    transports: {
+      cli: "appaloft domain-event prune --before <iso>",
+      orpc: { method: "POST", path: "/api/domain-events/prune" },
+    },
+  },
+  {
+    key: "provider-job-logs.prune",
+    kind: "command",
+    domain: "provider-job-logs",
+    messageName: "PruneProviderJobLogsCommand",
+    handlerName: "PruneProviderJobLogsCommandHandler",
+    serviceName: "PruneProviderJobLogsUseCase",
+    inputSchema: pruneProviderJobLogsCommandInputSchema,
+    serviceToken: tokens.pruneProviderJobLogsUseCase,
+    transports: {
+      cli: "appaloft provider-job-log prune --before <iso>",
+      orpc: { method: "POST", path: "/api/provider-job-logs/prune" },
     },
   },
   {

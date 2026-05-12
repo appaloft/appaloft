@@ -9,9 +9,11 @@ import {
   EnvironmentKindValue,
   EnvironmentName,
   err,
+  ok,
   Project,
   ProjectId,
   ProjectName,
+  type Result,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
 } from "@appaloft/core";
@@ -32,7 +34,14 @@ import {
   SequenceIdGenerator,
 } from "@appaloft/testkit";
 
-import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
+import {
+  createExecutionContext,
+  type ExecutionContext,
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
+  type RepositoryContext,
+  toRepositoryContext,
+} from "../src";
 import {
   CreateDependencyResourceBackupCommand,
   RestoreDependencyResourceBackupCommand,
@@ -54,6 +63,18 @@ function createContext(): ExecutionContext {
   });
 }
 
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
+  }
+}
+
 async function createHarness() {
   const context = createContext();
   const repositoryContext = toRepositoryContext(context);
@@ -71,6 +92,7 @@ async function createHarness() {
   const backupProvider = new FakeDependencyResourceBackupProvider();
   const logger = new NoopLogger();
   const idGenerator = new SequenceIdGenerator();
+  const processAttemptRecorder = new RecordingProcessAttemptRecorder();
 
   const project = Project.create({
     id: ProjectId.rehydrate("prj_demo"),
@@ -104,6 +126,7 @@ async function createHarness() {
       idGenerator,
       eventBus,
       logger,
+      processAttemptRecorder,
     ),
     deleteDependencyResource: new DeleteDependencyResourceUseCase(
       dependencyResources,
@@ -130,6 +153,7 @@ async function createHarness() {
       managedPostgresProvider,
     ),
     repositoryContext,
+    processAttemptRecorder,
     restoreBackup: new RestoreDependencyResourceBackupUseCase(
       dependencyResources,
       backups,
@@ -138,15 +162,23 @@ async function createHarness() {
       idGenerator,
       eventBus,
       logger,
+      processAttemptRecorder,
     ),
     showBackup: new ShowDependencyResourceBackupQueryService(backupReadModel, clock),
   };
 }
 
 describe("dependency resource backup and restore use cases", () => {
-  test("[DEP-RES-BACKUP-001] [DEP-RES-BACKUP-002] creates a ready provider backup", async () => {
-    const { backupProvider, context, createBackup, eventBus, provisionPostgres, showBackup } =
-      await createHarness();
+  test("[DEP-RES-BACKUP-001] [DEP-RES-BACKUP-002] [PROC-DELIVERY-001] creates a ready provider backup", async () => {
+    const {
+      backupProvider,
+      context,
+      createBackup,
+      eventBus,
+      processAttemptRecorder,
+      provisionPostgres,
+      showBackup,
+    } = await createHarness();
     const dependencyResourceId = (
       await provisionPostgres.execute(context, {
         projectId: "prj_demo",
@@ -186,14 +218,67 @@ describe("dependency resource backup and restore use cases", () => {
       retentionStatus: "retained",
       providerArtifactHandle: `backup/${dependencyResourceId}/${result._unsafeUnwrap().id}`,
     });
+    expect(processAttemptRecorder.records).toEqual([
+      {
+        id: "dba_0004",
+        kind: "system",
+        status: "running",
+        operationKey: "dependency-resources.create-backup",
+        dedupeKey: `dependency-resource-backup:${dependencyResourceId}:drb_0003:dba_0004`,
+        correlationId: "req_dependency_resource_backup_restore_test",
+        requestId: "req_dependency_resource_backup_restore_test",
+        phase: "dependency-resource-backup",
+        step: "pending",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          backupId: "drb_0003",
+          dependencyResourceId,
+          dependencyKind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          retentionStatus: "none",
+        },
+      },
+      {
+        id: "dba_0004",
+        kind: "system",
+        status: "succeeded",
+        operationKey: "dependency-resources.create-backup",
+        dedupeKey: `dependency-resource-backup:${dependencyResourceId}:drb_0003:dba_0004`,
+        correlationId: "req_dependency_resource_backup_restore_test",
+        requestId: "req_dependency_resource_backup_restore_test",
+        phase: "dependency-resource-backup",
+        step: "ready",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          backupId: "drb_0003",
+          dependencyResourceId,
+          dependencyKind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          retentionStatus: "retained",
+        },
+      },
+    ]);
   });
 
-  test("[DEP-RES-BACKUP-003] records provider backup failure as failed metadata", async () => {
-    const { backupProvider, context, createBackup, provisionPostgres, showBackup } =
-      await createHarness();
+  test("[DEP-RES-BACKUP-003] [PROC-DELIVERY-004] records provider backup failure as failed metadata", async () => {
+    const {
+      backupProvider,
+      context,
+      createBackup,
+      processAttemptRecorder,
+      provisionPostgres,
+      showBackup,
+    } = await createHarness();
     backupProvider.setBackupResult(
       err(
-        domainError.provider("Backup failed", {
+        domainError.provider("Backup failed with secret token output", {
           phase: "dependency-resource-backup",
           providerKey: "appaloft-managed-postgres",
         }),
@@ -220,6 +305,26 @@ describe("dependency resource backup and restore use cases", () => {
       status: "failed",
       failureCode: "provider_error",
     });
+    expect(processAttemptRecorder.records.at(-1)).toMatchObject({
+      id: "dba_0004",
+      kind: "system",
+      status: "failed",
+      operationKey: "dependency-resources.create-backup",
+      phase: "dependency-resource-backup",
+      step: "failed",
+      projectId: "prj_demo",
+      errorCode: "provider_error",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: {
+        backupId: "drb_0003",
+        dependencyResourceId,
+        dependencyKind: "postgres",
+        providerKey: "appaloft-managed-postgres",
+      },
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("secret token output");
   });
 
   test("[DEP-RES-BACKUP-004] rejects unsupported backup provider before persistence", async () => {
@@ -247,9 +352,16 @@ describe("dependency resource backup and restore use cases", () => {
     expect(backups.items.size).toBe(0);
   });
 
-  test("[DEP-RES-BACKUP-006] [DEP-RES-BACKUP-007] restores a ready backup with acknowledgements", async () => {
-    const { backupProvider, context, createBackup, provisionPostgres, restoreBackup, showBackup } =
-      await createHarness();
+  test("[DEP-RES-BACKUP-006] [DEP-RES-BACKUP-007] [PROC-DELIVERY-001] restores a ready backup with acknowledgements", async () => {
+    const {
+      backupProvider,
+      context,
+      createBackup,
+      processAttemptRecorder,
+      provisionPostgres,
+      restoreBackup,
+      showBackup,
+    } = await createHarness();
     const dependencyResourceId = (
       await provisionPostgres.execute(context, {
         projectId: "prj_demo",
@@ -286,6 +398,123 @@ describe("dependency resource backup and restore use cases", () => {
       attemptId: result._unsafeUnwrap().id,
       status: "completed",
     });
+    expect(processAttemptRecorder.records.slice(-2)).toEqual([
+      {
+        id: "dra_0005",
+        kind: "system",
+        status: "running",
+        operationKey: "dependency-resources.restore-backup",
+        dedupeKey: `dependency-resource-restore:${dependencyResourceId}:drb_0003:dra_0005`,
+        correlationId: "req_dependency_resource_backup_restore_test",
+        requestId: "req_dependency_resource_backup_restore_test",
+        phase: "dependency-resource-restore",
+        step: "pending",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          backupId: "drb_0003",
+          dependencyResourceId,
+          dependencyKind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          restoreAttemptId: "dra_0005",
+        },
+      },
+      {
+        id: "dra_0005",
+        kind: "system",
+        status: "succeeded",
+        operationKey: "dependency-resources.restore-backup",
+        dedupeKey: `dependency-resource-restore:${dependencyResourceId}:drb_0003:dra_0005`,
+        correlationId: "req_dependency_resource_backup_restore_test",
+        requestId: "req_dependency_resource_backup_restore_test",
+        phase: "dependency-resource-restore",
+        step: "completed",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          backupId: "drb_0003",
+          dependencyResourceId,
+          dependencyKind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          restoreAttemptId: "dra_0005",
+        },
+      },
+    ]);
+  });
+
+  test("[DEP-RES-BACKUP-008] [PROC-DELIVERY-004] records provider restore failure safely", async () => {
+    const {
+      backupProvider,
+      context,
+      createBackup,
+      processAttemptRecorder,
+      provisionPostgres,
+      restoreBackup,
+      showBackup,
+    } = await createHarness();
+    const dependencyResourceId = (
+      await provisionPostgres.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Main DB",
+      })
+    )._unsafeUnwrap().id;
+    const backupId = (await createBackup.execute(context, { dependencyResourceId }))._unsafeUnwrap()
+      .id;
+    backupProvider.setRestoreResult(
+      err(
+        domainError.provider("Restore failed with secret token output", {
+          phase: "dependency-resource-restore",
+          providerKey: "appaloft-managed-postgres",
+        }),
+      ),
+    );
+
+    const result = await restoreBackup.execute(
+      context,
+      RestoreDependencyResourceBackupCommand.create({
+        backupId,
+        acknowledgeDataOverwrite: true,
+        acknowledgeRuntimeNotRestarted: true,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const shown = await showBackup.execute(
+      context,
+      ShowDependencyResourceBackupQuery.create({ backupId })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().backup.latestRestoreAttempt).toMatchObject({
+      attemptId: result._unsafeUnwrap().id,
+      status: "failed",
+      failureCode: "provider_error",
+    });
+    expect(processAttemptRecorder.records.at(-1)).toMatchObject({
+      id: "dra_0005",
+      kind: "system",
+      status: "failed",
+      operationKey: "dependency-resources.restore-backup",
+      phase: "dependency-resource-restore",
+      step: "failed",
+      projectId: "prj_demo",
+      errorCode: "provider_error",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: {
+        backupId: "drb_0003",
+        dependencyResourceId,
+        dependencyKind: "postgres",
+        providerKey: "appaloft-managed-postgres",
+        restoreAttemptId: "dra_0005",
+      },
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("secret token output");
   });
 
   test("[DEP-RES-BACKUP-009] requires explicit restore acknowledgements", () => {

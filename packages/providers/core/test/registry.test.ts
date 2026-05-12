@@ -5,7 +5,7 @@ import { tencentProvider } from "@appaloft/provider-tencent";
 import { InMemoryProviderRegistry } from "../src/index";
 
 describe("provider registry contract", () => {
-  test("returns provider descriptors with stable capability flags", () => {
+  test("[SYSTEM-DIAG-001] returns provider descriptors with safe capability diagnostics", () => {
     const registry = new InMemoryProviderRegistry([
       genericSshProvider,
       aliyunProvider,
@@ -17,10 +17,27 @@ describe("provider registry contract", () => {
         expect.objectContaining({
           key: "generic-ssh",
           category: "deploy-target",
+          capabilityDetails: expect.arrayContaining([
+            expect.objectContaining({
+              key: "remote-command",
+              enabled: true,
+            }),
+          ]),
+          configuration: expect.objectContaining({
+            status: "configured",
+            diagnostics: expect.arrayContaining([
+              expect.objectContaining({
+                code: "provider.generic_ssh.configured",
+              }),
+            ]),
+          }),
         }),
         expect.objectContaining({
           key: "aliyun",
           category: "cloud-provider",
+          configuration: expect.objectContaining({
+            status: "not-configured",
+          }),
         }),
         expect.objectContaining({
           key: "tencent-cloud",
@@ -28,6 +45,8 @@ describe("provider registry contract", () => {
         }),
       ]),
     );
+    expect(JSON.stringify(registry.list())).not.toContain("accessToken");
+    expect(JSON.stringify(registry.list())).not.toContain("privateKey");
   });
 
   test("finds a provider descriptor by normalized key without scanning callers", () => {

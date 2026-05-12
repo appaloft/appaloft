@@ -1,4 +1,9 @@
 import { readFileSync } from "node:fs";
+import {
+  type OperationCatalogEntry,
+  operationCatalog,
+} from "@appaloft/application/operation-catalog";
+import { getPublicDocsOperationCoverage, resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
 import { type AppaloftOrpcRouter } from "@appaloft/orpc";
 import { type SystemPluginDefinition, type SystemPluginHttpRoute } from "@appaloft/plugin-sdk";
 import {
@@ -154,6 +159,9 @@ export async function createAppaloftOpenApiSpec(
   if (options.groupOperationsByDomain !== false) {
     applyAppaloftOpenApiDomainTags(document);
   }
+
+  applyAppaloftOpenApiSyntheticCatalogPaths(document);
+  applyAppaloftOpenApiOperationMetadata(document);
 
   if (options.promoteSchemaExamples !== false) {
     promoteSchemaExamplesToMediaTypes(document);
@@ -399,7 +407,11 @@ function resolveAppaloftOpenApiDomainTag(path: string): AppaloftOpenApiTagName |
     return appaloftOpenApiTagNames.certificates;
   }
 
-  if (isDeploymentObservabilityPath(path) || isResourceObservabilityPath(path)) {
+  if (
+    isDeploymentObservabilityPath(path) ||
+    isResourceObservabilityPath(path) ||
+    path.startsWith("/domain-events")
+  ) {
     return appaloftOpenApiTagNames.observability;
   }
 
@@ -442,6 +454,199 @@ function isResourceObservabilityPath(path: string): boolean {
     path.endsWith("/diagnostic-summary") ||
     path.endsWith("/health")
   );
+}
+
+type OpenApiOperationWithExtensions = OpenAPI.OperationObject & Record<string, unknown>;
+
+type CatalogHttpRoute = {
+  readonly method: string;
+  readonly path: string;
+  readonly streaming: boolean;
+};
+
+function applyAppaloftOpenApiOperationMetadata(document: OpenAPI.Document): OpenAPI.Document {
+  const catalogEntriesByRoute = new Map<
+    string,
+    { entry: OperationCatalogEntry; route: CatalogHttpRoute }
+  >();
+
+  for (const entry of operationCatalog) {
+    for (const route of operationCatalogHttpRoutes(entry)) {
+      catalogEntriesByRoute.set(openApiRouteKey(route.method, stripApiPrefix(route.path)), {
+        entry,
+        route,
+      });
+    }
+  }
+
+  for (const [path, pathItem] of Object.entries(document.paths ?? {})) {
+    if (!pathItem || isReferenceObject(pathItem)) {
+      continue;
+    }
+
+    for (const method of openApiHttpMethods) {
+      const operation = pathItem[method];
+
+      if (!operation) {
+        continue;
+      }
+
+      const catalogMatch = catalogEntriesByRoute.get(openApiRouteKey(method, path));
+
+      if (!catalogMatch) {
+        continue;
+      }
+
+      annotateOpenApiOperationWithAppaloftMetadata(
+        operation as OpenApiOperationWithExtensions,
+        catalogMatch.entry,
+        catalogMatch.route,
+      );
+    }
+  }
+
+  return document;
+}
+
+function applyAppaloftOpenApiSyntheticCatalogPaths(document: OpenAPI.Document): OpenAPI.Document {
+  document.paths ??= {};
+
+  for (const entry of operationCatalog) {
+    for (const route of operationCatalogHttpRoutes(entry)) {
+      const path = stripApiPrefix(route.path);
+      const method = route.method.toLowerCase() as (typeof openApiHttpMethods)[number];
+      const existingPathItem = document.paths[path];
+
+      if (existingPathItem && !isReferenceObject(existingPathItem) && existingPathItem[method]) {
+        continue;
+      }
+
+      if (!existingPathItem) {
+        document.paths[path] = {};
+      }
+
+      const pathItem = document.paths[path];
+      if (!pathItem || isReferenceObject(pathItem)) {
+        continue;
+      }
+
+      (pathItem as Record<string, unknown>)[method] = createSyntheticCatalogOperation(entry, route);
+    }
+  }
+
+  return document;
+}
+
+function createSyntheticCatalogOperation(
+  entry: OperationCatalogEntry,
+  route: CatalogHttpRoute,
+): OpenAPI.OperationObject {
+  const successStatus = entry.kind === "command" ? "202" : "200";
+
+  return {
+    operationId: entry.key,
+    tags: [
+      resolveAppaloftOpenApiDomainTag(stripApiPrefix(route.path)) ?? domainToTitle(entry.domain),
+    ],
+    parameters: pathParameterObjects(route.path),
+    responses: {
+      [successStatus]: {
+        description: "OK",
+      },
+    },
+  };
+}
+
+function pathParameterObjects(path: string): OpenAPI.ParameterObject[] {
+  const names = [...path.matchAll(/\{([^}]+)\}/g)].flatMap((match) => (match[1] ? [match[1]] : []));
+
+  return [...new Set(names)].map((name) => ({
+    name,
+    in: "path",
+    required: true,
+    schema: {
+      type: "string",
+    },
+  }));
+}
+
+function domainToTitle(domain: string): string {
+  return domain
+    .split("-")
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function operationCatalogHttpRoutes(entry: OperationCatalogEntry): CatalogHttpRoute[] {
+  return [
+    ...(entry.transports.orpc
+      ? [
+          {
+            ...entry.transports.orpc,
+            streaming: false,
+          },
+        ]
+      : []),
+    ...(entry.transports.orpcAdditional ?? []).map((route) => ({ ...route, streaming: false })),
+    ...(entry.transports.orpcStream
+      ? [
+          {
+            ...entry.transports.orpcStream,
+            streaming: true,
+          },
+        ]
+      : []),
+  ];
+}
+
+function annotateOpenApiOperationWithAppaloftMetadata(
+  operation: OpenApiOperationWithExtensions,
+  entry: OperationCatalogEntry,
+  route: CatalogHttpRoute,
+): void {
+  operation["x-appaloft-operation-key"] = entry.key;
+  operation["x-appaloft-operation-kind"] = entry.kind;
+  operation["x-appaloft-operation-domain"] = entry.domain;
+  operation["x-appaloft-message-name"] = entry.messageName;
+  operation["x-appaloft-auth-policy"] = resolveOperationAuthPolicy(entry);
+  operation["x-appaloft-error-family"] = "structured-platform-error";
+  operation["x-appaloft-streaming"] = route.streaming;
+
+  const docsHref = resolveOperationDocsHref(entry.key);
+
+  if (docsHref) {
+    operation["x-appaloft-docs-href"] = docsHref;
+  }
+}
+
+function resolveOperationAuthPolicy(entry: OperationCatalogEntry): string {
+  if (entry.key === "auth.bootstrap-status" || entry.key === "auth.bootstrap-first-admin") {
+    return "bootstrap-public";
+  }
+
+  if (entry.key === "source-events.ingest") {
+    return "webhook-signature";
+  }
+
+  return "product-session";
+}
+
+function resolveOperationDocsHref(operationKey: string): string | undefined {
+  const coverage = getPublicDocsOperationCoverage(operationKey);
+
+  if (!coverage || coverage.status !== "documented") {
+    return undefined;
+  }
+
+  return resolvePublicDocsHelpHref(coverage.topicId);
+}
+
+function openApiRouteKey(method: string, path: string): string {
+  return `${method.toUpperCase()} ${path}`;
+}
+
+function stripApiPrefix(path: string): string {
+  return path.replace(/^\/api(?=\/)/, "");
 }
 
 function promoteSchemaExamplesToMediaTypes(document: OpenAPI.Document): OpenAPI.Document {

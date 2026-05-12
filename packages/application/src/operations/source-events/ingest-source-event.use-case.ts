@@ -6,6 +6,8 @@ import {
   type Clock,
   type IdGenerator,
   type IngestSourceEventResult,
+  type ProcessAttemptNextAction,
+  type ProcessAttemptRecorder,
   type SourceEventDeploymentDispatcher,
   type SourceEventIdentity,
   type SourceEventIgnoredReason,
@@ -16,6 +18,7 @@ import {
   type SourceEventRecorder,
   type SourceEventVerificationSummary,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { parseOperationInput } from "../shared-schema";
 import {
@@ -37,6 +40,8 @@ export class IngestSourceEventUseCase {
     private readonly sourceEventPolicyReader?: SourceEventPolicyReader,
     @inject(tokens.sourceEventDeploymentDispatcher)
     private readonly sourceEventDeploymentDispatcher?: SourceEventDeploymentDispatcher,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
@@ -106,6 +111,15 @@ export class IngestSourceEventUseCase {
     };
 
     const stored = await this.sourceEventRecorder.record(repositoryContext, record);
+    await recordSourceEventProcessAttempt({
+      recorder: this.processAttemptRecorder,
+      repositoryContext,
+      context,
+      record: stored,
+      phase: "source-event-ingest",
+      step: stored.status,
+      dispatchTargetCount: outcome.dispatchTargets.length,
+    });
     if (
       this.sourceEventDeploymentDispatcher &&
       stored.sourceEventId === sourceEventId &&
@@ -119,11 +133,104 @@ export class IngestSourceEventUseCase {
         stored,
         outcome.dispatchTargets,
       );
+      await recordSourceEventProcessAttempt({
+        recorder: this.processAttemptRecorder,
+        repositoryContext,
+        context,
+        record: dispatched,
+        phase: "source-event-dispatch",
+        step: dispatched.status,
+        dispatchTargetCount: outcome.dispatchTargets.length,
+      });
       return ok(resultFromRecord(dispatched));
     }
 
     return ok(resultFromRecord(stored));
   }
+}
+
+function sourceEventProcessStatus(record: SourceEventRecord): "running" | "succeeded" | "failed" {
+  switch (record.status) {
+    case "accepted":
+      return record.matchedResourceIds.length > 0 ? "running" : "succeeded";
+    case "dispatched":
+    case "ignored":
+      return "succeeded";
+    case "blocked":
+    case "failed":
+      return "failed";
+    case "deduped":
+      return "succeeded";
+  }
+}
+
+function sourceEventProcessNextActions(record: SourceEventRecord): ProcessAttemptNextAction[] {
+  return record.status === "blocked" || record.status === "failed"
+    ? ["diagnostic", "manual-review"]
+    : ["no-action"];
+}
+
+function singleValue(values: string[]): string | undefined {
+  return values.length === 1 ? values[0] : undefined;
+}
+
+function firstDispatchErrorCode(record: SourceEventRecord): string | undefined {
+  return record.policyResults.find((result) => result.status === "dispatch-failed")?.errorCode;
+}
+
+async function recordSourceEventProcessAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  context: ExecutionContext;
+  record: SourceEventRecord;
+  phase: "source-event-ingest" | "source-event-dispatch";
+  step: string;
+  dispatchTargetCount: number;
+}): Promise<void> {
+  const processStatus = sourceEventProcessStatus(input.record);
+  const resourceId = singleValue(input.record.matchedResourceIds);
+  const deploymentId = singleValue(input.record.createdDeploymentIds);
+  const errorCode =
+    firstDispatchErrorCode(input.record) ??
+    (input.record.status === "blocked" ? "source_event_policy_blocked" : undefined);
+  const nextActions = sourceEventProcessNextActions(input.record);
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: input.record.sourceEventId,
+    kind: "system",
+    status: processStatus,
+    operationKey: "source-events.ingest",
+    dedupeKey: `source-event:${input.record.dedupeKey}`,
+    correlationId: input.context.requestId,
+    requestId: input.context.requestId,
+    phase: input.phase,
+    step: input.step,
+    ...(input.record.projectId ? { projectId: input.record.projectId } : {}),
+    ...(resourceId ? { resourceId } : {}),
+    ...(deploymentId ? { deploymentId } : {}),
+    startedAt: input.record.receivedAt,
+    updatedAt: input.record.receivedAt,
+    ...(processStatus !== "running" ? { finishedAt: input.record.receivedAt } : {}),
+    ...(errorCode ? { errorCode, errorCategory: "async-processing" } : {}),
+    ...(processStatus === "failed" ? { retriable: input.record.status === "failed" } : {}),
+    nextActions,
+    safeDetails: {
+      sourceKind: input.record.sourceKind,
+      eventKind: input.record.eventKind,
+      ref: input.record.ref,
+      verificationStatus: input.record.verification.status,
+      ...(input.record.sourceIdentity.repositoryFullName
+        ? { repositoryFullName: input.record.sourceIdentity.repositoryFullName }
+        : {}),
+      matchedResourceCount: input.record.matchedResourceIds.length,
+      ignoredReasonCount: input.record.ignoredReasons.length,
+      policyResultCount: input.record.policyResults.length,
+      createdDeploymentCount: input.record.createdDeploymentIds.length,
+      dispatchTargetCount: input.dispatchTargetCount,
+      sourceEventStatus: input.record.status,
+    },
+  });
+
+  void result;
 }
 
 interface SourceEventOutcome {

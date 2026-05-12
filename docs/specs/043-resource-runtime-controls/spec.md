@@ -2,10 +2,13 @@
 
 ## Status
 
-Spec Round for Phase 7 / `0.9.0`.
+Accepted and active.
 
-This artifact positions Resource runtime stop/start/restart before Code Round. It does not activate
-new commands, HTTP routes, Web actions, or runtime adapter capabilities.
+Resource runtime stop/start/restart are active Phase 9 operations. The implemented surface includes
+application command schemas and handlers, a shared runtime-control use case, process-attempt
+visibility, PG/PGlite attempt persistence/readback, provider-neutral runtime target control ports,
+Docker/Compose adapter coverage, CLI commands, HTTP/oRPC routes, Web Resource detail controls, and
+public docs/help anchors.
 
 ## Governing Sources
 
@@ -37,9 +40,8 @@ editing, runtime log observation, or server cleanup.
 | `resources.runtime.start` | Active command | Resource runtime control application service | Starts the last stopped runtime instance from retained safe runtime metadata. |
 | `resources.runtime.restart` | Active command | Resource runtime control application service | Performs stop then start over the current runtime instance without re-planning or rebuilding. |
 
-The first Code Round may implement these operations through one shared application service and one
-runtime target control port, but each public command must keep a distinct operation key and command
-schema.
+The implemented Code Round uses one shared application service and one runtime target control port,
+while each public command keeps a distinct operation key and command schema.
 
 ## Business Semantics
 
@@ -78,8 +80,7 @@ must report whether stop succeeded but start failed.
 
 ## Read And Recovery Surface
 
-The first Code Round must expose latest runtime-control attempt status through
-`resources.health.latestRuntimeControl`.
+Runtime-control attempt status is exposed through `resources.health.latestRuntimeControl`.
 
 A future `resources.runtime-control.show` or `resources.runtime-controls.list` query remains
 deferred until attempt history, pagination, or audit workflows need an independent read model. Do
@@ -106,16 +107,23 @@ Failures should guide users to:
 
 ## Public Surfaces
 
-Future Code Round must synchronize:
+Active surfaces:
 
-- CLI commands for runtime stop/start/restart;
-- HTTP/oRPC routes using the same command schemas;
-- Web Resource detail affordances showing clear stop/start/restart versus redeploy language;
-- public docs/help anchors explaining runtime controls, blocked start, and restart versus redeploy;
-- future MCP/tool descriptors generated from operation catalog metadata.
+- CLI commands for runtime stop/start/restart.
+- HTTP/oRPC routes using the same command schemas.
+- Web Resource detail affordances showing clear stop/start/restart versus redeploy language.
+- Public docs/help anchors explaining runtime controls, blocked start, and restart versus redeploy.
 
-## Remaining Work Before Code Round
+Future MCP/tool descriptors remain deferred until the tool surface exists and must be generated from
+operation catalog metadata.
 
-- Bind test matrix rows to automated command/use-case, adapter, CLI/HTTP, and Web tests.
-- Add runtime-control command schemas, handlers, use cases, persistence/readback, and adapter ports.
-- Update `CORE_OPERATIONS.md` and `operation-catalog.ts` only when activating the operations.
+## Current Implementation Notes And Migration Gaps
+
+- Runtime controls are active in `CORE_OPERATIONS.md`, `docs/BUSINESS_OPERATION_MAP.md`,
+  `packages/application/src/operation-catalog.ts`, CLI, HTTP/oRPC, and Web.
+- `resources.health.latestRuntimeControl` is the readback surface for the current slice; a separate
+  runtime-control list/show history query remains deferred until operators need paginated attempt
+  history outside Resource health.
+- Real runtime adapter smoke remains environment-gated; local application, persistence, contract,
+  adapter command-mapping, CLI/HTTP, docs-registry, and Web typecheck coverage are the active local
+  evidence.

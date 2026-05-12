@@ -14,6 +14,10 @@ relatedOperations:
   - resources.diagnostic-summary
   - resources.access-failure-evidence.lookup
   - servers.capacity.inspect
+  - servers.capacity.prune
+  - scheduled-runtime-prune-policies.configure
+  - scheduled-runtime-prune-policies.list
+  - scheduled-runtime-prune-policies.show
 sidebar:
   label: "Diagnostics"
   order: 4
@@ -68,6 +72,69 @@ appaloft server capacity inspect srv_primary
 usage、Appaloft runtime/state/source workspace usage、safe reclaimable estimate 和 warnings。
 
 `safeReclaimableEstimate` 是后续 cleanup/prune 决策的估算输入，不代表 Appaloft 已经执行清理。
+
+如需预览 target-owned 清理，先用 dry-run 运行 prune：
+
+```bash title="Dry-run runtime target prune"
+appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z
+```
+
+Docker build cache 和 unused image 清理必须显式选择 category：
+
+```bash title="Dry-run Docker cache and image prune"
+appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --category docker-build-cache --category unused-images
+```
+
+破坏性 prune 仍然需要 `--dry-run false`。这个命令不会运行 broad `docker system prune`，
+也不会执行 Docker volume prune；它会保留 Appaloft state roots、active runtimes、rollback
+candidates、deployment snapshots、audit/events、logs 和业务状态。
+
+<h2 id="scheduled-runtime-prune-policy">Scheduled runtime prune policy</h2>
+
+scheduled runtime prune policy 用来配置内部 runtime prune scheduler 读取的保留窗口。scheduler
+仍然通过和手动 prune 相同的 `servers.capacity.prune` 边界执行清理，所以只有 policy 明确开启时，
+才会执行破坏性清理。
+
+用 scope、retention window、target selector 和 cleanup categories 创建或替换 policy：
+
+```bash title="配置 scheduled runtime prune policy"
+appaloft server capacity policy configure \
+  --scope project \
+  --server-id srv_primary \
+  --retention-days 14 \
+  --category stopped-containers
+```
+
+policy 默认 enabled，失败后会 retry，并且因为 `--destructive` 默认为 `false`，scheduler 会以
+dry-run 方式运行。只有先通过 dry-run 确认候选项符合预期后，才添加 `--destructive true`。
+Docker build cache 和 unused image 清理仍然必须显式选择 category。
+
+查看 scheduler 当前能读取的 policy：
+
+```bash title="列出 scheduled runtime prune policies"
+appaloft server capacity policy list --server-id srv_primary --enabled-only true
+```
+
+按 id 查看单个 policy，用于审计 scheduler 决策：
+
+```bash title="查看 scheduled runtime prune policy"
+appaloft server capacity policy show rtp_primary
+```
+
+HTTP API 暴露同一组 command/query surface：`POST /api/servers/capacity/policies`、
+`GET /api/servers/capacity/policies` 和 `GET /api/servers/capacity/policies/{policyId}`。
+policy readback 是安全输出，只包含 ids、scope、retention days、enabled state、destructive mode、
+category names、retry behavior 和 update time，不包含 runtime command output 或 secrets。
+
+policy precedence 沿用 Appaloft 配置优先级：
+
+```text title="Scheduled runtime prune policy precedence"
+defaults < system < organization < project < environment < deployment snapshot
+```
+
+已配置的 policy 可以使用 `deployment-snapshot` scope。repository 或 deployment-snapshot
+configuration 还不会自动创建这些 policy 记录，所以需要通过 policy command 或 API 创建。用
+operator work 查看已接受的 scheduled prune attempt 和失败状态。
 
 <h2 id="diagnostic-secret-masking">Secret 屏蔽</h2>
 

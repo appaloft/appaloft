@@ -25,6 +25,15 @@ describe("Appaloft deployment config schema", () => {
         upstreamProtocol: "http",
         exposureMode: "reverse-proxy",
       },
+      retention: {
+        runtimePrune: {
+          retentionDays: 14,
+          destructive: true,
+          categories: ["stopped-containers", "preview-workspaces"],
+          retryOnFailure: false,
+          enabled: true,
+        },
+      },
       source: {
         baseDirectory: "apps/api",
       },
@@ -48,6 +57,13 @@ describe("Appaloft deployment config schema", () => {
       expect(parsed.data.runtime?.dockerComposeFilePath).toBe("deploy/compose.yaml");
       expect(parsed.data.runtime?.buildTarget).toBe("runtime");
       expect(parsed.data.network?.internalPort).toBe(4310);
+      expect(parsed.data.retention?.runtimePrune).toEqual({
+        retentionDays: 14,
+        destructive: true,
+        categories: ["stopped-containers", "preview-workspaces"],
+        retryOnFailure: false,
+        enabled: true,
+      });
     }
 
     const yaml = parseAppaloftDeploymentConfigText(
@@ -69,6 +85,19 @@ describe("Appaloft deployment config schema", () => {
       expect(yaml.data.runtime?.strategy).toBe("static");
       expect(yaml.data.runtime?.publishDirectory).toBe("dist");
     }
+  });
+
+  test("[RT-CAP-SCHED-001] rejects unsafe scheduled runtime prune retention config", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      retention: {
+        runtimePrune: {
+          retentionDays: 0,
+          categories: ["docker-volumes"],
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(false);
   });
 
   test("[CONFIG-FILE-DISC-001] declares JSON and YAML config discovery names", () => {

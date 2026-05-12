@@ -2,7 +2,7 @@
 
 ## Normative Contract
 
-`terminal-sessions.open` uses the shared platform error model and neverthrow conventions.
+Terminal session operations use the shared platform error model and neverthrow conventions.
 
 Errors must use stable `code`, `category`, `phase`, `retriable`, and scope details. Error details
 must not include terminal input, terminal output, raw shell command strings, private keys, access
@@ -30,7 +30,8 @@ type TerminalSessionErrorDetails = {
     | "workspace-resolution"
     | "terminal-open"
     | "terminal-transport"
-    | "terminal-close";
+    | "terminal-close"
+    | "terminal-expire";
   step?: string;
   scope?: "server" | "resource";
   serverId?: string;
@@ -71,7 +72,7 @@ possible.
 | Error code | Category | Phase | Retriable | Meaning |
 | --- | --- | --- | --- | --- |
 | `terminal_session_stream_failed` | `infra` | `terminal-transport` | No | PTY, SSH, WebSocket, or provider stream failed after opening. |
-| `terminal_session_not_found` | `user` | `terminal-transport` | No | A transport tried to attach to an unknown or already closed session. |
+| `terminal_session_not_found` | `user` | `terminal-transport` or `terminal-close` | No | A transport or lifecycle command tried to attach to or close an unknown or already closed session. |
 | `terminal_session_closed` | `user` | `terminal-close` | No | Session closed intentionally or backend exited. Usually a close frame, not a UI error. |
 | `timeout` | `retryable` | `terminal-transport` | Yes | Transport stalled or idle timeout closed the session. |
 

@@ -231,6 +231,7 @@ const sidebar = [
         items: [
           { slug: "reference/cli" },
           { slug: "reference/http-api" },
+          { slug: "reference/typescript-sdk" },
           { slug: "reference/web-console" },
         ],
       },

@@ -14,7 +14,6 @@
 ## Release Gate Checklist
 
 This roadmap is the release gate for Appaloft versions before `1.0.0`.
-
 - [x] Keep roadmap entries in Markdown todo format so completed and incomplete work is visible.
 - [x] Keep external baseline research summarized without naming other products in this document.
 - [x] Before every release, compare implementation, operation catalog, specs, tests, and migration
@@ -27,7 +26,6 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
   published release agree on the current version line.
 
 Version selection rules:
-
 - [x] Use a target minor version only when every required item and exit criterion for that target
   phase, and all earlier phases, is checked.
 - [x] If the current line is `0.2.x` and the `0.3.0` checklist is not fully checked, release the
@@ -40,11 +38,10 @@ Version selection rules:
   note/migration gap that explains why the version can still ship.
 
 Version plan:
-
 - [x] `0.10.0` is Phase 8: Self-Hosted Auth And Organization Bootstrap.
 - [x] `0.10.x` is the Phase 8 hardening line: installer/auth fixes, release packaging fixes, and
   backwards-compatible corrections only.
-- [ ] `0.11.0` is Phase 9: Operator/Internal State Closure And Interface Parity.
+- [x] `0.11.0` is Phase 9: Operator/Internal State Closure And Interface Parity.
 - [ ] `1.0.0-rc` is the GA release-candidate gate after Phase 9, not a separate feature phase.
 - [ ] `1.0.0` is GA.
 - [x] Post-`1.0.0` tracks do not reserve `0.x` versions. If maintainers deliberately pull a
@@ -54,18 +51,14 @@ Version plan:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-05-11, the latest public release is `v0.10.0`; root package and Release
-  Please manifest are `0.10.0`.
-- [x] The current stable development line is `0.10.x`; patch releases on this line are limited to
-  Phase 8 hardening, installer/auth fixes, release packaging fixes, and other backwards-compatible
-  corrections that do not claim Phase 9 completion.
-- [x] The next minor target is `0.11.0` for Phase 9 Operator/Internal State Closure And Interface
-  Parity. `1.0.0-rc` is a separate release-candidate hardening gate after Phase 9 is complete, not
-  the Phase 9 target itself.
+- [x] On 2026-05-12, the latest public release is `v0.10.0`; root package
+  and Release Please manifest on `main` are `0.10.0`; the release PR target is
+  `0.11.0`.
+- [x] On 2026-05-12, the roadmap gate allows `Release-As: 0.11.0` because
+  Phase 0 through Phase 9 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
 Historical alignment notes:
-
 - [x] On 2026-04-23, the public docs app and standalone docs deployment workflow are merged on
   `origin/main`; `docs.appaloft.com` DNS and release deployment secrets/variables are configured,
   so the docs site should deploy after the next release publish run creates a GitHub Release.
@@ -93,7 +86,6 @@ Historical alignment notes:
 ## Source-Of-Truth Inputs
 
 Internal governing sources:
-
 - [x] [Business Operation Map](./BUSINESS_OPERATION_MAP.md)
 - [x] [Core Operations](./CORE_OPERATIONS.md)
 - [x] [Domain Model](./DOMAIN_MODEL.md)
@@ -110,7 +102,6 @@ Internal governing sources:
 - [x] [AI-Native Resource Template And MCP Roadmap](./implementation/ai-native-resource-template-roadmap.md)
 
 Product constraints:
-
 - [x] Treat Appaloft as a self-hosted deployment control plane, not a web-first CRUD app.
 - [x] Keep `detect -> plan -> execute -> verify -> rollback` as the core product shape.
 - [x] Keep CLI, HTTP/oRPC, Web, and future MCP/tool entrypoints aligned through the same operation
@@ -121,7 +112,6 @@ Product constraints:
 ## 1.0.0 Definition Of Done
 
 The 1.0.0 product is ready only when all of these are checked:
-
 - [ ] A new operator can install Appaloft, connect a single-server SSH/Docker target and a Docker
   Swarm cluster target, create/select a project/environment/resource, deploy an app, and observe
   status, logs, health, access, diagnostics, and failure reasons.
@@ -152,7 +142,6 @@ The 1.0.0 product is ready only when all of these are checked:
 ## Current Baseline
 
 Already implemented or materially present:
-
 - [x] Core models projects, environments, deployment targets, destinations, resources, resource
   instances, bindings, releases, deployments, rollback plans, domain bindings, and runtime plans.
 - [x] Active operations cover project create/list.
@@ -195,7 +184,6 @@ Already implemented or materially present:
   and required preview URL gating without adding fields to `deployments.create`.
 
 Still blocking 1.0.0:
-
 - [ ] Top-level resource CRUD/lifecycle is uneven across projects, servers, credentials, resources,
   deployments, domain bindings, certificates, default access policy, dependency resources, storage,
   webhooks, and internal process state.
@@ -224,7 +212,6 @@ Still blocking 1.0.0:
 Target: current worktree to the next planning checkpoint.
 
 Required:
-
 - [x] Create one roadmap owner document for `1.0.0`.
 - [x] Keep roadmap status in checkbox form.
 - [x] Align generated default access, `ResourceAccessSummary`, static-site, proxy-preview, and
@@ -238,7 +225,6 @@ Required:
 - [x] Use the resource/internal-state ledger below as the release checklist for horizontal closure.
 
 Exit criteria:
-
 - [x] One roadmap owner document exists.
 - [x] Product priority does not depend on `docs/ai/**`.
 - [x] Every later phase has concrete source-of-truth docs updated before its implementation is
@@ -249,12 +235,10 @@ Exit criteria:
 Target: `0.3.0`.
 
 Release rule:
-
 - [x] Select `0.3.0` only when all required Phase 1 items and exit criteria are checked. If any
   Phase 1 item remains unchecked, release a `0.2.x` patch instead.
 
 Already done:
-
 - [x] `docs/PRODUCT_ROADMAP.md` exists.
 - [x] The roadmap uses Markdown checkbox status.
 - [x] The release skill requires roadmap alignment before release execution.
@@ -263,7 +247,6 @@ Already done:
   planner status are reflected as current baseline rather than future work.
 
 Required:
-
 - [x] Verify the latest public release, Release Please state, and package manifests agree on the
   current `0.2.x` line.
 - [x] Commit the roadmap and release-skill alignment work before any `0.3.0` release.
@@ -273,7 +256,6 @@ Required:
 - [x] Confirm no release workflow can be intentionally triggered without explicit user confirmation.
 
 Exit criteria:
-
 - [x] Maintainers can decide between `0.2.x` patch and `0.3.0` by reading the roadmap checklist.
 - [x] Release preparation includes roadmap alignment in the Release Please PR before merge.
 - [x] No roadmap phase before `0.3.0` remains implicit.
@@ -283,12 +265,10 @@ Exit criteria:
 Target: `0.4.0`.
 
 Release rule:
-
 - [x] Select `0.4.0` only when all required Phase 2 items, Phase 1 items, and exit criteria are
   checked. If any Phase 2 item remains unchecked, release a `0.3.x` patch instead.
 
 Already done:
-
 - [x] Projects can be created and listed.
 - [x] Environments can be created, listed, shown, inspected for effective precedence, diffed,
   promoted, and updated through baseline variable set/unset operations.
@@ -301,7 +281,6 @@ Already done:
   resource-scoped domain actions.
 
 Required:
-
 - [x] Verify Web, CLI, and HTTP/oRPC all dispatch the active operation catalog entries for the
   minimum loop. Covered by `MIN-CONSOLE-OPS-001`.
 - [x] Confirm Quick Deploy still dispatches `resources.create` before ids-only `deployments.create`
@@ -312,14 +291,12 @@ Required:
   roadmap. Covered by `MIN-CONSOLE-GAPS-001`.
 
 Exit criteria:
-
 - [x] A user can complete a minimal first deployment loop from the console or CLI without relying on
   hidden Web-only behavior.
 - [x] The current active operations are accurately checked in the resource/internal-state ledger.
 - [x] Missing CRUD/lifecycle operations are explicitly assigned to later phases.
 
 Post-`0.4.0` gaps assigned to later phases:
-
 - Credential rotation, broad credential usage visibility, and delete-when-unused are active
   lifecycle slices.
 - Remaining environment lock/history work remains Phase 4 work after effective-precedence, archive,
@@ -337,12 +314,10 @@ Post-`0.4.0` gaps assigned to later phases:
 Target: `0.5.0`.
 
 Release rule:
-
 - [x] Select `0.5.0` only when all required Phase 3 items, earlier phase items, and exit criteria
   are checked. If any Phase 3 item remains unchecked, release a `0.4.x` patch instead.
 
 Already done:
-
 - [x] Minimal static-site deployment works through resource runtime/network profiles and Docker/OCI
   static-server packaging.
 - [x] Generated default access is visible through `ResourceAccessSummary`.
@@ -357,7 +332,6 @@ Already done:
   custom command fallback.
 
 Required:
-
 - [x] Verify the checked access/static/SSH/planner items above against current executable tests and
   migration notes before release.
 - [x] Confirm generated, durable, and server-applied route states remain visually and semantically
@@ -368,7 +342,6 @@ Required:
   standalone deployment observation, and broader API/Web/CLI regression coverage.
 
 Phase 3 release-gate verification notes from 2026-04-24:
-
 - No operation catalog change is required for the checked Phase 3 baseline. First-class static site
   deployment remains an accepted workflow over `resources.create -> deployments.create`; framework
   planning, generated access resolution, edge proxy route realization, and pure CLI/SSH
@@ -400,7 +373,6 @@ Phase 3 release-gate verification notes from 2026-04-24:
   regression coverage for access, proxy preview, and server-applied route visuals.
 
 Exit criteria:
-
 - [x] `0.5.0` represents the access/static/SSH-config/planner baseline already present in the
   product, not the future policy/lifecycle closure work.
 - [x] Any unchecked access/static/SSH/planner hardening work remains assigned to `0.6.0+` phases.
@@ -410,12 +382,10 @@ Exit criteria:
 Target: `0.6.0`.
 
 Release rule:
-
 - [x] Select `0.6.0` only when all required Phase 4 items, earlier phase items, and exit criteria
   are checked. If any Phase 4 item remains unchecked, release a `0.5.x` patch instead.
 
 Already done:
-
 - [x] `resources.create` exists.
 - [x] Resource read/list/show, source/runtime/network/health configuration, resource variable
   overrides/effective config, archive/delete, runtime logs, proxy preview, diagnostics, and Web
@@ -432,7 +402,6 @@ Already done:
   proxy-repair, and credential baseline exist.
 
 Required:
-
 - [x] Add project show/rename/archive with Web detail/settings closure and side-effect clarity.
 - [x] Add server show with proxy status and initial deployment/resource/domain rollups.
 - [x] Add server rename.
@@ -456,7 +425,6 @@ Required:
 - [x] Ensure CLI, HTTP/oRPC, Web, and future MCP naming reuse the same command/query schemas.
 
 Phase 4 resource profile editing verification notes from 2026-04-27:
-
 - Resource detail source/runtime/network profile forms dispatch `resources.configure-source`,
   `resources.configure-runtime`, and `resources.configure-network` through the typed oRPC client,
   then invalidate the resource detail/list read paths instead of storing Web-only configuration.
@@ -477,7 +445,6 @@ Phase 4 resource profile editing verification notes from 2026-04-27:
   closure and is now tracked by the Phase 7 profile-drift entries below.
 
 Exit criteria:
-
 - [x] A user can create, read, update, and archive/delete project, environment, server, credential,
   and resource configuration without creating a deployment as a side effect.
 - [x] `resources.create` is no longer the only durable resource profile write.
@@ -493,12 +460,10 @@ Exit criteria:
 Target: `0.7.0`.
 
 Release rule:
-
 - [x] Select `0.7.0` only when all required Phase 5 items, earlier phase items, and exit criteria
   are checked. If any Phase 5 item remains unchecked, release a `0.6.x` patch instead.
 
 Already done:
-
 - [x] Static strategy, Vite static, Angular static, Astro static, Nuxt generate static, Next.js
   static export, SvelteKit adapter-static/static, and generic static server packaging have
   implementation coverage.
@@ -523,7 +488,6 @@ Already done:
   metadata from the same resource profile vocabulary before ids-only deployment admission.
 
 Required:
-
 - [x] Finish CLI migration to the shared Quick Deploy workflow program.
 - [x] Make deployment admission use the runtime target backend registry before acceptance.
 - [x] Add unsupported-target rejection before acceptance.
@@ -555,7 +519,6 @@ Required:
   [docs/specs/018-runtime-plan-resolution-unsupported-override-contract](./specs/018-runtime-plan-resolution-unsupported-override-contract/spec.md).
 
 Exit criteria:
-
 - [x] The zero-to-SSH loop works for at least: Next.js, Vite static SPA, Astro static, Nuxt
   generate, SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python, generic
   Java, Dockerfile, Docker Compose, prebuilt image, and explicit custom commands.
@@ -579,7 +542,6 @@ Exit criteria:
   tests, and `deployments.plan/v1` contract coverage.
 
 Phase 5 release-gate verification notes from 2026-04-30:
-
 - `0.7.0` is published as GitHub Release `v0.7.0`; the local package manifest, Release Please
   manifest, changelog, and latest fetched tag on `main` align on `0.7.0`.
 - The supported catalog contract is closed by
@@ -604,12 +566,10 @@ Phase 5 release-gate verification notes from 2026-04-30:
 Target: `0.8.0`.
 
 Release rule:
-
 - [x] Select `0.8.0` only when all required Phase 6 items, earlier phase items, and exit criteria
   are checked. If any Phase 6 item remains unchecked, release a `0.7.x` patch instead.
 
 Already done:
-
 - [x] Generated access is visible through `ResourceAccessSummary`.
 - [x] Planned and latest generated routes are projected.
 - [x] Latest durable domain routes and latest server-applied routes are exposed separately.
@@ -621,7 +581,6 @@ Already done:
   summary exist as active observation surfaces.
 
 Required:
-
 - [x] Activate `default-access-domain-policies.configure`.
 - [x] Add default access policy list/show/update/disable behavior.
 - [x] Add operation catalog coverage for default access policy operations.
@@ -651,7 +610,6 @@ Required:
   diagnostics.
 
 Phase 6 verification notes from 2026-04-30:
-
 - The first Phase 6 slice closed `docs/specs/020-route-intent-status-and-access-diagnostics`
   through a traceability table rather than introducing a new public route operation. The active
   surfaces remain `resources.show`, `resources.health`, `resources.proxy-configuration.preview`,
@@ -669,7 +627,6 @@ Phase 6 verification notes from 2026-04-30:
   retry/redeploy/rollback.
 
 Phase 6 verification notes from 2026-05-01:
-
 - The access failure diagnostic baseline slice strengthened the existing
   `resource-access-failure/v1` envelope with safe affected request metadata, related domain binding
   id support, stable `nextAction`, and optional latest edge-failure composition through
@@ -700,7 +657,6 @@ Phase 6 verification notes from 2026-05-01:
   renderer support, and the Web lookup form remain future Phase 6 work.
 
 Phase 6 verification notes from 2026-05-03:
-
 - The access/proxy/health/diagnostic regression harness baseline closes the API/oRPC, CLI JSON, and
   Web helper coverage gap for generated access display, provider-rendered proxy preview routes,
   durable domain routes, server-applied routes, route intent descriptors, latest safe access failure
@@ -714,7 +670,6 @@ Phase 6 verification notes from 2026-05-03:
   credentials, auth headers, cookies, sensitive query strings, or remote raw logs.
 
 Phase 6 verification notes from 2026-05-03 applied route context metadata baseline:
-
 - The applied route context metadata slice adds `applied-route-context/v1` as a provider-neutral,
   copy-safe route ownership contract for existing proxy preview and diagnostic/evidence flows.
 - Provider-rendered proxy preview can expose safe resource, deployment, optional domain binding,
@@ -727,7 +682,6 @@ Phase 6 verification notes from 2026-05-03 applied route context metadata baseli
   form, no provider-native raw metadata parsing, and no real Traefik error-middleware e2e.
 
 Phase 6 verification notes from 2026-05-04 failure visibility baseline:
-
 - The failure visibility baseline keeps proxy/log/health-adjacent source errors visible through
   existing `resources.diagnostic-summary` and `resources.health` read models while normalizing
   unsafe adjacent text before it reaches copyable JSON.
@@ -740,7 +694,6 @@ Phase 6 verification notes from 2026-05-04 failure visibility baseline:
   companion/static renderer, provider-native metadata lookup, and Web lookup form work.
 
 Phase 6 verification notes from 2026-05-04 companion/static access failure renderer baseline:
-
 - The companion/static renderer baseline adds shared application rendering helpers and packages a
   provider-neutral static renderer asset into adapter-owned static-site Docker builds so one-shot
   CLI/SSH static runtimes can render safe `resource-access-failure/v1` diagnostics without a
@@ -754,7 +707,6 @@ Phase 6 verification notes from 2026-05-04 companion/static access failure rende
   provider-native metadata lookup, and Web lookup form work.
 
 Phase 6 verification notes from 2026-05-04 applied route context lookup baseline:
-
 - The applied route context lookup baseline makes `applied-route-context/v1` metadata resolvable
   through the shared provider-neutral lookup core by diagnostic id, route id, resource id,
   deployment id, host, or path where current safe read state allows.
@@ -767,7 +719,6 @@ Phase 6 verification notes from 2026-05-04 applied route context lookup baseline
   provider-native metadata lookup beyond safe Appaloft-applied metadata, and Web lookup form work.
 
 Phase 6 verification notes from 2026-05-04 real Traefik access failure middleware e2e baseline:
-
 - The real Traefik baseline wires served-route `errors` middleware to the existing
   `resource-access-failure/v1` renderer for 404, 502, 503, and 504 class failures, carrying only
   sanitized `applied-route-context/v1` query parameters for route/resource/deployment/domain/server
@@ -783,7 +734,6 @@ Phase 6 verification notes from 2026-05-04 real Traefik access failure middlewar
   diagnostics row.
 
 Phase 6 release-gate verification notes from 2026-05-04:
-
 - Release readiness is a Sync Round over already-merged behavior; no ADR, operation catalog,
   command/query schema, public operation, or implementation change is required.
 - Generated and configured access remains exposed through `ResourceAccessSummary`, with coverage in
@@ -803,7 +753,6 @@ Phase 6 release-gate verification notes from 2026-05-04:
   blockers.
 
 Exit criteria:
-
 - [x] A deployed HTTP app keeps exposing generated or configured access through
   `ResourceAccessSummary`.
 - [x] Operators can configure or disable the default generated-access policy through explicit
@@ -818,18 +767,15 @@ Exit criteria:
 Target: `0.9.0` beta.
 
 Release rule:
-
 - [x] Select `0.9.0` only when all required Phase 7 items, earlier phase items, and exit criteria
   are checked. If any Phase 7 item remains unchecked, release a `0.8.x` patch instead.
 
 Already done:
-
 - [x] Environment set/unset variable baseline exists.
 - [x] Core contains dependency resource and binding concepts.
 - [x] Deployment list/logs and resource health/log/diagnostic read surfaces exist.
 
 Current verification notes:
-
 - 2026-05-04 Phase 7 baseline slice implemented resource-scoped `.env` import,
   resource secret classification/masking, and `resources.effective-config` override summaries. This
   does not satisfy the full `0.9.0` release rule while storage, dependency resources, recovery,
@@ -1658,7 +1604,6 @@ Current verification notes:
   eligibility only; an actual release run remains governed by the release workflow.
 
 Required:
-
 - [x] Add resource-scoped environment variable operations.
 - [x] Add secret operations with build/runtime exposure rules, masking, `.env` import/paste, and
   effective config queries.
@@ -1718,7 +1663,6 @@ Required:
   smoke.
 
 Exit criteria:
-
 - [x] A user can manage config, secrets, storage, dependencies, auto-deploy, deployment history, and
   rollback candidates without editing files on the server.
 - [x] Postgres has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
@@ -1732,13 +1676,11 @@ Exit criteria:
 Target: `0.10.0`.
 
 Release rule:
-
 - [x] Select `0.10.0` only when all required Phase 8 items, earlier phase items, and exit criteria
   are checked. If any Phase 8 item remains unchecked, release a `0.9.x` patch or an explicitly
   requested prerelease instead.
 
 Already done:
-
 - [x] Better Auth compatible user, session, account, verification, organization, member, and
   invitation tables exist in the PostgreSQL/PGlite migration set.
 - [x] Web already has an auth-session query surface and UI test fixtures for Better Auth session
@@ -1747,7 +1689,6 @@ Already done:
   before public organization operations are exposed.
 
 Current verification notes:
-
 - 2026-05-10 Phase 8 self-hosted Action deploy-token auth Spec Round added ADR-043 and
   [docs/specs/052-self-hosted-action-deploy-token-auth](./specs/052-self-hosted-action-deploy-token-auth/spec.md)
   to position deploy tokens as the machine-to-machine authorization boundary for self-hosted Action
@@ -1875,7 +1816,6 @@ Current verification notes:
   normal release-environment image verification gate.
 
 Required:
-
 - [x] Add self-hosted Action API authentication: optional installer-generated deploy token,
   bearer-token verification on action mutation endpoints, token rotation/revocation, and clear
   401/403 errors.
@@ -1905,7 +1845,6 @@ Required:
   deploy token rotation, and GitHub Action self-hosted server mode configuration.
 
 Exit criteria:
-
 - [x] A new self-hosted user can run `install.sh`, open the printed console URL, log in with a
   local first-admin account, and deploy through the console or GitHub Action server mode without
   manually editing database rows. The default-skipped `SELF-HOSTED-AUTH-E2E-003` harness now passes
@@ -1931,81 +1870,288 @@ Exit criteria:
 Target: `0.11.0`.
 
 Release rule:
-
-- [ ] Select `0.11.0` only when all required Phase 9 items, earlier phase items, and exit criteria
-  are checked. If any Phase 9 item remains unchecked, release a `0.10.x` patch or an explicitly
-  requested prerelease instead.
-- [ ] Do not select `1.0.0-rc` directly for Phase 9 work. The release-candidate line starts only
+- [x] Select `0.11.0` only when all required Phase 9 items, earlier phase items, and exit criteria
+  are checked, except for the accepted deferred SSH smoke evidence gap recorded in this phase. If
+  any other Phase 9 item remains unchecked, release a `0.10.x` patch or an explicitly requested
+  prerelease instead.
+- [x] Do not select `1.0.0-rc` directly for Phase 9 work. The release-candidate line starts only
   after Phase 9 has shipped or has been explicitly retargeted as complete.
 
 Already done:
-
 - [x] System provider/plugin/doctor/db status/db migrate baseline exists.
 - [x] Terminal session open baseline exists.
 - [x] Remote SSH state and migration/recovery concepts have partial implementation.
+- [x] Operator-work can aggregate safe remote SSH state read-model rows for locks, migrations,
+  backups, and recovery markers when a producer supplies them.
+- [x] SSH remote-state diagnostics producer can read lock, migration journal, backup, and recovery
+  marker metadata into operator-work rows without mutating remote state.
+- [x] Durable process attempt journal can list due retry candidates with dedupe authority for
+  future schedulers and lifecycle commands.
 
 Required:
-
-- [ ] Add durable outbox/inbox or equivalent process state for long-running workflows.
-- [ ] Add retry, dedupe, and failure visibility for long-running workflows.
+- [x] Complete durable outbox/inbox or equivalent process-state coverage for long-running workflows.
+  ADR-054 and `docs/specs/060-durable-process-delivery-baseline` now define durable process
+  delivery as the outbox/inbox-equivalent baseline. Scheduled-task runs are the first worker
+  binding with accepted-state recording, atomic claim/completion, retry-generation persistence, and
+  generated retry handoff. Scheduled runtime prune is the second worker binding with accepted
+  maintenance recording, atomic claim/completion, command-bus dispatch of `servers.capacity.prune`,
+  retry-scheduled failure visibility, and safe operator-work details. Scheduled history retention is
+  the third worker binding with retention-default category attempt recording, atomic
+  claim/completion, command-bus dispatch of existing history prune commands, retry-scheduled failure
+  visibility, disabled-by-default shell runner wiring, and safe operator-work details. Preview
+  cleanup is the fourth operator-visible binding with successful and retry-scheduled cleanup
+  outcomes mirrored into the process attempt journal for `operator-work.*` visibility and repair;
+  its retry scheduler still uses the preview cleanup attempt store and preview-lifecycle lease
+  rather than process-attempt atomic claim/completion. Certificate issuance is the fifth
+  operator-visible binding with request, provider issuance, success, and retry-scheduled provider
+  failure outcomes mirrored into the process attempt journal; its retry scheduler still uses
+  certificate aggregate attempt state rather than process-attempt atomic claim/completion.
+  Certificate import is the sixth operator-visible binding with successful manual import outcomes
+  mirrored into the process attempt journal without PEM, private-key, or passphrase material.
+  Managed certificate revocation is the seventh operator-visible binding with running, success, and
+  retriable provider failure outcomes mirrored into the process attempt journal for
+  `certificates.revoke`; imported certificate revocation remains Appaloft-local lifecycle state
+  without provider work. Proxy bootstrap is the eighth operator-visible binding with running,
+  success, and failure outcomes
+  mirrored into the process attempt journal; repair execution still runs inline through
+  `servers.bootstrap-proxy` and post-register bootstrap remains event-driven rather than
+  process-attempt atomic claim/completion. Resource runtime control is the ninth
+  operator-visible binding with running, success, and failure outcomes mirrored into the process
+  attempt journal for `resources.runtime.stop`, `resources.runtime.start`, and
+  `resources.runtime.restart`; execution still runs inline through the command use case rather than
+  process-attempt atomic claim/completion. Source-event auto-deploy is the tenth operator-visible
+  binding with accepted, dispatched, and failed `source-events.ingest` outcomes mirrored into the
+  process attempt journal; deployment dispatch still runs inline through the source-event command
+  path rather than process-attempt atomic claim/completion. Dependency resource backup/restore is
+  the eleventh operator-visible binding with running, success, and failure outcomes mirrored into the
+  process attempt journal for `dependency-resources.create-backup` and
+  `dependency-resources.restore-backup`; provider execution still runs inline through command use
+  cases rather than process-attempt atomic claim/completion. Provider-native dependency resource
+  realization/delete is the twelfth operator-visible binding with running, success, and failure
+  outcomes mirrored into the process attempt journal for
+  `dependency-resources.provision-postgres`, `dependency-resources.provision-redis`, and
+  provider-managed `dependency-resources.delete`; provider execution still runs inline through
+  command use cases rather than process-attempt atomic claim/completion. Deployment create
+  execution is the thirteenth operator-visible binding with running, success, and failure outcomes
+  mirrored into the process attempt journal for `deployments.create`; runtime execution still runs
+  inline through the create use case rather than process-attempt atomic claim/completion. Domain
+  binding verification retry is the fourteenth operator-visible binding with accepted ownership
+  verification retry attempts mirrored into the process attempt journal for
+  `domain-bindings.retry-verification`; DNS recheck, certificate retry, route repair, deployment
+  retry, redeploy, and rollback remain separate governed workflows, and verification retry still
+  runs inline through the command use case rather than process-attempt atomic claim/completion.
+  Domain binding create is the fifteenth operator-visible binding with initial ownership
+  verification attempts mirrored into the process attempt journal for `domain-bindings.create`;
+  idempotency replays return the existing binding without duplicate process rows, and DNS recheck,
+  ownership confirmation, certificate issuance/import, route repair, deployment retry, redeploy,
+  and rollback remain separate governed workflows. Deployment retry execution is the sixteenth
+  operator-visible binding with running, success, and failure outcomes mirrored into the process
+  attempt journal for `deployments.retry`; `deployments.redeploy` already delegates through
+  `deployments.create` and uses the create-deployment projection path with operation key
+  `deployments.redeploy`. Deployment rollback execution is the seventeenth operator-visible binding
+  with running, success, and failure outcomes mirrored into the process attempt journal for
+  `deployments.rollback`, including source deployment lineage, rollback candidate lineage, runtime
+  plan, and target backend metadata. Remaining long-running workflow workers are future opt-in
+  slices under ADR-054 rather than Phase 9 release blockers.
+- [x] Add retry execution, dedupe enforcement, and failure visibility for long-running workflows.
+  Scheduled-task retry generation and handoff are implemented with process-attempt dedupe
+  authority and safe failure visibility. Scheduled runtime prune records retry-scheduled failure
+  visibility and relies on fresh policy ticks for new attempts rather than generic retry
+  generation. Scheduled history retention records retry-scheduled failure visibility and relies on
+  fresh retention-default policy ticks for new attempts rather than generic retry generation.
+  Preview cleanup records retry-scheduled process-attempt visibility for transient cleanup
+  failures and relies on the existing product-grade preview cleanup retry scheduler for retry
+  dispatch. Certificate issuance records retry-scheduled process-attempt visibility for provider
+  failures and relies on the existing certificate retry scheduler for retry dispatch. Managed
+  certificate revocation records retriable process-attempt failure visibility for provider
+  revocation failures while retry execution still requires a fresh `certificates.revoke` call or a
+  later governed worker. Proxy bootstrap records retriable process-attempt failure visibility for
+  repair attempts while retry execution still requires a fresh `servers.bootstrap-proxy` call or a
+  later governed worker.
+  Resource runtime control records retriable process-attempt failure visibility for runtime target
+  adapter failures while retry execution still requires a fresh `resources.runtime.*` command or a
+  later governed worker. Source-event auto-deploy records retriable process-attempt failure
+  visibility for deployment dispatch failures while retry execution still requires a fresh
+  source-event delivery or a later governed worker. Dependency resource backup/restore records
+  retriable process-attempt failure visibility for provider backup/restore failures while retry
+  execution still requires a fresh backup/restore command or a later governed worker.
+  Provider-native dependency resource realization/delete records retriable process-attempt failure
+  visibility for provider realization/delete failures while retry execution still requires a fresh
+  provision/delete command or a later governed worker. Deployment create records retriable
+  process-attempt failure visibility for post-acceptance runtime execution failures while retry
+  execution still requires `deployments.retry`/`deployments.redeploy`, a fresh create request, or a
+  later governed deployment worker. Deployment retry records retriable process-attempt failure
+  visibility for post-acceptance retry execution failures while retry execution itself still runs
+  inline through `deployments.retry` rather than a process-attempt worker. Deployment rollback
+  records retriable process-attempt failure visibility for post-acceptance rollback execution
+  failures while rollback execution itself still runs inline through `deployments.rollback` rather
+  than a process-attempt worker. Broader automatic workflow retry execution remains governed future
+  work and must opt in through local specs before provider/runtime work is executed by a worker.
 - [x] Add operator queries for deployment attempts.
 - [x] Add operator queries for proxy bootstrap attempts.
 - [x] Add operator queries for certificate attempts.
-- [ ] Add operator queries for remote SSH state locks, migrations, backups, and recovery markers.
-- [ ] Add operator queries for source links, route realization attempts, and worker/job status.
+- [x] Add a concrete remote SSH state diagnostics producer/read model for locks, migrations,
+  backups, and recovery markers.
+- [x] Add operator queries for source links, route realization attempts, and worker/job status.
 - [x] Add runtime target capacity diagnostics for disk, inode, memory, CPU, Docker image usage,
   build-cache usage, source workspace usage, and safe reclaimable estimates.
-- [ ] Add lifecycle commands for retry, cancel, mark-recovered, dead-letter, and prune where state
+- [x] Add aggregate-scoped audit event list/show read surfaces with redacted payload output.
+- [x] Add first operator lifecycle repair command: `operator-work.mark-recovered` for durable
+  failed, retry-scheduled, or dead-lettered process attempt rows.
+- [x] Add operator dead-letter command: `operator-work.dead-letter` for durable failed or
+  retry-scheduled process attempt rows that must stop retry selection.
+- [x] Add operator cancel command: `operator-work.cancel` for durable pending or retry-scheduled
+  process attempt rows that should not continue.
+- [x] Add operator retry command: `operator-work.retry` for creating a fresh pending durable
+  process attempt from failed or retry-scheduled retriable rows without executing provider/runtime
+  work.
+- [x] Add operator prune command: `operator-work.prune` for dry-running and deleting old terminal
+  durable process attempt journal rows without pruning runtime artifacts, audit/events, remote
+  state, or compatibility ledger rows.
+- [x] Add lifecycle commands for retry, cancel, mark-recovered, dead-letter, and prune where state
   can block deployments or create support load.
-- [ ] Add runtime artifact/workspace prune with dry-run, active-runtime preservation, rollback
-  candidate retention, preview-owned artifact cleanup, no-volume-by-default safety, and audit and
-  diagnostic output.
-- [ ] Add audit/event read surfaces with retention policy and redaction rules.
-- [ ] Add terminal session list/show/attach/close/expire if terminal sessions remain public.
-- [ ] Ensure provider/plugin/system operations expose capability details and configuration
+- [x] Add manual runtime artifact/workspace prune with dry-run, active-runtime preservation,
+  rollback candidate retention, preview-owned artifact cleanup, no-volume-by-default safety, and
+  audit and diagnostic output.
+  `servers.capacity.prune` is active with dry-run default, safe category selection, explicit
+  Docker build-cache/unused-image opt-in, CLI and HTTP/oRPC dispatch, runtime adapter exclusions,
+  and retained audit output for destructive prunes.
+- [x] Add scheduled runtime prune automation and broader retention-policy integration for runtime
+  artifacts/workspaces.
+  ADR-055 and `docs/specs/061-scheduled-runtime-prune-automation` now define the policy-gated,
+  command-bus, durable-process boundary for scheduled runtime prune automation. The implementation
+  can resolve configured policy records by precedence, including `deployment-snapshot` scope,
+  dispatch selected work through durable process state and `servers.capacity.prune`, reuse
+  scheduled-boundary audit output for destructive runs, discover enabled policies through the shell
+  runner's injected read model, and materialize repository config `retention.runtimePrune` as a
+  `deployment-snapshot` scoped policy for the selected target. CLI and HTTP/oRPC policy
+  configure/list/show entrypoints, public docs/help anchors, and focused automation tests are
+  active. Broader retention-policy integration outside runtime artifacts/workspaces remains under
+  the audit/event retention gaps.
+- [x] Complete audit/event retention policy coverage beyond aggregate-scoped redacted readback.
+  First audit-row retention command `audit-events.prune` and provider job log retention command
+  `provider-job-logs.prune` are specified and implemented; `audit-events.export` now provides
+  bounded aggregate-scoped redacted export. `deployments.logs.prune` now covers dry-run-first
+  embedded deployment log entry pruning. Resource runtime log archival now has Appaloft-owned
+  storage, CLI and HTTP/oRPC entrypoints, list/show readback, prune behavior, and delete-safety
+  blockers for retained archive snapshots. Global audit export is now governed by ADR-056 and
+  implemented as `audit-events.export-global` with bounded time-windowed redacted CLI and HTTP/oRPC
+  readback. Legal hold is governed by ADR-057 and implemented through
+  `audit-events.legal-holds.configure/list/show/release`; active holds block `audit-events.prune`
+  from deleting matching rows and expose held counts. Immutable archive is governed by ADR-058 and
+  implemented through `audit-events.archives.create/list/show/prune`, including retained redacted
+  snapshots, digest metadata, archive pruning, and archive-aware source-row retention for
+  `audit-events.prune`. Domain event stream retention is now governed by ADR-059 and
+  `docs/specs/065-domain-event-stream-retention`; `domain-events.prune`,
+  `domain_event_stream_records`, prune watermark state, retained `deployments.stream-events`
+  replay/gap/follow behavior, CLI, HTTP/oRPC, operation catalog, docs registry, OpenAPI/SDK
+  metadata, and focused tests are implemented. Organization retention defaults now have ADR-060,
+  `docs/specs/066-organization-retention-defaults`, operation-map positioning, test matrix,
+  application/persistence implementation, CLI, HTTP/oRPC, public docs/help, catalog, OpenAPI/SDK
+  metadata, and focused tests. Scheduled history retention automation now has ADR-061,
+  `docs/specs/067-scheduled-history-retention-automation`, operation-map positioning, a test
+  matrix, application command-bus dispatch over existing prune commands, durable process attempt
+  visibility, disabled-by-default shell runner wiring, and focused tests. ADR-054 defines durable
+  process attempts as the current outbox/inbox-equivalent baseline, so accepted background-work
+  retention is covered by `operator-work.prune`; a separate outbox/inbox retention command is not
+  applicable unless a future ADR introduces a separate outbox/inbox store. Focused retention
+  verification passes across audit, domain event stream, provider job log, deployment log, runtime
+  log archive, retention default, scheduled history retention, and operator-work process-attempt
+  retention tests.
+- [x] Add terminal session list/show/attach/close/expire if terminal sessions remain public.
+- [x] Ensure provider/plugin/system operations expose capability details and configuration
   diagnostics without leaking provider SDK types or secrets.
 - [x] Verify CLI, HTTP/oRPC, Web, and generated MCP/tool contracts against `operation-catalog.ts`.
-- [ ] Add a published TypeScript SDK as a public operation client after the Phase 8 auth/org
+- [x] Add a published TypeScript SDK as a public operation client after the Phase 8 auth/org
   baseline: methods generated from the OpenAPI SDK contract plus Appaloft operation metadata,
   shared command/query input schemas, typed result and error handling, deploy-token/session header
   support, and no dependency on `core`, `application`, repository ports, handlers, use cases, or
   shell composition.
-- [ ] Keep SDK authentication, deploy-token, session, 401/403, and organization scope semantics
+- [x] Keep SDK authentication, deploy-token, session, 401/403, and organization scope semantics
   planned rather than published until the TypeScript SDK and interface-parity slice is accepted.
-- [ ] Flatten CLI, HTTP/oRPC, Web, SDK, and generated MCP/tool parity around the operation catalog:
+- [x] Flatten CLI, HTTP/oRPC, Web, SDK, and generated MCP/tool parity around the operation catalog:
   each public operation has one canonical schema, one docs/help anchor decision, one error contract,
   and interface-specific adapters that dispatch through command/query boundaries instead of
   duplicating business behavior.
-- [ ] Let internal black-box and smoke tests use the published SDK against a running Appaloft
+- [x] Let internal black-box and smoke tests use the published SDK against a running Appaloft
   server, while lower-level domain/application tests continue to use direct domain objects,
   handlers, use cases, buses, and testkit fixtures where that is the behavior under test.
-- [ ] Harden install/upgrade/release: migrations, backup/recovery, all-in-one packaging, binary
+- [x] Harden install/upgrade/release: migrations, backup/recovery, all-in-one packaging, binary
   release, static console asset serving, and smoke tests.
+  Release-hardening source-of-truth now has `docs/testing/release-hardening-test-matrix.md`.
+  Installer, deploy-action, static asset, binary bundle, Docker packaging, release-build workflow,
+  SDK publish, manifest/checksum, release-note, final metadata, Homebrew, and smoke command
+  contracts are covered by focused local tests. On 2026-05-12, the local release-hardening
+  contract suite passed 66 tests, the bounded PGlite persistence release-readiness slice passed
+  50 tests, and the PostgreSQL persistence integration slice passed against an isolated temporary
+  PostgreSQL 14 cluster. The Docker-backed local smoke suite passed against Colima Docker for
+  workspace commands, static, Dockerfile, prebuilt-image, and Compose methods; `bun run
+  smoke:swarm` passed 11 tests including the opt-in real Swarm apply/cleanup path after temporary
+  Swarm initialization; and `bun run smoke:install-auth` passed the opt-in self-hosted PGlite
+  install/auth/deploy-token smoke after `bun.lock` was synced. The required opt-in SSH evidence is
+  now exposed through aggregate `bun run smoke:ssh`, its `smoke:ssh:remote-state` and
+  `smoke:ssh:quick-deploy` parts, `bun run smoke:ssh:evidence` for redacted
+  `dist/release/ssh-smoke-evidence.json` capture after both SSH suites pass, per-workflow redacted
+  evidence capture for the reusable release/nightly workflows. Maintainers accepted deferring real
+  SSH smoke evidence for `0.11.0` because this local release-preparation environment has no SSH
+  target server; the release workflow keeps manual `require_ssh_remote_state_e2e` and
+  `require_ssh_quick_deploy_e2e` inputs for environments that have SSH secrets, but `v0.11.x`
+  publish runs no longer require those SSH workflows automatically. This accepted gap must be named
+  in the `0.11.0` release notes, and real SSH evidence remains required before the gap can be
+  removed in a later release.
 
 Exit criteria:
-
-- [ ] Operators can see and repair stuck work through Appaloft operations.
-- [ ] Historical attempts, logs, events, remote state backups, runtime artifacts, source
+- [x] Operators can see and repair stuck work through Appaloft operations.
+  Verified on 2026-05-12 by 53 focused operator-work tests across application, CLI, and HTTP/oRPC:
+  list/show, durable-first merge, remote-state/source-link/route/job visibility,
+  mark-recovered, dead-letter, cancel, retry, and prune all dispatch through command/query
+  boundaries and mutate only the governed durable process-attempt ledger.
+- [x] Historical attempts, logs, events, remote state backups, runtime artifacts, source
   workspaces, and build cache have documented retention/prune behavior.
-- [ ] TypeScript SDK, CLI, HTTP/oRPC, Web, and generated MCP/tool contracts are verified from the
+  Verified on 2026-05-12 by the Phase 9 retention command/spec set. Historical process attempts
+  are governed by `operator-work.prune`; embedded deployment logs by `deployments.logs.prune`;
+  provider job logs by `provider-job-logs.prune`; retained audit rows, legal holds, immutable
+  archives, and archive-aware audit prune by `audit-events.*`; retained deployment/domain events by
+  `domain-events.prune` and `deployments.stream-events` retained replay/gap behavior; Appaloft-owned
+  runtime log archive snapshots by `resources.runtime-logs.archive` and
+  `resources.runtime-log-archives.*`; runtime artifacts, source workspaces, explicit Docker build
+  cache, and unused images by `servers.capacity.prune` plus scheduled runtime prune policies; and
+  scheduled history retention by retention defaults dispatching the existing manual prune commands.
+  Remote-state backups, migration journals, and state roots are explicitly excluded from runtime
+  capacity prune and audit/log/event/process retention commands; current behavior is inspect,
+  stale-lock recovery, migration backup/restore during state sync, and safe operator-work
+  diagnostics, while standalone state-root prune or backup-delete remains a future governed
+  extension rather than an unowned retention action.
+- [x] TypeScript SDK, CLI, HTTP/oRPC, Web, and generated MCP/tool contracts are verified from the
   same operation catalog after auth/org rules are active, with no SDK-only business operations or
   transport-only business schemas.
-- [ ] Phase 9 release readiness passes the local, PGlite, PostgreSQL, Docker, and opt-in SSH smoke
-  suites required for a `0.11.0` minor release.
+  Verified on 2026-05-12 by 102 focused interface-parity tests covering operation catalog/docs
+  coverage, OpenAPI `x-appaloft-*` metadata, generated TypeScript SDK facade, SDK import boundary,
+  SDK auth/error/stream helpers, running-server SDK smoke, generated MCP descriptors, CLI/oRPC/Web
+  docs-help links, and SDK release packaging.
+- [x] Phase 9 release readiness passes the local, PGlite, PostgreSQL, Docker, and opt-in SSH smoke
+  suites required for a `0.11.0` minor release, except for the accepted deferred SSH smoke evidence
+  gap.
+  Local, PGlite, PostgreSQL, Docker-backed local, Swarm, and install-auth evidence was recorded on
+  2026-05-12. Opt-in SSH smoke is wired through aggregate `smoke:ssh`,
+  `smoke:ssh:remote-state`, `smoke:ssh:quick-deploy`, `smoke:ssh:evidence`, and per-workflow
+  evidence scripts; Release publish runs can still require both SSH reusable workflows when the
+  manual `require_ssh_*` inputs are set, and those workflows upload redacted evidence artifacts
+  after success. Real SSH smoke evidence is accepted as deferred for `0.11.0` because this local
+  release-preparation environment has no SSH target server, so no
+  `dist/release/ssh-smoke-evidence.json` evidence file has been captured for `0.11.0`.
 
 ## 1.0.0 Release Candidate
 
 Target: `1.0.0-rc`.
 
 Release rule:
-
 - [ ] Select `1.0.0-rc` only after Phase 9 is complete, no unchecked Phase 9 release blocker
   remains, and the candidate is being used for GA hardening rather than new feature scope.
 - [ ] If release-candidate verification finds feature gaps, return the gap to the owning roadmap
   phase or release a `0.11.x` patch instead of expanding `1.0.0-rc` scope.
 
 Required:
-
 - [ ] Re-run the full `1.0.0 Definition Of Done` against current implementation, specs, operation
   catalog, docs, migration gaps, and release artifacts.
 - [ ] Verify installer, upgrade, static console serving, docs packaging, CLI, HTTP/oRPC, Web,
@@ -2016,7 +2162,6 @@ Required:
   migration, and support-readiness fixes only.
 
 Exit criteria:
-
 - [ ] The release candidate can be promoted to `1.0.0` without adding new product behavior.
 - [ ] Remaining gaps are either closed or explicitly accepted as non-GA-blocking in the roadmap,
   specs, public docs, and release notes.
@@ -2024,12 +2169,10 @@ Exit criteria:
 ## 1.0.0 GA
 
 Release rule:
-
 - [ ] Select `1.0.0` only when the full `1.0.0 Definition Of Done`, every phase exit criterion, and
   every release gate item are checked.
 
 Required:
-
 - [ ] Freeze the `1.0.0` active operation catalog.
 - [ ] Close or explicitly defer every temporary implementation gap.
 - [ ] Verify every active operation has command/query docs.
@@ -2042,7 +2185,6 @@ Required:
   lifecycles, known unsupported behavior, and migration constraints.
 
 Exit criteria:
-
 - [ ] No active `1.0.0` feature relies on an undocumented migration gap.
 - [ ] New users can complete the v1 minimum loop from install to reachable deployed app and day-two
   recovery without private workarounds.
@@ -2056,11 +2198,9 @@ template-backed software as a separate deployment engine. They are not current r
 do not authorize runtime code before their own ADR/spec/test gates.
 
 Governing planning document:
-
 - [AI-Native Resource Template And MCP Roadmap](./implementation/ai-native-resource-template-roadmap.md)
 
 Roadmap principles:
-
 - [ ] Preserve Appaloft's existing Resource, Workload, ResourceInstance, ResourceBinding,
   Deployment, RuntimePlan, EnvironmentSnapshot, Provider, Strategy, Integration, Plugin, command/
   query, and operation-catalog boundaries.
@@ -2084,7 +2224,6 @@ Roadmap principles:
   runtime as long-term themes rather than initial template/MCP dependencies.
 
 Candidate sequencing:
-
 - [ ] Post-1.0 Track 1: Resource Template / Workload Profile Foundation. If maintainers deliberately
   pull this before GA, first update the version plan with an explicit pre-GA phase and explain which
   existing GA blocker is being replaced or deferred.
@@ -2109,7 +2248,6 @@ Candidate sequencing:
 
 This ledger is the horizontal closure checklist. Each resource or internal state needs the unchecked
 work below before GA.
-
 - [x] Project: `projects.create`, `projects.list`.
 - [x] Project: show, rename, archive safety, Web detail/settings closure, and
   resource/environment/deployment/access rollups.
@@ -2157,7 +2295,12 @@ work below before GA.
 - [x] Resource health policy: configure, health query.
 - [ ] Resource health policy: update/delete/reset policy, effective health observation, history.
 - [x] Runtime logs: resource logs/stream and deployment logs.
-- [ ] Runtime logs: bounded logs, unavailable-state diagnostics, retention/prune.
+- [x] Runtime logs: bounded logs, unavailable-state diagnostics, retention/prune.
+  Resource runtime logs, deployment logs, provider job log retention prune, embedded deployment log
+  prune, and Appaloft-owned resource runtime log archive/list/show/prune are covered with CLI and
+  HTTP/oRPC entrypoints, persistence tests, and safe redaction/retention boundaries. Global
+  retention defaults, domain event stream retention, outbox/inbox retention, and scheduled
+  retention automation remain under the broader audit/event retention gaps.
 - [x] Environment/resource secrets: environment set/unset variable baseline.
 - [ ] Environment/resource secrets: secret reference create/list/show/update/delete, masking,
   build/runtime scope.
@@ -2183,30 +2326,79 @@ work below before GA.
 - [x] Auth/org/team: self-hosted install can bootstrap a default admin, operators can invite or
   add team members into an organization, and project/resource access is scoped by membership before
   deployment APIs are considered production-secure.
-- [ ] TypeScript SDK and interface parity: publish `@appaloft/sdk` as an operation client over the
+- [x] TypeScript SDK and interface parity: publish `@appaloft/sdk` as an operation client over the
   authenticated HTTP/oRPC contract, keep CLI and HTTP as sibling adapters over the same
   command/query schemas, and allow internal black-box tests to use the SDK only where a running
   server boundary is the subject.
-- [ ] Product-grade preview deployment: create from PR event, list/show/update policy/delete on
+- [x] Product-grade preview deployment: create from PR event, list/show/update policy/delete on
   close, scoped env, GitHub App status/comments, and cleanup retries.
-- [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs. Spec Round
+  Spec, operation catalog, CLI, HTTP/oRPC, Web, future MCP descriptors, public docs/help, safe
+  GitHub pull-request ingestion, feedback, cleanup retry, and persistence coverage are implemented.
+  Full GitHub App installation-token onboarding, provider smoke tests, and managed-domain public
+  enablement remain future hardening/public enablement work.
+- [x] Scheduled task: create/list/show/update/delete, run now, run history/logs. Spec Round
   positioned by ADR-039 and `docs/specs/044-scheduled-task-resource-shape`.
+  Operation catalog, CLI, HTTP/oRPC, Web controls, run history/logs, scheduled runner, runtime
+  adapter, persistence, docs/help, and durable delivery handoff are implemented; the shell runner is
+  opt-in by configuration.
 - [x] Terminal session: open.
-- [ ] Terminal session: list/show/attach/close/expire, audit and redaction.
-- [ ] Outbox/inbox/job/process state: list/show/retry/cancel/dead-letter/prune, attempt ownership.
+- [x] Terminal session: active list/show/attach/close/expire and redacted metadata.
+  WebSocket attach, active lifecycle list/show/close/expire, CLI and HTTP/oRPC lifecycle surfaces,
+  operation catalog entries, docs/help, and safe metadata redaction coverage are implemented.
+- [ ] Terminal session: durable audit/history and interactive attach hardening.
+  Durable closed-session audit/history, direct CLI TTY attachment, local true PTY resize, container
+  exec, compose service shells, and Web E2E coverage stay open under the audit/event and terminal
+  workflow gaps.
+- [x] Outbox/inbox/job/process state: list/show/retry/cancel/dead-letter/prune, attempt ownership.
+  ADR-054 positions durable process delivery as the accepted baseline. Scheduled-task runs now have
+  first worker execution, atomic claims, completion, and retry-generation handoff. Scheduled
+  runtime prune now has accepted maintenance recording, atomic claim/completion handoff,
+  command-bus dispatch, retry-scheduled failure visibility, and safe persisted operator details.
+  Scheduled history retention now has command-bus dispatch through durable process attempts, and
+  the current accepted long-running workflow set has operator-visible process-attempt projection
+  plus `operator-work.*` list/show/retry/cancel/dead-letter/prune coverage. Remaining automatic
+  provider/runtime retry workers are future opt-in slices, not a separate Phase 9 release blocker.
 - [x] Remote SSH PGlite state: partial config workflow.
-- [ ] Remote SSH PGlite state: show locks/migrations/backups/recovery, retry/repair/prune.
+- [x] Remote SSH PGlite state: show locks/migrations/backups/recovery diagnostics.
+  Operator-work aggregation and SSH diagnostics producer/read-model coverage expose safe lock,
+  migration journal, backup, and recovery-marker rows without mutating remote state or leaking SSH
+  identity paths.
+- [ ] Remote SSH PGlite state: retry/repair/prune.
+  Stale-lock recovery, migration execution, backup restore, and state-root prune remain future
+  governed business operations.
 - [x] Audit/event history: event specs and partial runtime events.
-- [ ] Audit/event history: list/show/filter/export, retention and redaction.
+- [x] Audit/event history: aggregate-scoped list/show/filter/export, retention prune, and redaction.
+  `audit-events.list/show/export/prune` cover retained aggregate-scoped audit rows, bounded
+  redacted export, dry-run-first retention prune, CLI and HTTP/oRPC dispatch, persistence, and
+  public docs/help coverage.
+- [x] Audit/event history: immutable archive snapshots and archive-aware retention.
+  Global audit export is governed by ADR-056 and implemented through `audit-events.export-global`.
+  Legal hold is governed by ADR-057 and implemented through
+  `audit-events.legal-holds.configure/list/show/release` with hold-aware audit prune. Immutable
+  archive is governed by ADR-058 and implemented through
+  `audit-events.archives.create/list/show/prune` with retained redacted snapshots, digest metadata,
+  archive pruning, and archive-aware audit prune source-row retention.
+- [x] Audit/event history: organization defaults, scheduled retention automation, and current
+  outbox/inbox-equivalent retention.
+  Domain event stream retention has ADR-059, active `domain-events.prune`, feature artifacts,
+  command spec, test matrix rows, `domain_event_stream_records` retained observation store,
+  retained `deployments.stream-events` replay/gap/follow behavior, entrypoints, and focused
+  verification. Organization retention defaults have ADR-060, feature artifacts, operation-map
+  positioning, test matrix, application/persistence implementation, CLI, HTTP/oRPC, public
+  docs/help, OpenAPI/SDK metadata, and focused tests. Scheduled history retention automation has
+  ADR-061, feature artifacts, operation-map positioning, a test matrix, application service
+  dispatch, durable process attempt visibility, disabled-by-default shell runner wiring, and
+  focused tests. ADR-054 defines durable process attempts as the current outbox/inbox-equivalent
+  baseline; `operator-work.prune` covers retention for that process state. A separate outbox/inbox
+  retention command is not applicable unless a future ADR introduces a separate outbox/inbox store.
 - [x] Providers/plugins/system: list providers/plugins, doctor, db status/migrate.
-- [ ] Providers/plugins/system: show capabilities/config diagnostics, safe enable/disable only when
+- [x] Providers/plugins/system: show capabilities/config diagnostics, safe enable/disable only when
   specs exist.
 
 ## Framework And Runtime Support Checklist
 
 A framework family is first-class only when detection, planner output, Docker/OCI execution, error
 mapping, matrix rows, and Web/CLI draft parity are all checked.
-
 - [x] Container-native: Dockerfile, Compose, and prebuilt image paths exist.
 - [ ] Container-native: harden path/build-target/profile updates, Compose target service selection,
   and image digest visibility.
@@ -2261,7 +2453,6 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
 ## External Baseline Gap Checklist
 
 External baseline research points to this practical minimum:
-
 - [x] Docker substrate with Dockerfile, Compose, and prebuilt image paths.
 - [ ] Buildpack/auto-detect option with explicit plan output. The contract now has a Phase 5
   feature artifact and stable matrix ids; Code Round still needs executable preview parity.
@@ -2279,7 +2470,6 @@ External baseline research points to this practical minimum:
 ## Immediate Spec-Round Todo
 
 Recommended next Spec Rounds before broad Code Rounds:
-
 - [ ] Resource profile lifecycle: reset/delete policy semantics and remaining profile/config drift
   redaction coverage after source/runtime/network/access profile configuration. Resource profile
   drift visibility now has a Spec Round artifact at

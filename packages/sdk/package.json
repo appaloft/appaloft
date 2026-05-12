@@ -1,0 +1,36 @@
+{
+  "name": "@appaloft/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript operation client for the Appaloft HTTP API.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@appaloft/application": "workspace:*",
+    "@appaloft/core": "workspace:*",
+    "@appaloft/openapi": "workspace:*",
+    "@appaloft/orpc": "workspace:*",
+    "@appaloft/sdk-generator": "workspace:*",
+    "elysia": "^1.4.28"
+  },
+  "scripts": {
+    "build": "bun run generate:operations && bun build src/index.ts src/generated-operations.ts --target node --format esm --packages external --outdir dist && tsc -p tsconfig.build.json",
+    "generate:operations": "bun run ../../scripts/release/generate-typescript-sdk-operations.ts",
+    "lint": "biome check package.json tsconfig.json tsconfig.build.json src/index.ts test",
+    "test": "bun test",
+    "typecheck": "tsgo -p tsconfig.json --noEmit --checkers 4"
+  }
+}

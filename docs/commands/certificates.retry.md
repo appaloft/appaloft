@@ -31,10 +31,15 @@ The command must:
 5. Reject duplicate in-flight retry attempts for the same reason unless idempotency matches.
 6. Dispatch the same issue/renew use-case path with the failed attempt's reason, provider key, and
    challenge type.
-7. Persist a new attempt and publish `certificate-requested`.
+7. Persist a new attempt, publish `certificate-requested`, and mirror the accepted attempt through
+   the `certificates.issue-or-renew` durable process-attempt projection with safe certificate
+   context.
 8. Return `ok({ certificateId, attemptId })`.
 
 Retry must not replay old events and must not retry domain ownership verification.
+It does not create a separate `certificates.retry` process-attempt worker binding; operator work
+shows the retry-created certificate attempt under the delegated `certificates.issue-or-renew`
+operation key.
 
 ## Domain-Specific Error Codes
 

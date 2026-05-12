@@ -39,8 +39,10 @@ import {
   type EventBus,
   type IdGenerator,
   type ManagedRedisProviderPort,
+  type ProcessAttemptRecorder,
   type ProjectRepository,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type ProvisionRedisDependencyResourceCommandInput } from "./provision-redis-dependency-resource.command";
@@ -109,6 +111,8 @@ export class ProvisionRedisDependencyResourceUseCase {
     private readonly logger: AppLogger,
     @inject(tokens.managedRedisProvider)
     private readonly managedRedisProvider: ManagedRedisProviderPort,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
@@ -125,6 +129,7 @@ export class ProvisionRedisDependencyResourceUseCase {
       idGenerator,
       logger,
       managedRedisProvider,
+      processAttemptRecorder,
       projectRepository,
     } = this;
 
@@ -229,6 +234,12 @@ export class ProvisionRedisDependencyResourceUseCase {
         dependencyResource,
         UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
       );
+      await recordManagedRedisRealizationProcessAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        context,
+        dependencyResource,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, dependencyResource, undefined);
 
       const realization = await managedRedisProvider.realize(context, {
@@ -312,9 +323,75 @@ export class ProvisionRedisDependencyResourceUseCase {
         dependencyResource,
         UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
       );
+      await recordManagedRedisRealizationProcessAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        context,
+        dependencyResource,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, dependencyResource, undefined);
 
       return ok({ id: dependencyResourceId.value });
     });
   }
+}
+
+async function recordManagedRedisRealizationProcessAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  context: ExecutionContext;
+  dependencyResource: ResourceInstance;
+}): Promise<void> {
+  const state = input.dependencyResource.toState();
+  const realization = state.providerRealization;
+  if (!realization) {
+    return;
+  }
+  const realizationStatus = realization.status.value;
+  const status =
+    realizationStatus === "pending"
+      ? "running"
+      : realizationStatus === "failed"
+        ? "failed"
+        : "succeeded";
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: realization.attemptId.value,
+    kind: "system",
+    status,
+    operationKey: "dependency-resources.provision-redis",
+    dedupeKey: `dependency-resource-realization:${state.id.value}:${realization.attemptId.value}`,
+    correlationId: input.context.requestId,
+    requestId: input.context.requestId,
+    phase: "dependency-resource-realization",
+    step: realizationStatus,
+    ...(state.projectId ? { projectId: state.projectId.value } : {}),
+    startedAt: realization.attemptedAt.value,
+    updatedAt:
+      realization.realizedAt?.value ?? realization.failedAt?.value ?? realization.attemptedAt.value,
+    ...(status !== "running"
+      ? {
+          finishedAt:
+            realization.realizedAt?.value ??
+            realization.failedAt?.value ??
+            realization.attemptedAt.value,
+        }
+      : {}),
+    ...(realization.failureCode
+      ? {
+          errorCode: realization.failureCode.value,
+          errorCategory: "async-processing",
+          retriable: true,
+        }
+      : {}),
+    nextActions: status === "failed" ? ["diagnostic", "manual-review"] : ["no-action"],
+    safeDetails: {
+      dependencyResourceId: state.id.value,
+      dependencyKind: state.kind.value,
+      providerKey: state.providerKey.value,
+      providerManaged: state.providerManaged === true,
+      realizationStatus,
+    },
+  });
+
+  void result;
 }

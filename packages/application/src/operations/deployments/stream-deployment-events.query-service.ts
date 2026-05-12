@@ -15,6 +15,7 @@ import {
   type DeploymentEventStream,
   type DeploymentEventStreamEnvelope,
   type DeploymentReadModel,
+  type DomainEventStreamObservationReader,
   type StreamDeploymentEventsResult,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -88,6 +89,8 @@ export class StreamDeploymentEventsQueryService {
     private readonly deploymentReadModel: DeploymentReadModel,
     @inject(tokens.deploymentEventObserver)
     private readonly deploymentEventObserver: DeploymentEventObserver,
+    @inject(tokens.domainEventStreamObservationReader)
+    private readonly domainEventStreamObservationReader?: DomainEventStreamObservationReader,
   ) {}
 
   async execute(
@@ -105,6 +108,53 @@ export class StreamDeploymentEventsQueryService {
     }
 
     const signal = query.signal ?? new AbortController().signal;
+
+    if (this.domainEventStreamObservationReader) {
+      const retainedRequest = {
+        deploymentId: deployment.id,
+        historyLimit: query.historyLimit,
+        includeHistory: query.includeHistory,
+        untilTerminal: query.untilTerminal,
+        ...(query.cursor ? { cursor: query.cursor } : {}),
+      };
+      const replayed = await (query.follow
+        ? this.domainEventStreamObservationReader.openDeploymentEventStream(
+            repositoryContext,
+            retainedRequest,
+            signal,
+          )
+        : this.domainEventStreamObservationReader.replayDeploymentEvents(
+            repositoryContext,
+            retainedRequest,
+          ));
+
+      if (replayed.isErr()) {
+        return err(
+          withStreamDeploymentEventDetails(replayed.error, {
+            phase: String(replayed.error.details?.phase ?? "event-source-load"),
+            deploymentId: query.deploymentId,
+            ...(query.cursor ? { cursor: query.cursor } : {}),
+          }),
+        );
+      }
+
+      if ("available" in replayed.value && replayed.value.available) {
+        return ok({
+          mode: "bounded",
+          deploymentId: deployment.id,
+          envelopes: replayed.value.envelopes,
+        });
+      }
+
+      if (!("available" in replayed.value)) {
+        return ok({
+          mode: "stream",
+          deploymentId: deployment.id,
+          stream: replayed.value,
+        });
+      }
+    }
+
     const opened = await this.deploymentEventObserver.open(
       context,
       { deployment },

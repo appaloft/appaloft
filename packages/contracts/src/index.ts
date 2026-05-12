@@ -208,6 +208,25 @@ export const removeOrganizationMemberResponseSchema = z.object({
   removedAt: z.string(),
 });
 
+export const systemCapabilityDetailSchema = z.object({
+  key: z.string(),
+  title: z.string(),
+  enabled: z.boolean(),
+  description: z.string().optional(),
+});
+
+export const systemConfigurationDiagnosticSchema = z.object({
+  code: z.string(),
+  severity: z.enum(["info", "warning", "error"]),
+  message: z.string(),
+  documentationHref: z.string().optional(),
+});
+
+export const systemConfigurationSummarySchema = z.object({
+  status: z.enum(["configured", "not-configured", "partial", "unknown"]),
+  diagnostics: z.array(systemConfigurationDiagnosticSchema),
+});
+
 export const pluginSummarySchema = z.object({
   name: z.string(),
   displayName: z.string().optional(),
@@ -215,7 +234,9 @@ export const pluginSummarySchema = z.object({
   version: z.string(),
   kind: z.enum(["user-extension", "system-extension"]),
   capabilities: z.array(z.string()),
+  capabilityDetails: z.array(systemCapabilityDetailSchema).optional(),
   compatible: z.boolean(),
+  configuration: systemConfigurationSummarySchema.optional(),
 });
 
 export const systemPluginWebExtensionSchema = z.object({
@@ -594,6 +615,251 @@ export const serverDetailSchema = z.object({
 });
 
 export const showServerResponseSchema = serverDetailSchema;
+
+export const inspectServerCapacityInputSchema = z.object({
+  serverId: z.string().min(1),
+});
+
+export const runtimeTargetCapacityWarningSchema = z.object({
+  code: z.enum([
+    "full-disk",
+    "high-disk-usage",
+    "high-inode-usage",
+    "docker-unavailable",
+    "timeout",
+    "partial-diagnostic",
+    "unsupported-provider",
+    "audit-record-failed",
+  ]),
+  message: z.string(),
+  path: z.string().optional(),
+  mount: z.string().optional(),
+  resource: z.enum(["disk", "inode", "docker", "memory", "cpu", "appaloft-runtime"]).optional(),
+});
+
+export const runtimeTargetDiskCapacitySchema = z.object({
+  path: z.string(),
+  mount: z.string(),
+  size: z.number(),
+  used: z.number(),
+  available: z.number(),
+  usePercent: z.number(),
+});
+
+export const runtimeTargetInodeCapacitySchema = z.object({
+  path: z.string(),
+  mount: z.string(),
+  used: z.number(),
+  free: z.number(),
+  usePercent: z.number(),
+});
+
+export const runtimeTargetDockerCapacitySchema = z.object({
+  imagesSize: z.number(),
+  reclaimableImagesSize: z.number(),
+  buildCacheSize: z.number(),
+  reclaimableBuildCacheSize: z.number(),
+  containersSize: z.number(),
+  volumesSize: z.number(),
+});
+
+export const runtimeTargetMemoryCapacitySchema = z.object({
+  total: z.number().nullable(),
+  available: z.number().nullable(),
+  used: z.number().nullable(),
+  usePercent: z.number().nullable(),
+});
+
+export const runtimeTargetCpuCapacitySchema = z.object({
+  logicalCores: z.number().nullable(),
+  loadAverage1m: z.number().nullable(),
+  loadAverage5m: z.number().nullable(),
+  loadAverage15m: z.number().nullable(),
+});
+
+export const runtimeTargetAppaloftCapacitySchema = z.object({
+  runtimeRoot: z.object({
+    path: z.string(),
+    size: z.number().nullable(),
+    detectable: z.boolean(),
+  }),
+  stateRoot: z.object({
+    path: z.string(),
+    size: z.number().nullable(),
+    detectable: z.boolean(),
+  }),
+  sourceWorkspace: z.object({
+    path: z.string(),
+    size: z.number().nullable(),
+    detectable: z.boolean(),
+  }),
+});
+
+export const runtimeTargetSafeReclaimableEstimateSchema = z.object({
+  stoppedContainersSize: z.number(),
+  danglingImagesSize: z.number(),
+  oldBuildCacheSize: z.number(),
+  oldPreviewWorkspaceCandidatesSize: z.number(),
+  total: z.number(),
+});
+
+export const inspectServerCapacityResponseSchema = z.object({
+  schemaVersion: z.literal("servers.capacity.inspect/v1"),
+  server: z.object({
+    id: z.string(),
+    name: z.string(),
+    host: z.string(),
+    port: z.number(),
+    providerKey: z.string(),
+    targetKind: z.string(),
+  }),
+  inspectedAt: z.string(),
+  disk: z.array(runtimeTargetDiskCapacitySchema),
+  inodes: z.array(runtimeTargetInodeCapacitySchema),
+  docker: runtimeTargetDockerCapacitySchema,
+  memory: runtimeTargetMemoryCapacitySchema,
+  cpu: runtimeTargetCpuCapacitySchema,
+  appaloftRuntime: runtimeTargetAppaloftCapacitySchema,
+  safeReclaimableEstimate: runtimeTargetSafeReclaimableEstimateSchema,
+  warnings: z.array(runtimeTargetCapacityWarningSchema),
+  partial: z.boolean(),
+});
+
+export const runtimeTargetPruneCategorySchema = z.enum([
+  "stopped-containers",
+  "preview-workspaces",
+  "source-workspaces",
+  "docker-build-cache",
+  "unused-images",
+]);
+
+export const runtimeTargetCapacityPruneCandidateSchema = z.object({
+  id: z.string(),
+  category: runtimeTargetPruneCategorySchema,
+  target: z.string(),
+  updatedAt: z.string().nullable(),
+  size: z.number().nullable(),
+  action: z.enum(["matched", "pruned", "skipped", "excluded"]),
+  skippedReason: z
+    .enum([
+      "active-runtime",
+      "rollback-candidate",
+      "cutoff-not-reached",
+      "ownership-unproven",
+      "unsupported-category",
+      "volume-excluded",
+      "state-root-excluded",
+      "remote-state-excluded",
+      "safety-evidence-missing",
+    ])
+    .optional(),
+});
+
+export const runtimeTargetCapacityPruneSummarySchema = z.object({
+  inspectedCount: z.number(),
+  matchedCount: z.number(),
+  prunedCount: z.number(),
+  skippedCount: z.number(),
+  excludedCount: z.number(),
+  reclaimedBytes: z.number(),
+});
+
+export const pruneServerCapacityResponseSchema = z.object({
+  schemaVersion: z.literal("servers.capacity.prune/v1"),
+  server: z.object({
+    id: z.string(),
+    name: z.string(),
+    host: z.string(),
+    port: z.number(),
+    providerKey: z.string(),
+    targetKind: z.string(),
+  }),
+  before: z.string(),
+  categories: z.array(runtimeTargetPruneCategorySchema),
+  dryRun: z.boolean(),
+  prunedAt: z.string(),
+  summary: runtimeTargetCapacityPruneSummarySchema,
+  candidates: z.array(runtimeTargetCapacityPruneCandidateSchema),
+  warnings: z.array(runtimeTargetCapacityWarningSchema),
+});
+
+export const scheduledRuntimePrunePolicyScopeSchema = z.enum([
+  "defaults",
+  "system",
+  "organization",
+  "project",
+  "environment",
+  "deployment-snapshot",
+]);
+
+export const scheduledRuntimePrunePolicyReadSchema = z.object({
+  schemaVersion: z.literal("scheduled-runtime-prune-policies.policy/v1"),
+  id: z.string(),
+  version: z.string(),
+  scope: scheduledRuntimePrunePolicyScopeSchema,
+  serverId: z.string(),
+  retentionDays: z.number(),
+  destructive: z.boolean(),
+  categories: z.array(runtimeTargetPruneCategorySchema),
+  categoryCount: z.number(),
+  retryOnFailure: z.boolean(),
+  enabled: z.boolean(),
+  updatedAt: z.string(),
+});
+
+export const configureScheduledRuntimePrunePolicyResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const listScheduledRuntimePrunePoliciesResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-runtime-prune-policies.list/v1"),
+  items: z.array(scheduledRuntimePrunePolicyReadSchema),
+});
+
+export const showScheduledRuntimePrunePolicyResponseSchema = z.object({
+  schemaVersion: z.literal("scheduled-runtime-prune-policies.show/v1"),
+  policy: scheduledRuntimePrunePolicyReadSchema.nullable(),
+});
+
+export const retentionDefaultScopeSchema = z.enum(["organization", "system"]);
+
+export const retentionDefaultCategorySchema = z.enum([
+  "audit-rows",
+  "deployment-logs",
+  "domain-event-streams",
+  "process-attempts",
+  "provider-job-logs",
+  "resource-runtime-log-archives",
+]);
+
+export const retentionDefaultReadSchema = z.object({
+  schemaVersion: z.literal("retention-defaults.policy/v1"),
+  id: z.string(),
+  scope: retentionDefaultScopeSchema,
+  organizationId: z.string().optional(),
+  category: retentionDefaultCategorySchema,
+  retentionDays: z.number(),
+  dryRunSchedulingEnabled: z.boolean(),
+  destructiveSchedulingEnabled: z.boolean(),
+  enabled: z.boolean(),
+  updatedAt: z.string(),
+  updatedByActorId: z.string().optional(),
+  updatedByActorKind: z.enum(["deploy-token", "system", "user"]).optional(),
+});
+
+export const configureRetentionDefaultsResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const listRetentionDefaultsResponseSchema = z.object({
+  schemaVersion: z.literal("retention-defaults.list/v1"),
+  items: z.array(retentionDefaultReadSchema),
+});
+
+export const showRetentionDefaultResponseSchema = z.object({
+  schemaVersion: z.literal("retention-defaults.show/v1"),
+  policy: retentionDefaultReadSchema.nullable(),
+});
 
 export const serverConnectivityCheckSchema = z.object({
   name: z.string(),
@@ -1917,6 +2183,327 @@ export const showSourceEventResponseSchema = z.object({
   receivedAt: z.string(),
 });
 
+const auditEventPayloadValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.string()).readonly(),
+]);
+
+export const listAuditEventsInputSchema = z.object({
+  aggregateId: z.string().min(1).optional(),
+  eventType: z.string().min(1).optional(),
+  limit: z.number().int().positive().max(100).optional(),
+  cursor: z.string().min(1).optional(),
+});
+
+export const showAuditEventInputSchema = z.object({
+  auditEventId: z.string().min(1),
+  aggregateId: z.string().min(1).optional(),
+});
+
+export const exportAuditEventsInputSchema = z.object({
+  aggregateId: z.string().min(1).optional(),
+  eventType: z.string().min(1).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  limit: z.coerce.number().int().positive().max(500).default(100),
+});
+
+export const exportGlobalAuditEventsInputSchema = z.object({
+  aggregateId: z.string().min(1).optional(),
+  eventType: z.string().min(1).optional(),
+  from: z.string(),
+  to: z.string(),
+  limit: z.coerce.number().int().positive().max(500).default(100),
+});
+
+export const pruneAuditEventsInputSchema = z.object({
+  before: z.string(),
+  aggregateId: z.string().min(1).optional(),
+  eventType: z.string().min(1).optional(),
+  dryRun: z.boolean().default(true),
+});
+
+export const createAuditEventArchiveInputSchema = z.object({
+  reason: z.string().min(1),
+  aggregateId: z.string().min(1).optional(),
+  eventType: z.string().min(1).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  limit: z.coerce.number().int().positive().max(500).default(100),
+  retainSourceRows: z.boolean().default(false),
+});
+
+export const listAuditEventArchivesInputSchema = z.object({
+  aggregateId: z.string().min(1).optional(),
+  eventType: z.string().min(1).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  limit: z.coerce.number().int().positive().max(100).default(50),
+  cursor: z.string().min(1).optional(),
+});
+
+export const showAuditEventArchiveInputSchema = z.object({
+  archiveId: z.string().min(1),
+});
+
+export const pruneAuditEventArchivesInputSchema = z.object({
+  before: z.string(),
+  aggregateId: z.string().min(1).optional(),
+  eventType: z.string().min(1).optional(),
+  dryRun: z.boolean().default(true),
+});
+
+export const auditEventLegalHoldStatusSchema = z.enum(["active", "released"]);
+
+export const configureAuditEventLegalHoldInputSchema = z.object({
+  reason: z.string().min(1),
+  aggregateId: z.string().min(1).optional(),
+  eventType: z.string().min(1).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  requestedBy: z.string().min(1).optional(),
+});
+
+export const releaseAuditEventLegalHoldInputSchema = z.object({
+  holdId: z.string().min(1),
+  releaseReason: z.string().min(1),
+  releasedBy: z.string().min(1).optional(),
+});
+
+export const listAuditEventLegalHoldsInputSchema = z.object({
+  status: auditEventLegalHoldStatusSchema.optional(),
+  aggregateId: z.string().min(1).optional(),
+  eventType: z.string().min(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(50),
+  cursor: z.string().min(1).optional(),
+});
+
+export const showAuditEventLegalHoldInputSchema = z.object({
+  holdId: z.string().min(1),
+});
+
+export const pruneProviderJobLogsInputSchema = z.object({
+  before: z.string(),
+  deploymentId: z.string().min(1).optional(),
+  providerKey: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  serverId: z.string().min(1).optional(),
+  dryRun: z.boolean().default(true),
+});
+
+export const auditEventSummarySchema = z.object({
+  auditEventId: z.string(),
+  aggregateId: z.string(),
+  eventType: z.string(),
+  createdAt: z.string(),
+});
+
+export const auditEventDetailSchema = auditEventSummarySchema.extend({
+  payload: z.record(z.string(), auditEventPayloadValueSchema),
+  redactedFields: z.array(z.string()),
+});
+
+export const listAuditEventsResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.list/v1"),
+  items: z.array(auditEventSummarySchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const showAuditEventResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.show/v1"),
+  event: auditEventDetailSchema,
+});
+
+export const exportAuditEventsResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.export/v1"),
+  aggregateId: z.string(),
+  filters: z.object({
+    eventType: z.string().optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    limit: z.number(),
+  }),
+  items: z.array(auditEventDetailSchema),
+  itemCount: z.number(),
+  truncated: z.boolean(),
+  generatedAt: z.string(),
+});
+
+export const exportGlobalAuditEventsResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.export-global/v1"),
+  filters: z.object({
+    aggregateId: z.string().optional(),
+    eventType: z.string().optional(),
+    from: z.string(),
+    to: z.string(),
+    limit: z.number(),
+  }),
+  items: z.array(auditEventDetailSchema),
+  itemCount: z.number(),
+  truncated: z.boolean(),
+  generatedAt: z.string(),
+});
+
+export const pruneAuditEventsResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.prune/v1"),
+  before: z.string(),
+  aggregateId: z.string().optional(),
+  eventType: z.string().optional(),
+  dryRun: z.boolean(),
+  matchedCount: z.number(),
+  prunedCount: z.number(),
+  heldCount: z.number(),
+  archiveRetainedCount: z.number(),
+  countsByEventType: z.record(z.string(), z.number()),
+  heldCountsByEventType: z.record(z.string(), z.number()),
+  archiveRetainedCountsByEventType: z.record(z.string(), z.number()),
+  activeHoldIds: z.array(z.string()),
+  activeArchiveIds: z.array(z.string()),
+  prunedAt: z.string(),
+});
+
+export const auditEventArchiveSourceSchema = z.union([
+  z.object({
+    kind: z.literal("aggregate"),
+    aggregateId: z.string(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal("global-window"),
+    from: z.string(),
+    to: z.string(),
+    aggregateId: z.string().optional(),
+  }),
+]);
+
+export const auditEventArchiveSchema = z.object({
+  archiveId: z.string(),
+  archiveSchemaVersion: z.literal("audit-events.archive/v1"),
+  source: auditEventArchiveSourceSchema,
+  eventType: z.string().optional(),
+  reason: z.string(),
+  itemCount: z.number(),
+  truncated: z.boolean(),
+  contentDigest: z.string(),
+  retainSourceRows: z.boolean(),
+  createdAt: z.string(),
+});
+
+export const auditEventArchiveResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.archives.archive/v1"),
+  archive: auditEventArchiveSchema,
+});
+
+export const listAuditEventArchivesResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.archives.list/v1"),
+  items: z.array(auditEventArchiveSchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const showAuditEventArchiveResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.archives.show/v1"),
+  archive: auditEventArchiveSchema.extend({
+    items: z.array(auditEventDetailSchema),
+  }),
+  generatedAt: z.string(),
+});
+
+export const pruneAuditEventArchivesResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.archives.prune/v1"),
+  before: z.string(),
+  aggregateId: z.string().optional(),
+  eventType: z.string().optional(),
+  dryRun: z.boolean(),
+  matchedCount: z.number(),
+  prunedCount: z.number(),
+  countsBySourceKind: z.record(z.string(), z.number()),
+  countsByEventType: z.record(z.string(), z.number()),
+  prunedAt: z.string(),
+});
+
+export const auditEventLegalHoldScopeSchema = z.union([
+  z.object({
+    kind: z.literal("aggregate"),
+    aggregateId: z.string(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal("global-window"),
+    from: z.string().optional(),
+    to: z.string().optional(),
+  }),
+]);
+
+export const auditEventLegalHoldSchema = z.object({
+  holdId: z.string(),
+  status: auditEventLegalHoldStatusSchema,
+  scope: auditEventLegalHoldScopeSchema,
+  eventType: z.string().optional(),
+  reason: z.string(),
+  requestedBy: z.string().optional(),
+  createdAt: z.string(),
+  releasedAt: z.string().optional(),
+  releaseReason: z.string().optional(),
+  releasedBy: z.string().optional(),
+});
+
+export const auditEventLegalHoldResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.legal-holds.hold/v1"),
+  hold: auditEventLegalHoldSchema,
+});
+
+export const listAuditEventLegalHoldsResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.legal-holds.list/v1"),
+  items: z.array(auditEventLegalHoldSchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const showAuditEventLegalHoldResponseSchema = z.object({
+  schemaVersion: z.literal("audit-events.legal-holds.show/v1"),
+  hold: auditEventLegalHoldSchema,
+  generatedAt: z.string(),
+});
+
+export const pruneProviderJobLogsResponseSchema = z.object({
+  schemaVersion: z.literal("provider-job-logs.prune/v1"),
+  before: z.string(),
+  deploymentId: z.string().optional(),
+  providerKey: z.string().optional(),
+  resourceId: z.string().optional(),
+  serverId: z.string().optional(),
+  dryRun: z.boolean(),
+  matchedCount: z.number(),
+  prunedCount: z.number(),
+  countsByProviderKey: z.record(z.string(), z.number()),
+  prunedAt: z.string(),
+});
+
+export const pruneDomainEventsResponseSchema = z.object({
+  schemaVersion: z.literal("domain-events.prune/v1"),
+  before: z.string(),
+  eventType: z.string().optional(),
+  aggregateId: z.string().optional(),
+  aggregateType: z.string().optional(),
+  deploymentId: z.string().optional(),
+  limit: z.number().optional(),
+  dryRun: z.boolean(),
+  inspectedCount: z.number(),
+  candidateCount: z.number(),
+  prunedCount: z.number(),
+  skippedCount: z.number(),
+  countsByEventType: z.record(z.string(), z.number()),
+  skippedCountsByReason: z.record(z.string(), z.number()),
+  prunedAt: z.string(),
+});
+
 export const previewEnvironmentStatusSchema = z.enum(["active", "cleanup-requested"]);
 
 export const previewEnvironmentSourceSummarySchema = z.object({
@@ -3197,6 +3784,46 @@ export const showOperatorWorkResponseSchema = z.object({
   generatedAt: z.string(),
 });
 
+export const markOperatorWorkRecoveredResponseSchema = z.object({
+  workId: z.string(),
+  status: z.literal("succeeded"),
+  recoveredAt: z.string(),
+});
+
+export const deadLetterOperatorWorkResponseSchema = z.object({
+  workId: z.string(),
+  status: z.literal("dead-lettered"),
+  deadLetteredAt: z.string(),
+});
+
+export const cancelOperatorWorkResponseSchema = z.object({
+  workId: z.string(),
+  status: z.literal("canceled"),
+  canceledAt: z.string(),
+});
+
+export const retryOperatorWorkResponseSchema = z.object({
+  workId: z.string(),
+  status: z.literal("pending"),
+  retryOfWorkId: z.string(),
+  retriedAt: z.string(),
+});
+
+export const pruneOperatorWorkResponseSchema = z.object({
+  prunedCount: z.number(),
+  matchedCount: z.number(),
+  dryRun: z.boolean(),
+  before: z.string(),
+  statuses: z.array(z.enum(["succeeded", "failed", "canceled", "dead-lettered"])),
+  countsByStatus: z.object({
+    succeeded: z.number().optional(),
+    failed: z.number().optional(),
+    canceled: z.number().optional(),
+    "dead-lettered": z.number().optional(),
+  }),
+  prunedAt: z.string(),
+});
+
 export const deploymentDetailSummarySchema = deploymentSummarySchema.omit({
   logs: true,
 });
@@ -3678,6 +4305,19 @@ export const deploymentLogsResponseSchema = z.object({
   logs: z.array(deploymentLogEntrySchema),
 });
 
+export const pruneDeploymentLogsResponseSchema = z.object({
+  schemaVersion: z.literal("deployments.logs.prune/v1"),
+  before: z.string(),
+  deploymentId: z.string().optional(),
+  resourceId: z.string().optional(),
+  serverId: z.string().optional(),
+  dryRun: z.boolean(),
+  matchedCount: z.number(),
+  prunedCount: z.number(),
+  affectedDeploymentCount: z.number(),
+  prunedAt: z.string(),
+});
+
 export const scheduledTaskRunStatusSchema = z.enum([
   "accepted",
   "running",
@@ -3891,6 +4531,54 @@ export const resourceRuntimeLogsResponseSchema = z.object({
   logs: z.array(resourceRuntimeLogLineSchema),
 });
 
+export const resourceRuntimeLogArchiveSummarySchema = z.object({
+  archiveId: z.string(),
+  resourceId: z.string(),
+  deploymentId: z.string().optional(),
+  serverId: z.string().optional(),
+  serviceName: z.string().optional(),
+  runtimeKind: z.string().optional(),
+  capturedAt: z.string(),
+  lineCount: z.number(),
+  retentionStatus: z.literal("retained"),
+  reason: z.string().optional(),
+});
+
+export const resourceRuntimeLogArchiveDetailSchema = resourceRuntimeLogArchiveSummarySchema.extend({
+  lines: z.array(resourceRuntimeLogLineSchema),
+});
+
+export const archiveResourceRuntimeLogsResponseSchema = z.object({
+  schemaVersion: z.literal("resources.runtime-logs.archive/v1"),
+  archive: resourceRuntimeLogArchiveDetailSchema,
+});
+
+export const listResourceRuntimeLogArchivesResponseSchema = z.object({
+  schemaVersion: z.literal("resources.runtime-log-archives.list/v1"),
+  items: z.array(resourceRuntimeLogArchiveSummarySchema),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const showResourceRuntimeLogArchiveResponseSchema = z.object({
+  schemaVersion: z.literal("resources.runtime-log-archives.show/v1"),
+  archive: resourceRuntimeLogArchiveDetailSchema,
+});
+
+export const pruneResourceRuntimeLogArchivesResponseSchema = z.object({
+  schemaVersion: z.literal("resources.runtime-log-archives.prune/v1"),
+  before: z.string(),
+  resourceId: z.string().optional(),
+  deploymentId: z.string().optional(),
+  serverId: z.string().optional(),
+  serviceName: z.string().optional(),
+  dryRun: z.boolean(),
+  matchedCount: z.number(),
+  prunedCount: z.number(),
+  affectedResourceCount: z.number(),
+  prunedAt: z.string(),
+});
+
 export const deploymentEventStreamResponseSchema = z.object({
   deploymentId: z.string(),
   envelopes: z.array(deploymentEventStreamEnvelopeSchema),
@@ -3918,6 +4606,31 @@ export const terminalSessionDescriptorSchema = z.object({
   providerKey: z.string(),
   workingDirectory: z.string().optional(),
   createdAt: z.string(),
+});
+
+export const terminalSessionSummarySchema = terminalSessionDescriptorSchema.extend({
+  status: z.enum(["active", "closing"]),
+});
+
+export const listTerminalSessionsResponseSchema = z.object({
+  schemaVersion: z.literal("terminal-sessions.list/v1"),
+  items: z.array(terminalSessionSummarySchema),
+});
+
+export const showTerminalSessionResponseSchema = z.object({
+  schemaVersion: z.literal("terminal-sessions.show/v1"),
+  item: terminalSessionSummarySchema,
+});
+
+export const closeTerminalSessionResponseSchema = z.object({
+  sessionId: z.string(),
+  closed: z.boolean(),
+  status: z.literal("closed"),
+});
+
+export const expireTerminalSessionsResponseSchema = z.object({
+  expiredCount: z.number().int().nonnegative(),
+  sessionIds: z.array(z.string()),
 });
 
 export const terminalSessionFrameSchema = z.discriminatedUnion("kind", [
@@ -4185,6 +4898,8 @@ export const providerDescriptorSchema = z.object({
   title: z.string(),
   category: z.enum(["cloud-provider", "deploy-target", "infra-service"]),
   capabilities: z.array(z.string()),
+  capabilityDetails: z.array(systemCapabilityDetailSchema).optional(),
+  configuration: systemConfigurationSummarySchema.optional(),
 });
 
 export const listProvidersResponseSchema = z.object({
@@ -4277,6 +4992,29 @@ export type RegisterServerResponse = z.infer<typeof registerServerResponseSchema
 export type ListServersResponse = z.infer<typeof listServersResponseSchema>;
 export type ServerDetail = z.infer<typeof serverDetailSchema>;
 export type ShowServerResponse = z.infer<typeof showServerResponseSchema>;
+export type InspectServerCapacityResponse = z.infer<typeof inspectServerCapacityResponseSchema>;
+export type PruneServerCapacityResponse = z.infer<typeof pruneServerCapacityResponseSchema>;
+export type ScheduledRuntimePrunePolicyScope = z.infer<
+  typeof scheduledRuntimePrunePolicyScopeSchema
+>;
+export type ScheduledRuntimePrunePolicyRead = z.infer<typeof scheduledRuntimePrunePolicyReadSchema>;
+export type ConfigureScheduledRuntimePrunePolicyResponse = z.infer<
+  typeof configureScheduledRuntimePrunePolicyResponseSchema
+>;
+export type ListScheduledRuntimePrunePoliciesResponse = z.infer<
+  typeof listScheduledRuntimePrunePoliciesResponseSchema
+>;
+export type ShowScheduledRuntimePrunePolicyResponse = z.infer<
+  typeof showScheduledRuntimePrunePolicyResponseSchema
+>;
+export type RetentionDefaultScope = z.infer<typeof retentionDefaultScopeSchema>;
+export type RetentionDefaultCategory = z.infer<typeof retentionDefaultCategorySchema>;
+export type RetentionDefaultRead = z.infer<typeof retentionDefaultReadSchema>;
+export type ConfigureRetentionDefaultsResponse = z.infer<
+  typeof configureRetentionDefaultsResponseSchema
+>;
+export type ListRetentionDefaultsResponse = z.infer<typeof listRetentionDefaultsResponseSchema>;
+export type ShowRetentionDefaultResponse = z.infer<typeof showRetentionDefaultResponseSchema>;
 export type RenameServerResponse = z.infer<typeof renameServerResponseSchema>;
 export type ConfigureServerEdgeProxyResponse = z.infer<
   typeof configureServerEdgeProxyResponseSchema
@@ -4575,6 +5313,24 @@ export type OperatorWorkNextAction = z.infer<typeof operatorWorkNextActionSchema
 export type OperatorWorkItem = z.infer<typeof operatorWorkItemSchema>;
 export type ListOperatorWorkResponse = z.infer<typeof listOperatorWorkResponseSchema>;
 export type ShowOperatorWorkResponse = z.infer<typeof showOperatorWorkResponseSchema>;
+export type RetryOperatorWorkResponse = z.infer<typeof retryOperatorWorkResponseSchema>;
+export type PruneOperatorWorkResponse = z.infer<typeof pruneOperatorWorkResponseSchema>;
+export type ExportAuditEventsResponse = z.infer<typeof exportAuditEventsResponseSchema>;
+export type ExportGlobalAuditEventsResponse = z.infer<typeof exportGlobalAuditEventsResponseSchema>;
+export type PruneAuditEventsResponse = z.infer<typeof pruneAuditEventsResponseSchema>;
+export type AuditEventArchive = z.infer<typeof auditEventArchiveSchema>;
+export type AuditEventArchiveResponse = z.infer<typeof auditEventArchiveResponseSchema>;
+export type ListAuditEventArchivesResponse = z.infer<typeof listAuditEventArchivesResponseSchema>;
+export type ShowAuditEventArchiveResponse = z.infer<typeof showAuditEventArchiveResponseSchema>;
+export type PruneAuditEventArchivesResponse = z.infer<typeof pruneAuditEventArchivesResponseSchema>;
+export type AuditEventLegalHold = z.infer<typeof auditEventLegalHoldSchema>;
+export type AuditEventLegalHoldResponse = z.infer<typeof auditEventLegalHoldResponseSchema>;
+export type ListAuditEventLegalHoldsResponse = z.infer<
+  typeof listAuditEventLegalHoldsResponseSchema
+>;
+export type ShowAuditEventLegalHoldResponse = z.infer<typeof showAuditEventLegalHoldResponseSchema>;
+export type PruneProviderJobLogsResponse = z.infer<typeof pruneProviderJobLogsResponseSchema>;
+export type PruneDomainEventsResponse = z.infer<typeof pruneDomainEventsResponseSchema>;
 export type DeploymentDetailSummary = z.infer<typeof deploymentDetailSummarySchema>;
 export type DeploymentRelatedContext = z.infer<typeof deploymentRelatedContextSchema>;
 export type DeploymentDetailSectionError = z.infer<typeof deploymentDetailSectionErrorSchema>;
@@ -4609,6 +5365,7 @@ export type DeploymentAttemptRecoverySummary = z.infer<
 export type ShowDeploymentInput = z.infer<typeof showDeploymentInputSchema>;
 export type ShowDeploymentResponse = z.infer<typeof showDeploymentResponseSchema>;
 export type DeploymentLogsResponse = z.infer<typeof deploymentLogsResponseSchema>;
+export type PruneDeploymentLogsResponse = z.infer<typeof pruneDeploymentLogsResponseSchema>;
 export type ScheduledTaskRunStatus = z.infer<typeof scheduledTaskRunStatusSchema>;
 export type ScheduledTaskRunTriggerKind = z.infer<typeof scheduledTaskRunTriggerKindSchema>;
 export type ScheduledTaskRunSummary = z.infer<typeof scheduledTaskRunSummarySchema>;
@@ -4629,13 +5386,35 @@ export type DeploymentEventStreamResponse = z.infer<typeof deploymentEventStream
 export type DeploymentEventStreamStreamResponse = z.infer<
   typeof deploymentEventStreamStreamResponseSchema
 >;
+export type DomainErrorResponse = z.infer<typeof domainErrorResponseSchema>;
 export type ResourceRuntimeLogLine = z.infer<typeof resourceRuntimeLogLineSchema>;
 export type ResourceRuntimeLogEvent = z.infer<typeof resourceRuntimeLogEventSchema>;
 export type ResourceRuntimeLogsResponse = z.infer<typeof resourceRuntimeLogsResponseSchema>;
 export type ResourceRuntimeLogsStreamResponse = z.infer<
   typeof resourceRuntimeLogsStreamResponseSchema
 >;
+export type ResourceRuntimeLogArchiveSummary = z.infer<
+  typeof resourceRuntimeLogArchiveSummarySchema
+>;
+export type ResourceRuntimeLogArchiveDetail = z.infer<typeof resourceRuntimeLogArchiveDetailSchema>;
+export type ArchiveResourceRuntimeLogsResponse = z.infer<
+  typeof archiveResourceRuntimeLogsResponseSchema
+>;
+export type ListResourceRuntimeLogArchivesResponse = z.infer<
+  typeof listResourceRuntimeLogArchivesResponseSchema
+>;
+export type ShowResourceRuntimeLogArchiveResponse = z.infer<
+  typeof showResourceRuntimeLogArchiveResponseSchema
+>;
+export type PruneResourceRuntimeLogArchivesResponse = z.infer<
+  typeof pruneResourceRuntimeLogArchivesResponseSchema
+>;
 export type TerminalSessionDescriptor = z.infer<typeof terminalSessionDescriptorSchema>;
+export type TerminalSessionSummary = z.infer<typeof terminalSessionSummarySchema>;
+export type ListTerminalSessionsResponse = z.infer<typeof listTerminalSessionsResponseSchema>;
+export type ShowTerminalSessionResponse = z.infer<typeof showTerminalSessionResponseSchema>;
+export type CloseTerminalSessionResponse = z.infer<typeof closeTerminalSessionResponseSchema>;
+export type ExpireTerminalSessionsResponse = z.infer<typeof expireTerminalSessionsResponseSchema>;
 export type TerminalSessionFrame = z.infer<typeof terminalSessionFrameSchema>;
 export type ResourceDiagnosticSummary = z.infer<typeof resourceDiagnosticSummarySchema>;
 export type ProxyConfigurationView = z.infer<typeof proxyConfigurationViewSchema>;

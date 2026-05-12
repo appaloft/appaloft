@@ -22,6 +22,7 @@ import {
   RuntimeServerConnectivityChecker,
   RuntimeServerEdgeProxyBootstrapper,
   RuntimeTargetCapacityInspectorAdapter,
+  RuntimeTargetCapacityPrunerAdapter,
   RuntimeTerminalSessionGateway,
   SshExecutionBackend,
 } from "@appaloft/adapter-runtime";
@@ -38,6 +39,8 @@ import {
   type DefaultAccessDomainPolicyRepository,
   DefaultAccessDomainRuntimePlanResolver,
   type DeploymentProgressReporter,
+  type DomainEventStreamRecorder,
+  EmptyRemoteStateWorkReadModel,
   type EventBus,
   type EventHandlerContract,
   type ExecutionContext,
@@ -50,16 +53,29 @@ import {
   type PreviewFeedbackWriter,
   type PreviewFeedbackWriterInput,
   type PreviewFeedbackWriterResult,
+  type ProcessAttemptClaimer,
+  type ProcessAttemptCompleter,
+  type ProcessAttemptDeliveryCandidateReader,
+  type ProcessAttemptRecoveryRecorder,
+  type ProcessAttemptRetryCandidateReader,
+  type ProcessAttemptRetryGenerator,
   QueryBus,
+  type RemoteStateWorkReadModel,
   RepositoryBackedDeploymentExecutionGuard,
   type ResourceAccessFailureRendererTarget,
+  type RetentionDefaultRepository,
+  type RouteRealizationWorkReadModel,
+  type ScheduledRuntimePrunePolicyReadModel,
+  type ScheduledRuntimePrunePolicyRepository,
   type ServerAppliedRouteDesiredStateRecord,
   type ServerAppliedRouteStateRepository,
   type ServerAppliedRouteStateSelectionSpec,
+  type SourceLinkReadModel,
   type SourceLinkRecord,
   type SourceLinkRepository,
   type SourceLinkSelectionSpec,
   tokens,
+  toRepositoryContext,
 } from "@appaloft/application";
 import { type AuthRuntime, BetterAuthDeployTokenMaterialIssuer } from "@appaloft/auth-better";
 import { type AppConfig } from "@appaloft/config";
@@ -75,6 +91,9 @@ import {
 import { gitlabIntegration } from "@appaloft/integration-gitlab";
 import {
   type DatabaseConnection,
+  PgAuditEventArchiveStore,
+  PgAuditEventLegalHoldStore,
+  PgAuditEventReadModel,
   PgAuthBootstrapStatusReader,
   PgCertificateReadModel,
   PgCertificateRepository,
@@ -88,6 +107,7 @@ import {
   PgDependencyResourceReadModel,
   PgDependencyResourceRepository,
   PgDependencyResourceSecretStore,
+  PgDeploymentLogRetentionStore,
   PgDeploymentReadModel,
   PgDeploymentRepository,
   PgDeployTokenReadModel,
@@ -96,6 +116,7 @@ import {
   PgDiagnostics,
   PgDomainBindingReadModel,
   PgDomainBindingRepository,
+  PgDomainEventStreamRetentionStore,
   PgDomainRouteBindingReader,
   PgDomainRouteFailureCandidateReader,
   PgEnvironmentReadModel,
@@ -111,6 +132,7 @@ import {
   PgProcessAttemptJournal,
   PgProjectReadModel,
   PgProjectRepository,
+  PgProviderJobLogRetentionStore,
   PgResourceAccessFailureEvidenceProjection,
   PgResourceDeletionBlockerReader,
   PgResourceDependencyBindingReadModel,
@@ -118,6 +140,9 @@ import {
   PgResourceReadModel,
   PgResourceRepository,
   PgResourceRuntimeControlAttemptRecorder,
+  PgResourceRuntimeLogArchiveStore,
+  PgRetentionDefaultRepository,
+  PgScheduledRuntimePrunePolicyReadModel,
   PgScheduledTaskDefinitionRepository,
   PgScheduledTaskDueCandidateReader,
   PgScheduledTaskReadModel,
@@ -125,10 +150,12 @@ import {
   PgScheduledTaskRunLogReadModel,
   PgScheduledTaskRunLogRecorder,
   PgScheduledTaskRunReadModel,
+  PgServerAppliedRouteRealizationWorkReadModel,
   PgServerDeletionBlockerReader,
   PgServerReadModel,
   PgServerRepository,
   PgSourceEventRepository,
+  PgSourceLinkReadModel,
   PgSshCredentialReadModel,
   PgSshCredentialRepository,
   PgSshCredentialUsageReader,
@@ -535,6 +562,7 @@ class InMemoryEventBus implements EventBus {
   constructor(
     private readonly container: DependencyContainer,
     private readonly logger: AppLogger,
+    private readonly streamRecorder?: DomainEventStreamRecorder,
   ) {}
 
   async publish(
@@ -549,6 +577,18 @@ class InMemoryEventBus implements EventBus {
     }
 
     for (const event of events) {
+      const recordResult = await this.streamRecorder?.record(toRepositoryContext(context), {
+        event,
+        requestId: context.requestId,
+      });
+      if (recordResult?.isErr()) {
+        this.logger.warn("domain_event_stream.record_failed", {
+          requestId: context.requestId,
+          eventType: event.type,
+          errorCode: recordResult.error.code,
+        });
+      }
+
       const dispatches = eventHandlerTypesFor(event.type).map(async (handlerType) => {
         try {
           this.logger.debug("event_bus.dispatch", {
@@ -735,8 +775,20 @@ export interface RegisterRuntimeDependenciesInput {
   remotePgliteStateSyncSession?: RemotePgliteStateSyncSession;
   refreshRemotePgliteState?: () => Promise<Result<void>>;
   sourceLinkRepository?: SourceLinkRepository;
+  sourceLinkReadModel?: SourceLinkReadModel;
   defaultAccessDomainPolicyRepository?: DefaultAccessDomainPolicyRepository;
   serverAppliedRouteStateRepository?: ServerAppliedRouteStateRepository;
+  remoteStateWorkReadModel?: RemoteStateWorkReadModel;
+  routeRealizationWorkReadModel?: RouteRealizationWorkReadModel;
+  processAttemptRetryCandidateReader?: ProcessAttemptRetryCandidateReader;
+  processAttemptDeliveryCandidateReader?: ProcessAttemptDeliveryCandidateReader;
+  processAttemptRetryGenerator?: ProcessAttemptRetryGenerator;
+  processAttemptRecoveryRecorder?: ProcessAttemptRecoveryRecorder;
+  processAttemptClaimer?: ProcessAttemptClaimer;
+  processAttemptCompleter?: ProcessAttemptCompleter;
+  retentionDefaultRepository?: RetentionDefaultRepository;
+  scheduledRuntimePrunePolicyRepository?: ScheduledRuntimePrunePolicyRepository;
+  scheduledRuntimePrunePolicyReadModel?: ScheduledRuntimePrunePolicyReadModel;
   resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined;
 }
 
@@ -754,13 +806,21 @@ export function registerRuntimeDependencies(
   container.register(tokens.eventBus, {
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
-        new InMemoryEventBus(dependencyContainer, dependencyContainer.resolve(tokens.logger)),
+        new InMemoryEventBus(
+          dependencyContainer,
+          dependencyContainer.resolve(tokens.logger),
+          dependencyContainer.resolve(tokens.domainEventStreamRecorder),
+        ),
     ),
   });
   container.registerInstance(tokens.deploymentProgressReporter, input.deploymentProgressReporter);
   container.registerInstance(
     tokens.sourceLinkRepository,
     input.sourceLinkRepository ?? new UnavailableSourceLinkRepository(),
+  );
+  container.registerInstance(
+    tokens.sourceLinkReadModel,
+    input.sourceLinkReadModel ?? new PgSourceLinkReadModel(input.database.db),
   );
   container.registerInstance(
     tokens.defaultAccessDomainPolicyRepository,
@@ -770,6 +830,15 @@ export function registerRuntimeDependencies(
   container.registerInstance(
     tokens.serverAppliedRouteStateRepository,
     input.serverAppliedRouteStateRepository ?? new NoopServerAppliedRouteStateRepository(),
+  );
+  container.registerInstance(
+    tokens.remoteStateWorkReadModel,
+    input.remoteStateWorkReadModel ?? new EmptyRemoteStateWorkReadModel(),
+  );
+  container.registerInstance(
+    tokens.routeRealizationWorkReadModel,
+    input.routeRealizationWorkReadModel ??
+      new PgServerAppliedRouteRealizationWorkReadModel(input.database.db),
   );
   container.register(tokens.defaultAccessDomainPolicySupport, {
     useFactory: instanceCachingFactory(
@@ -788,6 +857,15 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       () =>
         new RuntimeTargetCapacityInspectorAdapter(
+          join(input.config.dataDir, "runtime"),
+          input.config.remoteRuntimeRoot,
+        ),
+    ),
+  });
+  container.register(tokens.runtimeTargetCapacityPruner, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new RuntimeTargetCapacityPrunerAdapter(
           join(input.config.dataDir, "runtime"),
           input.config.remoteRuntimeRoot,
         ),
@@ -945,6 +1023,66 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.sourceEventReadModel, {
     useFactory: instanceCachingFactory(() => new PgSourceEventRepository(input.database.db)),
+  });
+  container.register(tokens.auditEventRecorder, {
+    useFactory: instanceCachingFactory(() => new PgAuditEventReadModel(input.database.db)),
+  });
+  container.register(tokens.auditEventReadModel, {
+    useFactory: instanceCachingFactory(() => new PgAuditEventReadModel(input.database.db)),
+  });
+  container.register(tokens.auditEventRetentionStore, {
+    useFactory: instanceCachingFactory(() => new PgAuditEventReadModel(input.database.db)),
+  });
+  container.register(tokens.auditEventLegalHoldStore, {
+    useFactory: instanceCachingFactory(() => new PgAuditEventLegalHoldStore(input.database.db)),
+  });
+  container.register(tokens.auditEventArchiveStore, {
+    useFactory: instanceCachingFactory(() => new PgAuditEventArchiveStore(input.database.db)),
+  });
+  container.register(tokens.providerJobLogRetentionStore, {
+    useFactory: instanceCachingFactory(() => new PgProviderJobLogRetentionStore(input.database.db)),
+  });
+  container.register(tokens.domainEventStreamRetentionStore, {
+    useFactory: instanceCachingFactory(
+      () => new PgDomainEventStreamRetentionStore(input.database.db),
+    ),
+  });
+  container.register(tokens.domainEventStreamObservationReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgDomainEventStreamRetentionStore(input.database.db),
+    ),
+  });
+  container.register(tokens.domainEventStreamRecorder, {
+    useFactory: instanceCachingFactory(
+      () => new PgDomainEventStreamRetentionStore(input.database.db),
+    ),
+  });
+  container.register(tokens.deploymentLogRetentionStore, {
+    useFactory: instanceCachingFactory(() => new PgDeploymentLogRetentionStore(input.database.db)),
+  });
+  container.register(tokens.resourceRuntimeLogArchiveStore, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceRuntimeLogArchiveStore(input.database.db),
+    ),
+  });
+  container.register(tokens.retentionDefaultRepository, {
+    useFactory: instanceCachingFactory(
+      () => input.retentionDefaultRepository ?? new PgRetentionDefaultRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.scheduledRuntimePrunePolicyReadModel, {
+    useFactory: instanceCachingFactory(
+      () =>
+        input.scheduledRuntimePrunePolicyReadModel ??
+        new PgScheduledRuntimePrunePolicyReadModel(input.database.db),
+    ),
+  });
+  container.register(tokens.scheduledRuntimePrunePolicyRepository, {
+    useFactory: instanceCachingFactory(
+      () =>
+        input.scheduledRuntimePrunePolicyRepository ??
+        new PgScheduledRuntimePrunePolicyReadModel(input.database.db),
+    ),
   });
   container.register(tokens.sourceEventRecorder, {
     useFactory: instanceCachingFactory(() => new PgSourceEventRepository(input.database.db)),
@@ -1110,8 +1248,41 @@ export function registerRuntimeDependencies(
   container.register(tokens.processAttemptRecorder, {
     useFactory: instanceCachingFactory(() => new PgProcessAttemptJournal(input.database.db)),
   });
+  container.register(tokens.processAttemptRecoveryRecorder, {
+    useFactory: instanceCachingFactory(
+      () => input.processAttemptRecoveryRecorder ?? new PgProcessAttemptJournal(input.database.db),
+    ),
+  });
   container.register(tokens.processAttemptReadModel, {
     useFactory: instanceCachingFactory(() => new PgProcessAttemptJournal(input.database.db)),
+  });
+  container.register(tokens.processAttemptRetryCandidateReader, {
+    useFactory: instanceCachingFactory(
+      () =>
+        input.processAttemptRetryCandidateReader ?? new PgProcessAttemptJournal(input.database.db),
+    ),
+  });
+  container.register(tokens.processAttemptDeliveryCandidateReader, {
+    useFactory: instanceCachingFactory(
+      () =>
+        input.processAttemptDeliveryCandidateReader ??
+        new PgProcessAttemptJournal(input.database.db),
+    ),
+  });
+  container.register(tokens.processAttemptRetryGenerator, {
+    useFactory: instanceCachingFactory(
+      () => input.processAttemptRetryGenerator ?? new PgProcessAttemptJournal(input.database.db),
+    ),
+  });
+  container.register(tokens.processAttemptClaimer, {
+    useFactory: instanceCachingFactory(
+      () => input.processAttemptClaimer ?? new PgProcessAttemptJournal(input.database.db),
+    ),
+  });
+  container.register(tokens.processAttemptCompleter, {
+    useFactory: instanceCachingFactory(
+      () => input.processAttemptCompleter ?? new PgProcessAttemptJournal(input.database.db),
+    ),
   });
 
   container.register(tokens.sourceDetector, {

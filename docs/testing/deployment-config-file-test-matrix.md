@@ -287,6 +287,8 @@ Current implemented coverage:
   smoke workflow, and the release workflow before release artifact publication. It runs when
   `APPALOFT_E2E_SSH_HOST` and `APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured; release
   dispatch can set `require_ssh_remote_state_e2e=true` to fail fast when the secrets are missing.
+  For `v0.11.x` publish tags, the release workflow requires this remote-state harness and the
+  `.github/workflows/ssh-quick-deploy-e2e.yml` harness automatically before artifact publication.
 - `CONFIG-FILE-DOMAIN-001` through `CONFIG-FILE-DOMAIN-004` have parser/schema coverage in
   `packages/deployment-config/test/appaloft-config.test.ts`, proving `access.domains[]` accepts
   safe host/path/TLS intent, normalizes defaults, rejects identity selectors, rejects raw TLS/secret

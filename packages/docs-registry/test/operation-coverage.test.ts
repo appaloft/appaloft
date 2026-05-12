@@ -110,6 +110,7 @@ describe("public docs operation coverage", () => {
   test("[OP-WORK-DOCS-001] operator work queries record read-only docs coverage", () => {
     const listCoverage = getPublicDocsOperationCoverage("operator-work.list");
     const showCoverage = getPublicDocsOperationCoverage("operator-work.show");
+    const pruneCoverage = getPublicDocsOperationCoverage("operator-work.prune");
     const topic = publicDocsHelpTopics["operator.work-ledger"];
 
     expect(listCoverage).toMatchObject({
@@ -122,14 +123,190 @@ describe("public docs operation coverage", () => {
       status: "documented",
       topicId: "operator.work-ledger",
     });
+    expect(pruneCoverage).toMatchObject({
+      operationKey: "operator-work.prune",
+      status: "documented",
+      topicId: "operator.work-ledger",
+    });
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
+        "docs/commands/operator-work.prune.md",
+        "docs/decisions/ADR-054-durable-process-delivery-baseline.md",
         "docs/queries/operator-work.list.md",
         "docs/queries/operator-work.show.md",
+        "docs/testing/durable-process-delivery-test-matrix.md",
         "docs/testing/operator-work-ledger-test-matrix.md",
       ]),
     );
     expect(topic.description).toContain("without recovery mutations");
+  });
+
+  test("[AUDIT-EVENT-EXPORT-001] audit event export records docs coverage", () => {
+    const coverage = getPublicDocsOperationCoverage("audit-events.export");
+    const globalCoverage = getPublicDocsOperationCoverage("audit-events.export-global");
+    const holdCoverage = getPublicDocsOperationCoverage("audit-events.legal-holds.configure");
+    const archiveCoverage = getPublicDocsOperationCoverage("audit-events.archives.create");
+    const topic = publicDocsHelpTopics["operator.audit-events"];
+
+    expect(coverage).toMatchObject({
+      operationKey: "audit-events.export",
+      status: "documented",
+      topicId: "operator.audit-events",
+    });
+    expect(globalCoverage).toMatchObject({
+      operationKey: "audit-events.export-global",
+      status: "documented",
+      topicId: "operator.audit-events",
+    });
+    expect(holdCoverage).toMatchObject({
+      operationKey: "audit-events.legal-holds.configure",
+      status: "documented",
+      topicId: "operator.audit-events",
+    });
+    expect(archiveCoverage).toMatchObject({
+      operationKey: "audit-events.archives.create",
+      status: "documented",
+      topicId: "operator.audit-events",
+    });
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/decisions/ADR-056-global-audit-event-export-boundary.md",
+        "docs/decisions/ADR-057-audit-event-legal-hold-boundary.md",
+        "docs/decisions/ADR-058-audit-event-immutable-archive-boundary.md",
+        "docs/commands/audit-events.archives.create.md",
+        "docs/commands/audit-events.archives.prune.md",
+        "docs/queries/audit-events.export.md",
+        "docs/queries/audit-events.export-global.md",
+        "docs/queries/audit-events.archives.list.md",
+        "docs/queries/audit-events.archives.show.md",
+        "docs/commands/audit-events.legal-holds.configure.md",
+        "docs/commands/audit-events.legal-holds.release.md",
+        "docs/queries/audit-events.legal-holds.list.md",
+        "docs/queries/audit-events.legal-holds.show.md",
+        "docs/specs/062-global-audit-event-export/spec.md",
+        "docs/specs/063-audit-event-legal-hold/spec.md",
+        "docs/specs/064-audit-event-immutable-archive/spec.md",
+        "docs/testing/audit-event-read-surface-test-matrix.md",
+      ]),
+    );
+    expect(topic.description).toContain("export");
+  });
+
+  test("[PROV-JOB-LOG-PRUNE-004] provider job log retention records docs coverage", () => {
+    const coverage = getPublicDocsOperationCoverage("provider-job-logs.prune");
+    const topic = publicDocsHelpTopics["operator.provider-job-logs"];
+
+    expect(coverage).toMatchObject({
+      operationKey: "provider-job-logs.prune",
+      status: "documented",
+      topicId: "operator.provider-job-logs",
+    });
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/commands/provider-job-logs.prune.md",
+        "docs/testing/provider-job-log-retention-test-matrix.md",
+        "docs/specs/057-provider-job-log-retention/spec.md",
+        "docs/decisions/ADR-049-provider-job-log-retention-policy.md",
+      ]),
+    );
+    expect(topic.description).toContain("without deleting deployment rows");
+  });
+
+  test("[DOMAIN-EVENT-RETENTION-004] domain event retention records docs coverage", () => {
+    const coverage = getPublicDocsOperationCoverage("domain-events.prune");
+    const topic = publicDocsHelpTopics["operator.domain-events"];
+
+    expect(coverage).toMatchObject({
+      operationKey: "domain-events.prune",
+      status: "documented",
+      topicId: "operator.domain-events",
+    });
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/commands/domain-events.prune.md",
+        "docs/testing/domain-event-stream-retention-test-matrix.md",
+        "docs/specs/065-domain-event-stream-retention/spec.md",
+        "docs/decisions/ADR-059-domain-event-stream-retention-boundary.md",
+      ]),
+    );
+    expect(topic.description).toContain("without deleting deployments");
+  });
+
+  test("[DEP-LOG-PRUNE-004] deployment log retention records docs coverage", () => {
+    const coverage = getPublicDocsOperationCoverage("deployments.logs.prune");
+    const topic = publicDocsHelpTopics["observability.runtime-logs"];
+
+    expect(coverage).toMatchObject({
+      operationKey: "deployments.logs.prune",
+      status: "documented",
+      topicId: "observability.runtime-logs",
+    });
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/commands/deployments.logs.prune.md",
+        "docs/testing/deployment-log-retention-test-matrix.md",
+        "docs/specs/058-deployment-log-retention/spec.md",
+        "docs/decisions/ADR-052-deployment-log-retention-policy.md",
+      ]),
+    );
+    expect(topic.description).toContain("prune old embedded deployment log entries");
+  });
+
+  test("[SYSTEM-DIAG-DOCS-001] system diagnostics operations record safe docs coverage", () => {
+    const providerCoverage = getPublicDocsOperationCoverage("system.providers.list");
+    const pluginCoverage = getPublicDocsOperationCoverage("system.plugins.list");
+    const providerTopic = publicDocsHelpTopics["advanced.provider-boundary"];
+    const pluginTopic = publicDocsHelpTopics["advanced.plugin-boundary"];
+
+    expect(providerCoverage).toMatchObject({
+      operationKey: "system.providers.list",
+      status: "documented",
+      topicId: "advanced.provider-boundary",
+    });
+    expect(pluginCoverage).toMatchObject({
+      operationKey: "system.plugins.list",
+      status: "documented",
+      topicId: "advanced.plugin-boundary",
+    });
+    expect(providerTopic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/PROVIDERS.md",
+        "docs/testing/system-diagnostics-test-matrix.md",
+      ]),
+    );
+    expect(pluginTopic.specReferences).toEqual(
+      expect.arrayContaining(["docs/PLUGINS.md", "docs/testing/system-diagnostics-test-matrix.md"]),
+    );
+    expect(providerTopic.description).toContain("configuration diagnostics");
+    expect(pluginTopic.aliases).toEqual(expect.arrayContaining(["configuration diagnostics"]));
+  });
+
+  test("[TERM-SESSION-ENTRY-007] [TERM-SESSION-ENTRY-008] terminal lifecycle operations record docs coverage", () => {
+    const topic = publicDocsHelpTopics["server.terminal-session"];
+
+    for (const operationKey of [
+      "terminal-sessions.open",
+      "terminal-sessions.list",
+      "terminal-sessions.show",
+      "terminal-sessions.close",
+      "terminal-sessions.expire",
+    ]) {
+      expect(getPublicDocsOperationCoverage(operationKey)).toMatchObject({
+        operationKey,
+        status: "documented",
+        topicId: "server.terminal-session",
+      });
+    }
+
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/commands/terminal-sessions.lifecycle.md",
+        "docs/queries/terminal-sessions.lifecycle.md",
+        "docs/testing/operator-terminal-session-test-matrix.md",
+      ]),
+    );
+    expect(topic.description).toContain("list, show, close, and expire");
+    expect(topic.aliases).toEqual(expect.arrayContaining(["terminal session lifecycle"]));
   });
 
   test("[SSH-CRED-ENTRY-009] [SSH-CRED-ENTRY-010] reusable SSH credential delete records docs coverage and Web surface", () => {

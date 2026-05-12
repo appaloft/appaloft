@@ -14,7 +14,6 @@
 
 Appaloft is not a web-first CRUD application. Its core is a deployment control system with multiple
 entry points:
-
 - CLI
 - HTTP / oRPC
 - Web console
@@ -50,7 +49,6 @@ to an explicit application operation.
 ## Business Capability Model
 
 The current Appaloft core is organized into eight implemented capability groups:
-
 - Projects
 - Deployment Targets
 - Environments
@@ -150,7 +148,14 @@ Implemented operations:
 | Delete reusable SSH credential when unused | Command | `credentials.delete-ssh` | `DeleteSshCredentialCommand` | `DeleteSshCredentialCommandInput` | `appaloft server credential-delete <credentialId> --confirm <credentialId>` | `DELETE /api/credentials/ssh/{credentialId}` |
 | Rotate reusable SSH credential in place | Command | `credentials.rotate-ssh` | `RotateSshCredentialCommand` | `RotateSshCredentialCommandInput` | `appaloft server credential-rotate <credentialId> --private-key-file <path> --confirm <credentialId>` | `POST /api/credentials/ssh/{credentialId}/rotate` |
 | Open deployment target terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft server terminal <serverId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
-
+| List terminal sessions | Query | `terminal-sessions.list` | `ListTerminalSessionsQuery` | `ListTerminalSessionsQueryInput` | `appaloft terminal-session list` | `GET /api/terminal-sessions` |
+| Show terminal session | Query | `terminal-sessions.show` | `ShowTerminalSessionQuery` | `ShowTerminalSessionQueryInput` | `appaloft terminal-session show <sessionId>` | `GET /api/terminal-sessions/{sessionId}` |
+| Close terminal session | Command | `terminal-sessions.close` | `CloseTerminalSessionCommand` | `CloseTerminalSessionCommandInput` | `appaloft terminal-session close <sessionId>` | `POST /api/terminal-sessions/{sessionId}/close` |
+| Expire terminal sessions | Command | `terminal-sessions.expire` | `ExpireTerminalSessionsCommand` | `ExpireTerminalSessionsCommandInput` | `appaloft terminal-session expire` | `POST /api/terminal-sessions/expire` |
+| Prune deployment target capacity | Command | `servers.capacity.prune` | `PruneServerCapacityCommand` | `PruneServerCapacityCommandInput` | `appaloft server capacity prune <serverId> --before <iso>` | `POST /api/servers/{serverId}/capacity/prune` |
+| Configure scheduled runtime prune policy | Command | `scheduled-runtime-prune-policies.configure` | `ConfigureScheduledRuntimePrunePolicyCommand` | `ConfigureScheduledRuntimePrunePolicyCommandInput` | `appaloft server capacity policy configure --scope <scope> --retention-days <days>` | `POST /api/servers/capacity/policies` |
+| List scheduled runtime prune policies | Query | `scheduled-runtime-prune-policies.list` | `ListScheduledRuntimePrunePoliciesQuery` | `ListScheduledRuntimePrunePoliciesQueryInput` | `appaloft server capacity policy list` | `GET /api/servers/capacity/policies` |
+| Show scheduled runtime prune policy | Query | `scheduled-runtime-prune-policies.show` | `ShowScheduledRuntimePrunePolicyQuery` | `ShowScheduledRuntimePrunePolicyQueryInput` | `appaloft server capacity policy show <policyId>` | `GET /api/servers/capacity/policies/{policyId}` |
 - server registration may carry edge proxy intent/provider selection; when omitted, the deployment
   target records the configured default edge proxy intent and an asynchronous lifecycle path
   attempts proxy bootstrap
@@ -173,6 +178,17 @@ Implemented operations:
   must not run Docker prune, delete volumes, delete `/var/lib/appaloft/runtime/state`, remove
   source workspaces, stop containers, repair proxy state, or mutate Appaloft records. Reclaimable
   values are estimates for later cleanup/prune decisions, not cleanup execution.
+- `servers.capacity.prune` is a runtime target maintenance mutation. It dry-runs by default,
+  requires a cutoff, and may delete only safe target-owned stopped containers or materialized
+  workspace candidates whose ownership, age, active-runtime, and rollback-safety evidence passes.
+  Docker build-cache and unused-image pruning require explicit category opt-in and use filtered
+  Docker prune commands. It must preserve active runtimes, rollback candidates, Docker volumes,
+  Appaloft state roots, remote state, backups, migration journals, audit/events, deployment
+  snapshots, logs, routes, resource state, server state, dependencies, and storage volumes.
+- `scheduled-runtime-prune-policies.configure/list/show` are the application command/query surface
+  for scheduled runtime prune policy records. They persist and read only safe retention policy
+  fields used by the scheduler; CLI and HTTP/oRPC adapters dispatch through command and query buses
+  and reuse the shared command/query schemas.
 - `servers.rename` changes only the deployment target/server display name. It preserves the server
   id, host, provider, credential, proxy, lifecycle state, and historical references. Active and
   inactive servers may be renamed; deleted servers are not visible to the normal rename entrypoint.
@@ -240,7 +256,6 @@ Implemented operations:
 Core next operations expected here:
 - list environment change history
 - restore/delete and lifecycle history
-
 - `environments.rename` changes only the environment display name inside its owning project. It
   preserves environment id, kind, parent environment, variables, resources, deployments, and
   runtime state.
@@ -352,7 +367,8 @@ Current boundary:
 - Postgres dependency resources are `ResourceInstance` records. Appaloft-managed Postgres records
   now carry provider-native realization state through a hermetic provider capability, imported
   external Postgres delete removes only Appaloft's record, and list/show output masks connection
-  secrets.
+  secrets. Provider realization/delete attempts are mirrored into safe operator-work process
+  attempts for visibility and repair.
 - Provider-native Postgres realization is implemented through the existing
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` boundaries. It is governed by
@@ -366,7 +382,8 @@ Current boundary:
   safe realization state, ready binding admission, unsupported-provider admission rejection, and
   managed Redis provider cleanup on delete. Persistence/contract/runtime materialization coverage
   is implemented for safe realization metadata, deployment snapshots, single-server secret
-  resolution, and Swarm secret handle rendering.
+  resolution, and Swarm secret handle rendering. Provider realization/delete attempts are mirrored
+  into safe operator-work process attempts for visibility and repair.
 - Resource dependency bindings are provider-neutral `ResourceBinding` records in this slice. Bind
   requires matching project/environment ownership, stores only safe target metadata and secret
   reference pointers, and reports safe deployment snapshot-reference readiness. Unbind removes only
@@ -400,7 +417,10 @@ Current boundary:
   [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md).
   The active operations create safe restore points and restore them in place through provider
   capabilities without exposing raw dumps, restarting workloads, redeploying Resources, or rewriting
-  deployment snapshots.
+  deployment snapshots. Backup and restore provider attempts are also projected into
+  `operator-work.*` through durable process-attempt rows with safe dependency/provider metadata;
+  provider execution still runs inline through the command use cases rather than process-attempt
+  atomic claim/completion.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).
@@ -446,6 +466,11 @@ Current boundary:
   [ADR-018: Resource Runtime Log Observation](./decisions/ADR-018-resource-runtime-log-observation.md);
   `resources.runtime-logs` is the active bounded and stream-capable query surface for runtime
   stdout/stderr observation through an injected runtime log reader
+- resource runtime log archival is governed by
+  [ADR-053: Resource Runtime Log Archive Retention Boundary](./decisions/ADR-053-resource-runtime-log-archive-retention-boundary.md).
+  Runtime-log archive operations create, list, show, and dry-run/prune explicit Appaloft-owned
+  archive snapshots derived from `resources.runtime-logs`; they do not persist every live runtime
+  line by default or mutate external backend log stores
 - resource runtime controls are resource-owned runtime operations governed by
   [ADR-038: Resource Runtime Control Ownership](./decisions/ADR-038-resource-runtime-control-ownership.md).
   `resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart` coordinate
@@ -618,7 +643,10 @@ Current boundary:
   `resource-secret:<KEY>` reference and verifies `X-Appaloft-Signature`; GitHub ingestion verifies
   `X-Hub-Signature-256` with `APPALOFT_GITHUB_WEBHOOK_SECRET`, treats `ping` as a no-op, and
   dispatches push events without `scopeResourceId` so policy matching can fan out. Neither route
-  persists raw payloads, signatures, or secret values.
+  persists raw payloads, signatures, or secret values. Accepted and dispatched/failed source-event
+  auto-deploy outcomes are also projected into `operator-work.*` through durable process-attempt
+  rows with safe source/ref metadata; dispatch still runs inline through the source-event command
+  path rather than process-attempt atomic claim/completion.
 - `source-events.list` and `source-events.show` are read-only diagnostics over persisted source
   event records. They require project or Resource scope and must not replay events, retry failed
   dispatch, mutate auto-deploy policy, or create deployments.
@@ -648,6 +676,7 @@ Implemented operations:
 | Redeploy current resource profile | Command | `deployments.redeploy` | `RedeployDeploymentCommand` | `RedeployDeploymentCommandInput` | `appaloft deployments redeploy <resourceId>` | `POST /api/resources/{resourceId}/redeploy` |
 | Roll back deployment | Command | `deployments.rollback` | `RollbackDeploymentCommand` | `RollbackDeploymentCommandInput` | `appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>` | `POST /api/deployments/{deploymentId}/rollback` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `appaloft logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
+| Prune deployment logs | Command | `deployments.logs.prune` | `PruneDeploymentLogsCommand` | `PruneDeploymentLogsCommandInput` | `appaloft deployments logs prune --before <iso>` | `POST /api/deployments/logs/prune` |
 | Stream deployment events | Query | `deployments.stream-events` | `StreamDeploymentEventsQuery` | `StreamDeploymentEventsQueryInput` | `appaloft deployments events <deploymentId>` | `GET /api/deployments/{deploymentId}/events` and `GET /api/deployments/{deploymentId}/events/stream` |
 
 Current boundary:
@@ -696,6 +725,13 @@ Current boundary:
 - `deployments.stream-events` is the read-only replay/follow observation surface for one accepted
   deployment attempt. It does not replace immutable detail on `deployments.show`, full attempt
   logs on `deployments.logs`, or reintroduce `deployments.reattach` as a write command.
+- `deployments.logs.prune` is a narrow embedded deployment log retention mutation. It dry-runs by
+  default, requires a cutoff, optionally narrows by deployment id, resource id, or server id, and
+  removes only matching entries from Deployment row `logs` when destructive mode is explicit. It
+  does not delete deployment rows, change deployment status, rewrite runtime plans, mutate resource
+  runtime logs, provider job logs, audit rows, event streams, outbox/inbox records, process
+  attempts, snapshots, runtime artifacts, source workspaces, build cache, resources, servers,
+  routes, or business state.
 - `deployments.recovery-readiness` is the active read-only recovery decision surface. It returns
   retry, redeploy, rollback, rollback-candidate, blocked-reason, and recommended-action facts for
   Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. Retry, redeploy, and rollback are active write
@@ -889,7 +925,6 @@ Product-grade preview policy operations:
 | List preview environments | Query | `preview-environments.list` | `ListPreviewEnvironmentsQuery` | `ListPreviewEnvironmentsQueryInput` | `appaloft preview environment list` | `GET /api/preview-environments` |
 | Show preview environment | Query | `preview-environments.show` | `ShowPreviewEnvironmentQuery` | `ShowPreviewEnvironmentQueryInput` | `appaloft preview environment show` | `GET /api/preview-environments/{previewEnvironmentId}` |
 | Delete preview environment | Command | `preview-environments.delete` | `DeletePreviewEnvironmentCommand` | `DeletePreviewEnvironmentCommandInput` | `appaloft preview environment delete` | `DELETE /api/resources/{resourceId}/preview-environments/{previewEnvironmentId}` |
-
 - `APPALOFT_PROJECT_ID`, `APPALOFT_RESOURCE_ID`, `APPALOFT_SERVER_ID`, and similar ids are optional
   trusted selection overrides for CLI/Action mode. They are required only when the operator wants to
   select existing control-plane identity explicitly; pure SSH CLI mode may reuse or create identity
@@ -919,16 +954,24 @@ Product-grade preview policy operations:
 - `deployments.retry` creates a new deployment attempt from a failed/interrupted/canceled/
   superseded attempt's immutable snapshot intent. It does not replay old events and does not mutate
   the old attempt. Its command implementation is scoped by
-  [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md).
+  [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md). Retry execution
+  is projected into `operator-work.*` through safe process-attempt rows with Deployment, Resource,
+  server, runtime plan, target backend, and source deployment lineage metadata.
 - `deployments.redeploy` creates a new deployment attempt from the current Resource profile,
   effective configuration, target, and destination at admission time. It is the "deploy current
   desired state again" operation, not a retry of an old snapshot. Its command implementation is scoped by
-  [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md).
+  [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md). Redeploy
+  delegates through `deployments.create` and uses the create-deployment process-attempt projection
+  path with operation key `deployments.redeploy`.
 - `deployments.rollback` creates a new rollback deployment attempt from a retained successful
   candidate's immutable snapshot and Docker/OCI artifact identity. It does not re-plan from the
   current Resource profile and does not roll back databases, volumes, or external dependencies. Its
   command implementation is scoped by
-  [Deployment Rollback](./specs/041-deployment-rollback/spec.md).
+  [Deployment Rollback](./specs/041-deployment-rollback/spec.md). Rollback execution is projected
+  into `operator-work.*` through safe process-attempt rows with Deployment, Resource, server,
+  runtime plan, target backend, source deployment lineage, and rollback candidate lineage metadata.
+  Execution still runs inline through the rollback use case rather than process-attempt atomic
+  claim/completion.
 - Quick Deploy is an entry workflow over explicit operations, not a separate domain command or
   operation-catalog entry. Web QuickDeploy and CLI interactive `appaloft deploy` must create/select
   context through existing commands and queries, then dispatch `deployments.create`. See
@@ -1039,8 +1082,13 @@ Current boundary:
 
 Business meaning:
 - operator work is the read-only visibility surface for long-running or background Appaloft work
-- it aggregates existing read models before a full durable outbox/inbox/job table exists
+- it aggregates durable process attempts first, then compatibility read models for workflows that
+  have not yet opted into durable process delivery
 - it helps operators decide which diagnostic or manual review path to use
+- durable process delivery is governed by ADR-054 as the outbox/inbox-equivalent baseline for
+  accepted long-running work; scheduled-task runs, scheduled runtime prune, and scheduled history
+  retention are selected worker bindings, and other workflow-specific workers must opt in through
+  local specs before retry execution can run provider or runtime work
 
 Implemented operations:
 
@@ -1048,15 +1096,153 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | List operator work ledger | Query | `operator-work.list` | `ListOperatorWorkQuery` | `ListOperatorWorkQueryInput` | `appaloft work list` | `GET /api/operator-work` |
 | Show operator work item | Query | `operator-work.show` | `ShowOperatorWorkQuery` | `ShowOperatorWorkQueryInput` | `appaloft work show <workId>` | `GET /api/operator-work/{workId}` |
+| Mark operator work recovered | Command | `operator-work.mark-recovered` | `MarkOperatorWorkRecoveredCommand` | `MarkOperatorWorkRecoveredCommandInput` | `appaloft work mark-recovered <workId>` | `POST /api/operator-work/{workId}/mark-recovered` |
+| Dead-letter operator work | Command | `operator-work.dead-letter` | `DeadLetterOperatorWorkCommand` | `DeadLetterOperatorWorkCommandInput` | `appaloft work dead-letter <workId>` | `POST /api/operator-work/{workId}/dead-letter` |
+| Cancel operator work | Command | `operator-work.cancel` | `CancelOperatorWorkCommand` | `CancelOperatorWorkCommandInput` | `appaloft work cancel <workId>` | `POST /api/operator-work/{workId}/cancel` |
+| Retry operator work | Command | `operator-work.retry` | `RetryOperatorWorkCommand` | `RetryOperatorWorkCommandInput` | `appaloft work retry <workId>` | `POST /api/operator-work/{workId}/retry` |
+| Prune operator work journal | Command | `operator-work.prune` | `PruneOperatorWorkCommand` | `PruneOperatorWorkCommandInput` | `appaloft work prune --before <iso>` | `POST /api/operator-work/prune` |
+| List audit events | Query | `audit-events.list` | `ListAuditEventsQuery` | `ListAuditEventsQueryInput` | `appaloft audit-event list --aggregate <aggregateId>` | `GET /api/audit-events` |
+| Show audit event | Query | `audit-events.show` | `ShowAuditEventQuery` | `ShowAuditEventQueryInput` | `appaloft audit-event show <auditEventId> --aggregate <aggregateId>` | `GET /api/audit-events/{auditEventId}` |
+| Export audit events | Query | `audit-events.export` | `ExportAuditEventsQuery` | `ExportAuditEventsQueryInput` | `appaloft audit-event export --aggregate <aggregateId>` | `GET /api/audit-events/export` |
+| Export global audit events | Query | `audit-events.export-global` | `ExportGlobalAuditEventsQuery` | `ExportGlobalAuditEventsQueryInput` | `appaloft audit-event export-global --from <iso> --to <iso>` | `GET /api/audit-events/export-global` |
+| Configure audit event legal hold | Command | `audit-events.legal-holds.configure` | `ConfigureAuditEventLegalHoldCommand` | `ConfigureAuditEventLegalHoldCommandInput` | `appaloft audit-event legal-hold configure` | `POST /api/audit-events/legal-holds` |
+| List audit event legal holds | Query | `audit-events.legal-holds.list` | `ListAuditEventLegalHoldsQuery` | `ListAuditEventLegalHoldsQueryInput` | `appaloft audit-event legal-hold list` | `GET /api/audit-events/legal-holds` |
+| Show audit event legal hold | Query | `audit-events.legal-holds.show` | `ShowAuditEventLegalHoldQuery` | `ShowAuditEventLegalHoldQueryInput` | `appaloft audit-event legal-hold show <holdId>` | `GET /api/audit-events/legal-holds/{holdId}` |
+| Release audit event legal hold | Command | `audit-events.legal-holds.release` | `ReleaseAuditEventLegalHoldCommand` | `ReleaseAuditEventLegalHoldCommandInput` | `appaloft audit-event legal-hold release <holdId>` | `POST /api/audit-events/legal-holds/{holdId}/release` |
+| Create audit event immutable archive | Command | `audit-events.archives.create` | `CreateAuditEventArchiveCommand` | `CreateAuditEventArchiveCommandInput` | `appaloft audit-event archive create` | `POST /api/audit-events/archives` |
+| List audit event immutable archives | Query | `audit-events.archives.list` | `ListAuditEventArchivesQuery` | `ListAuditEventArchivesQueryInput` | `appaloft audit-event archive list` | `GET /api/audit-events/archives` |
+| Show audit event immutable archive | Query | `audit-events.archives.show` | `ShowAuditEventArchiveQuery` | `ShowAuditEventArchiveQueryInput` | `appaloft audit-event archive show <archiveId>` | `GET /api/audit-events/archives/{archiveId}` |
+| Prune audit event immutable archives | Command | `audit-events.archives.prune` | `PruneAuditEventArchivesCommand` | `PruneAuditEventArchivesCommandInput` | `appaloft audit-event archive prune --before <iso>` | `POST /api/audit-events/archives/prune` |
+| Prune audit events | Command | `audit-events.prune` | `PruneAuditEventsCommand` | `PruneAuditEventsCommandInput` | `appaloft audit-event prune --before <iso>` | `POST /api/audit-events/prune` |
+| Configure retention defaults | Command | `retention-defaults.configure` | `ConfigureRetentionDefaultsCommand` | `ConfigureRetentionDefaultsCommandInput` | `appaloft retention-default configure --category <category> --retention-days <days>` | `POST /api/retention-defaults` |
+| List retention defaults | Query | `retention-defaults.list` | `ListRetentionDefaultsQuery` | `ListRetentionDefaultsQueryInput` | `appaloft retention-default list` | `GET /api/retention-defaults` |
+| Show retention default | Query | `retention-defaults.show` | `ShowRetentionDefaultQuery` | `ShowRetentionDefaultQueryInput` | `appaloft retention-default show <category>` | `GET /api/retention-defaults/{category}` |
+| Prune domain event stream | Command | `domain-events.prune` | `PruneDomainEventsCommand` | `PruneDomainEventsCommandInput` | `appaloft domain-event prune --before <iso>` | `POST /api/domain-events/prune` |
+| Prune provider job logs | Command | `provider-job-logs.prune` | `PruneProviderJobLogsCommand` | `PruneProviderJobLogsCommandInput` | `appaloft provider-job-log prune --before <iso>` | `POST /api/provider-job-logs/prune` |
 
 Current boundary:
-- `operator-work.list` and `operator-work.show` are read-only; they do not retry, cancel, mark
-  recovered, dead-letter, prune, or clean up work
+- `operator-work.list` and `operator-work.show` are read-only; they do not retry, cancel,
+  dead-letter, prune, or clean up work
+- `operator-work.mark-recovered` is a narrow durable process attempt ledger mutation. It marks only
+  failed, retry-scheduled, or dead-lettered process attempt rows as manually recovered and clears
+  retry eligibility. It does not retry, cancel, dead-letter, prune, recover remote state, or mutate
+  deployment/resource/server/runtime state
+- `operator-work.dead-letter` is a narrow durable process attempt ledger mutation. It marks only
+  failed or retry-scheduled process attempt rows as dead-lettered, clears retry eligibility, and
+  keeps manual review visible. It does not retry, cancel, mark recovered, prune, recover remote
+  state, or mutate deployment/resource/server/runtime state
+- `operator-work.cancel` is a narrow durable process attempt ledger mutation. It marks only pending
+  or retry-scheduled process attempt rows as canceled and clears retry eligibility. It does not stop
+  already-running runtime/provider work, retry, dead-letter, mark recovered, prune, recover remote
+  state, or mutate deployment/resource/server/runtime state
+- `operator-work.retry` is a narrow durable process attempt ledger mutation. It creates a new
+  pending process attempt row only from a failed or retry-scheduled row with `retriable = true`,
+  preserves safe lineage, and leaves operation-specific runtime/provider execution to governed
+  workers. Scheduled-task retries can be drained by the scheduled-task durable worker; workflows
+  without a governed worker remain pending annotations. It does not replay events, run provider
+  work directly, prune, recover remote state, or mutate deployment/resource/server/runtime state
+- `operator-work.prune` is a narrow durable process attempt ledger retention mutation. It dry-runs
+  by default and deletes only old terminal durable process attempt rows when `dryRun = false`. It
+  does not prune runtime artifacts, workspaces, build cache, remote-state backups, deployment
+  snapshots, audit events, event streams, logs, provider resources, resource state, deployment
+  state, or compatibility ledger rows aggregated from other read models
 - the current slice reads the internal durable process attempt journal first, then aggregates
-  deployment attempts, latest proxy bootstrap state, and latest certificate attempts from existing
-  read models for compatibility
-- remote-state locks, source links, route realization attempts, runtime maintenance jobs, and
-  worker status remain future extensions when their persisted read models exist
+  deployment attempts, latest proxy bootstrap state, latest certificate attempts, safe remote SSH
+  state lock/migration/backup/recovery-marker summaries, safe source-link summaries, and
+  route-realization summaries from existing read models for compatibility
+- worker, scheduler, runtime-maintenance, and job status are visible when they are recorded in the
+  durable process attempt journal
+- ADR-054 durable process delivery is implemented for selected durable worker bindings:
+  scheduled-task runs record process attempts, claim/complete due attempts, and can generate and
+  drain due retry attempts; scheduled runtime prune records policy-tick attempts and dispatches
+  `servers.capacity.prune` through the command bus; scheduled history retention records
+  retention-default category attempts and dispatches existing manual history prune commands through
+  the command bus. Preview cleanup, certificate issuance, certificate import, proxy bootstrap,
+  resource runtime control, source-event auto-deploy, dependency resource backup/restore,
+  provider-native dependency resource realization/delete, deployment create execution,
+  domain-binding verification retry, domain-binding create verification, deployment retry
+  execution, and deployment rollback execution also project selected outcomes into the process
+  attempt journal for operator visibility, but they do not yet consume process-attempt atomic
+  claim/completion as durable workers. Other long-running workflows must still opt in through local
+  specs before automatic retry execution can run provider or runtime work.
+- `audit-events.list` and `audit-events.show` are read-only aggregate-scoped history views over
+  retained audit rows; they do not provide global audit export, delete retention, replay events,
+  retry work, or mutate runtime/state roots
+- `audit-events.export` is a read-only bounded aggregate-scoped export over retained audit rows. It
+  returns redacted detail rows with export metadata for operator support or prune/delete review. It
+  is not a legal hold, immutable archive, organization retention policy, global export, replay
+  source, or mutation.
+- `audit-events.export-global` is a read-only bounded, time-windowed export over retained audit
+  rows across aggregates. It returns the same redacted detail shape as aggregate export and is not a
+  legal hold, immutable archive, organization retention policy, replay source, scheduled retention
+  policy, or mutation.
+- audit legal hold operations record active retention guard records for one aggregate or a bounded
+  global time window, expose safe list/show readback, and support explicit release while preserving
+  hold history. Active holds block `audit-events.prune` from deleting matching rows and surface
+  held counts without creating immutable archive storage or organization defaults.
+- audit immutable archive operations create bounded retained redacted snapshots, expose safe
+  list/show readback with digest metadata, and dry-run/prune archive records without deleting
+  source audit rows. Archives with source-row reference retention guard referenced source audit rows
+  from `audit-events.prune` until the archive is pruned.
+- `audit-events.prune` is a narrow audit row retention mutation. It dry-runs by default, requires
+  a cutoff, optionally narrows by aggregate id or event type, skips rows matched by active audit
+  legal holds or retained archive source-row references, and deletes only unheld/unarchived
+  `audit_logs` rows whose `createdAt < before` when destructive mode is explicit. It does not
+  prune domain event streams, outbox/inbox records,
+  process attempts, runtime logs, provider job logs, deployment snapshots, remote-state backups,
+  runtime artifacts, source workspaces, build cache, routes, resource/server/deployment state,
+  dependencies, or storage volumes
+- `retention-defaults.configure/list/show` are active application command/query operations for
+  non-executing
+  organization-level retention default policy. They define default windows and scheduling flags for
+  governed history categories, but they do not execute prune work, change manual prune command
+  cutoff requirements, override legal holds or archive guards, or make any retention command
+  destructive by default. CLI and HTTP/oRPC entrypoints dispatch through the shared command/query
+  schemas.
+- scheduled history retention is an implemented internal worker boundary governed by ADR-061. It
+  consumes `retention-defaults.*`, computes cutoffs, records durable process attempts, and dispatches
+  existing manual prune commands through the command bus. It has no first-slice public command and
+  must preserve every category-specific guard.
+- `domain-events.prune` is a narrow retained domain event stream retention mutation. It is governed
+  by ADR-059 and targets the `domain_event_stream_records` retained observation store plus prune
+  watermark state. It dry-runs by default and must stay separate from audit rows,
+  outbox/inbox/process attempts, logs, snapshots, runtime artifacts, and business state.
+- `provider-job-logs.prune` is a narrow provider job log retention mutation. It dry-runs by
+  default, requires a cutoff, optionally narrows by deployment id, provider key, resource id, or
+  server id, and deletes only `provider_job_logs` rows whose `created_at < before` when destructive
+  mode is explicit. It does not prune deployment rows, embedded deployment logs, runtime logs,
+  audit rows, domain event streams, outbox/inbox records, process attempts, snapshots, runtime
+  artifacts, source workspaces, build cache, provider resources, or business state
+
+Runtime log archive retention operations:
+
+| Capability | Kind | Operation Key | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- |
+| Archive resource runtime logs | Command | `resources.runtime-logs.archive` | `appaloft resource log-archives archive <resourceId>` | `POST /api/resources/{resourceId}/runtime-log-archives` |
+| List resource runtime log archives | Query | `resources.runtime-log-archives.list` | `appaloft resource log-archives list` | `GET /api/resources/runtime-log-archives` |
+| Show resource runtime log archive | Query | `resources.runtime-log-archives.show` | `appaloft resource log-archives show <archiveId>` | `GET /api/resources/runtime-log-archives/{archiveId}` |
+| Prune resource runtime log archives | Command | `resources.runtime-log-archives.prune` | `appaloft resource log-archives prune --before <iso>` | `POST /api/resources/runtime-log-archives/prune` |
+- resource runtime log archive retention captures only bounded redacted archive snapshots from
+  `resources.runtime-logs` into Appaloft-owned retained records, then list/show/prunes those
+  records. It does not persist every live runtime line by default and does not mutate external
+  Docker/Compose/Swarm/SSH/PM2/systemd/file-tail/provider log stores, deployment logs, provider job
+  logs, audit rows, domain event streams, outbox/inbox records, process attempts, snapshots,
+  runtime artifacts, source workspaces, build cache, or business state
+- remote-state stale-lock recovery, migration execution, backup restore, state-root prune, and
+  runtime artifact/workspace prune remain future extensions when their governed commands and
+  persisted read models exist
+
+Terminal session lifecycle boundary:
+- `terminal-sessions.list` and `terminal-sessions.show` expose only active ephemeral session
+  descriptors and safe scope metadata
+- `terminal-sessions.close` and `terminal-sessions.expire` release gateway-owned PTY, SSH,
+  subprocess, and transport resources; they do not mutate resource, deployment, or target
+  aggregates
+- terminal lifecycle operations must not persist or return terminal input/output, raw shell command
+  strings, SSH private keys, access tokens, environment secret values, provider SDK objects, or raw
+  provider payloads
+- durable audit/history of opened and closed terminal sessions is governed by the separate Phase 9
+  audit/event read-surface work
 - next actions are guidance such as diagnostic/manual review/no-action, not hidden mutation
   affordances
 - work item detail must not expose raw logs, private keys, raw environment values, certificate
@@ -1096,7 +1282,9 @@ Implemented operations:
 Current boundary:
 - `domain-bindings.create` creates durable binding state, persists the first manual verification
   attempt, records initial DNS observation metadata, publishes `domain-binding-requested`, and
-  returns accepted `ok({ id })`
+  returns accepted `ok({ id })`. Initial ownership verification attempts are also projected into
+  `operator-work.*` through safe process-attempt rows with DomainBinding, Resource, server, and DNS
+  expectation metadata
 - `domain-bindings.confirm-ownership` confirms the current verification attempt, defaults to
   Appaloft-observed DNS evidence before moving the binding to `bound`, supports explicit manual
   override, publishes `domain-bound`, and returns `ok({ id, verificationAttemptId })`
@@ -1131,7 +1319,9 @@ Current boundary:
 - `certificates.import` is an active manual-certificate operation for manual-policy bindings:
   it publishes `certificate-imported` instead of `certificate-issued`, is exposed through the
   operation catalog plus CLI/API entrypoints and the resource-scoped Web entrypoint, and now uses
-  durable PG/PGlite-backed secret persistence rather than placeholder refs
+  durable PG/PGlite-backed secret persistence rather than placeholder refs. Successful manual
+  imports are also projected into `operator-work.*` through safe process-attempt rows without PEM,
+  private-key, or passphrase material
 - the default shell composition intentionally registers an unavailable certificate provider until a
   real provider adapter is configured; this records retryable `certificate_provider_unavailable`
   state after accepted issue requests rather than pretending HTTPS is active
@@ -1142,8 +1332,10 @@ Current boundary:
   credentials, or raw provider responses
 - `certificates.retry` creates a new provider-issued certificate attempt from the latest retryable
   managed failure by reusing the `certificates.issue-or-renew` path and publishing
-  `certificate-requested`; it does not retry domain binding ownership verification and does not
-  replay old events
+  `certificate-requested`; the retry-created attempt uses the `certificates.issue-or-renew`
+  process-attempt projection path for operator-work visibility rather than a separate
+  `certificates.retry` worker binding. It does not retry domain binding ownership verification and
+  does not replay old events
 - imported certificates are not retried by `certificates.retry`; operators replace imported
   material by running `certificates.import` again with new secret-bearing input
 - `certificates.revoke` stops Appaloft from using a certificate for managed TLS. Provider-issued
@@ -1190,8 +1382,10 @@ Current boundary:
   deployment snapshot history, server-applied route audit, and certificate history. Delete is
   blocked while active certificate state is attached and does not revoke/delete certificates.
 - `domain-bindings.retry-verification` creates a new ownership verification attempt and resets DNS
-  observation to a waitable pending state when expected targets are known. It does not retry
-  certificate issuance, route repair, deployment retry, redeploy, or rollback.
+  observation to a waitable pending state when expected targets are known. Accepted verification
+  retry attempts are also projected into `operator-work.*` through safe process-attempt rows with
+  DomainBinding, Resource, server, and DNS expectation metadata. It does not retry certificate
+  issuance, route repair, deployment retry, redeploy, or rollback.
 - Web exposes domain binding from both the resource detail page and the standalone domain bindings
   page; the resource detail page is the owner-scoped affordance, while the standalone page is
   cross-resource management over the same command/query contracts
@@ -1225,6 +1419,14 @@ Implemented operations:
 | Database migrate | Command | `system.db-migrate` | `DbMigrateCommand` | none | `appaloft db migrate` | none |
 
 Current boundary:
+- provider and plugin list operations are read-only diagnostics; they expose stable capability
+  flags, optional capability details, and safe configuration diagnostics for operators and future
+  tools
+- provider and plugin list operations must not expose provider SDK types, raw SDK payloads, plugin
+  implementation internals, access tokens, private keys, secret references, certificate material, or
+  unredacted command output
+- planned providers and incompatible plugins may remain visible, but disabled capability details and
+  configuration diagnostics must make the inactive state explicit
 - embedded self-hosted PGlite applies migrations automatically during shell startup
 - Docker self-hosted installs enable startup migrations before the HTTP server is marked healthy
 - explicit `db migrate` remains the schema-control operation for external PostgreSQL and operational

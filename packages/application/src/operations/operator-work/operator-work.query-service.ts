@@ -18,10 +18,21 @@ import {
   type OperatorWorkStatus,
   type ProcessAttemptReadModel,
   type ProcessAttemptRecord,
+  type RemoteStateWorkReadModel,
+  type RemoteStateWorkSummary,
+  type RouteRealizationWorkReadModel,
+  type RouteRealizationWorkSummary,
   type ServerReadModel,
   type ServerSummary,
+  type SourceLinkReadModel,
+  type SourceLinkRecord,
 } from "../../ports";
-import { EmptyProcessAttemptReadModel } from "../../process-attempt-journal";
+import {
+  EmptyProcessAttemptReadModel,
+  EmptyRemoteStateWorkReadModel,
+  EmptyRouteRealizationWorkReadModel,
+  EmptySourceLinkReadModel,
+} from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { ListOperatorWorkQuery } from "./list-operator-work.query";
 import { type ShowOperatorWorkQuery } from "./show-operator-work.query";
@@ -37,7 +48,7 @@ type OperatorWorkFilter = {
 
 const defaultLimit = 50;
 const unsafeDetailKeyPattern =
-  /secret|password|passphrase|private[_-]?key|token|credential|command[_-]?line|commandline/i;
+  /secret|password|passphrase|private[_-]?key|ssh[_-]?key|identity[_-]?file|token|credential|command[_-]?line|commandline/i;
 const unsafeDetailValuePattern =
   /(BEGIN .*PRIVATE KEY|PRIVATE_KEY|SECRET_|PASSWORD=|TOKEN=|PASS=)/i;
 
@@ -300,6 +311,77 @@ function sanitizeSafeDetails(
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
 }
 
+function sourceLinkToWorkItem(sourceLink: SourceLinkRecord): OperatorWorkItem {
+  return {
+    id: `source-link:${sourceLink.sourceFingerprint}`,
+    kind: "system",
+    status: "succeeded",
+    operationKey: "source-links.relink",
+    phase: "source-link-state",
+    step: sourceLink.reason ?? "linked",
+    projectId: sourceLink.projectId,
+    resourceId: sourceLink.resourceId,
+    ...(sourceLink.serverId ? { serverId: sourceLink.serverId } : {}),
+    updatedAt: sourceLink.updatedAt,
+    finishedAt: sourceLink.updatedAt,
+    nextActions: ["no-action"],
+    safeDetails: {
+      sourceFingerprint: sourceLink.sourceFingerprint,
+      environmentId: sourceLink.environmentId,
+      ...(sourceLink.destinationId ? { destinationId: sourceLink.destinationId } : {}),
+      ...(sourceLink.reason ? { reason: sourceLink.reason } : {}),
+    },
+  };
+}
+
+function routeRealizationToWorkItem(route: RouteRealizationWorkSummary): OperatorWorkItem {
+  const safeDetails = sanitizeSafeDetails(route.safeDetails);
+
+  return {
+    id: `route-realization:${route.id}`,
+    kind: "route-realization",
+    status: route.status,
+    operationKey: route.operationKey,
+    ...(route.phase ? { phase: route.phase } : {}),
+    ...(route.step ? { step: route.step } : {}),
+    ...(route.projectId ? { projectId: route.projectId } : {}),
+    ...(route.resourceId ? { resourceId: route.resourceId } : {}),
+    ...(route.deploymentId ? { deploymentId: route.deploymentId } : {}),
+    ...(route.serverId ? { serverId: route.serverId } : {}),
+    ...(route.domainBindingId ? { domainBindingId: route.domainBindingId } : {}),
+    ...(route.startedAt ? { startedAt: route.startedAt } : {}),
+    updatedAt: route.updatedAt,
+    ...(route.finishedAt ? { finishedAt: route.finishedAt } : {}),
+    ...(route.errorCode ? { errorCode: route.errorCode } : {}),
+    ...(route.errorCategory ? { errorCategory: route.errorCategory } : {}),
+    ...(route.retriable === undefined ? {} : { retriable: route.retriable }),
+    nextActions: route.nextActions,
+    ...(safeDetails ? { safeDetails } : {}),
+  };
+}
+
+function remoteStateToWorkItem(remoteState: RemoteStateWorkSummary): OperatorWorkItem {
+  const safeDetails = sanitizeSafeDetails(remoteState.safeDetails);
+
+  return {
+    id: `remote-state:${remoteState.id}`,
+    kind: "remote-state",
+    status: remoteState.status,
+    operationKey: remoteState.operationKey,
+    phase: remoteState.phase,
+    ...(remoteState.step ? { step: remoteState.step } : {}),
+    ...(remoteState.serverId ? { serverId: remoteState.serverId } : {}),
+    ...(remoteState.startedAt ? { startedAt: remoteState.startedAt } : {}),
+    updatedAt: remoteState.updatedAt,
+    ...(remoteState.finishedAt ? { finishedAt: remoteState.finishedAt } : {}),
+    ...(remoteState.errorCode ? { errorCode: remoteState.errorCode } : {}),
+    ...(remoteState.errorCategory ? { errorCategory: remoteState.errorCategory } : {}),
+    ...(remoteState.retriable === undefined ? {} : { retriable: remoteState.retriable }),
+    nextActions: remoteState.nextActions,
+    ...(safeDetails ? { safeDetails } : {}),
+  };
+}
+
 function processAttemptToWorkItem(attempt: ProcessAttemptRecord): OperatorWorkItem {
   const safeDetails = sanitizeSafeDetails(attempt.safeDetails);
 
@@ -371,6 +453,12 @@ export class OperatorWorkQueryService {
     private readonly clock: Clock,
     @inject(tokens.processAttemptReadModel)
     private readonly processAttemptReadModel: ProcessAttemptReadModel = new EmptyProcessAttemptReadModel(),
+    @inject(tokens.remoteStateWorkReadModel)
+    private readonly remoteStateWorkReadModel: RemoteStateWorkReadModel = new EmptyRemoteStateWorkReadModel(),
+    @inject(tokens.sourceLinkReadModel)
+    private readonly sourceLinkReadModel: SourceLinkReadModel = new EmptySourceLinkReadModel(),
+    @inject(tokens.routeRealizationWorkReadModel)
+    private readonly routeRealizationWorkReadModel: RouteRealizationWorkReadModel = new EmptyRouteRealizationWorkReadModel(),
   ) {}
 
   async list(context: ExecutionContext, query: ListOperatorWorkQuery): Promise<OperatorWorkList> {
@@ -402,6 +490,30 @@ export class OperatorWorkQueryService {
       filter.kind && filter.kind !== "certificate"
         ? []
         : await this.certificateReadModel.list(repositoryContext);
+    const remoteStates =
+      filter.kind && filter.kind !== "remote-state"
+        ? []
+        : await this.remoteStateWorkReadModel.list(repositoryContext, {
+            ...(filter.serverId ? { serverId: filter.serverId } : {}),
+            ...(filter.limit ? { limit: filter.limit } : {}),
+          });
+    const sourceLinks =
+      filter.kind && filter.kind !== "system"
+        ? []
+        : await this.sourceLinkReadModel.list(repositoryContext, {
+            ...(filter.resourceId ? { resourceId: filter.resourceId } : {}),
+            ...(filter.serverId ? { serverId: filter.serverId } : {}),
+            ...(filter.limit ? { limit: filter.limit } : {}),
+          });
+    const routeRealizations =
+      filter.kind && filter.kind !== "route-realization"
+        ? []
+        : await this.routeRealizationWorkReadModel.list(repositoryContext, {
+            ...(filter.resourceId ? { resourceId: filter.resourceId } : {}),
+            ...(filter.serverId ? { serverId: filter.serverId } : {}),
+            ...(filter.deploymentId ? { deploymentId: filter.deploymentId } : {}),
+            ...(filter.limit ? { limit: filter.limit } : {}),
+          });
 
     const deploymentItems = deployments.map(deploymentToWorkItem);
     const serverItems = servers
@@ -412,13 +524,23 @@ export class OperatorWorkQueryService {
         certificateToWorkItem(certificate, bindingsById.get(certificate.domainBindingId)),
       )
       .filter((item): item is OperatorWorkItem => item !== null);
+    const remoteStateItems = remoteStates.map(remoteStateToWorkItem);
+    const sourceLinkItems = sourceLinks.map(sourceLinkToWorkItem);
+    const routeRealizationItems = routeRealizations.map(routeRealizationToWorkItem);
     const durableItems = processAttempts.map(processAttemptToWorkItem);
 
     const itemsById = new Map<string, OperatorWorkItem>();
     for (const item of durableItems) {
       itemsById.set(item.id, item);
     }
-    for (const item of [...deploymentItems, ...serverItems, ...certificateItems]) {
+    for (const item of [
+      ...deploymentItems,
+      ...serverItems,
+      ...certificateItems,
+      ...remoteStateItems,
+      ...sourceLinkItems,
+      ...routeRealizationItems,
+    ]) {
       if (!itemsById.has(item.id) && !hasDurableSameProxyScope(durableItems, item)) {
         itemsById.set(item.id, item);
       }

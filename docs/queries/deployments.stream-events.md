@@ -223,16 +223,27 @@ It must not:
 HTTP/oRPC bounded replay endpoint, HTTP/oRPC streaming endpoint, CLI `deployments events` command,
 shell deployment event observer, and Web deployment detail timeline.
 
-The first active implementation uses deployment log/progress projection data plus live progress
-observation to produce ordered envelopes with `deploymentId:sequence` cursor tokens. This satisfies
-the standalone replay/follow boundary without requiring the original `deployments.create` transport
-to stay open.
+The active bounded replay and follow implementations first check ADR-059 retained event observation
+rows for the deployment. When retained rows or prune watermark state exist, bounded replay and
+follow-mode cursor continuation read those rows and return a governed `gap` envelope for a cursor
+that falls behind retained history. When no retained event observation state exists yet, replay and
+follow fall back to the legacy deployment log/progress projection source.
+
+Newly published deployment domain events are recorded into the retained event observation store
+after the aggregate event is published from durable application state. Retained follow mode uses
+projection-rebuild-stable retained cursors for recorded deployment lifecycle facts and emits
+stream-gap envelopes if the stored continuation cursor is no longer present.
 
 Remaining hardening gaps:
 
-- projection-rebuild-stable cursors beyond the current deployment sequence token;
+- broader progress-observation retention for non-domain progress events that should survive process
+  restart;
 - broader executable coverage for CLI follow/cancellation and stream gap/failure envelopes;
 - richer durable lifecycle fact sourcing when outbox/process state becomes first-class.
+
+ADR-059 selects a dedicated retained event observation store for domain event stream retention.
+Embedded deployment-log replay remains the fallback observation source for streams without retained
+rows and is not a `domain-events.prune` target.
 
 ADR-034 clarifies that stream reconnect and gap behavior do not determine retry, redeploy, or
 rollback readiness. A gap envelope means observation continuity is incomplete; readiness must read

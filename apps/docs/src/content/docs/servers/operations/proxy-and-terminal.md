@@ -40,6 +40,8 @@ appaloft server proxy repair srv_primary
 
 终端会话用于对服务器或资源执行受控排查，不是普通部署路径的一部分。打开前应明确目标、身份和目的。
 
+使用 terminal session lifecycle operations 可以列出 active sessions、查看单个 session 的安全元数据、关闭一个 active session，或让旧的 active sessions 过期。这些操作只返回 session id、scope、target ids、provider key、transport path、timestamps 和 status，不暴露终端输入、终端输出、原始命令、private key、access token 或环境 secret 值。
+
 <h2 id="server-terminal-safe-copy">安全复制输出</h2>
 
 终端输出可能包含环境、路径或运行时细节。复制日志或诊断信息前，优先使用诊断摘要，并避免分享 secret、私钥或完整环境变量值。
