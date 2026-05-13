@@ -92,8 +92,7 @@ export function createAppaloftI18n(input?: {
     interpolation: {
       escapeValue: false,
     },
-    showSupportNotice: false,
-    initImmediate: false,
+    initAsync: false,
   });
 
   return instance;

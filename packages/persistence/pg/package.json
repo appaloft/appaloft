@@ -6,11 +6,11 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.4.3",
+    "@electric-sql/pglite": "^0.4.5",
     "@opentelemetry/api": "^1.9.1",
     "@appaloft/application": "workspace:*",
     "@appaloft/core": "workspace:*",
-    "kysely": "^0.28.15",
+    "kysely": "^0.29.0",
     "kysely-postgres-js": "^3.0.0",
     "postgres": "^3.4.9"
   },

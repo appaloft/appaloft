@@ -1,5 +1,6 @@
 import { type DiagnosticsPort } from "@appaloft/application";
-import { type Kysely, type Migrator } from "kysely";
+import { type Kysely } from "kysely";
+import { type Migrator } from "kysely/migration";
 import { type DatabaseConnectionDescriptor, pingDatabase } from "./db";
 import { type Database } from "./schema";
 
