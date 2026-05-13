@@ -21,6 +21,7 @@ import {
   EnvironmentName,
   HostAddress,
   MessageText,
+  ok,
   PortNumber,
   Project,
   ProjectId,
@@ -31,6 +32,7 @@ import {
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  type Result,
   RoutePathPrefix,
   TlsModeValue,
   UpsertDeploymentTargetSpec,
@@ -53,7 +55,14 @@ import {
   NoopLogger,
   SequenceIdGenerator,
 } from "@appaloft/testkit";
-import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
+import {
+  createExecutionContext,
+  type ExecutionContext,
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
+  type RepositoryContext,
+  toRepositoryContext,
+} from "../src";
 import { CreateDomainBindingUseCase, ListDomainBindingsQueryService } from "../src/use-cases";
 
 function createTestContext(): ExecutionContext {
@@ -79,6 +88,18 @@ function domainBindingRequestedEvent(events: unknown[]): DomainEvent {
   return event;
 }
 
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
+  }
+}
+
 async function seedRoutingContext(input?: {
   environmentProjectId?: string;
   resourceEnvironmentId?: string;
@@ -97,6 +118,7 @@ async function seedRoutingContext(input?: {
   const domainBindings = new MemoryDomainBindingRepository();
   const eventBus = new CapturedEventBus();
   const logger = new NoopLogger();
+  const processAttemptRecorder = new RecordingProcessAttemptRecorder();
 
   const project = Project.create({
     id: ProjectId.rehydrate("prj_demo"),
@@ -164,6 +186,7 @@ async function seedRoutingContext(input?: {
     new SequenceIdGenerator(),
     eventBus,
     logger,
+    processAttemptRecorder,
   );
 
   return {
@@ -171,15 +194,22 @@ async function seedRoutingContext(input?: {
     repositoryContext,
     domainBindings,
     eventBus,
+    processAttemptRecorder,
     useCase,
     readModel: new MemoryDomainBindingReadModel(domainBindings),
   };
 }
 
 describe("CreateDomainBindingUseCase", () => {
-  test("ROUTE-TLS-EVT-013 ROUTE-TLS-READMODEL-008 accepts a binding and exposes pending DNS observation", async () => {
-    const { context, domainBindings, eventBus, repositoryContext, useCase } =
-      await seedRoutingContext();
+  test("ROUTE-TLS-EVT-013 ROUTE-TLS-READMODEL-008 PROC-DELIVERY-001 accepts a binding and exposes pending DNS observation", async () => {
+    const {
+      context,
+      domainBindings,
+      eventBus,
+      processAttemptRecorder,
+      repositoryContext,
+      useCase,
+    } = await seedRoutingContext();
 
     const result = await useCase.execute(context, {
       projectId: "prj_demo",
@@ -229,6 +259,35 @@ describe("CreateDomainBindingUseCase", () => {
       verificationAttemptId: "dva_0002",
       correlationId: "req_domain_binding_test",
     });
+    expect(processAttemptRecorder.records).toHaveLength(1);
+    expect(processAttemptRecorder.records[0]).toMatchObject({
+      id: "dva_0002",
+      kind: "route-realization",
+      status: "pending",
+      operationKey: "domain-bindings.create",
+      dedupeKey: `domain-binding-verification:${id}:dva_0002`,
+      correlationId: "req_domain_binding_test",
+      requestId: "req_domain_binding_test",
+      phase: "domain-verification",
+      step: "verification-requested",
+      projectId: "prj_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      domainBindingId: id,
+      startedAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      nextActions: ["no-action"],
+      safeDetails: {
+        domainName: "www.example.com",
+        proxyKind: "traefik",
+        tlsMode: "auto",
+        certificatePolicy: "auto",
+        expectedTarget: "Manual verification required for www.example.com",
+        dnsExpectedTargets: "127.0.0.1",
+      },
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("BEGIN PRIVATE KEY");
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("provider raw payload");
 
     const repeated = await useCase.execute(context, {
       projectId: "prj_demo",
@@ -242,6 +301,7 @@ describe("CreateDomainBindingUseCase", () => {
     });
     expect(repeated.isOk()).toBe(true);
     expect(repeated._unsafeUnwrap().id).toBe(id);
+    expect(processAttemptRecorder.records).toHaveLength(1);
   });
 
   test("rejects proxyKind none for durable domain bindings", async () => {

@@ -15,10 +15,11 @@ resource.
 ## Success
 
 Returns `ok({ id })`, persists a restore attempt, and records
-`dependency-resource-restore-requested`.
+`dependency-resource-restore-requested`. The accepted and final provider restore outcomes are
+projected into `operator-work.*` through safe process-attempt rows keyed by the restore attempt id.
 
 Success means restore request accepted. Provider restore success or failure is reflected through
-restore attempt state, safe read models, and lifecycle events.
+restore attempt state, safe read models, operator-work visibility, and lifecycle events.
 
 ## Failure
 
@@ -32,4 +33,3 @@ restore attempt state, safe read models, and lifecycle events.
 
 No cross-resource restore, clone, export, deployment rollback, redeploy, runtime environment
 injection, workload restart, or historical snapshot rewrite.
-

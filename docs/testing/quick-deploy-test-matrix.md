@@ -299,7 +299,10 @@ processes with different runner-local PGlite directories and verifies that the s
 remote SSH state/source link identity instead of creating a duplicate resource.
 `.github/workflows/ssh-remote-state-e2e.yml` exposes that harness as a manual workflow and wires it
 into nightly smoke plus release gating when `APPALOFT_E2E_SSH_HOST` and
-`APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured.
+`APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured. `.github/workflows/ssh-quick-deploy-e2e.yml`
+exposes the real quick-deploy SSH harness through the same nightly/release release-readiness path.
+For `v0.11.x` publish tags, the release workflow requires both SSH workflows before release artifact
+publication.
 
 ## Open Questions
 

@@ -14,7 +14,8 @@ Returns `ok({ id })` and tombstones the dependency resource. Imported external d
 removes only Appaloft's control-plane record.
 
 Deleting a realized Appaloft-managed Postgres or Redis resource must request/apply provider cleanup
-after safety checks pass and tombstone the Appaloft record only after cleanup state is durable.
+after safety checks pass, mirror cleanup progress/failure into safe operator-visible
+process-attempt state, and tombstone the Appaloft record only after cleanup state is durable.
 
 ## Failure
 

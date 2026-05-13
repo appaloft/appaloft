@@ -184,6 +184,54 @@ export const domainError = {
     retryable = true,
   ): DomainError =>
     createError("source_event_read_unavailable", "infra", message, details, retryable),
+  auditEventScopeRequired: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("audit_event_scope_required", "user", message, details),
+  auditEventNotFound: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("audit_event_not_found", "user", message, details),
+  auditEventLegalHoldScopeRequired: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("audit_event_legal_hold_scope_required", "user", message, details),
+  auditEventLegalHoldNotFound: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("audit_event_legal_hold_not_found", "user", message, details),
+  auditEventArchiveScopeRequired: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("audit_event_archive_scope_required", "user", message, details),
+  auditEventArchiveNotFound: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("audit_event_archive_not_found", "user", message, details),
+  operatorWorkNotFound: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("operator_work_not_found", "user", message, details),
+  operatorWorkRecoveryNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("operator_work_recovery_not_allowed", "user", message, details),
+  operatorWorkDeadLetterNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("operator_work_dead_letter_not_allowed", "user", message, details),
+  operatorWorkCancelNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("operator_work_cancel_not_allowed", "user", message, details),
+  operatorWorkRetryNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("operator_work_retry_not_allowed", "user", message, details),
+  operatorWorkPruneNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("operator_work_prune_not_allowed", "user", message, details),
   sourceEventSignatureInvalid: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

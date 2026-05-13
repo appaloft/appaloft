@@ -2,10 +2,11 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: planned post-auth candidate for Phase 9 / `1.0.0-rc`
-- Roadmap dependency: Phase 8 self-hosted auth and organization bootstrap must be accepted before
-  SDK publication or SDK-driven internal smoke testing becomes release-gated.
+- Round: Code Round / Post-Implementation Sync
+- Artifact state: SDK/interface-parity slice accepted for Phase 9 / `0.11.0`
+- Roadmap dependency: Phase 8 self-hosted auth and organization bootstrap is accepted. SDK
+  publication, interface-parity checks, and representative SDK running-server coverage are now
+  automated for the SDK slice.
 
 ## Business Outcome
 
@@ -27,11 +28,13 @@ same OpenAPI artifact plus Appaloft operation metadata extensions.
 
 - [Business Operation Map](../../BUSINESS_OPERATION_MAP.md)
 - [Core Operations](../../CORE_OPERATIONS.md)
+- [ADR-046: TypeScript SDK Interface Parity](../../decisions/ADR-046-typescript-sdk-interface-parity.md)
 - [Adapter Command/Query Boundary](../../architecture/adapter-command-query-boundary.md)
 - [Error Model](../../errors/model.md)
 - [neverthrow Conventions](../../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../../architecture/async-lifecycle-and-acceptance.md)
 - [Product Roadmap](../../PRODUCT_ROADMAP.md)
+- [TypeScript SDK Interface Parity Test Matrix](../../testing/typescript-sdk-interface-parity-test-matrix.md)
 - `@appaloft/openapi` generated public API contract
 
 ## Ubiquitous Language
@@ -117,9 +120,37 @@ same OpenAPI artifact plus Appaloft operation metadata extensions.
   Web/internal usage, but the package is private and depends on server-side route construction.
 - `packages/openapi` already generates public HTTP API metadata and is the right place to extend
   the OpenAPI artifact with Appaloft operation metadata for SDK generation.
+- ADR-046 accepts the SDK package boundary and OpenAPI `x-appaloft-*` metadata contract. OpenAPI
+  metadata parity (`TS-SDK-OPENAPI-*`), initial SDK generation tooling (`TS-SDK-GEN-001`), and the
+  `@appaloft/sdk` import-boundary check (`TS-SDK-BOUNDARY-001`) are implemented.
+- `packages/sdk-generator` collects Appaloft operation descriptors from annotated OpenAPI metadata
+  and renders a reproducible TypeScript operation facade source string. The package is build-time
+  tooling and does not maintain a handwritten method inventory.
+- `packages/sdk` defines the runtime SDK package boundary and a thin operation request client over
+  generated operation descriptors. It has no runtime dependencies, exports `generatedSdkOperations`
+  built from the OpenAPI SDK contract, supports product-session cookie auth, deploy-token bearer
+  auth, operation input/path/query organization scoping, and typed structured errors without
+  parsing human message text.
+- The SDK exposes a lower-level stream helper only for operation descriptors marked
+  `streaming: true`. The helper wires `AbortSignal` cancellation into the request, parses JSON,
+  NDJSON, and SSE `data:` JSON envelopes, and turns non-OK responses into structured SDK stream
+  errors.
+- Public SDK reference docs are active at
+  `/docs/reference/typescript-sdk/#typescript-sdk-operation-client` and
+  `/docs/en/reference/typescript-sdk/#typescript-sdk-operation-client`. They cover installation,
+  base URL configuration, product-session cookie auth, deploy-token bearer auth, organization
+  scoping, operation examples, structured error handling, and lower-level streaming behavior.
+- `packages/sdk/test/running-server-smoke.test.ts` covers `TS-SDK-BLACKBOX-001` by starting the
+  real Elysia/oRPC HTTP mount on an ephemeral local port and exercising representative
+  project create/list/show calls through the SDK with product-session authorization. The command
+  and query buses remain stubbed so the test proves the server/API/serialization/auth boundary,
+  not persistence or project-domain policy.
+- `scripts/test/sdk-release-packaging.test.ts` and `release:npm:prepare -- --sdk-only` cover
+  `TS-SDK-RELEASE-001`: `@appaloft/sdk` builds to `dist/index.js` plus `dist/index.d.ts`, carries
+  generated operation descriptor JavaScript and declarations, carries public npm metadata,
+  contains no runtime `workspace:*` dependencies, and is included in the release npm publish job.
 - `@appaloft/ai-mcp` already generates tool descriptors from the operation catalog, proving the
   catalog can drive additional interface surfaces.
-- Phase 8 auth/org behavior is not yet accepted, so SDK authentication and organization scoping
-  must remain planned rather than published.
 - No `CORE_OPERATIONS.md` or `operation-catalog.ts` row is added for the SDK itself because the SDK
   is an interface surface over existing operations, not a business operation.
+- Generated high-level streaming facades remain a migration gap for later Phase 9 Code Rounds.

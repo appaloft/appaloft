@@ -49,6 +49,13 @@ describe("FileSystemDeploymentConfigReader", () => {
         "  startCommand: bun run start",
         "network:",
         "  internalPort: 4310",
+        "retention:",
+        "  runtimePrune:",
+        "    retentionDays: 14",
+        "    destructive: true",
+        "    categories:",
+        "      - stopped-containers",
+        "      - preview-workspaces",
       ].join("\n"),
     );
 
@@ -67,6 +74,13 @@ describe("FileSystemDeploymentConfigReader", () => {
       buildCommand: "bun run build",
       startCommand: "bun run start",
       port: 4310,
+    });
+    expect(snapshot?.retention?.runtimePrune).toEqual({
+      retentionDays: 14,
+      destructive: true,
+      categories: ["stopped-containers", "preview-workspaces"],
+      retryOnFailure: true,
+      enabled: true,
     });
     expect(snapshot?.project).toBeUndefined();
     expect(snapshot?.targets).toBeUndefined();

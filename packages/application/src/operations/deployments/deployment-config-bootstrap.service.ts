@@ -74,6 +74,7 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
+import { type ScheduledRuntimePrunePolicyRepository } from "../servers/scheduled-runtime-prune.service";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
 
 type LegacyDeploymentBootstrapInput = CreateDeploymentCommandInput & {
@@ -154,6 +155,10 @@ function normalizeDeploymentResourceInput(
   };
 }
 
+function deploymentSnapshotRuntimePrunePolicyId(serverId: string): string {
+  return `rpp_deployment_snapshot_${serverId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
+
 @injectable()
 export class DeploymentContextBootstrapService {
   constructor(
@@ -183,6 +188,8 @@ export class DeploymentContextBootstrapService {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.scheduledRuntimePrunePolicyRepository)
+    private readonly scheduledRuntimePrunePolicyRepository?: ScheduledRuntimePrunePolicyRepository,
   ) {}
 
   async bootstrap(
@@ -192,6 +199,18 @@ export class DeploymentContextBootstrapService {
     const self = this;
 
     return safeTry(async function* () {
+      const bootstrapInput = input as LegacyDeploymentBootstrapInput;
+      if (bootstrapInput.sourceLocator || bootstrapInput.configFilePath) {
+        const config = yield* await self.deploymentConfigReader.read(context, {
+          sourceLocator: bootstrapInput.sourceLocator ?? ".",
+          ...(bootstrapInput.configFilePath
+            ? { configFilePath: bootstrapInput.configFilePath }
+            : {}),
+        });
+        const configured = yield* await self.applyConfigStrategy(context, bootstrapInput, config);
+        return ok(configured);
+      }
+
       if (input.destinationId) {
         return ok(input);
       }
@@ -258,6 +277,13 @@ export class DeploymentContextBootstrapService {
         selectedDestinationId =
           selectedDestinationId ??
           (selectedTarget ? destinationIds.get(selectedTarget) : undefined);
+      }
+      if (selectedServerId && config?.retention?.runtimePrune) {
+        yield* await self.materializeConfiguredRuntimePrunePolicy(
+          context,
+          selectedServerId,
+          config,
+        );
       }
       const resourceConfig = input.resource
         ? normalizeDeploymentResourceInput(input.resource)
@@ -343,6 +369,44 @@ export class DeploymentContextBootstrapService {
         ...(destinationId ? { destinationId } : {}),
       });
     });
+  }
+
+  private async materializeConfiguredRuntimePrunePolicy(
+    context: ExecutionContext,
+    serverId: string,
+    config: DeploymentConfigSnapshot,
+  ): Promise<Result<void>> {
+    const policyConfig = config.retention?.runtimePrune;
+    const repository = this.scheduledRuntimePrunePolicyRepository;
+    if (!policyConfig || !repository) {
+      return ok(undefined);
+    }
+
+    const repositoryContext = toRepositoryContext(context);
+    const policyId = deploymentSnapshotRuntimePrunePolicyId(serverId);
+    const existing = await repository.findOne(repositoryContext, policyId);
+    if (existing.isErr()) {
+      return err(existing.error);
+    }
+
+    const record = {
+      id: existing.value?.id ?? policyId,
+      version: config.configFilePath ?? "deployment-config",
+      scope: "deployment-snapshot" as const,
+      serverId,
+      retentionDays: policyConfig.retentionDays,
+      destructive: policyConfig.destructive,
+      categories: policyConfig.categories,
+      retryOnFailure: policyConfig.retryOnFailure,
+      enabled: policyConfig.enabled,
+      updatedAt: this.clock.now(),
+    };
+    const persisted = await repository.upsert(repositoryContext, record);
+    if (persisted.isErr()) {
+      return err(persisted.error);
+    }
+
+    return ok(undefined);
   }
 
   private async resolveConfiguredProject(

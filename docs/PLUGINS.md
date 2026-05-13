@@ -69,6 +69,19 @@ Future lifecycle hooks:
 - plugin compatibility is checked with semver against the app version
 - incompatible plugins stay visible but should not be activated
 
+## Plugin Diagnostics
+
+`system.plugins.list` returns safe plugin discovery diagnostics:
+
+- `capabilities`: stable manifest capability flags
+- `capabilityDetails`: user-facing capability labels, enabled state, and safe descriptions
+- `configuration`: compatible/incompatible configuration status plus stable diagnostic codes
+
+Incompatible plugins remain visible with inactive capability details so operators can understand why
+an extension is unavailable. Plugin diagnostics must not expose plugin implementation internals,
+provider SDK types, raw runtime payloads, access tokens, private keys, secret references, or
+unredacted command output.
+
 ## Isolation
 
 Current posture:

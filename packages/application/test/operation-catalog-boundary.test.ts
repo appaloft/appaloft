@@ -52,6 +52,10 @@ describe("operation catalog aggregate mutation boundary", () => {
       "servers.capacity.inspect",
       "operator-work.list",
       "operator-work.show",
+      "operator-work.mark-recovered",
+      "operator-work.dead-letter",
+      "operator-work.cancel",
+      "operator-work.retry",
       "servers.rename",
       "servers.deactivate",
       "servers.delete-check",
@@ -189,6 +193,24 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[DOMAIN-EVENT-RETENTION-004] domain event prune is exposed through catalog transports", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "domain-events.prune");
+
+    expect(entry).toMatchObject({
+      key: "domain-events.prune",
+      kind: "command",
+      domain: "domain-events",
+      messageName: "PruneDomainEventsCommand",
+      handlerName: "PruneDomainEventsCommandHandler",
+      serviceName: "PruneDomainEventsUseCase",
+      transports: {
+        cli: "appaloft domain-event prune --before <iso>",
+        orpc: { method: "POST", path: "/api/domain-events/prune" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[DEP-RES-REDIS-NATIVE-009] Redis provider-native realization reuses stable catalog operations and schemas", () => {
     const catalogEntries: readonly OperationCatalogEntry[] = operationCatalog;
     const entriesByKey = new Map<string, OperationCatalogEntry>(
@@ -296,9 +318,24 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
-  test("[OP-WORK-CATALOG-001] operator work ledger is exposed as read-only queries", () => {
+  test("[OP-WORK-CATALOG-001] operator work ledger exposes queries and lifecycle commands", () => {
     const listEntry = operationCatalog.find((candidate) => candidate.key === "operator-work.list");
     const showEntry = operationCatalog.find((candidate) => candidate.key === "operator-work.show");
+    const markRecoveredEntry = operationCatalog.find(
+      (candidate) => candidate.key === "operator-work.mark-recovered",
+    );
+    const deadLetterEntry = operationCatalog.find(
+      (candidate) => candidate.key === "operator-work.dead-letter",
+    );
+    const cancelEntry = operationCatalog.find(
+      (candidate) => candidate.key === "operator-work.cancel",
+    );
+    const retryEntry = operationCatalog.find(
+      (candidate) => candidate.key === "operator-work.retry",
+    );
+    const pruneEntry = operationCatalog.find(
+      (candidate) => candidate.key === "operator-work.prune",
+    );
 
     expect(listEntry).toMatchObject({
       kind: "query",
@@ -322,8 +359,68 @@ describe("operation catalog aggregate mutation boundary", () => {
         orpc: { method: "GET", path: "/api/operator-work/{workId}" },
       },
     });
+    expect(markRecoveredEntry).toMatchObject({
+      kind: "command",
+      domain: "operator-work",
+      messageName: "MarkOperatorWorkRecoveredCommand",
+      handlerName: "MarkOperatorWorkRecoveredCommandHandler",
+      serviceName: "MarkOperatorWorkRecoveredUseCase",
+      transports: {
+        cli: "appaloft work mark-recovered <workId>",
+        orpc: { method: "POST", path: "/api/operator-work/{workId}/mark-recovered" },
+      },
+    });
+    expect(deadLetterEntry).toMatchObject({
+      kind: "command",
+      domain: "operator-work",
+      messageName: "DeadLetterOperatorWorkCommand",
+      handlerName: "DeadLetterOperatorWorkCommandHandler",
+      serviceName: "DeadLetterOperatorWorkUseCase",
+      transports: {
+        cli: "appaloft work dead-letter <workId>",
+        orpc: { method: "POST", path: "/api/operator-work/{workId}/dead-letter" },
+      },
+    });
+    expect(cancelEntry).toMatchObject({
+      kind: "command",
+      domain: "operator-work",
+      messageName: "CancelOperatorWorkCommand",
+      handlerName: "CancelOperatorWorkCommandHandler",
+      serviceName: "CancelOperatorWorkUseCase",
+      transports: {
+        cli: "appaloft work cancel <workId>",
+        orpc: { method: "POST", path: "/api/operator-work/{workId}/cancel" },
+      },
+    });
+    expect(retryEntry).toMatchObject({
+      kind: "command",
+      domain: "operator-work",
+      messageName: "RetryOperatorWorkCommand",
+      handlerName: "RetryOperatorWorkCommandHandler",
+      serviceName: "RetryOperatorWorkUseCase",
+      transports: {
+        cli: "appaloft work retry <workId>",
+        orpc: { method: "POST", path: "/api/operator-work/{workId}/retry" },
+      },
+    });
+    expect(pruneEntry).toMatchObject({
+      kind: "command",
+      domain: "operator-work",
+      messageName: "PruneOperatorWorkCommand",
+      handlerName: "PruneOperatorWorkCommandHandler",
+      serviceName: "PruneOperatorWorkUseCase",
+      transports: {
+        cli: "appaloft work prune --before <iso>",
+        orpc: { method: "POST", path: "/api/operator-work/prune" },
+      },
+    });
     expect(listEntry?.inputSchema).toBeDefined();
     expect(showEntry?.inputSchema).toBeDefined();
+    expect(markRecoveredEntry?.inputSchema).toBeDefined();
+    expect(deadLetterEntry?.inputSchema).toBeDefined();
+    expect(cancelEntry?.inputSchema).toBeDefined();
+    expect(retryEntry?.inputSchema).toBeDefined();
+    expect(pruneEntry?.inputSchema).toBeDefined();
   });
 
   test("[SRV-LIFE-ENTRY-015] server rename is exposed through the active operation catalog", () => {
@@ -583,6 +680,171 @@ describe("operation catalog aggregate mutation boundary", () => {
     });
     expect(listEntry?.inputSchema).toBeDefined();
     expect(showEntry?.inputSchema).toBeDefined();
+  });
+
+  test("[AUDIT-EVENT-CATALOG-001] audit event reads are exposed through the active operation catalog", () => {
+    const listEntry = operationCatalog.find((candidate) => candidate.key === "audit-events.list");
+    const showEntry = operationCatalog.find((candidate) => candidate.key === "audit-events.show");
+    const globalExportEntry = operationCatalog.find(
+      (candidate) => candidate.key === "audit-events.export-global",
+    );
+    const configureHoldEntry = operationCatalog.find(
+      (candidate) => candidate.key === "audit-events.legal-holds.configure",
+    );
+    const listHoldsEntry = operationCatalog.find(
+      (candidate) => candidate.key === "audit-events.legal-holds.list",
+    );
+    const showHoldEntry = operationCatalog.find(
+      (candidate) => candidate.key === "audit-events.legal-holds.show",
+    );
+    const releaseHoldEntry = operationCatalog.find(
+      (candidate) => candidate.key === "audit-events.legal-holds.release",
+    );
+    const createArchiveEntry = operationCatalog.find(
+      (candidate) => candidate.key === "audit-events.archives.create",
+    );
+    const listArchivesEntry = operationCatalog.find(
+      (candidate) => candidate.key === "audit-events.archives.list",
+    );
+    const showArchiveEntry = operationCatalog.find(
+      (candidate) => candidate.key === "audit-events.archives.show",
+    );
+    const pruneArchivesEntry = operationCatalog.find(
+      (candidate) => candidate.key === "audit-events.archives.prune",
+    );
+
+    expect(listEntry).toMatchObject({
+      kind: "query",
+      domain: "audit-events",
+      messageName: "ListAuditEventsQuery",
+      handlerName: "ListAuditEventsQueryHandler",
+      serviceName: "ListAuditEventsQueryService",
+      transports: {
+        cli: "appaloft audit-event list --aggregate <aggregateId>",
+        orpc: { method: "GET", path: "/api/audit-events" },
+      },
+    });
+    expect(showEntry).toMatchObject({
+      kind: "query",
+      domain: "audit-events",
+      messageName: "ShowAuditEventQuery",
+      handlerName: "ShowAuditEventQueryHandler",
+      serviceName: "ShowAuditEventQueryService",
+      transports: {
+        cli: "appaloft audit-event show <auditEventId> --aggregate <aggregateId>",
+        orpc: { method: "GET", path: "/api/audit-events/{auditEventId}" },
+      },
+    });
+    expect(globalExportEntry).toMatchObject({
+      kind: "query",
+      domain: "audit-events",
+      messageName: "ExportGlobalAuditEventsQuery",
+      handlerName: "ExportGlobalAuditEventsQueryHandler",
+      serviceName: "ExportGlobalAuditEventsQueryService",
+      transports: {
+        cli: "appaloft audit-event export-global --from <iso> --to <iso>",
+        orpc: { method: "GET", path: "/api/audit-events/export-global" },
+      },
+    });
+    expect(configureHoldEntry).toMatchObject({
+      kind: "command",
+      domain: "audit-events",
+      messageName: "ConfigureAuditEventLegalHoldCommand",
+      handlerName: "ConfigureAuditEventLegalHoldCommandHandler",
+      serviceName: "ConfigureAuditEventLegalHoldUseCase",
+      transports: {
+        cli: "appaloft audit-event legal-hold configure",
+        orpc: { method: "POST", path: "/api/audit-events/legal-holds" },
+      },
+    });
+    expect(listHoldsEntry).toMatchObject({
+      kind: "query",
+      domain: "audit-events",
+      messageName: "ListAuditEventLegalHoldsQuery",
+      handlerName: "ListAuditEventLegalHoldsQueryHandler",
+      serviceName: "ListAuditEventLegalHoldsQueryService",
+      transports: {
+        cli: "appaloft audit-event legal-hold list",
+        orpc: { method: "GET", path: "/api/audit-events/legal-holds" },
+      },
+    });
+    expect(showHoldEntry).toMatchObject({
+      kind: "query",
+      domain: "audit-events",
+      messageName: "ShowAuditEventLegalHoldQuery",
+      handlerName: "ShowAuditEventLegalHoldQueryHandler",
+      serviceName: "ShowAuditEventLegalHoldQueryService",
+      transports: {
+        cli: "appaloft audit-event legal-hold show <holdId>",
+        orpc: { method: "GET", path: "/api/audit-events/legal-holds/{holdId}" },
+      },
+    });
+    expect(releaseHoldEntry).toMatchObject({
+      kind: "command",
+      domain: "audit-events",
+      messageName: "ReleaseAuditEventLegalHoldCommand",
+      handlerName: "ReleaseAuditEventLegalHoldCommandHandler",
+      serviceName: "ReleaseAuditEventLegalHoldUseCase",
+      transports: {
+        cli: "appaloft audit-event legal-hold release <holdId>",
+        orpc: { method: "POST", path: "/api/audit-events/legal-holds/{holdId}/release" },
+      },
+    });
+    expect(createArchiveEntry).toMatchObject({
+      kind: "command",
+      domain: "audit-events",
+      messageName: "CreateAuditEventArchiveCommand",
+      handlerName: "CreateAuditEventArchiveCommandHandler",
+      serviceName: "CreateAuditEventArchiveUseCase",
+      transports: {
+        cli: "appaloft audit-event archive create",
+        orpc: { method: "POST", path: "/api/audit-events/archives" },
+      },
+    });
+    expect(listArchivesEntry).toMatchObject({
+      kind: "query",
+      domain: "audit-events",
+      messageName: "ListAuditEventArchivesQuery",
+      handlerName: "ListAuditEventArchivesQueryHandler",
+      serviceName: "ListAuditEventArchivesQueryService",
+      transports: {
+        cli: "appaloft audit-event archive list",
+        orpc: { method: "GET", path: "/api/audit-events/archives" },
+      },
+    });
+    expect(showArchiveEntry).toMatchObject({
+      kind: "query",
+      domain: "audit-events",
+      messageName: "ShowAuditEventArchiveQuery",
+      handlerName: "ShowAuditEventArchiveQueryHandler",
+      serviceName: "ShowAuditEventArchiveQueryService",
+      transports: {
+        cli: "appaloft audit-event archive show <archiveId>",
+        orpc: { method: "GET", path: "/api/audit-events/archives/{archiveId}" },
+      },
+    });
+    expect(pruneArchivesEntry).toMatchObject({
+      kind: "command",
+      domain: "audit-events",
+      messageName: "PruneAuditEventArchivesCommand",
+      handlerName: "PruneAuditEventArchivesCommandHandler",
+      serviceName: "PruneAuditEventArchivesUseCase",
+      transports: {
+        cli: "appaloft audit-event archive prune --before <iso>",
+        orpc: { method: "POST", path: "/api/audit-events/archives/prune" },
+      },
+    });
+    expect(listEntry?.inputSchema).toBeDefined();
+    expect(showEntry?.inputSchema).toBeDefined();
+    expect(globalExportEntry?.inputSchema).toBeDefined();
+    expect(configureHoldEntry?.inputSchema).toBeDefined();
+    expect(listHoldsEntry?.inputSchema).toBeDefined();
+    expect(showHoldEntry?.inputSchema).toBeDefined();
+    expect(releaseHoldEntry?.inputSchema).toBeDefined();
+    expect(createArchiveEntry?.inputSchema).toBeDefined();
+    expect(listArchivesEntry?.inputSchema).toBeDefined();
+    expect(showArchiveEntry?.inputSchema).toBeDefined();
+    expect(pruneArchivesEntry?.inputSchema).toBeDefined();
   });
 
   test("[SRC-AUTO-ENTRY-002][SRC-AUTO-ENTRY-004] source event ingest exposes governed HTTP routes", () => {

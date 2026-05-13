@@ -13,6 +13,10 @@ relatedOperations:
   - resources.diagnostic-summary
   - resources.access-failure-evidence.lookup
   - servers.capacity.inspect
+  - servers.capacity.prune
+  - scheduled-runtime-prune-policies.configure
+  - scheduled-runtime-prune-policies.list
+  - scheduled-runtime-prune-policies.show
 sidebar:
   label: "Diagnostics"
   order: 4
@@ -70,6 +74,71 @@ and warnings.
 
 `safeReclaimableEstimate` is input for a later cleanup or prune decision. It does not mean Appaloft
 has cleaned anything.
+
+To preview target-owned cleanup, run prune in dry-run mode:
+
+```bash title="Dry-run runtime target prune"
+appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z
+```
+
+Docker build cache and unused image cleanup are explicit opt-in categories:
+
+```bash title="Dry-run Docker cache and image prune"
+appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --category docker-build-cache --category unused-images
+```
+
+Destructive prune still requires `--dry-run false`. Appaloft never runs broad `docker system prune`
+or Docker volume prune from this command, and it preserves Appaloft state roots, active runtimes,
+rollback candidates, deployment snapshots, audit/events, logs, and business state.
+
+<h2 id="scheduled-runtime-prune-policy">Scheduled runtime prune policy</h2>
+
+Scheduled runtime prune policies let operators configure the retention window that the internal
+runtime prune scheduler reads before it dispatches safe capacity cleanup work. The scheduler still
+uses the same `servers.capacity.prune` boundary as manual prune, so destructive cleanup remains
+disabled unless a policy explicitly enables it.
+
+Create or replace a policy with a scope, retention window, target selector, and cleanup categories:
+
+```bash title="Configure scheduled runtime prune policy"
+appaloft server capacity policy configure \
+  --scope project \
+  --server-id srv_primary \
+  --retention-days 14 \
+  --category stopped-containers
+```
+
+The default policy is enabled, retries on failure, and runs as dry-run because `--destructive`
+defaults to `false`. Add `--destructive true` only after a dry-run has shown the expected
+candidates. Docker build cache and unused image cleanup remain explicit categories.
+
+List configured policies when checking what the scheduler can read:
+
+```bash title="List scheduled runtime prune policies"
+appaloft server capacity policy list --server-id srv_primary --enabled-only true
+```
+
+Show one policy by id when auditing a scheduler decision:
+
+```bash title="Show scheduled runtime prune policy"
+appaloft server capacity policy show rtp_primary
+```
+
+The HTTP API exposes the same command/query surfaces at `POST /api/servers/capacity/policies`,
+`GET /api/servers/capacity/policies`, and
+`GET /api/servers/capacity/policies/{policyId}`. Policy readback is safe: it includes ids, scope,
+retention days, enabled state, destructive mode, category names, retry behavior, and update time,
+but not runtime command output or secrets.
+
+Policy precedence follows Appaloft configuration precedence:
+
+```text title="Scheduled runtime prune policy precedence"
+defaults < system < organization < project < environment < deployment snapshot
+```
+
+Configured policies can use the `deployment-snapshot` scope. Repository or deployment-snapshot
+configuration does not yet create those policy records automatically, so create them through the
+policy command or API. Use operator work to inspect accepted scheduled prune attempts and failures.
 
 <h2 id="diagnostic-secret-masking">Secret masking</h2>
 

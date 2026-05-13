@@ -15,6 +15,7 @@ This test matrix inherits:
 - [Resource Runtime Log Observation Workflow Spec](../workflows/resource-runtime-log-observation.md)
 - [Resource Runtime Logs Error Spec](../errors/resources.runtime-logs.md)
 - [Resource Runtime Logs Implementation Plan](../implementation/resource-runtime-logs-plan.md)
+- [ADR-053: Resource Runtime Log Archive Retention Boundary](../decisions/ADR-053-resource-runtime-log-archive-retention-boundary.md)
 - [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
 
 ## Test Layers
@@ -118,6 +119,11 @@ output draining, bounded process timeout cleanup, and generic-SSH Docker/Compose
 construction, including no SSH ControlMaster reuse for bounded reads. Web verification covers lazy
 runtime-log loading for the logs tab, duplicate-tail avoidance when follow starts, and silent normal
 stream cancellation when follow stops.
+
+Runtime log archive retention coverage is governed separately by
+[Resource Runtime Log Archive Retention Test Matrix](./resource-runtime-log-archive-retention-test-matrix.md).
+`resources.runtime-logs` tests do not prove archive persistence, prune behavior, legal holds,
+organization defaults, search, drains, or metrics.
 
 ## Open Questions
 

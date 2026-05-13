@@ -6,6 +6,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@appaloft/application": "workspace:*",
+    "@appaloft/docs-registry": "workspace:*",
     "@appaloft/orpc": "workspace:*",
     "@appaloft/plugin-sdk": "workspace:*",
     "@orpc/openapi": "latest",

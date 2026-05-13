@@ -19,6 +19,8 @@ The matrix must prove:
 - secret-bearing inputs are validated and stored through secret-safe handling;
 - imported certificate success publishes `certificate-imported`, never `certificate-issued`;
 - safe metadata and secret references become durable state;
+- successful import appears in operator-work process state without PEM, private-key, or passphrase
+  material;
 - `domain-ready` evaluation happens only when ownership and route gates are also satisfied.
 
 ## Global References
@@ -45,6 +47,7 @@ This test matrix inherits:
 | Command schema | Required binding id and secret-bearing inputs are present and shaped correctly. |
 | Validator/domain service | Domain match, key match, not-before, expiry, algorithm, and malformed-chain checks. |
 | Use case/handler | Secret-store write, durable state write, event publication, idempotency, and structured error mapping. |
+| Operator work projection | Successful manual import records a safe terminal process attempt without secret-bearing material. |
 | Event/process manager | `certificate-imported` dedupe and `domain-ready` follow-up behavior. |
 | Read model | `certificates.list`, `domain-bindings.list`, and resource access summaries expose only safe metadata/state. |
 | Entry workflow | CLI, HTTP/oRPC, and Web resource-scoped surfaces collect secrets safely and converge on one command contract. |
@@ -53,7 +56,7 @@ This test matrix inherits:
 
 | Test ID | Preferred automation | Case | Input | Expected result | Expected error | Expected event | Expected state | Retriable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| CERT-IMPORT-CMD-001 | integration | Import valid manual certificate | Bound or ready binding with `certificatePolicy = manual`; valid chain/key/passphrase combination | `ok({ certificateId, attemptId })` | None | `certificate-imported` | Certificate active with `source = imported`; secret refs and safe metadata persisted | No |
+| CERT-IMPORT-CMD-001 | integration | Import valid manual certificate | Bound or ready binding with `certificatePolicy = manual`; valid chain/key/passphrase combination | `ok({ certificateId, attemptId })` | None | `certificate-imported` | Certificate active with `source = imported`; secret refs and safe metadata persisted; safe `certificates.import` process-attempt projection recorded for operator-work visibility | No |
 | CERT-IMPORT-CMD-002 | integration | Missing required secret-bearing input | Missing chain or private key input | `err` | `validation_error`, phase `command-validation` | None | No certificate import state recorded | No |
 | CERT-IMPORT-CMD-003 | integration | Missing binding | Unknown `domainBindingId` | `err` | `not_found`, phase `certificate-context-resolution` | None | No certificate mutation | No |
 | CERT-IMPORT-CMD-004 | integration | Binding not manual eligible | Binding `certificatePolicy = auto` or `disabled`, or binding not in a durably owned state | `err` | `certificate_import_not_allowed`, phase `certificate-admission` | None | No imported certificate attached | No |
@@ -107,6 +110,7 @@ Tests must assert:
 - `Result` shape and structured error fields;
 - `error.code`, `phase`, and `retriable`;
 - `certificateId` and `attemptId` on success;
+- safe process-attempt projection for successful imports, bound to `PROC-DELIVERY-001`;
 - no secret-bearing material in events, errors, CLI output, HTTP responses, or read models;
 - `certificate-imported` publication on success;
 - absence of `certificate-issued` for import success.

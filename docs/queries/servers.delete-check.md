@@ -115,7 +115,8 @@ external-facing route would make deletion ambiguous or unsafe:
 - `source-link`, `server-applied-route`, `default-access-policy`, or `runtime-task`: source,
   route, policy, or runtime state still targets the server.
 - `terminal-session`, `runtime-log-retention`, and `audit-retention`: operator support context
-  still depends on the server identity.
+  still depends on the server identity. Runtime-log retention refers to retained Appaloft-owned
+  runtime log archive snapshots, not external backend log stores.
 
 The blocker payload must include only safe blocker kinds, ids, entity types, and counts. It must
 not include logs, route provider config, private keys, SSH command output, certificate material,
@@ -154,7 +155,7 @@ blocker count; destructive delete controls remain a Web action gap.
 
 The PG blocker reader covers inactive gating, retained deployments, non-terminal deployments,
 domain bindings, certificates tied through domain bindings, server-applied routes, source links
-with the selected `server_id`, server credential attachment, provider runtime logs through
+with the selected `server_id`, server credential attachment, retained provider job logs through
 deployments, audit logs whose `aggregate_id` is the server id, and deployment-target default access
 policy overrides. Terminal session and external runtime-task blocker detection remain extension
 points until durable tables exist.

@@ -1,5 +1,7 @@
 import {
+  type RepositoryContext,
   type SourceLinkBySourceFingerprintSpec,
+  type SourceLinkReadModel,
   type SourceLinkRecord,
   type SourceLinkRepository,
   type SourceLinkSelectionSpec,
@@ -200,5 +202,31 @@ export class PgSourceLinkRepository implements SourceLinkRepository {
     } catch (error) {
       return err(persistenceError("Source link could not be removed", error));
     }
+  }
+}
+
+export class PgSourceLinkReadModel implements SourceLinkReadModel {
+  constructor(private readonly db: Kysely<Database>) {}
+
+  async list(
+    _context: RepositoryContext,
+    input?: { projectId?: string; resourceId?: string; serverId?: string; limit?: number },
+  ): Promise<SourceLinkRecord[]> {
+    let query = this.db.selectFrom("source_links").selectAll().orderBy("updated_at", "desc");
+
+    if (input?.projectId) {
+      query = query.where("project_id", "=", input.projectId);
+    }
+
+    if (input?.resourceId) {
+      query = query.where("resource_id", "=", input.resourceId);
+    }
+
+    if (input?.serverId) {
+      query = query.where("server_id", "=", input.serverId);
+    }
+
+    const rows = await query.limit(input?.limit ?? 50).execute();
+    return rows.map(mapRow);
   }
 }

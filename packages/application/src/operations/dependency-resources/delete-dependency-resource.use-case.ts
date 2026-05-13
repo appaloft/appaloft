@@ -6,6 +6,7 @@ import {
   err,
   OccurredAt,
   ok,
+  type ResourceInstance,
   ResourceInstanceByIdSpec,
   ResourceInstanceId,
   type Result,
@@ -24,7 +25,9 @@ import {
   type IdGenerator,
   type ManagedPostgresProviderPort,
   type ManagedRedisProviderPort,
+  type ProcessAttemptRecorder,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type DeleteDependencyResourceCommandInput } from "./delete-dependency-resource.command";
@@ -48,6 +51,8 @@ export class DeleteDependencyResourceUseCase {
     private readonly managedPostgresProvider: ManagedPostgresProviderPort,
     @inject(tokens.managedRedisProvider)
     private readonly managedRedisProvider: ManagedRedisProviderPort,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
@@ -64,6 +69,7 @@ export class DeleteDependencyResourceUseCase {
       logger,
       managedPostgresProvider,
       managedRedisProvider,
+      processAttemptRecorder,
     } = this;
 
     return safeTry(async function* () {
@@ -116,6 +122,12 @@ export class DeleteDependencyResourceUseCase {
             dependencyResource,
             UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
           );
+          await recordProviderDeleteProcessAttempt({
+            recorder: processAttemptRecorder,
+            repositoryContext,
+            context,
+            dependencyResource,
+          });
           await publishDomainEventsAndReturn(
             context,
             eventBus,
@@ -140,6 +152,13 @@ export class DeleteDependencyResourceUseCase {
                   requestedAt: requestedAt.value,
                 });
           if (providerDelete.isErr()) {
+            await recordProviderDeleteProcessAttempt({
+              recorder: processAttemptRecorder,
+              repositoryContext,
+              context,
+              dependencyResource,
+              failureCode: providerDelete.error.code,
+            });
             return err(providerDelete.error);
           }
           allowProviderManaged = true;
@@ -152,8 +171,64 @@ export class DeleteDependencyResourceUseCase {
         dependencyResource,
         UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
       );
+      await recordProviderDeleteProcessAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        context,
+        dependencyResource,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, dependencyResource, undefined);
       return ok({ id: dependencyResourceId.value });
     });
   }
+}
+
+async function recordProviderDeleteProcessAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  context: ExecutionContext;
+  dependencyResource: ResourceInstance;
+  failureCode?: string;
+}): Promise<void> {
+  const state = input.dependencyResource.toState();
+  const realization = state.providerRealization;
+  if (!realization || realization.status.value === "ready") {
+    return;
+  }
+  const realizationStatus = realization.status.value;
+  const failed = Boolean(input.failureCode);
+  const status =
+    realizationStatus === "delete-pending" && !failed ? "running" : failed ? "failed" : "succeeded";
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: realization.attemptId.value,
+    kind: "system",
+    status,
+    operationKey: "dependency-resources.delete",
+    dedupeKey: `dependency-resource-provider-delete:${state.id.value}:${realization.attemptId.value}`,
+    correlationId: input.context.requestId,
+    requestId: input.context.requestId,
+    phase: "dependency-resource-provider-delete",
+    step: realizationStatus,
+    ...(state.projectId ? { projectId: state.projectId.value } : {}),
+    startedAt: realization.attemptedAt.value,
+    updatedAt: realization.attemptedAt.value,
+    ...(status !== "running" ? { finishedAt: realization.attemptedAt.value } : {}),
+    ...(failed
+      ? {
+          errorCode: input.failureCode,
+          errorCategory: "async-processing",
+          retriable: true,
+        }
+      : {}),
+    nextActions: status === "failed" ? ["diagnostic", "manual-review"] : ["no-action"],
+    safeDetails: {
+      dependencyResourceId: state.id.value,
+      dependencyKind: state.kind.value,
+      providerKey: state.providerKey.value,
+      providerManaged: state.providerManaged === true,
+      realizationStatus,
+    },
+  });
+
+  void result;
 }

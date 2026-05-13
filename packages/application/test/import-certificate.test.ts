@@ -30,6 +30,7 @@ import {
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  type Result,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
@@ -62,6 +63,9 @@ import {
   ImportCertificateUseCase,
   ListCertificatesQueryService,
   MarkDomainReadyOnCertificateImportedHandler,
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
+  type RepositoryContext,
   RetryCertificateUseCase,
   RevokeCertificateUseCase,
   toRepositoryContext,
@@ -110,6 +114,18 @@ class FailingImportedSecretStore extends FakeCertificateSecretStore {
         true,
       ),
     );
+  }
+}
+
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
   }
 }
 
@@ -257,10 +273,11 @@ function createValidationResult(
 }
 
 describe("ImportCertificateUseCase", () => {
-  test("[CERT-IMPORT-CMD-001][CERT-IMPORT-CMD-014][CERT-IMPORT-READMODEL-001] imports a valid manual certificate and publishes certificate-imported only", async () => {
+  test("[CERT-IMPORT-CMD-001][CERT-IMPORT-CMD-014][CERT-IMPORT-READMODEL-001][PROC-DELIVERY-001] imports a valid manual certificate and publishes certificate-imported only", async () => {
     const seed = await seedImportContext();
     const validator = new FakeCertificateMaterialValidator(ok(createValidationResult()));
     const secretStore = new FakeCertificateSecretStore();
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
     const useCase = new ImportCertificateUseCase(
       seed.domainBindings,
       seed.certificates,
@@ -270,6 +287,7 @@ describe("ImportCertificateUseCase", () => {
       seed.idGenerator,
       seed.eventBus,
       seed.logger,
+      processAttemptRecorder,
     );
 
     const result = await useCase.execute(seed.context, {
@@ -283,6 +301,39 @@ describe("ImportCertificateUseCase", () => {
       certificateId: "crt_0003",
       attemptId: "cat_0004",
     });
+    expect(processAttemptRecorder.records).toEqual([
+      expect.objectContaining({
+        id: "cat_0004",
+        kind: "certificate",
+        status: "succeeded",
+        operationKey: "certificates.import",
+        dedupeKey: `certificate:${seed.domainBindingId}:cat_0004`,
+        correlationId: "req_certificate_import_test",
+        requestId: "req_certificate_import_test",
+        phase: "certificate-import",
+        step: "issued",
+        projectId: "prj_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        domainBindingId: seed.domainBindingId,
+        certificateId: "crt_0003",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:00:00.000Z",
+        retriable: false,
+        nextActions: ["no-action"],
+        safeDetails: expect.objectContaining({
+          providerKey: "manual-import",
+          challengeType: "manual-import",
+          reason: "issue",
+          domainName: "manual.example.test",
+          certificateSource: "imported",
+          expiresAt: "2026-06-01T00:00:00.000Z",
+        }),
+      }),
+    ]);
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("leaf-key");
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("BEGIN PRIVATE KEY");
     expect(secretStore.importedStored).toHaveLength(1);
     expect(eventsByType(seed.eventBus.events, "certificate-imported")).toHaveLength(1);
     expect(eventsByType(seed.eventBus.events, "certificate-issued")).toHaveLength(0);
@@ -530,6 +581,7 @@ describe("ImportCertificateUseCase", () => {
       provider,
       secretStore,
       seed.clock,
+      seed.idGenerator,
       seed.eventBus,
       seed.logger,
     );

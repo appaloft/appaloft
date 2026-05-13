@@ -18,6 +18,7 @@ import {
   EnvironmentKindValue,
   EnvironmentName,
   HostAddress,
+  ok,
   PortNumber,
   Project,
   ProjectId,
@@ -27,6 +28,7 @@ import {
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  type Result,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
@@ -54,6 +56,8 @@ import {
   type DomainBindingReadModel,
   type DomainBindingSummary,
   type ExecutionContext,
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
   type RepositoryContext,
   type ResourceReadModel,
   type ResourceSummary,
@@ -140,6 +144,18 @@ class StaticResourceReadModel implements ResourceReadModel {
     void context;
     void spec;
     return this.resources[0] ?? null;
+  }
+}
+
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
   }
 }
 
@@ -522,15 +538,17 @@ describe("Domain binding lifecycle", () => {
     expect(eventsByType(seed.eventBus.events, "domain-binding-deleted")).toHaveLength(1);
   });
 
-  test("ROUTE-TLS-CMD-023 retries ownership verification without certificate lifecycle side effects", async () => {
+  test("ROUTE-TLS-CMD-023 PROC-DELIVERY-001 retries ownership verification with operator-visible process state", async () => {
     const seed = await seedRoutingContext();
     const domainBindingId = await seed.createBinding("www.example.com");
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
     const useCase = new RetryDomainBindingVerificationUseCase(
       seed.domainBindings,
       seed.idGenerator,
       seed.clock,
       seed.eventBus,
       seed.logger,
+      processAttemptRecorder,
     );
 
     const result = await useCase.execute(seed.context, { domainBindingId });
@@ -547,5 +565,34 @@ describe("Domain binding lifecycle", () => {
       1,
     );
     expect(eventsByType(seed.eventBus.events, "certificate-requested")).toHaveLength(0);
+    expect(processAttemptRecorder.records).toHaveLength(1);
+    expect(processAttemptRecorder.records[0]).toMatchObject({
+      id: "dva_0003",
+      kind: "route-realization",
+      status: "pending",
+      operationKey: "domain-bindings.retry-verification",
+      dedupeKey: `domain-binding-verification:${domainBindingId}:dva_0003`,
+      correlationId: seed.context.requestId,
+      requestId: seed.context.requestId,
+      phase: "domain-verification",
+      step: "verification-retried",
+      projectId: "prj_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      domainBindingId,
+      startedAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      nextActions: ["no-action"],
+      safeDetails: {
+        domainName: "www.example.com",
+        proxyKind: "traefik",
+        tlsMode: "auto",
+        bindingStatus: "pending_verification",
+        expectedTarget: "Manual verification required for www.example.com",
+        dnsExpectedTargets: "127.0.0.1",
+      },
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("BEGIN PRIVATE KEY");
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("provider raw payload");
   });
 });

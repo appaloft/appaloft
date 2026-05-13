@@ -21,6 +21,7 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import {
   type Clock,
   type IdGenerator,
+  type ProcessAttemptRecorder,
   type ResourceRepository,
   type RunScheduledTaskNowResult,
   type ScheduledTaskDefinitionRepository,
@@ -28,6 +29,7 @@ import {
   type ScheduledTaskRunSummary,
   type ScheduledTaskRunTriggerKind,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 
 export interface ScheduledTaskRunAdmissionInput {
@@ -70,6 +72,8 @@ export class ScheduledTaskRunAdmissionService {
     private readonly idGenerator: IdGenerator,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async admit(
@@ -79,6 +83,7 @@ export class ScheduledTaskRunAdmissionService {
     const {
       clock,
       idGenerator,
+      processAttemptRecorder,
       resourceRepository,
       scheduledTaskDefinitionRepository,
       scheduledTaskRunAttemptRepository,
@@ -154,6 +159,29 @@ export class ScheduledTaskRunAdmissionService {
         runAttempt,
         UpsertScheduledTaskRunAttemptSpec.fromRunAttempt(runAttempt),
       );
+
+      const runState = runAttempt.toState();
+      yield* await processAttemptRecorder.record(repositoryContext, {
+        id: idGenerator.next("wrk"),
+        kind: "runtime-maintenance",
+        status: "pending",
+        operationKey: "scheduled-task-runs.run-now",
+        dedupeKey: `scheduled-task-run:${runState.id.value}`,
+        correlationId: context.requestId,
+        requestId: context.requestId,
+        phase: "scheduled-task-run-admission",
+        step: "accepted",
+        resourceId: runState.resourceId.value,
+        startedAt: createdAt.value,
+        updatedAt: createdAt.value,
+        nextActions: ["no-action"],
+        safeDetails: {
+          runId: runState.id.value,
+          taskId: runState.taskId.value,
+          resourceId: runState.resourceId.value,
+          triggerKind: runState.triggerKind.value,
+        },
+      });
 
       return ok({
         schemaVersion: "scheduled-tasks.run-now/v1",

@@ -39,8 +39,10 @@ import {
   type EventBus,
   type IdGenerator,
   type ManagedPostgresProviderPort,
+  type ProcessAttemptRecorder,
   type ProjectRepository,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type ProvisionPostgresDependencyResourceCommandInput } from "./provision-postgres-dependency-resource.command";
@@ -109,6 +111,8 @@ export class ProvisionPostgresDependencyResourceUseCase {
     private readonly logger: AppLogger,
     @inject(tokens.managedPostgresProvider)
     private readonly managedPostgresProvider: ManagedPostgresProviderPort,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
@@ -125,6 +129,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
       idGenerator,
       logger,
       managedPostgresProvider,
+      processAttemptRecorder,
       projectRepository,
     } = this;
 
@@ -231,6 +236,12 @@ export class ProvisionPostgresDependencyResourceUseCase {
         dependencyResource,
         UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
       );
+      await recordManagedPostgresRealizationProcessAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        context,
+        dependencyResource,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, dependencyResource, undefined);
 
       const realization = await managedPostgresProvider.realize(context, {
@@ -285,9 +296,75 @@ export class ProvisionPostgresDependencyResourceUseCase {
         dependencyResource,
         UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
       );
+      await recordManagedPostgresRealizationProcessAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        context,
+        dependencyResource,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, dependencyResource, undefined);
 
       return ok({ id: dependencyResource.toState().id.value });
     });
   }
+}
+
+async function recordManagedPostgresRealizationProcessAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  context: ExecutionContext;
+  dependencyResource: ResourceInstance;
+}): Promise<void> {
+  const state = input.dependencyResource.toState();
+  const realization = state.providerRealization;
+  if (!realization) {
+    return;
+  }
+  const realizationStatus = realization.status.value;
+  const status =
+    realizationStatus === "pending"
+      ? "running"
+      : realizationStatus === "failed"
+        ? "failed"
+        : "succeeded";
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: realization.attemptId.value,
+    kind: "system",
+    status,
+    operationKey: "dependency-resources.provision-postgres",
+    dedupeKey: `dependency-resource-realization:${state.id.value}:${realization.attemptId.value}`,
+    correlationId: input.context.requestId,
+    requestId: input.context.requestId,
+    phase: "dependency-resource-realization",
+    step: realizationStatus,
+    ...(state.projectId ? { projectId: state.projectId.value } : {}),
+    startedAt: realization.attemptedAt.value,
+    updatedAt:
+      realization.realizedAt?.value ?? realization.failedAt?.value ?? realization.attemptedAt.value,
+    ...(status !== "running"
+      ? {
+          finishedAt:
+            realization.realizedAt?.value ??
+            realization.failedAt?.value ??
+            realization.attemptedAt.value,
+        }
+      : {}),
+    ...(realization.failureCode
+      ? {
+          errorCode: realization.failureCode.value,
+          errorCategory: "async-processing",
+          retriable: true,
+        }
+      : {}),
+    nextActions: status === "failed" ? ["diagnostic", "manual-review"] : ["no-action"],
+    safeDetails: {
+      dependencyResourceId: state.id.value,
+      dependencyKind: state.kind.value,
+      providerKey: state.providerKey.value,
+      providerManaged: state.providerManaged === true,
+      realizationStatus,
+    },
+  });
+
+  void result;
 }

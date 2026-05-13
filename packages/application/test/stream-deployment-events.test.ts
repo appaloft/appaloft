@@ -3,7 +3,7 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import { ok, type Result } from "@appaloft/core";
 
-import { createExecutionContext, type ExecutionContext } from "../src";
+import { createExecutionContext, type ExecutionContext, type RepositoryContext } from "../src";
 import { StreamDeploymentEventsQuery } from "../src/messages";
 import {
   type DeploymentEventObservationContext,
@@ -14,6 +14,9 @@ import {
   type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DomainEventStreamObservationReader,
+  type DomainEventStreamObservationReplayResult,
+  type DomainEventStreamObservationRequest,
 } from "../src/ports";
 import { StreamDeploymentEventsQueryService } from "../src/use-cases";
 
@@ -77,6 +80,33 @@ class RecordingDeploymentEventObserver implements DeploymentEventObserver {
       signal,
     });
     return ok(this.stream);
+  }
+}
+
+class StaticDomainEventStreamObservationReader implements DomainEventStreamObservationReader {
+  calls: DomainEventStreamObservationRequest[] = [];
+  streamCalls: DomainEventStreamObservationRequest[] = [];
+
+  constructor(
+    private readonly result: DomainEventStreamObservationReplayResult,
+    private readonly streamResult: DeploymentEventStream | null = null,
+  ) {}
+
+  async replayDeploymentEvents(
+    _context: RepositoryContext,
+    request: DomainEventStreamObservationRequest,
+  ): Promise<Result<DomainEventStreamObservationReplayResult>> {
+    this.calls.push(request);
+    return ok(this.result);
+  }
+
+  async openDeploymentEventStream(
+    _context: RepositoryContext,
+    request: DomainEventStreamObservationRequest,
+    _signal: AbortSignal,
+  ): Promise<Result<DomainEventStreamObservationReplayResult | DeploymentEventStream>> {
+    this.streamCalls.push(request);
+    return ok(this.streamResult ?? this.result);
   }
 }
 
@@ -227,5 +257,189 @@ describe("stream deployment events query service", () => {
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap().mode).toBe("stream");
     expect(reader.calls[0]?.request.follow).toBe(true);
+  });
+
+  test("[DOMAIN-EVENT-RETENTION-005] bounded replay prefers retained stream gap envelopes", async () => {
+    const legacyObserver = new RecordingDeploymentEventObserver(
+      new StaticDeploymentEventStream([
+        {
+          schemaVersion: "deployments.stream-events/v1",
+          kind: "event",
+          event: {
+            deploymentId: "dep_demo",
+            sequence: 1,
+            cursor: "dep_demo:1",
+            emittedAt: "2026-01-01T00:00:01.000Z",
+            source: "progress-projection",
+            eventType: "deployment-progress",
+            phase: "deploy",
+            summary: "Legacy replay should not be used",
+          },
+        },
+      ]),
+    );
+    const retainedReader = new StaticDomainEventStreamObservationReader({
+      available: true,
+      envelopes: [
+        {
+          schemaVersion: "deployments.stream-events/v1",
+          kind: "gap",
+          gap: {
+            code: "deployment_event_stream_gap",
+            phase: "event-replay",
+            retriable: true,
+            cursor: "evt_pruned",
+            recommendedAction: "restart-stream",
+          },
+        },
+      ],
+    });
+    const service = new StreamDeploymentEventsQueryService(
+      new StaticDeploymentReadModel([deploymentSummary()]),
+      legacyObserver,
+      retainedReader,
+    );
+
+    const result = await service.execute(
+      createTestContext(),
+      StreamDeploymentEventsQuery.create({
+        deploymentId: "dep_demo",
+        cursor: "evt_pruned",
+        follow: false,
+        historyLimit: 25,
+        includeHistory: true,
+        untilTerminal: true,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const output = result._unsafeUnwrap();
+    expect(output.mode).toBe("bounded");
+    if (output.mode === "bounded") {
+      expect(output.envelopes).toEqual([
+        {
+          schemaVersion: "deployments.stream-events/v1",
+          kind: "gap",
+          gap: {
+            code: "deployment_event_stream_gap",
+            phase: "event-replay",
+            retriable: true,
+            cursor: "evt_pruned",
+            recommendedAction: "restart-stream",
+          },
+        },
+      ]);
+    }
+    expect(retainedReader.calls).toHaveLength(1);
+    expect(legacyObserver.calls).toHaveLength(0);
+  });
+
+  test("[DOMAIN-EVENT-RETENTION-005] follow mode prefers retained stream cursor continuation", async () => {
+    const legacyObserver = new RecordingDeploymentEventObserver(
+      new StaticDeploymentEventStream([
+        {
+          schemaVersion: "deployments.stream-events/v1",
+          kind: "event",
+          event: {
+            deploymentId: "dep_demo",
+            sequence: 1,
+            cursor: "dep_demo:1",
+            emittedAt: "2026-01-01T00:00:01.000Z",
+            source: "progress-projection",
+            eventType: "deployment-progress",
+            phase: "deploy",
+            summary: "Legacy follow should not be used",
+          },
+        },
+      ]),
+    );
+    const retainedStream = new StaticDeploymentEventStream([
+      {
+        schemaVersion: "deployments.stream-events/v1",
+        kind: "event",
+        event: {
+          deploymentId: "dep_demo",
+          sequence: 2,
+          cursor: "evt_002",
+          emittedAt: "2026-01-01T00:00:02.000Z",
+          source: "domain-event",
+          eventType: "deployment-succeeded",
+          phase: "verify",
+          status: "succeeded",
+          summary: "Deployment succeeded",
+        },
+      },
+      {
+        schemaVersion: "deployments.stream-events/v1",
+        kind: "closed",
+        reason: "completed",
+        cursor: "evt_002",
+      },
+    ]);
+    const retainedReader = new StaticDomainEventStreamObservationReader(
+      {
+        available: false,
+      },
+      retainedStream,
+    );
+    const service = new StreamDeploymentEventsQueryService(
+      new StaticDeploymentReadModel([deploymentSummary()]),
+      legacyObserver,
+      retainedReader,
+    );
+
+    const result = await service.execute(
+      createTestContext(),
+      StreamDeploymentEventsQuery.create({
+        deploymentId: "dep_demo",
+        cursor: "evt_001",
+        follow: true,
+        historyLimit: 25,
+        includeHistory: true,
+        untilTerminal: true,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const output = result._unsafeUnwrap();
+    expect(output.mode).toBe("stream");
+    if (output.mode === "stream") {
+      const envelopes: DeploymentEventStreamEnvelope[] = [];
+      for await (const envelope of output.stream) {
+        envelopes.push(envelope);
+      }
+      expect(envelopes).toEqual([
+        {
+          schemaVersion: "deployments.stream-events/v1",
+          kind: "event",
+          event: {
+            deploymentId: "dep_demo",
+            sequence: 2,
+            cursor: "evt_002",
+            emittedAt: "2026-01-01T00:00:02.000Z",
+            source: "domain-event",
+            eventType: "deployment-succeeded",
+            phase: "verify",
+            status: "succeeded",
+            summary: "Deployment succeeded",
+          },
+        },
+        {
+          schemaVersion: "deployments.stream-events/v1",
+          kind: "closed",
+          reason: "completed",
+          cursor: "evt_002",
+        },
+      ]);
+    }
+    expect(retainedReader.streamCalls).toHaveLength(1);
+    expect(retainedReader.streamCalls[0]).toMatchObject({
+      deploymentId: "dep_demo",
+      cursor: "evt_001",
+      historyLimit: 25,
+      includeHistory: true,
+      untilTerminal: true,
+    });
+    expect(legacyObserver.calls).toHaveLength(0);
   });
 });

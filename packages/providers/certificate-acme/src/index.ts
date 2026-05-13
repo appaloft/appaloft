@@ -23,6 +23,44 @@ export const acmeCertificateProvider: ProviderDescriptor = {
   title: "ACME Certificate Provider",
   category: "infra-service",
   capabilities: ["certificate-issuance", "http-01", "acme-account", "acme-order"],
+  capabilityDetails: [
+    {
+      key: "certificate-issuance",
+      title: "Certificate issuance",
+      enabled: true,
+      description: "Issues managed certificates through the certificate provider port.",
+    },
+    {
+      key: "http-01",
+      title: "HTTP-01 challenge",
+      enabled: true,
+      description: "Uses Appaloft HTTP challenge-token storage and routing.",
+    },
+    {
+      key: "acme-account",
+      title: "ACME account",
+      enabled: true,
+      description: "Uses configured account metadata without exposing account private keys.",
+    },
+    {
+      key: "acme-order",
+      title: "ACME order flow",
+      enabled: true,
+      description: "Coordinates orders behind the provider boundary.",
+    },
+  ],
+  configuration: {
+    status: "partial",
+    diagnostics: [
+      {
+        code: "provider.acme.requires_runtime_configuration",
+        severity: "warning",
+        message:
+          "ACME is available only when the shell registers certificate account configuration.",
+        documentationHref: "/docs/access/tls/certificates/#certificate-readiness",
+      },
+    ],
+  },
 };
 
 export interface AcmeHttpChallenge {

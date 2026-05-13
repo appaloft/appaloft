@@ -105,12 +105,27 @@ const context = createExecutionContext({
 
 describe("ACME certificate provider", () => {
   test("[ROUTE-TLS-PROVIDER-001] exports an infra-service provider descriptor", () => {
-    expect(acmeCertificateProvider).toEqual({
+    expect(acmeCertificateProvider).toMatchObject({
       key: "acme",
       title: "ACME Certificate Provider",
       category: "infra-service",
       capabilities: ["certificate-issuance", "http-01", "acme-account", "acme-order"],
+      capabilityDetails: expect.arrayContaining([
+        expect.objectContaining({
+          key: "certificate-issuance",
+          enabled: true,
+        }),
+      ]),
+      configuration: expect.objectContaining({
+        status: "partial",
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({
+            code: "provider.acme.requires_runtime_configuration",
+          }),
+        ]),
+      }),
     });
+    expect(JSON.stringify(acmeCertificateProvider)).not.toContain("accountPrivateKeyPem");
   });
 
   test("[ROUTE-TLS-PROVIDER-002] publishes and removes HTTP-01 challenges around issuance", async () => {

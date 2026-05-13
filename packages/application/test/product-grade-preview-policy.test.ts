@@ -43,6 +43,8 @@ import {
   PreviewPolicyEvaluator,
   PreviewPullRequestEventIngestService,
   PreviewScopedConfigResolver,
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
   type RepositoryContext,
   type SourceEventDeploymentDispatcher,
   type SourceEventDeploymentDispatchInput,
@@ -137,6 +139,18 @@ class InMemoryPreviewCleanupAttemptRecorder implements PreviewCleanupAttemptReco
 
   async record(_context: RepositoryContext, record: PreviewCleanupAttemptRecord): Promise<void> {
     this.records.push(record);
+  }
+}
+
+class InMemoryProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
   }
 }
 
@@ -1741,12 +1755,14 @@ describe("PreviewEnvironmentCleanupService", () => {
     );
     const cleaner = new CapturingPreviewEnvironmentCleaner();
     const recorder = new InMemoryPreviewCleanupAttemptRecorder();
+    const processAttemptRecorder = new InMemoryProcessAttemptRecorder();
     const cleanup = new PreviewEnvironmentCleanupService(
       repository,
       cleaner,
       recorder,
       new FixedClock("2026-05-06T04:50:00.000Z"),
       new SequentialIdGenerator(),
+      processAttemptRecorder,
     );
     const context = createExecutionContext({
       requestId: "req_preview_environment_cleanup_test",
@@ -1804,6 +1820,37 @@ describe("PreviewEnvironmentCleanupService", () => {
         updatedAt: "2026-05-06T04:50:00.000Z",
       },
     ]);
+    expect(processAttemptRecorder.records).toEqual([
+      {
+        id: "pcln_1",
+        kind: "system",
+        status: "succeeded",
+        operationKey: "preview-environments.delete",
+        dedupeKey: "preview-cleanup:prenv_1:res_preview_api:srcfp_preview_cleanup",
+        correlationId: "req_preview_environment_cleanup_test",
+        requestId: "req_preview_environment_cleanup_test",
+        phase: "preview-cleanup",
+        step: "cleanup-completed",
+        resourceId: "res_preview_api",
+        startedAt: "2026-05-06T04:50:00.000Z",
+        updatedAt: "2026-05-06T04:50:00.000Z",
+        finishedAt: "2026-05-06T04:50:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          previewEnvironmentId: "prenv_1",
+          resourceId: "res_preview_api",
+          sourceBindingFingerprint: "srcfp_preview_cleanup",
+          provider: "github",
+          repositoryFullName: "appaloft/demo",
+          pullRequestNumber: 50,
+          cleanedRuntime: true,
+          removedRoute: true,
+          removedSourceLink: true,
+          removedProviderMetadata: true,
+          updatedFeedback: true,
+        },
+      },
+    ]);
     expect(repository.deleteCount).toBe(0);
     expect(repository.previewEnvironment?.toState()).toMatchObject({
       id: { value: "prenv_1" },
@@ -1849,12 +1896,14 @@ describe("PreviewEnvironmentCleanupService", () => {
       true,
     );
     const recorder = new InMemoryPreviewCleanupAttemptRecorder();
+    const processAttemptRecorder = new InMemoryProcessAttemptRecorder();
     const cleanup = new PreviewEnvironmentCleanupService(
       repository,
       cleaner,
       recorder,
       new FixedClock("2026-05-06T05:05:00.000Z"),
       new SequentialIdGenerator(),
+      processAttemptRecorder,
     );
     const context = createExecutionContext({
       requestId: "req_preview_environment_cleanup_retry_test",
@@ -1927,9 +1976,40 @@ describe("PreviewEnvironmentCleanupService", () => {
         owner: "req_preview_environment_cleanup_retry_test",
       }),
     ]);
+    expect(processAttemptRecorder.records).toEqual([
+      expect.objectContaining({
+        id: "pcln_1",
+        kind: "system",
+        status: "retry-scheduled",
+        operationKey: "preview-environments.delete",
+        dedupeKey: "preview-cleanup:prenv_1:res_preview_api:srcfp_preview_cleanup_retry",
+        phase: "provider-metadata-cleanup",
+        step: "cleanup-failed",
+        resourceId: "res_preview_api",
+        errorCode: "provider_error",
+        errorCategory: "provider",
+        retriable: true,
+        nextEligibleAt: "2026-05-06T05:10:00.000Z",
+        nextActions: ["retry", "manual-review"],
+        safeDetails: expect.objectContaining({
+          previewEnvironmentId: "prenv_1",
+          resourceId: "res_preview_api",
+          sourceBindingFingerprint: "srcfp_preview_cleanup_retry",
+          provider: "github",
+          repositoryFullName: "appaloft/demo",
+          pullRequestNumber: 51,
+        }),
+      }),
+      expect.objectContaining({
+        id: "pcln_2",
+        status: "retry-scheduled",
+        nextEligibleAt: "2026-05-06T05:10:00.000Z",
+      }),
+    ]);
     expect(repository.previewEnvironment?.toState().status.value).toBe("cleanup-requested");
     expect(cleaner.inputs).toHaveLength(2);
     expect(JSON.stringify(recorder.records)).not.toContain("temporarily unavailable");
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("temporarily unavailable");
   });
 
   test("[PG-PREVIEW-CLEANUP-002] dispatches due cleanup retries through the cleanup service", async () => {

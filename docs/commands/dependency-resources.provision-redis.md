@@ -26,10 +26,11 @@ Returns `ok({ id })`, persists a `redis` `ResourceInstance` and realization atte
 Redis provider port.
 
 Success is acceptance-first: provider follow-up success or failure is observed through dependency
-resource state, events, and read models. Realization success records a safe provider handle, masked
-endpoint metadata, optional safe connection secret ref, `ready` lifecycle status, and
-`dependency-resource-realized`. Realization failure records degraded status, blocked binding
-readiness, and sanitized failure metadata while preserving the accepted command result.
+resource state, events, read models, and safe operator-visible process-attempt projection.
+Realization success records a safe provider handle, masked endpoint metadata, optional safe
+connection secret ref, `ready` lifecycle status, and `dependency-resource-realized`. Realization
+failure records degraded status, blocked binding readiness, sanitized failure metadata, and
+operator-visible process-attempt failure while preserving the accepted command result.
 
 ## Failure
 

@@ -131,5 +131,7 @@ An opt-in external SSH e2e harness in
 real GitHub Actions style process boundary when run with `APPALOFT_E2E_SSH_REMOTE_STATE=true`
 against a provisioned SSH/Docker target. `.github/workflows/ssh-remote-state-e2e.yml` runs the same
 harness manually, from nightly smoke, and before release artifact publication when
-`APPALOFT_E2E_SSH_HOST` and `APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured. Operational
-secret/target provisioning remains outside the repository code.
+`APPALOFT_E2E_SSH_HOST` and `APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured. For `v0.11.x`
+publish tags, the release workflow requires this remote-state harness and the quick-deploy SSH
+harness before release artifact publication. Operational secret/target provisioning remains outside
+the repository code.

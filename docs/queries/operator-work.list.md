@@ -45,14 +45,32 @@ The active slice reads durable process attempts first, then aggregates compatibi
 - deployment attempts from deployment read models;
 - latest proxy bootstrap state from server edge proxy read models;
 - latest certificate attempts from certificate read models.
+- safe remote SSH state lock, migration, backup, and recovery-marker summaries as
+  `kind = remote-state` items;
+- safe source-link read-model summaries as `kind = system` items with operation key
+  `source-links.relink`;
+- safe route-realization read-model summaries as `kind = route-realization` items;
+- durable process attempts for worker, job, scheduler, and runtime-maintenance status.
 
 When a durable process attempt and a compatibility read-model item describe the same work id or
 proxy bootstrap scope, the durable process attempt wins.
 
+Source-link work ids use `source-link:<safe fingerprint digest or sourceFingerprint>` depending on
+the selected read model. They must not expose credential-bearing source locators. Route-realization
+work ids use `route-realization:<route id or scope id>` and must not expose raw provider payloads.
+Remote-state work ids use `remote-state:<scope id>` and may represent lock, migration, backup, or
+recovery-marker state from the selected SSH/PGlite mirror read model. Remote-state rows expose safe
+state backend, server, path, owner/correlation, timestamp, stale, schema, backup, journal, and
+recovery marker metadata only; they do not acquire locks, recover stale locks, run migrations, or
+read raw PGlite pages.
+Worker/job status is visible only when recorded in the durable process attempt journal; the ledger
+must not synthesize worker health from process logs or in-memory runtime state.
+
 ## Safety
 
 The query must not return raw deployment log messages, secret values, private keys, certificate
-material, credential-bearing command lines, raw provider output, or environment values.
+material, credential-bearing command lines, credential-bearing source locators, raw provider
+output, raw PGlite content, SSH private-key paths, or environment values.
 
 Next actions are guidance only. A `diagnostic` or `manual-review` next action does not imply a
 mutating recovery command is public.

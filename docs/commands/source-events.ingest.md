@@ -5,7 +5,8 @@
 Accepted active integration boundary. Application command handling, generic signed verification,
 GitHub push verification/normalization, durable source-event dedupe persistence, policy matching
 for ignored or blocked outcomes, deployment dispatch, read models, public docs/help,
-`CORE_OPERATIONS.md`, `operation-catalog.ts`, and tests are aligned for the active HTTP routes.
+`CORE_OPERATIONS.md`, `operation-catalog.ts`, operator-visible process-attempt projection, and
+tests are aligned for the active HTTP routes.
 
 ## Governing Sources
 
@@ -25,7 +26,8 @@ diagnostic state, evaluates matching Resource auto-deploy policies, and dispatch
 deployment attempts through the existing `deployments.create` admission path.
 
 It does not store raw webhook payloads as business state, bypass deployment admission, mutate source
-binding, or guarantee automatic background retry before Phase 8 process-state work.
+binding, or guarantee automatic background retry before a later durable source-event worker is
+governed.
 
 ## Input
 
@@ -106,6 +108,9 @@ included in this command input, source event records, read models, errors, logs,
 9. For each match, dispatch ordinary `deployments.create` with Resource/environment/runtime context
    only; do not pass source event fields into deployment admission.
 10. Record created deployment ids or structured dispatch failure details.
+11. Project accepted and dispatched/failed outcomes into `operator-work.*` through safe
+    process-attempt rows keyed by the source event dedupe key. This is an operator-visible
+    projection only; source-event deployment dispatch still runs inline from this command path.
 
 ## Result
 

@@ -13,6 +13,8 @@ import {
   type Query,
   type QueryBus,
   type RepositoryContext,
+  ResolvePreviewPullRequestContextQuery,
+  ResolvePreviewPullRequestContextQueryService,
   type SourceEventPolicyCandidate,
   type SourceEventPolicyReader,
 } from "@appaloft/application";
@@ -87,6 +89,7 @@ function createApp(input: {
   commandBus?: CommandBus;
   githubWebhookSecret?: string;
   githubPreviewPullRequestWebhookVerifier?: GitHubPreviewPullRequestWebhookVerifier;
+  queryBus?: QueryBus;
   sourceEventPolicyReader?: SourceEventPolicyReader;
 }) {
   const commandBus =
@@ -94,10 +97,12 @@ function createApp(input: {
     ({
       execute: async <T>(): Promise<Result<T>> => ok({} as T),
     } as CommandBus);
-  const queryBus = {
-    execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
-      ok({} as T),
-  } as QueryBus;
+  const queryBus =
+    input.queryBus ??
+    ({
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus);
 
   return mountAppaloftOrpcRoutes(new Elysia(), {
     commandBus,
@@ -227,27 +232,47 @@ describe("GitHub preview pull request HTTP route", () => {
     } as CommandBus;
     const rawBody = JSON.stringify(githubPullRequestPayload());
     const signature = await hmacSha256Hex("correct-secret", rawBody);
+    const sourceEventPolicyReader = new MemorySourceEventPolicyReader([
+      {
+        projectId: "prj_mapped",
+        environmentId: "env_mapped",
+        resourceId: "res_mapped_api",
+        serverId: "srv_mapped",
+        destinationId: "dst_mapped",
+        sourceBindingFingerprint: "srcfp_mapped_repo",
+        status: "enabled",
+        refs: ["main"],
+        eventKinds: ["push"],
+        sourceBinding: {
+          locator: "https://github.com/appaloft/demo.git",
+          providerRepositoryId: "123456",
+          repositoryFullName: "appaloft/demo",
+        },
+      },
+    ]);
+    const queryService = new ResolvePreviewPullRequestContextQueryService(sourceEventPolicyReader);
+    let capturedQuery: Query<unknown> | undefined;
+    const queryBus = {
+      execute: async <T>(context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        if (query instanceof ResolvePreviewPullRequestContextQuery) {
+          const result = await queryService.execute(context, {
+            repositoryFullName: query.repositoryFullName,
+            baseRef: query.baseRef,
+            ...(query.providerRepositoryId
+              ? { providerRepositoryId: query.providerRepositoryId }
+              : {}),
+            ...(query.installationId ? { installationId: query.installationId } : {}),
+          });
+          return result as Result<T>;
+        }
+        return ok({} as T);
+      },
+    } as QueryBus;
     const app = createApp({
       commandBus,
       githubWebhookSecret: "correct-secret",
-      sourceEventPolicyReader: new MemorySourceEventPolicyReader([
-        {
-          projectId: "prj_mapped",
-          environmentId: "env_mapped",
-          resourceId: "res_mapped_api",
-          serverId: "srv_mapped",
-          destinationId: "dst_mapped",
-          sourceBindingFingerprint: "srcfp_mapped_repo",
-          status: "enabled",
-          refs: ["main"],
-          eventKinds: ["push"],
-          sourceBinding: {
-            locator: "https://github.com/appaloft/demo.git",
-            providerRepositoryId: "123456",
-            repositoryFullName: "appaloft/demo",
-          },
-        },
-      ]),
+      queryBus,
     });
 
     const response = await app.handle(
@@ -264,6 +289,13 @@ describe("GitHub preview pull request HTTP route", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(capturedQuery).toBeInstanceOf(ResolvePreviewPullRequestContextQuery);
+    expect(capturedQuery).toMatchObject({
+      repositoryFullName: "appaloft/demo",
+      providerRepositoryId: "123456",
+      installationId: "98765",
+      baseRef: "main",
+    });
     expect(capturedCommand).toBeInstanceOf(IngestPreviewPullRequestEventCommand);
     expect(capturedCommand).toMatchObject({
       projectId: "prj_mapped",

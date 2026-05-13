@@ -14,6 +14,7 @@ import {
   DestinationId,
   DetectSummary,
   DisplayNameText,
+  domainError,
   EnvironmentConfigSnapshot,
   EnvironmentId,
   EnvironmentSnapshotId,
@@ -21,6 +22,7 @@ import {
   ExecutionStatusValue,
   ExecutionStrategyKindValue,
   ExitCode,
+  err,
   FinishedAt,
   GeneratedAt,
   ok,
@@ -47,8 +49,12 @@ import {
   SequenceIdGenerator,
 } from "@appaloft/testkit";
 
-import { createExecutionContext, type ExecutionContext } from "../src";
-import { type ExecutionBackend } from "../src/ports";
+import { createExecutionContext, type ExecutionContext, type RepositoryContext } from "../src";
+import {
+  type ExecutionBackend,
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
+} from "../src/ports";
 import {
   DeploymentFactory,
   DeploymentLifecycleService,
@@ -78,6 +84,42 @@ class SuccessfulExecutionBackend implements ExecutionBackend {
 
   async rollback(): ReturnType<ExecutionBackend["rollback"]> {
     throw new Error("rollback is not used by retry tests");
+  }
+}
+
+class FailingExecutionBackend implements ExecutionBackend {
+  async execute(): Promise<Result<{ deployment: Deployment }>> {
+    return err(
+      domainError.provider(
+        "Retry runtime failed with raw provider output",
+        {
+          phase: "runtime-execution",
+          step: "container-start",
+          safeAdapterErrorCode: "container_start_failed",
+        },
+        true,
+      ),
+    );
+  }
+
+  async cancel(): ReturnType<ExecutionBackend["cancel"]> {
+    return ok({ logs: [] });
+  }
+
+  async rollback(): ReturnType<ExecutionBackend["rollback"]> {
+    throw new Error("rollback is not used by retry tests");
+  }
+}
+
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
   }
 }
 
@@ -130,9 +172,10 @@ function sourceDeployment(status: "failed" | "succeeded") {
   });
 }
 
-function createUseCase(input?: { deployment?: Deployment }) {
+function createUseCase(input?: { deployment?: Deployment; executionBackend?: ExecutionBackend }) {
   const clock = new FixedClock("2026-01-01T00:00:15.000Z");
   const repository = new MemoryDeploymentRepository();
+  const processAttemptRecorder = new RecordingProcessAttemptRecorder();
   const context = createExecutionContext({
     requestId: "req_retry_deployment_test",
     entrypoint: "system",
@@ -144,19 +187,21 @@ function createUseCase(input?: { deployment?: Deployment }) {
     repository,
     useCase: new RetryDeploymentUseCase(
       repository,
-      new SuccessfulExecutionBackend(),
+      input?.executionBackend ?? new SuccessfulExecutionBackend(),
       new CapturedEventBus(),
       new NoopLogger(),
       new DeploymentFactory(clock, new SequenceIdGenerator()),
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
+      processAttemptRecorder,
     ),
+    processAttemptRecorder,
   };
 }
 
 describe("RetryDeploymentUseCase", () => {
-  test("[DEP-RETRY-001] creates a new retry attempt from retained snapshot intent", async () => {
-    const { context, repository, useCase } = createUseCase();
+  test("[DEP-RETRY-001] PROC-DELIVERY-001 creates a new retry attempt from retained snapshot intent", async () => {
+    const { context, processAttemptRecorder, repository, useCase } = createUseCase();
 
     const result = await useCase.execute(context, {
       deploymentId: "dep_source",
@@ -168,6 +213,94 @@ describe("RetryDeploymentUseCase", () => {
     expect(retryDeployment?.toState().triggerKind.value).toBe("retry");
     expect(retryDeployment?.toState().sourceDeploymentId).toEqual(
       DeploymentId.rehydrate("dep_source"),
+    );
+    expect(processAttemptRecorder.records).toHaveLength(2);
+    expect(processAttemptRecorder.records[0]).toMatchObject({
+      id: result._unsafeUnwrap().id,
+      kind: "deployment",
+      status: "running",
+      operationKey: "deployments.retry",
+      dedupeKey: `deployment:${result._unsafeUnwrap().id}`,
+      correlationId: "req_retry_deployment_test",
+      requestId: "req_retry_deployment_test",
+      phase: "deployment-execution",
+      step: "running",
+      projectId: "prj_demo",
+      resourceId: "res_demo",
+      deploymentId: result._unsafeUnwrap().id,
+      serverId: "srv_demo",
+      nextActions: ["no-action"],
+      safeDetails: {
+        triggerKind: "retry",
+        deploymentStatus: "running",
+        buildStrategy: "prebuilt-image",
+        packagingMode: "all-in-one-docker",
+        executionKind: "docker-container",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+        stepCount: 1,
+        sourceDeploymentId: "dep_source",
+      },
+    });
+    expect(processAttemptRecorder.records[1]).toMatchObject({
+      id: result._unsafeUnwrap().id,
+      kind: "deployment",
+      status: "succeeded",
+      operationKey: "deployments.retry",
+      step: "succeeded",
+      deploymentId: result._unsafeUnwrap().id,
+      nextActions: ["no-action"],
+      safeDetails: {
+        triggerKind: "retry",
+        deploymentStatus: "succeeded",
+        sourceDeploymentId: "dep_source",
+      },
+    });
+  });
+
+  test("[DEP-RETRY-001] [PROC-DELIVERY-004] records retriable retry execution failure visibility", async () => {
+    const { context, processAttemptRecorder, useCase } = createUseCase({
+      executionBackend: new FailingExecutionBackend(),
+    });
+
+    const result = await useCase.execute(context, {
+      deploymentId: "dep_source",
+      readinessGeneratedAt: "2026-01-01T00:00:12.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const deploymentId = result._unsafeUnwrap().id;
+    expect(processAttemptRecorder.records.map((record) => record.status)).toEqual([
+      "running",
+      "failed",
+    ]);
+    expect(processAttemptRecorder.records[1]).toMatchObject({
+      id: deploymentId,
+      kind: "deployment",
+      status: "failed",
+      operationKey: "deployments.retry",
+      dedupeKey: `deployment:${deploymentId}`,
+      phase: "deployment-execution",
+      step: "failed",
+      projectId: "prj_demo",
+      resourceId: "res_demo",
+      deploymentId,
+      serverId: "srv_demo",
+      errorCode: "provider_error",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: expect.objectContaining({
+        triggerKind: "retry",
+        deploymentStatus: "failed",
+        failurePhase: "runtime-execution",
+        failureStep: "container-start",
+        safeAdapterErrorCode: "container_start_failed",
+        sourceDeploymentId: "dep_source",
+      }),
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain(
+      "Retry runtime failed with raw provider output",
     );
   });
 

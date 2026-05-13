@@ -180,6 +180,16 @@ It must not:
 | HTTP/oRPC | Command endpoint plus WebSocket attach endpoint. | Implemented |
 | Automation / MCP | Future tool can request a session only when an interactive transport is available. | Future |
 
+Companion lifecycle operations:
+
+- `terminal-sessions.list` and `terminal-sessions.show` expose safe active-session metadata.
+- `terminal-sessions.close` closes one active session through the gateway.
+- `terminal-sessions.expire` closes active sessions older than an explicit cutoff or gateway
+  policy.
+
+These companion operations must not expose terminal input/output or mutate resource, deployment, or
+deployment-target aggregate state.
+
 ## Current Implementation Notes And Migration Gaps
 
 Application command/schema/handler/use case, terminal gateway port, runtime adapter, oRPC command

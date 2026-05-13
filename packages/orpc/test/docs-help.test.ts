@@ -74,6 +74,12 @@ describe("HTTP API docs help links", () => {
     expect(apiDocsHrefs.productGradePreviews).toBe(
       "/docs/deploy/previews/#product-grade-preview-deployments",
     );
+    expect(apiDocsHrefs.scheduledRuntimePrunePolicy).toBe(
+      "/docs/observe/diagnostics/#scheduled-runtime-prune-policy",
+    );
+    expect(apiDocsHrefs.operatorAuditEvents).toBe(
+      "/docs/reference/errors-statuses/#operator-audit-events",
+    );
 
     expect(apiRouteDescriptions.configureServerCredential).toContain(apiDocsHrefs.serverCredential);
     expect(apiRouteDescriptions.registerServer).toContain(apiDocsHrefs.serverDockerSwarmTarget);
@@ -97,6 +103,10 @@ describe("HTTP API docs help links", () => {
     );
     expect(apiRouteDescriptions.openTerminalSession).toContain(apiDocsHrefs.terminalSession);
     expect(apiRouteDescriptions.operatorWorkLedger).toContain(apiDocsHrefs.operatorWorkLedger);
+    expect(apiRouteDescriptions.exportAuditEvents).toContain(apiDocsHrefs.operatorAuditEvents);
+    expect(apiRouteDescriptions.exportGlobalAuditEvents).toContain(
+      apiDocsHrefs.operatorAuditEvents,
+    );
     expect(apiRouteDescriptions.deploymentPlan).toContain(apiDocsHrefs.deploymentPlan);
     expect(apiRouteDescriptions.configureResourceAutoDeploy).toContain(
       apiDocsHrefs.sourceAutoDeploySetup,
@@ -134,6 +144,15 @@ describe("HTTP API docs help links", () => {
     );
     expect(apiRouteDescriptions.rotateResourceDependencyBindingSecret).toContain(
       apiDocsHrefs.dependencyResourceLifecycle,
+    );
+    expect(apiRouteDescriptions.scheduledRuntimePrunePolicyConfigure).toContain(
+      apiDocsHrefs.scheduledRuntimePrunePolicy,
+    );
+    expect(apiRouteDescriptions.scheduledRuntimePrunePolicyList).toContain(
+      apiDocsHrefs.scheduledRuntimePrunePolicy,
+    );
+    expect(apiRouteDescriptions.scheduledRuntimePrunePolicyShow).toContain(
+      apiDocsHrefs.scheduledRuntimePrunePolicy,
     );
   });
 });

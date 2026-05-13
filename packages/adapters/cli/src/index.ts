@@ -21,6 +21,7 @@ export {
   type SshRemoteStateTarget,
   sshRemoteStateTargetFromDecision,
 } from "./commands/deployment-ssh-remote-state.js";
+export { buildSshRemoteStateDiagnosticsCommand } from "./commands/remote-state.js";
 export type { CliSourceLinkStore } from "./runtime.js";
 
 export function createCliProgram(input: CliProgramInput): CliProgram {

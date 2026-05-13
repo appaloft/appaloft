@@ -134,9 +134,15 @@ import {
 import {
   createExecutionContext,
   type ExecutionContext,
+  type RepositoryContext,
   toRepositoryContext,
 } from "../src/execution-context";
 import { CreateDeploymentCommand } from "../src/operations/deployments/create-deployment.command";
+import {
+  type ScheduledRuntimePrunePolicyListFilter,
+  type ScheduledRuntimePrunePolicyRecord,
+  type ScheduledRuntimePrunePolicyRepository,
+} from "../src/operations/servers/scheduled-runtime-prune.service";
 import {
   type DefaultAccessDomainProvider,
   type DefaultAccessDomainRequest,
@@ -147,6 +153,8 @@ import {
   type DomainRouteBindingCandidate,
   type DomainRouteBindingReader,
   type ExecutionBackend,
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
   type ProviderDescriptor,
   type ProviderRegistry,
   type RuntimePlanResolver,
@@ -435,6 +443,18 @@ class CancelFailingExecutionBackend extends HermeticExecutionBackend {
   }
 }
 
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
+  }
+}
+
 class NoopDeploymentProgressReporter implements DeploymentProgressReporter {
   report(): void {}
 }
@@ -450,6 +470,67 @@ class StaticDeploymentConfigReader implements DeploymentConfigReader {
 
   async read() {
     return ok(this.config);
+  }
+}
+
+class MemoryScheduledRuntimePrunePolicyRepository implements ScheduledRuntimePrunePolicyRepository {
+  readonly items = new Map<string, ScheduledRuntimePrunePolicyRecord>();
+
+  async findOne(
+    _context: ReturnType<typeof toRepositoryContext>,
+    policyId: string,
+  ): Promise<Result<ScheduledRuntimePrunePolicyRecord | null>> {
+    return ok(this.items.get(policyId) ?? null);
+  }
+
+  async list(
+    context: ReturnType<typeof toRepositoryContext>,
+    filter: ScheduledRuntimePrunePolicyListFilter = {},
+  ) {
+    const records = await this.listRecords(context, {
+      ...filter,
+      enabledOnly: filter.enabledOnly ?? true,
+    });
+    if (records.isErr()) {
+      return err(records.error);
+    }
+
+    return ok(
+      records.value.map((record) => ({
+        id: record.id,
+        version: record.version,
+        scope: record.scope,
+        serverId: record.serverId,
+        retentionDays: record.retentionDays,
+        destructive: record.destructive,
+        categories: record.categories,
+        retryOnFailure: record.retryOnFailure,
+      })),
+    );
+  }
+
+  async listRecords(
+    _context: ReturnType<typeof toRepositoryContext>,
+    filter: ScheduledRuntimePrunePolicyListFilter = {},
+  ): Promise<Result<ScheduledRuntimePrunePolicyRecord[]>> {
+    return ok(
+      Array.from(this.items.values()).filter((record) => {
+        const matchesEnabled = filter.enabledOnly === true ? record.enabled : true;
+        const matchesServer = filter.serverId
+          ? record.serverId === filter.serverId || record.serverId === "*"
+          : true;
+        const matchesScope = filter.scopes ? filter.scopes.includes(record.scope) : true;
+        return matchesEnabled && matchesServer && matchesScope;
+      }),
+    );
+  }
+
+  async upsert(
+    _context: ReturnType<typeof toRepositoryContext>,
+    record: ScheduledRuntimePrunePolicyRecord,
+  ): Promise<Result<ScheduledRuntimePrunePolicyRecord>> {
+    this.items.set(record.id, record);
+    return ok(record);
   }
 }
 
@@ -583,6 +664,7 @@ async function createDeploymentFixture(
     serverTargetKind?: "single-server" | "orchestrator-cluster";
     domainRouteBindingReader?: DomainRouteBindingReader;
     serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader;
+    processAttemptRecorder?: ProcessAttemptRecorder;
   } = {},
 ) {
   const projects = new MemoryProjectRepository();
@@ -722,6 +804,7 @@ async function createDeploymentFixture(
     options.serverAppliedRouteDesiredStateReader,
     dependencyBindingReadModel,
     dependencyResourceSecretStore,
+    options.processAttemptRecorder,
   );
   return {
     bindDependency: new BindResourceDependencyUseCase(
@@ -1316,6 +1399,133 @@ describe("CreateDeploymentUseCase", () => {
     });
     expect(runtimePlanResolver.input?.requestedDeployment.runtimeMetadata?.["preview.id"]).toBe(
       undefined,
+    );
+  });
+
+  test("[PROC-DELIVERY-001] projects deployment execution into operator work with safe details", async () => {
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
+    const { context, createDeploymentInput, createDeploymentUseCase } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        processAttemptRecorder,
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    const deploymentId = result._unsafeUnwrap().id;
+    expect(processAttemptRecorder.records).toHaveLength(2);
+    expect(processAttemptRecorder.records).toEqual([
+      expect.objectContaining({
+        id: deploymentId,
+        kind: "deployment",
+        status: "running",
+        operationKey: "deployments.create",
+        dedupeKey: `deployment:${deploymentId}`,
+        correlationId: "req_test",
+        requestId: "req_test",
+        phase: "deployment-execution",
+        step: "running",
+        projectId: "prj_demo",
+        resourceId: "res_demo",
+        deploymentId,
+        serverId: "srv_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: expect.objectContaining({
+          triggerKind: "create",
+          deploymentStatus: "running",
+          buildStrategy: "dockerfile",
+          executionKind: "docker-container",
+          targetKind: "single-server",
+          targetProviderKey: "generic-ssh",
+          packagingMode: "all-in-one-docker",
+        }),
+      }),
+      expect.objectContaining({
+        id: deploymentId,
+        kind: "deployment",
+        status: "succeeded",
+        operationKey: "deployments.create",
+        dedupeKey: `deployment:${deploymentId}`,
+        phase: "deployment-execution",
+        step: "succeeded",
+        projectId: "prj_demo",
+        resourceId: "res_demo",
+        deploymentId,
+        serverId: "srv_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:03:00.000Z",
+        updatedAt: "2026-01-01T00:03:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: expect.objectContaining({
+          triggerKind: "create",
+          deploymentStatus: "succeeded",
+          buildStrategy: "dockerfile",
+          executionKind: "docker-container",
+          targetKind: "single-server",
+          targetProviderKey: "generic-ssh",
+        }),
+      }),
+    ]);
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("Hermetic execution");
+  });
+
+  test("[PROC-DELIVERY-004] projects post-acceptance deployment failure without raw provider output", async () => {
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      resources,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      executionBackend: new FailingStaticPackageExecutionBackend(),
+      processAttemptRecorder,
+    });
+    const staticResource = createStaticSiteResource({ publishDirectory: "/dist" });
+
+    await resources.upsert(
+      repositoryContext,
+      staticResource,
+      UpsertResourceSpec.fromResource(staticResource),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    const deploymentId = result._unsafeUnwrap().id;
+    expect(processAttemptRecorder.records.map((record) => record.status)).toEqual([
+      "running",
+      "failed",
+    ]);
+    expect(processAttemptRecorder.records[1]).toMatchObject({
+      id: deploymentId,
+      kind: "deployment",
+      status: "failed",
+      operationKey: "deployments.create",
+      dedupeKey: `deployment:${deploymentId}`,
+      phase: "deployment-execution",
+      step: "failed",
+      projectId: "prj_demo",
+      resourceId: "res_demo",
+      deploymentId,
+      serverId: "srv_demo",
+      errorCode: "provider_error",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: expect.objectContaining({
+        triggerKind: "create",
+        deploymentStatus: "failed",
+        failurePhase: "image-build",
+        failureStep: "static-package",
+        buildStrategy: "dockerfile",
+        executionKind: "docker-container",
+      }),
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain(
+      "Static artifact package failed",
     );
   });
 
@@ -3750,5 +3960,103 @@ describe("CreateDeploymentUseCase", () => {
     expect(deployment?.toState().serverId.value).toBe("srv_0003");
     expect(deployment?.toState().destinationId.value).toBe("dst_0004");
     expect(deployment?.toState().resourceId.value).toBe("res_0005");
+  });
+
+  test("[RT-CAP-SCHED-001] materializes repository runtime prune config as deployment-snapshot policy", async () => {
+    const projects = new MemoryProjectRepository();
+    const servers = new MemoryServerRepository();
+    const destinations = new MemoryDestinationRepository();
+    const environments = new MemoryEnvironmentRepository();
+    const resources = new MemoryResourceRepository();
+    const policyRepository = new MemoryScheduledRuntimePrunePolicyRepository();
+    const clock = new FixedClock("2026-01-01T00:00:00.000Z");
+    const idGenerator = new SequenceIdGenerator();
+    const eventBus = new CapturedEventBus();
+    const logger = new NoopLogger();
+    const defaultsFactory = new DeploymentContextDefaultsFactory(clock, idGenerator);
+    const context = createTestContext();
+    const repositoryContext = toRepositoryContext(context);
+    const bootstrap = new DeploymentContextBootstrapService(
+      new StaticDeploymentConfigReader({
+        configFilePath: "appaloft.yml",
+        project: {
+          name: "Configured App",
+        },
+        environment: {
+          name: "production",
+          kind: "production",
+        },
+        resource: {
+          name: "web",
+          kind: "application",
+        },
+        targets: [
+          {
+            key: "ssh-prod",
+            name: "SSH Production",
+            providerKey: "generic-ssh",
+            host: "203.0.113.10",
+            port: 22,
+            destination: {
+              name: "default",
+              kind: "generic",
+            },
+          },
+        ],
+        deployment: {
+          targetKey: "ssh-prod",
+          method: "workspace-commands",
+          startCommand: "node dist/server.js",
+          port: 3000,
+        },
+        retention: {
+          runtimePrune: {
+            retentionDays: 14,
+            destructive: true,
+            categories: ["stopped-containers", "preview-workspaces"],
+            retryOnFailure: false,
+            enabled: true,
+          },
+        },
+      }),
+      projects,
+      servers,
+      destinations,
+      environments,
+      resources,
+      new StaticProviderRegistry(),
+      new ExplicitContextRequiredPolicy(),
+      defaultsFactory,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+      policyRepository,
+    );
+
+    const result = await bootstrap.bootstrap(context, {
+      sourceLocator: ".",
+    } as never);
+
+    expect(result.isOk()).toBe(true);
+    const policies = await policyRepository.listRecords(repositoryContext, {
+      scopes: ["deployment-snapshot"],
+      enabledOnly: false,
+    });
+    expect(policies.isOk()).toBe(true);
+    expect(policies._unsafeUnwrap()).toEqual([
+      {
+        id: "rpp_deployment_snapshot_srv_0003",
+        version: "appaloft.yml",
+        scope: "deployment-snapshot",
+        serverId: "srv_0003",
+        retentionDays: 14,
+        destructive: true,
+        categories: ["stopped-containers", "preview-workspaces"],
+        retryOnFailure: false,
+        enabled: true,
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
   });
 });

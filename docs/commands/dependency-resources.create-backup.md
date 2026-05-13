@@ -15,10 +15,11 @@ may produce a safe restore point.
 ## Success
 
 Returns `ok({ id })`, persists a `DependencyResourceBackup` attempt, and records
-`dependency-resource-backup-requested`.
+`dependency-resource-backup-requested`. The accepted and final provider backup outcomes are
+projected into `operator-work.*` through safe process-attempt rows keyed by the backup attempt id.
 
 Success means backup request accepted. Provider backup success or failure is reflected through
-backup state, safe read models, and lifecycle events.
+backup state, safe read models, operator-work visibility, and lifecycle events.
 
 ## Failure
 

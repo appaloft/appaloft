@@ -1,0 +1,53 @@
+# Plan: Runtime Artifact And Workspace Prune
+
+## Governing Sources
+
+- Domain model: `docs/DOMAIN_MODEL.md`
+- Decisions/ADRs: ADR-021, ADR-023, ADR-034, ADR-047
+- Local specs: `docs/commands/servers.capacity.prune.md`,
+  `docs/workflows/deployment-runtime-target-abstraction.md`
+- Test matrix: `docs/testing/runtime-target-capacity-test-matrix.md`
+
+## Architecture Approach
+
+- Domain/application placement: command schema, command, handler, and use case live in
+  `packages/application`; the use case loads `DeploymentTarget` and delegates target mutation to a
+  `RuntimeTargetCapacityPruner` port.
+- Repository/specification/visitor impact: reuse `ServerRepository.findOne` with
+  `DeploymentTargetByIdSpec`; no new persistence adapter in this slice.
+- Event/CQRS/read-model impact: command-side mutation through `CommandBus`; successful destructive
+  prune with at least one deleted candidate records one retained audit row through an injected
+  application port. No query mutation and no domain event/outbox publication is added in this slice.
+- Entrypoint impact: CLI and oRPC use the command schema directly; Web remains future.
+- Persistence/migration impact: none.
+
+## Roadmap And Compatibility
+
+- Roadmap target: Phase 9 operator state closure for `0.11.0`.
+- Version target: pre-1.0 policy; new public CLI/API capability.
+- Compatibility impact: additive command and response schema; destructive behavior requires
+  explicit `dryRun = false`.
+
+## Testing Strategy
+
+- Matrix ids: `RT-CAP-PRUNE-001` through `RT-CAP-PRUNE-007`.
+- Test-first rows: application use case, CLI dispatch, oRPC route, runtime adapter parser/script
+  coverage.
+- Acceptance/e2e: focused CLI/oRPC tests prove command bus dispatch and shared schema.
+- Contract/integration/unit: application command schema and runtime adapter parse/delete intent
+  tests prove safety exclusions.
+
+## Follow-On Extension
+
+- ADR-050 extends the command with explicit opt-in `docker-build-cache` and `unused-images`
+  categories. They are not default categories; operators must request them explicitly.
+- Runtime adapters use Docker filtered prune commands (`until=<before>`) and never run broad
+  `docker system prune` or Docker volume prune.
+
+## Risks And Migration Gaps
+
+- Audit row recording is limited to the destructive prune outcome. Scheduled runtime prune
+  automation, audit export, and legal-hold policy are separate implemented Phase 9 slices. Event
+  stream/outbox publication remains outside this runtime artifact prune boundary.
+- The runtime adapter must prefer skipped diagnostics over deletion when ownership evidence is
+  incomplete.
