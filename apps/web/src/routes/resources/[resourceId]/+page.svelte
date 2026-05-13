@@ -62,6 +62,7 @@
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import ResourceProfileSummary from "$lib/components/console/ResourceProfileSummary.svelte";
+  import RuntimeUsagePanel from "$lib/components/console/RuntimeUsagePanel.svelte";
   import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
@@ -84,6 +85,7 @@
     sourceEventRevisionLabel,
     sourceEventVisibleOutcomes,
   } from "$lib/console/source-events";
+  import { runtimeUsageQueryOptions } from "$lib/console/runtime-usage";
   import {
     findEnvironment,
     findProject,
@@ -146,6 +148,7 @@
     | "auto-deploy"
     | "configuration"
     | "domains"
+    | "usage"
     | "health"
     | "proxy"
     | "diagnostics";
@@ -164,6 +167,7 @@
     "auto-deploy",
     "configuration",
     "domains",
+    "usage",
     "health",
     "proxy",
     "diagnostics",
@@ -254,6 +258,15 @@
       staleTime: 5_000,
     }),
   );
+  const resourceRuntimeUsageQuery = createQuery(() =>
+    runtimeUsageQueryOptions(
+      {
+        kind: "resource",
+        resourceId,
+      },
+      browser && resourceId.length > 0,
+    ),
+  );
 
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
@@ -301,6 +314,10 @@
   const resourceSourceEvents = $derived(resourceSourceEventsQuery.data?.items ?? []);
   const scheduledTasks = $derived(scheduledTasksQuery.data?.items ?? []);
   const scheduledTaskRuns = $derived(scheduledTaskRunsQuery.data?.items ?? []);
+  const resourceRuntimeUsage = $derived(resourceRuntimeUsageQuery.data ?? null);
+  const resourceRuntimeUsageError = $derived(
+    resourceRuntimeUsageQuery.error ? readErrorMessage(resourceRuntimeUsageQuery.error) : "",
+  );
   const autoDeployPolicy = $derived(resourceDetail?.autoDeployPolicy ?? null);
   const profileDiagnostics = $derived(resourceDetail?.diagnostics ?? []);
   const resourceHealthOverall = $derived.by((): ResourceHealthViewStatus => {
@@ -2532,6 +2549,8 @@
         return $t(i18nKeys.console.resources.configurationTitle);
       case "domains":
         return $t(i18nKeys.console.resources.domainBindingsTitle);
+      case "usage":
+        return $t(i18nKeys.console.runtimeUsage.usageSection);
       case "health":
         return $t(i18nKeys.console.resources.healthPolicy);
       case "proxy":
@@ -5763,6 +5782,13 @@
                   {/if}
                 </div>
               </section>
+
+              {:else if activeSettingsSection === "usage"}
+              <RuntimeUsagePanel
+                usage={resourceRuntimeUsage}
+                loading={resourceRuntimeUsageQuery.isPending}
+                error={resourceRuntimeUsageError}
+              />
 
               {:else if activeSettingsSection === "health"}
               <section id="resource-overview-health" class="rounded-md border bg-background p-4">

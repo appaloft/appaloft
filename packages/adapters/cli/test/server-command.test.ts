@@ -198,6 +198,8 @@ describe("CLI server commands", () => {
               detectable: false,
             },
           },
+          appaloftContainers: [],
+          appaloftWorkspaces: [],
           safeReclaimableEstimate: {
             stoppedContainersSize: 0,
             danglingImagesSize: 0,

@@ -9,7 +9,7 @@ target/server capacity operations.
 
 | ID | Behavior | Level | Automation |
 | --- | --- | --- | --- |
-| RT-CAP-INSPECT-001 | `servers.capacity.inspect` dispatches a read-only application query from CLI. | CLI | Automated in `packages/adapters/cli/test/server-command.test.ts`. |
+| RT-CAP-INSPECT-001 | `servers.capacity.inspect` dispatches a read-only application query from CLI and the runtime adapter inspects only safe capacity signals, including Appaloft-managed container labels, writable sizes, and source workspace metadata. | CLI/adapter | CLI dispatch automated in `packages/adapters/cli/test/server-command.test.ts`; read-only capacity script plus Appaloft-managed container and workspace parsing automated in `packages/adapters/runtime/test/runtime-target-capacity.test.ts`. |
 | RT-CAP-PRUNE-001 | `servers.capacity.prune` defaults to dry-run and deletes nothing. | Application | Automated in `packages/application/test/server-capacity-prune.test.ts`. |
 | RT-CAP-PRUNE-002 | Destructive prune deletes only matched safe categories. | Application | Automated in `packages/application/test/server-capacity-prune.test.ts`. |
 | RT-CAP-PRUNE-003 | Runtime adapter reports active-runtime, rollback, volume, state-root, and cutoff skips/exclusions. | Adapter | Automated in `packages/adapters/runtime/test/runtime-target-capacity-prune.test.ts`. |
@@ -28,6 +28,9 @@ target/server capacity operations.
 ## Current Gaps
 
 - Real Docker and SSH prune smoke tests are opt-in because they mutate external runtime targets.
+- `servers.capacity.inspect` includes read-only Appaloft-managed container label/size capture and
+  source workspace metadata for attribution. It must not stop, remove, prune, restart, or repair
+  containers while reading.
 - Docker build-cache and unused-image deletion are explicit opt-in categories; scheduled prune
   automation is implemented behind ADR-055 policy-gated command-bus dispatch.
 - Runtime prune audit output records retained audit rows only; domain event stream/outbox

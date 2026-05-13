@@ -1465,6 +1465,29 @@ export interface RuntimeTargetAppaloftCapacity {
   sourceWorkspace: RuntimeTargetPathCapacity;
 }
 
+export interface RuntimeTargetAppaloftContainerCapacity {
+  id: string;
+  name: string;
+  running: boolean;
+  status: string;
+  writableBytes: number | null;
+  deploymentId?: string;
+  projectId?: string;
+  environmentId?: string;
+  resourceId?: string;
+  serverId?: string;
+  destinationId?: string;
+  artifactKind?: string;
+}
+
+export interface RuntimeTargetAppaloftWorkspaceCapacity {
+  deploymentId: string;
+  path: string;
+  bytes: number | null;
+  activeMarker: boolean;
+  rollbackCandidateMarker: boolean;
+}
+
 export interface RuntimeTargetSafeReclaimableEstimate {
   stoppedContainersSize: number;
   danglingImagesSize: number;
@@ -1522,6 +1545,8 @@ export interface RuntimeTargetCapacityInspection {
   memory: RuntimeTargetMemoryCapacity;
   cpu: RuntimeTargetCpuCapacity;
   appaloftRuntime: RuntimeTargetAppaloftCapacity;
+  appaloftContainers: RuntimeTargetAppaloftContainerCapacity[];
+  appaloftWorkspaces: RuntimeTargetAppaloftWorkspaceCapacity[];
   safeReclaimableEstimate: RuntimeTargetSafeReclaimableEstimate;
   warnings: RuntimeTargetCapacityWarning[];
   partial: boolean;
@@ -1534,6 +1559,170 @@ export interface RuntimeTargetCapacityInspector {
       server: DeploymentTargetState;
     },
   ): Promise<Result<RuntimeTargetCapacityInspection>>;
+}
+
+export type RuntimeUsageScope =
+  | { kind: "server"; serverId: string }
+  | { kind: "project"; projectId: string }
+  | { kind: "environment"; environmentId: string }
+  | { kind: "resource"; resourceId: string }
+  | { kind: "deployment"; deploymentId: string };
+
+export type RuntimeUsageFreshness = "live" | "recent-sample" | "stale" | "unknown";
+
+export interface RuntimeCpuUsage {
+  logicalCores?: number;
+  loadAverage1m?: number;
+  loadAverage5m?: number;
+  loadAverage15m?: number;
+  containerCpuPercent?: number;
+}
+
+export interface RuntimeMemoryUsage {
+  totalBytes?: number;
+  usedBytes?: number;
+  availableBytes?: number;
+  containerUsedBytes?: number;
+}
+
+export interface RuntimeDiskUsage {
+  totalBytes?: number;
+  usedBytes?: number;
+  availableBytes?: number;
+  attributedBytes?: number;
+}
+
+export interface RuntimeInodeUsage {
+  total?: number;
+  used?: number;
+  available?: number;
+}
+
+export interface RuntimeDockerUsage {
+  imageBytes?: number;
+  buildCacheBytes?: number;
+  containerWritableBytes?: number;
+}
+
+export interface RuntimeNetworkUsage {
+  rxBytes?: number;
+  txBytes?: number;
+}
+
+export interface RuntimeUsageTotals {
+  cpu?: RuntimeCpuUsage;
+  memory?: RuntimeMemoryUsage;
+  disk?: RuntimeDiskUsage;
+  inode?: RuntimeInodeUsage;
+  docker?: RuntimeDockerUsage;
+  network?: RuntimeNetworkUsage;
+}
+
+export type RuntimeUsageOwnership =
+  | "attributed"
+  | "partially-attributed"
+  | "unattributed"
+  | "unknown";
+
+export interface RuntimeUsageWarning {
+  code:
+    | "partial-diagnostic"
+    | "unsupported-provider"
+    | "docker-unavailable"
+    | "timeout"
+    | "ownership-unproven"
+    | "missing-metric-source"
+    | "stale-observation";
+  message: string;
+  scope?: RuntimeUsageScope;
+  resource?: "cpu" | "memory" | "disk" | "inode" | "docker" | "network" | "ownership";
+}
+
+export interface RuntimeUsageSourceError {
+  source: "runtime-target" | "docker" | "read-model" | "capacity" | "workspace" | "unknown";
+  code: string;
+  message: string;
+  retriable: boolean;
+}
+
+export interface RuntimeUsageRollup {
+  scope: RuntimeUsageScope;
+  ownership: RuntimeUsageOwnership;
+  totals: RuntimeUsageTotals;
+  currentDeploymentId?: string;
+  currentRuntimeId?: string;
+  artifactCount?: number;
+  warnings: RuntimeUsageWarning[];
+}
+
+export type RuntimeUsageArtifactKind =
+  | "active-runtime"
+  | "rollback-candidate"
+  | "source-workspace"
+  | "docker-image"
+  | "docker-build-cache"
+  | "appaloft-state-root"
+  | "volume"
+  | "unknown";
+
+export interface RuntimeUsageEvidence {
+  source:
+    | "label"
+    | "deployment-snapshot"
+    | "runtime-identity"
+    | "workspace-metadata"
+    | "read-model";
+  key: string;
+}
+
+export interface RuntimeArtifactUsage {
+  kind: RuntimeUsageArtifactKind;
+  ownership: RuntimeUsageOwnership;
+  serverId?: string;
+  projectId?: string;
+  environmentId?: string;
+  resourceId?: string;
+  deploymentId?: string;
+  destinationId?: string;
+  runtimeId?: string;
+  bytes?: number;
+  inodeCount?: number;
+  observedAt?: string;
+  evidence: RuntimeUsageEvidence[];
+  reclaimable: "yes" | "no" | "unknown";
+  reclaimBlockedReason?: string;
+  warnings: RuntimeUsageWarning[];
+}
+
+export interface RuntimeUsageInspection {
+  schemaVersion: "runtime-usage.inspect/v1";
+  scope: RuntimeUsageScope;
+  generatedAt: string;
+  observedAt?: string;
+  freshness: RuntimeUsageFreshness;
+  partial: boolean;
+  totals: RuntimeUsageTotals;
+  byProject: RuntimeUsageRollup[];
+  byEnvironment: RuntimeUsageRollup[];
+  byResource: RuntimeUsageRollup[];
+  byDeployment: RuntimeUsageRollup[];
+  artifacts: RuntimeArtifactUsage[];
+  warnings: RuntimeUsageWarning[];
+  sourceErrors: RuntimeUsageSourceError[];
+}
+
+export interface RuntimeUsageInspectorInput {
+  scope: RuntimeUsageScope;
+  mode: "current";
+  includeArtifacts: boolean;
+  includeWarnings: boolean;
+}
+
+export interface RuntimeUsageInspector {
+  inspect(
+    context: ExecutionContext,
+    input: RuntimeUsageInspectorInput,
+  ): Promise<Result<RuntimeUsageInspection>>;
 }
 
 export type RuntimeTargetCapacityPruneCategory =

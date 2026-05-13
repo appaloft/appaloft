@@ -2161,16 +2161,26 @@ Governing planning document:
 - [Runtime Usage Attribution And Monitoring](./specs/068-runtime-usage-attribution-and-monitoring/spec.md)
 
 Required:
-- [ ] Add ADR for runtime usage attribution operation/read-model boundaries.
-- [ ] Add runtime usage test matrix with `RT-USAGE-*` rows.
-- [ ] Implement read-only `runtime-usage.inspect` for server, project, environment, resource, and
+- [x] Add ADR for runtime usage attribution operation/read-model boundaries.
+- [x] Add runtime usage test matrix with `RT-USAGE-*` rows.
+- [x] Implement read-only `runtime-usage.inspect` for server, project, environment, resource, and
   deployment scopes, using safe Appaloft ownership evidence and no mutation.
-- [ ] Prove the `0.12.0` slice answers objective operator questions about current attribution,
+  - [x] Server scope returns live capacity-backed usage context.
+  - [x] Project, environment, resource, and deployment scopes resolve current deployment/server
+    context through read models and return partial attribution instead of guessed totals when
+    ownership evidence is incomplete.
+  - [x] Appaloft-managed Docker container labels provide current artifact, deployment/resource
+    rollup, container writable byte, and runtime id attribution when the labels are present.
+  - [x] Source workspace metadata and deployment read models provide deployment-id-based
+    project/environment/resource rollups beyond current container labels.
+  - [x] Retained runtime identity metadata from deployment read models enriches deployment-id-only
+    artifacts when present.
+- [x] Prove the `0.12.0` slice answers objective operator questions about current attribution,
   capacity pressure, disk ownership classes, current deployment/runtime context, and next
   diagnostic action without adding dashboard-only metrics.
-- [ ] Expose the accepted query through CLI and HTTP/oRPC shared schemas; Web readback is included
-  only after query DTOs and i18n keys exist.
-- [ ] Preserve existing rejection for unsupported CPU/memory/replicas/runtime sizing config fields.
+- [x] Expose the accepted query through CLI and HTTP/oRPC shared schemas.
+- [x] Add Web readback after query DTOs and i18n keys exist.
+- [x] Preserve existing rejection for unsupported CPU/memory/replicas/runtime sizing config fields.
 
 Deferred unless explicitly pulled into `0.12.0`:
 - [ ] Bounded runtime usage sample retention and rollup queries for charts.

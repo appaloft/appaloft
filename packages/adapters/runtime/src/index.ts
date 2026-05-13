@@ -147,6 +147,11 @@ export {
   RuntimeTargetCapacityInspectorAdapter,
   RuntimeTargetCapacityPrunerAdapter,
 } from "./runtime-target-capacity";
+export {
+  RuntimeUsageCapacityInspectorAdapter,
+  translateCapacityInspectionToRuntimeUsage,
+  type RuntimeUsageServerResolver,
+} from "./runtime-usage";
 export { RuntimeTerminalSessionGateway } from "./terminal-sessions";
 export { SshExecutionBackend } from "./ssh-execution";
 export * from "./runtime-commands";

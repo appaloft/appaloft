@@ -13,6 +13,7 @@ searchAliases:
 relatedOperations:
   - resources.diagnostic-summary
   - resources.access-failure-evidence.lookup
+  - runtime-usage.inspect
   - servers.capacity.inspect
   - servers.capacity.prune
   - scheduled-runtime-prune-policies.configure
@@ -69,9 +70,31 @@ appaloft server capacity inspect srv_primary
 
 这个入口只读取容量信号，不会运行 prune，不会删除 Docker volume，不会删除
 `/var/lib/appaloft/runtime/state`，也不会停止容器。输出会包含 disk、inodes、Docker image/build-cache
-usage、Appaloft runtime/state/source workspace usage、safe reclaimable estimate 和 warnings。
+usage、Appaloft runtime/state/source workspace usage、Appaloft-managed container label/size
+evidence、source workspace metadata、safe reclaimable estimate 和 warnings。
 
 `safeReclaimableEstimate` 是后续 cleanup/prune 决策的估算输入，不代表 Appaloft 已经执行清理。
+
+<h2 id="runtime-usage-inspect">Runtime usage attribution inspect</h2>
+
+当需要查看 Appaloft 如何把运行时容量归因到一个 scope 时，使用只读 usage attribution 查询：
+
+```bash title="查看 server scope 的运行时 usage"
+appaloft runtime-usage inspect server:srv_primary
+```
+
+HTTP API 使用同一个查询边界：
+
+```http title="Inspect runtime usage over HTTP"
+GET /api/runtime-usage/inspect?scope.kind=server&scope.serverId=srv_primary
+```
+
+第一阶段的实现会把 server scope 的安全容量诊断翻译成 `runtime-usage.inspect/v1`：包含 totals、
+artifacts、warnings 和 sourceErrors。这个查询不会保存 sample，不会执行 prune，不会停止或重启
+runtime，不会部署，也不会执行 quota 或 threshold enforcement。Appaloft-managed container labels
+存在时可以提供当前 resource/deployment 归因和 runtime id。source workspace metadata 可以提供用于
+resource rollup 的 deployment-id 证据；retained runtime identity metadata 存在时可以补充 runtime
+id。samples、rollups、charts 和 threshold policy 属于后续受治理的切片。
 
 如需预览 target-owned 清理，先用 dry-run 运行 prune：
 

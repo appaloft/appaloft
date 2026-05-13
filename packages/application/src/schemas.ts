@@ -161,6 +161,7 @@ export * from "./operations/resources/resource-runtime-logs.schema";
 export * from "./operations/resources/set-resource-variable.schema";
 export * from "./operations/resources/show-resource.schema";
 export * from "./operations/resources/unset-resource-variable.schema";
+export * from "./operations/runtime-usage/inspect-runtime-usage.schema";
 export * from "./operations/scheduled-tasks/scheduled-task.schema";
 export * from "./operations/servers/bootstrap-server-proxy.schema";
 export * from "./operations/servers/check-server-delete-safety.schema";

@@ -38,6 +38,7 @@ export const webDocsHrefs = {
   observabilityRuntimeLogs: resolvePublicDocsHelpHref("observability.runtime-logs"),
   observabilityHealthSummary: resolvePublicDocsHelpHref("observability.health-summary"),
   diagnosticsSafeSupportPayload: resolvePublicDocsHelpHref("diagnostics.safe-support-payload"),
+  runtimeUsageInspect: resolvePublicDocsHelpHref("diagnostics.runtime-usage"),
   sourceAutoDeploySetup: resolvePublicDocsHelpHref("source.auto-deploy-setup"),
   sourceAutoDeploySignatures: resolvePublicDocsHelpHref("source.auto-deploy-signatures"),
   sourceAutoDeployDedupe: resolvePublicDocsHelpHref("source.auto-deploy-dedupe"),

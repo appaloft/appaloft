@@ -154,6 +154,7 @@ import {
   ImportResourceVariablesUseCase,
   IngestSourceEventCommandHandler,
   IngestSourceEventUseCase,
+  InspectRuntimeUsageQueryHandler,
   InspectServerCapacityQueryHandler,
   InspectServerCapacityQueryService,
   InviteOrganizationMemberCommandHandler,
@@ -320,6 +321,7 @@ import {
   RunScheduledTaskNowCommandHandler,
   RunScheduledTaskNowUseCase,
   RuntimePlanResolutionInputBuilder,
+  RuntimeUsageInspectionQueryService,
   ScheduledHistoryRetentionService,
   ScheduledRuntimePrunePolicyResolver,
   ScheduledRuntimePruneService,
@@ -543,6 +545,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ConfigureResourceAccessCommandHandler);
   container.registerSingleton(ConfigureResourceAutoDeployCommandHandler);
   container.registerSingleton(IngestSourceEventCommandHandler);
+  container.registerSingleton(InspectRuntimeUsageQueryHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
@@ -988,6 +991,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.inspectServerCapacityQueryService,
     InspectServerCapacityQueryService,
+  );
+  container.registerSingleton(
+    tokens.runtimeUsageInspectionQueryService,
+    RuntimeUsageInspectionQueryService,
   );
   container.registerSingleton(tokens.pruneServerCapacityUseCase, PruneServerCapacityUseCase);
   container.registerSingleton(
