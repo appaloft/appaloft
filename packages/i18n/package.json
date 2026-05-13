@@ -6,7 +6,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "i18next": "^25.6.3"
+    "i18next": "^26.1.0"
   },
   "scripts": {
     "lint": "biome check .",

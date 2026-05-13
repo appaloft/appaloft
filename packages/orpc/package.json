@@ -18,7 +18,7 @@
     "@appaloft/docs-registry": "workspace:*",
     "@appaloft/i18n": "workspace:*",
     "elysia": "^1.4.28",
-    "zod": "^4.1.12"
+    "zod": "^4.4.3"
   },
   "scripts": {
     "lint": "biome check .",
