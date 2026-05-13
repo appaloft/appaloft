@@ -368,11 +368,11 @@ jobs:
             fi
             npm publish "$package_dir" --access public --tag "${NPM_TAG}"
           }
-          for package_dir in packages/npm/cli-*; do
+          for package_dir in ./packages/npm/cli-*; do
             publish_package "$package_dir"
           done
-          publish_package packages/npm/cli
-          publish_package packages/sdk
+          publish_package ./packages/npm/cli
+          publish_package ./packages/sdk
         env:
           NPM_TAG: ${{ needs.resolve.outputs.npm_tag }}
 
