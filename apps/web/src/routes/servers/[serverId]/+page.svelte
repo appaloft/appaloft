@@ -44,7 +44,7 @@
   import * as Tabs from "$lib/components/ui/tabs";
   import { toDefaultAccessPolicyFormState } from "$lib/console/default-access-policy-form";
   import { webDocsHrefs } from "$lib/console/docs-help";
-  import { runtimeUsageQueryOptions } from "$lib/console/runtime-usage";
+  import { runtimeUsageQueryOptions } from "$lib/console/runtime-usage-query";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
   import { formatTime } from "$lib/console/utils";

@@ -1,7 +1,4 @@
-import { type InspectRuntimeUsageResponse, type RuntimeUsageScope } from "@appaloft/contracts";
-import { queryOptions } from "@tanstack/svelte-query";
-
-import { orpcClient } from "$lib/orpc";
+import { type RuntimeUsageScope } from "@appaloft/contracts";
 
 export function runtimeUsageQueryKey(scope: RuntimeUsageScope): readonly string[] {
   switch (scope.kind) {
@@ -16,22 +13,6 @@ export function runtimeUsageQueryKey(scope: RuntimeUsageScope): readonly string[
     case "deployment":
       return ["runtime-usage", scope.kind, scope.deploymentId];
   }
-}
-
-export function runtimeUsageQueryOptions(scope: RuntimeUsageScope, enabled: boolean) {
-  return queryOptions<InspectRuntimeUsageResponse>({
-    queryKey: runtimeUsageQueryKey(scope),
-    queryFn: () =>
-      orpcClient.runtimeUsage.inspect({
-        scope,
-        mode: "current",
-        includeArtifacts: true,
-        includeWarnings: true,
-      }),
-    enabled,
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-  });
 }
 
 export function formatRuntimeUsageBytes(value: number | undefined): string | null {

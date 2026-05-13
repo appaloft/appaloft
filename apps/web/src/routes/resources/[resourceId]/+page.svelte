@@ -85,7 +85,7 @@
     sourceEventRevisionLabel,
     sourceEventVisibleOutcomes,
   } from "$lib/console/source-events";
-  import { runtimeUsageQueryOptions } from "$lib/console/runtime-usage";
+  import { runtimeUsageQueryOptions } from "$lib/console/runtime-usage-query";
   import {
     findEnvironment,
     findProject,
