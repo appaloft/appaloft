@@ -76,6 +76,9 @@ and protects product mutations by organization role. A mutation without a sessio
 `401 product_auth_missing`; a logged-in user outside the organization or without enough role returns
 `403 product_auth_forbidden`.
 
+To end the browser session, use the **Sign out** control in the console header or user menu. The
+console clears its cached session state and returns to `/login`.
+
 <h2 id="self-hosting-first-admin-public-api">Bootstrap status and setup API</h2>
 
 Install and console setup flows can read the public bootstrap status:

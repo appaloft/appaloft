@@ -29,6 +29,8 @@ describe("organization auth management console surface", () => {
     expect(pageSource).not.toContain("better-auth");
     expect(shellSource).toContain('href: "/organization"');
     expect(shellSource).toContain("i18nKeys.console.nav.organization");
+    expect(shellSource).toContain('"/api/auth/sign-out"');
+    expect(shellSource).toContain("i18nKeys.common.actions.signOut");
     expect(clientContractSource).toContain("organizations: {");
     expect(clientContractSource).toContain("SwitchCurrentOrganizationCommandInput");
     expect(clientContractSource).toContain("InviteOrganizationMemberCommandInput");

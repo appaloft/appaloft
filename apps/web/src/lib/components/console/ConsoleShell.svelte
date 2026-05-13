@@ -10,6 +10,7 @@
     GitBranch,
     Globe2,
     Moon,
+    LogOut,
     Package,
     Play,
     Rocket,
@@ -32,6 +33,7 @@
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
   import { Button } from "$lib/components/ui/button";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import { queryClient } from "$lib/query-client";
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -109,6 +111,8 @@
   let colorModeReady = $state(false);
   let sidebarOpen = $state(false);
   let sidebarReady = $state(false);
+  let signOutError = $state("");
+  let signingOut = $state(false);
 
   const {
     healthQuery,
@@ -272,6 +276,27 @@
 
     if (response.url && browser) {
       window.location.href = response.url;
+    }
+  }
+
+  async function signOut(): Promise<void> {
+    if (!browser || signingOut) {
+      return;
+    }
+
+    signingOut = true;
+    signOutError = "";
+
+    try {
+      await request<{ success: boolean }>("/api/auth/sign-out", {
+        method: "POST",
+      });
+      queryClient.clear();
+      await goto("/login");
+    } catch (error) {
+      signOutError = readErrorMessage(error);
+    } finally {
+      signingOut = false;
     }
   }
 
@@ -465,6 +490,18 @@
             <BookOpen class="size-4" />
             {$t(i18nKeys.common.actions.openDocumentation)}
           </DropdownMenuItem>
+          {#if authSession.session}
+            <DropdownMenuSeparator />
+            {#if signOutError}
+              <DropdownMenuLabel>
+                <span class="block text-xs font-normal text-destructive">{signOutError}</span>
+              </DropdownMenuLabel>
+            {/if}
+            <DropdownMenuItem disabled={signingOut} onclick={signOut}>
+              <LogOut class="size-4" />
+              {signingOut ? $t(i18nKeys.common.actions.signingOut) : $t(i18nKeys.common.actions.signOut)}
+            </DropdownMenuItem>
+          {/if}
           <DropdownMenuSeparator />
           <DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={$locale}>
@@ -534,6 +571,18 @@
             <Moon class="size-4" />
           {/if}
         </Button>
+        {#if authSession.session}
+          <Button
+            aria-label={$t(i18nKeys.common.actions.signOut)}
+            title={$t(i18nKeys.common.actions.signOut)}
+            size="icon-sm"
+            variant="outline"
+            disabled={signingOut}
+            onclick={signOut}
+          >
+            <LogOut class="size-4" />
+          </Button>
+        {/if}
         <Button
           href="/deploy"
           size="sm"

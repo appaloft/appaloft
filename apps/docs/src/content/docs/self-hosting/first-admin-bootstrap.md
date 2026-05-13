@@ -73,6 +73,9 @@ appaloft auth bootstrap-first-admin \
 保护产品 mutation。没有 session 的 mutation 会返回 `401 product_auth_missing`；已登录但不属于目标
 organization 或 role 不足时，会返回 `403 product_auth_forbidden`。
 
+如需结束当前浏览器会话，使用 console 顶部栏或用户菜单里的 **退出登录**。console 会清理已缓存的
+session 状态并返回 `/login`。
+
 <h2 id="self-hosting-first-admin-public-api">Bootstrap status 和 setup API</h2>
 
 安装和 console setup 可以读取公开 bootstrap status：

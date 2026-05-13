@@ -33,6 +33,8 @@ export const enUS = {
       saving: "Saving",
       selectDirectory: "Select directory",
       closeTerminal: "Close terminal",
+      signOut: "Sign out",
+      signingOut: "Signing out",
       switchToDarkMode: "Switch to dark mode",
       switchToLightMode: "Switch to light mode",
       testConnectivity: "Test connectivity",

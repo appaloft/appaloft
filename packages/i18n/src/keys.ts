@@ -31,6 +31,8 @@ export const i18nKeys = {
       saving: "common:actions.saving",
       selectDirectory: "common:actions.selectDirectory",
       closeTerminal: "common:actions.closeTerminal",
+      signOut: "common:actions.signOut",
+      signingOut: "common:actions.signingOut",
       switchToDarkMode: "common:actions.switchToDarkMode",
       switchToLightMode: "common:actions.switchToLightMode",
       testConnectivity: "common:actions.testConnectivity",

@@ -72,8 +72,8 @@ Current status:
   `self-hosting/action-deploy-token-auth#self-hosting-action-deploy-token-auth`.
   Self-hosted first-admin docs now describe installer-driven local admin bootstrap, generated
   one-time passwords, login URL expectations, public bootstrap status/setup endpoints, OAuth
-  optionality, required OAuth provider settings, callback URL expectations, trusted origin
-  configuration, and product auth 401/403 recovery under
+  optionality, console sign-out, required OAuth provider settings, callback URL expectations,
+  trusted origin configuration, and product auth 401/403 recovery under
   `self-hosting/first-admin-bootstrap#self-hosting-first-admin-bootstrap`.
   Self-hosted organization/team docs now describe current context, current organization switching,
   member and invitation lists, member invitation, role updates, removal, CLI session handoff, safe
