@@ -39,6 +39,8 @@ export const zhCN = {
       saving: "保存中",
       selectDirectory: "选择目录",
       closeTerminal: "关闭终端",
+      signOut: "退出登录",
+      signingOut: "退出中",
       switchToDarkMode: "切换到深色模式",
       switchToLightMode: "切换到浅色模式",
       testConnectivity: "测试连通性",
