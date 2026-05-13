@@ -13,11 +13,11 @@
   "devDependencies": {
     "@appaloft/openapi": "workspace:*",
     "@appaloft/design": "workspace:*",
-    "@astrojs/check": "^0.9.8",
-    "@astrojs/starlight": "^0.38.3",
-    "astro": "^6.1.9",
+    "@astrojs/check": "^0.9.9",
+    "@astrojs/starlight": "^0.39.2",
+    "astro": "^6.3.1",
     "reflect-metadata": "^0.2.2",
-    "starlight-openapi": "^0.25.0",
-    "typescript": "^6.0.2"
+    "starlight-openapi": "^0.25.1",
+    "typescript": "^6.0.3"
   }
 }

@@ -8,7 +8,7 @@
   "dependencies": {
     "@appaloft/application": "workspace:*",
     "@appaloft/core": "workspace:*",
-    "better-auth": "^1.6.1",
+    "better-auth": "^1.6.10",
     "reflect-metadata": "^0.2.2"
   },
   "scripts": {

@@ -1,5 +1,6 @@
 import { context, type Span, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import {
+  type AbortableOperationOptions,
   type CompiledQuery,
   type DatabaseConnection,
   type DatabaseIntrospector,
@@ -61,7 +62,10 @@ class TracingDatabaseConnection implements DatabaseConnection {
     private readonly descriptor: DatabaseTraceDescriptor,
   ) {}
 
-  async executeQuery<R>(compiledQuery: CompiledQuery): Promise<QueryResult<R>> {
+  async executeQuery<R>(
+    compiledQuery: CompiledQuery,
+    options?: AbortableOperationOptions,
+  ): Promise<QueryResult<R>> {
     const operation = readOperationName(compiledQuery.sql);
 
     return tracer.startActiveSpan(
@@ -72,7 +76,7 @@ class TracingDatabaseConnection implements DatabaseConnection {
       },
       async (span) => {
         try {
-          const result = await this.inner.executeQuery<R>(compiledQuery);
+          const result = await this.inner.executeQuery<R>(compiledQuery, options);
           span.setStatus({ code: SpanStatusCode.OK });
           span.setAttribute("db.response.returned_rows", result.rows.length);
           return result;
@@ -88,7 +92,8 @@ class TracingDatabaseConnection implements DatabaseConnection {
 
   async *streamQuery<R>(
     compiledQuery: CompiledQuery,
-    chunkSize?: number,
+    chunkSize: number,
+    options?: AbortableOperationOptions,
   ): AsyncIterableIterator<QueryResult<R>> {
     const operation = readOperationName(compiledQuery.sql);
     const span = tracer.startSpan(`db.postgresql.${operation.toLowerCase()}`, {
@@ -99,7 +104,7 @@ class TracingDatabaseConnection implements DatabaseConnection {
 
     try {
       const stream = context.with(activeContext, () =>
-        this.inner.streamQuery<R>(compiledQuery, chunkSize),
+        this.inner.streamQuery<R>(compiledQuery, chunkSize, options),
       );
 
       for await (const result of stream) {

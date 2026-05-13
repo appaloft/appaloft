@@ -1,7 +1,8 @@
 import { resolve } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { $ } from "bun";
-import { Kysely, type MigrationProvider, Migrator, sql } from "kysely";
+import { Kysely, sql } from "kysely";
+import { type MigrationProvider, Migrator } from "kysely/migration";
 import { PostgresJSDialect } from "kysely-postgres-js";
 import postgres from "postgres";
 

@@ -12,9 +12,9 @@
     "@appaloft/core": "workspace:*",
     "@appaloft/deployment-config": "workspace:*",
     "@appaloft/docs-registry": "workspace:*",
-    "@effect/cli": "^0.75.0",
+    "@effect/cli": "^0.75.1",
     "@effect/platform-node": "^0.106.0",
-    "effect": "^3.21.0"
+    "effect": "^3.21.2"
   },
   "scripts": {
     "lint": "biome check .",
