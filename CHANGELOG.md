@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.10.1](https://github.com/appaloft/appaloft/compare/v0.10.0...v0.10.1) (2026-05-13)
+
+
+### Features
+
+* add console sign out ([#233](https://github.com/appaloft/appaloft/issues/233)) ([380b905](https://github.com/appaloft/appaloft/commit/380b9056c5211c5c238b4f797307ee0060c42a13))
+* complete 0.11 release readiness ([#229](https://github.com/appaloft/appaloft/issues/229)) ([af04f82](https://github.com/appaloft/appaloft/commit/af04f8267224eda9aff952d9e0db770a718db22a))
+
+
+### Bug Fixes
+
+* **application:** allow global preview environment listing ([61249fd](https://github.com/appaloft/appaloft/commit/61249fd9493881a3f42208cd63f6a5a3e562aa08))
+* gate first-admin routing and token handoff ([#228](https://github.com/appaloft/appaloft/issues/228)) ([878d953](https://github.com/appaloft/appaloft/commit/878d9536f6023e940c85b43bb1682015e92b3dfc))
+* **persistence:** normalize legacy deployment log sources ([79facc9](https://github.com/appaloft/appaloft/commit/79facc9105db1d3daa3cb03fe1d02d3afb5bc1c4))
+
+
+### Documentation
+
+* align roadmap version plan ([64d0927](https://github.com/appaloft/appaloft/commit/64d0927b0db8c775cfb67b26257ec36b83cc9101))
+* plan runtime usage attribution roadmap ([738b959](https://github.com/appaloft/appaloft/commit/738b95950e96fd617198e178997bb79a4eb4f3af))
+
+
+### Miscellaneous
+
+* upgrade dependencies ([#230](https://github.com/appaloft/appaloft/issues/230)) ([7ed5686](https://github.com/appaloft/appaloft/commit/7ed5686c8b24c33ded393a8816ba0ce6c29630a2))
+
 ## [0.10.0](https://github.com/appaloft/appaloft/compare/v0.9.10...v0.10.0) (2026-05-11)
 
 
