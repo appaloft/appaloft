@@ -361,12 +361,14 @@ jobs:
           publish_package() {
             local package_dir="$1"
             local package_name
+            local publish_dir
             package_name="$(node -e "const fs = require('fs'); console.log(JSON.parse(fs.readFileSync(process.argv[1], 'utf8')).name)" "${package_dir}/package.json")"
             if npm view "${package_name}@${APPALOFT_APP_VERSION}" version >/dev/null 2>&1; then
               echo "Skipping ${package_name}@${APPALOFT_APP_VERSION}; already published"
               return
             fi
-            npm publish "$package_dir" --access public --tag "${NPM_TAG}"
+            publish_dir="./${package_dir#./}"
+            npm publish "$publish_dir" --access public --tag "${NPM_TAG}"
           }
           for package_dir in packages/npm/cli-*; do
             publish_package "$package_dir"
