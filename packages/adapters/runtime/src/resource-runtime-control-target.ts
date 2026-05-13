@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,6 +23,7 @@ import {
   type Result,
 } from "@appaloft/core";
 
+import { runBufferedProcess } from "./buffered-process";
 import { deriveRuntimeInstanceNames } from "./runtime-instance-names";
 
 export interface RuntimeControlCommandExecution {
@@ -57,7 +57,7 @@ export interface RuntimeControlSpawnResult {
 export type RuntimeControlSpawn = (
   args: readonly string[],
   options: RuntimeControlSpawnOptions,
-) => RuntimeControlSpawnResult;
+) => Promise<RuntimeControlSpawnResult>;
 
 type SshRuntimeControlTarget = {
   host: string;
@@ -97,16 +97,20 @@ function repositoryContext(context: ExecutionContext): RepositoryContext {
   };
 }
 
-function defaultSpawn(args: readonly string[], options: RuntimeControlSpawnOptions) {
-  const [command, ...commandArgs] = args;
-  if (!command) {
-    return {
-      status: null,
-      error: new Error("Runtime control command is empty"),
-    };
-  }
+async function defaultSpawn(args: readonly string[], options: RuntimeControlSpawnOptions) {
+  const result = await runBufferedProcess({
+    command: args,
+    ...(options.cwd ? { cwd: options.cwd } : {}),
+    timeoutMs: options.timeout,
+    timeoutMessage: "Runtime control command timed out",
+  });
 
-  return spawnSync(command, commandArgs, options);
+  return {
+    status: result.exitCode,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    ...(result.error ? { error: result.error } : {}),
+  };
 }
 
 function hostWithUsername(host: string, username?: string): string {
@@ -348,7 +352,7 @@ export class RuntimeControlShellCommandExecutor implements RuntimeControlCommand
   ): Promise<Result<void, DomainError>> {
     switch (execution.providerKey) {
       case "local-shell":
-        return this.runLocal(execution);
+        return await this.runLocal(execution);
       case "generic-ssh":
         return this.runSsh(context, execution);
       default:
@@ -367,8 +371,10 @@ export class RuntimeControlShellCommandExecutor implements RuntimeControlCommand
     }
   }
 
-  private runLocal(execution: RuntimeControlCommandExecution): Result<void, DomainError> {
-    const result = this.spawn(["sh", "-lc", execution.command], {
+  private async runLocal(
+    execution: RuntimeControlCommandExecution,
+  ): Promise<Result<void, DomainError>> {
+    const result = await this.spawn(["sh", "-lc", execution.command], {
       ...(execution.workingDirectory ? { cwd: execution.workingDirectory } : {}),
       encoding: "utf8",
       timeout: this.timeoutMs,
@@ -387,7 +393,7 @@ export class RuntimeControlShellCommandExecutor implements RuntimeControlCommand
     }
 
     try {
-      const result = this.spawn(
+      const result = await this.spawn(
         ["ssh", ...sshArgs(target.value, remoteCommandWithCwd(execution.command, execution.workingDirectory))],
         {
           encoding: "utf8",

@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,11 +13,12 @@ import {
   createEdgeProxyDiagnosticsPlanForSelection,
   proxyBootstrapOptionsFromEnv,
 } from "./edge-proxy-plans";
+import { runBufferedProcess, shellCommand } from "./buffered-process";
 
 interface CommandRunnerResult {
   status: number | null;
-  stdout?: string | Buffer;
-  stderr?: string | Buffer;
+  stdout?: string;
+  stderr?: string;
   error?: Error;
 }
 
@@ -26,7 +26,7 @@ type CommandRunner = (
   command: string,
   args: string[],
   timeoutMs: number,
-) => CommandRunnerResult;
+) => Promise<CommandRunnerResult>;
 
 interface ProcessCheckInput {
   name: string;
@@ -52,14 +52,14 @@ function hostWithUsername(host: string, username?: string): string {
   return username && !host.includes("@") ? `${username}@${host}` : host;
 }
 
-function trimOutput(stdout: string | Buffer | undefined, stderr: string | Buffer | undefined): string {
+function trimOutput(stdout: string | undefined, stderr: string | undefined): string {
   const output = `${String(stdout ?? "")}\n${String(stderr ?? "")}`.trim();
   return output.length > 0 ? output.slice(0, 240) : "";
 }
 
-function processCheck(input: ProcessCheckInput): ServerConnectivityCheck {
+async function processCheck(input: ProcessCheckInput): Promise<ServerConnectivityCheck> {
   const startedAt = Date.now();
-  const result = input.runner(input.command, input.args, input.timeoutMs);
+  const result = await input.runner(input.command, input.args, input.timeoutMs);
   const durationMs = Date.now() - startedAt;
   const details = trimOutput(result.stdout, result.stderr);
 
@@ -191,14 +191,14 @@ function prepareSshArgs(server: DeploymentTargetState, remoteCommand: string): P
   };
 }
 
-function sshProcessCheck(
+async function sshProcessCheck(
   server: DeploymentTargetState,
   remoteCommand: string,
   input: Omit<ProcessCheckInput, "command" | "args">,
-): ServerConnectivityCheck {
+): Promise<ServerConnectivityCheck> {
   const prepared = prepareSshArgs(server, remoteCommand);
   try {
-    return processCheck({
+    return await processCheck({
       ...input,
       command: "ssh",
       args: prepared.args,
@@ -208,26 +208,32 @@ function sshProcessCheck(
   }
 }
 
-function shellProcessCheck(
+async function shellProcessCheck(
   command: string,
   input: Omit<ProcessCheckInput, "command" | "args">,
-): ServerConnectivityCheck {
-  return processCheck({
+): Promise<ServerConnectivityCheck> {
+  return await processCheck({
     ...input,
     command: "sh",
     args: ["-lc", command],
   });
 }
 
-function defaultCommandRunner(
+async function defaultCommandRunner(
   command: string,
   args: string[],
   timeoutMs: number,
-): CommandRunnerResult {
-  return spawnSync(command, args, {
-    encoding: "utf8",
-    timeout: timeoutMs,
+): Promise<CommandRunnerResult> {
+  const result = await runBufferedProcess({
+    command: command === "sh" && args[0] === "-lc" && args[1] ? shellCommand(args[1]) : [command, ...args],
+    timeoutMs,
   });
+  return {
+    status: result.exitCode,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    ...(result.error ? { error: result.error } : {}),
+  };
 }
 
 function withProxyRepairMetadata(
@@ -339,30 +345,34 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
       ];
     }
 
-    return plan.checks.map((check) => {
-      const input = {
-        name: check.name,
-        timeoutMs: check.timeoutMs,
-        successMessage: check.successMessage,
-        failureMessage: check.failureMessage,
-        metadata: {
-          providerKey: plan.providerKey,
-          proxyKind,
-          ...check.metadata,
-        },
-        runner: this.commandRunner,
-      };
+    return await Promise.all(
+      plan.checks.map(async (check) => {
+        const input = {
+          name: check.name,
+          timeoutMs: check.timeoutMs,
+          successMessage: check.successMessage,
+          failureMessage: check.failureMessage,
+          metadata: {
+            providerKey: plan.providerKey,
+            proxyKind,
+            ...check.metadata,
+          },
+          runner: this.commandRunner,
+        };
 
-      const result =
-        server.providerKey.value === "generic-ssh"
-          ? sshProcessCheck(server, check.command, input)
-          : shellProcessCheck(check.command, input);
+        const result =
+          server.providerKey.value === "generic-ssh"
+            ? await sshProcessCheck(server, check.command, input)
+            : await shellProcessCheck(check.command, input);
 
-      return withProxyRepairMetadata(server, result);
-    });
+        return withProxyRepairMetadata(server, result);
+      }),
+    );
   }
 
-  private dockerSwarmManagerChecks(server: DeploymentTargetState): ServerConnectivityCheck[] {
+  private async dockerSwarmManagerChecks(
+    server: DeploymentTargetState,
+  ): Promise<ServerConnectivityCheck[]> {
     const metadata = {
       host: server.host.value,
       port: String(server.port.value),
@@ -372,7 +382,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
     const checks: ServerConnectivityCheck[] = [];
 
     checks.push(
-      sshProcessCheck(server, "printf appaloft-swarm-connectivity", {
+      await sshProcessCheck(server, "printf appaloft-swarm-connectivity", {
         name: "ssh",
         timeoutMs: 8000,
         successMessage: "SSH connection to the Swarm manager succeeded",
@@ -382,7 +392,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
       }),
     );
     checks.push(
-      sshProcessCheck(server, "docker version --format '{{.Server.Version}}'", {
+      await sshProcessCheck(server, "docker version --format '{{.Server.Version}}'", {
         name: "docker",
         timeoutMs: 8000,
         successMessage: "Swarm manager Docker daemon is available",
@@ -392,7 +402,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
       }),
     );
     checks.push(
-      sshProcessCheck(
+      await sshProcessCheck(
         server,
         "state=$(docker info --format '{{.Swarm.LocalNodeState}} {{.Swarm.ControlAvailable}}'); test \"$state\" = 'active true' && printf '%s' \"$state\"",
         {
@@ -406,7 +416,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
       ),
     );
     checks.push(
-      sshProcessCheck(
+      await sshProcessCheck(
         server,
         "docker info --format '{{range .Plugins.Network}}{{println .}}{{end}}' | grep -Fx overlay",
         {
@@ -466,7 +476,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
         durationMs: 0,
       });
       checks.push(
-        processCheck({
+        await processCheck({
           name: "docker",
           command: "docker",
           args: ["version", "--format", "{{.Server.Version}}"],
@@ -478,7 +488,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
       );
     } else if (server.providerKey.value === "generic-ssh") {
       checks.push(
-        sshProcessCheck(server, "printf appaloft-connectivity", {
+        await sshProcessCheck(server, "printf appaloft-connectivity", {
           name: "ssh",
           timeoutMs: 8000,
           successMessage: "SSH connection succeeded",
@@ -491,7 +501,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
         }),
       );
       checks.push(
-        sshProcessCheck(server, "docker version --format '{{.Server.Version}}'", {
+        await sshProcessCheck(server, "docker version --format '{{.Server.Version}}'", {
           name: "docker",
           timeoutMs: 8000,
           successMessage: "Remote Docker daemon is available",
@@ -504,7 +514,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
         }),
       );
     } else if (server.providerKey.value === "docker-swarm") {
-      checks.push(...this.dockerSwarmManagerChecks(server));
+      checks.push(...(await this.dockerSwarmManagerChecks(server)));
     } else {
       checks.push(
         await tcpCheck({

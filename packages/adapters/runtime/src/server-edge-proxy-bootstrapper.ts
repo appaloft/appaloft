@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,11 +8,12 @@ import {
   type ServerEdgeProxyBootstrapResult,
 } from "@appaloft/application";
 import { ok, type DeploymentTargetState, type Result } from "@appaloft/core";
+import { runBufferedProcess, shellCommand } from "./buffered-process";
+import { classifyEdgeProxyStartFailure } from "./edge-proxy-failure-classification";
 import {
   createEdgeProxyEnsurePlanForSelection,
   proxyBootstrapOptionsFromEnv,
 } from "./edge-proxy-plans";
-import { classifyEdgeProxyStartFailure } from "./edge-proxy-failure-classification";
 
 interface CommandResult {
   failed: boolean;
@@ -25,21 +25,20 @@ interface PreparedSshArgs {
   cleanup(): void;
 }
 
-function trimOutput(stdout: string | Buffer | undefined, stderr: string | Buffer | undefined): string {
+function trimOutput(stdout: string | undefined, stderr: string | undefined): string {
   const output = `${String(stdout ?? "")}\n${String(stderr ?? "")}`.trim();
   return output.length > 0 ? output.slice(0, 480) : "";
 }
 
-function runLocalCommand(command: string): CommandResult {
-  const result = spawnSync(command, {
-    encoding: "utf8",
-    shell: true,
-    timeout: 30_000,
+async function runLocalCommand(command: string): Promise<CommandResult> {
+  const result = await runBufferedProcess({
+    command: shellCommand(command),
+    timeoutMs: 30_000,
     env: process.env,
   });
 
   return {
-    failed: result.status !== 0,
+    failed: result.failed,
     output: trimOutput(result.stdout, result.stderr),
   };
 }
@@ -89,16 +88,19 @@ function prepareSshArgs(server: DeploymentTargetState, remoteCommand: string): P
   };
 }
 
-function runSshCommand(server: DeploymentTargetState, command: string): CommandResult {
+async function runSshCommand(
+  server: DeploymentTargetState,
+  command: string,
+): Promise<CommandResult> {
   const prepared = prepareSshArgs(server, command);
   try {
-    const result = spawnSync("ssh", prepared.args, {
-      encoding: "utf8",
-      timeout: 30_000,
+    const result = await runBufferedProcess({
+      command: ["ssh", ...prepared.args],
+      timeoutMs: 30_000,
     });
 
     return {
-      failed: result.status !== 0,
+      failed: result.failed,
       output: trimOutput(result.stdout, result.stderr),
     };
   } finally {
@@ -198,7 +200,7 @@ export class RuntimeServerEdgeProxyBootstrapper implements ServerEdgeProxyBootst
       );
     }
 
-    const network = runCommand(plan.networkCommand);
+    const network = await runCommand(plan.networkCommand);
     if (network.failed) {
       return ok(
         failedResult({
@@ -212,7 +214,7 @@ export class RuntimeServerEdgeProxyBootstrapper implements ServerEdgeProxyBootst
       );
     }
 
-    const proxy = runCommand(plan.containerCommand);
+    const proxy = await runCommand(plan.containerCommand);
     if (proxy.failed) {
       const failure = classifyEdgeProxyStartFailure({
         containerName: plan.containerName,
