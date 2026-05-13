@@ -478,6 +478,7 @@ export const enUS = {
       noDisplayName: "No display name",
       organizationId: "Organization ID",
       ownerSafetyNotice: "Role updates and removals keep at least one organization owner.",
+      overviewTitle: "Overview",
       pageDescription: "Current organization, members, invitations, and deploy-token controls.",
       pageTitle: "Organization",
       permissionDeniedBody:

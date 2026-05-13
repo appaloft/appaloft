@@ -91,7 +91,6 @@
     { href: "/servers", labelKey: i18nKeys.console.nav.servers, icon: Server },
     { href: "/domain-bindings", labelKey: i18nKeys.console.nav.domainBindings, icon: Globe2 },
     { href: "/deployments", labelKey: i18nKeys.console.nav.deployments, icon: Rocket },
-    { href: "/organization", labelKey: i18nKeys.console.nav.organization, icon: UserRound },
     {
       href: "/preview-environments",
       labelKey: i18nKeys.console.nav.previewEnvironments,
@@ -102,7 +101,6 @@
       labelKey: i18nKeys.console.nav.previewPolicies,
       icon: ShieldCheck,
     },
-    { href: "/instance", labelKey: i18nKeys.console.nav.instance, icon: Settings2 },
   ] as const;
 
   let { title, description, breadcrumbs = [], children }: Props = $props();
@@ -481,6 +479,10 @@
           <DropdownMenuItem onclick={() => navigateTo("/organization")}>
             <UserRound class="size-4" />
             {$t(i18nKeys.console.nav.organization)}
+          </DropdownMenuItem>
+          <DropdownMenuItem onclick={() => navigateTo("/instance")}>
+            <Settings2 class="size-4" />
+            {$t(i18nKeys.console.nav.instance)}
           </DropdownMenuItem>
           <DropdownMenuItem onclick={() => navigateTo("/deployments")}>
             <Rocket class="size-4" />

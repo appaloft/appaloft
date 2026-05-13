@@ -27,8 +27,12 @@ describe("organization auth management console surface", () => {
     expect(pageSource).toContain("i18nKeys.console.organization");
     expect(pageSource).toContain("organizationTeamManagement");
     expect(pageSource).not.toContain("better-auth");
-    expect(shellSource).toContain('href: "/organization"');
+    expect(shellSource).not.toContain('href: "/organization"');
+    expect(shellSource).not.toContain('href: "/instance"');
+    expect(shellSource).toContain('navigateTo("/organization")');
+    expect(shellSource).toContain('navigateTo("/instance")');
     expect(shellSource).toContain("i18nKeys.console.nav.organization");
+    expect(shellSource).toContain("i18nKeys.console.nav.instance");
     expect(shellSource).toContain('"/api/auth/sign-out"');
     expect(shellSource).toContain("i18nKeys.common.actions.signOut");
     expect(clientContractSource).toContain("organizations: {");
@@ -56,5 +60,32 @@ describe("organization auth management console surface", () => {
     expect(webDocsHrefs.organizationTeamManagement).toBe(
       "/docs/self-hosting/organization-team-management/#self-hosting-organization-team-management",
     );
+  });
+
+  test("[ORG-TEAM-WEB-004] keeps organization and instance management outside the product sidebar", async () => {
+    const [organizationPageSource, instancePageSource, managementShellSource] = await Promise.all([
+      readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
+      readFile(
+        new URL("../../lib/components/console/ManagementShell.svelte", import.meta.url),
+        "utf8",
+      ),
+    ]);
+
+    expect(organizationPageSource).toContain("ManagementShell");
+    expect(instancePageSource).toContain("ManagementShell");
+    expect(organizationPageSource).not.toContain("ConsoleShell");
+    expect(instancePageSource).not.toContain("ConsoleShell");
+    expect(organizationPageSource).toContain("activeSection");
+    expect(organizationPageSource).toContain("sectionOptions");
+    expect(organizationPageSource).toContain('href: "/organization/members"');
+    expect(organizationPageSource).toContain('href: "/organization/invitations"');
+    expect(organizationPageSource).toContain('href: "/organization/deploy-tokens"');
+    expect(managementShellSource).not.toContain('href: "/organization"');
+    expect(managementShellSource).not.toContain('href: "/instance"');
+    expect(managementShellSource).not.toContain("managementItems");
+    expect(managementShellSource).not.toContain("i18nKeys.console.nav.management");
+    expect(managementShellSource).not.toContain("projectSearch");
+    expect(managementShellSource).not.toContain("filteredProjects");
   });
 });

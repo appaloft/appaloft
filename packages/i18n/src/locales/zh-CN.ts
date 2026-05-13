@@ -464,6 +464,7 @@ export const zhCN = {
       noDisplayName: "无显示名称",
       organizationId: "Organization ID",
       ownerSafetyNotice: "Role 更新和成员移除都会保留至少一个 organization owner。",
+      overviewTitle: "概览",
       pageDescription: "当前 organization、成员、邀请和 deploy-token 控制。",
       pageTitle: "Organization",
       permissionDeniedBody:
