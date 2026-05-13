@@ -26,11 +26,11 @@ function reloadPlan(input?: {
 }
 
 describe("executeProxyReloadPlan", () => {
-  test("EDGE-PROXY-RELOAD-002 executes provider-produced command reload steps", () => {
+  test("EDGE-PROXY-RELOAD-002 executes provider-produced command reload steps", async () => {
     const commands: string[] = [];
-    const result = executeProxyReloadPlan({
+    const result = await executeProxyReloadPlan({
       plan: reloadPlan({ command: "printf reload-ok" }),
-      runCommand: (step) => {
+      runCommand: async (step) => {
         commands.push(step.command ?? "");
         return {
           failed: false,
@@ -45,10 +45,10 @@ describe("executeProxyReloadPlan", () => {
     expect(result.logs.map((entry) => entry.message)).toContain("Test proxy reload completed");
   });
 
-  test("EDGE-PROXY-RELOAD-003 fails when a provider-produced command reload step fails", () => {
-    const result = executeProxyReloadPlan({
+  test("EDGE-PROXY-RELOAD-003 fails when a provider-produced command reload step fails", async () => {
+    const result = await executeProxyReloadPlan({
       plan: reloadPlan({ command: "false" }),
-      runCommand: () => ({
+      runCommand: async () => ({
         failed: true,
         stdout: "",
         stderr: "reload failed",
@@ -64,11 +64,11 @@ describe("executeProxyReloadPlan", () => {
     }
   });
 
-  test("EDGE-PROXY-RELOAD-001 records automatic reload steps without executing commands", () => {
+  test("EDGE-PROXY-RELOAD-001 records automatic reload steps without executing commands", async () => {
     const commands: string[] = [];
-    const result = executeProxyReloadPlan({
+    const result = await executeProxyReloadPlan({
       plan: reloadPlan({ mode: "automatic" }),
-      runCommand: (step) => {
+      runCommand: async (step) => {
         commands.push(step.command ?? "");
         return {
           failed: false,

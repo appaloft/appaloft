@@ -63,7 +63,7 @@ class StaticServerRepository implements ServerRepository {
 }
 
 function createSpawn(calls: SpawnCall[], status = 0): RuntimeControlSpawn {
-  return (args, options) => {
+  return async (args, options) => {
     calls.push({
       args,
       ...(options.cwd ? { cwd: options.cwd } : {}),

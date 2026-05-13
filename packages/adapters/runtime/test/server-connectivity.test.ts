@@ -224,7 +224,7 @@ describe("RuntimeServerConnectivityChecker", () => {
 
   test("[SWARM-TARGET-REG-002] checks Docker Swarm manager readiness through SSH", async () => {
     const capturedCommands: string[] = [];
-    const checker = new RuntimeServerConnectivityChecker(undefined, (command, args) => {
+    const checker = new RuntimeServerConnectivityChecker(undefined, async (command, args) => {
       capturedCommands.push([command, ...args].join(" "));
       return {
         status: 0,

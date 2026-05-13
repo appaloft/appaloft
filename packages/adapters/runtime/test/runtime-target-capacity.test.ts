@@ -9,6 +9,7 @@ import {
   TargetKindValue,
   type DeploymentTargetState,
 } from "@appaloft/core";
+import { runBufferedProcess, shellCommand } from "../src/buffered-process";
 import {
   parseDockerSizeToBytes,
   parseRuntimeTargetCapacityOutput,
@@ -113,5 +114,21 @@ describe("runtime target capacity diagnostics", () => {
       expect.arrayContaining(["full-disk", "high-inode-usage", "docker-unavailable"]),
     );
     expect(value.partial).toBe(true);
+  });
+
+  test("[RUNTIME-CAPACITY-INSPECT-003] capacity command execution does not block the event loop while waiting", async () => {
+    const command = runBufferedProcess({
+      command: shellCommand("sleep 0.2; printf 'APPALOFT_CAPACITY_V1\\n'"),
+      timeoutMs: 1_000,
+    });
+    const firstSettled = await Promise.race([
+      command.then(() => "command"),
+      new Promise<"timer">((resolve) => setTimeout(() => resolve("timer"), 25)),
+    ]);
+
+    expect(firstSettled).toBe("timer");
+    const result = await command;
+    expect(result.failed).toBe(false);
+    expect(result.stdout).toContain("APPALOFT_CAPACITY_V1");
   });
 });

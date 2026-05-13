@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readSync, rmSync, statSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
@@ -65,6 +65,7 @@ import {
 } from "./generated-docker-build-assets";
 import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
+import { runBufferedProcess, shellCommand } from "./buffered-process";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -273,60 +274,60 @@ function shellQuote(input: string): string {
   return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
-function runSyncCommand(input: {
+async function runShellCommand(input: {
   command: string;
   cwd: string;
   env: NodeJS.ProcessEnv;
   redactions?: readonly string[];
-}): {
+}): Promise<{
   exitCode: number;
   stdout: string;
   stderr: string;
   failed: boolean;
   reason?: string;
-} {
-  const result = spawnSync(input.command, {
+}> {
+  const result = await runBufferedProcess({
+    command: shellCommand(input.command),
     cwd: input.cwd,
     env: input.env,
-    shell: true,
-    encoding: "utf8",
+    ...(input.redactions ? { redactions: input.redactions } : {}),
   });
 
   return {
-    exitCode: result.status ?? 1,
-    stdout: redactSecrets(result.stdout ?? "", input.redactions),
-    stderr: redactSecrets(result.stderr ?? "", input.redactions),
-    failed: result.status !== 0,
-    ...(result.signal ? { reason: `terminated by signal ${result.signal}` } : {}),
+    exitCode: result.exitCode ?? 1,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    failed: result.failed,
+    ...(result.reason ? { reason: result.reason } : {}),
   };
 }
 
-function runSyncProcess(input: {
+async function runProcess(input: {
   command: string;
   args: string[];
   cwd: string;
   env: NodeJS.ProcessEnv;
   redactions?: readonly string[];
-}): {
+}): Promise<{
   exitCode: number;
   stdout: string;
   stderr: string;
   failed: boolean;
   reason?: string;
-} {
-  const result = spawnSync(input.command, input.args, {
+}> {
+  const result = await runBufferedProcess({
+    command: [input.command, ...input.args],
     cwd: input.cwd,
     env: input.env,
-    encoding: "utf8",
+    ...(input.redactions ? { redactions: input.redactions } : {}),
   });
 
   return {
-    exitCode: result.status ?? 1,
-    stdout: redactSecrets(result.stdout ?? "", input.redactions),
-    stderr: redactSecrets(result.stderr ?? "", input.redactions),
-    failed: result.status !== 0,
-    ...(result.signal ? { reason: `terminated by signal ${result.signal}` } : {}),
-    ...(result.error ? { reason: result.error.message } : {}),
+    exitCode: result.exitCode ?? 1,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    failed: result.failed,
+    ...(result.reason ? { reason: result.reason } : {}),
   };
 }
 
@@ -678,7 +679,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     return { deployment };
   }
 
-  private pushDockerContainerDiagnostics(
+  private async pushDockerContainerDiagnostics(
     logs: DeploymentLogEntry[],
     input: {
       context: ExecutionContext;
@@ -687,7 +688,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       env: NodeJS.ProcessEnv;
       containerName: string;
     },
-  ): void {
+  ): Promise<void> {
     const format =
       "status={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} oomKilled={{.State.OOMKilled}} finishedAt={{.State.FinishedAt}}";
     const inspectMessage = `Inspect Docker container ${input.containerName}`;
@@ -699,7 +700,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       message: inspectMessage,
     });
 
-    const inspect = runSyncCommand({
+    const inspect = await runShellCommand({
       command: `docker inspect --format ${shellQuote(format)} ${shellQuote(input.containerName)}`,
       cwd: input.workdir,
       env: input.env,
@@ -730,7 +731,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       message: logsMessage,
     });
 
-    const dockerLogs = runSyncCommand({
+    const dockerLogs = await runShellCommand({
       command: `docker logs --tail 50 ${shellQuote(input.containerName)}`,
       cwd: input.workdir,
       env: input.env,
@@ -888,7 +889,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       cloneLocator,
       sourceDir,
     ];
-    const clone = runSyncProcess({
+    const clone = await runProcess({
       command: "git",
       args: cloneArgs,
       cwd: input.runtimeDir,
@@ -941,7 +942,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       };
     }
 
-    const commit = runSyncProcess({
+    const commit = await runProcess({
       command: "git",
       args: ["-C", sourceDir, "rev-parse", "--verify", "HEAD"],
       cwd: input.runtimeDir,
@@ -1363,7 +1364,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       message: "Prepare Docker container deployment",
     });
 
-    const dockerVersion = runSyncCommand({
+    const dockerVersion = await runShellCommand({
       command: "docker version --format '{{.Server.Version}}'",
       cwd: workdir,
       env,
@@ -1550,7 +1551,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           status: "running",
           message: `Build image ${image}`,
         });
-        const build = runSyncCommand({
+        const build = await runShellCommand({
           command: buildCommand,
           cwd: workdir,
           env,
@@ -1669,7 +1670,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         message: proxyMessage,
       });
 
-      const network = runSyncCommand({
+      const network = await runShellCommand({
         command: proxyBootstrap.networkCommand,
         cwd: workdir,
         env,
@@ -1691,7 +1692,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         stream: "stderr",
       });
 
-      const proxy = runSyncCommand({
+      const proxy = await runShellCommand({
         command: proxyBootstrap.containerCommand,
         cwd: workdir,
         env,
@@ -1764,7 +1765,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         resourceId: state.resourceId.value,
         deploymentIds: supersededDeploymentIds,
       });
-    runSyncCommand({
+    await runShellCommand({
       command: renderRuntimeCommandString(
         dockerCommandBuilder.removeContainer({
           containerName,
@@ -1776,7 +1777,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       env,
     });
     if (usesDirectHostPort && supersededDeploymentIds.length > 0) {
-      runSyncCommand({
+      await runShellCommand({
         command: renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
           quote: shellQuote,
         }),
@@ -1883,7 +1884,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       status: "running",
       message: `Start container ${containerName}`,
     });
-    const run = runSyncCommand({
+    const run = await runShellCommand({
       command: runCommand,
       cwd: workdir,
       env: runtimeExecutionEnv,
@@ -1975,10 +1976,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
         status: "running",
         message: `Reload ${proxyReloadPlan.displayName} edge proxy`,
       });
-      const reload = executeProxyReloadPlan({
+      const reload = await executeProxyReloadPlan({
         plan: proxyReloadPlan,
-        runCommand: (step) =>
-          runSyncCommand({
+        runCommand: async (step) =>
+          await runShellCommand({
             command: step.command ?? "",
             cwd: workdir,
             env,
@@ -2041,7 +2042,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     const healthPath = state.runtimePlan.execution.healthCheckPath ?? "/";
-    const publishedPortResult = runSyncCommand({
+    const publishedPortResult = await runShellCommand({
       command: dockerPublishedPortCommand({
         containerName,
         containerPort,
@@ -2053,14 +2054,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const publishedHostPort = parseDockerPublishedHostPort(publishedPortResult.stdout);
 
     if (publishedPortResult.failed || publishedHostPort === undefined) {
-      this.pushDockerContainerDiagnostics(logs, {
+      await this.pushDockerContainerDiagnostics(logs, {
         context,
         deploymentId: state.id.value,
         workdir,
         env,
         containerName,
       });
-      runSyncCommand({
+      await runShellCommand({
         command: `docker rm -f ${containerName}`,
         cwd: workdir,
         env,
@@ -2128,14 +2129,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const health = await waitForHealth(url, healthOptions);
 
     if (!health.ok) {
-      this.pushDockerContainerDiagnostics(logs, {
+      await this.pushDockerContainerDiagnostics(logs, {
         context,
         deploymentId: state.id.value,
         workdir,
         env,
         containerName,
       });
-      runSyncCommand({
+      await runShellCommand({
         command: `docker rm -f ${containerName}`,
         cwd: workdir,
         env,
@@ -2177,7 +2178,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       message,
     });
     if (!usesDirectHostPort && supersededDeploymentIds.length > 0) {
-      const cleanup = runSyncCommand({
+      const cleanup = await runShellCommand({
         command: renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
           quote: shellQuote,
         }),
@@ -2286,7 +2287,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       message: `Start compose stack ${composeFile}`,
     });
 
-    const up = runSyncCommand({
+    const up = await runShellCommand({
       command: upCommand,
       cwd: workdir,
       env: runtimeEnv.value.env,
@@ -2452,7 +2453,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           metadata: state.runtimePlan.execution.metadata,
         });
         const containerName = metadata.containerName ?? runtimeInstanceNames.containerName;
-        runSyncCommand({
+        await runShellCommand({
           command: `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
           cwd: workdir,
           env,
@@ -2471,7 +2472,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName;
           if (composeFile) {
             const composeProjectFlag = `-p ${shellQuote(composeProjectName)} `;
-            runSyncCommand({
+            await runShellCommand({
               command: `docker compose ${composeProjectFlag}-f ${shellQuote(composeFile)} down`,
               cwd: workdir,
               env,
@@ -2543,7 +2544,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           );
           break;
         case "docker-container":
-          runSyncCommand({
+          await runShellCommand({
             command: `docker rm -f ${metadata.containerName ?? runtimeInstanceNames.containerName}`,
             cwd: workdir,
             env,
@@ -2564,7 +2565,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
               metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName;
             if (composeFile) {
               const composeProjectFlag = `-p ${shellQuote(composeProjectName)} `;
-              runSyncCommand({
+              await runShellCommand({
                 command: `docker compose ${composeProjectFlag}-f ${shellQuote(composeFile)} down`,
                 cwd: workdir,
                 env,
