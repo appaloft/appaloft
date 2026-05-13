@@ -2,7 +2,7 @@
   import { browser } from "$app/environment";
   import { ClipboardList, GitBranch, Globe2, Network } from "@lucide/svelte";
 
-  import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import ManagementShell from "$lib/components/console/ManagementShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { i18nKeys, t } from "$lib/i18n";
 
@@ -21,7 +21,7 @@ server-config-deploy: true`);
   <title>{$t(i18nKeys.console.instance.pageTitle)} · Appaloft</title>
 </svelte:head>
 
-<ConsoleShell
+<ManagementShell
   title={$t(i18nKeys.console.instance.pageTitle)}
   description={$t(i18nKeys.console.instance.pageDescription)}
   breadcrumbs={[
@@ -103,4 +103,4 @@ server-config-deploy: true`);
       </div>
     </section>
   </div>
-</ConsoleShell>
+</ManagementShell>
