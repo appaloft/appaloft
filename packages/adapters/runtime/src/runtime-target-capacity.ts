@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +11,7 @@ import {
   type RuntimeTargetCapacityWarning,
 } from "@appaloft/application";
 import { domainError, err, ok, type DeploymentTargetState, type Result } from "@appaloft/core";
+import { runBufferedProcess, shellCommand } from "./buffered-process";
 
 const kib = 1024;
 const defaultRemoteRuntimeRoot = "/var/lib/appaloft/runtime";
@@ -819,33 +819,38 @@ export function parseRuntimeTargetCapacityPruneOutput(input: {
   });
 }
 
-function runLocalCapacityScript(script: string): CapacityCommandResult {
-  const result = spawnSync("sh", ["-lc", script], {
-    encoding: "utf8",
-    timeout: 15_000,
+async function runLocalCapacityScript(script: string): Promise<CapacityCommandResult> {
+  const result = await runBufferedProcess({
+    command: shellCommand(script),
+    timeoutMs: 15_000,
+    timeoutMessage: "Capacity diagnostic timed out",
   });
 
   return {
-    stdout: String(result.stdout ?? ""),
-    stderr: String(result.stderr ?? ""),
-    failed: result.status !== 0 || Boolean(result.error),
-    timedOut: result.error instanceof Error && result.error.message.includes("ETIMEDOUT"),
+    stdout: result.stdout,
+    stderr: result.stderr,
+    failed: result.failed,
+    timedOut: result.timedOut,
   };
 }
 
-function runSshCapacityScript(server: DeploymentTargetState, script: string): CapacityCommandResult {
+async function runSshCapacityScript(
+  server: DeploymentTargetState,
+  script: string,
+): Promise<CapacityCommandResult> {
   const prepared = prepareSshArgs(server, script);
   try {
-    const result = spawnSync("ssh", prepared.args, {
-      encoding: "utf8",
-      timeout: 20_000,
+    const result = await runBufferedProcess({
+      command: ["ssh", ...prepared.args],
+      timeoutMs: 20_000,
+      timeoutMessage: "Capacity diagnostic timed out",
     });
 
     return {
-      stdout: String(result.stdout ?? ""),
-      stderr: String(result.stderr ?? ""),
-      failed: result.status !== 0 || Boolean(result.error),
-      timedOut: result.error instanceof Error && result.error.message.includes("ETIMEDOUT"),
+      stdout: result.stdout,
+      stderr: result.stderr,
+      failed: result.failed,
+      timedOut: result.timedOut,
     };
   } finally {
     prepared.cleanup();
@@ -882,8 +887,8 @@ export class RuntimeTargetCapacityInspectorAdapter implements RuntimeTargetCapac
     });
     const result =
       providerKey === "generic-ssh"
-        ? runSshCapacityScript(input.server, script)
-        : runLocalCapacityScript(script);
+        ? await runSshCapacityScript(input.server, script)
+        : await runLocalCapacityScript(script);
 
     const parsed = parseRuntimeTargetCapacityOutput({
       stdout: result.stdout,
@@ -939,8 +944,8 @@ export class RuntimeTargetCapacityPrunerAdapter implements RuntimeTargetCapacity
     });
     const result =
       providerKey === "generic-ssh"
-        ? runSshCapacityScript(input.server, script)
-        : runLocalCapacityScript(script);
+        ? await runSshCapacityScript(input.server, script)
+        : await runLocalCapacityScript(script);
 
     const parsed = parseRuntimeTargetCapacityPruneOutput({
       stdout: result.stdout,
