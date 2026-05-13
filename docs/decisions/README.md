@@ -87,6 +87,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-060: Organization Retention Defaults Boundary](./ADR-060-organization-retention-defaults-boundary.md) | Accepted | Defines organization-level retention default policy as a non-executing source for later scheduled retention automation, separate from manual prune commands, legal holds, immutable archives, event streams, and process attempts. |
 | [ADR-061: Scheduled History Retention Automation](./ADR-061-scheduled-history-retention-automation.md) | Accepted | Defines scheduled history retention automation as policy-gated command-bus dispatch over existing manual prune commands with durable process visibility and category guard preservation. |
 | [ADR-062: Runtime Usage Attribution Boundary](./ADR-062-runtime-usage-attribution-boundary.md) | Accepted | Defines read-only `runtime-usage.inspect` attribution over server, project, environment, resource, and deployment scopes without cleanup, enforcement, or sample persistence in the first slice. |
+| [ADR-063: Runtime Monitoring Observation Boundary](./ADR-063-runtime-monitoring-observation-boundary.md) | Accepted | Defines bounded runtime monitoring observation with retained samples, rollups, chart/log/event correlation, and non-enforcing thresholds without becoming a Prometheus-class observability platform. |
 
 ## Authoring Rules
 
