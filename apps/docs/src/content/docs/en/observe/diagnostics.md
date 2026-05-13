@@ -12,6 +12,7 @@ searchAliases:
 relatedOperations:
   - resources.diagnostic-summary
   - resources.access-failure-evidence.lookup
+  - runtime-usage.inspect
   - servers.capacity.inspect
   - servers.capacity.prune
   - scheduled-runtime-prune-policies.configure
@@ -69,11 +70,34 @@ appaloft server capacity inspect srv_primary
 
 This entrypoint only reads capacity signals. It does not run prune, delete Docker volumes, delete
 `/var/lib/appaloft/runtime/state`, or stop containers. The output includes disk, inodes, Docker
-image/build-cache usage, Appaloft runtime/state/source workspace usage, safe reclaimable estimates,
-and warnings.
+image/build-cache usage, Appaloft runtime/state/source workspace usage, Appaloft-managed container
+label/size evidence, source workspace metadata, safe reclaimable estimates, and warnings.
 
 `safeReclaimableEstimate` is input for a later cleanup or prune decision. It does not mean Appaloft
 has cleaned anything.
+
+<h2 id="runtime-usage-inspect">Runtime usage attribution inspect</h2>
+
+When you need to see how Appaloft attributes runtime capacity to one scope, use the read-only usage
+attribution query:
+
+```bash title="Inspect runtime usage for a server scope"
+appaloft runtime-usage inspect server:srv_primary
+```
+
+The HTTP API uses the same query boundary:
+
+```http title="Inspect runtime usage over HTTP"
+GET /api/runtime-usage/inspect?scope.kind=server&scope.serverId=srv_primary
+```
+
+The first implementation translates safe server-scope capacity diagnostics into
+`runtime-usage.inspect/v1` totals, artifacts, warnings, and sourceErrors. This query does not save
+samples, run prune, stop or restart runtimes, deploy, enforce quota, or evaluate threshold policy.
+Appaloft-managed container labels can provide current resource/deployment attribution and runtime
+ids when those labels are present. Source workspace metadata can provide deployment-id evidence for
+resource rollups, and retained runtime identity metadata can add runtime ids when present. Samples,
+rollups, charts, and threshold policy remain governed follow-up slices.
 
 To preview target-owned cleanup, run prune in dry-run mode:
 

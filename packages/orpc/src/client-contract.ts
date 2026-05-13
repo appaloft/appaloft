@@ -47,6 +47,7 @@ import {
   type GetCurrentOrganizationContextQueryInput,
   type ImportCertificateCommandInput,
   type ImportResourceVariablesCommandInput,
+  type InspectRuntimeUsageQueryInput,
   type InviteOrganizationMemberCommandInput,
   type IssueOrRenewCertificateCommandInput,
   type ListCertificatesQueryInput,
@@ -169,6 +170,7 @@ import {
   type EnvironmentSummary,
   type ImportCertificateResponse,
   type ImportResourceVariablesResponse,
+  type InspectRuntimeUsageResponse,
   type InviteOrganizationMemberResponse,
   type IssueOrRenewCertificateResponse,
   type ListCertificatesResponse,
@@ -994,6 +996,14 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       StreamDeploymentEventsQueryInput,
       AsyncIteratorClass<DeploymentEventStreamEnvelope, DeploymentEventStreamStreamResponse, void>,
+      AppaloftClientError
+    >;
+  };
+  runtimeUsage: {
+    inspect: Client<
+      AppaloftClientContext,
+      InspectRuntimeUsageQueryInput,
+      InspectRuntimeUsageResponse,
       AppaloftClientError
     >;
   };

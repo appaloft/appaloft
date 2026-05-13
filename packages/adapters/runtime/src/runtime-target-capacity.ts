@@ -116,6 +116,17 @@ export function renderRuntimeTargetCapacityScript(input: {
     "emit_du runtimeRoot \"$APPALOFT_RUNTIME_ROOT\"",
     "emit_du stateRoot \"$APPALOFT_STATE_ROOT\"",
     "emit_du sourceWorkspace \"$APPALOFT_SOURCE_WORKSPACE_ROOT\"",
+    "if [ -d \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" ]; then",
+    "  find \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do",
+    "    name=$(basename \"$workspace\")",
+    "    size_bytes=$(du -sk \"$workspace\" 2>/dev/null | awk '{print $1 * 1024}')",
+    "    active_marker=false",
+    "    rollback_marker=false",
+    "    [ -e \"$workspace/.appaloft-active\" ] && active_marker=true",
+    "    [ -e \"$workspace/.appaloft-rollback-candidate\" ] && rollback_marker=true",
+    "    printf 'CAPACITY_APPALOFT_WORKSPACE\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$name\" \"$workspace\" \"${size_bytes:-}\" \"$active_marker\" \"$rollback_marker\"",
+    "  done",
+    "fi",
     "if [ -r /proc/meminfo ]; then",
     "  awk '/MemTotal:/ {total=$2} /MemAvailable:/ {available=$2} END {if (total) printf \"CAPACITY_MEMORY\\t%s\\t%s\\n\", total, available}' /proc/meminfo",
     "fi",
@@ -134,6 +145,26 @@ export function renderRuntimeTargetCapacityScript(input: {
     "  else",
     "    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker system df failed\\n'",
     "  fi",
+    "  docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do",
+    "    [ -n \"$container_id\" ] || continue",
+    `    docker inspect --size --format ${shellQuote(
+      [
+        "CAPACITY_APPALOFT_CONTAINER",
+        "{{.Id}}",
+        "{{.Name}}",
+        "{{.State.Running}}",
+        "{{.State.Status}}",
+        "{{.SizeRw}}",
+        '{{ index .Config.Labels "appaloft.deployment-id" }}',
+        '{{ index .Config.Labels "appaloft.project-id" }}',
+        '{{ index .Config.Labels "appaloft.environment-id" }}',
+        '{{ index .Config.Labels "appaloft.resource-id" }}',
+        '{{ index .Config.Labels "appaloft.server-id" }}',
+        '{{ index .Config.Labels "appaloft.destination-id" }}',
+        '{{ index .Config.Labels "appaloft.artifact-kind" }}',
+      ].join("\\t"),
+    )} "$container_id" 2>/dev/null`,
+    "  done",
     "else",
     "  printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
     "fi",
@@ -272,6 +303,11 @@ function parseNumber(input: string | undefined): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+function sanitizeDockerTemplateValue(input: string | undefined): string {
+  const value = input?.trim() ?? "";
+  return value === "<no value>" || value === "<nil>" ? "" : value;
+}
+
 export function parseDockerSizeToBytes(input: string | undefined): number {
   const trimmed = input?.trim() ?? "";
   const match = /^([0-9]+(?:\.[0-9]+)?)\s*([kmgtp]?i?b)$/i.exec(trimmed);
@@ -362,6 +398,8 @@ export function parseRuntimeTargetCapacityOutput(input: {
     containersSize: 0,
     volumesSize: 0,
   };
+  const appaloftContainers: RuntimeTargetCapacityInspection["appaloftContainers"] = [];
+  const appaloftWorkspaces: RuntimeTargetCapacityInspection["appaloftWorkspaces"] = [];
   let reclaimableContainersSize = 0;
   const warnings: RuntimeTargetCapacityWarning[] = [];
   let memory: RuntimeTargetCapacityInspection["memory"] = {
@@ -496,6 +534,70 @@ export function parseRuntimeTargetCapacityOutput(input: {
       continue;
     }
 
+    if (tag === "CAPACITY_APPALOFT_CONTAINER") {
+      const [
+        id,
+        name,
+        running,
+        status,
+        writableBytes,
+        deploymentId,
+        projectId,
+        environmentId,
+        resourceId,
+        serverId,
+        destinationId,
+        artifactKind,
+      ] = parts.slice(1);
+      appaloftContainers.push({
+        id: sanitizeDockerTemplateValue(id),
+        name: sanitizeDockerTemplateValue(name).replace(/^\/+/, ""),
+        running: running === "true",
+        status: sanitizeDockerTemplateValue(status),
+        writableBytes: parseNumber(sanitizeDockerTemplateValue(writableBytes)),
+        ...(sanitizeDockerTemplateValue(deploymentId)
+          ? { deploymentId: sanitizeDockerTemplateValue(deploymentId) }
+          : {}),
+        ...(sanitizeDockerTemplateValue(projectId)
+          ? { projectId: sanitizeDockerTemplateValue(projectId) }
+          : {}),
+        ...(sanitizeDockerTemplateValue(environmentId)
+          ? { environmentId: sanitizeDockerTemplateValue(environmentId) }
+          : {}),
+        ...(sanitizeDockerTemplateValue(resourceId)
+          ? { resourceId: sanitizeDockerTemplateValue(resourceId) }
+          : {}),
+        ...(sanitizeDockerTemplateValue(serverId)
+          ? { serverId: sanitizeDockerTemplateValue(serverId) }
+          : {}),
+        ...(sanitizeDockerTemplateValue(destinationId)
+          ? { destinationId: sanitizeDockerTemplateValue(destinationId) }
+          : {}),
+        ...(sanitizeDockerTemplateValue(artifactKind)
+          ? { artifactKind: sanitizeDockerTemplateValue(artifactKind) }
+          : {}),
+      });
+      continue;
+    }
+
+    if (tag === "CAPACITY_APPALOFT_WORKSPACE") {
+      const [deploymentId, path, sizeBytes, activeMarker, rollbackCandidateMarker] =
+        parts.slice(1);
+      const normalizedDeploymentId = sanitizeDockerTemplateValue(deploymentId);
+      if (!normalizedDeploymentId) {
+        continue;
+      }
+
+      appaloftWorkspaces.push({
+        deploymentId: normalizedDeploymentId,
+        path: path ?? "",
+        bytes: sizeBytes === "" ? null : parseNumber(sizeBytes),
+        activeMarker: activeMarker === "true",
+        rollbackCandidateMarker: rollbackCandidateMarker === "true",
+      });
+      continue;
+    }
+
     if (tag === "CAPACITY_WARNING") {
       const [code, message] = parts.slice(1);
       warnings.push(
@@ -569,6 +671,8 @@ export function parseRuntimeTargetCapacityOutput(input: {
       stateRoot,
       sourceWorkspace,
     },
+    appaloftContainers,
+    appaloftWorkspaces,
     safeReclaimableEstimate,
     warnings,
     partial: warnings.some((item) =>

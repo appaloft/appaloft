@@ -83,6 +83,9 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.diagnosticsSafeSupportPayload).toBe(
       "/docs/observe/diagnostics/#diagnostic-summary-copy-support-payload",
     );
+    expect(webDocsHrefs.runtimeUsageInspect).toBe(
+      "/docs/observe/diagnostics/#runtime-usage-inspect",
+    );
     expect(webDocsHrefs.sourceAutoDeploySetup).toBe(
       "/docs/deploy/sources/#source-auto-deploy-setup",
     );

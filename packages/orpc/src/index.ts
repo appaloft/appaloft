@@ -151,6 +151,7 @@ import {
   ImportResourceVariablesCommand,
   IngestPreviewPullRequestEventCommand,
   IngestSourceEventCommand,
+  InspectRuntimeUsageQuery,
   InspectServerCapacityQuery,
   InviteOrganizationMemberCommand,
   IssueOrRenewCertificateCommand,
@@ -158,6 +159,7 @@ import {
   importPostgresDependencyResourceCommandInputSchema,
   importRedisDependencyResourceCommandInputSchema,
   importResourceVariablesCommandInputSchema,
+  inspectRuntimeUsageQueryInputSchema,
   inspectServerCapacityQueryInputSchema,
   inviteOrganizationMemberCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
@@ -465,6 +467,7 @@ import {
   exportGlobalAuditEventsResponseSchema,
   importCertificateResponseSchema,
   importResourceVariablesResponseSchema,
+  inspectRuntimeUsageResponseSchema,
   inspectServerCapacityResponseSchema,
   inviteOrganizationMemberResponseSchema,
   issueOrRenewCertificateResponseSchema,
@@ -849,6 +852,10 @@ export const apiRouteDescriptions = {
   serverCapacity: routeDescription(
     "Inspects disk, inode, Docker, memory, CPU, and Appaloft runtime capacity without pruning or mutating server state.",
     "diagnostics.runtime-target-capacity",
+  ),
+  runtimeUsageInspect: routeDescription(
+    "Inspects runtime usage attribution for one scope without pruning, quota enforcement, sample persistence, or state mutation.",
+    "diagnostics.runtime-usage",
   ),
   serverCapacityPrune: routeDescription(
     "Dry-runs or prunes safe Appaloft-managed stopped containers and runtime workspaces without deleting volumes, state roots, or rollback candidates.",
@@ -2293,6 +2300,19 @@ export const inspectServerCapacityProcedure = base
   .output(inspectServerCapacityResponseSchema)
   .handler(async ({ input, context }) =>
     executeQuery(context, InspectServerCapacityQuery.create(input)),
+  );
+
+export const inspectRuntimeUsageProcedure = base
+  .route({
+    method: "GET",
+    path: "/runtime-usage/inspect",
+    description: apiRouteDescriptions.runtimeUsageInspect,
+    successStatus: 200,
+  })
+  .input(inspectRuntimeUsageQueryInputSchema)
+  .output(inspectRuntimeUsageResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, InspectRuntimeUsageQuery.create(input)),
   );
 
 export const pruneServerCapacityProcedure = base
@@ -4519,6 +4539,9 @@ export const appaloftOrpcRouter = {
     testDraftConnectivity: testDraftServerConnectivityProcedure,
     bootstrapProxy: bootstrapServerProxyProcedure,
   },
+  runtimeUsage: {
+    inspect: inspectRuntimeUsageProcedure,
+  },
   retentionDefaults: {
     configure: configureRetentionDefaultsProcedure,
     list: listRetentionDefaultsProcedure,
@@ -6442,6 +6465,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/retention-defaults/:category",
     "/api/servers/:serverId/capacity",
     "/api/servers/:serverId/capacity/prune",
+    "/api/runtime-usage/inspect",
     "/api/servers/:serverId/rename",
     "/api/servers/:serverId/edge-proxy/configuration",
     "/api/servers/:serverId/deactivate",

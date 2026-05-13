@@ -2,8 +2,8 @@
 
 ## Status
 
-- Round: Spec Round / roadmap planning
-- Artifact state: proposed roadmap candidate, not implemented
+- Round: Spec Round / accepted boundary planning
+- Artifact state: accepted candidate, not implemented
 - Roadmap target: `0.12.0`
 - Compatibility impact: pre-1.0 policy; additive read surfaces first, later enforcement requires a
   separate accepted ADR
@@ -73,7 +73,7 @@ Proposed read-only operation keys:
 
 | Operation | Kind | Role | Code Round state |
 | --- | --- | --- | --- |
-| `runtime-usage.inspect` | Query | Return current safe usage attribution for one server, project, environment, resource, or deployment scope. | Proposed. |
+| `runtime-usage.inspect` | Query | Return current safe usage attribution for one server, project, environment, resource, or deployment scope. | Accepted for first Code Round. |
 | `runtime-usage.rollup` | Query | Return bounded time-window usage rollups for a scope from collected samples. | Proposed after sample persistence exists. |
 | `runtime-usage.samples.list` | Query | Return bounded raw sample windows for charts and diagnostics. | Proposed after retention policy exists. |
 | `runtime-usage-thresholds.configure` | Command | Persist non-enforcing warning/critical threshold policy for a scope. | Future Spec Round. |
@@ -143,10 +143,11 @@ Initial measurement groups:
 
 ## Public Surfaces
 
-- CLI: proposed `appaloft usage inspect`, `appaloft server usage`, `appaloft resource usage`, and
-  `appaloft project usage` aliases only after command/help naming is accepted.
-- HTTP/oRPC: proposed `GET /api/runtime-usage/inspect` or scope-specific routes after schema
-  review.
+- CLI: `appaloft runtime-usage inspect <kind:id>` dispatches the accepted query. Compatibility
+  aliases such as `appaloft server usage`, `appaloft resource usage`, and `appaloft project usage`
+  require a later help-naming decision.
+- HTTP/oRPC: `GET /api/runtime-usage/inspect` dispatches the accepted query with shared schema
+  parsing for the first read-only route.
 - Web: resource detail, deployment detail, project detail, and server detail can show compact usage
   cards and charts after query contracts exist.
 - Public docs/help: proposed stable anchors under `diagnostics.runtime-usage` and
@@ -167,13 +168,12 @@ Initial measurement groups:
 
 ## ADR Decision
 
-A new ADR is required before Code Round for any slice that adds persistent sample storage,
-background collection, threshold policy, alert delivery, quota decisions, runtime sizing, or public
-operation naming.
+[ADR-062: Runtime Usage Attribution Boundary](../../decisions/ADR-062-runtime-usage-attribution-boundary.md)
+accepts `runtime-usage.inspect` as the first read-only query boundary for `0.12.0`.
 
-No new ADR is required for a narrow design-only roadmap artifact. The first Code Round should add
-an ADR because it will introduce at least one new operation boundary and likely a retained sample
-read model.
+A separate accepted ADR/spec is still required before any slice that adds persistent sample storage,
+background collection, threshold policy, alert delivery, quota decisions, runtime sizing, or
+enforcement.
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -182,6 +182,25 @@ read model.
   estimates, warnings, and partial state.
 - `servers.capacity.prune` and scheduled runtime prune already provide safe cleanup boundaries, but
   they are maintenance operations and must not be collapsed into usage reads.
+- `runtime-usage.inspect` is active as an application query/schema/handler/service boundary with a
+  `RuntimeUsageInspector` port. The first runtime adapter supports server-scope live inspection by
+  translating `servers.capacity.inspect` output into `runtime-usage.inspect/v1`.
+- `runtime-usage.inspect` is exposed through `CORE_OPERATIONS.md`, operation catalog, CLI,
+  HTTP/oRPC, contracts, public diagnostics docs, generated SDK operation metadata, and Web
+  server/resource readback.
+- Project, environment, resource, and deployment scopes resolve through read models to candidate
+  current deployments and server capacity context. They return partial attribution with empty totals
+  when ownership evidence is incomplete, rather than guessing that server usage belongs to the
+  requested scope.
+- Appaloft-managed Docker containers labeled with `appaloft.managed=true` now contribute current
+  artifact evidence, container writable bytes, deployment/resource ownership, and current runtime ids
+  when ownership labels are present.
+- Source workspace directories under the Appaloft source workspace root now contribute
+  workspace-metadata evidence keyed by deployment id. Project/environment/resource/destination
+  context is enriched from deployment read models before scope rollups are assembled.
+- Retained runtime identity metadata from deployment read models now enriches deployment-id-only
+  artifacts when `containerName`, `swarm.serviceName`, or `swarm.stackName` is present.
+- Future MCP/tool descriptors remain pending.
 - `resources.health`, `resources.runtime-logs`, and `resources.diagnostic-summary` provide
   resource observation, but they are not usage attribution or time-series metrics.
 - Repository config CPU, memory, replicas, restart policy, and rollout sizing remain unsupported

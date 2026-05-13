@@ -695,6 +695,29 @@ export const runtimeTargetAppaloftCapacitySchema = z.object({
   }),
 });
 
+export const runtimeTargetAppaloftContainerCapacitySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  running: z.boolean(),
+  status: z.string(),
+  writableBytes: z.number().nullable(),
+  deploymentId: z.string().optional(),
+  projectId: z.string().optional(),
+  environmentId: z.string().optional(),
+  resourceId: z.string().optional(),
+  serverId: z.string().optional(),
+  destinationId: z.string().optional(),
+  artifactKind: z.string().optional(),
+});
+
+export const runtimeTargetAppaloftWorkspaceCapacitySchema = z.object({
+  deploymentId: z.string(),
+  path: z.string(),
+  bytes: z.number().nullable(),
+  activeMarker: z.boolean(),
+  rollbackCandidateMarker: z.boolean(),
+});
+
 export const runtimeTargetSafeReclaimableEstimateSchema = z.object({
   stoppedContainersSize: z.number(),
   danglingImagesSize: z.number(),
@@ -720,9 +743,181 @@ export const inspectServerCapacityResponseSchema = z.object({
   memory: runtimeTargetMemoryCapacitySchema,
   cpu: runtimeTargetCpuCapacitySchema,
   appaloftRuntime: runtimeTargetAppaloftCapacitySchema,
+  appaloftContainers: z.array(runtimeTargetAppaloftContainerCapacitySchema),
+  appaloftWorkspaces: z.array(runtimeTargetAppaloftWorkspaceCapacitySchema),
   safeReclaimableEstimate: runtimeTargetSafeReclaimableEstimateSchema,
   warnings: z.array(runtimeTargetCapacityWarningSchema),
   partial: z.boolean(),
+});
+
+export const runtimeUsageScopeSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("server"),
+    serverId: z.string(),
+  }),
+  z.object({
+    kind: z.literal("project"),
+    projectId: z.string(),
+  }),
+  z.object({
+    kind: z.literal("environment"),
+    environmentId: z.string(),
+  }),
+  z.object({
+    kind: z.literal("resource"),
+    resourceId: z.string(),
+  }),
+  z.object({
+    kind: z.literal("deployment"),
+    deploymentId: z.string(),
+  }),
+]);
+
+export const runtimeUsageFreshnessSchema = z.enum(["live", "recent-sample", "stale", "unknown"]);
+
+export const runtimeCpuUsageSchema = z.object({
+  logicalCores: z.number().optional(),
+  loadAverage1m: z.number().optional(),
+  loadAverage5m: z.number().optional(),
+  loadAverage15m: z.number().optional(),
+  containerCpuPercent: z.number().optional(),
+});
+
+export const runtimeMemoryUsageSchema = z.object({
+  totalBytes: z.number().optional(),
+  usedBytes: z.number().optional(),
+  availableBytes: z.number().optional(),
+  containerUsedBytes: z.number().optional(),
+});
+
+export const runtimeDiskUsageSchema = z.object({
+  totalBytes: z.number().optional(),
+  usedBytes: z.number().optional(),
+  availableBytes: z.number().optional(),
+  attributedBytes: z.number().optional(),
+});
+
+export const runtimeInodeUsageSchema = z.object({
+  total: z.number().optional(),
+  used: z.number().optional(),
+  available: z.number().optional(),
+});
+
+export const runtimeDockerUsageSchema = z.object({
+  imageBytes: z.number().optional(),
+  buildCacheBytes: z.number().optional(),
+  containerWritableBytes: z.number().optional(),
+});
+
+export const runtimeNetworkUsageSchema = z.object({
+  rxBytes: z.number().optional(),
+  txBytes: z.number().optional(),
+});
+
+export const runtimeUsageTotalsSchema = z.object({
+  cpu: runtimeCpuUsageSchema.optional(),
+  memory: runtimeMemoryUsageSchema.optional(),
+  disk: runtimeDiskUsageSchema.optional(),
+  inode: runtimeInodeUsageSchema.optional(),
+  docker: runtimeDockerUsageSchema.optional(),
+  network: runtimeNetworkUsageSchema.optional(),
+});
+
+export const runtimeUsageOwnershipSchema = z.enum([
+  "attributed",
+  "partially-attributed",
+  "unattributed",
+  "unknown",
+]);
+
+export const runtimeUsageWarningSchema = z.object({
+  code: z.enum([
+    "partial-diagnostic",
+    "unsupported-provider",
+    "docker-unavailable",
+    "timeout",
+    "ownership-unproven",
+    "missing-metric-source",
+    "stale-observation",
+  ]),
+  message: z.string(),
+  scope: runtimeUsageScopeSchema.optional(),
+  resource: z.enum(["cpu", "memory", "disk", "inode", "docker", "network", "ownership"]).optional(),
+});
+
+export const runtimeUsageSourceErrorSchema = z.object({
+  source: z.enum(["runtime-target", "docker", "read-model", "capacity", "workspace", "unknown"]),
+  code: z.string(),
+  message: z.string(),
+  retriable: z.boolean(),
+});
+
+export const runtimeUsageRollupSchema = z.object({
+  scope: runtimeUsageScopeSchema,
+  ownership: runtimeUsageOwnershipSchema,
+  totals: runtimeUsageTotalsSchema,
+  currentDeploymentId: z.string().optional(),
+  currentRuntimeId: z.string().optional(),
+  artifactCount: z.number().optional(),
+  warnings: z.array(runtimeUsageWarningSchema),
+});
+
+export const runtimeUsageEvidenceSchema = z.object({
+  source: z.enum([
+    "label",
+    "deployment-snapshot",
+    "runtime-identity",
+    "workspace-metadata",
+    "read-model",
+  ]),
+  key: z.string(),
+});
+
+export const runtimeUsageArtifactKindSchema = z.enum([
+  "active-runtime",
+  "rollback-candidate",
+  "source-workspace",
+  "docker-image",
+  "docker-build-cache",
+  "appaloft-state-root",
+  "volume",
+  "unknown",
+]);
+
+export const runtimeArtifactUsageSchema = z.object({
+  kind: runtimeUsageArtifactKindSchema,
+  ownership: runtimeUsageOwnershipSchema,
+  serverId: z.string().optional(),
+  projectId: z.string().optional(),
+  environmentId: z.string().optional(),
+  resourceId: z.string().optional(),
+  deploymentId: z.string().optional(),
+  destinationId: z.string().optional(),
+  runtimeId: z.string().optional(),
+  bytes: z.number().optional(),
+  inodeCount: z.number().optional(),
+  observedAt: z.string().optional(),
+  evidence: z.array(runtimeUsageEvidenceSchema),
+  reclaimable: z.enum(["yes", "no", "unknown"]),
+  reclaimBlockedReason: z.string().optional(),
+  warnings: z.array(runtimeUsageWarningSchema),
+});
+
+export const inspectRuntimeUsageResponseSchema = z.object({
+  schemaVersion: z.literal("runtime-usage.inspect/v1"),
+  scope: runtimeUsageScopeSchema,
+  generatedAt: z.string(),
+  observedAt: z.string().optional(),
+  freshness: runtimeUsageFreshnessSchema,
+  partial: z.boolean(),
+  totals: runtimeUsageTotalsSchema,
+  byProject: z.array(runtimeUsageRollupSchema),
+  byEnvironment: z.array(runtimeUsageRollupSchema),
+  byResource: z.array(runtimeUsageRollupSchema),
+  byDeployment: z.array(runtimeUsageRollupSchema),
+  artifacts: z.array(runtimeArtifactUsageSchema),
+  warnings: z.array(runtimeUsageWarningSchema),
+  sourceErrors: z.array(runtimeUsageSourceErrorSchema),
 });
 
 export const runtimeTargetPruneCategorySchema = z.enum([
@@ -4993,6 +5188,17 @@ export type ListServersResponse = z.infer<typeof listServersResponseSchema>;
 export type ServerDetail = z.infer<typeof serverDetailSchema>;
 export type ShowServerResponse = z.infer<typeof showServerResponseSchema>;
 export type InspectServerCapacityResponse = z.infer<typeof inspectServerCapacityResponseSchema>;
+export type RuntimeUsageScope = z.infer<typeof runtimeUsageScopeSchema>;
+export type RuntimeUsageFreshness = z.infer<typeof runtimeUsageFreshnessSchema>;
+export type RuntimeUsageTotals = z.infer<typeof runtimeUsageTotalsSchema>;
+export type RuntimeUsageOwnership = z.infer<typeof runtimeUsageOwnershipSchema>;
+export type RuntimeUsageWarning = z.infer<typeof runtimeUsageWarningSchema>;
+export type RuntimeUsageSourceError = z.infer<typeof runtimeUsageSourceErrorSchema>;
+export type RuntimeUsageRollup = z.infer<typeof runtimeUsageRollupSchema>;
+export type RuntimeUsageEvidence = z.infer<typeof runtimeUsageEvidenceSchema>;
+export type RuntimeUsageArtifactKind = z.infer<typeof runtimeUsageArtifactKindSchema>;
+export type RuntimeArtifactUsage = z.infer<typeof runtimeArtifactUsageSchema>;
+export type InspectRuntimeUsageResponse = z.infer<typeof inspectRuntimeUsageResponseSchema>;
 export type PruneServerCapacityResponse = z.infer<typeof pruneServerCapacityResponseSchema>;
 export type ScheduledRuntimePrunePolicyScope = z.infer<
   typeof scheduledRuntimePrunePolicyScopeSchema

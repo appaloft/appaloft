@@ -141,6 +141,7 @@ import { unsetResourceVariableCommandInputSchema } from "./operations/resources/
 import { configureRetentionDefaultsCommandInputSchema } from "./operations/retention-defaults/configure-retention-defaults.command";
 import { listRetentionDefaultsQueryInputSchema } from "./operations/retention-defaults/list-retention-defaults.query";
 import { showRetentionDefaultQueryInputSchema } from "./operations/retention-defaults/show-retention-default.query";
+import { inspectRuntimeUsageQueryInputSchema } from "./operations/runtime-usage/inspect-runtime-usage.query";
 import { createScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/create-scheduled-task.command";
 import { deleteScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/delete-scheduled-task.command";
 import { listScheduledTaskRunsQueryInputSchema } from "./operations/scheduled-tasks/list-scheduled-task-runs.query";
@@ -205,6 +206,7 @@ type OperationDomain =
   | "domain-events"
   | "provider-job-logs"
   | "retention-defaults"
+  | "runtime-usage"
   | "organizations"
   | "deployments"
   | "operator-work"
@@ -727,6 +729,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server capacity inspect <serverId>",
       orpc: { method: "GET", path: "/api/servers/{serverId}/capacity" },
+    },
+  },
+  {
+    key: "runtime-usage.inspect",
+    kind: "query",
+    domain: "runtime-usage",
+    messageName: "InspectRuntimeUsageQuery",
+    handlerName: "InspectRuntimeUsageQueryHandler",
+    serviceName: "RuntimeUsageInspectionQueryService",
+    inputSchema: inspectRuntimeUsageQueryInputSchema,
+    serviceToken: tokens.runtimeUsageInspectionQueryService,
+    transports: {
+      cli: "appaloft runtime-usage inspect <scope>",
+      orpc: { method: "GET", path: "/api/runtime-usage/inspect" },
     },
   },
   {

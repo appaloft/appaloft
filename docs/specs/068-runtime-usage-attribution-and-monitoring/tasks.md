@@ -8,40 +8,55 @@
 - [x] Add `0.12.0` roadmap visibility without marking the behavior implemented.
 - [x] Add objective operator requirement baseline and exclude dashboard-only metrics from the
   `0.12.0` slice.
-- [ ] Draft ADR for runtime usage attribution boundaries before Code Round.
-- [ ] Add `docs/testing/runtime-usage-attribution-test-matrix.md` with `RT-USAGE-*` rows.
-- [ ] Decide accepted operation names and route/CLI naming for `runtime-usage.inspect` and later
-  rollup/sample queries.
+- [x] Draft ADR for runtime usage attribution boundaries before Code Round.
+- [x] Add `docs/testing/runtime-usage-attribution-test-matrix.md` with `RT-USAGE-*` rows.
+- [x] Decide accepted operation name for the first slice as `runtime-usage.inspect`; route/CLI
+  naming is specified as first-Code-Round guidance in `docs/queries/runtime-usage.inspect.md`.
 
 ## Test-First
 
-- [ ] RT-USAGE-001: prove `runtime-usage.inspect` is read-only and never dispatches prune, repair,
-  stop/start/restart, deployment, or runtime mutation commands.
-- [ ] RT-USAGE-002: prove attribution uses Appaloft ownership labels/snapshots and reports uncertain
-  artifacts as unattributed.
-- [ ] RT-USAGE-003: prove project/environment/resource/deployment rollups aggregate query-shaped
-  data without aggregate mutation.
-- [ ] RT-USAGE-004: prove partial/freshness/warning behavior for unsupported provider, Docker
-  unavailable, timeout, and missing metric sources.
-- [ ] RT-USAGE-005: prove disk classes separate active runtime, rollback candidate, source
-  workspace, Docker image/cache, Appaloft state roots, volumes, and unknown storage.
-- [ ] RT-USAGE-006: prove current deployment/runtime identity is visible when ownership evidence
-  exists without implying historical time-series correlation.
+- [x] RT-USAGE-001: prove the application query/handler boundary for `runtime-usage.inspect` is
+  read-only and has no command-bus dependency.
+- [x] RT-USAGE-002: prove application DTOs carry ownership evidence and report uncertain artifacts
+  as unattributed/unknown.
+- [x] RT-USAGE-003: prove application DTOs expose project/environment/resource/deployment rollups as
+  query-shaped data.
+- [x] RT-USAGE-004: prove application partial/freshness/source-error behavior for unavailable
+  sources and unexpected inspector failures.
+- [x] RT-USAGE-005: prove application DTOs preserve disk classes, including volume exclusion.
+- [x] RT-USAGE-006: prove application DTOs expose current deployment/runtime identity only from
+  supplied evidence.
 - [ ] RT-USAGE-007: add collector/process-attempt tests only after sample persistence is in scope.
-- [ ] RT-USAGE-008: prove CLI and HTTP/oRPC dispatch through shared query schemas.
+- [x] RT-USAGE-008: prove CLI, HTTP/oRPC, and Web dispatch/read through shared query schemas and
+  typed DTOs; application
+  schema defaults are covered in `packages/application/test/runtime-usage-inspect.test.ts`, CLI
+  dispatch is covered in `packages/adapters/cli/test/runtime-usage-command.test.ts`, HTTP/oRPC
+  dispatch is covered in `packages/orpc/test/runtime-usage.http.test.ts`, and operation catalog
+  exposure is covered in `packages/application/test/operation-catalog-boundary.test.ts`; Web
+  readback/i18n coverage is in `apps/web/src/lib/console/runtime-usage.test.ts`.
 - [ ] RT-USAGE-009: prove threshold evaluation is non-enforcing and does not mutate runtime state.
-- [ ] RT-USAGE-010: preserve existing rejection for unsupported CPU/memory/replicas/runtime sizing
-  config fields until sizing ADR/specs are accepted.
+- [x] RT-USAGE-010: preserve existing rejection for unsupported CPU/memory/replicas/runtime sizing
+  config fields until sizing ADR/specs are accepted. Coverage remains in deployment config, CLI
+  config, deployment create contract, and quick deploy workflow tests; runtime usage does not add
+  sizing/enforcement inputs.
 
 ## Implementation
 
-- [ ] Add application query messages and handlers for the accepted first read-only operation.
-- [ ] Add runtime usage inspector port and fake/in-memory adapter for deterministic tests.
-- [ ] Add local-shell/generic-SSH/Docker adapter support for safe point-in-time usage inspection.
-- [ ] Add attribution translator for container labels, runtime snapshots, workspace metadata, and
-  deployment/resource context.
-- [ ] Add CLI and HTTP/oRPC entrypoints through `QueryBus`.
-- [ ] Add Web compact readback after contracts and i18n keys exist.
+- [x] Add application query messages and handlers for the accepted first read-only operation.
+- [x] Add runtime usage inspector port and deterministic application test fake.
+- [x] Add server-scope local-shell/generic-SSH/Docker capacity-backed adapter translation for safe
+  point-in-time usage inspection.
+- [x] Add shell dependency registration for the runtime usage inspector adapter.
+- [x] Add conservative project/environment/resource/deployment scope resolution through read models
+  that returns partial attribution instead of guessing totals without ownership evidence.
+- [x] Add Appaloft-managed Docker container label attribution for current container writable bytes,
+  deployment/resource context, and current runtime ids.
+- [x] Add source workspace metadata attribution and deployment read-model enrichment for
+  deployment-id-only artifacts.
+- [x] Add retained runtime identity metadata enrichment from deployment read models for
+  deployment-id-only artifacts.
+- [x] Add CLI and HTTP/oRPC entrypoints through `QueryBus`.
+- [x] Add Web compact readback after contracts and i18n keys exist.
 - [ ] Add sample persistence, collector worker, rollup queries, and charts only in Slice 2.
 - [ ] Add threshold policy command/query, operator visibility, and notification hooks only in Slice
   3.
@@ -49,25 +64,34 @@
 
 ## Entrypoints And Docs
 
-- [ ] Update `docs/CORE_OPERATIONS.md` and `packages/application/src/operation-catalog.ts` when
-  operation names are accepted.
-- [ ] Add command/query specs for accepted operations.
-- [ ] Add public docs anchors under diagnostics/observability.
-- [ ] Add CLI help, HTTP/oRPC descriptions, SDK metadata, and future MCP/tool descriptors from the
-  same operation catalog entries.
-- [ ] Keep Web usage text localized through `packages/i18n`.
+- [x] Update `docs/CORE_OPERATIONS.md` and `packages/application/src/operation-catalog.ts` when
+  the Code Round adds active query schemas and handlers.
+- [x] Add command/query specs for accepted operations.
+- [x] Add public docs anchors under diagnostics/observability.
+- [x] Add CLI help, HTTP/oRPC descriptions, and SDK metadata from the same operation catalog
+  entries.
+- [ ] Add future MCP/tool descriptors after MCP surfaces enter scope.
+- [x] Keep Web usage text localized through `packages/i18n`.
 
 ## Verification
 
-- [ ] Run focused application, runtime adapter, CLI, oRPC, Web, docs-registry, typecheck, and lint
-  checks for any Code Round slice.
-- [ ] Run `git diff --check`.
-- [ ] Add opt-in Docker/SSH smoke only after the read path is proven non-mutating.
+- [x] Run focused application, runtime adapter, CLI, oRPC, docs-registry, SDK generator, SDK,
+  typecheck, and lint checks for the current Code Round slice.
+- [x] Run Web checks when the Web readback slice changes `apps/web`.
+- [x] Run `git diff --check`.
+- [x] Prove the current `0.12.0` operator questions with automated coverage:
+  current attribution and rollups in `packages/application/test/runtime-usage-inspect.test.ts`,
+  capacity pressure and disk class evidence in `packages/adapters/runtime/test/runtime-usage-inspector.test.ts`,
+  current deployment/runtime context in application enrichment tests, and next diagnostic action
+  through warning/source-error readback plus public diagnostics help coverage.
+- [x] Add opt-in Docker/SSH smoke gates after the read path is proven non-mutating. They are
+  disabled by default and run only with `APPALOFT_RUNTIME_USAGE_DOCKER_SMOKE=1` or
+  `APPALOFT_RUNTIME_USAGE_SSH_SMOKE=1`.
 
 ## Post-Implementation Sync
 
-- [ ] Reconcile ADR, feature artifacts, business operation map, core operations, operation catalog,
+- [x] Reconcile ADR, feature artifacts, business operation map, core operations, operation catalog,
   local command/query specs, runtime target capacity docs, public docs/help, tests, and roadmap
-  status.
-- [ ] Record remaining migration gaps for unavailable backend metrics, sample retention, thresholds,
+  status for the active read-only query and Appaloft-managed container label attribution slice.
+- [x] Record remaining migration gaps for unavailable backend metrics, sample retention, thresholds,
   and runtime sizing.

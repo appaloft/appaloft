@@ -313,6 +313,11 @@ export const cliCommandDescriptions = {
     "Show scheduled runtime prune policy",
     "diagnostics.scheduled-runtime-prune-policy",
   ),
+  runtimeUsage: withDocs("Runtime usage attribution diagnostics", "diagnostics.runtime-usage"),
+  runtimeUsageInspect: withDocs(
+    "Inspect runtime usage attribution for a scope without cleanup",
+    "diagnostics.runtime-usage",
+  ),
   serverProxy: withDocs("Server edge proxy operations", "server.proxy-readiness"),
   serverProxyRepair: withDocs(
     "Repair provider-owned edge proxy infrastructure",

@@ -4,7 +4,7 @@
 
 - Domain model: `docs/DOMAIN_MODEL.md`
 - Decisions/ADRs: ADR-012, ADR-013, ADR-018, ADR-020, ADR-021, ADR-023, ADR-047, ADR-050,
-  ADR-054, ADR-055
+  ADR-054, ADR-055, ADR-062
 - Global contracts:
   - `docs/architecture/adapter-command-query-boundary.md`
   - `docs/architecture/async-lifecycle-and-acceptance.md`
@@ -20,7 +20,7 @@
   - `docs/commands/servers.capacity.prune.md`
 - Test matrices:
   - `docs/testing/runtime-target-capacity-test-matrix.md`
-  - future `docs/testing/runtime-usage-attribution-test-matrix.md`
+  - `docs/testing/runtime-usage-attribution-test-matrix.md`
 
 ## Architecture Approach
 
@@ -50,13 +50,14 @@
 
 ### Slice 1: Current Usage Inspect
 
-- Add ADR for runtime usage attribution operation/read-model boundary.
+- Use ADR-062 for the runtime usage attribution operation/read-model boundary.
 - Add `runtime-usage.inspect` query for one scope: server, project, environment, resource, or
   deployment.
 - Reuse existing runtime target capacity primitives where possible.
 - Attribute containers/workspaces/artifacts only through Appaloft labels, deployment snapshots, or
   retained runtime identity.
-- Add CLI/HTTP/oRPC entrypoints and compact Web readback for server/resource detail.
+- Add CLI/HTTP/oRPC entrypoints first; compact Web readback for server/resource detail follows
+  after the typed DTO and i18n copy are accepted.
 - Keep output point-in-time with `freshness = live` or `unknown`; no sample persistence required.
 
 ### Slice 2: Sample Retention And Rollups

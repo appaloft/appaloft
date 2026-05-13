@@ -203,6 +203,8 @@ describe("server show HTTP route", () => {
               detectable: true,
             },
           },
+          appaloftContainers: [],
+          appaloftWorkspaces: [],
           safeReclaimableEstimate: {
             stoppedContainersSize: 3,
             danglingImagesSize: 2,

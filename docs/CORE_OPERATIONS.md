@@ -134,6 +134,7 @@ Implemented operations:
 | List deployment targets | Product-session member query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `appaloft server list` | `GET /api/servers` |
 | Show deployment target | Product-session member query | `servers.show` | `ShowServerQuery` | `ShowServerQueryInput` | `appaloft server show <serverId>` | `GET /api/servers/{serverId}` |
 | Inspect deployment target capacity | Query | `servers.capacity.inspect` | `InspectServerCapacityQuery` | `InspectServerCapacityQueryInput` | `appaloft server capacity inspect <serverId>` | `GET /api/servers/{serverId}/capacity` |
+| Inspect runtime usage attribution | Query | `runtime-usage.inspect` | `InspectRuntimeUsageQuery` | `InspectRuntimeUsageQueryInput` | `appaloft runtime-usage inspect <scope>` | `GET /api/runtime-usage/inspect` |
 | Rename deployment target | Command | `servers.rename` | `RenameServerCommand` | `RenameServerCommandInput` | `appaloft server rename <serverId> --name <name>` | `POST /api/servers/{serverId}/rename` |
 | Configure deployment target edge proxy | Command | `servers.configure-edge-proxy` | `ConfigureServerEdgeProxyCommand` | `ConfigureServerEdgeProxyCommandInput` | `appaloft server proxy configure <serverId> --kind none\|traefik\|caddy` | `POST /api/servers/{serverId}/edge-proxy/configuration` |
 | Deactivate deployment target | Command | `servers.deactivate` | `DeactivateServerCommand` | `DeactivateServerCommandInput` | `appaloft server deactivate <serverId>` | `POST /api/servers/{serverId}/deactivate` |
@@ -178,6 +179,17 @@ Implemented operations:
   must not run Docker prune, delete volumes, delete `/var/lib/appaloft/runtime/state`, remove
   source workspaces, stop containers, repair proxy state, or mutate Appaloft records. Reclaimable
   values are estimates for later cleanup/prune decisions, not cleanup execution.
+- `runtime-usage.inspect` is a read-only attribution query. The first active adapter slice supports
+  server scope by translating the safe capacity diagnostic into `runtime-usage.inspect/v1` totals,
+  artifacts, warnings, and source errors. Project, environment, resource, and deployment scopes
+  resolve current deployment/server context through read models and return partial attribution
+  rather than guessed totals when ownership evidence is incomplete. Appaloft-managed Docker
+  container labels can provide current artifact ownership, container writable bytes, deployment or
+  resource rollups, and runtime ids when the labels are present. Source workspace metadata can
+  provide deployment-id evidence that is enriched from deployment read models before scope rollups
+  are returned; retained runtime identity metadata can add runtime ids when present. The query must
+  not prune, repair, stop/start/restart workloads, deploy, enforce quota, persist samples, or mutate
+  Appaloft records. Retained samples and rollup read models remain governed follow-up slices.
 - `servers.capacity.prune` is a runtime target maintenance mutation. It dry-runs by default,
   requires a cutoff, and may delete only safe target-owned stopped containers or materialized
   workspace candidates whose ownership, age, active-runtime, and rollback-safety evidence passes.

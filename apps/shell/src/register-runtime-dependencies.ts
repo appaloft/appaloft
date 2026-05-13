@@ -24,6 +24,7 @@ import {
   RuntimeTargetCapacityInspectorAdapter,
   RuntimeTargetCapacityPrunerAdapter,
   RuntimeTerminalSessionGateway,
+  RuntimeUsageCapacityInspectorAdapter,
   SshExecutionBackend,
 } from "@appaloft/adapter-runtime";
 import {
@@ -65,11 +66,13 @@ import {
   type ResourceAccessFailureRendererTarget,
   type RetentionDefaultRepository,
   type RouteRealizationWorkReadModel,
+  type RuntimeTargetCapacityInspector,
   type ScheduledRuntimePrunePolicyReadModel,
   type ScheduledRuntimePrunePolicyRepository,
   type ServerAppliedRouteDesiredStateRecord,
   type ServerAppliedRouteStateRepository,
   type ServerAppliedRouteStateSelectionSpec,
+  type ServerRepository,
   type SourceLinkReadModel,
   type SourceLinkRecord,
   type SourceLinkRepository,
@@ -79,7 +82,15 @@ import {
 } from "@appaloft/application";
 import { type AuthRuntime, BetterAuthDeployTokenMaterialIssuer } from "@appaloft/auth-better";
 import { type AppConfig } from "@appaloft/config";
-import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  DeploymentTargetByIdSpec,
+  DeploymentTargetId,
+  type DomainError,
+  domainError,
+  err,
+  ok,
+  type Result,
+} from "@appaloft/core";
 import { InMemoryIntegrationRegistry } from "@appaloft/integration-core";
 import {
   createGitHubPreviewFeedbackWriter,
@@ -861,6 +872,34 @@ export function registerRuntimeDependencies(
           input.config.remoteRuntimeRoot,
         ),
     ),
+  });
+  container.register(tokens.runtimeUsageInspector, {
+    useFactory: instanceCachingFactory((dependencyContainer) => {
+      const serverRepository = dependencyContainer.resolve(
+        tokens.serverRepository,
+      ) as ServerRepository;
+      const capacityInspector = dependencyContainer.resolve(
+        tokens.runtimeTargetCapacityInspector,
+      ) as RuntimeTargetCapacityInspector;
+
+      return new RuntimeUsageCapacityInspectorAdapter(async (context, serverId) => {
+        const serverIdResult = DeploymentTargetId.create(serverId);
+        if (serverIdResult.isErr()) {
+          return err(serverIdResult.error);
+        }
+
+        const server = await serverRepository.findOne(
+          toRepositoryContext(context),
+          DeploymentTargetByIdSpec.create(serverIdResult.value),
+        );
+
+        if (!server) {
+          return err(domainError.notFound("server", serverId));
+        }
+
+        return ok(server.toState());
+      }, capacityInspector);
+    }),
   });
   container.register(tokens.runtimeTargetCapacityPruner, {
     useFactory: instanceCachingFactory(
