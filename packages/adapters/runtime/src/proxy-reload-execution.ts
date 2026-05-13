@@ -35,10 +35,10 @@ export type ProxyReloadExecutionResult =
   | ProxyReloadExecutionSucceeded
   | ProxyReloadExecutionFailed;
 
-export function executeProxyReloadPlan(input: {
+export async function executeProxyReloadPlan(input: {
   plan: ProxyReloadPlan;
-  runCommand: (step: ProxyReloadStepPlan) => ProxyReloadCommandResult;
-}): ProxyReloadExecutionResult {
+  runCommand: (step: ProxyReloadStepPlan) => Promise<ProxyReloadCommandResult>;
+}): Promise<ProxyReloadExecutionResult> {
   const logs: ProxyReloadExecutionLog[] = [];
 
   if (!input.plan.required) {
@@ -72,7 +72,7 @@ export function executeProxyReloadPlan(input: {
       };
     }
 
-    const result = input.runCommand(step);
+    const result = await input.runCommand(step);
     logs.push({
       stepName: step.name,
       mode: step.mode,

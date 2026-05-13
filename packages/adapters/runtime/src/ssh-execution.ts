@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import {
@@ -68,6 +67,7 @@ import { runStreamingProcess } from "./streaming-process";
 import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
 import { normalizeGeneratedDockerBuildAssetPath } from "./generated-docker-build-assets";
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
+import { runBufferedProcess, shellCommand } from "./buffered-process";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -422,60 +422,60 @@ function remoteInternalHealthCheckCommand(url: string, options: HttpHealthCheckO
   return `(sh -lc ${shellQuote(curlScript)})${wgetFallback}`;
 }
 
-function runSyncProcess(input: {
+async function runProcess(input: {
   command: string;
   args: string[];
   cwd: string;
   env: NodeJS.ProcessEnv;
   redactions?: readonly string[];
-}): {
+}): Promise<{
   exitCode: number;
   stdout: string;
   stderr: string;
   failed: boolean;
   reason?: string;
-} {
-  const result = spawnSync(input.command, input.args, {
+}> {
+  const result = await runBufferedProcess({
+    command: [input.command, ...input.args],
     cwd: input.cwd,
     env: input.env,
-    encoding: "utf8",
+    ...(input.redactions ? { redactions: input.redactions } : {}),
   });
 
   return {
-    exitCode: result.status ?? 1,
-    stdout: redactSecrets(result.stdout ?? "", input.redactions),
-    stderr: redactSecrets(result.stderr ?? "", input.redactions),
-    failed: result.status !== 0,
-    ...(result.signal ? { reason: `terminated by signal ${result.signal}` } : {}),
-    ...(result.error ? { reason: result.error.message } : {}),
+    exitCode: result.exitCode ?? 1,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    failed: result.failed,
+    ...(result.reason ? { reason: result.reason } : {}),
   };
 }
 
-function runSyncShell(input: {
+async function runShell(input: {
   command: string;
   cwd: string;
   env: NodeJS.ProcessEnv;
   redactions?: readonly string[];
-}): {
+}): Promise<{
   exitCode: number;
   stdout: string;
   stderr: string;
   failed: boolean;
   reason?: string;
-} {
-  const result = spawnSync(input.command, {
+}> {
+  const result = await runBufferedProcess({
+    command: shellCommand(input.command),
     cwd: input.cwd,
     env: input.env,
-    shell: true,
-    encoding: "utf8",
+    ...(input.redactions ? { redactions: input.redactions } : {}),
   });
 
   return {
-    exitCode: result.status ?? 1,
-    stdout: redactSecrets(result.stdout ?? "", input.redactions),
-    stderr: redactSecrets(result.stderr ?? "", input.redactions),
-    failed: result.status !== 0,
-    ...(result.signal ? { reason: `terminated by signal ${result.signal}` } : {}),
+    exitCode: result.exitCode ?? 1,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    failed: result.failed,
+    ...(result.reason ? { reason: result.reason } : {}),
   };
 }
 
@@ -709,7 +709,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     return deployment;
   }
 
-  private pushRemoteDockerContainerDiagnostics(
+  private async pushRemoteDockerContainerDiagnostics(
     logs: DeploymentLogEntry[],
     input: {
       context: ExecutionContext;
@@ -719,7 +719,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       env: NodeJS.ProcessEnv;
       containerName: string;
     },
-  ): void {
+  ): Promise<void> {
     const format =
       "status={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} oomKilled={{.State.OOMKilled}} finishedAt={{.State.FinishedAt}}";
     const inspectMessage = `Inspect SSH Docker container ${input.containerName}`;
@@ -731,7 +731,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       message: inspectMessage,
     });
 
-    const inspect = this.runRemoteCommand({
+    const inspect = await this.runRemoteCommand({
       target: input.target,
       command: `docker inspect --format ${shellQuote(format)} ${shellQuote(input.containerName)}`,
       cwd: input.runtimeDir,
@@ -763,7 +763,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       message: logsMessage,
     });
 
-    const dockerLogs = this.runRemoteCommand({
+    const dockerLogs = await this.runRemoteCommand({
       target: input.target,
       command: `docker logs --tail 50 ${shellQuote(input.containerName)}`,
       cwd: input.runtimeDir,
@@ -885,14 +885,14 @@ export class SshExecutionBackend implements ExecutionBackend {
     ];
   }
 
-  private runRemoteCommand(input: {
+  private async runRemoteCommand(input: {
     target: SshTarget;
     command: string;
     cwd: string;
     env: NodeJS.ProcessEnv;
     redactions?: readonly string[];
   }) {
-    return runSyncProcess({
+    return await runProcess({
       command: "ssh",
       args: [...this.sshArgs(input.target), input.command],
       cwd: input.cwd,
@@ -935,7 +935,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
 
     for (let attempt = 0; attempt < input.options.retries; attempt += 1) {
-      const result = this.runRemoteCommand({
+      const result = await this.runRemoteCommand({
         target: input.target,
         command: remoteInternalHealthCheckCommand(input.url, input.options),
         cwd: input.cwd,
@@ -1170,7 +1170,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         };
       }
 
-      const commit = this.runRemoteCommand({
+      const commit = await this.runRemoteCommand({
         target: input.target,
         command: `git -C ${shellQuote(remoteSourceRoot)} rev-parse --verify HEAD`,
         cwd: input.runtimeDir,
@@ -1265,7 +1265,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         status: "running",
         message: `Write ${source.kind} source on target`,
       });
-      const writeInlineSource = this.runRemoteCommand({
+      const writeInlineSource = await this.runRemoteCommand({
         target: input.target,
         command: [
           `rm -rf ${shellQuote(remoteSourceRoot)}`,
@@ -1374,7 +1374,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       remotePrepareCommand,
       sshArgs: this.sshArgs(input.target),
     });
-    const upload = runSyncShell({
+    const upload = await runShell({
       command: uploadCommand,
       cwd: input.runtimeDir,
       env: input.env,
@@ -1393,7 +1393,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         ? `Source upload failed: ${upload.reason}`
         : `Source upload failed with exit code ${upload.exitCode}`;
       logs.push(phaseLog("package", message, "error"));
-      this.runRemoteCommand({
+      await this.runRemoteCommand({
         target: input.target,
         command: `rm -rf ${shellQuote(remoteWorkdir)}`,
         cwd: input.runtimeDir,
@@ -1492,7 +1492,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         return ok({ deployment: prepared.deployment });
       }
 
-      const dockerVersion = this.runRemoteCommand({
+      const dockerVersion = await this.runRemoteCommand({
         target,
         command: "docker version --format '{{.Server.Version}}'",
         cwd: runtimeDir,
@@ -1584,7 +1584,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               ...generatedFiles.slice(1).map((file) => file.path),
             );
 
-            const writeDockerBuildAssets = this.runRemoteCommand({
+            const writeDockerBuildAssets = await this.runRemoteCommand({
               target,
               command: remoteWriteTextFilesCommand(generatedFiles),
               cwd: runtimeDir,
@@ -1647,7 +1647,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               ...generatedFiles.slice(1).map((file) => file.path),
             );
 
-            const writeDockerBuildAssets = this.runRemoteCommand({
+            const writeDockerBuildAssets = await this.runRemoteCommand({
               target,
               command: remoteWriteTextFilesCommand(generatedFiles),
               cwd: runtimeDir,
@@ -1741,7 +1741,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           }
         } finally {
           if (generatedRemoteContextAssetPaths.length > 0) {
-            this.runRemoteCommand({
+            await this.runRemoteCommand({
               target,
               command: `rm -f ${generatedRemoteContextAssetPaths.map(shellQuote).join(" ")}`,
               cwd: runtimeDir,
@@ -2043,10 +2043,10 @@ export class SshExecutionBackend implements ExecutionBackend {
           status: "running",
           message: `Reload ${proxyReloadPlan.displayName} edge proxy`,
         });
-        const reload = executeProxyReloadPlan({
+        const reload = await executeProxyReloadPlan({
           plan: proxyReloadPlan,
-          runCommand: (step) =>
-            this.runRemoteCommand({
+          runCommand: async (step) =>
+            await this.runRemoteCommand({
               target,
               command: step.command ?? "",
               cwd: runtimeDir,
@@ -2110,7 +2110,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
-      const publishedPortResult = this.runRemoteCommand({
+      const publishedPortResult = await this.runRemoteCommand({
         target,
         command: dockerPublishedPortCommand({
           containerName,
@@ -2123,7 +2123,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       const publishedHostPort = parseDockerPublishedHostPort(publishedPortResult.stdout);
 
       if (publishedPortResult.failed || publishedHostPort === undefined) {
-        this.pushRemoteDockerContainerDiagnostics(logs, {
+        await this.pushRemoteDockerContainerDiagnostics(logs, {
           context,
           deploymentId: state.id.value,
           target,
@@ -2131,7 +2131,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           env,
           containerName,
         });
-        this.runRemoteCommand({
+        await this.runRemoteCommand({
           target,
           command: `docker rm -f ${shellQuote(containerName)}`,
           cwd: runtimeDir,
@@ -2229,7 +2229,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           });
 
           if (!internalHealth.ok) {
-            this.pushRemoteDockerContainerDiagnostics(logs, {
+            await this.pushRemoteDockerContainerDiagnostics(logs, {
               context,
               deploymentId: state.id.value,
               target,
@@ -2237,7 +2237,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               env,
               containerName,
             });
-            this.runRemoteCommand({
+            await this.runRemoteCommand({
               target,
               command: `docker rm -f ${shellQuote(containerName)}`,
               cwd: runtimeDir,
@@ -2304,7 +2304,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             const publicHealth = await waitForHealth(publicUrl, healthOptions);
 
             if (!publicHealth.ok) {
-              this.pushRemoteDockerContainerDiagnostics(logs, {
+              await this.pushRemoteDockerContainerDiagnostics(logs, {
                 context,
                 deploymentId: state.id.value,
                 target,
@@ -2312,7 +2312,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                 env,
                 containerName,
               });
-              this.runRemoteCommand({
+              await this.runRemoteCommand({
                 target,
                 command: `docker rm -f ${shellQuote(containerName)}`,
                 cwd: runtimeDir,
@@ -2351,7 +2351,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         const cleanupCommand = renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
           quote: shellQuote,
         });
-        const cleanup = this.runRemoteCommand({
+        const cleanup = await this.runRemoteCommand({
           target,
           command: cleanupCommand,
           cwd: runtimeDir,
@@ -2466,7 +2466,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         );
       }
 
-      const dockerVersion = this.runRemoteCommand({
+      const dockerVersion = await this.runRemoteCommand({
         target,
         command: "docker version --format '{{.Server.Version}}'",
         cwd: runtimeDir,
@@ -2640,7 +2640,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     try {
       if (state.runtimePlan.execution.kind === "docker-container") {
-        this.runRemoteCommand({
+        await this.runRemoteCommand({
           target,
           command: `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
           cwd: runtimeDir,
@@ -2653,7 +2653,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           const remoteComposeFile = composeFile.startsWith("/")
             ? composeFile
             : `${remoteWorkdir}/${composeFile}`;
-          this.runRemoteCommand({
+          await this.runRemoteCommand({
             target,
             command: `docker compose -p ${shellQuote(
               metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName,
@@ -2726,7 +2726,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     try {
       if (state.runtimePlan.execution.kind === "docker-container") {
-        this.runRemoteCommand({
+        await this.runRemoteCommand({
           target,
           command: `docker rm -f ${shellQuote(metadata.containerName ?? runtimeInstanceNames.containerName)}`,
           cwd: runtimeDir,
@@ -2739,7 +2739,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           const remoteComposeFile = composeFile.startsWith("/")
             ? composeFile
             : `${remoteWorkdir}/${composeFile}`;
-          this.runRemoteCommand({
+          await this.runRemoteCommand({
             target,
             command: `docker compose -p ${shellQuote(
               metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName,
