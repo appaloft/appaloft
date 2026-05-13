@@ -450,6 +450,7 @@ export const i18nKeys = {
       noDisplayName: "console:organization.noDisplayName",
       organizationId: "console:organization.organizationId",
       ownerSafetyNotice: "console:organization.ownerSafetyNotice",
+      overviewTitle: "console:organization.overviewTitle",
       pageDescription: "console:organization.pageDescription",
       pageTitle: "console:organization.pageTitle",
       permissionDeniedBody: "console:organization.permissionDeniedBody",

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { page } from "$app/state";
   import {
     BookOpen,
     KeyRound,
@@ -13,7 +14,7 @@
   import type { OrganizationTeamRole } from "@appaloft/contracts";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
 
-  import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import ManagementShell from "$lib/components/console/ManagementShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
@@ -28,6 +29,10 @@
   import { i18nKeys, t } from "$lib/i18n";
 
   type DeployTokenWorkflow = "preview-cleanup" | "server-config-deploy" | "source-link-deploy";
+  type OrganizationManagementSection = "overview" | "members" | "invitations" | "deploy-tokens";
+  type Props = {
+    section?: OrganizationManagementSection | null;
+  };
 
   const roleOptions = ["owner", "admin", "developer", "billing", "viewer"] as const;
   const workflowOptions = [
@@ -35,6 +40,32 @@
     "server-config-deploy",
     "preview-cleanup",
   ] as const;
+  const sectionOptions = [
+    {
+      value: "overview",
+      href: "/organization",
+      labelKey: i18nKeys.console.organization.overviewTitle,
+    },
+    {
+      value: "members",
+      href: "/organization/members",
+      labelKey: i18nKeys.console.organization.membersTitle,
+    },
+    {
+      value: "invitations",
+      href: "/organization/invitations",
+      labelKey: i18nKeys.console.organization.invitationsTitle,
+    },
+    {
+      value: "deploy-tokens",
+      href: "/organization/deploy-tokens",
+      labelKey: i18nKeys.console.organization.deployTokensTitle,
+    },
+  ] as const satisfies ReadonlyArray<{
+    value: OrganizationManagementSection;
+    href: string;
+    labelKey: string;
+  }>;
 
   let inviteEmail = $state("");
   let inviteRole = $state<OrganizationTeamRole>("developer");
@@ -46,6 +77,7 @@
   let operationError = $state("");
   let selectedOrganizationId = $state("");
   let roleDrafts = $state<Record<string, OrganizationTeamRole>>({});
+  let { section = null }: Props = $props();
 
   const contextQuery = createQuery(() =>
     queryOptions({
@@ -60,6 +92,33 @@
   const currentOrganization = $derived(context?.currentOrganization ?? null);
   const currentOrganizationId = $derived(currentOrganization?.organizationId ?? "");
   const currentRole = $derived(currentOrganization?.role ?? "viewer");
+  const activeSection = $derived.by<OrganizationManagementSection>(() => {
+    if (section) {
+      return section;
+    }
+
+    if (page.url.pathname.endsWith("/members")) {
+      return "members";
+    }
+    if (page.url.pathname.endsWith("/invitations")) {
+      return "invitations";
+    }
+    if (page.url.pathname.endsWith("/deploy-tokens")) {
+      return "deploy-tokens";
+    }
+
+    const querySection = page.url.searchParams.get("section");
+    if (
+      querySection === "members" ||
+      querySection === "invitations" ||
+      querySection === "deploy-tokens" ||
+      querySection === "overview"
+    ) {
+      return querySection;
+    }
+
+    return "overview";
+  });
   const canManageByRole = $derived(currentRole === "owner" || currentRole === "admin");
   const canListMembers = $derived(context?.permissions?.canListMembers ?? canManageByRole);
   const canInviteMembers = $derived(context?.permissions?.canInviteMembers ?? canManageByRole);
@@ -364,7 +423,7 @@
   <title>{$t(i18nKeys.console.organization.pageTitle)} · Appaloft</title>
 </svelte:head>
 
-<ConsoleShell
+<ManagementShell
   title={$t(i18nKeys.console.organization.pageTitle)}
   description={$t(i18nKeys.console.organization.pageDescription)}
   breadcrumbs={[
@@ -442,6 +501,19 @@
         </section>
       {/if}
 
+      <nav class="flex flex-wrap gap-2" aria-label={$t(i18nKeys.console.organization.pageTitle)}>
+        {#each sectionOptions as section (section.value)}
+          <Button
+            href={section.href}
+            size="sm"
+            variant={activeSection === section.value ? "selected" : "outline"}
+          >
+            {$t(section.labelKey)}
+          </Button>
+        {/each}
+      </nav>
+
+      {#if activeSection === "overview"}
       <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div class="console-panel p-5">
           <div class="flex items-center gap-3">
@@ -542,6 +614,7 @@
           </div>
         </div>
       </section>
+      {/if}
 
       {#if !canInviteMembers && !canUpdateMemberRoles && !canManageDeployTokens}
         <section class="console-panel space-y-2 p-5">
@@ -552,6 +625,7 @@
         </section>
       {/if}
 
+      {#if activeSection === "members"}
       <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div class="space-y-3">
           <div>
@@ -661,7 +735,9 @@
           </Button>
         </form>
       </section>
+      {/if}
 
+      {#if activeSection === "invitations"}
       <section class="space-y-3">
         <div>
           <h2 class="text-lg font-semibold">{$t(i18nKeys.console.organization.invitationsTitle)}</h2>
@@ -690,7 +766,9 @@
           {/if}
         </div>
       </section>
+      {/if}
 
+      {#if activeSection === "deploy-tokens"}
       <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div class="space-y-3">
           <div>
@@ -809,6 +887,7 @@
           </Button>
         </form>
       </section>
+      {/if}
 
       <div class="flex flex-wrap gap-2">
         <Button href={webDocsHrefs.organizationTeamManagement} target="_blank" variant="outline">
@@ -818,4 +897,4 @@
       </div>
     </div>
   {/if}
-</ConsoleShell>
+</ManagementShell>
