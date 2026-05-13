@@ -42,7 +42,7 @@ Version plan:
 - [x] `0.10.x` is the Phase 8 hardening line: installer/auth fixes, release packaging fixes, and
   backwards-compatible corrections only.
 - [x] `0.11.0` is Phase 9: Operator/Internal State Closure And Interface Parity.
-- [ ] `0.12.0` is Runtime Usage Attribution And Monitoring.
+- [x] `0.12.0` is Phase 10: Runtime Usage Attribution And Monitoring.
 - [ ] `1.0.0-rc` is the GA release-candidate gate after `0.12.0`, not a separate feature phase.
 - [ ] `1.0.0` is GA.
 - [x] Post-`1.0.0` tracks do not reserve `0.x` versions. If maintainers deliberately pull a
@@ -52,11 +52,11 @@ Version plan:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-05-12, the latest public release is `v0.10.0`; root package
+- [x] On 2026-05-13, the latest public release is `v0.10.0`; root package
   and Release Please manifest on `main` are `0.10.0`; the release PR target is
-  `0.11.0`.
-- [x] On 2026-05-12, the roadmap gate allows `Release-As: 0.11.0` because
-  Phase 0 through Phase 9 release rules, required items, and exit criteria are checked.
+  `0.12.0`.
+- [x] On 2026-05-13, the roadmap gate allows `Release-As: 0.12.0` because
+  Phase 0 through Phase 10 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
 Historical alignment notes:
@@ -2143,18 +2143,19 @@ Exit criteria:
   release-preparation environment has no SSH target server, so no
   `dist/release/ssh-smoke-evidence.json` evidence file has been captured for `0.11.0`.
 
-## 0.12.0 Runtime Usage Attribution And Monitoring
+## Phase 10: Runtime Usage Attribution And Monitoring
 
 Target: `0.12.0`.
 
 Release rule:
-- [ ] Select `0.12.0` only after Phase 9 has shipped or has been explicitly retargeted as
+- [x] Select `0.12.0` only after Phase 9 has shipped or has been explicitly retargeted as
   complete, and only when the runtime usage attribution ADR/spec/test gates for the selected
-  `0.12.0` slice are complete.
-- [ ] Do not use `0.12.0` to silently accept runtime sizing, quotas, or enforcement. CPU, memory,
+  `0.12.0` slice are complete. On 2026-05-13, maintainers explicitly selected direct `0.12.0`
+  release preparation after Phase 9 completion was already checked on `main`.
+- [x] Do not use `0.12.0` to silently accept runtime sizing, quotas, or enforcement. CPU, memory,
   replicas, restart policy, rollout overlap/drain, quota, and destructive maintenance behavior
   still require their own accepted ADR/spec/test coverage before implementation.
-- [ ] Do not select `1.0.0-rc` directly while required `0.12.0` items remain unchecked, unless
+- [x] Do not select `1.0.0-rc` directly while required `0.12.0` items remain unchecked, unless
   maintainers explicitly defer this track back to post-GA and record the deferral here.
 
 Governing planning document:
@@ -2187,7 +2188,7 @@ Deferred unless explicitly pulled into `0.12.0`:
 - [ ] Non-enforcing usage thresholds, warning/critical state, and operator visibility.
 - [ ] Runtime sizing, quotas, or enforcement.
 
-## 1.0.0 Release Candidate
+## Phase 11: 1.0.0 Release Candidate
 
 Target: `1.0.0-rc`.
 
@@ -2213,7 +2214,7 @@ Exit criteria:
 - [ ] Remaining gaps are either closed or explicitly accepted as non-GA-blocking in the roadmap,
   specs, public docs, and release notes.
 
-## 1.0.0 GA
+## Phase 12: 1.0.0 GA
 
 Release rule:
 - [ ] Select `1.0.0` only when the full `1.0.0 Definition Of Done`, every phase exit criterion, and
