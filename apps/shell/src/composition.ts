@@ -28,8 +28,14 @@ import {
   MarkServerAppliedRouteFailedSpec,
   type MutationCoordinator,
   type PreviewCleanupRetryScheduler,
+  type ProcessAttemptDeliveryCandidateReader,
+  type ProcessAttemptRetryCandidateReader,
+  type ProcessAttemptRetryGenerator,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
+  type ScheduledHistoryRetentionService,
+  type ScheduledRuntimePrunePolicyReadModel,
+  type ScheduledRuntimePruneService,
   type ScheduledTaskRunWorker,
   type ScheduledTaskScheduler,
   ServerAppliedRouteStateByRouteSetIdSpec,
@@ -79,7 +85,10 @@ import { registerApplicationServices } from "./register-application-services";
 import { registerRuntimeDependencies } from "./register-runtime-dependencies";
 import { createReloadableDatabase } from "./reloadable-database";
 import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
+import { SshRemoteStateWorkReadModel } from "./remote-state-work-read-model";
 import { resourceAccessFailureRendererTargetForStartedServer } from "./resource-access-failure-renderer-target";
+import { createScheduledHistoryRetentionRunner } from "./scheduled-history-retention-runner";
+import { createScheduledRuntimePruneRunner } from "./scheduled-runtime-prune-runner";
 import { createScheduledTaskRunner } from "./scheduled-task-runner";
 
 export interface AppComposition {
@@ -373,6 +382,14 @@ export async function createAppComposition(
       : {}),
     sourceLinkRepository,
     serverAppliedRouteStateRepository: serverAppliedRouteRepository,
+    ...(remotePgliteStateSyncSession
+      ? {
+          remoteStateWorkReadModel: new SshRemoteStateWorkReadModel({
+            target: remotePgliteStateSyncSession.target,
+            dataRoot: remotePgliteStateSyncSession.dataRoot,
+          }),
+        }
+      : {}),
     resourceAccessFailureRenderer: () => resourceAccessFailureRendererTarget,
   });
   registerApplicationServices(childContainer);
@@ -485,10 +502,50 @@ export async function createAppComposition(
     childContainer,
     tokens.scheduledTaskRunWorker,
   );
+  const processAttemptDeliveryCandidateReader = resolveToken<ProcessAttemptDeliveryCandidateReader>(
+    childContainer,
+    tokens.processAttemptDeliveryCandidateReader,
+  );
+  const processAttemptRetryCandidateReader = resolveToken<ProcessAttemptRetryCandidateReader>(
+    childContainer,
+    tokens.processAttemptRetryCandidateReader,
+  );
+  const processAttemptRetryGenerator = resolveToken<ProcessAttemptRetryGenerator>(
+    childContainer,
+    tokens.processAttemptRetryGenerator,
+  );
+  const scheduledRuntimePruneService = resolveToken<ScheduledRuntimePruneService>(
+    childContainer,
+    tokens.scheduledRuntimePruneService,
+  );
+  const scheduledHistoryRetentionService = resolveToken<ScheduledHistoryRetentionService>(
+    childContainer,
+    tokens.scheduledHistoryRetentionService,
+  );
+  const scheduledRuntimePrunePolicyReadModel = resolveToken<ScheduledRuntimePrunePolicyReadModel>(
+    childContainer,
+    tokens.scheduledRuntimePrunePolicyReadModel,
+  );
   const scheduledTaskRunner = createScheduledTaskRunner({
     config: config.scheduledTaskRunner,
     scheduler: scheduledTaskScheduler,
     worker: scheduledTaskRunWorker,
+    processAttemptDeliveryCandidateReader,
+    processAttemptRetryCandidateReader,
+    processAttemptRetryGenerator,
+    executionContextFactory,
+    logger,
+  });
+  const scheduledRuntimePruneRunner = createScheduledRuntimePruneRunner({
+    config: config.scheduledRuntimePruneRunner,
+    policyReadModel: scheduledRuntimePrunePolicyReadModel,
+    service: scheduledRuntimePruneService,
+    executionContextFactory,
+    logger,
+  });
+  const scheduledHistoryRetentionRunner = createScheduledHistoryRetentionRunner({
+    config: config.scheduledHistoryRetentionRunner,
+    service: scheduledHistoryRetentionService,
     executionContextFactory,
     logger,
   });
@@ -549,6 +606,8 @@ export async function createAppComposition(
     certificateRetrySchedulerRunner.start();
     previewCleanupRetrySchedulerRunner.start();
     scheduledTaskRunner.start();
+    scheduledRuntimePruneRunner.start();
+    scheduledHistoryRetentionRunner.start();
   };
 
   const cliProgram = createCliProgram({
@@ -602,6 +661,8 @@ export async function createAppComposition(
       certificateRetrySchedulerRunner.stop();
       previewCleanupRetrySchedulerRunner.stop();
       scheduledTaskRunner.stop();
+      scheduledRuntimePruneRunner.stop();
+      scheduledHistoryRetentionRunner.stop();
       serverHandle?.stop?.();
       await telemetry.shutdown();
       await database.close();

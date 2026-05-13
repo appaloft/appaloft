@@ -66,6 +66,12 @@ import { previewFeedbackRecordsMigration } from "./migrations/058_preview_feedba
 import { previewCleanupAttemptsMigration } from "./migrations/059_preview_cleanup_attempts";
 import { dependencyResourceSecretsMigration } from "./migrations/060_dependency_resource_secrets";
 import { deployTokensMigration } from "./migrations/061_deploy_tokens";
+import { resourceRuntimeLogArchivesMigration } from "./migrations/062_resource_runtime_log_archives";
+import { scheduledRuntimePrunePoliciesMigration } from "./migrations/063_scheduled_runtime_prune_policies";
+import { auditEventLegalHoldsMigration } from "./migrations/064_audit_event_legal_holds";
+import { auditEventArchivesMigration } from "./migrations/065_audit_event_archives";
+import { domainEventStreamRecordsMigration } from "./migrations/066_domain_event_stream_records";
+import { retentionDefaultsMigration } from "./migrations/067_retention_defaults";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -223,6 +229,12 @@ class StaticMigrationProvider implements MigrationProvider {
       "059_preview_cleanup_attempts": previewCleanupAttemptsMigration,
       "060_dependency_resource_secrets": dependencyResourceSecretsMigration,
       "061_deploy_tokens": deployTokensMigration,
+      "062_resource_runtime_log_archives": resourceRuntimeLogArchivesMigration,
+      "063_scheduled_runtime_prune_policies": scheduledRuntimePrunePoliciesMigration,
+      "064_audit_event_legal_holds": auditEventLegalHoldsMigration,
+      "065_audit_event_archives": auditEventArchivesMigration,
+      "066_domain_event_stream_records": domainEventStreamRecordsMigration,
+      "067_retention_defaults": retentionDefaultsMigration,
     };
   }
 }

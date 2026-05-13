@@ -1,6 +1,7 @@
 import {
   BootstrapServerProxyCommand,
   CheckServerDeleteSafetyQuery,
+  ConfigureScheduledRuntimePrunePolicyCommand,
   ConfigureServerCredentialCommand,
   ConfigureServerEdgeProxyCommand,
   CreateSshCredentialCommand,
@@ -8,14 +9,19 @@ import {
   DeleteServerCommand,
   DeleteSshCredentialCommand,
   InspectServerCapacityQuery,
+  ListScheduledRuntimePrunePoliciesQuery,
   ListServersQuery,
   ListSshCredentialsQuery,
   OpenTerminalSessionCommand,
+  PruneServerCapacityCommand,
   RegisterServerCommand,
   RenameServerCommand,
   RotateSshCredentialCommand,
+  runtimeTargetPruneCategories,
+  ShowScheduledRuntimePrunePolicyQuery,
   ShowServerQuery,
   ShowSshCredentialQuery,
+  scheduledRuntimePrunePolicyScopeSchema,
   TestServerConnectivityCommand,
 } from "@appaloft/application";
 import { deploymentTargetCredentialKinds, edgeProxyKinds, targetKinds } from "@appaloft/core";
@@ -54,6 +60,15 @@ const serverIdArg = Args.text({ name: "serverId" });
 const credentialIdArg = Args.text({ name: "credentialId" });
 const rowsOption = Options.text("rows").pipe(Options.withDefault("24"));
 const colsOption = Options.text("cols").pipe(Options.withDefault("80"));
+const scheduledRuntimePrunePolicyScopes = scheduledRuntimePrunePolicyScopeSchema.options;
+const policyIdArg = Args.text({ name: "policyId" });
+const policyIdOption = Options.text("policy-id").pipe(Options.optional);
+const policyVersionOption = Options.text("version").pipe(Options.optional);
+const policyScopeOption = Options.choice("scope", scheduledRuntimePrunePolicyScopes);
+const optionalPolicyScopeOption = Options.choice("scope", scheduledRuntimePrunePolicyScopes).pipe(
+  Options.optional,
+);
+const optionalServerIdOption = Options.text("server-id").pipe(Options.optional);
 
 const registerCommand = EffectCommand.make(
   "register",
@@ -331,9 +346,110 @@ const capacityInspectCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCapacityInspect));
 
+const capacityPruneCommand = EffectCommand.make(
+  "prune",
+  {
+    serverId: serverIdArg,
+    before: Options.text("before"),
+    category: Options.choice("category", runtimeTargetPruneCategories).pipe(Options.repeated),
+    dryRun: Options.boolean("dry-run").pipe(Options.withDefault(true)),
+  },
+  ({ serverId, before, category, dryRun }) =>
+    runCommand(
+      PruneServerCapacityCommand.create({
+        serverId,
+        before,
+        categories: category.length > 0 ? [...category] : undefined,
+        dryRun,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCapacityPrune));
+
+const capacityPolicyConfigureCommand = EffectCommand.make(
+  "configure",
+  {
+    policyId: policyIdOption,
+    version: policyVersionOption,
+    scope: policyScopeOption,
+    serverId: optionalServerIdOption,
+    retentionDays: Options.text("retention-days"),
+    destructive: Options.boolean("destructive").pipe(Options.withDefault(false)),
+    category: Options.choice("category", runtimeTargetPruneCategories).pipe(Options.repeated),
+    retryOnFailure: Options.boolean("retry-on-failure").pipe(Options.withDefault(true)),
+    enabled: Options.boolean("enabled").pipe(Options.withDefault(true)),
+  },
+  ({
+    category,
+    destructive,
+    enabled,
+    policyId,
+    retentionDays,
+    retryOnFailure,
+    scope,
+    serverId,
+    version,
+  }) =>
+    runCommand(
+      ConfigureScheduledRuntimePrunePolicyCommand.create({
+        ...(optionalValue(policyId) ? { policyId: optionalValue(policyId) } : {}),
+        ...(optionalValue(version) ? { version: optionalValue(version) } : {}),
+        scope,
+        ...(optionalValue(serverId) ? { serverId: optionalValue(serverId) } : {}),
+        retentionDays: Number(retentionDays),
+        destructive,
+        categories: category.length > 0 ? [...category] : undefined,
+        retryOnFailure,
+        enabled,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCapacityPolicyConfigure));
+
+const capacityPolicyListCommand = EffectCommand.make(
+  "list",
+  {
+    serverId: optionalServerIdOption,
+    scope: optionalPolicyScopeOption,
+    enabledOnly: Options.boolean("enabled-only").pipe(Options.withDefault(false)),
+  },
+  ({ enabledOnly, scope, serverId }) =>
+    runQuery(
+      ListScheduledRuntimePrunePoliciesQuery.create({
+        ...(optionalValue(serverId) ? { serverId: optionalValue(serverId) } : {}),
+        ...(optionalValue(scope) ? { scope: optionalValue(scope) } : {}),
+        enabledOnly,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCapacityPolicyList));
+
+const capacityPolicyShowCommand = EffectCommand.make(
+  "show",
+  {
+    policyId: policyIdArg,
+  },
+  ({ policyId }) =>
+    runQuery(
+      ShowScheduledRuntimePrunePolicyQuery.create({
+        policyId,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCapacityPolicyShow));
+
+const capacityPolicyCommand = EffectCommand.make("policy").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.serverCapacityPolicy),
+  EffectCommand.withSubcommands([
+    capacityPolicyConfigureCommand,
+    capacityPolicyListCommand,
+    capacityPolicyShowCommand,
+  ]),
+);
+
 const capacityCommand = EffectCommand.make("capacity").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.serverCapacity),
-  EffectCommand.withSubcommands([capacityInspectCommand]),
+  EffectCommand.withSubcommands([
+    capacityInspectCommand,
+    capacityPruneCommand,
+    capacityPolicyCommand,
+  ]),
 );
 
 const proxyRepairCommand = EffectCommand.make(

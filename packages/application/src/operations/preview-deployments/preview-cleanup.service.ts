@@ -19,7 +19,9 @@ import {
   type PreviewEnvironmentCleaner,
   type PreviewEnvironmentCleanerResult,
   type PreviewEnvironmentRepository,
+  type ProcessAttemptRecorder,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 
 export interface CleanupPreviewEnvironmentInput {
@@ -64,6 +66,19 @@ function failurePhase(errorDetails: Record<string, unknown> | undefined): string
   return typeof errorDetails?.phase === "string" ? errorDetails.phase : "preview-cleanup-retry";
 }
 
+function cleanupProcessDedupeKey(input: {
+  previewEnvironmentId: string;
+  resourceId: string;
+  sourceBindingFingerprint: string;
+}): string {
+  return [
+    "preview-cleanup",
+    input.previewEnvironmentId,
+    input.resourceId,
+    input.sourceBindingFingerprint,
+  ].join(":");
+}
+
 @injectable()
 export class PreviewEnvironmentCleanupService {
   constructor(
@@ -77,6 +92,8 @@ export class PreviewEnvironmentCleanupService {
     private readonly clock: Clock,
     @inject(tokens.idGenerator)
     private readonly idGenerator: IdGenerator,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async cleanup(
@@ -126,11 +143,19 @@ export class PreviewEnvironmentCleanupService {
       const phase = failurePhase(cleanerResult.error.details);
       const retryable = cleanerResult.error.retryable;
       const retryAt = retryable ? nextRetryAt(attemptedAt) : undefined;
-      await this.previewCleanupAttemptRecorder.record(repositoryContext, {
-        attemptId,
+      const stateDetails = {
         previewEnvironmentId: state.id.value,
         resourceId: state.resourceId.value,
         sourceBindingFingerprint: state.source.sourceBindingFingerprint.value,
+        provider: state.provider.value,
+        repositoryFullName: state.source.repositoryFullName.value,
+        pullRequestNumber: state.source.pullRequestNumber.value,
+      };
+      await this.previewCleanupAttemptRecorder.record(repositoryContext, {
+        attemptId,
+        previewEnvironmentId: stateDetails.previewEnvironmentId,
+        resourceId: stateDetails.resourceId,
+        sourceBindingFingerprint: stateDetails.sourceBindingFingerprint,
         owner: context.actor?.id ?? context.requestId,
         status: retryable ? "retry-scheduled" : "failed",
         phase,
@@ -139,6 +164,27 @@ export class PreviewEnvironmentCleanupService {
         errorCode: cleanerResult.error.code,
         retryable,
         ...(retryAt ? { nextRetryAt: retryAt } : {}),
+      });
+      await this.processAttemptRecorder.record(repositoryContext, {
+        id: attemptId,
+        kind: "system",
+        status: retryable ? "retry-scheduled" : "failed",
+        operationKey: "preview-environments.delete",
+        dedupeKey: cleanupProcessDedupeKey(stateDetails),
+        correlationId: context.requestId,
+        requestId: context.requestId,
+        phase,
+        step: "cleanup-failed",
+        resourceId: stateDetails.resourceId,
+        startedAt: attemptedAt,
+        updatedAt: attemptedAt,
+        ...(retryable ? {} : { finishedAt: attemptedAt }),
+        errorCode: cleanerResult.error.code,
+        errorCategory: cleanerResult.error.category,
+        retriable: retryable,
+        ...(retryAt ? { nextEligibleAt: retryAt } : {}),
+        nextActions: retryable ? ["retry", "manual-review"] : ["manual-review"],
+        safeDetails: stateDetails,
       });
 
       return ok({
@@ -160,16 +206,47 @@ export class PreviewEnvironmentCleanupService {
       });
     }
 
-    await this.previewCleanupAttemptRecorder.record(repositoryContext, {
-      attemptId,
+    const cleanupDetails = {
       previewEnvironmentId: state.id.value,
       resourceId: state.resourceId.value,
       sourceBindingFingerprint: state.source.sourceBindingFingerprint.value,
+      provider: state.provider.value,
+      repositoryFullName: state.source.repositoryFullName.value,
+      pullRequestNumber: state.source.pullRequestNumber.value,
+      cleanedRuntime: cleanerResult.value.cleanedRuntime,
+      removedRoute: cleanerResult.value.removedRoute,
+      removedSourceLink: cleanerResult.value.removedSourceLink,
+      removedProviderMetadata: cleanerResult.value.removedProviderMetadata,
+      updatedFeedback: cleanerResult.value.updatedFeedback,
+    };
+
+    await this.previewCleanupAttemptRecorder.record(repositoryContext, {
+      attemptId,
+      previewEnvironmentId: cleanupDetails.previewEnvironmentId,
+      resourceId: cleanupDetails.resourceId,
+      sourceBindingFingerprint: cleanupDetails.sourceBindingFingerprint,
       owner: context.actor?.id ?? context.requestId,
       status: "succeeded",
       phase: "preview-cleanup",
       attemptedAt,
       updatedAt: attemptedAt,
+    });
+    await this.processAttemptRecorder.record(repositoryContext, {
+      id: attemptId,
+      kind: "system",
+      status: "succeeded",
+      operationKey: "preview-environments.delete",
+      dedupeKey: cleanupProcessDedupeKey(cleanupDetails),
+      correlationId: context.requestId,
+      requestId: context.requestId,
+      phase: "preview-cleanup",
+      step: "cleanup-completed",
+      resourceId: cleanupDetails.resourceId,
+      startedAt: attemptedAt,
+      updatedAt: attemptedAt,
+      finishedAt: attemptedAt,
+      nextActions: ["no-action"],
+      safeDetails: cleanupDetails,
     });
 
     return ok({

@@ -62,6 +62,26 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[TS-SDK-DOCS-001] TypeScript SDK help resolves to the SDK reference", () => {
+    const topic = publicDocsHelpTopics["typescript-sdk.operation-client"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/reference/typescript-sdk/#typescript-sdk-operation-client",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/reference/typescript-sdk/#typescript-sdk-operation-client",
+    );
+    expect(topic.surfaces).toEqual(expect.arrayContaining(["http-api", "mcp"]));
+    expect(topic.aliases).toEqual(expect.arrayContaining(["typescript sdk", "typed errors"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/decisions/ADR-046-typescript-sdk-interface-parity.md",
+        "docs/specs/052-typescript-sdk-interface-parity/spec.md",
+        "docs/testing/typescript-sdk-interface-parity-test-matrix.md",
+      ]),
+    );
+  });
+
   test("[PUB-DOCS-016] traceable topics point to spec files and product surfaces", () => {
     const defaultAccessTopic = publicDocsHelpTopics["default-access.policy"];
 
@@ -263,6 +283,26 @@ describe("public docs help registry", () => {
     expect(
       knowledge.remedies?.some((remedy) => remedy.command?.join(" ").includes("work list")),
     ).toBe(true);
+  });
+
+  test("[RT-CAP-SCHED-007][PUB-DOCS-005] scheduled runtime prune policy help resolves to diagnostics docs", () => {
+    const topic = publicDocsHelpTopics["diagnostics.scheduled-runtime-prune-policy"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/observe/diagnostics/#scheduled-runtime-prune-policy",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/observe/diagnostics/#scheduled-runtime-prune-policy",
+    );
+    expect(topic.relatedOperation).toBe("scheduled-runtime-prune-policies.configure");
+    expect(topic.surfaces).toEqual(expect.arrayContaining(["cli", "http-api", "mcp"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/decisions/ADR-055-scheduled-runtime-prune-automation.md",
+        "docs/specs/061-scheduled-runtime-prune-automation/spec.md",
+        "docs/testing/runtime-target-capacity-test-matrix.md",
+      ]),
+    );
   });
 
   test("[ERROR-KNOWLEDGE-004] public error guides point to existing agent-readable assets", () => {

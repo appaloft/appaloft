@@ -30,6 +30,7 @@ import {
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  type Result,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
@@ -58,6 +59,9 @@ import {
   type DomainOwnershipVerificationResult,
   type DomainOwnershipVerifier,
   type ExecutionContext,
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
+  type RepositoryContext,
   toRepositoryContext,
 } from "../src";
 import {
@@ -117,7 +121,39 @@ class StaticDomainOwnershipVerifier implements DomainOwnershipVerifier {
   }
 }
 
-async function seedCertificateContext(input?: { tlsMode?: "auto" | "disabled" }) {
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
+  }
+}
+
+class FailingRevokeCertificateProvider extends FakeCertificateProvider {
+  async revoke(
+    context: Parameters<FakeCertificateProvider["revoke"]>[0],
+    input: Parameters<FakeCertificateProvider["revoke"]>[1],
+  ): ReturnType<FakeCertificateProvider["revoke"]> {
+    void context;
+    this.revokeInputs.push(input);
+    return Promise.resolve(
+      err(
+        domainError.certificateProviderUnavailable("provider raw secret token output", {
+          phase: "provider-request",
+        }),
+      ),
+    );
+  }
+}
+
+async function seedCertificateContext(input?: {
+  processAttemptRecorder?: ProcessAttemptRecorder;
+  tlsMode?: "auto" | "disabled";
+}) {
   const context = createTestContext();
   const repositoryContext = toRepositoryContext(context);
   const clock = new FixedClock("2026-01-01T00:00:00.000Z");
@@ -222,6 +258,7 @@ async function seedCertificateContext(input?: { tlsMode?: "auto" | "disabled" })
     idGenerator,
     eventBus,
     logger,
+    input?.processAttemptRecorder,
   );
 
   const created = await createDomainBindingUseCase.execute(context, {
@@ -248,9 +285,11 @@ async function seedCertificateContext(input?: { tlsMode?: "auto" | "disabled" })
     domainBindings,
     domainBindingId,
     eventBus,
+    idGenerator,
     clock,
     issueUseCase,
     logger,
+    processAttemptRecorder: input?.processAttemptRecorder,
     readModel: new MemoryCertificateReadModel(certificates),
     repositoryContext,
   };
@@ -297,8 +336,9 @@ async function recordRetryableProviderFailure(
 
 describe("IssueOrRenewCertificateUseCase", () => {
   test("[ROUTE-TLS-CMD-011][ROUTE-TLS-CMD-012] requests issuance with the injected default provider", async () => {
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
     const { certificates, context, domainBindingId, eventBus, issueUseCase, repositoryContext } =
-      await seedCertificateContext();
+      await seedCertificateContext({ processAttemptRecorder });
 
     const result = await issueUseCase.execute(context, {
       domainBindingId,
@@ -335,6 +375,34 @@ describe("IssueOrRenewCertificateUseCase", () => {
       requestedAt: "2026-01-01T00:00:00.000Z",
       correlationId: "req_certificate_issue_test",
     });
+    expect(processAttemptRecorder.records).toEqual([
+      {
+        id: "cat_0004",
+        kind: "certificate",
+        status: "pending",
+        operationKey: "certificates.issue-or-renew",
+        dedupeKey: `certificate:${domainBindingId}:cat_0004`,
+        correlationId: "req_certificate_issue_test",
+        requestId: "req_certificate_issue_test",
+        phase: "certificate-request",
+        step: "requested",
+        projectId: "prj_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        domainBindingId,
+        certificateId: "crt_0003",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          providerKey: "acme",
+          challengeType: "http-01",
+          reason: "issue",
+          domainName: "secure.example.com",
+          certificateSource: "managed",
+        },
+      },
+    ]);
   });
 
   test("[ROUTE-TLS-READMODEL-004] lists the accepted certificate request", async () => {
@@ -449,6 +517,7 @@ describe("IssueOrRenewCertificateUseCase", () => {
   });
 
   test("[ROUTE-TLS-EVT-005][ROUTE-TLS-READMODEL-005] handles certificate-requested success as an issued certificate", async () => {
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
     const {
       certificates,
       clock,
@@ -458,7 +527,7 @@ describe("IssueOrRenewCertificateUseCase", () => {
       issueUseCase,
       logger,
       readModel,
-    } = await seedCertificateContext();
+    } = await seedCertificateContext({ processAttemptRecorder });
     const issuedAt = "2026-01-01T00:01:00.000Z";
     const expiresAt = "2026-04-01T00:01:00.000Z";
 
@@ -494,6 +563,7 @@ describe("IssueOrRenewCertificateUseCase", () => {
       clock,
       eventBus,
       logger,
+      processAttemptRecorder,
     );
 
     const handled = await handler.handle(context, requestedEvent);
@@ -532,9 +602,56 @@ describe("IssueOrRenewCertificateUseCase", () => {
         }),
       }),
     ]);
+    expect(processAttemptRecorder.records).toEqual([
+      expect.objectContaining({
+        id: "cat_0004",
+        kind: "certificate",
+        status: "pending",
+        operationKey: "certificates.issue-or-renew",
+        phase: "certificate-request",
+        step: "requested",
+        domainBindingId,
+        certificateId: "crt_0003",
+        nextActions: ["no-action"],
+      }),
+      expect.objectContaining({
+        id: "cat_0004",
+        kind: "certificate",
+        status: "running",
+        operationKey: "certificates.issue-or-renew",
+        phase: "provider-request",
+        step: "issuing",
+        domainBindingId,
+        certificateId: "crt_0003",
+        nextActions: ["no-action"],
+      }),
+      expect.objectContaining({
+        id: "cat_0004",
+        kind: "certificate",
+        status: "succeeded",
+        operationKey: "certificates.issue-or-renew",
+        phase: "certificate-issued",
+        step: "issued",
+        domainBindingId,
+        certificateId: "crt_0003",
+        finishedAt: issuedAt,
+        retriable: false,
+        nextActions: ["no-action"],
+        safeDetails: expect.objectContaining({
+          providerKey: "acme",
+          challengeType: "http-01",
+          reason: "issue",
+          domainName: "secure.example.com",
+          certificateSource: "managed",
+          expiresAt,
+        }),
+      }),
+    ]);
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("PRIVATE KEY");
   });
 
   test("[ROUTE-TLS-EVT-006][ROUTE-TLS-READMODEL-005] records retryable provider failure from certificate-requested", async () => {
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
     const {
       certificates,
       clock,
@@ -544,7 +661,7 @@ describe("IssueOrRenewCertificateUseCase", () => {
       issueUseCase,
       logger,
       readModel,
-    } = await seedCertificateContext();
+    } = await seedCertificateContext({ processAttemptRecorder });
 
     const requested = await issueUseCase.execute(context, {
       domainBindingId,
@@ -575,6 +692,7 @@ describe("IssueOrRenewCertificateUseCase", () => {
       clock,
       eventBus,
       logger,
+      processAttemptRecorder,
     );
 
     const handled = await handler.handle(context, requestedEvent);
@@ -612,9 +730,56 @@ describe("IssueOrRenewCertificateUseCase", () => {
         }),
       }),
     ]);
+    expect(processAttemptRecorder.records).toEqual([
+      expect.objectContaining({
+        id: "cat_0004",
+        kind: "certificate",
+        status: "pending",
+        operationKey: "certificates.issue-or-renew",
+        phase: "certificate-request",
+        step: "requested",
+        domainBindingId,
+        certificateId: "crt_0003",
+      }),
+      expect.objectContaining({
+        id: "cat_0004",
+        kind: "certificate",
+        status: "running",
+        operationKey: "certificates.issue-or-renew",
+        phase: "provider-request",
+        step: "issuing",
+        domainBindingId,
+        certificateId: "crt_0003",
+      }),
+      expect.objectContaining({
+        id: "cat_0004",
+        kind: "certificate",
+        status: "retry-scheduled",
+        operationKey: "certificates.issue-or-renew",
+        phase: "provider-request",
+        step: "retry_scheduled",
+        domainBindingId,
+        certificateId: "crt_0003",
+        finishedAt: "2026-01-01T00:00:00.000Z",
+        errorCode: "certificate_provider_unavailable",
+        errorCategory: "async-processing",
+        retriable: true,
+        nextActions: ["diagnostic", "manual-review"],
+        safeDetails: expect.objectContaining({
+          providerKey: "acme",
+          challengeType: "http-01",
+          reason: "issue",
+          domainName: "secure.example.com",
+          certificateSource: "managed",
+        }),
+      }),
+    ]);
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain(
+      "Certificate provider is unavailable",
+    );
   });
 
-  test("[ROUTE-TLS-CMD-025][ROUTE-TLS-CMD-026] retries a retry-scheduled provider-issued certificate", async () => {
+  test("[ROUTE-TLS-CMD-025][ROUTE-TLS-CMD-026][PROC-DELIVERY-001] retries a retry-scheduled provider-issued certificate through the issue/renew projection path", async () => {
     const seed = await seedCertificateContext();
     const failed = await recordRetryableProviderFailure(seed);
     const useCase = new RetryCertificateUseCase(seed.certificates, seed.issueUseCase);
@@ -666,6 +831,7 @@ describe("IssueOrRenewCertificateUseCase", () => {
       }),
     );
     const secretStore = new FakeCertificateSecretStore();
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
     const handler = new IssueCertificateOnCertificateRequestedHandler(
       seed.certificates,
       provider,
@@ -681,8 +847,10 @@ describe("IssueOrRenewCertificateUseCase", () => {
       provider,
       secretStore,
       seed.clock,
+      seed.idGenerator,
       seed.eventBus,
       seed.logger,
+      processAttemptRecorder,
     );
     const revoked = await revokeUseCase.execute(seed.context, {
       certificateId: "crt_0003",
@@ -704,12 +872,151 @@ describe("IssueOrRenewCertificateUseCase", () => {
         reason: "revoked",
       }),
     ]);
+    expect(processAttemptRecorder.records).toEqual([
+      expect.objectContaining({
+        id: "cat_0005",
+        kind: "certificate",
+        status: "running",
+        operationKey: "certificates.revoke",
+        dedupeKey: `certificate:${seed.domainBindingId}:cat_0005`,
+        correlationId: "req_certificate_issue_test",
+        requestId: "req_certificate_issue_test",
+        phase: "provider-request",
+        step: "revoking",
+        domainBindingId: seed.domainBindingId,
+        certificateId: "crt_0003",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: expect.objectContaining({
+          providerKey: "acme",
+          reason: "operator-requested",
+          domainName: "secure.example.com",
+          certificateSource: "managed",
+          fingerprint: "sha256:managed",
+        }),
+      }),
+      expect.objectContaining({
+        id: "cat_0005",
+        kind: "certificate",
+        status: "succeeded",
+        operationKey: "certificates.revoke",
+        dedupeKey: `certificate:${seed.domainBindingId}:cat_0005`,
+        phase: "certificate-revoke",
+        step: "revoked",
+        domainBindingId: seed.domainBindingId,
+        certificateId: "crt_0003",
+        finishedAt: "2026-01-01T00:00:00.000Z",
+        retriable: false,
+        nextActions: ["no-action"],
+        safeDetails: expect.objectContaining({
+          providerKey: "acme",
+          reason: "operator-requested",
+          domainName: "secure.example.com",
+          certificateSource: "managed",
+          fingerprint: "sha256:managed",
+        }),
+      }),
+    ]);
     const persisted = await seed.certificates.findOne(
       seed.repositoryContext,
       CertificateByIdSpec.create(CertificateId.rehydrate("crt_0003")),
     );
     expect(persisted?.toState().status.value).toBe("revoked");
     expect(eventsByType(seed.eventBus.events, "certificate-revoked")).toHaveLength(1);
+  });
+
+  test("[ROUTE-TLS-CMD-027][PROC-DELIVERY-004] records safe process-attempt failure when managed certificate revocation fails", async () => {
+    const seed = await seedCertificateContext();
+    const requested = await seed.issueUseCase.execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      reason: "issue",
+    });
+    expect(requested.isOk()).toBe(true);
+    const requestedEvent = eventsByType(seed.eventBus.events, "certificate-requested")[0];
+    if (!requestedEvent) {
+      throw new Error("certificate-requested event was not published");
+    }
+
+    const issueProvider = new FakeCertificateProvider(
+      ok({
+        certificateId: "crt_0003",
+        attemptId: "cat_0004",
+        domainBindingId: seed.domainBindingId,
+        domainName: "secure.example.com",
+        providerKey: "acme",
+        issuedAt: "2026-01-01T00:01:00.000Z",
+        expiresAt: "2026-04-01T00:01:00.000Z",
+        fingerprint: "sha256:managed",
+        certificatePem: "-----BEGIN CERTIFICATE-----\nmanaged\n-----END CERTIFICATE-----",
+        privateKeyPem: "-----BEGIN PRIVATE KEY-----\nmanaged\n-----END PRIVATE KEY-----",
+      }),
+    );
+    const secretStore = new FakeCertificateSecretStore();
+    const handler = new IssueCertificateOnCertificateRequestedHandler(
+      seed.certificates,
+      issueProvider,
+      secretStore,
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+    expect((await handler.handle(seed.context, requestedEvent)).isOk()).toBe(true);
+
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
+    const revokeProvider = new FailingRevokeCertificateProvider(
+      err(domainError.certificateProviderUnavailable("unused", { phase: "provider-request" })),
+    );
+    const revokeUseCase = new RevokeCertificateUseCase(
+      seed.certificates,
+      revokeProvider,
+      secretStore,
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+      processAttemptRecorder,
+    );
+    const revoked = await revokeUseCase.execute(seed.context, {
+      certificateId: "crt_0003",
+      reason: "operator-requested",
+    });
+
+    expect(revoked.isErr()).toBe(true);
+    expect(revoked._unsafeUnwrapErr().code).toBe("certificate_provider_unavailable");
+    expect(secretStore.deactivated).toHaveLength(0);
+    expect(processAttemptRecorder.records.map((record) => record.status)).toEqual([
+      "running",
+      "failed",
+    ]);
+    expect(processAttemptRecorder.records[1]).toMatchObject({
+      id: "cat_0005",
+      kind: "certificate",
+      status: "failed",
+      operationKey: "certificates.revoke",
+      dedupeKey: `certificate:${seed.domainBindingId}:cat_0005`,
+      phase: "provider-request",
+      step: "failed",
+      domainBindingId: seed.domainBindingId,
+      certificateId: "crt_0003",
+      errorCode: "certificate_provider_unavailable",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: expect.objectContaining({
+        providerKey: "acme",
+        reason: "operator-requested",
+        domainName: "secure.example.com",
+        certificateSource: "managed",
+        fingerprint: "sha256:managed",
+      }),
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("secret token output");
+    const persisted = await seed.certificates.findOne(
+      seed.repositoryContext,
+      CertificateByIdSpec.create(CertificateId.rehydrate("crt_0003")),
+    );
+    expect(persisted?.toState().status.value).toBe("active");
   });
 
   test("[ROUTE-TLS-CMD-029][ROUTE-TLS-CMD-030][ROUTE-TLS-EVT-016] deletes only non-active certificate lifecycle state", async () => {
@@ -767,6 +1074,7 @@ describe("IssueOrRenewCertificateUseCase", () => {
       provider,
       secretStore,
       seed.clock,
+      seed.idGenerator,
       seed.eventBus,
       seed.logger,
     );

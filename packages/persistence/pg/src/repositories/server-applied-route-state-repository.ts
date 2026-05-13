@@ -1,6 +1,11 @@
 import {
   type MarkServerAppliedRouteAppliedSpec,
   type MarkServerAppliedRouteFailedSpec,
+  type OperatorWorkNextAction,
+  type OperatorWorkStatus,
+  type RepositoryContext,
+  type RouteRealizationWorkReadModel,
+  type RouteRealizationWorkSummary,
   type ServerAppliedRouteAppliedState,
   type ServerAppliedRouteDesiredStateDomain,
   type ServerAppliedRouteDesiredStateRecord,
@@ -652,5 +657,95 @@ export class PgServerAppliedRouteStateRepository implements ServerAppliedRouteSt
     } catch (error) {
       return err(persistenceError("Server-applied route state sweep could not be removed", error));
     }
+  }
+}
+
+function routeStatusToOperatorWorkStatus(status: string): OperatorWorkStatus {
+  switch (status) {
+    case "desired":
+      return "pending";
+    case "applied":
+      return "succeeded";
+    case "failed":
+      return "failed";
+    default:
+      return "unknown";
+  }
+}
+
+function routeNextActions(status: OperatorWorkStatus): OperatorWorkNextAction[] {
+  return status === "failed" ? ["diagnostic", "manual-review"] : ["no-action"];
+}
+
+function routeRowToWorkSummary(row: ServerAppliedRouteStateRow): RouteRealizationWorkSummary {
+  const record = mapRow(row);
+  const status = routeStatusToOperatorWorkStatus(record.status);
+  const failure = record.lastFailure;
+  const applied = record.lastApplied;
+  const deploymentId = failure?.deploymentId ?? applied?.deploymentId;
+  const providerKey = failure?.providerKey ?? applied?.providerKey;
+  const proxyKind = failure?.proxyKind ?? applied?.proxyKind;
+
+  return {
+    id: record.routeSetId,
+    status,
+    operationKey: "deployments.create",
+    phase: failure?.phase ?? "route-realization",
+    step: record.status,
+    projectId: record.projectId,
+    resourceId: record.resourceId,
+    ...(deploymentId ? { deploymentId } : {}),
+    serverId: record.serverId,
+    updatedAt: failure?.failedAt ?? applied?.appliedAt ?? record.updatedAt,
+    ...(status === "failed" && failure?.failedAt ? { finishedAt: failure.failedAt } : {}),
+    ...(status === "succeeded" && applied?.appliedAt ? { finishedAt: applied.appliedAt } : {}),
+    ...(failure?.errorCode ? { errorCode: failure.errorCode } : {}),
+    ...(failure?.errorCode ? { errorCategory: "async-processing" } : {}),
+    ...(failure?.retryable === undefined ? {} : { retriable: failure.retryable }),
+    nextActions: routeNextActions(status),
+    safeDetails: {
+      routeSetId: record.routeSetId,
+      domainCount: record.domains.length,
+      ...(record.destinationId ? { destinationId: record.destinationId } : {}),
+      ...(record.sourceFingerprint ? { sourceFingerprint: record.sourceFingerprint } : {}),
+      ...(providerKey ? { providerKey } : {}),
+      ...(proxyKind ? { proxyKind } : {}),
+    },
+  };
+}
+
+export class PgServerAppliedRouteRealizationWorkReadModel implements RouteRealizationWorkReadModel {
+  constructor(private readonly db: Kysely<Database>) {}
+
+  async list(
+    _context: RepositoryContext,
+    input?: {
+      resourceId?: string;
+      serverId?: string;
+      deploymentId?: string;
+      limit?: number;
+    },
+  ): Promise<RouteRealizationWorkSummary[]> {
+    let query = this.db
+      .selectFrom("server_applied_route_states")
+      .selectAll()
+      .orderBy("updated_at", "desc");
+
+    if (input?.resourceId) {
+      query = query.where("resource_id", "=", input.resourceId);
+    }
+
+    if (input?.serverId) {
+      query = query.where("server_id", "=", input.serverId);
+    }
+
+    const rows = await query.limit(input?.limit ?? 50).execute();
+    const summaries = rows.map(routeRowToWorkSummary);
+
+    if (!input?.deploymentId) {
+      return summaries;
+    }
+
+    return summaries.filter((summary) => summary.deploymentId === input.deploymentId);
   }
 }

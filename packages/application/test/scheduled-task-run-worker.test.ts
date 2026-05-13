@@ -26,6 +26,12 @@ import { FixedClock, SequenceIdGenerator } from "@appaloft/testkit";
 
 import { createExecutionContext, type RepositoryContext } from "../src";
 import {
+  type ProcessAttemptClaimer,
+  type ProcessAttemptClaimInput,
+  type ProcessAttemptClaimResult,
+  type ProcessAttemptCompleter,
+  type ProcessAttemptCompletionInput,
+  type ProcessAttemptCompletionResult,
   type ScheduledTaskDefinitionRepository,
   type ScheduledTaskRunAttemptRepository,
   type ScheduledTaskRunLogRecord,
@@ -134,6 +140,46 @@ class RecordingScheduledTaskRunLogRecorder implements ScheduledTaskRunLogRecorde
   }
 }
 
+class RecordingProcessAttemptClaimer implements ProcessAttemptClaimer {
+  readonly claims: ProcessAttemptClaimInput[] = [];
+
+  constructor(private readonly result: ProcessAttemptClaimResult) {}
+
+  async claimDue(
+    _context: RepositoryContext,
+    input: ProcessAttemptClaimInput,
+  ): ReturnType<ProcessAttemptClaimer["claimDue"]> {
+    this.claims.push(input);
+    return Promise.resolve(ok(this.result));
+  }
+}
+
+class RecordingProcessAttemptCompleter implements ProcessAttemptCompleter {
+  readonly completions: ProcessAttemptCompletionInput[] = [];
+
+  constructor(
+    private readonly result: ProcessAttemptCompletionResult = {
+      status: "completed",
+      attempt: {
+        id: "wrk_scheduled_task_run",
+        kind: "runtime-maintenance",
+        status: "succeeded",
+        operationKey: "scheduled-task-runs.run-now",
+        updatedAt: "2026-05-05T00:20:05.000Z",
+        nextActions: ["no-action"],
+      },
+    },
+  ) {}
+
+  async complete(
+    _context: RepositoryContext,
+    input: ProcessAttemptCompletionInput,
+  ): ReturnType<ProcessAttemptCompleter["complete"]> {
+    this.completions.push(input);
+    return Promise.resolve(ok(this.result));
+  }
+}
+
 function taskFixture(): ScheduledTaskDefinition {
   return ScheduledTaskDefinition.create({
     id: ScheduledTaskId.rehydrate("tsk_daily_migration"),
@@ -227,5 +273,149 @@ describe("ScheduledTaskRunWorker", () => {
         finishedAt: "2026-05-05T00:20:05.000Z",
       },
     });
+  });
+
+  test("[SCHED-TASK-WORKER-001] [PROC-DELIVERY-002] [PROC-DELIVERY-004] claims and completes durable process attempts when provided", async () => {
+    const context = createExecutionContext({
+      requestId: "req_scheduled_task_run_worker_test",
+      entrypoint: "system",
+    });
+    const runs = new MemoryScheduledTaskRunAttemptRepository(runFixture());
+    const runtime = new RecordingScheduledTaskRuntimePort({
+      status: "failed",
+      exitCode: 1,
+      startedAt: "2026-05-05T00:20:00.000Z",
+      finishedAt: "2026-05-05T00:20:05.000Z",
+      failureSummary: "temporary network timeout",
+      logs: [],
+    });
+    const logs = new RecordingScheduledTaskRunLogRecorder();
+    const claimer = new RecordingProcessAttemptClaimer({
+      status: "claimed",
+      attempt: {
+        id: "wrk_scheduled_task_run",
+        kind: "runtime-maintenance",
+        status: "running",
+        operationKey: "scheduled-task-runs.run-now",
+        updatedAt: "2026-05-05T00:20:00.000Z",
+        nextActions: ["no-action"],
+      },
+    });
+    const completer = new RecordingProcessAttemptCompleter();
+    const worker = new ScheduledTaskRunWorker(
+      runs,
+      new StaticScheduledTaskDefinitionRepository(taskFixture()),
+      runtime,
+      logs,
+      new SequenceIdGenerator(),
+      new FixedClock("2026-05-05T00:20:00.000Z"),
+      claimer,
+      completer,
+    );
+
+    const result = await worker.run(context, {
+      runId: "str_manual",
+      taskId: "tsk_daily_migration",
+      resourceId: "res_api",
+      processAttemptId: "wrk_scheduled_task_run",
+      workerId: "worker_scheduled_task",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(claimer.claims).toEqual([
+      {
+        attemptId: "wrk_scheduled_task_run",
+        workerId: "worker_scheduled_task",
+        claimedAt: "2026-05-05T00:20:00.000Z",
+        safeDetails: {
+          runId: "str_manual",
+          taskId: "tsk_daily_migration",
+          resourceId: "res_api",
+        },
+      },
+    ]);
+    expect(completer.completions).toEqual([
+      {
+        attemptId: "wrk_scheduled_task_run",
+        status: "retry-scheduled",
+        completedAt: "2026-05-05T00:20:05.000Z",
+        phase: "scheduled-task-run",
+        step: "runtime-execution",
+        errorCode: "scheduled_task_run_failed",
+        errorCategory: "async-processing",
+        retriable: true,
+        nextEligibleAt: "2026-05-05T00:20:00.000Z",
+        nextActions: ["retry", "manual-review"],
+        safeDetails: {
+          runId: "str_manual",
+          taskId: "tsk_daily_migration",
+          resourceId: "res_api",
+          exitCode: 1,
+        },
+      },
+    ]);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      run: {
+        status: "failed",
+        failureSummary: "temporary network timeout",
+      },
+    });
+  });
+
+  test("[SCHED-TASK-WORKER-001] [PROC-DELIVERY-002] does not execute runtime work when durable claim is refused", async () => {
+    const context = createExecutionContext({
+      requestId: "req_scheduled_task_run_worker_test",
+      entrypoint: "system",
+    });
+    const runs = new MemoryScheduledTaskRunAttemptRepository(runFixture());
+    const runtime = new RecordingScheduledTaskRuntimePort({
+      status: "succeeded",
+      exitCode: 0,
+      startedAt: "2026-05-05T00:20:00.000Z",
+      finishedAt: "2026-05-05T00:20:05.000Z",
+      logs: [],
+    });
+    const claimer = new RecordingProcessAttemptClaimer({
+      status: "already-claimed",
+      attempt: {
+        id: "wrk_scheduled_task_run",
+        kind: "runtime-maintenance",
+        status: "running",
+        operationKey: "scheduled-task-runs.run-now",
+        updatedAt: "2026-05-05T00:19:00.000Z",
+        nextActions: ["no-action"],
+      },
+    });
+    const worker = new ScheduledTaskRunWorker(
+      runs,
+      new StaticScheduledTaskDefinitionRepository(taskFixture()),
+      runtime,
+      new RecordingScheduledTaskRunLogRecorder(),
+      new SequenceIdGenerator(),
+      new FixedClock("2026-05-05T00:20:00.000Z"),
+      claimer,
+      new RecordingProcessAttemptCompleter(),
+    );
+
+    const result = await worker.run(context, {
+      runId: "str_manual",
+      taskId: "tsk_daily_migration",
+      resourceId: "res_api",
+      processAttemptId: "wrk_scheduled_task_run",
+      workerId: "worker_scheduled_task",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "conflict",
+      details: {
+        phase: "scheduled-task-run-worker",
+        runId: "str_manual",
+        processAttemptId: "wrk_scheduled_task_run",
+        claimStatus: "already-claimed",
+      },
+    });
+    expect(runtime.requests).toEqual([]);
+    expect(runs.states).toEqual([]);
   });
 });

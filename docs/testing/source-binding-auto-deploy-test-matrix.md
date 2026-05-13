@@ -43,7 +43,7 @@ catalog entry and schemas.
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `SRC-AUTO-EVENT-001` | Verified push event matches one enabled policy. | One deployment is accepted through existing deployment admission. | `packages/application/test/source-events.test.ts` | Passing |
+| `SRC-AUTO-EVENT-001` | Verified push event matches one enabled policy. | One deployment is accepted through existing deployment admission, and accepted/dispatch outcomes are projected to operator-visible process-attempt rows with safe source metadata. | `packages/application/test/source-events.test.ts` | Passing |
 | `SRC-AUTO-EVENT-002` | Provider redelivers same event. | Durable source-event dedupe prevents duplicate source-event records and duplicate deployment dispatch while read models report deduped status. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
 | `SRC-AUTO-EVENT-003` | Event ref does not match policy. | No deployment is created and read model reports ignored ref. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
 | `SRC-AUTO-EVENT-004` | Generic signed webhook has invalid signature. | Event rejects before policy matching; no deployment is created. | `packages/application/test/source-events.test.ts`; `packages/orpc/test/source-event-generic-signed.http.test.ts` | Passing |

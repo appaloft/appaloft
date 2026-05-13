@@ -41,10 +41,12 @@ import {
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
+  type ProcessAttemptRecorder,
   type ProjectRepository,
   type ResourceRepository,
   type ServerRepository,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDomainBindingCommandInput } from "./create-domain-binding.command";
@@ -56,6 +58,61 @@ function contextMismatch(message: string, details: Record<string, string>): Resu
       ...details,
     }),
   );
+}
+
+async function recordInitialDomainVerificationAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  logger: AppLogger;
+  requestId: string;
+  domainBindingId: string;
+  verificationAttemptId: string;
+  projectId: string;
+  resourceId: string;
+  serverId: string;
+  domainName: string;
+  proxyKind: string;
+  tlsMode: string;
+  certificatePolicy: string;
+  createdAt: string;
+  expectedTarget: string;
+  dnsExpectedTargets: string;
+}): Promise<void> {
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: input.verificationAttemptId,
+    kind: "route-realization",
+    status: "pending",
+    operationKey: "domain-bindings.create",
+    dedupeKey: `domain-binding-verification:${input.domainBindingId}:${input.verificationAttemptId}`,
+    correlationId: input.requestId,
+    requestId: input.requestId,
+    phase: "domain-verification",
+    step: "verification-requested",
+    projectId: input.projectId,
+    resourceId: input.resourceId,
+    serverId: input.serverId,
+    domainBindingId: input.domainBindingId,
+    startedAt: input.createdAt,
+    updatedAt: input.createdAt,
+    nextActions: ["no-action"],
+    safeDetails: {
+      domainName: input.domainName,
+      proxyKind: input.proxyKind,
+      tlsMode: input.tlsMode,
+      certificatePolicy: input.certificatePolicy,
+      expectedTarget: input.expectedTarget,
+      dnsExpectedTargets: input.dnsExpectedTargets,
+    },
+  });
+
+  if (result.isErr()) {
+    input.logger.warn("domain_binding_create.process_attempt_record_failed", {
+      requestId: input.requestId,
+      domainBindingId: input.domainBindingId,
+      verificationAttemptId: input.verificationAttemptId,
+      errorCode: result.error.code,
+    });
+  }
 }
 
 @injectable()
@@ -81,6 +138,8 @@ export class CreateDomainBindingUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
@@ -95,6 +154,7 @@ export class CreateDomainBindingUseCase {
       eventBus,
       idGenerator,
       logger,
+      processAttemptRecorder,
       projectRepository,
       resourceRepository,
       serverRepository,
@@ -310,9 +370,28 @@ export class CreateDomainBindingUseCase {
         domainBinding,
         UpsertDomainBindingSpec.fromDomainBinding(domainBinding),
       );
+      const domainBindingState = domainBinding.toState();
+      await recordInitialDomainVerificationAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        logger,
+        requestId: context.requestId,
+        domainBindingId: domainBindingState.id.value,
+        verificationAttemptId: verificationAttemptId.value,
+        projectId: projectId.value,
+        resourceId: resourceId.value,
+        serverId: serverId.value,
+        domainName: domainName.value,
+        proxyKind: proxyKind.value,
+        tlsMode: tlsMode.value,
+        certificatePolicy: domainBindingState.certificatePolicy.value,
+        createdAt: createdAt.value,
+        expectedTarget: verificationExpectedTarget.value,
+        dnsExpectedTargets: dnsExpectedTarget.value,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, domainBinding, undefined);
 
-      return ok({ id: domainBinding.toState().id.value });
+      return ok({ id: domainBindingState.id.value });
     });
   }
 }

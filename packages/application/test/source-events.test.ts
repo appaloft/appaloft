@@ -2,6 +2,8 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
   type RepositoryContext,
   type SourceEventDeploymentDispatcher,
   type SourceEventDeploymentDispatchInput,
@@ -15,7 +17,7 @@ import {
   type SourceEventRecorder,
   type SourceEventShowInput,
 } from "@appaloft/application";
-import { ok } from "@appaloft/core";
+import { domainError, err, ok, type Result } from "@appaloft/core";
 import { FixedClock } from "@appaloft/testkit";
 
 import { createExecutionContext } from "../src";
@@ -166,6 +168,35 @@ class MemorySourceEventDeploymentDispatcher implements SourceEventDeploymentDisp
   }
 }
 
+class FailingSourceEventDeploymentDispatcher implements SourceEventDeploymentDispatcher {
+  readonly inputs: SourceEventDeploymentDispatchInput[] = [];
+
+  async dispatch(
+    _context: Parameters<SourceEventDeploymentDispatcher["dispatch"]>[0],
+    input: SourceEventDeploymentDispatchInput,
+  ): ReturnType<SourceEventDeploymentDispatcher["dispatch"]> {
+    this.inputs.push({ ...input });
+    return err(
+      domainError.provider("Deployment dispatch failed with secret token output", {
+        phase: "source-event-dispatch",
+        providerKey: "github",
+      }),
+    );
+  }
+}
+
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
+  }
+}
+
 function cloneRecord(record: SourceEventRecord): SourceEventRecord {
   return {
     ...record,
@@ -217,6 +248,7 @@ function createHarness(
   options: {
     policyCandidates?: SourceEventPolicyCandidate[];
     deploymentDispatcher?: SourceEventDeploymentDispatcher;
+    processAttemptRecorder?: ProcessAttemptRecorder;
   } = {},
 ) {
   const context = createExecutionContext({
@@ -238,6 +270,7 @@ function createHarness(
       new SequentialIdGenerator(),
       policyReader,
       options.deploymentDispatcher,
+      options.processAttemptRecorder,
     ),
     list: new ListSourceEventsQueryService(sourceEvents, clock),
     show: new ShowSourceEventQueryService(sourceEvents),
@@ -368,10 +401,12 @@ describe("source event application baseline", () => {
     );
   });
 
-  test("[SRC-AUTO-EVENT-001] dispatches matching source events through deployment admission", async () => {
+  test("[SRC-AUTO-EVENT-001] [PROC-DELIVERY-001] dispatches matching source events through deployment admission", async () => {
     const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher(["dep_1"]);
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
     const { context, ingest, sourceEvents } = createHarness({
       deploymentDispatcher,
+      processAttemptRecorder,
       policyCandidates: [
         {
           projectId: "prj_demo",
@@ -440,6 +475,151 @@ describe("source event application baseline", () => {
         },
       ],
     });
+    expect(processAttemptRecorder.records).toEqual([
+      {
+        id: "sevt_1",
+        kind: "system",
+        status: "running",
+        operationKey: "source-events.ingest",
+        dedupeKey:
+          "source-event:delivery:github:repo_1:appaloft/demo:https://github.com/appaloft/demo:delivery_matching_push",
+        correlationId: "req_source_events_test",
+        requestId: "req_source_events_test",
+        phase: "source-event-ingest",
+        step: "accepted",
+        projectId: "prj_demo",
+        resourceId: "res_web",
+        startedAt: "2026-01-01T00:00:10.000Z",
+        updatedAt: "2026-01-01T00:00:10.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          sourceKind: "github",
+          eventKind: "push",
+          ref: "main",
+          verificationStatus: "verified",
+          repositoryFullName: "appaloft/demo",
+          matchedResourceCount: 1,
+          ignoredReasonCount: 0,
+          policyResultCount: 1,
+          createdDeploymentCount: 0,
+          dispatchTargetCount: 1,
+          sourceEventStatus: "accepted",
+        },
+      },
+      {
+        id: "sevt_1",
+        kind: "system",
+        status: "succeeded",
+        operationKey: "source-events.ingest",
+        dedupeKey:
+          "source-event:delivery:github:repo_1:appaloft/demo:https://github.com/appaloft/demo:delivery_matching_push",
+        correlationId: "req_source_events_test",
+        requestId: "req_source_events_test",
+        phase: "source-event-dispatch",
+        step: "dispatched",
+        projectId: "prj_demo",
+        resourceId: "res_web",
+        deploymentId: "dep_1",
+        startedAt: "2026-01-01T00:00:10.000Z",
+        updatedAt: "2026-01-01T00:00:10.000Z",
+        finishedAt: "2026-01-01T00:00:10.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          sourceKind: "github",
+          eventKind: "push",
+          ref: "main",
+          verificationStatus: "verified",
+          repositoryFullName: "appaloft/demo",
+          matchedResourceCount: 1,
+          ignoredReasonCount: 0,
+          policyResultCount: 1,
+          createdDeploymentCount: 1,
+          dispatchTargetCount: 1,
+          sourceEventStatus: "dispatched",
+        },
+      },
+    ]);
+  });
+
+  test("[SRC-AUTO-EVENT-001] [PROC-DELIVERY-004] records safe operator-visible source event dispatch failures", async () => {
+    const deploymentDispatcher = new FailingSourceEventDeploymentDispatcher();
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
+    const { context, ingest } = createHarness({
+      deploymentDispatcher,
+      processAttemptRecorder,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          serverId: "srv_prod",
+          destinationId: "dst_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://token:secret@github.com/appaloft/demo",
+            providerRepositoryId: "repo_1",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ],
+    });
+
+    const result = await ingest.execute(context, {
+      sourceKind: "github",
+      eventKind: "push",
+      sourceIdentity: {
+        locator: "https://token:secret@github.com/appaloft/demo",
+        providerRepositoryId: "repo_1",
+        repositoryFullName: "appaloft/demo",
+      },
+      ref: "main",
+      revision: "abc123",
+      deliveryId: "delivery_failed_dispatch",
+      verification: {
+        status: "verified",
+        method: "provider-signature",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      sourceEventId: "sevt_1",
+      status: "failed",
+      matchedResourceIds: ["res_web"],
+      createdDeploymentIds: [],
+    });
+    expect(deploymentDispatcher.inputs).toHaveLength(1);
+    expect(processAttemptRecorder.records.at(-1)).toMatchObject({
+      id: "sevt_1",
+      kind: "system",
+      status: "failed",
+      operationKey: "source-events.ingest",
+      phase: "source-event-dispatch",
+      step: "failed",
+      projectId: "prj_demo",
+      resourceId: "res_web",
+      errorCode: "provider_error",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: {
+        sourceKind: "github",
+        eventKind: "push",
+        ref: "main",
+        verificationStatus: "verified",
+        repositoryFullName: "appaloft/demo",
+        matchedResourceCount: 1,
+        ignoredReasonCount: 0,
+        policyResultCount: 1,
+        createdDeploymentCount: 0,
+        dispatchTargetCount: 1,
+        sourceEventStatus: "failed",
+      },
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("secret token output");
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("token:secret");
   });
 
   test("[SRC-AUTO-EVENT-002] dedupes redelivery after source event dispatch", async () => {

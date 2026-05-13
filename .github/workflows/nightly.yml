@@ -19,6 +19,12 @@ jobs:
       required: false
     secrets: inherit
 
+  ssh-quick-deploy-e2e:
+    uses: ./.github/workflows/ssh-quick-deploy-e2e.yml
+    with:
+      required: false
+    secrets: inherit
+
   compose-smoke:
     runs-on: ubuntu-latest
     steps:

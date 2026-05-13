@@ -1,5 +1,6 @@
 import {
   ArchiveResourceCommand,
+  ArchiveResourceRuntimeLogsCommand,
   AttachResourceStorageCommand,
   BindResourceDependencyCommand,
   ConfigureResourceAccessCommand,
@@ -14,8 +15,10 @@ import {
   DetachResourceStorageCommand,
   ImportResourceVariablesCommand,
   ListResourceDependencyBindingsQuery,
+  ListResourceRuntimeLogArchivesQuery,
   ListResourcesQuery,
   OpenTerminalSessionCommand,
+  PruneResourceRuntimeLogArchivesCommand,
   ResourceAccessFailureEvidenceLookupQuery,
   ResourceDiagnosticSummaryQuery,
   ResourceEffectiveConfigQuery,
@@ -27,6 +30,7 @@ import {
   SetResourceVariableCommand,
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
+  ShowResourceRuntimeLogArchiveQuery,
   StartResourceRuntimeCommand,
   StopResourceRuntimeCommand,
   UnbindResourceDependencyCommand,
@@ -171,6 +175,11 @@ const healthRetriesOption = Options.text("retries").pipe(Options.withDefault("10
 const healthStartPeriodOption = Options.text("start-period").pipe(Options.withDefault("5"));
 const disableHealthOption = Options.boolean("disable").pipe(Options.withDefault(false));
 const tailOption = Options.text("tail").pipe(Options.withDefault("100"));
+const logArchiveBeforeOption = Options.text("before");
+const logArchiveServerOption = Options.text("server").pipe(Options.optional);
+const logArchiveCursorOption = Options.text("cursor").pipe(Options.optional);
+const logArchiveLimitOption = Options.text("limit").pipe(Options.withDefault("50"));
+const logArchiveDryRunOption = Options.boolean("dry-run").pipe(Options.withDefault(true));
 const diagnosticTailOption = Options.text("tail").pipe(Options.withDefault("20"));
 const includeDeploymentLogsOption = Options.boolean("deployment-logs").pipe(
   Options.withDefault(true),
@@ -391,6 +400,96 @@ const logsCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceLogs));
+
+const captureLogArchiveCommand = EffectCommand.make(
+  "archive",
+  {
+    resourceId: resourceIdArg,
+    deployment: deploymentOption,
+    service: serviceOption,
+    tail: tailOption,
+    reason: archiveReasonOption,
+  },
+  ({ deployment, reason, resourceId, service, tail }) =>
+    runCommand(
+      ArchiveResourceRuntimeLogsCommand.create({
+        resourceId,
+        deploymentId: optionalValue(deployment),
+        serviceName: optionalValue(service),
+        tailLines: Number(tail),
+        reason: optionalValue(reason),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceLogsArchive));
+
+const listLogArchivesCommand = EffectCommand.make(
+  "list",
+  {
+    resource: Options.text("resource").pipe(Options.optional),
+    deployment: deploymentOption,
+    server: logArchiveServerOption,
+    service: serviceOption,
+    limit: logArchiveLimitOption,
+    cursor: logArchiveCursorOption,
+  },
+  ({ cursor, deployment, limit, resource, server, service }) =>
+    runQuery(
+      ListResourceRuntimeLogArchivesQuery.create({
+        resourceId: optionalValue(resource),
+        deploymentId: optionalValue(deployment),
+        serverId: optionalValue(server),
+        serviceName: optionalValue(service),
+        limit: Number(limit),
+        cursor: optionalValue(cursor),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceLogArchivesList));
+
+const showLogArchiveCommand = EffectCommand.make(
+  "show",
+  {
+    archiveId: Args.text({ name: "archiveId" }),
+  },
+  ({ archiveId }) =>
+    runQuery(
+      ShowResourceRuntimeLogArchiveQuery.create({
+        archiveId,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceLogArchivesShow));
+
+const pruneLogArchivesCommand = EffectCommand.make(
+  "prune",
+  {
+    before: logArchiveBeforeOption,
+    resource: Options.text("resource").pipe(Options.optional),
+    deployment: deploymentOption,
+    server: logArchiveServerOption,
+    service: serviceOption,
+    dryRun: logArchiveDryRunOption,
+  },
+  ({ before, deployment, dryRun, resource, server, service }) =>
+    runCommand(
+      PruneResourceRuntimeLogArchivesCommand.create({
+        before,
+        resourceId: optionalValue(resource),
+        deploymentId: optionalValue(deployment),
+        serverId: optionalValue(server),
+        serviceName: optionalValue(service),
+        dryRun,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceLogArchivesPrune));
+
+const logArchivesCommand = EffectCommand.make("log-archives").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.resourceLogArchives),
+  EffectCommand.withSubcommands([
+    captureLogArchiveCommand,
+    listLogArchivesCommand,
+    showLogArchiveCommand,
+    pruneLogArchivesCommand,
+  ]),
+);
 
 const runtimeStopCommand = EffectCommand.make(
   "stop",
@@ -1027,6 +1126,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     unsetVariableCommand,
     terminalCommand,
     logsCommand,
+    logArchivesCommand,
     runtimeCommand,
     accessFailureCommand,
     healthCommand,

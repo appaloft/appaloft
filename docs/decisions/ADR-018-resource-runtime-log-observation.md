@@ -124,6 +124,7 @@ only defines live or bounded runtime observation.
 - [Resource Runtime Logs Error Spec](../errors/resources.runtime-logs.md)
 - [Resource Runtime Logs Test Matrix](../testing/resource-runtime-logs-test-matrix.md)
 - [Resource Runtime Logs Implementation Plan](../implementation/resource-runtime-logs-plan.md)
+- [ADR-053: Resource Runtime Log Archive Retention Boundary](./ADR-053-resource-runtime-log-archive-retention-boundary.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [Project Resource Console Test Matrix](../testing/project-resource-console-test-matrix.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](./ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
@@ -161,5 +162,6 @@ strategies.
 
 - Should any non-Docker reader be promoted from diagnostic adapter capability to public workload
   runtime support through a future ADR?
-- What default retention or archival behavior, if any, should be added later for runtime logs beyond
-  live tail and bounded tail reads?
+- ADR-053 answers the first archival boundary: future runtime-log archive operations create
+  explicit Appaloft-owned bounded redacted snapshots derived from `resources.runtime-logs`, and
+  retention/prune applies only to those archive records.

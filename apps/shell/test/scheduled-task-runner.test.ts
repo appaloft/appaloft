@@ -6,6 +6,15 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  type ProcessAttemptDeliveryCandidateFilter,
+  type ProcessAttemptDeliveryCandidateReader,
+  type ProcessAttemptRecord,
+  type ProcessAttemptRetryCandidateFilter,
+  type ProcessAttemptRetryCandidateReader,
+  type ProcessAttemptRetryGenerationInput,
+  type ProcessAttemptRetryGenerationResult,
+  type ProcessAttemptRetryGenerator,
+  type RepositoryContext,
   type ScheduledTaskRunWorker,
   type ScheduledTaskScheduler,
 } from "@appaloft/application";
@@ -104,6 +113,105 @@ class CapturingScheduledTaskRunWorker implements Pick<ScheduledTaskRunWorker, "r
   }
 }
 
+class CapturingProcessAttemptDeliveryCandidateReader
+  implements Pick<ProcessAttemptDeliveryCandidateReader, "listDueDeliveryCandidates">
+{
+  readonly calls: Array<{
+    context: RepositoryContext;
+    filter: ProcessAttemptDeliveryCandidateFilter;
+  }> = [];
+
+  constructor(private readonly attempts: ProcessAttemptRecord[]) {}
+
+  async listDueDeliveryCandidates(
+    context: RepositoryContext,
+    filter: ProcessAttemptDeliveryCandidateFilter,
+  ): Promise<ProcessAttemptRecord[]> {
+    this.calls.push({ context, filter });
+    return this.attempts;
+  }
+}
+
+class CapturingProcessAttemptRetryCandidateReader
+  implements Pick<ProcessAttemptRetryCandidateReader, "listDueRetries">
+{
+  readonly calls: Array<{
+    context: RepositoryContext;
+    filter: ProcessAttemptRetryCandidateFilter;
+  }> = [];
+
+  constructor(private readonly attempts: ProcessAttemptRecord[]) {}
+
+  async listDueRetries(
+    context: RepositoryContext,
+    filter: ProcessAttemptRetryCandidateFilter,
+  ): Promise<ProcessAttemptRecord[]> {
+    this.calls.push({ context, filter });
+    return this.attempts;
+  }
+}
+
+class CapturingProcessAttemptRetryGenerator
+  implements Pick<ProcessAttemptRetryGenerator, "generateDueRetry">
+{
+  readonly calls: Array<{
+    context: RepositoryContext;
+    input: ProcessAttemptRetryGenerationInput;
+  }> = [];
+
+  constructor(private readonly attempts: ProcessAttemptRecord[]) {}
+
+  async generateDueRetry(
+    context: RepositoryContext,
+    input: ProcessAttemptRetryGenerationInput,
+  ): ReturnType<ProcessAttemptRetryGenerator["generateDueRetry"]> {
+    this.calls.push({ context, input });
+    const retryAttempt = this.attempts.shift();
+    if (!retryAttempt) {
+      const result: ProcessAttemptRetryGenerationResult = {
+        status: "not-found",
+        sourceAttemptId: input.sourceAttemptId,
+      };
+      return ok(result);
+    }
+
+    const result: ProcessAttemptRetryGenerationResult = {
+      status: "generated",
+      sourceAttempt: scheduledTaskProcessAttempt({
+        id: input.sourceAttemptId,
+        status: "retry-scheduled",
+        retriable: false,
+        nextActions: ["no-action"],
+      }),
+      retryAttempt,
+    };
+    return ok(result);
+  }
+}
+
+function scheduledTaskProcessAttempt(
+  overrides: Partial<ProcessAttemptRecord> = {},
+): ProcessAttemptRecord {
+  return {
+    id: "wrk_scheduled_task_run",
+    kind: "runtime-maintenance",
+    status: "pending",
+    operationKey: "scheduled-task-runs.run-now",
+    phase: "manual-retry",
+    step: "queued",
+    resourceId: "res_api",
+    startedAt: "2026-05-05T01:00:00.000Z",
+    updatedAt: "2026-05-05T01:00:00.000Z",
+    nextActions: ["no-action"],
+    safeDetails: {
+      runId: "str_retry",
+      taskId: "tsk_daily",
+      resourceId: "res_api",
+    },
+    ...overrides,
+  };
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -173,6 +281,149 @@ describe("ScheduledTaskRunner", () => {
           runId: "str_scheduled",
           taskId: "tsk_daily",
           resourceId: "res_api",
+        },
+      },
+    ]);
+  });
+
+  test("[SCHED-TASK-RUNNER-001] [PROC-DELIVERY-002] wires due durable process attempts into scheduled task worker", async () => {
+    const scheduler = new CapturingScheduledTaskScheduler();
+    const processAttemptDeliveryCandidateReader =
+      new CapturingProcessAttemptDeliveryCandidateReader([scheduledTaskProcessAttempt()]);
+    const worker = new CapturingScheduledTaskRunWorker();
+    const runner = createScheduledTaskRunner({
+      config: {
+        enabled: true,
+        intervalSeconds: 60,
+        batchSize: 7,
+      },
+      scheduler,
+      worker,
+      processAttemptDeliveryCandidateReader,
+      executionContextFactory: new FixedExecutionContextFactory(),
+      logger: new CapturingLogger(),
+    });
+
+    runner.start();
+    await sleep(5);
+    runner.stop();
+
+    expect(processAttemptDeliveryCandidateReader.calls).toHaveLength(1);
+    const candidateCall = processAttemptDeliveryCandidateReader.calls[0];
+    expect(candidateCall?.filter).toMatchObject({
+      kind: "runtime-maintenance",
+      operationKey: "scheduled-task-runs.run-now",
+      limit: 7,
+    });
+    const schedulerCall = scheduler.calls[0];
+    expect(schedulerCall).toBeDefined();
+    if (!schedulerCall) {
+      throw new Error("expected scheduled task scheduler call");
+    }
+    expect(worker.calls).toEqual([
+      {
+        context: schedulerCall.context,
+        input: {
+          runId: "str_scheduled",
+          taskId: "tsk_daily",
+          resourceId: "res_api",
+        },
+      },
+      {
+        context: schedulerCall.context,
+        input: {
+          runId: "str_retry",
+          taskId: "tsk_daily",
+          resourceId: "res_api",
+          processAttemptId: "wrk_scheduled_task_run",
+          workerId: "scheduled-task-runner",
+        },
+      },
+    ]);
+  });
+
+  test("[SCHED-TASK-RUNNER-001] [PROC-DELIVERY-011] generates due retries before durable worker handoff", async () => {
+    const scheduler = new CapturingScheduledTaskScheduler();
+    const processAttemptRetryCandidateReader = new CapturingProcessAttemptRetryCandidateReader([
+      scheduledTaskProcessAttempt({
+        id: "wrk_retry_source",
+        status: "retry-scheduled",
+        retriable: true,
+        nextEligibleAt: "2026-05-05T01:05:00.000Z",
+      }),
+    ]);
+    const processAttemptRetryGenerator = new CapturingProcessAttemptRetryGenerator([
+      scheduledTaskProcessAttempt({
+        id: "wrk_retry_generated",
+        phase: "scheduled-task-run-retry",
+        step: "queued",
+      }),
+    ]);
+    const processAttemptDeliveryCandidateReader =
+      new CapturingProcessAttemptDeliveryCandidateReader([
+        scheduledTaskProcessAttempt({
+          id: "wrk_retry_generated",
+          phase: "scheduled-task-run-retry",
+          step: "queued",
+        }),
+      ]);
+    const worker = new CapturingScheduledTaskRunWorker();
+    const runner = createScheduledTaskRunner({
+      config: {
+        enabled: true,
+        intervalSeconds: 60,
+        batchSize: 7,
+      },
+      scheduler,
+      worker,
+      processAttemptRetryCandidateReader,
+      processAttemptRetryGenerator,
+      processAttemptDeliveryCandidateReader,
+      executionContextFactory: new FixedExecutionContextFactory(),
+      logger: new CapturingLogger(),
+    });
+
+    runner.start();
+    await sleep(5);
+    runner.stop();
+
+    expect(processAttemptRetryCandidateReader.calls).toHaveLength(1);
+    expect(processAttemptRetryCandidateReader.calls[0]?.filter).toMatchObject({
+      kind: "runtime-maintenance",
+      limit: 7,
+    });
+    expect(processAttemptRetryGenerator.calls).toHaveLength(1);
+    expect(processAttemptRetryGenerator.calls[0]?.input).toMatchObject({
+      sourceAttemptId: "wrk_retry_source",
+      retryAttemptId: "wrk_retry_source_retry",
+      phase: "scheduled-task-run-retry",
+      step: "queued",
+      safeDetails: {
+        generatedBy: "scheduled-task-runner",
+      },
+    });
+    const schedulerCall = scheduler.calls[0];
+    expect(schedulerCall).toBeDefined();
+    if (!schedulerCall) {
+      throw new Error("expected scheduled task scheduler call");
+    }
+    expect(worker.calls).toEqual([
+      {
+        context: schedulerCall.context,
+        input: {
+          runId: "str_scheduled",
+          taskId: "tsk_daily",
+          resourceId: "res_api",
+        },
+      },
+      {
+        context: schedulerCall.context,
+        input: {
+          runId: "str_retry",
+          taskId: "tsk_daily",
+          resourceId: "res_api",
+          processAttemptId: "wrk_retry_generated",
+          workerId: "scheduled-task-runner",
         },
       },
     ]);

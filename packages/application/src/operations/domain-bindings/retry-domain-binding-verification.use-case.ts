@@ -20,7 +20,9 @@ import {
   type DomainBindingRepository,
   type EventBus,
   type IdGenerator,
+  type ProcessAttemptRecorder,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import {
@@ -40,6 +42,61 @@ function domainBindingNotFound(id: string) {
   };
 }
 
+async function recordDomainVerificationRetryAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  logger: AppLogger;
+  requestId: string;
+  domainBindingId: string;
+  verificationAttemptId: string;
+  projectId: string;
+  resourceId: string;
+  serverId: string;
+  domainName: string;
+  proxyKind: string;
+  tlsMode: string;
+  status: string;
+  retriedAt: string;
+  expectedTarget: string;
+  dnsExpectedTargets?: string;
+}): Promise<void> {
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: input.verificationAttemptId,
+    kind: "route-realization",
+    status: "pending",
+    operationKey: "domain-bindings.retry-verification",
+    dedupeKey: `domain-binding-verification:${input.domainBindingId}:${input.verificationAttemptId}`,
+    correlationId: input.requestId,
+    requestId: input.requestId,
+    phase: "domain-verification",
+    step: "verification-retried",
+    projectId: input.projectId,
+    resourceId: input.resourceId,
+    serverId: input.serverId,
+    domainBindingId: input.domainBindingId,
+    startedAt: input.retriedAt,
+    updatedAt: input.retriedAt,
+    nextActions: ["no-action"],
+    safeDetails: {
+      domainName: input.domainName,
+      proxyKind: input.proxyKind,
+      tlsMode: input.tlsMode,
+      bindingStatus: input.status,
+      expectedTarget: input.expectedTarget,
+      ...(input.dnsExpectedTargets ? { dnsExpectedTargets: input.dnsExpectedTargets } : {}),
+    },
+  });
+
+  if (result.isErr()) {
+    input.logger.warn("domain_binding_verification_retry.process_attempt_record_failed", {
+      requestId: input.requestId,
+      domainBindingId: input.domainBindingId,
+      verificationAttemptId: input.verificationAttemptId,
+      errorCode: result.error.code,
+    });
+  }
+}
+
 @injectable()
 export class RetryDomainBindingVerificationUseCase {
   constructor(
@@ -53,13 +110,22 @@ export class RetryDomainBindingVerificationUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: RetryDomainBindingVerificationCommandInput,
   ): Promise<Result<RetryDomainBindingVerificationCommandResult>> {
-    const { clock, domainBindingRepository, eventBus, idGenerator, logger } = this;
+    const {
+      clock,
+      domainBindingRepository,
+      eventBus,
+      idGenerator,
+      logger,
+      processAttemptRecorder,
+    } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -96,6 +162,31 @@ export class RetryDomainBindingVerificationUseCase {
         domainBinding,
         UpsertDomainBindingSpec.fromDomainBinding(domainBinding),
       );
+      const retriedState = domainBinding.toState();
+      await recordDomainVerificationRetryAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        logger,
+        requestId: context.requestId,
+        domainBindingId: domainBindingId.value,
+        verificationAttemptId: retryResult.verificationAttemptId.value,
+        projectId: retriedState.projectId.value,
+        resourceId: retriedState.resourceId.value,
+        serverId: retriedState.serverId.value,
+        domainName: retriedState.domainName.value,
+        proxyKind: retriedState.proxyKind.value,
+        tlsMode: retriedState.tlsMode.value,
+        status: retriedState.status.value,
+        retriedAt: retryAt.value,
+        expectedTarget: verificationExpectedTarget.value,
+        ...(retriedState.dnsObservation?.expectedTargets.length
+          ? {
+              dnsExpectedTargets: retriedState.dnsObservation.expectedTargets
+                .map((target) => target.value)
+                .join(","),
+            }
+          : {}),
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, domainBinding, undefined);
 
       return ok({

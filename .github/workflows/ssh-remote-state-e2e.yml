@@ -84,6 +84,14 @@ jobs:
           echo "APPALOFT_E2E_SSH_PRIVATE_KEY=${RUNNER_TEMP}/appaloft-ssh/key" >> "${GITHUB_ENV}"
           echo "APPALOFT_E2E_REMOTE_STATE_ROOT=/tmp/appaloft-github-ssh-state-e2e/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_ENV}"
 
+      - name: Check SSH Release Readiness
+        if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' }}
+        env:
+          APPALOFT_E2E_SSH_HOST: ${{ secrets.APPALOFT_E2E_SSH_HOST }}
+          APPALOFT_E2E_SSH_PORT: ${{ secrets.APPALOFT_E2E_SSH_PORT }}
+          APPALOFT_E2E_SSH_USERNAME: ${{ secrets.APPALOFT_E2E_SSH_USERNAME }}
+        run: bun run smoke:ssh:preflight
+
       - name: Run SSH Remote State E2E
         if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' }}
         env:
@@ -92,4 +100,12 @@ jobs:
           APPALOFT_E2E_SSH_PORT: ${{ secrets.APPALOFT_E2E_SSH_PORT || '22' }}
           APPALOFT_E2E_SSH_USERNAME: ${{ secrets.APPALOFT_E2E_SSH_USERNAME || 'root' }}
           APPALOFT_E2E_PUBLIC_ROUTE_HOST: ${{ secrets.APPALOFT_E2E_PUBLIC_ROUTE_HOST }}
-        run: bun test ./apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts
+        run: bun run smoke:ssh:remote-state:evidence
+
+      - name: Upload SSH Remote State Evidence
+        if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh-remote-state-evidence
+          if-no-files-found: ignore
+          path: dist/release/ssh-remote-state-evidence.json

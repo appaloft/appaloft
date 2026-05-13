@@ -65,10 +65,9 @@ export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerR
             .where("domain_bindings.resource_id", "=", input.resourceId)
             .execute();
           const runtimeLogRows = await executor
-            .selectFrom("provider_job_logs")
-            .innerJoin("deployments", "deployments.id", "provider_job_logs.deployment_id")
-            .select("provider_job_logs.id as id")
-            .where("deployments.resource_id", "=", input.resourceId)
+            .selectFrom("resource_runtime_log_archives")
+            .select("id")
+            .where("resource_id", "=", input.resourceId)
             .execute();
           const auditRows = await executor
             .selectFrom("audit_logs")
@@ -90,7 +89,7 @@ export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerR
             blockerFromRows("deployment-history", "deployment", deploymentRows),
             blockerFromRows("domain-binding", "domain-binding", domainBindingRows),
             blockerFromRows("certificate", "certificate", certificateRows),
-            blockerFromRows("runtime-log-retention", "runtime-log", runtimeLogRows),
+            blockerFromRows("runtime-log-retention", "runtime-log-archive", runtimeLogRows),
             blockerFromRows("audit-retention", "audit-log", auditRows),
             blockerFromRows("source-link", "source-link", sourceLinkRows),
             blockerFromRows("server-applied-route", "server-applied-route", serverAppliedRouteRows),

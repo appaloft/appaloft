@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { type DeploymentTargetState, type DomainEvent, ok } from "@appaloft/core";
+import { type DeploymentTargetState, type DomainEvent, ok, type Result } from "@appaloft/core";
 import {
   CapturedEventBus,
   FixedClock,
@@ -9,8 +9,14 @@ import {
   NoopLogger,
   SequenceIdGenerator,
 } from "@appaloft/testkit";
-import { createExecutionContext, type ExecutionContext } from "../src/execution-context";
 import {
+  createExecutionContext,
+  type ExecutionContext,
+  type RepositoryContext,
+} from "../src/execution-context";
+import {
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
   type ServerEdgeProxyBootstrapper,
   type ServerEdgeProxyBootstrapResult,
 } from "../src/ports";
@@ -56,6 +62,18 @@ class RecordingProxyBootstrapper implements ServerEdgeProxyBootstrapper {
         image: "traefik:v3.6.2",
       },
     });
+  }
+}
+
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
   }
 }
 
@@ -117,6 +135,7 @@ describe("BootstrapServerProxyUseCase", () => {
     const { clock, eventBus, idGenerator, logger, serverId, serverRepository } =
       await createRegisteredServer();
     const bootstrapper = new RecordingProxyBootstrapper(["ready"]);
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
     const useCase = new BootstrapServerProxyUseCase(
       serverRepository,
       bootstrapper,
@@ -124,6 +143,7 @@ describe("BootstrapServerProxyUseCase", () => {
       idGenerator,
       eventBus,
       logger,
+      processAttemptRecorder,
     );
 
     clock.set("2026-01-01T00:00:01.000Z");
@@ -157,6 +177,49 @@ describe("BootstrapServerProxyUseCase", () => {
       attemptId: "pxy_0002",
       edgeProxyProviderKey: "traefik",
     });
+    expect(processAttemptRecorder.records).toEqual([
+      {
+        id: "pxy_0002",
+        kind: "proxy-bootstrap",
+        status: "running",
+        operationKey: "servers.bootstrap-proxy",
+        dedupeKey: `proxy-bootstrap:${serverId}:pxy_0002`,
+        correlationId: "req_test",
+        requestId: "req_test",
+        phase: "proxy-bootstrap",
+        step: "starting",
+        serverId,
+        startedAt: "2026-01-01T00:00:01.000Z",
+        updatedAt: "2026-01-01T00:00:01.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          proxyKind: "traefik",
+          providerKey: "traefik",
+          reason: "repair",
+        },
+      },
+      {
+        id: "pxy_0002",
+        kind: "proxy-bootstrap",
+        status: "succeeded",
+        operationKey: "servers.bootstrap-proxy",
+        dedupeKey: `proxy-bootstrap:${serverId}:pxy_0002`,
+        correlationId: "req_test",
+        requestId: "req_test",
+        phase: "server-ready",
+        step: "ready",
+        serverId,
+        startedAt: "2026-01-01T00:00:01.000Z",
+        updatedAt: "2026-01-01T00:00:01.000Z",
+        finishedAt: "2026-01-01T00:00:01.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          proxyKind: "traefik",
+          providerKey: "traefik",
+          reason: "repair",
+        },
+      },
+    ]);
 
     const persisted = serverRepository.items.get(serverId)?.toState();
     expect(persisted?.edgeProxy?.status.value).toBe("ready");
@@ -168,6 +231,7 @@ describe("BootstrapServerProxyUseCase", () => {
     const { clock, eventBus, idGenerator, logger, serverId, serverRepository } =
       await createRegisteredServer();
     const bootstrapper = new RecordingProxyBootstrapper(["failed", "failed"]);
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
     const useCase = new BootstrapServerProxyUseCase(
       serverRepository,
       bootstrapper,
@@ -175,6 +239,7 @@ describe("BootstrapServerProxyUseCase", () => {
       idGenerator,
       eventBus,
       logger,
+      processAttemptRecorder,
     );
 
     clock.set("2026-01-01T00:00:01.000Z");
@@ -203,6 +268,68 @@ describe("BootstrapServerProxyUseCase", () => {
       failurePhase: "proxy-container",
       retriable: true,
     });
+    expect(processAttemptRecorder.records.map((record) => record.status)).toEqual([
+      "running",
+      "failed",
+      "running",
+      "failed",
+    ]);
+    const failedAttempts = processAttemptRecorder.records.filter(
+      (record) => record.status === "failed",
+    );
+    expect(failedAttempts).toEqual([
+      {
+        id: "pxy_0002",
+        kind: "proxy-bootstrap",
+        status: "failed",
+        operationKey: "servers.bootstrap-proxy",
+        dedupeKey: `proxy-bootstrap:${serverId}:pxy_0002`,
+        correlationId: "req_test",
+        requestId: "req_test",
+        phase: "proxy-container",
+        step: "failed",
+        serverId,
+        startedAt: "2026-01-01T00:00:01.000Z",
+        updatedAt: "2026-01-01T00:00:01.000Z",
+        finishedAt: "2026-01-01T00:00:01.000Z",
+        errorCode: "edge_proxy_start_failed",
+        errorCategory: "async-processing",
+        retriable: true,
+        nextActions: ["diagnostic", "manual-review"],
+        safeDetails: {
+          proxyKind: "traefik",
+          providerKey: "traefik",
+          reason: "repair",
+        },
+      },
+      {
+        id: "pxy_0003",
+        kind: "proxy-bootstrap",
+        status: "failed",
+        operationKey: "servers.bootstrap-proxy",
+        dedupeKey: `proxy-bootstrap:${serverId}:pxy_0003`,
+        correlationId: "req_test",
+        requestId: "req_test",
+        phase: "proxy-container",
+        step: "failed",
+        serverId,
+        startedAt: "2026-01-01T00:00:02.000Z",
+        updatedAt: "2026-01-01T00:00:02.000Z",
+        finishedAt: "2026-01-01T00:00:02.000Z",
+        errorCode: "edge_proxy_start_failed",
+        errorCategory: "async-processing",
+        retriable: true,
+        nextActions: ["diagnostic", "manual-review"],
+        safeDetails: {
+          proxyKind: "traefik",
+          providerKey: "traefik",
+          reason: "retry",
+        },
+      },
+    ]);
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain(
+      "Traefik edge proxy failed to start",
+    );
 
     const persisted = serverRepository.items.get(serverId)?.toState();
     expect(persisted?.edgeProxy?.status.value).toBe("failed");
@@ -216,6 +343,7 @@ describe("BootstrapServerProxyUseCase", () => {
       errorCode: "edge_proxy_host_port_conflict",
       message: "Traefik edge proxy failed to start: host port 80 is already allocated",
     });
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
     const useCase = new BootstrapServerProxyUseCase(
       serverRepository,
       bootstrapper,
@@ -223,6 +351,7 @@ describe("BootstrapServerProxyUseCase", () => {
       idGenerator,
       eventBus,
       logger,
+      processAttemptRecorder,
     );
 
     clock.set("2026-01-01T00:00:01.000Z");
@@ -240,6 +369,31 @@ describe("BootstrapServerProxyUseCase", () => {
       failurePhase: "proxy-container",
       retriable: true,
     });
+    const failedAttempt = processAttemptRecorder.records.find(
+      (record) => record.status === "failed",
+    );
+    expect(failedAttempt).toMatchObject({
+      id: "pxy_0002",
+      kind: "proxy-bootstrap",
+      status: "failed",
+      operationKey: "servers.bootstrap-proxy",
+      dedupeKey: `proxy-bootstrap:${serverId}:pxy_0002`,
+      correlationId: "req_test",
+      requestId: "req_test",
+      phase: "proxy-container",
+      step: "failed",
+      serverId,
+      errorCode: "edge_proxy_host_port_conflict",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: {
+        proxyKind: "traefik",
+        providerKey: "traefik",
+        reason: "repair",
+      },
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("host port 80");
 
     const persisted = serverRepository.items.get(serverId)?.toState();
     expect(persisted?.edgeProxy?.status.value).toBe("failed");

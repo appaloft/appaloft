@@ -88,6 +88,11 @@ Then:
 | TERM-SESSION-TRANSPORT-005 | integration | Client closes | WebSocket closes or CLI exits | Backend PTY/SSH/process is closed. |
 | TERM-SESSION-TRANSPORT-006 | integration | Backend exits | Shell exits normally | Closed frame is emitted; session is removed. |
 | TERM-SESSION-TRANSPORT-007 | integration | Backend fails | PTY/SSH errors after open | Structured error frame is emitted; backend is closed. |
+| TERM-SESSION-LIFE-001 | integration | List active sessions | One server session and one resource session are active | List returns safe descriptors sorted newest first and no terminal output, command text, private keys, tokens, or environment secrets. |
+| TERM-SESSION-LIFE-002 | integration | Show active session | Session id is active | Show returns the safe descriptor and lifecycle status without attaching to the transport. |
+| TERM-SESSION-LIFE-003 | integration | Close active session | Session id is active | Gateway closes backend resources, removes the session from active readback, and returns `status = closed`. |
+| TERM-SESSION-LIFE-004 | integration | Close missing session | Session id is unknown or already removed | Command returns `terminal_session_not_found` and does not close another session. |
+| TERM-SESSION-LIFE-005 | integration | Expire old sessions | Active sessions exist before and after cutoff | Only sessions older than the cutoff close; response returns safe counts and ids. |
 
 ## Entrypoint Matrix
 
@@ -99,6 +104,8 @@ Then:
 | TERM-SESSION-ENTRY-004 | e2e-preferred | CLI server | `terminal open --server <serverId>` | Opens interactive session and restores local TTY on close. |
 | TERM-SESSION-ENTRY-005 | e2e-preferred | CLI resource | `resource terminal <resourceId>` | Opens latest resource workspace session and restores local TTY on close. |
 | TERM-SESSION-ENTRY-006 | e2e-preferred | HTTP/WebSocket | Client disconnects | Abort propagates and backend resources close. |
+| TERM-SESSION-ENTRY-007 | e2e-preferred | CLI lifecycle | `terminal-session list/show/close/expire` | CLI dispatches the shared lifecycle query/command schemas and prints safe JSON. |
+| TERM-SESSION-ENTRY-008 | e2e-preferred | HTTP lifecycle | `GET /api/terminal-sessions`, `GET /api/terminal-sessions/{sessionId}`, `POST /api/terminal-sessions/{sessionId}/close`, and `POST /api/terminal-sessions/expire` | HTTP routes dispatch shared messages and never expose terminal input/output. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -107,7 +114,12 @@ workspace metadata, source-locator fallback rejection, server relative-directory
 selected deployment context mismatch, unsafe relative directory validation, and no-deployment
 workspace unavailable errors.
 
-Runtime adapter, HTTP/WebSocket, interactive CLI, and Web E2E tests remain follow-up coverage.
+Active lifecycle list/show/close/expire tests exist under `TERM-SESSION-LIFE-*`,
+`TERM-SESSION-ENTRY-007`, and `TERM-SESSION-ENTRY-008`. HTTP/WebSocket attach has focused adapter
+coverage for routing client input frames to the attached terminal session.
+
+Runtime adapter process-spawn coverage, direct interactive CLI TTY attachment, durable
+closed-session audit/history, and Web E2E tests remain follow-up coverage.
 
 ## Open Questions
 

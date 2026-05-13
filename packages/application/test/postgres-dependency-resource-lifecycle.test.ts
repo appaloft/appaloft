@@ -13,6 +13,7 @@ import {
   Project,
   ProjectId,
   ProjectName,
+  type Result,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
 } from "@appaloft/core";
@@ -31,7 +32,14 @@ import {
   SequenceIdGenerator,
 } from "@appaloft/testkit";
 
-import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
+import {
+  createExecutionContext,
+  type ExecutionContext,
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
+  type RepositoryContext,
+  toRepositoryContext,
+} from "../src";
 import { ListDependencyResourcesQuery, ShowDependencyResourceQuery } from "../src/messages";
 import {
   DeleteDependencyResourceUseCase,
@@ -51,6 +59,18 @@ function createContext(): ExecutionContext {
   });
 }
 
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
+  }
+}
+
 async function createHarness() {
   const context = createContext();
   const repositoryContext = toRepositoryContext(context);
@@ -66,6 +86,7 @@ async function createHarness() {
   const managedRedisProvider = new FakeManagedRedisProvider();
   const logger = new NoopLogger();
   const idGenerator = new SequenceIdGenerator();
+  const processAttemptRecorder = new RecordingProcessAttemptRecorder();
 
   const project = Project.create({
     id: ProjectId.rehydrate("prj_demo"),
@@ -98,6 +119,7 @@ async function createHarness() {
       logger,
       managedPostgresProvider,
       managedRedisProvider,
+      processAttemptRecorder,
     ),
     deleteSafetyReader,
     dependencyResources,
@@ -136,6 +158,7 @@ async function createHarness() {
       eventBus,
       logger,
       managedPostgresProvider,
+      processAttemptRecorder,
     ),
     provisionRedis: new ProvisionRedisDependencyResourceUseCase(
       projects,
@@ -147,7 +170,9 @@ async function createHarness() {
       eventBus,
       logger,
       managedRedisProvider,
+      processAttemptRecorder,
     ),
+    processAttemptRecorder,
     readModel,
     renameDependencyResource: new RenameDependencyResourceUseCase(
       dependencyResources,
@@ -161,11 +186,12 @@ async function createHarness() {
 }
 
 describe("Postgres dependency resource lifecycle use cases", () => {
-  test("[DEP-RES-PG-PROVISION-001] [DEP-RES-PG-NATIVE-001] [DEP-RES-PG-NATIVE-002] [DEP-BIND-SECRET-RESOLVE-003] provisions managed Postgres through provider realization", async () => {
+  test("[DEP-RES-PG-PROVISION-001] [DEP-RES-PG-NATIVE-001] [DEP-RES-PG-NATIVE-002] [DEP-BIND-SECRET-RESOLVE-003] [PROC-DELIVERY-001] provisions managed Postgres through provider realization", async () => {
     const {
       context,
       eventBus,
       managedPostgresProvider,
+      processAttemptRecorder,
       provisionPostgres,
       showDependencyResource,
     } = await createHarness();
@@ -212,6 +238,53 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         maskedConnection: expect.stringContaining("********"),
       },
     });
+    expect(processAttemptRecorder.records).toEqual([
+      {
+        id: "dpr_0002",
+        kind: "system",
+        status: "running",
+        operationKey: "dependency-resources.provision-postgres",
+        dedupeKey: `dependency-resource-realization:${result._unsafeUnwrap().id}:dpr_0002`,
+        correlationId: "req_dependency_resource_lifecycle_test",
+        requestId: "req_dependency_resource_lifecycle_test",
+        phase: "dependency-resource-realization",
+        step: "pending",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          dependencyResourceId: result._unsafeUnwrap().id,
+          dependencyKind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          providerManaged: true,
+          realizationStatus: "pending",
+        },
+      },
+      {
+        id: "dpr_0002",
+        kind: "system",
+        status: "succeeded",
+        operationKey: "dependency-resources.provision-postgres",
+        dedupeKey: `dependency-resource-realization:${result._unsafeUnwrap().id}:dpr_0002`,
+        correlationId: "req_dependency_resource_lifecycle_test",
+        requestId: "req_dependency_resource_lifecycle_test",
+        phase: "dependency-resource-realization",
+        step: "ready",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          dependencyResourceId: result._unsafeUnwrap().id,
+          dependencyKind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          providerManaged: true,
+          realizationStatus: "ready",
+        },
+      },
+    ]);
   });
 
   test("[DEP-BIND-SECRET-RESOLVE-003] keeps managed Postgres binding ready for resolvable Appaloft-owned refs", async () => {
@@ -315,12 +388,17 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     });
   });
 
-  test("[DEP-RES-PG-NATIVE-003] provider realization failure keeps provision accepted and blocks binding readiness", async () => {
-    const { context, managedPostgresProvider, provisionPostgres, showDependencyResource } =
-      await createHarness();
+  test("[DEP-RES-PG-NATIVE-003] [PROC-DELIVERY-004] provider realization failure keeps provision accepted and blocks binding readiness", async () => {
+    const {
+      context,
+      managedPostgresProvider,
+      processAttemptRecorder,
+      provisionPostgres,
+      showDependencyResource,
+    } = await createHarness();
     managedPostgresProvider.setRealizationResult(
       err(
-        domainError.provider("Managed Postgres unavailable", {
+        domainError.provider("Managed Postgres unavailable with secret token output", {
           phase: "dependency-resource-realization",
           providerKey: "appaloft-managed-postgres",
         }),
@@ -348,6 +426,27 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         failureCode: "provider_error",
       },
     });
+    expect(processAttemptRecorder.records.at(-1)).toMatchObject({
+      id: "dpr_0002",
+      kind: "system",
+      status: "failed",
+      operationKey: "dependency-resources.provision-postgres",
+      phase: "dependency-resource-realization",
+      step: "failed",
+      projectId: "prj_demo",
+      errorCode: "provider_error",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: {
+        dependencyResourceId: result._unsafeUnwrap().id,
+        dependencyKind: "postgres",
+        providerKey: "appaloft-managed-postgres",
+        providerManaged: true,
+        realizationStatus: "failed",
+      },
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("secret token output");
   });
 
   test("[DEP-RES-PG-NATIVE-007] rejects unsupported managed Postgres provider before persistence", async () => {
@@ -558,11 +657,12 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     expect(shown._unsafeUnwrapErr().code).toBe("not_found");
   });
 
-  test("[DEP-RES-PG-NATIVE-005] deletes realized managed Postgres through provider cleanup", async () => {
+  test("[DEP-RES-PG-NATIVE-005] [PROC-DELIVERY-001] deletes realized managed Postgres through provider cleanup", async () => {
     const {
       context,
       deleteDependencyResource,
       managedPostgresProvider,
+      processAttemptRecorder,
       provisionPostgres,
       showDependencyResource,
     } = await createHarness();
@@ -591,6 +691,53 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     );
     expect(shown.isErr()).toBe(true);
     expect(shown._unsafeUnwrapErr().code).toBe("not_found");
+    expect(processAttemptRecorder.records.slice(-2)).toEqual([
+      {
+        id: "dpd_0003",
+        kind: "system",
+        status: "running",
+        operationKey: "dependency-resources.delete",
+        dedupeKey: `dependency-resource-provider-delete:${created.id}:dpd_0003`,
+        correlationId: "req_dependency_resource_lifecycle_test",
+        requestId: "req_dependency_resource_lifecycle_test",
+        phase: "dependency-resource-provider-delete",
+        step: "delete-pending",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          dependencyResourceId: created.id,
+          dependencyKind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          providerManaged: true,
+          realizationStatus: "delete-pending",
+        },
+      },
+      {
+        id: "dpd_0003",
+        kind: "system",
+        status: "succeeded",
+        operationKey: "dependency-resources.delete",
+        dedupeKey: `dependency-resource-provider-delete:${created.id}:dpd_0003`,
+        correlationId: "req_dependency_resource_lifecycle_test",
+        requestId: "req_dependency_resource_lifecycle_test",
+        phase: "dependency-resource-provider-delete",
+        step: "deleted",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          dependencyResourceId: created.id,
+          dependencyKind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          providerManaged: true,
+          realizationStatus: "deleted",
+        },
+      },
+    ]);
   });
 
   test("[DEP-RES-PG-DELETE-002] blocks bound dependency delete", async () => {
@@ -619,9 +766,73 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     });
   });
 
-  test("[DEP-RES-REDIS-PROVISION-001] [DEP-RES-REDIS-NATIVE-001] [DEP-RES-REDIS-NATIVE-002] provisions managed Redis through provider realization", async () => {
-    const { context, eventBus, managedRedisProvider, provisionRedis, showDependencyResource } =
-      await createHarness();
+  test("[DEP-RES-PG-NATIVE-005] [PROC-DELIVERY-004] records managed Postgres provider delete failure safely", async () => {
+    const {
+      context,
+      deleteDependencyResource,
+      managedPostgresProvider,
+      processAttemptRecorder,
+      provisionPostgres,
+    } = await createHarness();
+    const created = (
+      await provisionPostgres.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Failing Delete DB",
+      })
+    )._unsafeUnwrap();
+    managedPostgresProvider.setDeleteResult(
+      err(
+        domainError.provider("Delete failed with secret token output", {
+          phase: "dependency-resource-provider-delete",
+          providerKey: "appaloft-managed-postgres",
+        }),
+      ),
+    );
+
+    const deleted = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: created.id,
+    });
+
+    expect(deleted.isErr()).toBe(true);
+    expect(deleted._unsafeUnwrapErr()).toMatchObject({
+      code: "provider_error",
+      details: {
+        phase: "dependency-resource-provider-delete",
+      },
+    });
+    expect(processAttemptRecorder.records.at(-1)).toMatchObject({
+      id: "dpd_0003",
+      kind: "system",
+      status: "failed",
+      operationKey: "dependency-resources.delete",
+      phase: "dependency-resource-provider-delete",
+      step: "delete-pending",
+      projectId: "prj_demo",
+      errorCode: "provider_error",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: {
+        dependencyResourceId: created.id,
+        dependencyKind: "postgres",
+        providerKey: "appaloft-managed-postgres",
+        providerManaged: true,
+        realizationStatus: "delete-pending",
+      },
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("secret token output");
+  });
+
+  test("[DEP-RES-REDIS-PROVISION-001] [DEP-RES-REDIS-NATIVE-001] [DEP-RES-REDIS-NATIVE-002] [PROC-DELIVERY-001] provisions managed Redis through provider realization", async () => {
+    const {
+      context,
+      eventBus,
+      managedRedisProvider,
+      processAttemptRecorder,
+      provisionRedis,
+      showDependencyResource,
+    } = await createHarness();
 
     const result = await provisionRedis.execute(context, {
       projectId: "prj_demo",
@@ -665,6 +876,53 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         maskedConnection: expect.stringContaining("********"),
       },
     });
+    expect(processAttemptRecorder.records).toEqual([
+      {
+        id: "dpr_0002",
+        kind: "system",
+        status: "running",
+        operationKey: "dependency-resources.provision-redis",
+        dedupeKey: `dependency-resource-realization:${result._unsafeUnwrap().id}:dpr_0002`,
+        correlationId: "req_dependency_resource_lifecycle_test",
+        requestId: "req_dependency_resource_lifecycle_test",
+        phase: "dependency-resource-realization",
+        step: "pending",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          dependencyResourceId: result._unsafeUnwrap().id,
+          dependencyKind: "redis",
+          providerKey: "appaloft-managed-redis",
+          providerManaged: true,
+          realizationStatus: "pending",
+        },
+      },
+      {
+        id: "dpr_0002",
+        kind: "system",
+        status: "succeeded",
+        operationKey: "dependency-resources.provision-redis",
+        dedupeKey: `dependency-resource-realization:${result._unsafeUnwrap().id}:dpr_0002`,
+        correlationId: "req_dependency_resource_lifecycle_test",
+        requestId: "req_dependency_resource_lifecycle_test",
+        phase: "dependency-resource-realization",
+        step: "ready",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          dependencyResourceId: result._unsafeUnwrap().id,
+          dependencyKind: "redis",
+          providerKey: "appaloft-managed-redis",
+          providerManaged: true,
+          realizationStatus: "ready",
+        },
+      },
+    ]);
   });
 
   test("[DEP-RES-REDIS-NATIVE-002] keeps managed Redis binding ready for resolvable Appaloft-owned refs", async () => {
@@ -781,12 +1039,17 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     expect(JSON.stringify(shown._unsafeUnwrap().dependencyResource)).not.toContain("super-secret");
   });
 
-  test("[DEP-RES-REDIS-NATIVE-003] provider realization failure keeps Redis provision accepted and blocks binding readiness", async () => {
-    const { context, managedRedisProvider, provisionRedis, showDependencyResource } =
-      await createHarness();
+  test("[DEP-RES-REDIS-NATIVE-003] [PROC-DELIVERY-004] provider realization failure keeps Redis provision accepted and blocks binding readiness", async () => {
+    const {
+      context,
+      managedRedisProvider,
+      processAttemptRecorder,
+      provisionRedis,
+      showDependencyResource,
+    } = await createHarness();
     managedRedisProvider.setRealizationResult(
       err(
-        domainError.provider("Managed Redis unavailable", {
+        domainError.provider("Managed Redis unavailable with secret token output", {
           phase: "dependency-resource-realization",
           providerKey: "appaloft-managed-redis",
         }),
@@ -814,6 +1077,27 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         failureCode: "provider_error",
       },
     });
+    expect(processAttemptRecorder.records.at(-1)).toMatchObject({
+      id: "dpr_0002",
+      kind: "system",
+      status: "failed",
+      operationKey: "dependency-resources.provision-redis",
+      phase: "dependency-resource-realization",
+      step: "failed",
+      projectId: "prj_demo",
+      errorCode: "provider_error",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: {
+        dependencyResourceId: result._unsafeUnwrap().id,
+        dependencyKind: "redis",
+        providerKey: "appaloft-managed-redis",
+        providerManaged: true,
+        realizationStatus: "failed",
+      },
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("secret token output");
   });
 
   test("[DEP-RES-REDIS-NATIVE-008] rejects unsupported managed Redis provider before persistence", async () => {
@@ -841,11 +1125,12 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     expect(list._unsafeUnwrap().items).toEqual([]);
   });
 
-  test("[DEP-RES-REDIS-NATIVE-006] deletes realized managed Redis through provider cleanup", async () => {
+  test("[DEP-RES-REDIS-NATIVE-006] [PROC-DELIVERY-001] deletes realized managed Redis through provider cleanup", async () => {
     const {
       context,
       deleteDependencyResource,
       managedRedisProvider,
+      processAttemptRecorder,
       provisionRedis,
       showDependencyResource,
     } = await createHarness();
@@ -874,6 +1159,53 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     );
     expect(shown.isErr()).toBe(true);
     expect(shown._unsafeUnwrapErr().code).toBe("not_found");
+    expect(processAttemptRecorder.records.slice(-2)).toEqual([
+      {
+        id: "dpd_0003",
+        kind: "system",
+        status: "running",
+        operationKey: "dependency-resources.delete",
+        dedupeKey: `dependency-resource-provider-delete:${created.id}:dpd_0003`,
+        correlationId: "req_dependency_resource_lifecycle_test",
+        requestId: "req_dependency_resource_lifecycle_test",
+        phase: "dependency-resource-provider-delete",
+        step: "delete-pending",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          dependencyResourceId: created.id,
+          dependencyKind: "redis",
+          providerKey: "appaloft-managed-redis",
+          providerManaged: true,
+          realizationStatus: "delete-pending",
+        },
+      },
+      {
+        id: "dpd_0003",
+        kind: "system",
+        status: "succeeded",
+        operationKey: "dependency-resources.delete",
+        dedupeKey: `dependency-resource-provider-delete:${created.id}:dpd_0003`,
+        correlationId: "req_dependency_resource_lifecycle_test",
+        requestId: "req_dependency_resource_lifecycle_test",
+        phase: "dependency-resource-provider-delete",
+        step: "deleted",
+        projectId: "prj_demo",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:00:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          dependencyResourceId: created.id,
+          dependencyKind: "redis",
+          providerKey: "appaloft-managed-redis",
+          providerManaged: true,
+          realizationStatus: "deleted",
+        },
+      },
+    ]);
   });
 
   test("[DEP-RES-REDIS-NATIVE-007] blocks protected realized managed Redis delete before provider cleanup", async () => {

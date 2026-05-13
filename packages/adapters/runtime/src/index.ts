@@ -141,8 +141,11 @@ export {
 export {
   parseDockerSizeToBytes,
   parseRuntimeTargetCapacityOutput,
+  parseRuntimeTargetCapacityPruneOutput,
   renderRuntimeTargetCapacityScript,
+  renderRuntimeTargetCapacityPruneScript,
   RuntimeTargetCapacityInspectorAdapter,
+  RuntimeTargetCapacityPrunerAdapter,
 } from "./runtime-target-capacity";
 export { RuntimeTerminalSessionGateway } from "./terminal-sessions";
 export { SshExecutionBackend } from "./ssh-execution";

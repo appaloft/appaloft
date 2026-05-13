@@ -45,6 +45,7 @@ This query inherits:
 - [Resource Runtime Logs Error Spec](../errors/resources.runtime-logs.md)
 - [Resource Runtime Logs Test Matrix](../testing/resource-runtime-logs-test-matrix.md)
 - [Resource Runtime Logs Implementation Plan](../implementation/resource-runtime-logs-plan.md)
+- [ADR-053: Resource Runtime Log Archive Retention Boundary](../decisions/ADR-053-resource-runtime-log-archive-retention-boundary.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 
@@ -210,8 +211,10 @@ closure.
 PM2, systemd/journalctl, provider-native APIs, and remote SSH file-tail readers remain future
 adapter implementations behind the same port.
 
-Runtime application log archival, search, and retention are still out of scope. `deployments.logs`
-remains the separate deployment-attempt log operation.
+Runtime application log archival, search, and retention are still out of scope for this query.
+ADR-053 positions future archive behavior as explicit Appaloft-owned bounded redacted snapshots
+derived from this query, with retention/prune applying only to those archive records.
+`deployments.logs` remains the separate deployment-attempt log operation.
 
 ## Open Questions
 

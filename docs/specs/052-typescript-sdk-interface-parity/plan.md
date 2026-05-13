@@ -7,6 +7,7 @@
 - Operation catalog source: [Core Operations](../../CORE_OPERATIONS.md)
 - Public API generation: `@appaloft/openapi`
 - Architecture:
+  [ADR-046: TypeScript SDK Interface Parity](../../decisions/ADR-046-typescript-sdk-interface-parity.md),
   [Adapter Command/Query Boundary](../../architecture/adapter-command-query-boundary.md),
   [Async Lifecycle And Acceptance](../../architecture/async-lifecycle-and-acceptance.md)
 - Error contracts:
@@ -16,11 +17,11 @@
 
 ## Architecture Approach
 
-- Package placement: add a future `packages/sdk` package published as `@appaloft/sdk`. If a
-  generator package is needed, place it in a dedicated tooling package such as
-  `packages/sdk-generator` rather than inside the SDK runtime.
-- Dependency direction: `@appaloft/sdk` may consume public contracts, HTTP/oRPC client plumbing,
-  generated operation metadata, and safe error DTOs. It must not import `@appaloft/core`,
+- Package placement: `packages/sdk` is the public `@appaloft/sdk` package. SDK generation tooling
+  lives in `packages/sdk-generator`, not inside the SDK runtime.
+- Dependency direction: `@appaloft/sdk` owns its public runtime error/version types and generated
+  operation metadata. It has no runtime dependency on private workspace packages and must not import
+  `@appaloft/core`,
   `@appaloft/application`, repositories, use cases, handlers, DI tokens, shell composition,
   persistence adapters, provider SDKs, or CLI local-state helpers.
 - Generation baseline: use the generated OpenAPI artifact as the cross-language SDK contract.
@@ -33,9 +34,9 @@
   other SDKs should reuse the same OpenAPI SDK contract and generator metadata, with only
   language-specific runtime code for fetch/HTTP, auth, typed errors, cancellation, pagination, and
   streaming.
-- Auth shape: wait for Phase 8 auth/org acceptance before freezing SDK configuration. The SDK
-  should support the accepted deploy-token/session headers, organization scope selection, and typed
-  401/403 errors.
+- Auth shape: Phase 8 auth/org acceptance is complete for the SDK slice. The SDK supports the
+  accepted deploy-token/session headers, organization scope selection through operation inputs, and
+  typed 401/403 errors.
 - CLI/HTTP parity: keep CLI and HTTP as sibling adapters. CLI keeps local parsing, pure SSH, and
   local state ownership where applicable; SDK uses the authenticated server API. Both reuse the
   same command/query schema vocabulary.
@@ -44,9 +45,10 @@
 
 ## Decision And Spec Gates
 
-- ADR required before Code Round: yes, because the implementation will freeze the public SDK
-  package boundary, OpenAPI extension contract, generation substrate, auth configuration semantics,
-  streaming behavior, and compatibility policy.
+- ADR required before Code Round: complete through
+  [ADR-046: TypeScript SDK Interface Parity](../../decisions/ADR-046-typescript-sdk-interface-parity.md),
+  which freezes the public SDK package boundary, OpenAPI extension contract, generation substrate,
+  auth configuration semantics, streaming behavior, and compatibility policy.
 - `CORE_OPERATIONS.md` update: not for the SDK surface itself. Update only when a new business
   operation is added or an existing operation changes.
 - `operation-catalog.ts` update: not for the SDK surface itself. Code Round should add golden
@@ -57,9 +59,9 @@
 ## Roadmap And Compatibility
 
 - Roadmap target: Phase 9, after Phase 8 self-hosted auth and organization bootstrap.
-- Version target: `1.0.0-rc` line unless explicitly pulled forward after auth closes.
-- Compatibility impact: `pre-1.0-policy`; new public npm package and public client API. Avoid
-  broad compatibility promises until auth/org and operation catalog freeze rules are accepted.
+- Version target: Phase 9 / `0.11.0`, while the overall `0.11.0` release remains blocked by other
+  Phase 9 checklist items.
+- Compatibility impact: `pre-1.0-policy`; new public npm package and public client API.
 - Release notes: must call out that the SDK is an operation client over authenticated HTTP/oRPC,
   not an embedded application runtime.
 
@@ -77,13 +79,33 @@
   - 401/403 and structured errors are typed and do not rely on message text;
   - SDK e2e tests can create/list/show representative resources against a running PGlite server;
   - streaming/read-follow helpers have explicit behavior and cancellation semantics.
+- The first Code Round closed `TS-SDK-OPENAPI-001`, `TS-SDK-OPENAPI-002`, and
+  `TS-SDK-OPENAPI-003`: OpenAPI metadata parity with `operation-catalog.ts`. The next partial Code
+  Round added initial SDK generation and package-boundary automation for `TS-SDK-GEN-001` and
+  `TS-SDK-BOUNDARY-001`.
+- After Phase 8 auth/org acceptance, the SDK runtime added product-session cookie auth,
+  deploy-token bearer auth, organization scope via operation input/path/query data, and typed
+  structured error handling for `TS-SDK-AUTH-001` and `TS-SDK-ERROR-001`.
+- The SDK runtime now has a lower-level stream helper for `TS-SDK-STREAM-001`. Generated
+  operation-specific streaming facades can build on this helper once publication/docs shape is
+  settled.
+- Public SDK reference docs now cover installation, authentication, operation examples, structured
+  errors, and streaming under the stable `typescript-sdk.operation-client` help topic.
+- `TS-SDK-BLACKBOX-001` now has a representative running-server smoke in
+  `packages/sdk/test/running-server-smoke.test.ts`: the SDK calls a locally served Elysia/oRPC
+  HTTP mount for project create/list/show with product-session auth, while command/query buses are
+  stubbed to keep the test at the server/API boundary.
+- `TS-SDK-RELEASE-001` now verifies that `@appaloft/sdk` is prepared as a public npm package with
+  generated operation descriptors, built ESM JavaScript, declaration files, public package
+  metadata, and no runtime workspace dependencies. The release npm job publishes `packages/sdk`
+  after `release:npm:prepare` builds it.
 - Use SDK e2e tests for black-box API confidence. Keep command/query handler tests and domain
   tests at their native layers.
 
 ## Risks And Migration Gaps
 
-- Publishing before Phase 8 auth closes would bake unstable auth and organization semantics into a
-  public package.
+- Generated high-level streaming facade semantics remain a later enhancement; the lower-level
+  streaming helper remains the published initial stream surface.
 - A handwritten SDK facade can drift from the operation catalog. The TypeScript SDK must be
   generated from the same OpenAPI SDK contract intended for future non-TypeScript SDKs.
 - Re-exporting too much from contracts could accidentally publish internal DTOs. The first SDK

@@ -1,4 +1,5 @@
 import {
+  type DependencyResourceBackup,
   DependencyResourceBackupByIdSpec,
   DependencyResourceBackupFailureCode,
   DependencyResourceBackupId,
@@ -25,7 +26,9 @@ import {
   type DependencyResourceRepository,
   type EventBus,
   type IdGenerator,
+  type ProcessAttemptRecorder,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type RestoreDependencyResourceBackupCommandInput } from "./restore-dependency-resource-backup.command";
@@ -47,6 +50,8 @@ export class RestoreDependencyResourceBackupUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
@@ -62,6 +67,7 @@ export class RestoreDependencyResourceBackupUseCase {
       eventBus,
       idGenerator,
       logger,
+      processAttemptRecorder,
     } = this;
 
     return safeTry(async function* () {
@@ -135,6 +141,13 @@ export class RestoreDependencyResourceBackupUseCase {
         backup,
         UpsertDependencyResourceBackupSpec.fromDependencyResourceBackup(backup),
       );
+      await recordRestoreProcessAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        context,
+        backup,
+        restoreAttemptId: restoreAttemptId.value,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, backup, undefined);
 
       const providerResult = await dependencyResourceBackupProvider.restoreBackup(context, {
@@ -167,8 +180,73 @@ export class RestoreDependencyResourceBackupUseCase {
         backup,
         UpsertDependencyResourceBackupSpec.fromDependencyResourceBackup(backup),
       );
+      await recordRestoreProcessAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        context,
+        backup,
+        restoreAttemptId: restoreAttemptId.value,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, backup, undefined);
       return ok({ id: restoreAttemptId.value });
     });
   }
+}
+
+async function recordRestoreProcessAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  context: ExecutionContext;
+  backup: DependencyResourceBackup;
+  restoreAttemptId: string;
+}): Promise<void> {
+  const state = input.backup.toState();
+  const restore = state.latestRestoreAttempt;
+  if (!restore || restore.attemptId.value !== input.restoreAttemptId) {
+    return;
+  }
+
+  const status =
+    restore.status.value === "pending"
+      ? "running"
+      : restore.status.value === "completed"
+        ? "succeeded"
+        : "failed";
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: restore.attemptId.value,
+    kind: "system",
+    status,
+    operationKey: "dependency-resources.restore-backup",
+    dedupeKey: `dependency-resource-restore:${state.dependencyResourceId.value}:${state.id.value}:${restore.attemptId.value}`,
+    correlationId: input.context.requestId,
+    requestId: input.context.requestId,
+    phase: "dependency-resource-restore",
+    step: restore.status.value,
+    projectId: state.projectId.value,
+    startedAt: restore.requestedAt.value,
+    updatedAt: restore.completedAt?.value ?? restore.failedAt?.value ?? restore.requestedAt.value,
+    ...(status !== "running"
+      ? {
+          finishedAt:
+            restore.completedAt?.value ?? restore.failedAt?.value ?? restore.requestedAt.value,
+        }
+      : {}),
+    ...(restore.failureCode
+      ? {
+          errorCode: restore.failureCode.value,
+          errorCategory: "async-processing",
+          retriable: true,
+        }
+      : {}),
+    nextActions: status === "failed" ? ["diagnostic", "manual-review"] : ["no-action"],
+    safeDetails: {
+      backupId: state.id.value,
+      dependencyResourceId: state.dependencyResourceId.value,
+      dependencyKind: state.dependencyKind.value,
+      providerKey: state.providerKey.value,
+      restoreAttemptId: restore.attemptId.value,
+    },
+  });
+
+  void result;
 }

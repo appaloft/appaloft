@@ -227,6 +227,24 @@ export interface DependencyResourceBackupsTable {
   created_at: TimestampColumn;
 }
 
+export interface ResourceRuntimeLogArchivesTable {
+  id: string;
+  resource_id: string;
+  deployment_id: string | null;
+  server_id: string | null;
+  service_name: string | null;
+  runtime_kind: string | null;
+  captured_at: TimestampColumn;
+  reason: string | null;
+  line_count: number;
+  retention_status: string;
+  lines: ColumnType<
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[]
+  >;
+}
+
 export interface ResourceStorageAttachmentsTable {
   id: string;
   resource_id: string;
@@ -395,12 +413,101 @@ export interface AuditLogsTable {
   created_at: TimestampColumn;
 }
 
+export interface AuditEventLegalHoldsTable {
+  id: string;
+  status: string;
+  aggregate_id: string | null;
+  event_type: string | null;
+  from_time: string | null;
+  to_time: string | null;
+  reason: string;
+  requested_by: string | null;
+  created_at: TimestampColumn;
+  released_at: NullableUpdatableTimestampColumn;
+  release_reason: string | null;
+  released_by: string | null;
+}
+
+export interface AuditEventArchiveSourceJson {
+  kind: "aggregate" | "global-window";
+  aggregateId?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface AuditEventArchiveItemJson {
+  auditEventId: string;
+  aggregateId: string;
+  eventType: string;
+  payload: Record<string, string | number | boolean | null | readonly string[]>;
+  redactedFields: string[];
+  createdAt: string;
+}
+
+export interface AuditEventArchivesTable {
+  id: string;
+  archive_schema_version: string;
+  source_kind: string;
+  aggregate_id: string | null;
+  event_type: string | null;
+  from_time: string | null;
+  to_time: string | null;
+  source: ColumnType<
+    AuditEventArchiveSourceJson,
+    AuditEventArchiveSourceJson,
+    AuditEventArchiveSourceJson
+  >;
+  reason: string;
+  item_count: number;
+  truncated: boolean;
+  content_digest: string;
+  retain_source_rows: boolean;
+  created_at: TimestampColumn;
+}
+
+export interface AuditEventArchiveItemsTable {
+  archive_id: string;
+  audit_event_id: string;
+  aggregate_id: string;
+  event_type: string;
+  created_at: TimestampColumn;
+  item: ColumnType<AuditEventArchiveItemJson, AuditEventArchiveItemJson, AuditEventArchiveItemJson>;
+}
+
 export interface ProviderJobLogsTable {
   id: string;
   deployment_id: string;
   provider_key: string;
   payload: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
   created_at: TimestampColumn;
+}
+
+export interface DomainEventStreamRecordsTable {
+  id: string;
+  stream_scope: string;
+  stream_id: string;
+  cursor: string;
+  occurred_at: TimestampColumn;
+  event_type: string;
+  source_kind: string;
+  aggregate_id: string | null;
+  aggregate_type: string | null;
+  deployment_id: string | null;
+  correlation_id: string | null;
+  causation_id: string | null;
+  request_id: string | null;
+  summary: string | null;
+  payload: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  guard_reason: string | null;
+  created_at: TimestampColumn;
+}
+
+export interface DomainEventStreamPruneWatermarksTable {
+  stream_scope: string;
+  stream_id: string;
+  pruned_before: UpdatableTimestampColumn;
+  last_pruned_cursor: ColumnType<string | null, string | null | undefined, string | null>;
+  updated_at: UpdatableTimestampColumn;
 }
 
 export interface SourceLinksTable {
@@ -767,6 +874,33 @@ export interface BetterAuthInvitationsTable {
   inviterId: string;
 }
 
+export interface ScheduledRuntimePrunePoliciesTable {
+  id: string;
+  version: string;
+  scope: string;
+  server_id: string;
+  retention_days: number;
+  destructive: boolean;
+  categories: ColumnType<string[], string[], string[]>;
+  retry_on_failure: boolean;
+  enabled: boolean;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface RetentionDefaultsTable {
+  id: string;
+  scope: string;
+  organization_id: string | null;
+  category: string;
+  retention_days: number;
+  dry_run_scheduling_enabled: boolean;
+  destructive_scheduling_enabled: boolean;
+  enabled: boolean;
+  updated_at: UpdatableTimestampColumn;
+  updated_by_actor_id: string | null;
+  updated_by_actor_kind: string | null;
+}
+
 export interface Database {
   account: BetterAuthAccountsTable;
   projects: ProjectsTable;
@@ -780,6 +914,7 @@ export interface Database {
   dependency_resources: DependencyResourcesTable;
   dependency_resource_backups: DependencyResourceBackupsTable;
   resource_dependency_bindings: ResourceDependencyBindingsTable;
+  resource_runtime_log_archives: ResourceRuntimeLogArchivesTable;
   dependency_binding_secrets: DependencyBindingSecretsTable;
   dependency_resource_secrets: DependencyResourceSecretsTable;
   storage_volumes: StorageVolumesTable;
@@ -789,7 +924,12 @@ export interface Database {
   certificates: CertificatesTable;
   certificate_secrets: CertificateSecretsTable;
   audit_logs: AuditLogsTable;
+  audit_event_legal_holds: AuditEventLegalHoldsTable;
+  audit_event_archives: AuditEventArchivesTable;
+  audit_event_archive_items: AuditEventArchiveItemsTable;
   provider_job_logs: ProviderJobLogsTable;
+  domain_event_stream_records: DomainEventStreamRecordsTable;
+  domain_event_stream_prune_watermarks: DomainEventStreamPruneWatermarksTable;
   source_links: SourceLinksTable;
   source_events: SourceEventsTable;
   preview_environments: PreviewEnvironmentsTable;
@@ -806,6 +946,8 @@ export interface Database {
   scheduled_task_definitions: ScheduledTaskDefinitionsTable;
   scheduled_task_run_attempts: ScheduledTaskRunAttemptsTable;
   scheduled_task_run_logs: ScheduledTaskRunLogsTable;
+  scheduled_runtime_prune_policies: ScheduledRuntimePrunePoliciesTable;
+  retention_defaults: RetentionDefaultsTable;
   deploy_tokens: DeployTokensTable;
   invitation: BetterAuthInvitationsTable;
   member: BetterAuthMembersTable;

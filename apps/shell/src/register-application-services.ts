@@ -6,6 +6,8 @@ import {
   ArchiveProjectCommandHandler,
   ArchiveProjectUseCase,
   ArchiveResourceCommandHandler,
+  ArchiveResourceRuntimeLogsCommandHandler,
+  ArchiveResourceRuntimeLogsUseCase,
   ArchiveResourceUseCase,
   AttachResourceStorageCommandHandler,
   AttachResourceStorageUseCase,
@@ -17,6 +19,8 @@ import {
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
   BootstrapServerProxyCommandHandler,
   BootstrapServerProxyUseCase,
+  CancelOperatorWorkCommandHandler,
+  CancelOperatorWorkUseCase,
   type CertificateProviderSelection,
   type CertificateProviderSelectionInput,
   type CertificateProviderSelectionPolicy,
@@ -31,6 +35,9 @@ import {
   CleanupPreviewUseCase,
   CloneEnvironmentCommandHandler,
   CloneEnvironmentUseCase,
+  CloseTerminalSessionCommandHandler,
+  ConfigureAuditEventLegalHoldCommandHandler,
+  ConfigureAuditEventLegalHoldUseCase,
   ConfigureDefaultAccessDomainPolicyCommandHandler,
   ConfigureDefaultAccessDomainPolicyUseCase,
   ConfigureDomainBindingRouteCommandHandler,
@@ -49,6 +56,10 @@ import {
   ConfigureResourceRuntimeUseCase,
   ConfigureResourceSourceCommandHandler,
   ConfigureResourceSourceUseCase,
+  ConfigureRetentionDefaultsCommandHandler,
+  ConfigureRetentionDefaultsUseCase,
+  ConfigureScheduledRuntimePrunePolicyCommandHandler,
+  ConfigureScheduledRuntimePrunePolicyUseCase,
   ConfigureScheduledTaskCommandHandler,
   ConfigureScheduledTaskUseCase,
   ConfigureServerCredentialUseCase,
@@ -59,6 +70,8 @@ import {
   ConfirmDomainBindingOwnershipUseCase,
   CreateActionSourceLinkDeploymentCommandHandler,
   CreateActionSourceLinkDeploymentUseCase,
+  CreateAuditEventArchiveCommandHandler,
+  CreateAuditEventArchiveUseCase,
   CreateDependencyResourceBackupCommandHandler,
   CreateDependencyResourceBackupUseCase,
   CreateDeploymentSourceEventDispatcher,
@@ -78,6 +91,8 @@ import {
   DbStatusQueryService,
   DeactivateServerCommandHandler,
   DeactivateServerUseCase,
+  DeadLetterOperatorWorkCommandHandler,
+  DeadLetterOperatorWorkUseCase,
   DeleteCertificateCommandHandler,
   DeleteCertificateUseCase,
   DeleteDependencyResourceCommandHandler,
@@ -119,6 +134,11 @@ import {
   EnvironmentEffectivePrecedenceQueryHandler,
   EnvironmentEffectivePrecedenceQueryService,
   type ExecutionContext,
+  ExpireTerminalSessionsCommandHandler,
+  ExportAuditEventsQueryHandler,
+  ExportAuditEventsQueryService,
+  ExportGlobalAuditEventsQueryHandler,
+  ExportGlobalAuditEventsQueryService,
   GenericSignedSourceEventVerifier,
   GetAuthBootstrapStatusQueryHandler,
   GetAuthBootstrapStatusQueryService,
@@ -141,6 +161,12 @@ import {
   IssueCertificateOnCertificateRequestedHandler,
   IssueOrRenewCertificateCommandHandler,
   IssueOrRenewCertificateUseCase,
+  ListAuditEventArchivesQueryHandler,
+  ListAuditEventArchivesQueryService,
+  ListAuditEventLegalHoldsQueryHandler,
+  ListAuditEventLegalHoldsQueryService,
+  ListAuditEventsQueryHandler,
+  ListAuditEventsQueryService,
   ListCertificatesQueryHandler,
   ListCertificatesQueryService,
   ListDefaultAccessDomainPoliciesQueryHandler,
@@ -167,7 +193,13 @@ import {
   ListProvidersQueryService,
   ListResourceDependencyBindingsQueryHandler,
   ListResourceDependencyBindingsQueryService,
+  ListResourceRuntimeLogArchivesQueryHandler,
+  ListResourceRuntimeLogArchivesQueryService,
   ListResourcesQueryService,
+  ListRetentionDefaultsQueryHandler,
+  ListRetentionDefaultsQueryService,
+  ListScheduledRuntimePrunePoliciesQueryHandler,
+  ListScheduledRuntimePrunePoliciesQueryService,
   ListScheduledTaskRunsQueryHandler,
   ListScheduledTaskRunsQueryService,
   ListScheduledTasksQueryHandler,
@@ -178,6 +210,7 @@ import {
   ListSshCredentialsQueryService,
   ListStorageVolumesQueryHandler,
   ListStorageVolumesQueryService,
+  ListTerminalSessionsQueryHandler,
   LockEnvironmentCommandHandler,
   LockEnvironmentUseCase,
   type ManagedPostgresDeleteInput,
@@ -195,6 +228,8 @@ import {
   MarkDomainReadyOnDeploymentFinishedHandler,
   MarkDomainReadyOnDomainBoundHandler,
   MarkDomainRouteFailedOnDeploymentFinishedHandler,
+  MarkOperatorWorkRecoveredCommandHandler,
+  MarkOperatorWorkRecoveredUseCase,
   MarkServerAppliedRouteStatusOnDeploymentFinishedHandler,
   OpenTerminalSessionUseCase,
   OperatorWorkQueryService,
@@ -209,9 +244,27 @@ import {
   ProvisionPostgresDependencyResourceUseCase,
   ProvisionRedisDependencyResourceCommandHandler,
   ProvisionRedisDependencyResourceUseCase,
+  PruneAuditEventArchivesCommandHandler,
+  PruneAuditEventArchivesUseCase,
+  PruneAuditEventsCommandHandler,
+  PruneAuditEventsUseCase,
+  PruneDeploymentLogsCommandHandler,
+  PruneDeploymentLogsUseCase,
+  PruneDomainEventsCommandHandler,
+  PruneDomainEventsUseCase,
+  PruneOperatorWorkCommandHandler,
+  PruneOperatorWorkUseCase,
+  PruneProviderJobLogsCommandHandler,
+  PruneProviderJobLogsUseCase,
+  PruneResourceRuntimeLogArchivesCommandHandler,
+  PruneResourceRuntimeLogArchivesUseCase,
+  PruneServerCapacityCommandHandler,
+  PruneServerCapacityUseCase,
   RedeployDeploymentCommandHandler,
   RedeployDeploymentUseCase,
   RegisterServerUseCase,
+  ReleaseAuditEventLegalHoldCommandHandler,
+  ReleaseAuditEventLegalHoldUseCase,
   RelinkSourceLinkCommandHandler,
   RelinkSourceLinkUseCase,
   RemoveOrganizationMemberCommandHandler,
@@ -250,6 +303,8 @@ import {
   RetryDeploymentUseCase,
   RetryDomainBindingVerificationCommandHandler,
   RetryDomainBindingVerificationUseCase,
+  RetryOperatorWorkCommandHandler,
+  RetryOperatorWorkUseCase,
   RevokeCertificateCommandHandler,
   RevokeCertificateUseCase,
   RevokeDeployTokenCommandHandler,
@@ -265,6 +320,9 @@ import {
   RunScheduledTaskNowCommandHandler,
   RunScheduledTaskNowUseCase,
   RuntimePlanResolutionInputBuilder,
+  ScheduledHistoryRetentionService,
+  ScheduledRuntimePrunePolicyResolver,
+  ScheduledRuntimePruneService,
   ScheduledTaskRunAdmissionService,
   ScheduledTaskRunLogsQueryHandler,
   ScheduledTaskRunLogsQueryService,
@@ -273,6 +331,12 @@ import {
   SetEnvironmentVariableUseCase,
   SetResourceVariableCommandHandler,
   SetResourceVariableUseCase,
+  ShowAuditEventArchiveQueryHandler,
+  ShowAuditEventArchiveQueryService,
+  ShowAuditEventLegalHoldQueryHandler,
+  ShowAuditEventLegalHoldQueryService,
+  ShowAuditEventQueryHandler,
+  ShowAuditEventQueryService,
   ShowCertificateQueryHandler,
   ShowCertificateQueryService,
   ShowDefaultAccessDomainPolicyQueryHandler,
@@ -299,6 +363,12 @@ import {
   ShowResourceDependencyBindingQueryService,
   ShowResourceQueryHandler,
   ShowResourceQueryService,
+  ShowResourceRuntimeLogArchiveQueryHandler,
+  ShowResourceRuntimeLogArchiveQueryService,
+  ShowRetentionDefaultQueryHandler,
+  ShowRetentionDefaultQueryService,
+  ShowScheduledRuntimePrunePolicyQueryHandler,
+  ShowScheduledRuntimePrunePolicyQueryService,
   ShowScheduledTaskQueryHandler,
   ShowScheduledTaskQueryService,
   ShowScheduledTaskRunQueryHandler,
@@ -310,12 +380,14 @@ import {
   ShowSshCredentialQueryService,
   ShowStorageVolumeQueryHandler,
   ShowStorageVolumeQueryService,
+  ShowTerminalSessionQueryHandler,
   StartResourceRuntimeCommandHandler,
   StopResourceRuntimeCommandHandler,
   StreamDeploymentEventsQueryHandler,
   StreamDeploymentEventsQueryService,
   SwitchCurrentOrganizationCommandHandler,
   SwitchCurrentOrganizationUseCase,
+  TerminalSessionLifecycleService,
   TestServerConnectivityUseCase,
   tokens,
   UnbindResourceDependencyCommandHandler,
@@ -513,6 +585,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(StopResourceRuntimeCommandHandler);
   container.registerSingleton(StartResourceRuntimeCommandHandler);
   container.registerSingleton(RestartResourceRuntimeCommandHandler);
+  container.registerSingleton(ArchiveResourceRuntimeLogsCommandHandler);
+  container.registerSingleton(ListResourceRuntimeLogArchivesQueryHandler);
+  container.registerSingleton(ShowResourceRuntimeLogArchiveQueryHandler);
+  container.registerSingleton(PruneResourceRuntimeLogArchivesCommandHandler);
   container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
@@ -523,16 +599,48 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(RelinkSourceLinkCommandHandler);
   container.registerSingleton(ResolveActionServerConfigDeploymentTargetCommandHandler);
   container.registerSingleton(RenameProjectCommandHandler);
+  container.registerSingleton(CancelOperatorWorkCommandHandler);
+  container.registerSingleton(DeadLetterOperatorWorkCommandHandler);
+  container.registerSingleton(MarkOperatorWorkRecoveredCommandHandler);
+  container.registerSingleton(PruneOperatorWorkCommandHandler);
+  container.registerSingleton(RetryOperatorWorkCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
+  container.registerSingleton(ListAuditEventsQueryHandler);
+  container.registerSingleton(ExportAuditEventsQueryHandler);
+  container.registerSingleton(ExportGlobalAuditEventsQueryHandler);
+  container.registerSingleton(CreateAuditEventArchiveCommandHandler);
+  container.registerSingleton(ListAuditEventArchivesQueryHandler);
+  container.registerSingleton(ShowAuditEventArchiveQueryHandler);
+  container.registerSingleton(PruneAuditEventArchivesCommandHandler);
+  container.registerSingleton(ListAuditEventLegalHoldsQueryHandler);
+  container.registerSingleton(ShowAuditEventLegalHoldQueryHandler);
+  container.registerSingleton(ShowAuditEventQueryHandler);
+  container.registerSingleton(PruneAuditEventsCommandHandler);
+  container.registerSingleton(ConfigureAuditEventLegalHoldCommandHandler);
+  container.registerSingleton(ReleaseAuditEventLegalHoldCommandHandler);
+  container.registerSingleton(PruneDeploymentLogsCommandHandler);
+  container.registerSingleton(PruneDomainEventsCommandHandler);
+  container.registerSingleton(PruneProviderJobLogsCommandHandler);
+  container.registerSingleton(ConfigureRetentionDefaultsCommandHandler);
+  container.registerSingleton(ListRetentionDefaultsQueryHandler);
+  container.registerSingleton(ShowRetentionDefaultQueryHandler);
   container.registerSingleton(ShowCertificateQueryHandler);
   container.registerSingleton(ListOperatorWorkQueryHandler);
   container.registerSingleton(ShowOperatorWorkQueryHandler);
+  container.registerSingleton(ListTerminalSessionsQueryHandler);
+  container.registerSingleton(ShowTerminalSessionQueryHandler);
+  container.registerSingleton(CloseTerminalSessionCommandHandler);
+  container.registerSingleton(ExpireTerminalSessionsCommandHandler);
   container.registerSingleton(ListDeployTokensQueryHandler);
   container.registerSingleton(ShowDeployTokenQueryHandler);
   container.registerSingleton(ShowProjectQueryHandler);
   container.registerSingleton(ShowDomainBindingQueryHandler);
   container.registerSingleton(ShowSshCredentialQueryHandler);
   container.registerSingleton(InspectServerCapacityQueryHandler);
+  container.registerSingleton(PruneServerCapacityCommandHandler);
+  container.registerSingleton(ConfigureScheduledRuntimePrunePolicyCommandHandler);
+  container.registerSingleton(ListScheduledRuntimePrunePoliciesQueryHandler);
+  container.registerSingleton(ShowScheduledRuntimePrunePolicyQueryHandler);
   container.registerSingleton(CreateStorageVolumeCommandHandler);
   container.registerSingleton(BindResourceDependencyCommandHandler);
   container.registerSingleton(UnbindResourceDependencyCommandHandler);
@@ -801,6 +909,49 @@ export function registerApplicationServices(container: DependencyContainer): voi
   );
   container.registerSingleton(tokens.listSourceEventsQueryService, ListSourceEventsQueryService);
   container.registerSingleton(tokens.showSourceEventQueryService, ShowSourceEventQueryService);
+  container.registerSingleton(tokens.listAuditEventsQueryService, ListAuditEventsQueryService);
+  container.registerSingleton(tokens.exportAuditEventsQueryService, ExportAuditEventsQueryService);
+  container.registerSingleton(
+    tokens.exportGlobalAuditEventsQueryService,
+    ExportGlobalAuditEventsQueryService,
+  );
+  container.registerSingleton(tokens.showAuditEventQueryService, ShowAuditEventQueryService);
+  container.registerSingleton(tokens.pruneAuditEventsUseCase, PruneAuditEventsUseCase);
+  container.registerSingleton(
+    tokens.createAuditEventArchiveUseCase,
+    CreateAuditEventArchiveUseCase,
+  );
+  container.registerSingleton(
+    tokens.listAuditEventArchivesQueryService,
+    ListAuditEventArchivesQueryService,
+  );
+  container.registerSingleton(
+    tokens.showAuditEventArchiveQueryService,
+    ShowAuditEventArchiveQueryService,
+  );
+  container.registerSingleton(
+    tokens.pruneAuditEventArchivesUseCase,
+    PruneAuditEventArchivesUseCase,
+  );
+  container.registerSingleton(
+    tokens.configureAuditEventLegalHoldUseCase,
+    ConfigureAuditEventLegalHoldUseCase,
+  );
+  container.registerSingleton(
+    tokens.releaseAuditEventLegalHoldUseCase,
+    ReleaseAuditEventLegalHoldUseCase,
+  );
+  container.registerSingleton(
+    tokens.listAuditEventLegalHoldsQueryService,
+    ListAuditEventLegalHoldsQueryService,
+  );
+  container.registerSingleton(
+    tokens.showAuditEventLegalHoldQueryService,
+    ShowAuditEventLegalHoldQueryService,
+  );
+  container.registerSingleton(tokens.pruneDeploymentLogsUseCase, PruneDeploymentLogsUseCase);
+  container.registerSingleton(tokens.pruneDomainEventsUseCase, PruneDomainEventsUseCase);
+  container.registerSingleton(tokens.pruneProviderJobLogsUseCase, PruneProviderJobLogsUseCase);
   container.registerSingleton(
     tokens.resolveGenericSignedSourceEventSecretQueryService,
     ResolveGenericSignedSourceEventSecretQueryService,
@@ -838,6 +989,40 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.inspectServerCapacityQueryService,
     InspectServerCapacityQueryService,
   );
+  container.registerSingleton(tokens.pruneServerCapacityUseCase, PruneServerCapacityUseCase);
+  container.registerSingleton(
+    tokens.configureRetentionDefaultsUseCase,
+    ConfigureRetentionDefaultsUseCase,
+  );
+  container.registerSingleton(
+    tokens.listRetentionDefaultsQueryService,
+    ListRetentionDefaultsQueryService,
+  );
+  container.registerSingleton(
+    tokens.showRetentionDefaultQueryService,
+    ShowRetentionDefaultQueryService,
+  );
+  container.registerSingleton(
+    tokens.scheduledHistoryRetentionService,
+    ScheduledHistoryRetentionService,
+  );
+  container.registerSingleton(
+    tokens.configureScheduledRuntimePrunePolicyUseCase,
+    ConfigureScheduledRuntimePrunePolicyUseCase,
+  );
+  container.registerSingleton(
+    tokens.listScheduledRuntimePrunePoliciesQueryService,
+    ListScheduledRuntimePrunePoliciesQueryService,
+  );
+  container.registerSingleton(
+    tokens.showScheduledRuntimePrunePolicyQueryService,
+    ShowScheduledRuntimePrunePolicyQueryService,
+  );
+  container.registerSingleton(
+    tokens.scheduledRuntimePrunePolicyResolver,
+    ScheduledRuntimePrunePolicyResolver,
+  );
+  container.registerSingleton(tokens.scheduledRuntimePruneService, ScheduledRuntimePruneService);
   container.registerSingleton(tokens.renameServerUseCase, RenameServerUseCase);
   container.registerSingleton(
     tokens.configureServerEdgeProxyUseCase,
@@ -943,6 +1128,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
     DeploymentRecoveryReadinessQueryService,
   );
   container.registerSingleton(tokens.operatorWorkQueryService, OperatorWorkQueryService);
+  container.registerSingleton(tokens.cancelOperatorWorkUseCase, CancelOperatorWorkUseCase);
+  container.registerSingleton(tokens.deadLetterOperatorWorkUseCase, DeadLetterOperatorWorkUseCase);
+  container.registerSingleton(
+    tokens.markOperatorWorkRecoveredUseCase,
+    MarkOperatorWorkRecoveredUseCase,
+  );
+  container.registerSingleton(tokens.pruneOperatorWorkUseCase, PruneOperatorWorkUseCase);
+  container.registerSingleton(tokens.retryOperatorWorkUseCase, RetryOperatorWorkUseCase);
   container.registerSingleton(
     tokens.streamDeploymentEventsQueryService,
     StreamDeploymentEventsQueryService,
@@ -966,7 +1159,27 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.resourceRuntimeLogsQueryService,
     ResourceRuntimeLogsQueryService,
   );
+  container.registerSingleton(
+    tokens.archiveResourceRuntimeLogsUseCase,
+    ArchiveResourceRuntimeLogsUseCase,
+  );
+  container.registerSingleton(
+    tokens.listResourceRuntimeLogArchivesQueryService,
+    ListResourceRuntimeLogArchivesQueryService,
+  );
+  container.registerSingleton(
+    tokens.showResourceRuntimeLogArchiveQueryService,
+    ShowResourceRuntimeLogArchiveQueryService,
+  );
+  container.registerSingleton(
+    tokens.pruneResourceRuntimeLogArchivesUseCase,
+    PruneResourceRuntimeLogArchivesUseCase,
+  );
   container.registerSingleton(tokens.openTerminalSessionUseCase, OpenTerminalSessionUseCase);
+  container.registerSingleton(
+    tokens.terminalSessionLifecycleService,
+    TerminalSessionLifecycleService,
+  );
   container.registerSingleton(
     tokens.createActionSourceLinkDeploymentUseCase,
     CreateActionSourceLinkDeploymentUseCase,

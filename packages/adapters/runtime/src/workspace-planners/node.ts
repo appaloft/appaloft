@@ -67,7 +67,8 @@ function runCommandFor(packageManager: NodePackageManager, script: string): stri
 }
 
 function nodeBaseImage(input: WorkspacePlannerInput): string {
-  if (input.source.inspection?.packageManager === "bun" || commandMentions(input, ["bun"])) {
+  const packageManager = input.source.inspection?.packageManager;
+  if (packageManager === "bun" || (!packageManager && commandMentions(input, ["bun"]))) {
     return pinnedBunAlpineImage;
   }
 

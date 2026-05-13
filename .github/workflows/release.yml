@@ -17,6 +17,11 @@ on:
         required: false
         default: false
         type: boolean
+      require_ssh_quick_deploy_e2e:
+        description: Fail the release if SSH quick-deploy E2E secrets are missing.
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - main
@@ -159,13 +164,22 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     uses: ./.github/workflows/ssh-remote-state-e2e.yml
     with:
-      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_ssh_remote_state_e2e || false }}
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_ssh_remote_state_e2e }}
+    secrets: inherit
+
+  ssh-quick-deploy-e2e:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/ssh-quick-deploy-e2e.yml
+    with:
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_ssh_quick_deploy_e2e }}
     secrets: inherit
 
   build-release:
     needs:
       - release-please
       - ssh-remote-state-e2e
+      - ssh-quick-deploy-e2e
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     permissions:
       contents: write

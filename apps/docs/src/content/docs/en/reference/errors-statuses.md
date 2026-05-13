@@ -12,6 +12,10 @@ searchAliases:
 relatedOperations:
   - operator-work.list
   - operator-work.show
+  - audit-events.list
+  - audit-events.show
+  - audit-events.export
+  - audit-events.export-global
 sidebar:
   label: "Errors and statuses"
   order: 4
@@ -44,6 +48,79 @@ appaloft work show <workId>
 The work ledger is read-only. It summarizes attempt kind, status, phase, related resource/server/deployment/certificate ids, stable error code/category, retriability, and safe `nextActions`. `diagnostic` means run a diagnostic first; `manual-review` means an operator should inspect the item; `retry` only means a future recovery command may consider retrying, and the query itself will not execute a retry; `no-action` means the item does not currently require user action.
 
 This entrypoint does not retry, cancel, recover, dead-letter, delete, or prune anything. Recovery, cleanup, and retry capabilities are exposed through separate explicit commands so viewing status cannot accidentally mutate runtime or remote SSH state.
+
+<h2 id="operator-audit-events">Audit events</h2>
+
+When you need to explain historical changes for one resource, server, certificate, or other object, inspect retained audit events by aggregate id:
+
+```bash title="View audit events"
+appaloft audit-event list --aggregate <aggregateId>
+appaloft audit-event show <auditEventId> --aggregate <aggregateId>
+```
+
+Audit event queries are read-only. The list returns only event id, aggregate id, event type, and creation time. Detail returns a safe payload and marks masked fields in `redactedFields`. Private keys, tokens, secrets, environment values, certificate material, signatures, credential payloads, and complex provider/native payloads are not returned raw.
+
+For a bounded copy-safe export before prune or delete review, export one aggregate:
+
+```bash title="Export redacted audit events"
+appaloft audit-event export --aggregate <aggregateId> --limit 100
+```
+
+For incident triage or support handoff across aggregates, use a required time window:
+
+```bash title="Export a bounded global audit window"
+appaloft audit-event export-global --from 2026-01-01T00:00:00.000Z --to 2026-01-02T00:00:00.000Z --limit 100
+```
+
+Global export is still bounded, redacted, and read-only. It is not a legal hold, immutable archive, replay source, organization retention default, or scheduled retention policy. Reading or exporting audit events does not delete history, clean runtime state, recover state, or trigger retries.
+
+Use a legal hold when old retained audit rows must survive destructive prune during support, incident, or compliance review:
+
+```bash title="Hold and release audit rows"
+appaloft audit-event legal-hold configure --aggregate <aggregateId> --reason "support review"
+appaloft audit-event legal-hold list --status active
+appaloft audit-event legal-hold release <holdId> --reason "review complete"
+```
+
+Legal holds are retention blockers, not immutable archives or discovery workflows. `appaloft audit-event prune` reports held rows and skips rows matched by active holds until every matching hold is released.
+
+<h2 id="operator-provider-job-logs">Provider job logs</h2>
+
+Provider job logs are retained separately from deployment rows and embedded deployment logs. Run a dry-run before destructive cleanup:
+
+```bash title="Dry-run provider job log retention"
+appaloft provider-job-log prune --before 2026-01-01T00:00:00.000Z
+```
+
+Narrow the scope when needed:
+
+```bash title="Prune one provider scope"
+appaloft provider-job-log prune --before 2026-01-01T00:00:00.000Z --provider generic-ssh --dry-run false
+```
+
+The command deletes only `provider_job_logs` rows older than the cutoff when `--dry-run false` is explicit. It does not delete deployment rows, embedded deployment logs, runtime logs, audit rows, events, process attempts, snapshots, runtime artifacts, provider resources, or business state.
+
+<h2 id="operator-retention-defaults">Organization retention defaults</h2>
+
+Retention defaults are non-executing policy records. They store the default retention window for each governed history category and whether future scheduled retention may request dry-run or destructive work. They do not delete rows or let manual prune commands infer a cutoff.
+
+```bash title="Configure retention defaults"
+appaloft retention-default configure --scope system --category provider-job-logs --retention-days 30
+appaloft retention-default list --scope system
+appaloft retention-default show provider-job-logs --scope system
+```
+
+Even when a category allows destructive scheduling, manual prune still requires explicit cutoff and dry-run/destructive input. Legal holds, immutable archives, replay guards, active attempts, and category-specific skip rules remain authoritative.
+
+<h2 id="operator-domain-events">Domain event stream retention</h2>
+
+Domain event stream retention only targets retained event stream observation rows. Dry-run first, then delete by explicit cutoff:
+
+```bash title="Dry-run retained domain events"
+appaloft domain-event prune --before 2026-01-01T00:00:00.000Z
+```
+
+This command does not delete deployments, audit rows, provider logs, process attempts, snapshots, rollback candidates, runtime artifacts, or business state. Replay guards, cursor continuity, and recovery evidence take precedence over deletion.
 
 <h2 id="remote-state-resolution">SSH remote state resolution</h2>
 

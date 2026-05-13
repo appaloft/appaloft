@@ -1208,6 +1208,75 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  test("[WF-PLAN-CAT-008][RELEASE-HARDENING-006] keeps npm package-manager base image when an explicit build command mentions bun", async () => {
+    ensureReflectMetadata();
+    const [{ DefaultRuntimePlanResolver }, { generateWorkspaceDockerBuild }] = await Promise.all([
+      import("../src"),
+      import("../src/workspace-planners"),
+    ]);
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_express_npm_bun_build_command",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/express-npm-app",
+        displayName: "express-npm-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "express",
+          packageManager: "npm",
+          runtimeVersion: "22",
+          detectedFiles: ["package-json", "package-lock"],
+          detectedScripts: ["build", "start-built"],
+        }),
+      }),
+      server: {
+        id: "srv_express_npm",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_express_npm"),
+      detectedReasoning: ["detected express app"],
+      requestedDeployment: {
+        method: "workspace-commands",
+        buildCommand: "bun build.mjs",
+        startCommand: "node dist/server.js",
+        port: 4317,
+        healthCheckPath: "/health",
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    const dockerBuild = generateWorkspaceDockerBuild({
+      execution: plan.execution,
+      sourceInspection: plan.source.inspection,
+    });
+
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "node",
+        runtimeKind: "node",
+        framework: "express",
+        packageManager: "npm",
+        baseImage: "node:22-alpine",
+        applicationShape: "serverful-http",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        installCommand: "npm install",
+        buildCommand: "bun build.mjs",
+        startCommand: "node dist/server.js",
+      }),
+    );
+    expect(dockerBuild?.dockerfile).toContain("FROM node:22-alpine");
+    expect(dockerBuild?.dockerfile).toContain('RUN ["sh","-lc","npm install"]');
+    expect(dockerBuild?.dockerfile).toContain('RUN ["sh","-lc","bun build.mjs"]');
+  });
+
   test("[DEP-CREATE-ADM-029][WF-PLAN-DET-012][WF-PLAN-CAT-008] rejects Node API framework evidence without production start", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");

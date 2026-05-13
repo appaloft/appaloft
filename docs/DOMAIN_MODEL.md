@@ -273,6 +273,53 @@ Transport compatibility note:
   PostgreSQL/PGlite backends must persist it through a dedicated persistence adapter rather than a
   `Resource` repository or resource aggregate field.
 
+### Operator/Internal State
+
+Owns:
+- process attempt journal
+- operator work read model
+- durable process delivery state for accepted long-running work
+
+Implemented now:
+- process attempt journal read/write ports and persistence
+- operator-work list/show visibility over process attempts and compatibility read models
+- operator repair annotations for retry, cancel, dead-letter, mark-recovered, and prune
+- selected durable worker bindings for scheduled-task runs, scheduled runtime prune, and scheduled
+  history retention
+- preview cleanup process-attempt projection for operator-visible cleanup success and retry
+  failures
+- proxy bootstrap process-attempt projection for operator-visible repair success and retriable
+  failure details
+- resource runtime-control process-attempt projection for operator-visible stop/start/restart
+  success and failure details
+- source-event auto-deploy process-attempt projection for operator-visible accepted dispatch,
+  success, and failure details
+
+Boundary rule:
+- durable process delivery is Appaloft's outbox/inbox-equivalent baseline for accepted
+  long-running work under
+  [ADR-054](./decisions/ADR-054-durable-process-delivery-baseline.md)
+- process attempt rows record operator-visible process state, retry eligibility, lineage, safe
+  details, and terminal outcomes; they are not event-sourcing events and not business aggregate
+  snapshots
+- operation-specific workers may execute runtime/provider work only after a successful atomic
+  delivery claim through application ports and persistence-owned claim/dedupe translation
+- operator-work commands mutate only process attempt state unless a workflow-specific spec governs
+  additional business-state mutation
+- workflow-specific durable workers remain opt-in by local spec/test matrix; existing in-memory
+  event consumers do not become durable automatically
+- preview cleanup retry scheduling still uses the preview cleanup attempt store and
+  preview-lifecycle coordination lease until a later local spec moves it to process-attempt atomic
+  claim/completion
+- proxy bootstrap repair execution still runs inline through `servers.bootstrap-proxy` and
+  post-register bootstrap remains event-driven until a later local spec moves it to process-attempt
+  atomic claim/completion
+- resource runtime-control execution still runs inline through `resources.runtime.*` command use
+  cases until a later local spec moves retry execution to process-attempt atomic claim/completion
+- source-event auto-deploy dispatch still runs inline through `source-events.ingest` and the
+  source-event record update path until a later local spec moves retry execution to
+  process-attempt atomic claim/completion
+
 ### Workload Delivery
 
 Owns:
@@ -335,7 +382,9 @@ Boundary rule:
   application-layer runtime log reader port. Docker/Compose is the v1 deployment-backed reader
   substrate under ADR-021; future PM2, systemd, file-tail, and provider log mechanisms are adapter
   details that require ADR coverage before they become public workload runtime strategies, and must
-  not leak into core aggregates
+  not leak into core aggregates. Runtime log archival is separate under ADR-053 and uses explicit
+  Appaloft-owned archive snapshots derived from observation instead of persisting every live line by
+  default.
 - current resource health observation belongs to the resource surface and is performed through
   application-layer read/query ports that inspect runtime/container/process state, configured
   health policy, proxy route state, and public access state. `ResourceHealthSummary` is a read
@@ -415,6 +464,8 @@ Rules:
 - source mode is either `appaloft-managed` or `imported-external`
 - Appaloft-managed Postgres and Redis include durable provider-native realization state and safe
   provider handles without moving provider SDK concerns into core
+- provider-native realization and managed provider cleanup attempts are mirrored into
+  operator-visible process-attempt state with safe dependency/provider metadata
 - imported external Postgres delete removes only the Appaloft control-plane record and must not
   imply external database deletion
 - connection read models expose only masked endpoint/connection metadata and secret references; raw
@@ -446,8 +497,8 @@ Current scope:
   [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md)
 - Phase 7 provider-native Redis realization under
   [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md)
-- provider-native credential rotation, runtime cleanup, and final closed-loop verification are
-  future Phase 7 work
+- full process-attempt atomic claim/completion workers, provider-native credential rotation,
+  runtime cleanup, and final closed-loop verification are future work
 
 ### Dependency Resource Backup
 
@@ -463,6 +514,9 @@ Rules:
 - retained ready backups and in-flight backup/restore attempts block dependency resource deletion
 - backup/restore must not mutate ResourceBindings, historical deployment snapshots, runtime env, or
   workload runtime state
+- backup/restore provider attempts are projected into operator-visible process attempts with safe
+  dependency kind, provider, backup id, and restore attempt metadata; provider execution remains
+  inline until a later local spec moves it to process-attempt atomic claim/completion
 - raw dump contents, passwords, provider credentials, raw connection URLs, provider SDK payloads,
   and command output must not appear in core state, read models, events, errors, logs, or public
   contracts
@@ -512,8 +566,9 @@ Boundary rule:
 - deployments are displayed under the Resource that owns them; global or project-level deployment
   pages are read/query rollups
 - deployment logs are attempt/progress records; application runtime logs are resource-owned
-  observation and must not be treated as Deployment aggregate state unless a future ADR introduces
-  persisted runtime log archival
+  observation and must not be treated as Deployment aggregate state. ADR-053 introduces planned
+  runtime log archive snapshots as Appaloft-owned retained records outside Deployment aggregate
+  state.
 - public rollback is active under ADR-016/ADR-034, and rollback plans in the v1 model reference
   prior deployment snapshots and Docker/OCI runtime artifact identity rather than reconstructing
   host-process command state

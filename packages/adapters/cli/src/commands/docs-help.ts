@@ -45,7 +45,13 @@ export const cliDocsHrefs = {
   diagnosticsRuntimeTargetCapacity: resolvePublicDocsHelpHref(
     "diagnostics.runtime-target-capacity",
   ),
+  diagnosticsScheduledRuntimePrunePolicy: resolvePublicDocsHelpHref(
+    "diagnostics.scheduled-runtime-prune-policy",
+  ),
   operatorWorkLedger: resolvePublicDocsHelpHref("operator.work-ledger"),
+  operatorAuditEvents: resolvePublicDocsHelpHref("operator.audit-events"),
+  operatorDomainEvents: resolvePublicDocsHelpHref("operator.domain-events"),
+  operatorProviderJobLogs: resolvePublicDocsHelpHref("operator.provider-job-logs"),
   remoteStateLock: resolvePublicDocsHelpHref("errors.remote-state-lock"),
   sourceAutoDeploySetup: resolvePublicDocsHelpHref("source.auto-deploy-setup"),
   sourceAutoDeploySignatures: resolvePublicDocsHelpHref("source.auto-deploy-signatures"),
@@ -64,6 +70,10 @@ export const cliCommandDescriptions = {
   deploy: withDocs("Create a deployment", "deployment.source"),
   deploymentPlan: withDocs("Preview deployment plan without execution", "deployment.plan-preview"),
   deploymentLogs: withDocs("Show deployment logs", "observability.runtime-logs"),
+  deploymentLogsPrune: withDocs(
+    "Dry-run or prune old embedded deployment log entries",
+    "observability.runtime-logs",
+  ),
   deploymentList: withDocs("List deployments", "deployment.lifecycle"),
   deploymentShow: withDocs("Show deployment detail", "deployment.lifecycle"),
   deploymentRecoveryReadiness: withDocs(
@@ -147,6 +157,94 @@ export const cliCommandDescriptions = {
     "Show one background work item without retrying or cleaning it up",
     "operator.work-ledger",
   ),
+  operatorWorkMarkRecovered: withDocs(
+    "Mark one durable background work item as manually recovered",
+    "operator.work-ledger",
+  ),
+  operatorWorkDeadLetter: withDocs(
+    "Dead-letter one durable background work item after manual review",
+    "operator.work-ledger",
+  ),
+  operatorWorkCancel: withDocs(
+    "Cancel one pending or retry-scheduled durable background work item",
+    "operator.work-ledger",
+  ),
+  operatorWorkRetry: withDocs(
+    "Create a new pending retry attempt for one retriable background work item",
+    "operator.work-ledger",
+  ),
+  operatorWorkPrune: withDocs(
+    "Dry-run or prune old terminal durable background work journal rows",
+    "operator.work-ledger",
+  ),
+  auditEvent: withDocs("Audit event visibility", "operator.audit-events"),
+  auditEventList: withDocs("List safe audit events for one aggregate", "operator.audit-events"),
+  auditEventShow: withDocs("Show one redacted audit event", "operator.audit-events"),
+  auditEventExport: withDocs(
+    "Export bounded redacted audit events for one aggregate",
+    "operator.audit-events",
+  ),
+  auditEventExportGlobal: withDocs(
+    "Export bounded redacted audit events across aggregates",
+    "operator.audit-events",
+  ),
+  auditEventPrune: withDocs(
+    "Dry-run or prune old retained audit rows while preserving active legal holds and archives",
+    "operator.audit-events",
+  ),
+  auditEventArchive: withDocs("Audit event archive management", "operator.audit-events"),
+  auditEventArchiveCreate: withDocs(
+    "Create an immutable redacted audit event archive",
+    "operator.audit-events",
+  ),
+  auditEventArchiveList: withDocs("List audit event archives", "operator.audit-events"),
+  auditEventArchiveShow: withDocs("Show one audit event archive", "operator.audit-events"),
+  auditEventArchivePrune: withDocs(
+    "Dry-run or prune old retained audit event archives",
+    "operator.audit-events",
+  ),
+  auditEventLegalHold: withDocs("Audit event legal hold management", "operator.audit-events"),
+  auditEventLegalHoldConfigure: withDocs(
+    "Configure an audit event legal hold",
+    "operator.audit-events",
+  ),
+  auditEventLegalHoldList: withDocs("List audit event legal holds", "operator.audit-events"),
+  auditEventLegalHoldShow: withDocs("Show one audit event legal hold", "operator.audit-events"),
+  auditEventLegalHoldRelease: withDocs(
+    "Release an audit event legal hold",
+    "operator.audit-events",
+  ),
+  providerJobLog: withDocs("Provider job log retention", "operator.provider-job-logs"),
+  providerJobLogPrune: withDocs(
+    "Dry-run or prune old retained provider job log rows",
+    "operator.provider-job-logs",
+  ),
+  retentionDefault: withDocs("Organization retention defaults", "operator.retention-defaults"),
+  retentionDefaultConfigure: withDocs(
+    "Configure non-executing retention defaults",
+    "operator.retention-defaults",
+  ),
+  retentionDefaultList: withDocs("List retention defaults", "operator.retention-defaults"),
+  retentionDefaultShow: withDocs("Show retention default", "operator.retention-defaults"),
+  domainEvent: withDocs("Domain event stream retention", "operator.domain-events"),
+  domainEventPrune: withDocs(
+    "Dry-run or prune old retained domain event stream rows",
+    "operator.domain-events",
+  ),
+  terminalSession: withDocs("Terminal session lifecycle operations", "server.terminal-session"),
+  terminalSessionList: withDocs(
+    "List active terminal sessions without terminal output",
+    "server.terminal-session",
+  ),
+  terminalSessionShow: withDocs(
+    "Show one active terminal session without attaching to it",
+    "server.terminal-session",
+  ),
+  terminalSessionClose: withDocs("Close one active terminal session", "server.terminal-session"),
+  terminalSessionExpire: withDocs(
+    "Expire active terminal sessions older than a cutoff",
+    "server.terminal-session",
+  ),
   project: withDocs("Project operations", "project.lifecycle"),
   projectCreate: withDocs("Create a project", "project.concept"),
   projectList: withDocs("List projects", "project.concept"),
@@ -195,6 +293,26 @@ export const cliCommandDescriptions = {
     "Inspect disk, inode, Docker, and Appaloft runtime capacity without cleanup",
     "diagnostics.runtime-target-capacity",
   ),
+  serverCapacityPrune: withDocs(
+    "Dry-run or prune safe stopped containers and Appaloft runtime workspaces",
+    "diagnostics.runtime-target-capacity",
+  ),
+  serverCapacityPolicy: withDocs(
+    "Scheduled runtime prune policy operations",
+    "diagnostics.scheduled-runtime-prune-policy",
+  ),
+  serverCapacityPolicyConfigure: withDocs(
+    "Configure scheduled runtime prune policy",
+    "diagnostics.scheduled-runtime-prune-policy",
+  ),
+  serverCapacityPolicyList: withDocs(
+    "List scheduled runtime prune policies",
+    "diagnostics.scheduled-runtime-prune-policy",
+  ),
+  serverCapacityPolicyShow: withDocs(
+    "Show scheduled runtime prune policy",
+    "diagnostics.scheduled-runtime-prune-policy",
+  ),
   serverProxy: withDocs("Server edge proxy operations", "server.proxy-readiness"),
   serverProxyRepair: withDocs(
     "Repair provider-owned edge proxy infrastructure",
@@ -213,6 +331,26 @@ export const cliCommandDescriptions = {
   resourceDelete: withDocs("Delete an archived resource", "resource.concept"),
   resourceTerminal: withDocs("Open a resource terminal session", "server.terminal-session"),
   resourceLogs: withDocs("Show resource runtime logs", "observability.runtime-logs"),
+  resourceLogsArchive: withDocs(
+    "Capture a redacted resource runtime log archive snapshot",
+    "observability.runtime-logs",
+  ),
+  resourceLogArchives: withDocs(
+    "Resource runtime log archive retention",
+    "observability.runtime-logs",
+  ),
+  resourceLogArchivesList: withDocs(
+    "List retained resource runtime log archive snapshots",
+    "observability.runtime-logs",
+  ),
+  resourceLogArchivesShow: withDocs(
+    "Show one retained resource runtime log archive snapshot",
+    "observability.runtime-logs",
+  ),
+  resourceLogArchivesPrune: withDocs(
+    "Dry-run or prune retained resource runtime log archive snapshots",
+    "observability.runtime-logs",
+  ),
   resourceRuntime: withDocs("Resource runtime control operations", "resource.runtime-controls"),
   resourceRuntimeStop: withDocs("Stop the current resource runtime", "resource.runtime-controls"),
   resourceRuntimeStart: withDocs(

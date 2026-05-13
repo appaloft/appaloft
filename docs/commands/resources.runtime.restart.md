@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted candidate. Do not expose this command until runtime-control attempt persistence, readback,
-error contracts, public docs/help, `CORE_OPERATIONS.md`, `operation-catalog.ts`, CLI, HTTP/oRPC,
-Web, and tests are aligned in Code Round.
+Accepted and active. Runtime-control attempt persistence, readback, error contracts, public
+docs/help, `CORE_OPERATIONS.md`, `operation-catalog.ts`, CLI, HTTP/oRPC, Web, and tests are aligned
+for the current runtime-control slice.
 
 ## Governing Sources
 
@@ -92,7 +92,7 @@ Use [Resource Runtime Controls Error Spec](../errors/resource-runtime-controls.m
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail runtime controls with restart-vs-redeploy copy. | Future Code Round |
-| CLI | `appaloft resource runtime restart <resourceId>`. | Future Code Round |
-| oRPC / HTTP | `POST /api/resources/{resourceId}/runtime/restart`. | Future Code Round |
+| Web | Resource detail runtime controls with restart-vs-redeploy copy. | Active |
+| CLI | `appaloft resource runtime restart <resourceId>`. | Active |
+| oRPC / HTTP | `POST /api/resources/{resourceId}/runtime/restart`. | Active |
 | Automation / MCP | Future command/tool over the same operation key. | Future |

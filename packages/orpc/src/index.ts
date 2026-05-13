@@ -7,10 +7,12 @@ import {
   ArchiveEnvironmentCommand,
   ArchiveProjectCommand,
   ArchiveResourceCommand,
+  ArchiveResourceRuntimeLogsCommand,
   AttachResourceStorageCommand,
   archiveEnvironmentCommandInputSchema,
   archiveProjectCommandInputSchema,
   archiveResourceCommandInputSchema,
+  archiveResourceRuntimeLogsCommandInputSchema,
   attachResourceStorageCommandInputSchema,
   BindResourceDependencyCommand,
   BootstrapFirstAdminCommand,
@@ -18,13 +20,16 @@ import {
   bindResourceDependencyCommandInputSchema,
   bootstrapFirstAdminCommandInputSchema,
   bootstrapServerProxyCommandInputSchema,
+  CancelOperatorWorkCommand,
   ChangeOrganizationMemberRoleCommand,
   CheckDomainBindingDeleteSafetyQuery,
   CheckServerDeleteSafetyQuery,
   CleanupPreviewCommand,
   CloneEnvironmentCommand,
+  CloseTerminalSessionCommand,
   type Command,
   type CommandBus,
+  ConfigureAuditEventLegalHoldCommand,
   ConfigureDefaultAccessDomainPolicyCommand,
   ConfigureDomainBindingRouteCommand,
   ConfigurePreviewPolicyCommand,
@@ -34,12 +39,15 @@ import {
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
+  ConfigureRetentionDefaultsCommand,
+  ConfigureScheduledRuntimePrunePolicyCommand,
   ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   ConfigureServerEdgeProxyCommand,
   ConfirmActionPreviewRouteCommand,
   ConfirmDomainBindingOwnershipCommand,
   CreateActionSourceLinkDeploymentCommand,
+  CreateAuditEventArchiveCommand,
   CreateDependencyResourceBackupCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
@@ -51,11 +59,14 @@ import {
   CreateScheduledTaskCommand,
   CreateSshCredentialCommand,
   CreateStorageVolumeCommand,
+  cancelOperatorWorkCommandInputSchema,
   changeOrganizationMemberRoleCommandInputSchema,
   checkDomainBindingDeleteSafetyQueryInputSchema,
   checkServerDeleteSafetyQueryInputSchema,
   cleanupPreviewCommandInputSchema,
   cloneEnvironmentCommandInputSchema,
+  closeTerminalSessionCommandInputSchema,
+  configureAuditEventLegalHoldCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureDomainBindingRouteCommandInputSchema,
   configurePreviewPolicyCommandInputSchema,
@@ -65,10 +76,13 @@ import {
   configureResourceNetworkCommandInputSchema,
   configureResourceRuntimeCommandInputSchema,
   configureResourceSourceCommandInputSchema,
+  configureRetentionDefaultsCommandInputSchema,
+  configureScheduledRuntimePrunePolicyCommandInputSchema,
   configureScheduledTaskCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   configureServerEdgeProxyCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
+  createAuditEventArchiveCommandInputSchema,
   createDependencyResourceBackupCommandInputSchema,
   createDeploymentCommandInputSchema,
   createDeployTokenCommandInputSchema,
@@ -80,6 +94,7 @@ import {
   createSshCredentialCommandInputSchema,
   createStorageVolumeCommandInputSchema,
   DeactivateServerCommand,
+  DeadLetterOperatorWorkCommand,
   DeleteCertificateCommand,
   DeleteDependencyResourceCommand,
   DeleteDomainBindingCommand,
@@ -98,6 +113,7 @@ import {
   DetachResourceStorageCommand,
   DiffEnvironmentsQuery,
   deactivateServerCommandInputSchema,
+  deadLetterOperatorWorkCommandInputSchema,
   deleteCertificateCommandInputSchema,
   deleteDependencyResourceCommandInputSchema,
   deleteDomainBindingCommandInputSchema,
@@ -116,7 +132,13 @@ import {
   type ExecutionActor,
   type ExecutionContext,
   type ExecutionContextFactory,
+  ExpireTerminalSessionsCommand,
+  ExportAuditEventsQuery,
+  ExportGlobalAuditEventsQuery,
   environmentEffectivePrecedenceQueryInputSchema,
+  expireTerminalSessionsCommandInputSchema,
+  exportAuditEventsQueryInputSchema,
+  exportGlobalAuditEventsQueryInputSchema,
   GetAuthBootstrapStatusQuery,
   GetCurrentOrganizationContextQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
@@ -129,14 +151,19 @@ import {
   ImportResourceVariablesCommand,
   IngestPreviewPullRequestEventCommand,
   IngestSourceEventCommand,
+  InspectServerCapacityQuery,
   InviteOrganizationMemberCommand,
   IssueOrRenewCertificateCommand,
   importCertificateCommandInputSchema,
   importPostgresDependencyResourceCommandInputSchema,
   importRedisDependencyResourceCommandInputSchema,
   importResourceVariablesCommandInputSchema,
+  inspectServerCapacityQueryInputSchema,
   inviteOrganizationMemberCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
+  ListAuditEventArchivesQuery,
+  ListAuditEventLegalHoldsQuery,
+  ListAuditEventsQuery,
   ListCertificatesQuery,
   ListDefaultAccessDomainPoliciesQuery,
   ListDependencyResourceBackupsQuery,
@@ -154,14 +181,21 @@ import {
   ListProjectsQuery,
   ListProvidersQuery,
   ListResourceDependencyBindingsQuery,
+  ListResourceRuntimeLogArchivesQuery,
   ListResourcesQuery,
+  ListRetentionDefaultsQuery,
+  ListScheduledRuntimePrunePoliciesQuery,
   ListScheduledTaskRunsQuery,
   ListScheduledTasksQuery,
   ListServersQuery,
   ListSourceEventsQuery,
   ListSshCredentialsQuery,
   ListStorageVolumesQuery,
+  ListTerminalSessionsQuery,
   LockEnvironmentCommand,
+  listAuditEventArchivesQueryInputSchema,
+  listAuditEventLegalHoldsQueryInputSchema,
+  listAuditEventsQueryInputSchema,
   listCertificatesQueryInputSchema,
   listDefaultAccessDomainPoliciesQueryInputSchema,
   listDependencyResourceBackupsQueryInputSchema,
@@ -176,13 +210,19 @@ import {
   listOrganizationMembersQueryInputSchema,
   listPreviewEnvironmentsQueryInputSchema,
   listResourceDependencyBindingsQueryInputSchema,
+  listResourceRuntimeLogArchivesQueryInputSchema,
   listResourcesQueryInputSchema,
+  listRetentionDefaultsQueryInputSchema,
+  listScheduledRuntimePrunePoliciesQueryInputSchema,
   listScheduledTaskRunsQueryInputSchema,
   listScheduledTasksQueryInputSchema,
   listSourceEventsQueryInputSchema,
   listSshCredentialsQueryInputSchema,
   listStorageVolumesQueryInputSchema,
+  listTerminalSessionsQueryInputSchema,
   lockEnvironmentCommandInputSchema,
+  MarkOperatorWorkRecoveredCommand,
+  markOperatorWorkRecoveredCommandInputSchema,
   OpenTerminalSessionCommand,
   openTerminalSessionCommandInputSchema,
   type ProductOrganizationRole,
@@ -190,13 +230,30 @@ import {
   PromoteEnvironmentCommand,
   ProvisionPostgresDependencyResourceCommand,
   ProvisionRedisDependencyResourceCommand,
+  PruneAuditEventArchivesCommand,
+  PruneAuditEventsCommand,
+  PruneDeploymentLogsCommand,
+  PruneDomainEventsCommand,
+  PruneOperatorWorkCommand,
+  PruneProviderJobLogsCommand,
+  PruneResourceRuntimeLogArchivesCommand,
+  PruneServerCapacityCommand,
   promoteEnvironmentCommandInputSchema,
   provisionPostgresDependencyResourceCommandInputSchema,
   provisionRedisDependencyResourceCommandInputSchema,
+  pruneAuditEventArchivesCommandInputSchema,
+  pruneAuditEventsCommandInputSchema,
+  pruneDeploymentLogsCommandInputSchema,
+  pruneDomainEventsCommandInputSchema,
+  pruneOperatorWorkCommandInputSchema,
+  pruneProviderJobLogsCommandInputSchema,
+  pruneResourceRuntimeLogArchivesCommandInputSchema,
+  pruneServerCapacityCommandInputSchema,
   type Query,
   type QueryBus,
   RedeployDeploymentCommand,
   RegisterServerCommand,
+  ReleaseAuditEventLegalHoldCommand,
   RelinkSourceLinkCommand,
   RemoveOrganizationMemberCommand,
   RenameDependencyResourceCommand,
@@ -222,6 +279,7 @@ import {
   RetryCertificateCommand,
   RetryDeploymentCommand,
   RetryDomainBindingVerificationCommand,
+  RetryOperatorWorkCommand,
   RevokeCertificateCommand,
   RevokeDeployTokenCommand,
   RollbackDeploymentCommand,
@@ -231,6 +289,7 @@ import {
   RunScheduledTaskNowCommand,
   redeployDeploymentCommandInputSchema,
   registerServerCommandInputSchema,
+  releaseAuditEventLegalHoldCommandInputSchema,
   relinkSourceLinkCommandInputSchema,
   removeOrganizationMemberCommandInputSchema,
   renameDependencyResourceCommandInputSchema,
@@ -249,6 +308,7 @@ import {
   retryCertificateCommandInputSchema,
   retryDeploymentCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
+  retryOperatorWorkCommandInputSchema,
   revokeCertificateCommandInputSchema,
   revokeDeployTokenCommandInputSchema,
   rollbackDeploymentCommandInputSchema,
@@ -259,6 +319,9 @@ import {
   ScheduledTaskRunLogsQuery,
   SetEnvironmentVariableCommand,
   SetResourceVariableCommand,
+  ShowAuditEventArchiveQuery,
+  ShowAuditEventLegalHoldQuery,
+  ShowAuditEventQuery,
   ShowCertificateQuery,
   ShowDefaultAccessDomainPolicyQuery,
   ShowDependencyResourceBackupQuery,
@@ -273,12 +336,16 @@ import {
   ShowProjectQuery,
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
+  ShowResourceRuntimeLogArchiveQuery,
+  ShowRetentionDefaultQuery,
+  ShowScheduledRuntimePrunePolicyQuery,
   ShowScheduledTaskQuery,
   ShowScheduledTaskRunQuery,
   ShowServerQuery,
   ShowSourceEventQuery,
   ShowSshCredentialQuery,
   ShowStorageVolumeQuery,
+  ShowTerminalSessionQuery,
   type SourceEventVerificationPort,
   StartResourceRuntimeCommand,
   StopResourceRuntimeCommand,
@@ -289,6 +356,9 @@ import {
   scheduledTaskRunLogsQueryInputSchema,
   setEnvironmentVariableCommandInputSchema,
   setResourceVariableCommandInputSchema,
+  showAuditEventArchiveQueryInputSchema,
+  showAuditEventLegalHoldQueryInputSchema,
+  showAuditEventQueryInputSchema,
   showCertificateQueryInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
   showDependencyResourceBackupQueryInputSchema,
@@ -303,12 +373,16 @@ import {
   showProjectQueryInputSchema,
   showResourceDependencyBindingQueryInputSchema,
   showResourceQueryInputSchema,
+  showResourceRuntimeLogArchiveQueryInputSchema,
+  showRetentionDefaultQueryInputSchema,
+  showScheduledRuntimePrunePolicyQueryInputSchema,
   showScheduledTaskQueryInputSchema,
   showScheduledTaskRunQueryInputSchema,
   showServerQueryInputSchema,
   showSourceEventQueryInputSchema,
   showSshCredentialQueryInputSchema,
   showStorageVolumeQueryInputSchema,
+  showTerminalSessionQueryInputSchema,
   startResourceRuntimeCommandInputSchema,
   stopResourceRuntimeCommandInputSchema,
   streamDeploymentEventsQueryInputSchema,
@@ -329,14 +403,19 @@ import {
   archiveEnvironmentResponseSchema,
   archiveProjectResponseSchema,
   archiveResourceResponseSchema,
+  archiveResourceRuntimeLogsResponseSchema,
   attachResourceStorageResponseSchema,
+  auditEventArchiveResponseSchema,
+  auditEventLegalHoldResponseSchema,
   bindResourceDependencyResponseSchema,
   bootstrapServerProxyResponseSchema,
+  cancelOperatorWorkResponseSchema,
   changeOrganizationMemberRoleResponseSchema,
   checkDomainBindingDeleteSafetyResponseSchema,
   checkServerDeleteSafetyResponseSchema,
   cleanupPreviewResponseSchema,
   cloneEnvironmentResponseSchema,
+  closeTerminalSessionResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
   configureDomainBindingRouteResponseSchema,
   configurePreviewPolicyResponseSchema,
@@ -346,6 +425,8 @@ import {
   configureResourceNetworkResponseSchema,
   configureResourceRuntimeResponseSchema,
   configureResourceSourceResponseSchema,
+  configureRetentionDefaultsResponseSchema,
+  configureScheduledRuntimePrunePolicyResponseSchema,
   configureServerEdgeProxyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
   createDeploymentResponseSchema,
@@ -358,6 +439,7 @@ import {
   createStorageVolumeResponseSchema,
   currentOrganizationContextResponseSchema,
   deactivateServerResponseSchema,
+  deadLetterOperatorWorkResponseSchema,
   deleteCertificateResponseSchema,
   deleteDomainBindingResponseSchema,
   deletePreviewEnvironmentResponseSchema,
@@ -378,10 +460,17 @@ import {
   diffEnvironmentResponseSchema,
   environmentEffectivePrecedenceResponseSchema,
   environmentSummarySchema,
+  expireTerminalSessionsResponseSchema,
+  exportAuditEventsResponseSchema,
+  exportGlobalAuditEventsResponseSchema,
   importCertificateResponseSchema,
   importResourceVariablesResponseSchema,
+  inspectServerCapacityResponseSchema,
   inviteOrganizationMemberResponseSchema,
   issueOrRenewCertificateResponseSchema,
+  listAuditEventArchivesResponseSchema,
+  listAuditEventLegalHoldsResponseSchema,
+  listAuditEventsResponseSchema,
   listCertificatesResponseSchema,
   listDefaultAccessDomainPoliciesResponseSchema,
   listDependencyResourceBackupsResponseSchema,
@@ -399,16 +488,29 @@ import {
   listProjectsResponseSchema,
   listProvidersResponseSchema,
   listResourceDependencyBindingsResponseSchema,
+  listResourceRuntimeLogArchivesResponseSchema,
   listResourcesResponseSchema,
+  listRetentionDefaultsResponseSchema,
+  listScheduledRuntimePrunePoliciesResponseSchema,
   listScheduledTaskRunsResponseSchema,
   listScheduledTasksResponseSchema,
   listServersResponseSchema,
   listSourceEventsResponseSchema,
   listSshCredentialsResponseSchema,
   listStorageVolumesResponseSchema,
+  listTerminalSessionsResponseSchema,
   lockEnvironmentResponseSchema,
+  markOperatorWorkRecoveredResponseSchema,
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
+  pruneAuditEventArchivesResponseSchema,
+  pruneAuditEventsResponseSchema,
+  pruneDeploymentLogsResponseSchema,
+  pruneDomainEventsResponseSchema,
+  pruneOperatorWorkResponseSchema,
+  pruneProviderJobLogsResponseSchema,
+  pruneResourceRuntimeLogArchivesResponseSchema,
+  pruneServerCapacityResponseSchema,
   redeployDeploymentResponseSchema,
   registerServerResponseSchema,
   removeOrganizationMemberResponseSchema,
@@ -428,6 +530,7 @@ import {
   retryCertificateResponseSchema,
   retryDeploymentResponseSchema,
   retryDomainBindingVerificationResponseSchema,
+  retryOperatorWorkResponseSchema,
   revokeCertificateResponseSchema,
   revokeDeployTokenResponseSchema,
   rollbackDeploymentResponseSchema,
@@ -438,6 +541,9 @@ import {
   scheduledTaskCommandResponseSchema,
   scheduledTaskRunLogsResponseSchema,
   setResourceVariableResponseSchema,
+  showAuditEventArchiveResponseSchema,
+  showAuditEventLegalHoldResponseSchema,
+  showAuditEventResponseSchema,
   showCertificateResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
   showDependencyResourceBackupResponseSchema,
@@ -450,12 +556,16 @@ import {
   showPreviewPolicyResponseSchema,
   showProjectResponseSchema,
   showResourceDependencyBindingResponseSchema,
+  showResourceRuntimeLogArchiveResponseSchema,
+  showRetentionDefaultResponseSchema,
+  showScheduledRuntimePrunePolicyResponseSchema,
   showScheduledTaskResponseSchema,
   showScheduledTaskRunResponseSchema,
   showServerResponseSchema,
   showSourceEventResponseSchema,
   showSshCredentialResponseSchema,
   showStorageVolumeResponseSchema,
+  showTerminalSessionResponseSchema,
   startResourceRuntimeResponseSchema,
   stopResourceRuntimeResponseSchema,
   terminalSessionDescriptorSchema,
@@ -690,7 +800,12 @@ export const apiDocsHrefs = {
   healthSummary: resolvePublicDocsHelpHref("observability.health-summary"),
   diagnosticSummary: resolvePublicDocsHelpHref("diagnostics.safe-support-payload"),
   accessFailureEvidenceLookup: resolvePublicDocsHelpHref("diagnostics.access-failure-request-id"),
+  scheduledRuntimePrunePolicy: resolvePublicDocsHelpHref(
+    "diagnostics.scheduled-runtime-prune-policy",
+  ),
   operatorWorkLedger: resolvePublicDocsHelpHref("operator.work-ledger"),
+  operatorAuditEvents: resolvePublicDocsHelpHref("operator.audit-events"),
+  operatorRetentionDefaults: resolvePublicDocsHelpHref("operator.retention-defaults"),
   terminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
   storageVolumeLifecycle: resolvePublicDocsHelpHref("storage.volume-lifecycle"),
@@ -730,6 +845,38 @@ export const apiRouteDescriptions = {
   showServer: routeDescription(
     "Reads one deployment target with proxy status and usage rollups.",
     "server.deployment-target",
+  ),
+  serverCapacity: routeDescription(
+    "Inspects disk, inode, Docker, memory, CPU, and Appaloft runtime capacity without pruning or mutating server state.",
+    "diagnostics.runtime-target-capacity",
+  ),
+  serverCapacityPrune: routeDescription(
+    "Dry-runs or prunes safe Appaloft-managed stopped containers and runtime workspaces without deleting volumes, state roots, or rollback candidates.",
+    "diagnostics.runtime-target-capacity",
+  ),
+  scheduledRuntimePrunePolicyConfigure: routeDescription(
+    "Configures a scheduled runtime prune policy used by scheduler readback and worker handoff.",
+    "diagnostics.scheduled-runtime-prune-policy",
+  ),
+  scheduledRuntimePrunePolicyList: routeDescription(
+    "Lists safe scheduled runtime prune policy records with optional target and scope filters.",
+    "diagnostics.scheduled-runtime-prune-policy",
+  ),
+  scheduledRuntimePrunePolicyShow: routeDescription(
+    "Reads one safe scheduled runtime prune policy record by id.",
+    "diagnostics.scheduled-runtime-prune-policy",
+  ),
+  retentionDefaultsConfigure: routeDescription(
+    "Configures non-executing retention defaults for governed history categories.",
+    "operator.retention-defaults",
+  ),
+  retentionDefaultsList: routeDescription(
+    "Lists safe retention default policy records without retained history payloads.",
+    "operator.retention-defaults",
+  ),
+  retentionDefaultsShow: routeDescription(
+    "Reads one safe retention default policy record by category.",
+    "operator.retention-defaults",
   ),
   renameServer: routeDescription(
     "Renames the display label for one deployment target without changing its identity.",
@@ -1064,8 +1211,28 @@ export const apiRouteDescriptions = {
     "environment.diff-promote",
   ),
   deploymentLogs: routeDescription("Reads deployment logs.", "observability.runtime-logs"),
+  pruneDeploymentLogs: routeDescription(
+    "Dry-runs or prunes old embedded deployment log entries without deleting deployment rows.",
+    "observability.runtime-logs",
+  ),
   resourceRuntimeLogs: routeDescription(
     "Reads resource runtime logs.",
+    "observability.runtime-logs",
+  ),
+  archiveResourceRuntimeLogs: routeDescription(
+    "Captures a bounded redacted resource runtime log archive snapshot.",
+    "observability.runtime-logs",
+  ),
+  listResourceRuntimeLogArchives: routeDescription(
+    "Lists retained Appaloft-owned resource runtime log archive snapshots.",
+    "observability.runtime-logs",
+  ),
+  showResourceRuntimeLogArchive: routeDescription(
+    "Shows one retained Appaloft-owned resource runtime log archive snapshot.",
+    "observability.runtime-logs",
+  ),
+  pruneResourceRuntimeLogArchives: routeDescription(
+    "Dry-runs or prunes retained resource runtime log archive snapshots.",
     "observability.runtime-logs",
   ),
   resourceDiagnosticSummary: routeDescription(
@@ -1088,8 +1255,76 @@ export const apiRouteDescriptions = {
     "Reads background work, failed attempts, and diagnostic next actions without recovery mutation.",
     "operator.work-ledger",
   ),
+  operatorAuditEvents: routeDescription(
+    "Explains audit event readback, export, redaction, and retention boundaries.",
+    "operator.audit-events",
+  ),
+  listAuditEvents: routeDescription(
+    "Lists safe audit events for one aggregate without exposing raw sensitive payloads.",
+    "operator.audit-events",
+  ),
+  showAuditEvent: routeDescription(
+    "Reads one safe audit event with redacted payload fields.",
+    "operator.audit-events",
+  ),
+  exportAuditEvents: routeDescription(
+    "Exports bounded redacted audit events for one aggregate without mutating retention.",
+    "operator.audit-events",
+  ),
+  exportGlobalAuditEvents: routeDescription(
+    "Exports bounded redacted audit events across aggregates without mutating retention.",
+    "operator.audit-events",
+  ),
+  pruneAuditEvents: routeDescription(
+    "Dry-runs or prunes old retained audit rows while preserving rows matched by active legal holds or retained archives.",
+    "operator.audit-events",
+  ),
+  createAuditEventArchive: routeDescription(
+    "Creates an immutable redacted audit archive snapshot for an aggregate or bounded global window.",
+    "operator.audit-events",
+  ),
+  listAuditEventArchives: routeDescription(
+    "Lists safe immutable audit archive summaries without archived item payloads.",
+    "operator.audit-events",
+  ),
+  showAuditEventArchive: routeDescription(
+    "Reads one immutable audit archive with stored redacted items and digest metadata.",
+    "operator.audit-events",
+  ),
+  pruneAuditEventArchives: routeDescription(
+    "Dry-runs or deletes retained audit archive records without deleting source audit rows.",
+    "operator.audit-events",
+  ),
+  configureAuditEventLegalHold: routeDescription(
+    "Records an active legal hold that blocks audit row prune for an aggregate or bounded global window.",
+    "operator.audit-events",
+  ),
+  listAuditEventLegalHolds: routeDescription(
+    "Lists safe audit event legal hold metadata without audit payloads.",
+    "operator.audit-events",
+  ),
+  showAuditEventLegalHold: routeDescription(
+    "Reads one safe audit event legal hold record without audit payloads.",
+    "operator.audit-events",
+  ),
+  releaseAuditEventLegalHold: routeDescription(
+    "Marks an audit event legal hold released while keeping hold history readable.",
+    "operator.audit-events",
+  ),
+  pruneProviderJobLogs: routeDescription(
+    "Dry-runs or prunes old retained provider job log rows by cutoff and optional deployment, provider, resource, or server filters.",
+    "operator.provider-job-logs",
+  ),
+  pruneDomainEvents: routeDescription(
+    "Dry-runs or prunes old retained domain event stream rows by cutoff and optional event, aggregate, or deployment filters.",
+    "operator.domain-events",
+  ),
   openTerminalSession: routeDescription(
     "Opens a controlled terminal session for server or resource troubleshooting.",
+    "server.terminal-session",
+  ),
+  terminalSessionLifecycle: routeDescription(
+    "Lists, shows, closes, or expires active terminal sessions without exposing terminal output.",
     "server.terminal-session",
   ),
   listSourceEvents: routeDescription(
@@ -2047,6 +2282,110 @@ export const showServerProcedure = base
   .output(showServerResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ShowServerQuery.create(input)));
 
+export const inspectServerCapacityProcedure = base
+  .route({
+    method: "GET",
+    path: "/servers/{serverId}/capacity",
+    description: apiRouteDescriptions.serverCapacity,
+    successStatus: 200,
+  })
+  .input(inspectServerCapacityQueryInputSchema)
+  .output(inspectServerCapacityResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, InspectServerCapacityQuery.create(input)),
+  );
+
+export const pruneServerCapacityProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/{serverId}/capacity/prune",
+    description: apiRouteDescriptions.serverCapacityPrune,
+    successStatus: 200,
+  })
+  .input(pruneServerCapacityCommandInputSchema)
+  .output(pruneServerCapacityResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneServerCapacityCommand.create(input)),
+  );
+
+export const configureScheduledRuntimePrunePolicyProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/capacity/policies",
+    description: apiRouteDescriptions.scheduledRuntimePrunePolicyConfigure,
+    successStatus: 200,
+  })
+  .input(configureScheduledRuntimePrunePolicyCommandInputSchema)
+  .output(configureScheduledRuntimePrunePolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureScheduledRuntimePrunePolicyCommand.create(input)),
+  );
+
+export const listScheduledRuntimePrunePoliciesProcedure = base
+  .route({
+    method: "GET",
+    path: "/servers/capacity/policies",
+    description: apiRouteDescriptions.scheduledRuntimePrunePolicyList,
+    successStatus: 200,
+  })
+  .input(listScheduledRuntimePrunePoliciesQueryInputSchema)
+  .output(listScheduledRuntimePrunePoliciesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListScheduledRuntimePrunePoliciesQuery.create(input)),
+  );
+
+export const showScheduledRuntimePrunePolicyProcedure = base
+  .route({
+    method: "GET",
+    path: "/servers/capacity/policies/{policyId}",
+    description: apiRouteDescriptions.scheduledRuntimePrunePolicyShow,
+    successStatus: 200,
+  })
+  .input(showScheduledRuntimePrunePolicyQueryInputSchema)
+  .output(showScheduledRuntimePrunePolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowScheduledRuntimePrunePolicyQuery.create(input)),
+  );
+
+export const configureRetentionDefaultsProcedure = base
+  .route({
+    method: "POST",
+    path: "/retention-defaults",
+    description: apiRouteDescriptions.retentionDefaultsConfigure,
+    successStatus: 200,
+  })
+  .input(configureRetentionDefaultsCommandInputSchema)
+  .output(configureRetentionDefaultsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureRetentionDefaultsCommand.create(input)),
+  );
+
+export const listRetentionDefaultsProcedure = base
+  .route({
+    method: "GET",
+    path: "/retention-defaults",
+    description: apiRouteDescriptions.retentionDefaultsList,
+    successStatus: 200,
+  })
+  .input(listRetentionDefaultsQueryInputSchema)
+  .output(listRetentionDefaultsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListRetentionDefaultsQuery.create(input)),
+  );
+
+export const showRetentionDefaultProcedure = base
+  .route({
+    method: "GET",
+    path: "/retention-defaults/{category}",
+    description: apiRouteDescriptions.retentionDefaultsShow,
+    successStatus: 200,
+  })
+  .input(showRetentionDefaultQueryInputSchema)
+  .output(showRetentionDefaultResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowRetentionDefaultQuery.create(input)),
+  );
+
 export const renameServerProcedure = base
   .route({
     method: "POST",
@@ -2895,6 +3234,71 @@ export const showOperatorWorkProcedure = base
     executeQuery(context, ShowOperatorWorkQuery.create(input)),
   );
 
+export const markOperatorWorkRecoveredProcedure = base
+  .route({
+    method: "POST",
+    path: "/operator-work/{workId}/mark-recovered",
+    description: apiRouteDescriptions.operatorWorkLedger,
+    successStatus: 200,
+  })
+  .input(markOperatorWorkRecoveredCommandInputSchema)
+  .output(markOperatorWorkRecoveredResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, MarkOperatorWorkRecoveredCommand.create(input)),
+  );
+
+export const deadLetterOperatorWorkProcedure = base
+  .route({
+    method: "POST",
+    path: "/operator-work/{workId}/dead-letter",
+    description: apiRouteDescriptions.operatorWorkLedger,
+    successStatus: 200,
+  })
+  .input(deadLetterOperatorWorkCommandInputSchema)
+  .output(deadLetterOperatorWorkResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeadLetterOperatorWorkCommand.create(input)),
+  );
+
+export const cancelOperatorWorkProcedure = base
+  .route({
+    method: "POST",
+    path: "/operator-work/{workId}/cancel",
+    description: apiRouteDescriptions.operatorWorkLedger,
+    successStatus: 200,
+  })
+  .input(cancelOperatorWorkCommandInputSchema)
+  .output(cancelOperatorWorkResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CancelOperatorWorkCommand.create(input)),
+  );
+
+export const retryOperatorWorkProcedure = base
+  .route({
+    method: "POST",
+    path: "/operator-work/{workId}/retry",
+    description: apiRouteDescriptions.operatorWorkLedger,
+    successStatus: 200,
+  })
+  .input(retryOperatorWorkCommandInputSchema)
+  .output(retryOperatorWorkResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RetryOperatorWorkCommand.create(input)),
+  );
+
+export const pruneOperatorWorkProcedure = base
+  .route({
+    method: "POST",
+    path: "/operator-work/prune",
+    description: apiRouteDescriptions.operatorWorkLedger,
+    successStatus: 200,
+  })
+  .input(pruneOperatorWorkCommandInputSchema)
+  .output(pruneOperatorWorkResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneOperatorWorkCommand.create(input)),
+  );
+
 export const listSourceEventsProcedure = base
   .route({
     method: "GET",
@@ -2918,6 +3322,197 @@ export const showSourceEventProcedure = base
   .input(showSourceEventQueryInputSchema)
   .output(showSourceEventResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ShowSourceEventQuery.create(input)));
+
+export const listAuditEventsProcedure = base
+  .route({
+    method: "GET",
+    path: "/audit-events",
+    description: apiRouteDescriptions.listAuditEvents,
+    successStatus: 200,
+  })
+  .input(listAuditEventsQueryInputSchema)
+  .output(listAuditEventsResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ListAuditEventsQuery.create(input)));
+
+export const exportAuditEventsProcedure = base
+  .route({
+    method: "GET",
+    path: "/audit-events/export",
+    description: apiRouteDescriptions.exportAuditEvents,
+    successStatus: 200,
+  })
+  .input(exportAuditEventsQueryInputSchema)
+  .output(exportAuditEventsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ExportAuditEventsQuery.create(input)),
+  );
+
+export const exportGlobalAuditEventsProcedure = base
+  .route({
+    method: "GET",
+    path: "/audit-events/export-global",
+    description: apiRouteDescriptions.exportGlobalAuditEvents,
+    successStatus: 200,
+  })
+  .input(exportGlobalAuditEventsQueryInputSchema)
+  .output(exportGlobalAuditEventsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ExportGlobalAuditEventsQuery.create(input)),
+  );
+
+export const showAuditEventProcedure = base
+  .route({
+    method: "GET",
+    path: "/audit-events/{auditEventId}",
+    description: apiRouteDescriptions.showAuditEvent,
+    successStatus: 200,
+  })
+  .input(showAuditEventQueryInputSchema)
+  .output(showAuditEventResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowAuditEventQuery.create(input)));
+
+export const pruneAuditEventsProcedure = base
+  .route({
+    method: "POST",
+    path: "/audit-events/prune",
+    description: apiRouteDescriptions.pruneAuditEvents,
+    successStatus: 200,
+  })
+  .input(pruneAuditEventsCommandInputSchema)
+  .output(pruneAuditEventsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneAuditEventsCommand.create(input)),
+  );
+
+export const createAuditEventArchiveProcedure = base
+  .route({
+    method: "POST",
+    path: "/audit-events/archives",
+    description: apiRouteDescriptions.createAuditEventArchive,
+    successStatus: 200,
+  })
+  .input(createAuditEventArchiveCommandInputSchema)
+  .output(auditEventArchiveResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateAuditEventArchiveCommand.create(input)),
+  );
+
+export const listAuditEventArchivesProcedure = base
+  .route({
+    method: "GET",
+    path: "/audit-events/archives",
+    description: apiRouteDescriptions.listAuditEventArchives,
+    successStatus: 200,
+  })
+  .input(listAuditEventArchivesQueryInputSchema)
+  .output(listAuditEventArchivesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListAuditEventArchivesQuery.create(input)),
+  );
+
+export const showAuditEventArchiveProcedure = base
+  .route({
+    method: "GET",
+    path: "/audit-events/archives/{archiveId}",
+    description: apiRouteDescriptions.showAuditEventArchive,
+    successStatus: 200,
+  })
+  .input(showAuditEventArchiveQueryInputSchema)
+  .output(showAuditEventArchiveResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowAuditEventArchiveQuery.create(input)),
+  );
+
+export const pruneAuditEventArchivesProcedure = base
+  .route({
+    method: "POST",
+    path: "/audit-events/archives/prune",
+    description: apiRouteDescriptions.pruneAuditEventArchives,
+    successStatus: 200,
+  })
+  .input(pruneAuditEventArchivesCommandInputSchema)
+  .output(pruneAuditEventArchivesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneAuditEventArchivesCommand.create(input)),
+  );
+
+export const configureAuditEventLegalHoldProcedure = base
+  .route({
+    method: "POST",
+    path: "/audit-events/legal-holds",
+    description: apiRouteDescriptions.configureAuditEventLegalHold,
+    successStatus: 200,
+  })
+  .input(configureAuditEventLegalHoldCommandInputSchema)
+  .output(auditEventLegalHoldResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureAuditEventLegalHoldCommand.create(input)),
+  );
+
+export const listAuditEventLegalHoldsProcedure = base
+  .route({
+    method: "GET",
+    path: "/audit-events/legal-holds",
+    description: apiRouteDescriptions.listAuditEventLegalHolds,
+    successStatus: 200,
+  })
+  .input(listAuditEventLegalHoldsQueryInputSchema)
+  .output(listAuditEventLegalHoldsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListAuditEventLegalHoldsQuery.create(input)),
+  );
+
+export const showAuditEventLegalHoldProcedure = base
+  .route({
+    method: "GET",
+    path: "/audit-events/legal-holds/{holdId}",
+    description: apiRouteDescriptions.showAuditEventLegalHold,
+    successStatus: 200,
+  })
+  .input(showAuditEventLegalHoldQueryInputSchema)
+  .output(showAuditEventLegalHoldResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowAuditEventLegalHoldQuery.create(input)),
+  );
+
+export const releaseAuditEventLegalHoldProcedure = base
+  .route({
+    method: "POST",
+    path: "/audit-events/legal-holds/{holdId}/release",
+    description: apiRouteDescriptions.releaseAuditEventLegalHold,
+    successStatus: 200,
+  })
+  .input(releaseAuditEventLegalHoldCommandInputSchema)
+  .output(auditEventLegalHoldResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ReleaseAuditEventLegalHoldCommand.create(input)),
+  );
+
+export const pruneProviderJobLogsProcedure = base
+  .route({
+    method: "POST",
+    path: "/provider-job-logs/prune",
+    description: apiRouteDescriptions.pruneProviderJobLogs,
+    successStatus: 200,
+  })
+  .input(pruneProviderJobLogsCommandInputSchema)
+  .output(pruneProviderJobLogsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneProviderJobLogsCommand.create(input)),
+  );
+
+export const pruneDomainEventsProcedure = base
+  .route({
+    method: "POST",
+    path: "/domain-events/prune",
+    description: apiRouteDescriptions.pruneDomainEvents,
+    successStatus: 200,
+  })
+  .input(pruneDomainEventsCommandInputSchema)
+  .output(pruneDomainEventsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneDomainEventsCommand.create(input)),
+  );
 
 export const configurePreviewPolicyProcedure = base
   .route({
@@ -3136,6 +3731,19 @@ export const deploymentLogsProcedure = base
   .output(deploymentLogsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, DeploymentLogsQuery.create(input)));
 
+export const pruneDeploymentLogsProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/logs/prune",
+    description: apiRouteDescriptions.pruneDeploymentLogs,
+    successStatus: 200,
+  })
+  .input(pruneDeploymentLogsCommandInputSchema)
+  .output(pruneDeploymentLogsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneDeploymentLogsCommand.create(input)),
+  );
+
 export const deploymentEventReplayProcedure = base
   .route({
     method: "GET",
@@ -3209,6 +3817,58 @@ export const resourceRuntimeLogsProcedure = base
       logs: result.logs,
     };
   });
+
+export const archiveResourceRuntimeLogsProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/runtime-log-archives",
+    description: apiRouteDescriptions.archiveResourceRuntimeLogs,
+    successStatus: 201,
+  })
+  .input(archiveResourceRuntimeLogsCommandInputSchema)
+  .output(archiveResourceRuntimeLogsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ArchiveResourceRuntimeLogsCommand.create(input)),
+  );
+
+export const listResourceRuntimeLogArchivesProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/runtime-log-archives",
+    description: apiRouteDescriptions.listResourceRuntimeLogArchives,
+    successStatus: 200,
+  })
+  .input(listResourceRuntimeLogArchivesQueryInputSchema)
+  .output(listResourceRuntimeLogArchivesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListResourceRuntimeLogArchivesQuery.create(input)),
+  );
+
+export const showResourceRuntimeLogArchiveProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/runtime-log-archives/{archiveId}",
+    description: apiRouteDescriptions.showResourceRuntimeLogArchive,
+    successStatus: 200,
+  })
+  .input(showResourceRuntimeLogArchiveQueryInputSchema)
+  .output(showResourceRuntimeLogArchiveResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowResourceRuntimeLogArchiveQuery.create(input)),
+  );
+
+export const pruneResourceRuntimeLogArchivesProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/runtime-log-archives/prune",
+    description: apiRouteDescriptions.pruneResourceRuntimeLogArchives,
+    successStatus: 200,
+  })
+  .input(pruneResourceRuntimeLogArchivesCommandInputSchema)
+  .output(pruneResourceRuntimeLogArchivesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneResourceRuntimeLogArchivesCommand.create(input)),
+  );
 
 export const resourceRuntimeLogsStreamProcedure = base
   .route({
@@ -3726,6 +4386,58 @@ export const openTerminalSessionProcedure = base
     executeCommand(context, OpenTerminalSessionCommand.create(input)),
   );
 
+export const listTerminalSessionsProcedure = base
+  .route({
+    method: "GET",
+    path: "/terminal-sessions",
+    description: apiRouteDescriptions.terminalSessionLifecycle,
+    successStatus: 200,
+  })
+  .input(listTerminalSessionsQueryInputSchema)
+  .output(listTerminalSessionsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListTerminalSessionsQuery.create(input)),
+  );
+
+export const showTerminalSessionProcedure = base
+  .route({
+    method: "GET",
+    path: "/terminal-sessions/{sessionId}",
+    description: apiRouteDescriptions.terminalSessionLifecycle,
+    successStatus: 200,
+  })
+  .input(showTerminalSessionQueryInputSchema)
+  .output(showTerminalSessionResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowTerminalSessionQuery.create(input)),
+  );
+
+export const closeTerminalSessionProcedure = base
+  .route({
+    method: "POST",
+    path: "/terminal-sessions/{sessionId}/close",
+    description: apiRouteDescriptions.terminalSessionLifecycle,
+    successStatus: 200,
+  })
+  .input(closeTerminalSessionCommandInputSchema)
+  .output(closeTerminalSessionResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CloseTerminalSessionCommand.create(input)),
+  );
+
+export const expireTerminalSessionsProcedure = base
+  .route({
+    method: "POST",
+    path: "/terminal-sessions/expire",
+    description: apiRouteDescriptions.terminalSessionLifecycle,
+    successStatus: 200,
+  })
+  .input(expireTerminalSessionsCommandInputSchema)
+  .output(expireTerminalSessionsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ExpireTerminalSessionsCommand.create(input)),
+  );
+
 export const listProvidersProcedure = base
   .route({
     method: "GET",
@@ -3787,6 +4499,15 @@ export const appaloftOrpcRouter = {
   servers: {
     list: listServersProcedure,
     show: showServerProcedure,
+    capacity: {
+      inspect: inspectServerCapacityProcedure,
+      prune: pruneServerCapacityProcedure,
+      policy: {
+        configure: configureScheduledRuntimePrunePolicyProcedure,
+        list: listScheduledRuntimePrunePoliciesProcedure,
+        show: showScheduledRuntimePrunePolicyProcedure,
+      },
+    },
     rename: renameServerProcedure,
     configureEdgeProxy: configureServerEdgeProxyProcedure,
     deactivate: deactivateServerProcedure,
@@ -3797,6 +4518,11 @@ export const appaloftOrpcRouter = {
     testConnectivity: testServerConnectivityProcedure,
     testDraftConnectivity: testDraftServerConnectivityProcedure,
     bootstrapProxy: bootstrapServerProxyProcedure,
+  },
+  retentionDefaults: {
+    configure: configureRetentionDefaultsProcedure,
+    list: listRetentionDefaultsProcedure,
+    show: showRetentionDefaultProcedure,
   },
   credentials: {
     ssh: {
@@ -3851,6 +4577,12 @@ export const appaloftOrpcRouter = {
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
     logs: resourceRuntimeLogsProcedure,
     logsStream: resourceRuntimeLogsStreamProcedure,
+    archiveLogs: archiveResourceRuntimeLogsProcedure,
+    logArchives: {
+      list: listResourceRuntimeLogArchivesProcedure,
+      show: showResourceRuntimeLogArchiveProcedure,
+      prune: pruneResourceRuntimeLogArchivesProcedure,
+    },
     runtime: {
       stop: stopResourceRuntimeProcedure,
       start: startResourceRuntimeProcedure,
@@ -3900,6 +4632,10 @@ export const appaloftOrpcRouter = {
   },
   terminalSessions: {
     open: openTerminalSessionProcedure,
+    list: listTerminalSessionsProcedure,
+    show: showTerminalSessionProcedure,
+    close: closeTerminalSessionProcedure,
+    expire: expireTerminalSessionsProcedure,
   },
   domainBindings: {
     list: listDomainBindingsProcedure,
@@ -3932,16 +4668,47 @@ export const appaloftOrpcRouter = {
     recoveryReadiness: deploymentRecoveryReadinessProcedure,
     createStream: createDeploymentStreamProcedure,
     logs: deploymentLogsProcedure,
+    pruneLogs: pruneDeploymentLogsProcedure,
     events: deploymentEventReplayProcedure,
     eventsStream: deploymentEventStreamProcedure,
   },
   operatorWork: {
     list: listOperatorWorkProcedure,
     show: showOperatorWorkProcedure,
+    markRecovered: markOperatorWorkRecoveredProcedure,
+    deadLetter: deadLetterOperatorWorkProcedure,
+    cancel: cancelOperatorWorkProcedure,
+    retry: retryOperatorWorkProcedure,
+    prune: pruneOperatorWorkProcedure,
   },
   sourceEvents: {
     list: listSourceEventsProcedure,
     show: showSourceEventProcedure,
+  },
+  auditEvents: {
+    list: listAuditEventsProcedure,
+    export: exportAuditEventsProcedure,
+    exportGlobal: exportGlobalAuditEventsProcedure,
+    show: showAuditEventProcedure,
+    prune: pruneAuditEventsProcedure,
+    archives: {
+      create: createAuditEventArchiveProcedure,
+      list: listAuditEventArchivesProcedure,
+      show: showAuditEventArchiveProcedure,
+      prune: pruneAuditEventArchivesProcedure,
+    },
+    legalHolds: {
+      configure: configureAuditEventLegalHoldProcedure,
+      list: listAuditEventLegalHoldsProcedure,
+      show: showAuditEventLegalHoldProcedure,
+      release: releaseAuditEventLegalHoldProcedure,
+    },
+  },
+  providerJobLogs: {
+    prune: pruneProviderJobLogsProcedure,
+  },
+  domainEvents: {
+    prune: pruneDomainEventsProcedure,
   },
   sourceLinks: {
     relink: relinkSourceLinkProcedure,
@@ -5669,6 +6436,12 @@ export function mountAppaloftOrpcRoutes(
     "/api/credentials/ssh/:credentialId/rotate",
     "/api/servers",
     "/api/servers/:serverId",
+    "/api/servers/capacity/policies",
+    "/api/servers/capacity/policies/:policyId",
+    "/api/retention-defaults",
+    "/api/retention-defaults/:category",
+    "/api/servers/:serverId/capacity",
+    "/api/servers/:serverId/capacity/prune",
     "/api/servers/:serverId/rename",
     "/api/servers/:serverId/edge-proxy/configuration",
     "/api/servers/:serverId/deactivate",
@@ -5705,6 +6478,10 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/proxy-configuration",
     "/api/resources/:resourceId/runtime-logs",
     "/api/resources/:resourceId/runtime-logs/stream",
+    "/api/resources/:resourceId/runtime-log-archives",
+    "/api/resources/runtime-log-archives",
+    "/api/resources/runtime-log-archives/:archiveId",
+    "/api/resources/runtime-log-archives/prune",
     "/api/resources/:resourceId/runtime/stop",
     "/api/resources/:resourceId/runtime/start",
     "/api/resources/:resourceId/runtime/restart",
@@ -5720,6 +6497,9 @@ export function mountAppaloftOrpcRoutes(
     "/api/scheduled-task-runs/:runId/logs",
     "/api/resource-access-failures/:requestId",
     "/api/terminal-sessions",
+    "/api/terminal-sessions/expire",
+    "/api/terminal-sessions/:sessionId",
+    "/api/terminal-sessions/:sessionId/close",
     "/api/domain-bindings",
     "/api/domain-bindings/:domainBindingId",
     "/api/domain-bindings/:domainBindingId/route",
@@ -5740,6 +6520,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/deployments/:deploymentId",
     "/api/deployments/:deploymentId/recovery-readiness",
     "/api/deployments/stream",
+    "/api/deployments/logs/prune",
     "/api/deployments/:deploymentId/logs",
     "/api/deployments/:deploymentId/events",
     "/api/deployments/:deploymentId/events/stream",
@@ -5756,6 +6537,23 @@ export function mountAppaloftOrpcRoutes(
     "/api/dependency-resources/:dependencyResourceId/rename",
     "/api/operator-work",
     "/api/operator-work/:workId",
+    "/api/operator-work/:workId/mark-recovered",
+    "/api/operator-work/:workId/dead-letter",
+    "/api/operator-work/:workId/cancel",
+    "/api/operator-work/:workId/retry",
+    "/api/audit-events",
+    "/api/audit-events/export",
+    "/api/audit-events/export-global",
+    "/api/audit-events/prune",
+    "/api/audit-events/archives",
+    "/api/audit-events/archives/prune",
+    "/api/audit-events/archives/:archiveId",
+    "/api/audit-events/legal-holds",
+    "/api/audit-events/legal-holds/:holdId",
+    "/api/audit-events/legal-holds/:holdId/release",
+    "/api/audit-events/:auditEventId",
+    "/api/provider-job-logs/prune",
+    "/api/domain-events/prune",
     "/api/preview-policies",
     "/api/preview-policies/show",
     "/api/preview-environments",

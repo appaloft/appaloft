@@ -1,4 +1,5 @@
 export * from "./operations/resources/archive-resource.command";
+export * from "./operations/resources/archive-resource-runtime-logs.command";
 export * from "./operations/resources/attach-resource-storage.command";
 export * from "./operations/resources/bind-resource-dependency.command";
 export * from "./operations/resources/configure-resource-access.command";
@@ -12,7 +13,9 @@ export * from "./operations/resources/delete-resource.command";
 export * from "./operations/resources/detach-resource-storage.command";
 export * from "./operations/resources/import-resource-variables.command";
 export * from "./operations/resources/list-resource-dependency-bindings.query";
+export * from "./operations/resources/list-resource-runtime-log-archives.query";
 export * from "./operations/resources/list-resources.query";
+export * from "./operations/resources/prune-resource-runtime-log-archives.command";
 export * from "./operations/resources/resource-access-failure-evidence-lookup.query";
 export * from "./operations/resources/resource-diagnostic-summary.query";
 export * from "./operations/resources/resource-effective-config.query";
@@ -24,6 +27,7 @@ export * from "./operations/resources/rotate-resource-dependency-binding-secret.
 export * from "./operations/resources/set-resource-variable.command";
 export * from "./operations/resources/show-resource.query";
 export * from "./operations/resources/show-resource-dependency-binding.query";
+export * from "./operations/resources/show-resource-runtime-log-archive.query";
 export * from "./operations/resources/start-resource-runtime.command";
 export * from "./operations/resources/stop-resource-runtime.command";
 export * from "./operations/resources/unbind-resource-dependency.command";

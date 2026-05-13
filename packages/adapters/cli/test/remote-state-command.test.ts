@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  buildSshRemoteStateDiagnosticsCommand,
   buildSshRemoteStateLockInspectCommand,
   buildSshRemoteStateLockRecoverStaleCommand,
 } from "../src/commands/remote-state";
@@ -106,5 +107,25 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(capacityPreflightAction).toContain("reclaimedCount");
     expect(capacityPreflightAction).toContain("availableKbAfter");
     expect(`${maintenanceWorkflow}\n${preflightAction}`).not.toContain("force");
+  });
+
+  test("[OP-WORK-QRY-011] diagnostics command reads lock, migration, backup, and recovery markers without mutation", () => {
+    const command = buildSshRemoteStateDiagnosticsCommand({
+      dataRoot: "/var/lib/appaloft/runtime/state",
+      staleAfterSeconds: 1_200,
+      limit: 20,
+    });
+
+    expect(command).toContain('lock_dir="$data_root/locks/mutation.lock"');
+    expect(command).toContain('"$data_root"/journals/*.json');
+    expect(command).toContain('"$data_root"/backups/*');
+    expect(command).toContain('"$data_root"/recovery/*.json');
+    expect(command).toContain('"$data_root"/locks/recovered/*/recovered.json');
+    expect(command).toContain("remote-state-migration");
+    expect(command).toContain("remote-state-backup");
+    expect(command).toContain("remote-state-recovery");
+    expect(command).not.toContain('mkdir "$lock_dir"');
+    expect(command).not.toContain('mv "$lock_dir"');
+    expect(command).not.toContain("OPENSSH PRIVATE KEY");
   });
 });

@@ -29,7 +29,9 @@ import {
   type DependencyResourceRepository,
   type EventBus,
   type IdGenerator,
+  type ProcessAttemptRecorder,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDependencyResourceBackupCommandInput } from "./create-dependency-resource-backup.command";
@@ -51,6 +53,8 @@ export class CreateDependencyResourceBackupUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
@@ -66,6 +70,7 @@ export class CreateDependencyResourceBackupUseCase {
       eventBus,
       idGenerator,
       logger,
+      processAttemptRecorder,
     } = this;
 
     return safeTry(async function* () {
@@ -140,6 +145,12 @@ export class CreateDependencyResourceBackupUseCase {
         backup,
         UpsertDependencyResourceBackupSpec.fromDependencyResourceBackup(backup),
       );
+      await recordBackupProcessAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        context,
+        backup,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, backup, undefined);
 
       const providerResult = await dependencyResourceBackupProvider.createBackup(context, {
@@ -180,8 +191,63 @@ export class CreateDependencyResourceBackupUseCase {
         backup,
         UpsertDependencyResourceBackupSpec.fromDependencyResourceBackup(backup),
       );
+      await recordBackupProcessAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        context,
+        backup,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, backup, undefined);
       return ok({ id: backupId.value });
     });
   }
+}
+
+async function recordBackupProcessAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  context: ExecutionContext;
+  backup: DependencyResourceBackup;
+}): Promise<void> {
+  const state = input.backup.toState();
+  const status =
+    state.status.value === "pending"
+      ? "running"
+      : state.status.value === "ready"
+        ? "succeeded"
+        : "failed";
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: state.attemptId.value,
+    kind: "system",
+    status,
+    operationKey: "dependency-resources.create-backup",
+    dedupeKey: `dependency-resource-backup:${state.dependencyResourceId.value}:${state.id.value}:${state.attemptId.value}`,
+    correlationId: input.context.requestId,
+    requestId: input.context.requestId,
+    phase: "dependency-resource-backup",
+    step: state.status.value,
+    projectId: state.projectId.value,
+    startedAt: state.requestedAt.value,
+    updatedAt: state.completedAt?.value ?? state.failedAt?.value ?? state.requestedAt.value,
+    ...(status !== "running"
+      ? { finishedAt: state.completedAt?.value ?? state.failedAt?.value ?? state.requestedAt.value }
+      : {}),
+    ...(state.failureCode
+      ? {
+          errorCode: state.failureCode.value,
+          errorCategory: "async-processing",
+          retriable: true,
+        }
+      : {}),
+    nextActions: status === "failed" ? ["diagnostic", "manual-review"] : ["no-action"],
+    safeDetails: {
+      backupId: state.id.value,
+      dependencyResourceId: state.dependencyResourceId.value,
+      dependencyKind: state.dependencyKind.value,
+      providerKey: state.providerKey.value,
+      retentionStatus: state.retentionStatus.value,
+    },
+  });
+
+  void result;
 }

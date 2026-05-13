@@ -38,3 +38,7 @@ For deployment items the work id is the deployment id. For durable process attem
 the process attempt id. Older certificate compatibility items use the latest visible attempt id.
 Older proxy bootstrap compatibility items use `proxy-bootstrap:<serverId>` when no durable process
 attempt exists for that proxy bootstrap scope.
+Source-link compatibility items use `source-link:<safe fingerprint digest or sourceFingerprint>`
+from the source-link read model. Route-realization compatibility items use
+`route-realization:<route id or scope id>`. Worker/job status items are shown only when their
+durable process attempt id exists in the process attempt journal.

@@ -255,6 +255,52 @@
       "additionalProperties": false,
       "description": "Network profile fields copied into resource creation for quick deploy."
     },
+    "retention": {
+      "type": "object",
+      "properties": {
+        "runtimePrune": {
+          "type": "object",
+          "properties": {
+            "retentionDays": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "destructive": {
+              "default": false,
+              "type": "boolean"
+            },
+            "categories": {
+              "default": ["stopped-containers"],
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "stopped-containers",
+                  "preview-workspaces",
+                  "source-workspaces",
+                  "docker-build-cache",
+                  "unused-images"
+                ]
+              }
+            },
+            "retryOnFailure": {
+              "default": true,
+              "type": "boolean"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": ["retentionDays", "destructive", "categories", "retryOnFailure", "enabled"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "description": "Safe retention policy fields materialized during deployment config bootstrap."
+    },
     "health": {
       "type": "object",
       "properties": {

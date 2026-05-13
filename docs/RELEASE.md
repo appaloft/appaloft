@@ -45,6 +45,13 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
 - `release.yml`: manually creates or updates a Release Please PR on `main`, adds roadmap release
   alignment to that PR, and publishes only when the merged release PR pushes a `chore: release ...`
   commit to `main`. Public docs deployment is no longer tied to product releases.
+- `ssh-remote-state-e2e.yml` and `ssh-quick-deploy-e2e.yml`: opt-in SSH release-readiness smokes
+  used by nightly and release. They require SSH test-target secrets and can be made required for a
+  manual release run with `require_ssh_remote_state_e2e=true` and
+  `require_ssh_quick_deploy_e2e=true`. For `0.11.0`, real SSH smoke evidence is an accepted
+  deferred roadmap gap when no SSH target server is available; publish runs do not require both SSH
+  smokes automatically, but maintainers should set the manual inputs whenever SSH secrets exist.
+  Each reusable workflow uploads a redacted SSH evidence JSON artifact after its suite passes.
 - `deploy-docs.yml`: deploys `apps/docs` as a standalone static site to `https://docs.appaloft.com`
   with Appaloft from the checked-out source and `appaloft.docs.yml`. Pushes to `main` auto-deploy
   when docs content, docs config, or the source-side deployment stack used by docs changes. Manual
@@ -84,7 +91,8 @@ The CLI binary bundle embeds:
 
 - GitHub Release is the canonical artifact host.
 - GHCR publishes `ghcr.io/appaloft/appaloft:X.Y.Z`, `X.Y`, `X`, and `latest` for stable releases.
-- npm publishes `@appaloft/cli` plus platform-specific optional dependency packages.
+- npm publishes `@appaloft/cli`, platform-specific optional dependency packages, and
+  `@appaloft/sdk`.
 - Homebrew publishes `appaloft` to `appaloft/homebrew-tap` when `HOMEBREW_TAP_TOKEN` is configured.
 - Homebrew Cask for desktop is generated only when macOS desktop artifacts are present.
 
@@ -94,6 +102,15 @@ The CLI binary bundle embeds:
 - `NPM_TOKEN`: optional fallback for npm publish. Prefer npm trusted publishing/OIDC. Because the
   source repository is private, npm provenance is not requested.
 - `HOMEBREW_TAP_TOKEN`: token with write access to `appaloft/homebrew-tap`.
+- `APPALOFT_E2E_SSH_HOST`: SSH release-readiness target host used by the opt-in
+  `smoke:ssh:remote-state` and `smoke:ssh:quick-deploy` suites.
+- `APPALOFT_E2E_SSH_PRIVATE_KEY`: SSH private key for the release-readiness target. Workflows write
+  this value to a temporary key file and pass only the file path to the tests.
+- `APPALOFT_E2E_SSH_PORT`: optional SSH release-readiness target port; defaults to `22`.
+- `APPALOFT_E2E_SSH_USERNAME`: optional SSH release-readiness target user; defaults to `root`.
+  Blank whitespace-only values are rejected by the preflight.
+- `APPALOFT_E2E_PUBLIC_ROUTE_HOST`: optional host template for SSH remote-state route checks. Use
+  `{suffix}` in the value when the target needs per-run hostnames.
 - `APPALOFT_SSH_PRIVATE_KEY`: SSH private key used by `deploy-docs.yml` to deploy to the same
   server as `appaloft/www` when the docs workflow uses the pure SSH CLI fallback.
 - `APPALOFT_TOKEN`: bearer token used by `deploy-docs.yml` when
@@ -126,13 +143,32 @@ flows.
 1. Merge normal feature and fix PRs into `main`.
 2. Read `docs/PRODUCT_ROADMAP.md`, compare it with the implementation and release state, and choose
    the allowed version.
-3. Open GitHub Actions and run `Release` from `main`. Set `release_as` only when the roadmap gate
-   allows an explicit target such as `0.4.0`.
-4. Review the single Release Please PR. It must include the generated version/changelog changes and
+3. Before selecting `0.11.0` or any later pre-`1.0.0` target whose roadmap requires SSH
+   release-readiness, run `bun run smoke:ssh:preflight` to verify the `ssh` executable,
+   `APPALOFT_E2E_SSH_HOST`, optional `APPALOFT_E2E_SSH_PORT`, optional
+   `APPALOFT_E2E_SSH_USERNAME`, and the private-key path is a regular file with content and private
+   permissions, then run `bun run smoke:ssh:evidence` with the target's optional SSH variables
+   configured. The evidence command runs the aggregate `bun run smoke:ssh` suite and writes
+   `dist/release/ssh-smoke-evidence.json` only after both SSH suites pass; the JSON records
+   redacted configuration booleans and does not include host, username, key path, route host, or
+   secret material. Verify the captured aggregate artifact with `bun run smoke:ssh:evidence:verify`
+   before recording the evidence in the roadmap or release notes. In GitHub Actions, the reusable
+   SSH workflows write
+   `dist/release/ssh-remote-state-evidence.json` and
+   `dist/release/ssh-quick-deploy-evidence.json` and upload them as workflow artifacts after the
+   corresponding suite passes. For `0.11.0`, `docs/PRODUCT_ROADMAP.md` records an accepted
+   deferred SSH smoke evidence gap when no SSH target server is available; keep that gap in the
+   release notes until real SSH evidence is captured in a later release.
+4. Open GitHub Actions and run `Release` from `main`. Set `release_as` only when the roadmap gate
+   allows an explicit target such as `0.11.0`. For a `0.11.0` release-readiness run with SSH
+   secrets available, set both `require_ssh_remote_state_e2e=true` and
+   `require_ssh_quick_deploy_e2e=true`; otherwise the accepted deferred SSH smoke evidence gap in
+   the roadmap must stay in the release notes.
+5. Review the single Release Please PR. It must include the generated version/changelog changes and
    the `docs/PRODUCT_ROADMAP.md` release alignment commit. When `release_as` is set, the workflow
    also enforces that the release PR title, body, version files, and changelog use that exact
    version.
-5. Merge the Release Please PR when ready to publish. Use the default release PR title as the merge
+6. Merge the Release Please PR when ready to publish. Use the default release PR title as the merge
    commit subject so it starts with `chore: release `. The merge commit is the publishing
    confirmation and triggers the release publish run automatically.
 

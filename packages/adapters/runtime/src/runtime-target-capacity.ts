@@ -6,6 +6,9 @@ import {
   type ExecutionContext,
   type RuntimeTargetCapacityInspection,
   type RuntimeTargetCapacityInspector,
+  type RuntimeTargetCapacityPruneCandidate,
+  type RuntimeTargetCapacityPruneResult,
+  type RuntimeTargetCapacityPruner,
   type RuntimeTargetCapacityWarning,
 } from "@appaloft/application";
 import { domainError, err, ok, type DeploymentTargetState, type Result } from "@appaloft/core";
@@ -134,6 +137,129 @@ export function renderRuntimeTargetCapacityScript(input: {
     "else",
     "  printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
     "fi",
+  ].join("\n");
+}
+
+export function renderRuntimeTargetCapacityPruneScript(input: {
+  runtimeRoot: string;
+  stateRoot?: string;
+  sourceWorkspaceRoot?: string;
+  before: string;
+  categories: string[];
+  dryRun: boolean;
+}): string {
+  const runtimeRoot = input.runtimeRoot.replace(/\/+$/, "");
+  const stateRoot = input.stateRoot ?? `${runtimeRoot}/state`;
+  const sourceWorkspaceRoot = input.sourceWorkspaceRoot ?? `${runtimeRoot}/ssh-deployments`;
+  const categories = input.categories.join(",");
+
+  return [
+    "set +e",
+    `APPALOFT_RUNTIME_ROOT=${shellQuote(runtimeRoot)}`,
+    `APPALOFT_STATE_ROOT=${shellQuote(stateRoot)}`,
+    `APPALOFT_SOURCE_WORKSPACE_ROOT=${shellQuote(sourceWorkspaceRoot)}`,
+    `APPALOFT_PRUNE_BEFORE=${shellQuote(input.before)}`,
+    `APPALOFT_PRUNE_CATEGORIES=${shellQuote(categories)}`,
+    `APPALOFT_PRUNE_DRY_RUN=${input.dryRun ? "1" : "0"}`,
+    "printf 'APPALOFT_CAPACITY_PRUNE_V1\\n'",
+    "has_category() {",
+    "  case \",$APPALOFT_PRUNE_CATEGORIES,\" in",
+    "    *\",$1,\"*) return 0 ;;",
+    "    *) return 1 ;;",
+    "  esac",
+    "}",
+    "older_than_cutoff() {",
+    "  candidate_time=\"$1\"",
+    "  [ -n \"$candidate_time\" ] || return 1",
+    "  [ \"$candidate_time\" \\< \"$APPALOFT_PRUNE_BEFORE\" ]",
+    "}",
+    "emit_candidate() {",
+    "  category=\"$1\"; id=\"$2\"; target=\"$3\"; updated_at=\"$4\"; size_bytes=\"$5\"; action=\"$6\"; reason=\"$7\"",
+    "  printf 'PRUNE_CANDIDATE\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$category\" \"$id\" \"$target\" \"$updated_at\" \"$size_bytes\" \"$action\" \"$reason\"",
+    "}",
+    "if has_category stopped-containers; then",
+    "  if command -v docker >/dev/null 2>&1; then",
+    "    docker ps -a --filter label=appaloft.managed=true --format '{{.ID}}\\t{{.Names}}\\t{{.Status}}' 2>/dev/null | while IFS='	' read -r cid cname cstatus; do",
+    "      [ -n \"$cid\" ] || continue",
+    "      ccreated=$(docker inspect -f '{{.Created}}' \"$cid\" 2>/dev/null)",
+    "      case \"$cstatus\" in",
+    "        Up*) emit_candidate stopped-containers \"$cid\" \"$cname\" \"$ccreated\" \"0\" skipped active-runtime ;;",
+    "        *)",
+    "          if older_than_cutoff \"$ccreated\"; then",
+    "            if [ \"$APPALOFT_PRUNE_DRY_RUN\" = \"1\" ]; then",
+    "              emit_candidate stopped-containers \"$cid\" \"$cname\" \"$ccreated\" \"0\" matched \"\"",
+    "            else",
+    "              docker rm \"$cid\" >/dev/null 2>&1",
+    "              if [ \"$?\" = \"0\" ]; then emit_candidate stopped-containers \"$cid\" \"$cname\" \"$ccreated\" \"0\" pruned \"\"; else emit_candidate stopped-containers \"$cid\" \"$cname\" \"$ccreated\" \"0\" skipped safety-evidence-missing; fi",
+    "            fi",
+    "          else",
+    "            emit_candidate stopped-containers \"$cid\" \"$cname\" \"$ccreated\" \"0\" skipped cutoff-not-reached",
+    "          fi",
+    "          ;;",
+    "      esac",
+    "    done",
+    "  else",
+    "    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
+    "  fi",
+    "fi",
+    "if has_category docker-build-cache; then",
+    "  if command -v docker >/dev/null 2>&1; then",
+    "    if [ \"$APPALOFT_PRUNE_DRY_RUN\" = \"1\" ]; then",
+    "      emit_candidate docker-build-cache docker-build-cache docker-build-cache \"$APPALOFT_PRUNE_BEFORE\" \"0\" matched \"\"",
+    "    else",
+    "      docker builder prune --force --filter \"until=$APPALOFT_PRUNE_BEFORE\" >/dev/null 2>&1",
+    "      if [ \"$?\" = \"0\" ]; then emit_candidate docker-build-cache docker-build-cache docker-build-cache \"$APPALOFT_PRUNE_BEFORE\" \"0\" pruned \"\"; else emit_candidate docker-build-cache docker-build-cache docker-build-cache \"$APPALOFT_PRUNE_BEFORE\" \"0\" skipped safety-evidence-missing; fi",
+    "    fi",
+    "  else",
+    "    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
+    "  fi",
+    "fi",
+    "if has_category unused-images; then",
+    "  if command -v docker >/dev/null 2>&1; then",
+    "    if [ \"$APPALOFT_PRUNE_DRY_RUN\" = \"1\" ]; then",
+    "      emit_candidate unused-images docker-unused-images docker-unused-images \"$APPALOFT_PRUNE_BEFORE\" \"0\" matched \"\"",
+    "    else",
+    "      docker image prune --force --filter \"until=$APPALOFT_PRUNE_BEFORE\" >/dev/null 2>&1",
+    "      if [ \"$?\" = \"0\" ]; then emit_candidate unused-images docker-unused-images docker-unused-images \"$APPALOFT_PRUNE_BEFORE\" \"0\" pruned \"\"; else emit_candidate unused-images docker-unused-images docker-unused-images \"$APPALOFT_PRUNE_BEFORE\" \"0\" skipped safety-evidence-missing; fi",
+    "    fi",
+    "  else",
+    "    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
+    "  fi",
+    "fi",
+    "if has_category preview-workspaces || has_category source-workspaces; then",
+    "  if [ -d \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" ]; then",
+    "    find \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do",
+    "      name=$(basename \"$workspace\")",
+    "      case \"$workspace\" in",
+    "        \"$APPALOFT_STATE_ROOT\"|\"$APPALOFT_STATE_ROOT\"/*|\"$APPALOFT_RUNTIME_ROOT/state\"|\"$APPALOFT_RUNTIME_ROOT/state\"/*)",
+    "          emit_candidate source-workspaces \"$name\" \"$workspace\" \"\" \"0\" excluded state-root-excluded",
+    "          continue",
+    "          ;;",
+    "      esac",
+    "      category=source-workspaces",
+    "      case \"$name\" in *preview*|prv_*|preview_*) category=preview-workspaces ;; esac",
+    "      has_category \"$category\" || continue",
+    "      updated_at=$(date -r \"$workspace\" -u +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null)",
+    "      size_bytes=$(du -sk \"$workspace\" 2>/dev/null | awk '{print $1 * 1024}')",
+    "      if older_than_cutoff \"$updated_at\"; then",
+    "        if [ -e \"$workspace/.appaloft-active\" ]; then",
+    "          emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" skipped active-runtime",
+    "        elif [ -e \"$workspace/.appaloft-rollback-candidate\" ]; then",
+    "          emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" skipped rollback-candidate",
+    "        elif [ \"$APPALOFT_PRUNE_DRY_RUN\" = \"1\" ]; then",
+    "          emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" matched \"\"",
+    "        else",
+    "          rm -rf \"$workspace\"",
+    "          if [ \"$?\" = \"0\" ]; then emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" pruned \"\"; else emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" skipped safety-evidence-missing; fi",
+    "        fi",
+    "      else",
+    "        emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" skipped cutoff-not-reached",
+    "      fi",
+    "    done",
+    "  fi",
+    "fi",
+    "emit_candidate source-workspaces state-root \"$APPALOFT_STATE_ROOT\" \"\" \"0\" excluded state-root-excluded",
+    "emit_candidate source-workspaces volumes docker-volumes \"\" \"0\" excluded volume-excluded",
   ].join("\n");
 }
 
@@ -451,6 +577,144 @@ export function parseRuntimeTargetCapacityOutput(input: {
   });
 }
 
+function isPruneAction(
+  input: string,
+): input is RuntimeTargetCapacityPruneCandidate["action"] {
+  return ["matched", "pruned", "skipped", "excluded"].includes(input);
+}
+
+function isPruneSkippedReason(
+  input: string,
+): input is NonNullable<RuntimeTargetCapacityPruneCandidate["skippedReason"]> {
+  return [
+    "active-runtime",
+    "rollback-candidate",
+    "cutoff-not-reached",
+    "ownership-unproven",
+    "unsupported-category",
+    "volume-excluded",
+    "state-root-excluded",
+    "remote-state-excluded",
+    "safety-evidence-missing",
+  ].includes(input);
+}
+
+function isPruneCategory(
+  input: string,
+): input is RuntimeTargetCapacityPruneCandidate["category"] {
+  return [
+    "stopped-containers",
+    "preview-workspaces",
+    "source-workspaces",
+    "docker-build-cache",
+    "unused-images",
+  ].includes(input);
+}
+
+export function parseRuntimeTargetCapacityPruneOutput(input: {
+  stdout: string;
+  stderr?: string;
+  server: DeploymentTargetState;
+  before: string;
+  categories: RuntimeTargetCapacityPruneCandidate["category"][];
+  dryRun: boolean;
+  prunedAt: string;
+  timedOut?: boolean;
+}): Result<RuntimeTargetCapacityPruneResult> {
+  if (!input.stdout.includes("APPALOFT_CAPACITY_PRUNE_V1")) {
+    return err(
+      domainError.infra("Runtime target capacity prune output was not recognized", {
+        phase: "runtime-target-capacity-prune",
+        serverId: input.server.id.value,
+      }),
+    );
+  }
+
+  const candidates: RuntimeTargetCapacityPruneCandidate[] = [];
+  const warnings: RuntimeTargetCapacityWarning[] = [];
+
+  for (const line of input.stdout.split(/\r?\n/)) {
+    const parts = line.split("\t");
+    const tag = parts[0];
+
+    if (tag === "PRUNE_CANDIDATE") {
+      const [category, id, target, updatedAt, size, action, reason] = parts.slice(1);
+      if (!category || !isPruneCategory(category) || !action || !isPruneAction(action)) {
+        continue;
+      }
+
+      const skippedReason =
+        reason && isPruneSkippedReason(reason) ? { skippedReason: reason } : {};
+      candidates.push({
+        id: id ?? "",
+        category,
+        target: target ?? "",
+        updatedAt: updatedAt || null,
+        size: parseNumber(size),
+        action,
+        ...skippedReason,
+      });
+      continue;
+    }
+
+    if (tag === "CAPACITY_WARNING") {
+      const [code, message] = parts.slice(1);
+      warnings.push(
+        warning(
+          code === "docker-unavailable" ? "docker-unavailable" : "partial-diagnostic",
+          message ?? "Capacity prune warning",
+          code === "docker-unavailable" ? { resource: "docker" } : undefined,
+        ),
+      );
+    }
+  }
+
+  if (input.timedOut) {
+    warnings.push(
+      warning("timeout", "Capacity prune timed out before all checks completed", {
+        resource: "appaloft-runtime",
+      }),
+    );
+  }
+
+  if (input.stderr?.trim()) {
+    warnings.push(
+      warning("partial-diagnostic", "Capacity prune emitted non-fatal stderr output", {
+        resource: "appaloft-runtime",
+      }),
+    );
+  }
+
+  const prunedCandidates = candidates.filter((candidate) => candidate.action === "pruned");
+  const reclaimedBytes = prunedCandidates.reduce((sum, candidate) => sum + (candidate.size ?? 0), 0);
+
+  return ok({
+    schemaVersion: "servers.capacity.prune/v1",
+    server: {
+      id: input.server.id.value,
+      name: input.server.name.value,
+      host: input.server.host.value,
+      port: input.server.port.value,
+      providerKey: input.server.providerKey.value,
+      targetKind: input.server.targetKind.value,
+    },
+    before: input.before,
+    categories: input.categories,
+    dryRun: input.dryRun,
+    prunedAt: input.prunedAt,
+    summary: {
+      inspectedCount: candidates.length,
+      matchedCount: candidates.filter((candidate) => candidate.action === "matched").length,
+      prunedCount: prunedCandidates.length,
+      skippedCount: candidates.filter((candidate) => candidate.action === "skipped").length,
+      excludedCount: candidates.filter((candidate) => candidate.action === "excluded").length,
+      reclaimedBytes,
+    },
+    candidates,
+    warnings,
+  });
+}
+
 function runLocalCapacityScript(script: string): CapacityCommandResult {
   const result = spawnSync("sh", ["-lc", script], {
     encoding: "utf8",
@@ -532,6 +796,66 @@ export class RuntimeTargetCapacityInspectorAdapter implements RuntimeTargetCapac
     return err(
       domainError.infra("Runtime target capacity diagnostic failed", {
         phase: "runtime-target-capacity",
+        serverId: input.server.id.value,
+        providerKey,
+        stderr: result.stderr.slice(0, 240),
+      }),
+    );
+  }
+}
+
+export class RuntimeTargetCapacityPrunerAdapter implements RuntimeTargetCapacityPruner {
+  constructor(
+    private readonly localRuntimeRoot: string,
+    private readonly remoteRuntimeRoot = defaultRemoteRuntimeRoot,
+  ) {}
+
+  async prune(
+    _context: ExecutionContext,
+    input: Parameters<RuntimeTargetCapacityPruner["prune"]>[1],
+  ): Promise<Result<RuntimeTargetCapacityPruneResult>> {
+    const providerKey = input.server.providerKey.value;
+    if (providerKey !== "local-shell" && providerKey !== "generic-ssh") {
+      return err(
+        domainError.runtimeTargetUnsupported("Runtime target capacity prune is unsupported", {
+          phase: "runtime-target-capacity-prune",
+          serverId: input.server.id.value,
+          providerKey,
+          targetKind: input.server.targetKind.value,
+          missingCapability: "runtime.capacity",
+        }),
+      );
+    }
+
+    const script = renderRuntimeTargetCapacityPruneScript({
+      runtimeRoot: providerKey === "generic-ssh" ? this.remoteRuntimeRoot : this.localRuntimeRoot,
+      before: input.before,
+      categories: input.categories,
+      dryRun: input.dryRun,
+    });
+    const result =
+      providerKey === "generic-ssh"
+        ? runSshCapacityScript(input.server, script)
+        : runLocalCapacityScript(script);
+
+    const parsed = parseRuntimeTargetCapacityPruneOutput({
+      stdout: result.stdout,
+      stderr: result.failed ? result.stderr : "",
+      server: input.server,
+      before: input.before,
+      categories: input.categories,
+      dryRun: input.dryRun,
+      prunedAt: new Date().toISOString(),
+      timedOut: result.timedOut,
+    });
+
+    if (parsed.isOk()) {
+      return parsed;
+    }
+
+    return err(
+      domainError.infra("Runtime target capacity prune failed", {
+        phase: "runtime-target-capacity-prune",
         serverId: input.server.id.value,
         providerKey,
         stderr: result.stderr.slice(0, 240),

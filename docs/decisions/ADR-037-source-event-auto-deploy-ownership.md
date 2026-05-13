@@ -158,8 +158,6 @@ persisting a source event.
 
 ## Process State And Retry Baseline
 
-The first Code Round does not require the Phase 8 durable outbox/inbox baseline.
-
 It must still persist a durable source event record before dispatching a matching deployment. That
 record is the minimum source-event process state for:
 
@@ -172,9 +170,13 @@ Initial behavior may dispatch matching deployments synchronously inside the inge
 the source event record is persisted. If dispatch fails after the source event is accepted, the
 source event record must show a failed or partially-dispatched state with structured error details.
 
-No automatic retry guarantee is implied until Phase 8 adds durable outbox/inbox or equivalent
-process management. Public docs and read models must not claim background retry beyond the recorded
-source event state.
+ADR-054 extends this baseline with operator-visible process-attempt projection for accepted
+source-event ingestion and final dispatched/failed outcomes. That projection gives operators a
+single `operator-work.*` view over source-event dispatch failures with safe source/ref details, but
+it does not convert source-event auto-deploy into a process-attempt atomic claim/completion worker.
+No automatic retry guarantee is implied until a later spec adds a durable source-event worker.
+Public docs and read models must not claim background retry beyond recorded source-event and
+operator-work state.
 
 ## Ingestion And Dedupe
 

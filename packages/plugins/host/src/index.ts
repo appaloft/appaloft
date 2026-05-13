@@ -56,7 +56,34 @@ export class LocalPluginHost implements PluginRegistry {
           version: manifest.version,
           kind: manifest.kind,
           capabilities: manifest.capabilities,
+          capabilityDetails: manifest.capabilities.map((capability) => ({
+            key: capability,
+            title: capability,
+            enabled: compatible,
+            description: compatible
+              ? "Capability is active for the current Appaloft version."
+              : "Capability is disabled because the plugin compatibility range does not match.",
+          })),
           compatible,
+          configuration: {
+            status: compatible ? "configured" : "not-configured",
+            diagnostics: compatible
+              ? [
+                  {
+                    code: "plugin.compatible",
+                    severity: "info",
+                    message: "Plugin compatibility range matches the current Appaloft version.",
+                  },
+                ]
+              : [
+                  {
+                    code: "plugin.incompatible",
+                    severity: "warning",
+                    message:
+                      "Plugin is visible but inactive because its compatibility range does not match the current Appaloft version.",
+                  },
+                ],
+          },
         },
       };
     });

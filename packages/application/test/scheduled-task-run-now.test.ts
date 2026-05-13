@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import {
   CreatedAt,
   EnvironmentId,
+  ok,
   ProjectId,
   Resource,
   ResourceId,
@@ -11,6 +12,7 @@ import {
   ResourceLifecycleStatusValue,
   ResourceName,
   ResourceSlug,
+  type Result,
   ScheduledTaskCommandIntent,
   ScheduledTaskConcurrencyPolicyValue,
   ScheduledTaskDefinition,
@@ -31,6 +33,8 @@ import { FixedClock, MemoryResourceRepository, SequenceIdGenerator } from "@appa
 
 import { createExecutionContext, type RepositoryContext, toRepositoryContext } from "../src";
 import {
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
   type ScheduledTaskDefinitionRepository,
   type ScheduledTaskRunAttemptRepository,
 } from "../src/ports";
@@ -109,6 +113,18 @@ class RecordingScheduledTaskRunAttemptRepository implements ScheduledTaskRunAtte
   }
 }
 
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
+  }
+}
+
 function resourceFixture(input?: {
   id?: string;
   lifecycleStatus?: "active" | "archived" | "deleted";
@@ -164,9 +180,11 @@ async function createHarness(input?: {
     UpsertResourceSpec.fromResource(resource),
   );
   const runAttemptRepository = new RecordingScheduledTaskRunAttemptRepository();
+  const processAttemptRecorder = new RecordingProcessAttemptRecorder();
 
   return {
     context,
+    processAttemptRecorder,
     runAttemptRepository,
     useCase: new RunScheduledTaskNowUseCase(
       new ScheduledTaskRunAdmissionService(
@@ -175,14 +193,16 @@ async function createHarness(input?: {
         resourceRepository,
         new SequenceIdGenerator(),
         new FixedClock("2026-05-05T00:10:00.000Z"),
+        processAttemptRecorder,
       ),
     ),
   };
 }
 
 describe("RunScheduledTaskNowUseCase", () => {
-  test("[SCHED-TASK-RUN-001] accepts run-now without executing the task synchronously", async () => {
-    const { context, runAttemptRepository, useCase } = await createHarness();
+  test("[SCHED-TASK-RUN-001] [PROC-DELIVERY-001] accepts run-now and records durable process state without executing synchronously", async () => {
+    const { context, processAttemptRecorder, runAttemptRepository, useCase } =
+      await createHarness();
 
     const result = await useCase.execute(context, {
       taskId: "tsk_daily_migration",
@@ -205,6 +225,29 @@ describe("RunScheduledTaskNowUseCase", () => {
     expect(result._unsafeUnwrap().run).not.toHaveProperty("finishedAt");
     expect(runAttemptRepository.records).toHaveLength(1);
     expect(runAttemptRepository.records[0]?.toState().status.value).toBe("accepted");
+    expect(processAttemptRecorder.records).toEqual([
+      {
+        id: "wrk_0002",
+        kind: "runtime-maintenance",
+        status: "pending",
+        operationKey: "scheduled-task-runs.run-now",
+        dedupeKey: "scheduled-task-run:str_0001",
+        correlationId: "req_scheduled_task_run_now_test",
+        requestId: "req_scheduled_task_run_now_test",
+        phase: "scheduled-task-run-admission",
+        step: "accepted",
+        resourceId: "res_api",
+        startedAt: "2026-05-05T00:10:00.000Z",
+        updatedAt: "2026-05-05T00:10:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          runId: "str_0001",
+          taskId: "tsk_daily_migration",
+          resourceId: "res_api",
+          triggerKind: "manual",
+        },
+      },
+    ]);
   });
 
   test("[SCHED-TASK-RUN-002] rejects archived Resources before runtime execution", async () => {

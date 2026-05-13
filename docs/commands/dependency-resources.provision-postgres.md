@@ -20,7 +20,8 @@ Returns `ok({ id })`, persists a `postgres` `ResourceInstance`, and records a
 `dependency-resource-created` domain event.
 
 Success means realization request accepted. Provider success or failure is reflected through
-dependency resource state, safe read models, and lifecycle events.
+dependency resource state, safe read models, lifecycle events, and safe operator-visible
+process-attempt projection.
 
 ## Failure
 

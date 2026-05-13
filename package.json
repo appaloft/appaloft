@@ -40,7 +40,17 @@
     "smoke:local:prebuilt": "bun run scripts/smoke/local-deploy.ts --method=prebuilt-image --port=4313",
     "smoke:local:static": "bun run scripts/smoke/local-deploy.ts --method=static",
     "smoke:install-auth": "APPALOFT_INSTALL_FULL_SMOKE=1 bun test scripts/test/install-full-smoke.test.ts",
-    "smoke:swarm": "APPALOFT_DOCKER_SWARM_SMOKE=1 bun test packages/adapters/runtime/test/docker-swarm-execution-backend.test.ts",
+    "smoke:swarm": "APPALOFT_DOCKER_SWARM_SMOKE=1 APPALOFT_DOCKER_SWARM_SMOKE_TIMEOUT_MS=300000 bun test --timeout=300000 packages/adapters/runtime/test/docker-swarm-execution-backend.test.ts",
+    "smoke:ssh:preflight": "bun run scripts/release/check-ssh-release-readiness.ts",
+    "smoke:ssh:remote-state": "bun run smoke:ssh:preflight && APPALOFT_E2E_SSH_REMOTE_STATE=true bun test --timeout=900000 ./apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts",
+    "smoke:ssh:quick-deploy": "bun run smoke:ssh:preflight && APPALOFT_E2E_SSH_QUICK_DEPLOY=true bun test --timeout=900000 ./apps/shell/test/e2e/quick-deploy-ssh.workflow.e2e.ts",
+    "smoke:ssh": "bun run smoke:ssh:preflight && bun run smoke:ssh:remote-state && bun run smoke:ssh:quick-deploy",
+    "smoke:ssh:remote-state:evidence": "bun run scripts/release/capture-ssh-smoke-evidence.ts --suite remote-state --out dist/release/ssh-remote-state-evidence.json",
+    "smoke:ssh:quick-deploy:evidence": "bun run scripts/release/capture-ssh-smoke-evidence.ts --suite quick-deploy --out dist/release/ssh-quick-deploy-evidence.json",
+    "smoke:ssh:evidence": "bun run scripts/release/capture-ssh-smoke-evidence.ts",
+    "smoke:ssh:evidence:verify": "bun run scripts/release/verify-ssh-smoke-evidence.ts",
+    "smoke:ssh:remote-state:evidence:verify": "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite remote-state --path dist/release/ssh-remote-state-evidence.json",
+    "smoke:ssh:quick-deploy:evidence:verify": "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite quick-deploy --path dist/release/ssh-quick-deploy-evidence.json",
     "prepare": "husky"
   },
   "lint-staged": {

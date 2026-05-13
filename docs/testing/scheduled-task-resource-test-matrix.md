@@ -28,7 +28,7 @@ active CLI/API/Web/MCP entrypoints.
 | SCHED-TASK-UPDATE-002 | Application command | Resource is archived. | Update admission rejects before storing changes with a structured Resource lifecycle phase. |
 | SCHED-TASK-DELETE-001 | Application command | User deletes a scheduled task. | Command verifies Resource ownership and deletes through an explicit repository mutation spec with a timestamped result. |
 | SCHED-TASK-DELETE-002 | Application command | Resource context does not match task ownership. | Delete admission rejects before persistence with a structured Resource context mismatch phase. |
-| SCHED-TASK-RUN-001 | Application command | User runs a task now. | Command returns `ok({ runId })` after admission; run state starts as accepted/pending/running according to workflow. |
+| SCHED-TASK-RUN-001 | Application command | User runs a task now. | Command returns `ok({ runId })` after admission; run state starts as accepted/pending/running according to workflow; admission records a pending durable process attempt for worker delivery visibility. |
 | SCHED-TASK-RUN-002 | Application command | Resource is archived. | Run admission rejects or skips before runtime execution with a structured resource lifecycle phase. |
 | SCHED-TASK-RUN-QUERY-001 | Application query/log adapter | User lists or shows task runs or reads run logs. | Query handlers wrap run-specific read models with stable schema versions and generated timestamps while deployment/resource runtime logs remain unchanged. |
 | SCHED-TASK-PERSIST-001 | Persistence/read model | Task definition is stored and queried. | Postgres/PGlite repository rehydrates the Resource-owned task aggregate and read model lists/shows task definitions by Resource/project/environment/status filters. |
@@ -37,8 +37,8 @@ active CLI/API/Web/MCP entrypoints.
 | SCHED-TASK-SCHED-001 | Scheduler | Enabled task is due. | Scheduler dispatches the same run admission path as run-now and records the same run shape. |
 | SCHED-TASK-SCHED-002 | Scheduler/concurrency | Previous run is non-terminal. | Default `forbid` policy prevents concurrent runtime execution and records safe skip/rejection state. |
 | SCHED-TASK-RUNTIME-001 | Runtime adapter | Accepted task run is executed. | Runtime adapter executes one-off task command intent and returns run-scoped stdout/stderr logs, terminal status, timestamps, and exit code without writing deployment/resource runtime logs. |
-| SCHED-TASK-WORKER-001 | Application worker | Accepted run is drained. | Worker transitions accepted run to running, invokes the scheduled-task runtime port, records run-scoped logs, and persists terminal run state. |
-| SCHED-TASK-RUNNER-001 | Shell runner | Scheduled task runner is enabled. | Long-running shell composition can start an opt-in scheduled task runner that scans due tasks, admits scheduled runs, and drains the admitted runs through the worker. |
+| SCHED-TASK-WORKER-001 | Application worker | Accepted run is drained. | Worker transitions accepted run to running, optionally claims a supplied durable process attempt before runtime execution, skips runtime execution when the durable claim is refused, invokes the scheduled-task runtime port, records run-scoped logs, persists terminal run state, and completes the durable process attempt when one was supplied. |
+| SCHED-TASK-RUNNER-001 | Shell runner | Scheduled task runner is enabled. | Long-running shell composition can start an opt-in scheduled task runner that scans due tasks, admits scheduled runs, generates due scheduled-task retry delivery attempts, drains the admitted/generated runs through the worker, and passes due scheduled-task durable process attempts to the same worker with `processAttemptId`/`workerId`. |
 | SCHED-TASK-LOGS-001 | Query/log adapter | Run emits output. | `scheduled-task-runs.logs` reads run-scoped logs; deployment and resource runtime logs are unchanged. |
 | SCHED-TASK-SECRET-001 | Redaction | Task input references secrets. | Definitions, runs, logs, errors, diagnostics, and tool descriptors expose only safe references and masked values. |
 | SCHED-TASK-ENTRY-001 | CLI/API/Web/MCP | Entrypoints are active. | CLI, HTTP/oRPC, and Web controls dispatch command/query messages through catalog schemas; generated MCP descriptors consume the catalog entries; public docs/help links target stable scheduled-task anchors. |
@@ -62,8 +62,9 @@ unsafe command output masking for
 `packages/application/test/scheduled-task-update.test.ts`.
 `SCHED-TASK-DELETE-001` and `SCHED-TASK-DELETE-002` have application delete-admission
 coverage in `packages/application/test/scheduled-task-delete.test.ts`.
-`SCHED-TASK-RUN-001` and `SCHED-TASK-RUN-002` have application run-now admission coverage
-in `packages/application/test/scheduled-task-run-now.test.ts`.
+`SCHED-TASK-RUN-001`, `SCHED-TASK-RUN-002`, and ADR-054 accepted-work durable state coverage for
+`PROC-DELIVERY-001` have application run-now admission coverage in
+`packages/application/test/scheduled-task-run-now.test.ts`.
 `SCHED-TASK-SCHED-001` has application scheduler admission coverage in
 `packages/application/test/scheduled-task-scheduler.test.ts` and Postgres/PGlite due-candidate
 read-model coverage in `packages/persistence/pg/test/scheduled-task-definition.pglite.test.ts`.
@@ -71,9 +72,12 @@ read-model coverage in `packages/persistence/pg/test/scheduled-task-definition.p
 `SCHED-TASK-SECRET-001` have adapter coverage in
 `packages/adapters/runtime/test/scheduled-task-runtime.test.ts`.
 `SCHED-TASK-WORKER-001` has application worker coverage in
-`packages/application/test/scheduled-task-run-worker.test.ts`.
+`packages/application/test/scheduled-task-run-worker.test.ts`, including ADR-054 durable process
+claim/completion binding for `PROC-DELIVERY-002` and `PROC-DELIVERY-004`.
 `SCHED-TASK-RUNNER-001` has shell runner and configuration coverage in
-`apps/shell/test/scheduled-task-runner.test.ts` and `packages/config/test/index.test.ts`.
+`apps/shell/test/scheduled-task-runner.test.ts` and `packages/config/test/index.test.ts`; the
+shell runner coverage includes ADR-054 due durable process attempt handoff for `PROC-DELIVERY-002`
+and generated retry delivery handoff for `PROC-DELIVERY-011`.
 `SCHED-TASK-DOMAIN-001` through `SCHED-TASK-DOMAIN-003` have core coverage in
 `packages/core/test/scheduled-task.test.ts`. The implemented slices add dedicated value objects for
 schedule, timezone, command intent, timeout, retry, lifecycle status, and `forbid` concurrency
@@ -90,7 +94,8 @@ Application command/query schemas, messages, result DTOs, read-model ports, crea
 run-now admission, scheduler admission, accepted-run worker, read-query handlers/services,
 scheduled task persistence/read models, and hermetic runtime adapter support exist. Shell
 composition can resolve the scheduled-task repositories, read models, runtime port, handlers, use
-cases, scheduler, and worker. The scheduled-task runner is configured off by default and can be
-enabled for long-running shell processes. Operation catalog entries, HTTP/oRPC routes, CLI
+cases, scheduler, worker, and process attempt candidate/claim/completion ports. The scheduled-task
+runner is configured off by default and can be enabled for long-running shell processes. Operation catalog
+entries, HTTP/oRPC routes, CLI
 commands, Web Resource-detail controls, generated MCP descriptors, and public docs/help anchors are
 active.

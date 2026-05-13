@@ -244,11 +244,12 @@ Current code has the initial target backend shape, but it is still running throu
 - `ResourceRuntimeLogReader`, resource health, diagnostic summary, and proxy configuration previews
   are being normalized as read/query surfaces, but target backend capabilities are not yet their
   shared selection mechanism.
-- Runtime target capacity diagnostics and prune contracts are not first-class yet. Current
-  single-server Docker/SSH behavior can leave unused images, BuildKit/build cache, and materialized
-  source workspaces behind after preview cleanup or failed rollout. The first capacity slice exposes
-  `servers.capacity.inspect` as a read-only query for local-shell and generic-SSH targets; prune,
-  cleanup automation, and volume/state deletion remain out of scope for that slice.
+- Runtime target capacity diagnostics are first-class through `servers.capacity.inspect`, and the
+  first prune contract is first-class through `servers.capacity.prune`. Current single-server
+  Docker/SSH behavior can still leave unused images and BuildKit/build cache behind after preview
+  cleanup or failed rollout because the first prune slice is limited to stopped Appaloft-managed
+  containers and materialized workspace candidates. Build-cache deletion, unused-image deletion,
+  cleanup automation, and volume/state deletion remain out of scope until later governed slices.
 
 The current state is acceptable for the single-server v1 loop. It is not yet ready to add
 Kubernetes because deployment admission still needs to use the registry for pre-acceptance support

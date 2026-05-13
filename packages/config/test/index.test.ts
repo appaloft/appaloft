@@ -372,6 +372,15 @@ describe("resolveConfig", () => {
       intervalSeconds: 60,
       batchSize: 25,
     });
+    expect(config.scheduledRuntimePruneRunner).toEqual({
+      enabled: false,
+      intervalSeconds: 3600,
+      batchSize: 25,
+    });
+    expect(config.scheduledHistoryRetentionRunner).toEqual({
+      enabled: false,
+      intervalSeconds: 3600,
+    });
     expect(config.previewCleanupRetryScheduler).toEqual({
       enabled: false,
       intervalSeconds: 300,
@@ -437,6 +446,36 @@ describe("resolveConfig", () => {
       enabled: true,
       intervalSeconds: 15,
       batchSize: 3,
+    });
+  });
+
+  test("[RT-CAP-SCHED-007] allows configuring the scheduled runtime prune runner through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_ENABLED: "true",
+        APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_INTERVAL_SECONDS: "120",
+        APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_BATCH_SIZE: "6",
+      },
+    });
+
+    expect(config.scheduledRuntimePruneRunner).toEqual({
+      enabled: true,
+      intervalSeconds: 120,
+      batchSize: 6,
+    });
+  });
+
+  test("[SCHED-HISTORY-RETENTION-006] allows configuring the scheduled history retention runner through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED: "true",
+        APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS: "180",
+      },
+    });
+
+    expect(config.scheduledHistoryRetentionRunner).toEqual({
+      enabled: true,
+      intervalSeconds: 180,
     });
   });
 

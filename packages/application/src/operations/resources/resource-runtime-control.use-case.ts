@@ -18,6 +18,7 @@ import {
   type DeploymentSummary,
   type IdGenerator,
   type MutationCoordinator,
+  type ProcessAttemptRecorder,
   type ResourceReadModel,
   type ResourceRepository,
   type ResourceRuntimeControlAttemptRecord,
@@ -29,6 +30,7 @@ import {
   type ResourceRuntimeControlTargetPort,
   type ResourceSummary,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { deploymentResourceRuntimeScopeForIds } from "../deployments/deployment-mutation-scopes";
 
@@ -202,6 +204,75 @@ function toCommandResult(
   };
 }
 
+function runtimeControlProcessStatus(
+  status: ResourceRuntimeControlAttemptRecord["status"],
+): "running" | "succeeded" | "failed" {
+  switch (status) {
+    case "succeeded":
+      return "succeeded";
+    case "accepted":
+    case "running":
+      return "running";
+    case "blocked":
+    case "failed":
+      return "failed";
+  }
+}
+
+function runtimeControlNextActions(
+  status: ResourceRuntimeControlAttemptRecord["status"],
+): ["diagnostic", "manual-review"] | ["no-action"] {
+  return status === "failed" || status === "blocked"
+    ? ["diagnostic", "manual-review"]
+    : ["no-action"];
+}
+
+async function recordRuntimeControlProcessAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  context: ExecutionContext;
+  attempt: ResourceRuntimeControlAttemptRecord;
+  providerKey: string;
+  runtimeKind: string;
+  targetKind: string;
+}): Promise<void> {
+  const processStatus = runtimeControlProcessStatus(input.attempt.status);
+  const errorCode =
+    input.attempt.errorCode ??
+    (input.attempt.blockedReason ? `resource_runtime_${input.attempt.blockedReason}` : undefined);
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: input.attempt.runtimeControlAttemptId,
+    kind: "runtime-maintenance",
+    status: processStatus,
+    operationKey: operationKey(input.attempt.operation),
+    dedupeKey: `resource-runtime-control:${input.attempt.resourceId}:${input.attempt.runtimeControlAttemptId}`,
+    correlationId: input.context.requestId,
+    requestId: input.context.requestId,
+    phase: "runtime-control",
+    step: `${input.attempt.operation}-${input.attempt.status}`,
+    resourceId: input.attempt.resourceId,
+    ...(input.attempt.deploymentId ? { deploymentId: input.attempt.deploymentId } : {}),
+    serverId: input.attempt.serverId,
+    startedAt: input.attempt.startedAt,
+    updatedAt: input.attempt.completedAt ?? input.attempt.startedAt,
+    ...(input.attempt.completedAt ? { finishedAt: input.attempt.completedAt } : {}),
+    ...(errorCode ? { errorCode, errorCategory: "async-processing" } : {}),
+    ...(processStatus === "failed" ? { retriable: true } : {}),
+    nextActions: runtimeControlNextActions(input.attempt.status),
+    safeDetails: {
+      operation: input.attempt.operation,
+      runtimeState: input.attempt.runtimeState,
+      providerKey: input.providerKey,
+      runtimeKind: input.runtimeKind,
+      targetKind: input.targetKind,
+      ...(input.attempt.reason ? { reason: input.attempt.reason } : {}),
+      ...(input.attempt.blockedReason ? { blockedReason: input.attempt.blockedReason } : {}),
+    },
+  });
+
+  void result;
+}
+
 @injectable()
 export class ResourceRuntimeControlUseCase {
   constructor(
@@ -221,6 +292,8 @@ export class ResourceRuntimeControlUseCase {
     private readonly clock: Clock,
     @inject(tokens.mutationCoordinator)
     private readonly mutationCoordinator: MutationCoordinator,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
@@ -233,6 +306,7 @@ export class ResourceRuntimeControlUseCase {
       clock,
       idGenerator,
       mutationCoordinator,
+      processAttemptRecorder,
       resourceReadModel,
       resourceRepository,
       targetPort,
@@ -337,6 +411,15 @@ export class ResourceRuntimeControlUseCase {
         work: async () =>
           safeTry(async function* () {
             yield* await attemptRecorder.record(repositoryContext, runningAttempt);
+            await recordRuntimeControlProcessAttempt({
+              recorder: processAttemptRecorder,
+              repositoryContext,
+              context,
+              attempt: runningAttempt,
+              providerKey: deployment.runtimePlan.target.providerKey,
+              runtimeKind: deployment.runtimePlan.execution.kind,
+              targetKind: deployment.runtimePlan.target.kind,
+            });
 
             const targetResult = await targetPort.control(context, {
               runtimeControlAttemptId: attemptId,
@@ -384,6 +467,15 @@ export class ResourceRuntimeControlUseCase {
               repositoryContext,
               terminalAttempt,
             );
+            await recordRuntimeControlProcessAttempt({
+              recorder: processAttemptRecorder,
+              repositoryContext,
+              context,
+              attempt: terminalAttempt,
+              providerKey: deployment.runtimePlan.target.providerKey,
+              runtimeKind: deployment.runtimePlan.execution.kind,
+              targetKind: deployment.runtimePlan.target.kind,
+            });
 
             if (targetResult.isErr()) {
               return err(

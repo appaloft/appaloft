@@ -22,6 +22,9 @@ The command contract is:
 - accepted requests persist a domain binding state such as `requested` or `pending_verification`;
 - accepted requests persist the expected public DNS target and initial DNS observation state when
   the target can be derived safely;
+- accepted requests mirror the initial ownership verification attempt into the durable process
+  attempt journal for `operator-work.*` visibility with safe DomainBinding, Resource, server, and
+  domain/DNS expectation metadata;
 - accepted requests publish `domain-binding-requested`;
 - DNS/proxy/certificate readiness progresses asynchronously.
 

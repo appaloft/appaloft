@@ -16,7 +16,7 @@ const builtinRuntimePlugin: SystemPluginDefinition = {
 };
 
 describe("plugin registry contract", () => {
-  test("returns plugin summaries from registered definitions", () => {
+  test("[SYSTEM-DIAG-002] returns plugin summaries with safe capability diagnostics", () => {
     const host = new LocalPluginHost([builtinRuntimePlugin], "0.1.2");
 
     expect(host.list()).toEqual(
@@ -26,9 +26,48 @@ describe("plugin registry contract", () => {
           displayName: "Builtin Fake Runtime",
           kind: "user-extension",
           compatible: true,
+          capabilityDetails: expect.arrayContaining([
+            expect.objectContaining({
+              key: "deployment-hook",
+              enabled: true,
+            }),
+          ]),
+          configuration: expect.objectContaining({
+            status: "configured",
+            diagnostics: expect.arrayContaining([
+              expect.objectContaining({
+                code: "plugin.compatible",
+              }),
+            ]),
+          }),
         }),
       ]),
     );
+  });
+
+  test("[SYSTEM-DIAG-002] keeps incompatible plugin capabilities visible but inactive", () => {
+    const host = new LocalPluginHost([builtinRuntimePlugin], "0.2.0");
+
+    expect(host.list()).toEqual([
+      expect.objectContaining({
+        name: "builtin-fake-runtime",
+        compatible: false,
+        capabilityDetails: expect.arrayContaining([
+          expect.objectContaining({
+            key: "deployment-hook",
+            enabled: false,
+          }),
+        ]),
+        configuration: expect.objectContaining({
+          status: "not-configured",
+          diagnostics: expect.arrayContaining([
+            expect.objectContaining({
+              code: "plugin.incompatible",
+            }),
+          ]),
+        }),
+      }),
+    ]);
   });
 
   test("finds a plugin summary by plugin name", () => {

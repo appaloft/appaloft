@@ -300,6 +300,30 @@ export const appaloftDeploymentNetworkConfigSchema = z
   })
   .describe("Network profile fields copied into resource creation for quick deploy.");
 
+const runtimePruneCategorySchema = z.enum([
+  "stopped-containers",
+  "preview-workspaces",
+  "source-workspaces",
+  "docker-build-cache",
+  "unused-images",
+]);
+
+export const appaloftDeploymentRetentionConfigSchema = z
+  .object({
+    runtimePrune: z
+      .object({
+        retentionDays: positiveIntegerSchema,
+        destructive: z.boolean().default(false),
+        categories: z.array(runtimePruneCategorySchema).min(1).default(["stopped-containers"]),
+        retryOnFailure: z.boolean().default(true),
+        enabled: z.boolean().default(true),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .describe("Safe retention policy fields materialized during deployment config bootstrap.");
+
 function isDomainName(value: string): boolean {
   const normalized = value.trim().toLowerCase();
 
@@ -543,6 +567,7 @@ export const appaloftDeploymentConfigSchema = z
     source: appaloftDeploymentSourceConfigSchema.optional(),
     runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
     network: appaloftDeploymentNetworkConfigSchema.optional(),
+    retention: appaloftDeploymentRetentionConfigSchema.optional(),
     health: appaloftDeploymentHealthCheckConfigSchema.optional(),
     access: appaloftDeploymentAccessConfigSchema.optional(),
     env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),

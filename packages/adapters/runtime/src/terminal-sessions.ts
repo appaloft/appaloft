@@ -18,6 +18,7 @@ import {
   type TerminalSessionDescriptor,
   type TerminalSessionFrame,
   type TerminalSessionGateway,
+  type TerminalSessionSummary,
   type TerminalSessionOpenRequest,
 } from "@appaloft/application";
 
@@ -271,7 +272,13 @@ async function readTerminalOutput(input: {
 }
 
 export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
-  private readonly sessions = new Map<string, RuntimeTerminalSession>();
+  private readonly sessions = new Map<
+    string,
+    {
+      session: RuntimeTerminalSession;
+      summary: TerminalSessionSummary;
+    }
+  >();
 
   constructor(
     private readonly input: {
@@ -328,15 +335,7 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
         },
       );
 
-      this.sessions.set(request.sessionId, session);
-      queue.push({
-        kind: "ready",
-        sessionId: request.sessionId,
-        ...(workingDirectory ? { workingDirectory } : {}),
-      });
-      this.monitorProcess(request.sessionId, session, subprocess, queue, spawnSpec.cleanup);
-
-      return ok({
+      const summary = {
         sessionId: request.sessionId,
         scope: request.scope.kind,
         serverId: request.scope.server.id,
@@ -347,13 +346,27 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
             }
           : {}),
         transport: {
-          kind: "websocket",
+          kind: "websocket" as const,
           path: `/api/terminal-sessions/${encodeURIComponent(request.sessionId)}/attach`,
         },
         providerKey,
         ...(workingDirectory ? { workingDirectory } : {}),
         createdAt: new Date().toISOString(),
+        status: "active" as const,
+      };
+
+      this.sessions.set(request.sessionId, {
+        session,
+        summary,
       });
+      queue.push({
+        kind: "ready",
+        sessionId: request.sessionId,
+        ...(workingDirectory ? { workingDirectory } : {}),
+      });
+      this.monitorProcess(request.sessionId, session, subprocess, queue, spawnSpec.cleanup);
+
+      return ok(summary);
     } catch (error) {
       await spawnSpec.cleanup();
       return err(
@@ -366,15 +379,90 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
   }
 
   attach(sessionId: string): Result<TerminalSession> {
-    const session = this.sessions.get(sessionId);
+    const entry = this.sessions.get(sessionId);
 
-    return session
-      ? ok(session)
+    return entry
+      ? ok(entry.session)
       : err(
           domainError.terminalSessionNotFound("Terminal session was not found", {
             sessionId,
           }),
         );
+  }
+
+  list(input?: {
+    scope?: "server" | "resource";
+    serverId?: string;
+    resourceId?: string;
+    deploymentId?: string;
+    limit?: number;
+  }): TerminalSessionSummary[] {
+    const limit = input?.limit ?? 50;
+    return [...this.sessions.values()]
+      .map((entry) => entry.summary)
+      .filter((summary) => (input?.scope ? summary.scope === input.scope : true))
+      .filter((summary) => (input?.serverId ? summary.serverId === input.serverId : true))
+      .filter((summary) => (input?.resourceId ? summary.resourceId === input.resourceId : true))
+      .filter((summary) =>
+        input?.deploymentId ? summary.deploymentId === input.deploymentId : true,
+      )
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .slice(0, limit);
+  }
+
+  show(sessionId: string): Result<TerminalSessionSummary> {
+    const entry = this.sessions.get(sessionId);
+    return entry
+      ? ok(entry.summary)
+      : err(
+          domainError.terminalSessionNotFound("Terminal session was not found", {
+            sessionId,
+          }),
+        );
+  }
+
+  async close(sessionId: string): Promise<Result<{ sessionId: string; closed: boolean; status: "closed" }>> {
+    const entry = this.sessions.get(sessionId);
+    if (!entry) {
+      return err(
+        domainError.terminalSessionNotFound("Terminal session was not found", {
+          sessionId,
+        }),
+      );
+    }
+
+    entry.summary.status = "closing";
+    await entry.session.close();
+    this.sessions.delete(sessionId);
+    return ok({
+      sessionId,
+      closed: true,
+      status: "closed",
+    });
+  }
+
+  async expire(input?: {
+    olderThan?: string;
+    limit?: number;
+  }): Promise<Result<{ expiredCount: number; sessionIds: string[] }>> {
+    const cutoff = input?.olderThan ? Date.parse(input.olderThan) : Date.now();
+    const candidates = [...this.sessions.values()]
+      .filter((entry) => Date.parse(entry.summary.createdAt) < cutoff)
+      .sort((left, right) => left.summary.createdAt.localeCompare(right.summary.createdAt))
+      .slice(0, input?.limit ?? 200);
+    const sessionIds: string[] = [];
+
+    for (const candidate of candidates) {
+      const result = await this.close(candidate.summary.sessionId);
+      if (result.isOk()) {
+        sessionIds.push(candidate.summary.sessionId);
+      }
+    }
+
+    return ok({
+      expiredCount: sessionIds.length,
+      sessionIds,
+    });
   }
 
   private async createSpawnSpec(

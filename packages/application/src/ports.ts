@@ -296,6 +296,44 @@ export interface DeploymentEventObserver {
   ): Promise<Result<DeploymentEventStream>>;
 }
 
+export interface DomainEventStreamObservationRequest {
+  deploymentId: string;
+  cursor?: string;
+  historyLimit: number;
+  includeHistory: boolean;
+  untilTerminal: boolean;
+}
+
+export type DomainEventStreamObservationReplayResult =
+  | {
+      available: true;
+      envelopes: DeploymentEventStreamEnvelope[];
+    }
+  | {
+      available: false;
+    };
+
+export interface DomainEventStreamObservationReader {
+  replayDeploymentEvents(
+    context: RepositoryContext,
+    request: DomainEventStreamObservationRequest,
+  ): Promise<Result<DomainEventStreamObservationReplayResult>>;
+  openDeploymentEventStream(
+    context: RepositoryContext,
+    request: DomainEventStreamObservationRequest,
+    signal: AbortSignal,
+  ): Promise<Result<DomainEventStreamObservationReplayResult | DeploymentEventStream>>;
+}
+
+export interface DomainEventStreamRecordInput {
+  event: DomainEvent;
+  requestId: string;
+}
+
+export interface DomainEventStreamRecorder {
+  record(context: RepositoryContext, input: DomainEventStreamRecordInput): Promise<Result<void>>;
+}
+
 export interface SourceLinkTarget {
   projectId: string;
   environmentId: string;
@@ -357,6 +395,18 @@ export interface SourceLinkRepository {
   findOne(spec: SourceLinkSelectionSpec): Promise<Result<SourceLinkRecord | null>>;
   upsert(record: SourceLinkRecord, spec: SourceLinkUpsertSpec): Promise<Result<SourceLinkRecord>>;
   deleteOne(spec: SourceLinkSelectionSpec): Promise<Result<boolean>>;
+}
+
+export interface SourceLinkReadModel {
+  list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      resourceId?: string;
+      serverId?: string;
+      limit?: number;
+    },
+  ): Promise<SourceLinkRecord[]>;
 }
 
 export interface ProjectRepository {
@@ -1430,7 +1480,8 @@ export type RuntimeTargetCapacityWarningCode =
   | "docker-unavailable"
   | "timeout"
   | "partial-diagnostic"
-  | "unsupported-provider";
+  | "unsupported-provider"
+  | "audit-record-failed";
 
 export interface RuntimeTargetCapacityWarning {
   code: RuntimeTargetCapacityWarningCode;
@@ -1483,6 +1534,74 @@ export interface RuntimeTargetCapacityInspector {
       server: DeploymentTargetState;
     },
   ): Promise<Result<RuntimeTargetCapacityInspection>>;
+}
+
+export type RuntimeTargetCapacityPruneCategory =
+  | "stopped-containers"
+  | "preview-workspaces"
+  | "source-workspaces"
+  | "docker-build-cache"
+  | "unused-images";
+
+export type RuntimeTargetCapacityPruneSkippedReason =
+  | "active-runtime"
+  | "rollback-candidate"
+  | "cutoff-not-reached"
+  | "ownership-unproven"
+  | "unsupported-category"
+  | "volume-excluded"
+  | "state-root-excluded"
+  | "remote-state-excluded"
+  | "safety-evidence-missing";
+
+export interface RuntimeTargetCapacityPruneCandidate {
+  id: string;
+  category: RuntimeTargetCapacityPruneCategory;
+  target: string;
+  updatedAt: string | null;
+  size: number | null;
+  action: "matched" | "pruned" | "skipped" | "excluded";
+  skippedReason?: RuntimeTargetCapacityPruneSkippedReason;
+}
+
+export interface RuntimeTargetCapacityPruneSummary {
+  inspectedCount: number;
+  matchedCount: number;
+  prunedCount: number;
+  skippedCount: number;
+  excludedCount: number;
+  reclaimedBytes: number;
+}
+
+export interface RuntimeTargetCapacityPruneResult {
+  schemaVersion: "servers.capacity.prune/v1";
+  server: {
+    id: string;
+    name: string;
+    host: string;
+    port: number;
+    providerKey: string;
+    targetKind: string;
+  };
+  before: string;
+  categories: RuntimeTargetCapacityPruneCategory[];
+  dryRun: boolean;
+  prunedAt: string;
+  summary: RuntimeTargetCapacityPruneSummary;
+  candidates: RuntimeTargetCapacityPruneCandidate[];
+  warnings: RuntimeTargetCapacityWarning[];
+}
+
+export interface RuntimeTargetCapacityPruner {
+  prune(
+    context: ExecutionContext,
+    input: {
+      server: DeploymentTargetState;
+      before: string;
+      categories: RuntimeTargetCapacityPruneCategory[];
+      dryRun: boolean;
+    },
+  ): Promise<Result<RuntimeTargetCapacityPruneResult>>;
 }
 
 export interface ServerEdgeProxyBootstrapResult {
@@ -3212,6 +3331,46 @@ export interface TerminalSessionDescriptor {
   createdAt: string;
 }
 
+export type TerminalSessionStatus = "active" | "closing";
+
+export interface TerminalSessionSummary extends TerminalSessionDescriptor {
+  status: TerminalSessionStatus;
+}
+
+export interface TerminalSessionList {
+  schemaVersion: "terminal-sessions.list/v1";
+  items: TerminalSessionSummary[];
+}
+
+export interface TerminalSessionDetail {
+  schemaVersion: "terminal-sessions.show/v1";
+  item: TerminalSessionSummary;
+}
+
+export interface CloseTerminalSessionResponse {
+  sessionId: string;
+  closed: boolean;
+  status: "closed";
+}
+
+export interface ExpireTerminalSessionsResponse {
+  expiredCount: number;
+  sessionIds: string[];
+}
+
+export interface ListTerminalSessionsInput {
+  scope?: "server" | "resource";
+  serverId?: string;
+  resourceId?: string;
+  deploymentId?: string;
+  limit?: number;
+}
+
+export interface ExpireTerminalSessionsInput {
+  olderThan?: string;
+  limit?: number;
+}
+
 export type TerminalSessionFrame =
   | {
       kind: "ready";
@@ -3245,6 +3404,10 @@ export interface TerminalSessionGateway {
     request: TerminalSessionOpenRequest,
   ): Promise<Result<TerminalSessionDescriptor>>;
   attach(sessionId: string): Result<TerminalSession>;
+  list(input?: ListTerminalSessionsInput): TerminalSessionSummary[];
+  show(sessionId: string): Result<TerminalSessionSummary>;
+  close(sessionId: string): Promise<Result<CloseTerminalSessionResponse>>;
+  expire(input?: ExpireTerminalSessionsInput): Promise<Result<ExpireTerminalSessionsResponse>>;
 }
 
 export type ResourceRuntimeLogsResult =
@@ -3260,6 +3423,95 @@ export type ResourceRuntimeLogsResult =
       deploymentId?: string;
       stream: ResourceRuntimeLogStream;
     };
+
+export interface ResourceRuntimeLogArchiveSummary {
+  archiveId: string;
+  resourceId: string;
+  deploymentId?: string;
+  serverId?: string;
+  serviceName?: string;
+  runtimeKind?: string;
+  capturedAt: string;
+  lineCount: number;
+  retentionStatus: "retained";
+  reason?: string;
+}
+
+export interface ResourceRuntimeLogArchiveDetail extends ResourceRuntimeLogArchiveSummary {
+  lines: ResourceRuntimeLogLine[];
+}
+
+export interface ResourceRuntimeLogArchiveCreateInput {
+  archiveId: string;
+  resourceId: string;
+  deploymentId?: string;
+  serverId?: string;
+  serviceName?: string;
+  runtimeKind?: string;
+  capturedAt: string;
+  reason?: string;
+  lines: ResourceRuntimeLogLine[];
+}
+
+export interface ResourceRuntimeLogArchiveListInput {
+  resourceId?: string;
+  deploymentId?: string;
+  serverId?: string;
+  serviceName?: string;
+  limit: number;
+  cursor?: string;
+}
+
+export interface ResourceRuntimeLogArchiveShowInput {
+  archiveId: string;
+}
+
+export interface ResourceRuntimeLogArchivePruneInput {
+  before: string;
+  resourceId?: string;
+  deploymentId?: string;
+  serverId?: string;
+  serviceName?: string;
+  dryRun: boolean;
+}
+
+export interface ResourceRuntimeLogArchivePruneStoreResult {
+  matchedCount: number;
+  prunedCount: number;
+  affectedResourceCount: number;
+}
+
+export interface ResourceRuntimeLogArchiveListPage {
+  items: ResourceRuntimeLogArchiveSummary[];
+  nextCursor?: string;
+}
+
+export interface ResourceRuntimeLogArchiveResult {
+  schemaVersion: "resources.runtime-logs.archive/v1";
+  archive: ResourceRuntimeLogArchiveDetail;
+}
+
+export interface ResourceRuntimeLogArchiveListResult extends ResourceRuntimeLogArchiveListPage {
+  schemaVersion: "resources.runtime-log-archives.list/v1";
+  generatedAt: string;
+}
+
+export interface ResourceRuntimeLogArchiveShowResult {
+  schemaVersion: "resources.runtime-log-archives.show/v1";
+  archive: ResourceRuntimeLogArchiveDetail;
+}
+
+export interface ResourceRuntimeLogArchivePruneResult
+  extends ResourceRuntimeLogArchivePruneStoreResult {
+  schemaVersion: "resources.runtime-log-archives.prune/v1";
+  before: string;
+  resourceId?: string;
+  deploymentId?: string;
+  serverId?: string;
+  serviceName?: string;
+  dryRun: boolean;
+  prunedAt: string;
+}
 
 export type ResourceDiagnosticSectionStatus =
   | "available"
@@ -4138,6 +4390,70 @@ export interface OperatorWorkItem {
   safeDetails?: Record<string, string | number | boolean | null>;
 }
 
+export interface RouteRealizationWorkSummary {
+  id: string;
+  status: OperatorWorkStatus;
+  operationKey: string;
+  phase?: string;
+  step?: string;
+  projectId?: string;
+  resourceId?: string;
+  deploymentId?: string;
+  serverId?: string;
+  domainBindingId?: string;
+  startedAt?: string;
+  updatedAt: string;
+  finishedAt?: string;
+  errorCode?: string;
+  errorCategory?: string;
+  retriable?: boolean;
+  nextActions: OperatorWorkNextAction[];
+  safeDetails?: Record<string, string | number | boolean | null>;
+}
+
+export interface RouteRealizationWorkReadModel {
+  list(
+    context: RepositoryContext,
+    input?: {
+      resourceId?: string;
+      serverId?: string;
+      deploymentId?: string;
+      limit?: number;
+    },
+  ): Promise<RouteRealizationWorkSummary[]>;
+}
+
+export interface RemoteStateWorkSummary {
+  id: string;
+  status: OperatorWorkStatus;
+  operationKey: string;
+  phase:
+    | "remote-state-lock"
+    | "remote-state-migration"
+    | "remote-state-backup"
+    | "remote-state-recovery";
+  step?: string;
+  serverId?: string;
+  startedAt?: string;
+  updatedAt: string;
+  finishedAt?: string;
+  errorCode?: string;
+  errorCategory?: string;
+  retriable?: boolean;
+  nextActions: OperatorWorkNextAction[];
+  safeDetails?: Record<string, string | number | boolean | null>;
+}
+
+export interface RemoteStateWorkReadModel {
+  list(
+    context: RepositoryContext,
+    input?: {
+      serverId?: string;
+      limit?: number;
+    },
+  ): Promise<RemoteStateWorkSummary[]>;
+}
+
 export interface OperatorWorkList {
   schemaVersion: "operator-work.list/v1";
   items: OperatorWorkItem[];
@@ -4190,11 +4506,167 @@ export interface ProcessAttemptListFilter {
   limit?: number;
 }
 
+export interface ProcessAttemptRetryCandidateFilter {
+  kind?: ProcessAttemptKind;
+  now: string;
+  limit?: number;
+}
+
+export interface ProcessAttemptDeliveryCandidateFilter {
+  kind?: ProcessAttemptKind;
+  operationKey?: string;
+  now: string;
+  limit?: number;
+}
+
+export interface ProcessAttemptRetryGenerationFilter {
+  kind?: ProcessAttemptKind;
+  operationKey?: string;
+  now: string;
+  limit?: number;
+}
+
+export const prunableProcessAttemptStatuses = [
+  "succeeded",
+  "failed",
+  "canceled",
+  "dead-lettered",
+] as const;
+
+export type PrunableProcessAttemptStatus = (typeof prunableProcessAttemptStatuses)[number];
+
+export interface ProcessAttemptPruneInput {
+  before: string;
+  statuses: PrunableProcessAttemptStatus[];
+  dryRun: boolean;
+}
+
+export interface ProcessAttemptPruneResult {
+  matchedCount: number;
+  prunedCount: number;
+  countsByStatus: Partial<Record<PrunableProcessAttemptStatus, number>>;
+}
+
+export interface ProcessAttemptClaimInput {
+  attemptId: string;
+  workerId: string;
+  claimedAt: string;
+  safeDetails?: Record<string, string | number | boolean | null>;
+}
+
+export type ProcessAttemptClaimResult =
+  | {
+      status: "claimed";
+      attempt: ProcessAttemptRecord;
+    }
+  | {
+      status: "not-found";
+      attemptId: string;
+    }
+  | {
+      status: "already-claimed";
+      attempt: ProcessAttemptRecord;
+    }
+  | {
+      status: "not-due";
+      attempt: ProcessAttemptRecord;
+    }
+  | {
+      status: "not-claimable";
+      attempt: ProcessAttemptRecord;
+    };
+
+export type ProcessAttemptCompletionStatus = "succeeded" | "failed" | "retry-scheduled";
+
+export interface ProcessAttemptCompletionInput {
+  attemptId: string;
+  status: ProcessAttemptCompletionStatus;
+  completedAt: string;
+  phase?: string;
+  step?: string;
+  errorCode?: string;
+  errorCategory?: string;
+  retriable?: boolean;
+  nextEligibleAt?: string;
+  nextActions: ProcessAttemptNextAction[];
+  safeDetails?: Record<string, string | number | boolean | null>;
+}
+
+export type ProcessAttemptCompletionResult =
+  | {
+      status: "completed";
+      attempt: ProcessAttemptRecord;
+    }
+  | {
+      status: "not-found";
+      attemptId: string;
+    }
+  | {
+      status: "not-running";
+      attempt: ProcessAttemptRecord;
+    };
+
+export interface ProcessAttemptRetryGenerationInput {
+  sourceAttemptId: string;
+  retryAttemptId: string;
+  generatedAt: string;
+  phase: string;
+  step: string;
+  safeDetails?: Record<string, string | number | boolean | null>;
+}
+
+export type ProcessAttemptRetryGenerationResult =
+  | {
+      status: "generated";
+      sourceAttempt: ProcessAttemptRecord;
+      retryAttempt: ProcessAttemptRecord;
+    }
+  | {
+      status: "not-found";
+      sourceAttemptId: string;
+    }
+  | {
+      status: "not-due";
+      sourceAttempt: ProcessAttemptRecord;
+    }
+  | {
+      status: "not-retriable";
+      sourceAttempt: ProcessAttemptRecord;
+    }
+  | {
+      status: "stale-generation";
+      sourceAttempt: ProcessAttemptRecord;
+      latestAttempt: ProcessAttemptRecord;
+    };
+
 export interface ProcessAttemptRecorder {
   record(
     context: RepositoryContext,
     attempt: ProcessAttemptRecord,
   ): Promise<Result<ProcessAttemptRecord>>;
+}
+
+export interface ProcessAttemptRecoveryRecorder {
+  markRecovered(
+    context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>>;
+  deadLetter(
+    context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>>;
+  cancel(
+    context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>>;
+  retry(
+    context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>>;
+  prune(
+    context: RepositoryContext,
+    input: ProcessAttemptPruneInput,
+  ): Promise<Result<ProcessAttemptPruneResult>>;
 }
 
 export interface ProcessAttemptReadModel {
@@ -4203,6 +4675,41 @@ export interface ProcessAttemptReadModel {
     filter?: ProcessAttemptListFilter,
   ): Promise<ProcessAttemptRecord[]>;
   findOne(context: RepositoryContext, id: string): Promise<ProcessAttemptRecord | null>;
+}
+
+export interface ProcessAttemptRetryCandidateReader {
+  listDueRetries(
+    context: RepositoryContext,
+    filter: ProcessAttemptRetryCandidateFilter,
+  ): Promise<ProcessAttemptRecord[]>;
+}
+
+export interface ProcessAttemptDeliveryCandidateReader {
+  listDueDeliveryCandidates(
+    context: RepositoryContext,
+    filter: ProcessAttemptDeliveryCandidateFilter,
+  ): Promise<ProcessAttemptRecord[]>;
+}
+
+export interface ProcessAttemptRetryGenerator {
+  generateDueRetry(
+    context: RepositoryContext,
+    input: ProcessAttemptRetryGenerationInput,
+  ): Promise<Result<ProcessAttemptRetryGenerationResult>>;
+}
+
+export interface ProcessAttemptClaimer {
+  claimDue(
+    context: RepositoryContext,
+    input: ProcessAttemptClaimInput,
+  ): Promise<Result<ProcessAttemptClaimResult>>;
+}
+
+export interface ProcessAttemptCompleter {
+  complete(
+    context: RepositoryContext,
+    input: ProcessAttemptCompletionInput,
+  ): Promise<Result<ProcessAttemptCompletionResult>>;
 }
 
 export type StreamDeploymentEventsResult =
@@ -4457,6 +4964,387 @@ export interface SourceEventDetail {
   policyResults: SourceEventPolicyResult[];
   createdDeploymentIds: string[];
   receivedAt: string;
+}
+
+export type AuditEventPayloadValue = string | number | boolean | null | readonly string[];
+
+export interface AuditEventListInput {
+  aggregateId: string;
+  eventType?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface AuditEventShowInput {
+  auditEventId: string;
+  aggregateId: string;
+}
+
+export interface AuditEventExportInput {
+  aggregateId: string;
+  eventType?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+export interface AuditEventGlobalExportInput {
+  from: string;
+  to: string;
+  aggregateId?: string;
+  eventType?: string;
+  limit?: number;
+}
+
+export interface AuditEventSummary {
+  auditEventId: string;
+  aggregateId: string;
+  eventType: string;
+  createdAt: string;
+}
+
+export interface AuditEventDetail {
+  schemaVersion?: "audit-events.show/v1";
+  auditEventId: string;
+  aggregateId: string;
+  eventType: string;
+  payload: Record<string, AuditEventPayloadValue>;
+  redactedFields: string[];
+  createdAt: string;
+}
+
+export interface AuditEventListPage {
+  items: AuditEventSummary[];
+  nextCursor?: string;
+}
+
+export interface AuditEventListResult extends AuditEventListPage {
+  schemaVersion: "audit-events.list/v1";
+  generatedAt: string;
+}
+
+export interface AuditEventShowResult {
+  schemaVersion: "audit-events.show/v1";
+  event: AuditEventDetail;
+}
+
+export interface AuditEventExportPage {
+  items: AuditEventDetail[];
+  truncated: boolean;
+}
+
+export interface AuditEventExportResult extends AuditEventExportPage {
+  schemaVersion: "audit-events.export/v1";
+  aggregateId: string;
+  filters: {
+    eventType?: string;
+    from?: string;
+    to?: string;
+    limit: number;
+  };
+  itemCount: number;
+  generatedAt: string;
+}
+
+export interface AuditEventGlobalExportResult extends AuditEventExportPage {
+  schemaVersion: "audit-events.export-global/v1";
+  filters: {
+    from: string;
+    to: string;
+    aggregateId?: string;
+    eventType?: string;
+    limit: number;
+  };
+  itemCount: number;
+  generatedAt: string;
+}
+
+export interface AuditEventPruneInput {
+  before: string;
+  aggregateId?: string;
+  eventType?: string;
+  dryRun: boolean;
+}
+
+export interface AuditEventPruneStoreResult {
+  matchedCount: number;
+  prunedCount: number;
+  heldCount: number;
+  archiveRetainedCount: number;
+  countsByEventType: Record<string, number>;
+  heldCountsByEventType: Record<string, number>;
+  archiveRetainedCountsByEventType: Record<string, number>;
+  activeHoldIds: string[];
+  activeArchiveIds: string[];
+}
+
+export interface AuditEventPruneResult extends AuditEventPruneStoreResult {
+  schemaVersion: "audit-events.prune/v1";
+  before: string;
+  aggregateId?: string;
+  eventType?: string;
+  dryRun: boolean;
+  prunedAt: string;
+}
+
+export type AuditEventLegalHoldStatus = "active" | "released";
+
+export type AuditEventLegalHoldScope =
+  | {
+      kind: "aggregate";
+      aggregateId: string;
+      from?: string;
+      to?: string;
+    }
+  | {
+      kind: "global-window";
+      from?: string;
+      to?: string;
+    };
+
+export interface AuditEventLegalHoldRecord {
+  holdId: string;
+  status: AuditEventLegalHoldStatus;
+  scope: AuditEventLegalHoldScope;
+  eventType?: string;
+  reason: string;
+  requestedBy?: string;
+  createdAt: string;
+  releasedAt?: string;
+  releaseReason?: string;
+  releasedBy?: string;
+}
+
+export interface AuditEventLegalHoldConfigureInput {
+  holdId: string;
+  aggregateId?: string;
+  eventType?: string;
+  from?: string;
+  to?: string;
+  reason: string;
+  requestedBy?: string;
+  createdAt: string;
+}
+
+export interface AuditEventLegalHoldReleaseInput {
+  holdId: string;
+  releaseReason: string;
+  releasedBy?: string;
+  releasedAt: string;
+}
+
+export interface AuditEventLegalHoldListInput {
+  status?: AuditEventLegalHoldStatus;
+  aggregateId?: string;
+  eventType?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface AuditEventLegalHoldListPage {
+  items: AuditEventLegalHoldRecord[];
+  nextCursor?: string;
+}
+
+export interface AuditEventLegalHoldResult {
+  schemaVersion: "audit-events.legal-holds.hold/v1";
+  hold: AuditEventLegalHoldRecord;
+}
+
+export interface AuditEventLegalHoldListResult extends AuditEventLegalHoldListPage {
+  schemaVersion: "audit-events.legal-holds.list/v1";
+  generatedAt: string;
+}
+
+export interface AuditEventLegalHoldShowResult {
+  schemaVersion: "audit-events.legal-holds.show/v1";
+  hold: AuditEventLegalHoldRecord;
+  generatedAt: string;
+}
+
+export type AuditEventArchiveSourceSelection =
+  | {
+      kind: "aggregate";
+      aggregateId: string;
+      from?: string;
+      to?: string;
+    }
+  | {
+      kind: "global-window";
+      from: string;
+      to: string;
+      aggregateId?: string;
+    };
+
+export interface AuditEventArchiveRecord {
+  archiveId: string;
+  archiveSchemaVersion: "audit-events.archive/v1";
+  source: AuditEventArchiveSourceSelection;
+  eventType?: string;
+  reason: string;
+  itemCount: number;
+  truncated: boolean;
+  contentDigest: string;
+  retainSourceRows: boolean;
+  createdAt: string;
+}
+
+export interface AuditEventArchiveDetail extends AuditEventArchiveRecord {
+  items: AuditEventDetail[];
+}
+
+export interface AuditEventArchiveCreateInput {
+  archiveId: string;
+  source: AuditEventArchiveSourceSelection;
+  eventType?: string;
+  reason: string;
+  items: AuditEventDetail[];
+  truncated: boolean;
+  contentDigest: string;
+  retainSourceRows: boolean;
+  createdAt: string;
+}
+
+export interface AuditEventArchiveListInput {
+  aggregateId?: string;
+  eventType?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface AuditEventArchiveListPage {
+  items: AuditEventArchiveRecord[];
+  nextCursor?: string;
+}
+
+export interface AuditEventArchivePruneInput {
+  before: string;
+  aggregateId?: string;
+  eventType?: string;
+  dryRun: boolean;
+}
+
+export interface AuditEventArchivePruneStoreResult {
+  matchedCount: number;
+  prunedCount: number;
+  countsBySourceKind: Record<string, number>;
+  countsByEventType: Record<string, number>;
+}
+
+export interface AuditEventArchiveResult {
+  schemaVersion: "audit-events.archives.archive/v1";
+  archive: AuditEventArchiveRecord;
+}
+
+export interface AuditEventArchiveListResult extends AuditEventArchiveListPage {
+  schemaVersion: "audit-events.archives.list/v1";
+  generatedAt: string;
+}
+
+export interface AuditEventArchiveShowResult {
+  schemaVersion: "audit-events.archives.show/v1";
+  archive: AuditEventArchiveDetail;
+  generatedAt: string;
+}
+
+export interface AuditEventArchivePruneResult extends AuditEventArchivePruneStoreResult {
+  schemaVersion: "audit-events.archives.prune/v1";
+  before: string;
+  aggregateId?: string;
+  eventType?: string;
+  dryRun: boolean;
+  prunedAt: string;
+}
+
+export interface ProviderJobLogPruneInput {
+  before: string;
+  deploymentId?: string;
+  providerKey?: string;
+  resourceId?: string;
+  serverId?: string;
+  dryRun: boolean;
+}
+
+export interface ProviderJobLogPruneStoreResult {
+  matchedCount: number;
+  prunedCount: number;
+  countsByProviderKey: Record<string, number>;
+}
+
+export interface ProviderJobLogPruneResult extends ProviderJobLogPruneStoreResult {
+  schemaVersion: "provider-job-logs.prune/v1";
+  before: string;
+  deploymentId?: string;
+  providerKey?: string;
+  resourceId?: string;
+  serverId?: string;
+  dryRun: boolean;
+  prunedAt: string;
+}
+
+export interface DomainEventStreamPruneInput {
+  before: string;
+  eventType?: string;
+  aggregateId?: string;
+  aggregateType?: string;
+  deploymentId?: string;
+  limit?: number;
+  dryRun: boolean;
+}
+
+export interface DomainEventStreamPruneStoreResult {
+  inspectedCount: number;
+  candidateCount: number;
+  prunedCount: number;
+  skippedCount: number;
+  countsByEventType: Record<string, number>;
+  skippedCountsByReason: Record<string, number>;
+}
+
+export interface DomainEventStreamPruneResult extends DomainEventStreamPruneStoreResult {
+  schemaVersion: "domain-events.prune/v1";
+  before: string;
+  eventType?: string;
+  aggregateId?: string;
+  aggregateType?: string;
+  deploymentId?: string;
+  limit?: number;
+  dryRun: boolean;
+  prunedAt: string;
+}
+
+export interface DeploymentLogPruneInput {
+  before: string;
+  deploymentId?: string;
+  resourceId?: string;
+  serverId?: string;
+  dryRun: boolean;
+}
+
+export interface DeploymentLogPruneStoreResult {
+  matchedCount: number;
+  prunedCount: number;
+  affectedDeploymentCount: number;
+}
+
+export interface DeploymentLogPruneResult extends DeploymentLogPruneStoreResult {
+  schemaVersion: "deployments.logs.prune/v1";
+  before: string;
+  deploymentId?: string;
+  resourceId?: string;
+  serverId?: string;
+  dryRun: boolean;
+  prunedAt: string;
+}
+
+export interface AuditEventRecordInput {
+  id: string;
+  aggregateId: string;
+  eventType: string;
+  payload: Record<string, AuditEventPayloadValue>;
+  createdAt: string;
 }
 
 export interface IngestSourceEventResult {
@@ -4949,6 +5837,105 @@ export interface SourceEventReadModel {
     context: RepositoryContext,
     input: SourceEventShowInput,
   ): Promise<SourceEventDetail | null>;
+}
+
+export interface AuditEventReadModel {
+  list(context: RepositoryContext, input: AuditEventListInput): Promise<AuditEventListPage>;
+  findOne(context: RepositoryContext, input: AuditEventShowInput): Promise<AuditEventDetail | null>;
+  export(context: RepositoryContext, input: AuditEventExportInput): Promise<AuditEventExportPage>;
+  exportGlobal(
+    context: RepositoryContext,
+    input: AuditEventGlobalExportInput,
+  ): Promise<AuditEventExportPage>;
+}
+
+export interface AuditEventRetentionStore {
+  prune(
+    context: RepositoryContext,
+    input: AuditEventPruneInput,
+  ): Promise<Result<AuditEventPruneStoreResult>>;
+}
+
+export interface AuditEventLegalHoldStore {
+  configure(
+    context: RepositoryContext,
+    input: AuditEventLegalHoldConfigureInput,
+  ): Promise<Result<AuditEventLegalHoldRecord>>;
+  release(
+    context: RepositoryContext,
+    input: AuditEventLegalHoldReleaseInput,
+  ): Promise<Result<AuditEventLegalHoldRecord | null>>;
+  list(
+    context: RepositoryContext,
+    input: AuditEventLegalHoldListInput,
+  ): Promise<Result<AuditEventLegalHoldListPage>>;
+  findOne(
+    context: RepositoryContext,
+    holdId: string,
+  ): Promise<Result<AuditEventLegalHoldRecord | null>>;
+}
+
+export interface AuditEventArchiveStore {
+  create(
+    context: RepositoryContext,
+    input: AuditEventArchiveCreateInput,
+  ): Promise<Result<AuditEventArchiveRecord>>;
+  list(
+    context: RepositoryContext,
+    input: AuditEventArchiveListInput,
+  ): Promise<Result<AuditEventArchiveListPage>>;
+  findOne(
+    context: RepositoryContext,
+    archiveId: string,
+  ): Promise<Result<AuditEventArchiveDetail | null>>;
+  prune(
+    context: RepositoryContext,
+    input: AuditEventArchivePruneInput,
+  ): Promise<Result<AuditEventArchivePruneStoreResult>>;
+}
+
+export interface AuditEventRecorder {
+  record(context: RepositoryContext, input: AuditEventRecordInput): Promise<Result<void>>;
+}
+
+export interface ProviderJobLogRetentionStore {
+  prune(
+    context: RepositoryContext,
+    input: ProviderJobLogPruneInput,
+  ): Promise<Result<ProviderJobLogPruneStoreResult>>;
+}
+
+export interface DomainEventStreamRetentionStore {
+  prune(
+    context: RepositoryContext,
+    input: DomainEventStreamPruneInput,
+  ): Promise<Result<DomainEventStreamPruneStoreResult>>;
+}
+
+export interface DeploymentLogRetentionStore {
+  prune(
+    context: RepositoryContext,
+    input: DeploymentLogPruneInput,
+  ): Promise<Result<DeploymentLogPruneStoreResult>>;
+}
+
+export interface ResourceRuntimeLogArchiveStore {
+  create(
+    context: RepositoryContext,
+    input: ResourceRuntimeLogArchiveCreateInput,
+  ): Promise<Result<ResourceRuntimeLogArchiveDetail>>;
+  list(
+    context: RepositoryContext,
+    input: ResourceRuntimeLogArchiveListInput,
+  ): Promise<Result<ResourceRuntimeLogArchiveListPage>>;
+  findOne(
+    context: RepositoryContext,
+    input: ResourceRuntimeLogArchiveShowInput,
+  ): Promise<Result<ResourceRuntimeLogArchiveDetail | null>>;
+  prune(
+    context: RepositoryContext,
+    input: ResourceRuntimeLogArchivePruneInput,
+  ): Promise<Result<ResourceRuntimeLogArchivePruneStoreResult>>;
 }
 
 export interface PreviewEnvironmentSourceSummary {
@@ -5665,6 +6652,25 @@ export interface DeploymentConfiguredTarget {
   destination?: DeploymentConfiguredDestination;
 }
 
+export type DeploymentConfiguredRuntimePruneCategory =
+  | "stopped-containers"
+  | "preview-workspaces"
+  | "source-workspaces"
+  | "docker-build-cache"
+  | "unused-images";
+
+export interface DeploymentConfiguredRuntimePrunePolicy {
+  retentionDays: number;
+  destructive: boolean;
+  categories: DeploymentConfiguredRuntimePruneCategory[];
+  retryOnFailure: boolean;
+  enabled: boolean;
+}
+
+export interface DeploymentConfiguredRetention {
+  runtimePrune?: DeploymentConfiguredRuntimePrunePolicy;
+}
+
 export interface DeploymentConfigSnapshot {
   configFilePath?: string;
   project?: DeploymentConfiguredProject;
@@ -5674,6 +6680,7 @@ export interface DeploymentConfigSnapshot {
   deployment?: Partial<RequestedDeploymentConfig> & {
     targetKey?: string;
   };
+  retention?: DeploymentConfiguredRetention;
 }
 
 export interface DeploymentConfigReader {
@@ -5865,6 +6872,21 @@ export interface ProviderDescriptor {
   title: string;
   category: "cloud-provider" | "deploy-target" | "infra-service";
   capabilities: string[];
+  capabilityDetails?: {
+    key: string;
+    title: string;
+    enabled: boolean;
+    description?: string;
+  }[];
+  configuration?: {
+    status: "configured" | "not-configured" | "partial" | "unknown";
+    diagnostics: {
+      code: string;
+      severity: "info" | "warning" | "error";
+      message: string;
+      documentationHref?: string;
+    }[];
+  };
 }
 
 export interface IntegrationDescriptor {
@@ -5972,7 +6994,22 @@ export interface PluginSummary {
   version: string;
   kind: "user-extension" | "system-extension";
   capabilities: string[];
+  capabilityDetails?: {
+    key: string;
+    title: string;
+    enabled: boolean;
+    description?: string;
+  }[];
   compatible: boolean;
+  configuration?: {
+    status: "configured" | "not-configured" | "partial" | "unknown";
+    diagnostics: {
+      code: string;
+      severity: "info" | "warning" | "error";
+      message: string;
+      documentationHref?: string;
+    }[];
+  };
 }
 
 export interface PluginRegistry {

@@ -101,6 +101,16 @@ function knownGaps(version: string, assets: readonly ReleaseAsset[]): string[] {
     );
   }
 
+  if (version.startsWith("0.11.")) {
+    gaps.push(
+      [
+        "- Real SSH release-readiness smoke evidence is deferred for this release because the local",
+        "release-preparation environment did not have an SSH target server. The SSH smoke workflows",
+        "and redacted evidence capture remain available for environments with SSH secrets.",
+      ].join(" "),
+    );
+  }
+
   if (
     cliFiles.some((file) => file.includes("win32")) &&
     !desktopFiles.some((file) => file.includes("win32"))

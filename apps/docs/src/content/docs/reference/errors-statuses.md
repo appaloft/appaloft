@@ -13,6 +13,10 @@ searchAliases:
 relatedOperations:
   - operator-work.list
   - operator-work.show
+  - audit-events.list
+  - audit-events.show
+  - audit-events.export
+  - audit-events.export-global
 sidebar:
   label: "Errors and statuses"
   order: 4
@@ -45,6 +49,79 @@ appaloft work show <workId>
 工作台账是只读入口。它汇总 attempt kind、status、phase、关联的 resource/server/deployment/certificate id、稳定 error code/category、是否可重试，以及安全的 `nextActions`。`diagnostic` 表示下一步应该先运行诊断；`manual-review` 表示需要人工确认；`retry` 只表示未来恢复命令可以考虑重试，不会在查询时自动执行；`no-action` 表示当前条目不需要用户动作。
 
 这个入口不会 retry、cancel、recover、dead-letter、delete 或 prune。恢复、清理和重试能力会通过独立的显式命令暴露，避免用户在查看状态时意外改变运行时或远端 SSH 状态。
+
+<h2 id="operator-audit-events">Audit events</h2>
+
+当你需要解释某个 resource、server、certificate 或其他对象的历史变化时，可以按 aggregate id 查看保留的审计事件：
+
+```bash title="查看审计事件"
+appaloft audit-event list --aggregate <aggregateId>
+appaloft audit-event show <auditEventId> --aggregate <aggregateId>
+```
+
+审计事件查询是只读入口。列表只返回事件 id、aggregate id、event type 和创建时间。详情会返回经过安全处理的 payload，并用 `redactedFields` 标出被遮蔽的字段。私钥、token、secret、环境变量值、证书材料、签名、credential payload 或其他复杂 provider/native payload 不会原样出现在输出里。
+
+如果需要在 prune 或 delete review 前导出可复制的安全内容，可以导出一个 aggregate：
+
+```bash title="导出经过遮蔽的审计事件"
+appaloft audit-event export --aggregate <aggregateId> --limit 100
+```
+
+如果需要跨 aggregate 做 incident triage 或 support handoff，必须使用有界时间窗口：
+
+```bash title="导出有界全局审计窗口"
+appaloft audit-event export-global --from 2026-01-01T00:00:00.000Z --to 2026-01-02T00:00:00.000Z --limit 100
+```
+
+全局导出仍然是有界、经过遮蔽、只读的导出。它不是 legal hold、immutable archive、replay source、organization retention default 或 scheduled retention policy。查看或导出审计事件不会删除历史、清理运行时、恢复状态或触发重试。
+
+当 support、incident 或 compliance review 期间需要保留旧的审计行时，可以配置 legal hold：
+
+```bash title="Hold and release audit rows"
+appaloft audit-event legal-hold configure --aggregate <aggregateId> --reason "support review"
+appaloft audit-event legal-hold list --status active
+appaloft audit-event legal-hold release <holdId> --reason "review complete"
+```
+
+Legal hold 是 retention blocker，不是 immutable archive 或 discovery workflow。`appaloft audit-event prune` 会报告 held rows，并跳过所有被 active hold 匹配的行，直到匹配的 hold 全部 release。
+
+<h2 id="operator-provider-job-logs">Provider job logs</h2>
+
+Provider job logs 与 deployment rows 和 deployment 内嵌 logs 分开保留。执行破坏性清理前先 dry-run：
+
+```bash title="Dry-run provider job log retention"
+appaloft provider-job-log prune --before 2026-01-01T00:00:00.000Z
+```
+
+需要时可以缩小范围：
+
+```bash title="Prune one provider scope"
+appaloft provider-job-log prune --before 2026-01-01T00:00:00.000Z --provider generic-ssh --dry-run false
+```
+
+只有显式传入 `--dry-run false` 时，这个命令才会删除早于 cutoff 的 `provider_job_logs` rows。它不会删除 deployment rows、deployment 内嵌 logs、runtime logs、audit rows、events、process attempts、snapshots、runtime artifacts、provider resources 或业务状态。
+
+<h2 id="operator-retention-defaults">Organization retention defaults</h2>
+
+Retention defaults 是非执行型策略记录。它们只保存每类历史的默认保留窗口和未来 scheduled retention 是否允许 dry-run 或 destructive 调度，不会自己删除 rows，也不会让手动 prune 命令推断 cutoff。
+
+```bash title="Configure retention defaults"
+appaloft retention-default configure --scope system --category provider-job-logs --retention-days 30
+appaloft retention-default list --scope system
+appaloft retention-default show provider-job-logs --scope system
+```
+
+即使某个 category 允许 destructive scheduling，manual prune 仍然必须显式提供 cutoff 和 destructive/dry-run 输入。Legal holds、immutable archives、replay guards、active attempts 和各 category 的 skip rules 仍然优先生效。
+
+<h2 id="operator-domain-events">Domain event stream retention</h2>
+
+Domain event stream retention 只针对保留的 event stream observation rows。先 dry-run，再按显式 cutoff 删除：
+
+```bash title="Dry-run retained domain events"
+appaloft domain-event prune --before 2026-01-01T00:00:00.000Z
+```
+
+这个命令不会删除 deployments、audit rows、provider logs、process attempts、snapshots、rollback candidates、runtime artifacts 或业务状态。Replay guards、cursor continuity 和 recovery evidence 会优先阻止不安全删除。
 
 <h2 id="remote-state-resolution">SSH remote state resolution</h2>
 

@@ -1146,7 +1146,8 @@ export const publicDocsHelpTopics = {
   "server.terminal-session": {
     id: "server.terminal-session",
     title: "Terminal session",
-    description: "How to open terminal sessions for controlled server or resource troubleshooting.",
+    description:
+      "How to open, list, show, close, and expire terminal sessions for controlled server or resource troubleshooting.",
     page: {
       "zh-CN": "servers/operations/proxy-and-terminal",
       "en-US": "en/servers/operations/proxy-and-terminal",
@@ -1158,7 +1159,15 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "terminal-sessions.open",
-    aliases: ["terminal", "shell", "ssh session", "终端"],
+    specReferences: [
+      "docs/decisions/ADR-022-operator-terminal-session-boundary.md",
+      "docs/commands/terminal-sessions.open.md",
+      "docs/commands/terminal-sessions.lifecycle.md",
+      "docs/queries/terminal-sessions.lifecycle.md",
+      "docs/workflows/operator-terminal-session.md",
+      "docs/testing/operator-terminal-session-test-matrix.md",
+    ],
+    aliases: ["terminal", "shell", "ssh session", "terminal session lifecycle", "终端"],
   },
   "environment.concept": {
     id: "environment.concept",
@@ -1356,7 +1365,8 @@ export const publicDocsHelpTopics = {
   "observability.runtime-logs": {
     id: "observability.runtime-logs",
     title: "Runtime logs",
-    description: "How to inspect runtime and deployment logs from user-facing entrypoints.",
+    description:
+      "How to inspect runtime and deployment logs, capture redacted runtime log archive snapshots, and prune old embedded deployment log entries or retained archive snapshots from user-facing entrypoints.",
     page: {
       "zh-CN": "observe/logs-health",
       "en-US": "en/observe/logs-health",
@@ -1368,7 +1378,18 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "resources.runtime-logs",
-    aliases: ["logs", "runtime logs", "deployment logs", "日志"],
+    specReferences: [
+      "docs/queries/resources.runtime-logs.md",
+      "docs/commands/deployments.logs.prune.md",
+      "docs/specs/059-resource-runtime-log-archive-retention/spec.md",
+      "docs/testing/resource-runtime-logs-test-matrix.md",
+      "docs/testing/deployment-log-retention-test-matrix.md",
+      "docs/testing/resource-runtime-log-archive-retention-test-matrix.md",
+      "docs/specs/058-deployment-log-retention/spec.md",
+      "docs/decisions/ADR-052-deployment-log-retention-policy.md",
+      "docs/decisions/ADR-053-resource-runtime-log-archive-retention-boundary.md",
+    ],
+    aliases: ["logs", "runtime logs", "deployment logs", "log archives", "日志"],
   },
   "observability.health-summary": {
     id: "observability.health-summary",
@@ -1517,8 +1538,9 @@ export const publicDocsHelpTopics = {
   },
   "diagnostics.runtime-target-capacity": {
     id: "diagnostics.runtime-target-capacity",
-    title: "Runtime target capacity inspect",
-    description: "How to inspect disk, inode, Docker, and Appaloft runtime usage without cleanup.",
+    title: "Runtime target capacity",
+    description:
+      "How to inspect disk, inode, Docker, and Appaloft runtime usage, then dry-run or prune safe target-owned artifacts.",
     page: {
       "zh-CN": "observe/diagnostics",
       "en-US": "en/observe/diagnostics",
@@ -1530,13 +1552,43 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["cli", "http-api", "mcp"],
     relatedOperation: "servers.capacity.inspect",
-    aliases: ["capacity", "disk full", "build cache", "docker system df", "容量诊断"],
+    aliases: ["capacity", "disk full", "build cache", "docker system df", "prune", "容量诊断"],
+  },
+  "diagnostics.scheduled-runtime-prune-policy": {
+    id: "diagnostics.scheduled-runtime-prune-policy",
+    title: "Scheduled runtime prune policy",
+    description:
+      "How to configure and read back scheduled runtime prune policies for safe target-owned cleanup.",
+    page: {
+      "zh-CN": "observe/diagnostics",
+      "en-US": "en/observe/diagnostics",
+    },
+    anchor: "scheduled-runtime-prune-policy",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "scheduled-runtime-prune-policies.configure",
+    aliases: [
+      "scheduled prune",
+      "runtime prune policy",
+      "retention policy",
+      "capacity policy",
+      "定时清理",
+      "保留策略",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-055-scheduled-runtime-prune-automation.md",
+      "docs/specs/061-scheduled-runtime-prune-automation/spec.md",
+      "docs/testing/runtime-target-capacity-test-matrix.md",
+    ],
   },
   "operator.work-ledger": {
     id: "operator.work-ledger",
     title: "Operator work ledger",
     description:
-      "How to view background work attempts, failures, and next diagnostic actions without recovery mutations.",
+      "How to view durable process delivery attempts, failures, and next diagnostic actions without recovery mutations.",
     page: {
       "zh-CN": "reference/errors-statuses",
       "en-US": "en/reference/errors-statuses",
@@ -1550,20 +1602,174 @@ export const publicDocsHelpTopics = {
     relatedOperation: "operator-work.list",
     specReferences: [
       "docs/decisions/ADR-029-deployment-event-stream-and-recovery-boundary.md",
+      "docs/decisions/ADR-054-durable-process-delivery-baseline.md",
+      "docs/commands/operator-work.mark-recovered.md",
+      "docs/commands/operator-work.dead-letter.md",
+      "docs/commands/operator-work.cancel.md",
+      "docs/commands/operator-work.retry.md",
+      "docs/commands/operator-work.prune.md",
       "docs/queries/operator-work.list.md",
       "docs/queries/operator-work.show.md",
       "docs/testing/operator-work-ledger-test-matrix.md",
+      "docs/testing/durable-process-delivery-test-matrix.md",
       "docs/specs/010-operator-work-ledger/spec.md",
+      "docs/specs/060-durable-process-delivery-baseline/spec.md",
     ],
     webSurfaces: ["Web/MCP operator console backlog and CLI/HTTP background work visibility"],
     aliases: [
       "operator work",
       "work ledger",
       "background work",
+      "durable process delivery",
       "attempt visibility",
       "failed attempts",
       "后台工作",
       "工作台账",
+    ],
+  },
+  "operator.audit-events": {
+    id: "operator.audit-events",
+    title: "Audit events",
+    description:
+      "How to inspect, export, archive, place legal holds on, and prune retained audit events with redacted payload fields, aggregate-scoped filters, and bounded global export windows.",
+    page: {
+      "zh-CN": "reference/errors-statuses",
+      "en-US": "en/reference/errors-statuses",
+    },
+    anchor: "operator-audit-events",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "audit-events.list",
+    specReferences: [
+      "docs/queries/audit-events.list.md",
+      "docs/queries/audit-events.show.md",
+      "docs/queries/audit-events.export.md",
+      "docs/queries/audit-events.export-global.md",
+      "docs/commands/audit-events.archives.create.md",
+      "docs/commands/audit-events.archives.prune.md",
+      "docs/queries/audit-events.archives.list.md",
+      "docs/queries/audit-events.archives.show.md",
+      "docs/commands/audit-events.legal-holds.configure.md",
+      "docs/commands/audit-events.legal-holds.release.md",
+      "docs/queries/audit-events.legal-holds.list.md",
+      "docs/queries/audit-events.legal-holds.show.md",
+      "docs/commands/audit-events.prune.md",
+      "docs/decisions/ADR-056-global-audit-event-export-boundary.md",
+      "docs/decisions/ADR-057-audit-event-legal-hold-boundary.md",
+      "docs/decisions/ADR-058-audit-event-immutable-archive-boundary.md",
+      "docs/specs/062-global-audit-event-export/spec.md",
+      "docs/specs/063-audit-event-legal-hold/spec.md",
+      "docs/specs/064-audit-event-immutable-archive/spec.md",
+      "docs/testing/audit-event-read-surface-test-matrix.md",
+    ],
+    aliases: [
+      "audit events",
+      "audit log",
+      "history",
+      "redacted audit",
+      "global audit export",
+      "audit legal hold",
+      "audit archive",
+      "audit prune",
+      "审计事件",
+      "审计日志",
+    ],
+  },
+  "operator.provider-job-logs": {
+    id: "operator.provider-job-logs",
+    title: "Provider job logs",
+    description:
+      "How to dry-run and prune retained provider job logs without deleting deployment rows, embedded deployment logs, runtime logs, audit rows, events, process attempts, or business state.",
+    page: {
+      "zh-CN": "reference/errors-statuses",
+      "en-US": "en/reference/errors-statuses",
+    },
+    anchor: "operator-provider-job-logs",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "provider-job-logs.prune",
+    specReferences: [
+      "docs/commands/provider-job-logs.prune.md",
+      "docs/testing/provider-job-log-retention-test-matrix.md",
+      "docs/specs/057-provider-job-log-retention/spec.md",
+      "docs/decisions/ADR-049-provider-job-log-retention-policy.md",
+    ],
+    aliases: [
+      "provider job logs",
+      "provider logs",
+      "retention prune",
+      "provider job log prune",
+      "provider log retention",
+      "提供商任务日志",
+      "提供商日志",
+    ],
+  },
+  "operator.domain-events": {
+    id: "operator.domain-events",
+    title: "Domain event stream retention",
+    description:
+      "How to dry-run and prune retained domain event stream rows without deleting deployments, audit rows, logs, process attempts, snapshots, rollback candidates, or business state.",
+    page: {
+      "zh-CN": "reference/errors-statuses",
+      "en-US": "en/reference/errors-statuses",
+    },
+    anchor: "operator-domain-events",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "domain-events.prune",
+    specReferences: [
+      "docs/commands/domain-events.prune.md",
+      "docs/testing/domain-event-stream-retention-test-matrix.md",
+      "docs/specs/065-domain-event-stream-retention/spec.md",
+      "docs/decisions/ADR-059-domain-event-stream-retention-boundary.md",
+    ],
+    aliases: [
+      "domain events",
+      "domain event stream",
+      "event stream retention",
+      "domain event prune",
+      "retained events",
+      "领域事件",
+      "事件流保留",
+    ],
+  },
+  "operator.retention-defaults": {
+    id: "operator.retention-defaults",
+    title: "Organization retention defaults",
+    description:
+      "How to configure and read non-executing default retention windows for governed history categories.",
+    page: {
+      "zh-CN": "reference/errors-statuses",
+      "en-US": "en/reference/errors-statuses",
+    },
+    anchor: "operator-retention-defaults",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "retention-defaults.configure",
+    specReferences: [
+      "docs/decisions/ADR-060-organization-retention-defaults-boundary.md",
+      "docs/specs/066-organization-retention-defaults/spec.md",
+      "docs/testing/organization-retention-defaults-test-matrix.md",
+    ],
+    aliases: [
+      "retention defaults",
+      "organization retention",
+      "retention policy defaults",
+      "retention-defaults.configure",
+      "保留默认值",
+      "组织保留策略",
     ],
   },
   "advanced.control-plane": {
@@ -1702,7 +1908,8 @@ export const publicDocsHelpTopics = {
   "advanced.provider-boundary": {
     id: "advanced.provider-boundary",
     title: "Provider boundary",
-    description: "How providers expose capabilities without leaking provider-specific details.",
+    description:
+      "How providers expose safe capability details and configuration diagnostics without leaking provider-specific details.",
     page: {
       "zh-CN": "integrations/providers",
       "en-US": "en/integrations/providers",
@@ -1714,7 +1921,14 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["cli", "http-api", "mcp"],
     relatedOperation: "system.providers.list",
-    aliases: ["provider", "capability", "cloud provider", "provider 边界"],
+    specReferences: ["docs/PROVIDERS.md", "docs/testing/system-diagnostics-test-matrix.md"],
+    aliases: [
+      "provider",
+      "capability",
+      "configuration diagnostics",
+      "cloud provider",
+      "provider 边界",
+    ],
   },
   "advanced.plugin-boundary": {
     id: "advanced.plugin-boundary",
@@ -1731,7 +1945,8 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["cli", "http-api", "mcp"],
     relatedOperation: "system.plugins.list",
-    aliases: ["plugin", "extension", "compatibility", "插件"],
+    specReferences: ["docs/PLUGINS.md", "docs/testing/system-diagnostics-test-matrix.md"],
+    aliases: ["plugin", "extension", "compatibility", "configuration diagnostics", "插件"],
   },
   "http-api.openapi-reference": {
     id: "http-api.openapi-reference",
@@ -1749,6 +1964,38 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["http-api"],
     aliases: ["openapi", "scalar", "api reference", "接口文档"],
+  },
+  "typescript-sdk.operation-client": {
+    id: "typescript-sdk.operation-client",
+    title: "TypeScript SDK operation client",
+    description:
+      "How to install, authenticate, call operations, handle structured errors, and consume streams through the TypeScript SDK.",
+    page: {
+      "zh-CN": "reference/typescript-sdk",
+      "en-US": "en/reference/typescript-sdk",
+    },
+    anchor: "typescript-sdk-operation-client",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["http-api", "mcp"],
+    aliases: [
+      "typescript sdk",
+      "sdk client",
+      "operation client",
+      "typed errors",
+      "streaming sdk",
+      "TypeScript SDK",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-046-typescript-sdk-interface-parity.md",
+      "docs/specs/052-typescript-sdk-interface-parity/spec.md",
+      "docs/testing/typescript-sdk-interface-parity-test-matrix.md",
+    ],
+    webSurfaces: [
+      "External automation and internal black-box tests use @appaloft/sdk over HTTP/oRPC operation contracts",
+    ],
   },
 } as const satisfies Record<string, Omit<PublicDocsHelpTopic, "id"> & { id: string }>;
 
@@ -2022,6 +2269,26 @@ export const publicDocsOperationCoverage = [
     topicId: "diagnostics.runtime-target-capacity",
   },
   {
+    operationKey: "servers.capacity.prune",
+    status: "documented",
+    topicId: "diagnostics.runtime-target-capacity",
+  },
+  {
+    operationKey: "scheduled-runtime-prune-policies.configure",
+    status: "documented",
+    topicId: "diagnostics.scheduled-runtime-prune-policy",
+  },
+  {
+    operationKey: "scheduled-runtime-prune-policies.list",
+    status: "documented",
+    topicId: "diagnostics.scheduled-runtime-prune-policy",
+  },
+  {
+    operationKey: "scheduled-runtime-prune-policies.show",
+    status: "documented",
+    topicId: "diagnostics.scheduled-runtime-prune-policy",
+  },
+  {
     operationKey: "operator-work.list",
     status: "documented",
     topicId: "operator.work-ledger",
@@ -2030,6 +2297,121 @@ export const publicDocsOperationCoverage = [
     operationKey: "operator-work.show",
     status: "documented",
     topicId: "operator.work-ledger",
+  },
+  {
+    operationKey: "operator-work.mark-recovered",
+    status: "documented",
+    topicId: "operator.work-ledger",
+  },
+  {
+    operationKey: "operator-work.dead-letter",
+    status: "documented",
+    topicId: "operator.work-ledger",
+  },
+  {
+    operationKey: "operator-work.cancel",
+    status: "documented",
+    topicId: "operator.work-ledger",
+  },
+  {
+    operationKey: "operator-work.retry",
+    status: "documented",
+    topicId: "operator.work-ledger",
+  },
+  {
+    operationKey: "operator-work.prune",
+    status: "documented",
+    topicId: "operator.work-ledger",
+  },
+  {
+    operationKey: "audit-events.list",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.show",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.export",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.export-global",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.archives.create",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.archives.list",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.archives.show",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.archives.prune",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.legal-holds.configure",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.legal-holds.list",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.legal-holds.show",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.legal-holds.release",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "audit-events.prune",
+    status: "documented",
+    topicId: "operator.audit-events",
+  },
+  {
+    operationKey: "retention-defaults.configure",
+    status: "documented",
+    topicId: "operator.retention-defaults",
+  },
+  {
+    operationKey: "retention-defaults.list",
+    status: "documented",
+    topicId: "operator.retention-defaults",
+  },
+  {
+    operationKey: "retention-defaults.show",
+    status: "documented",
+    topicId: "operator.retention-defaults",
+  },
+  {
+    operationKey: "provider-job-logs.prune",
+    status: "documented",
+    topicId: "operator.provider-job-logs",
+  },
+  {
+    operationKey: "domain-events.prune",
+    status: "documented",
+    topicId: "operator.domain-events",
   },
   { operationKey: "servers.rename", status: "documented", topicId: "server.deployment-target" },
   {
@@ -2205,6 +2587,26 @@ export const publicDocsOperationCoverage = [
     topicId: "observability.runtime-logs",
   },
   {
+    operationKey: "resources.runtime-logs.archive",
+    status: "documented",
+    topicId: "observability.runtime-logs",
+  },
+  {
+    operationKey: "resources.runtime-log-archives.list",
+    status: "documented",
+    topicId: "observability.runtime-logs",
+  },
+  {
+    operationKey: "resources.runtime-log-archives.show",
+    status: "documented",
+    topicId: "observability.runtime-logs",
+  },
+  {
+    operationKey: "resources.runtime-log-archives.prune",
+    status: "documented",
+    topicId: "observability.runtime-logs",
+  },
+  {
     operationKey: "resources.runtime.stop",
     status: "documented",
     topicId: "resource.runtime-controls",
@@ -2221,6 +2623,26 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "terminal-sessions.open",
+    status: "documented",
+    topicId: "server.terminal-session",
+  },
+  {
+    operationKey: "terminal-sessions.list",
+    status: "documented",
+    topicId: "server.terminal-session",
+  },
+  {
+    operationKey: "terminal-sessions.show",
+    status: "documented",
+    topicId: "server.terminal-session",
+  },
+  {
+    operationKey: "terminal-sessions.close",
+    status: "documented",
+    topicId: "server.terminal-session",
+  },
+  {
+    operationKey: "terminal-sessions.expire",
     status: "documented",
     topicId: "server.terminal-session",
   },
@@ -2513,6 +2935,11 @@ export const publicDocsOperationCoverage = [
     topicId: "deployment.recovery-readiness",
   },
   { operationKey: "deployments.logs", status: "documented", topicId: "observability.runtime-logs" },
+  {
+    operationKey: "deployments.logs.prune",
+    status: "documented",
+    topicId: "observability.runtime-logs",
+  },
   {
     operationKey: "deployments.stream-events",
     status: "documented",

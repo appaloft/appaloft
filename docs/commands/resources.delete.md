@@ -157,7 +157,8 @@ ambiguous or unsafe:
 - `dependency-binding`: any dependency resource, dependency binding, storage binding, or managed
   service binding references the resource.
 - `terminal-session`: any open or retained terminal session references the resource.
-- `runtime-log-retention`: retained runtime logs require the resource identity.
+- `runtime-log-retention`: retained Appaloft-owned runtime log archive snapshots require the
+  resource identity.
 - `audit-retention`: audit policy requires the resource identity to remain queryable.
 - `generated-access-route`, `server-applied-route`, or `proxy-route`: any durable desired/applied
   access route still references the resource.
@@ -258,7 +259,7 @@ Resource deletion is active in `CORE_OPERATIONS.md`, `operation-catalog.ts`, app
 HTTP/oRPC, CLI, Web, Resource repository tombstone state, and normal read-model omission.
 
 The v1 PG deletion blocker reader covers retained deployments, durable domain bindings,
-certificates tied through domain bindings, retained provider runtime logs, audit logs whose
+certificates tied through domain bindings, retained provider job logs, audit logs whose
 `aggregate_id` is the resource id, and source links whose `source_links.resource_id` is the
 resource id. Dependency, terminal-session, and external route-store blocker detection remain
 extension points on the same `ResourceDeletionBlockerReader` port where no durable PG table exists

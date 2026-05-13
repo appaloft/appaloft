@@ -247,6 +247,300 @@ describe("CLI server commands", () => {
     });
   });
 
+  test("[RT-CAP-PRUNE-005] server capacity prune dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { PruneServerCapacityCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({
+          schemaVersion: "servers.capacity.prune/v1",
+          server: {
+            id: "srv_primary",
+            name: "Primary",
+            host: "203.0.113.10",
+            port: 22,
+            providerKey: "generic-ssh",
+            targetKind: "single-server",
+          },
+          before: "2026-01-01T00:05:00.000Z",
+          categories: ["docker-build-cache", "unused-images"],
+          dryRun: false,
+          prunedAt: "2026-01-01T00:10:00.000Z",
+          summary: {
+            inspectedCount: 1,
+            matchedCount: 0,
+            prunedCount: 1,
+            skippedCount: 0,
+            excludedCount: 0,
+            reclaimedBytes: 1024,
+          },
+          candidates: [],
+          warnings: [],
+        } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_server_capacity_prune_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "capacity",
+        "prune",
+        "srv_primary",
+        "--before",
+        "2026-01-01T00:05:00.000Z",
+        "--category",
+        "docker-build-cache",
+        "--category",
+        "unused-images",
+        "--dry-run",
+        "false",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(PruneServerCapacityCommand);
+    expect(commands[0]).toMatchObject({
+      input: {
+        serverId: "srv_primary",
+        before: "2026-01-01T00:05:00.000Z",
+        categories: ["docker-build-cache", "unused-images"],
+        dryRun: false,
+      },
+    });
+  });
+
+  test("[RT-CAP-SCHED-007] server capacity policy configure dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { ConfigureScheduledRuntimePrunePolicyCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "rtp_primary" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_scheduled_runtime_prune_policy_configure_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "capacity",
+        "policy",
+        "configure",
+        "--policy-id",
+        "rtp_primary",
+        "--version",
+        "v2",
+        "--scope",
+        "environment",
+        "--server-id",
+        "srv_primary",
+        "--retention-days",
+        "14",
+        "--destructive",
+        "true",
+        "--category",
+        "stopped-containers",
+        "--category",
+        "unused-images",
+        "--retry-on-failure",
+        "false",
+        "--enabled",
+        "false",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ConfigureScheduledRuntimePrunePolicyCommand);
+    expect(commands[0]).toMatchObject({
+      input: {
+        policyId: "rtp_primary",
+        version: "v2",
+        scope: "environment",
+        serverId: "srv_primary",
+        retentionDays: 14,
+        destructive: true,
+        categories: ["stopped-containers", "unused-images"],
+        retryOnFailure: false,
+        enabled: false,
+      },
+    });
+  });
+
+  test("[RT-CAP-SCHED-007] server capacity policy list dispatches the application query", async () => {
+    ensureReflectMetadata();
+    const { ListScheduledRuntimePrunePoliciesQuery, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({
+          schemaVersion: "scheduled-runtime-prune-policies.list/v1",
+          items: [],
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_scheduled_runtime_prune_policy_list_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "capacity",
+        "policy",
+        "list",
+        "--server-id",
+        "srv_primary",
+        "--scope",
+        "project",
+        "--enabled-only",
+        "true",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(ListScheduledRuntimePrunePoliciesQuery);
+    expect(queries[0]).toMatchObject({
+      serverId: "srv_primary",
+      scope: "project",
+      enabledOnly: true,
+    });
+  });
+
+  test("[RT-CAP-SCHED-007] server capacity policy show dispatches the application query", async () => {
+    ensureReflectMetadata();
+    const { ShowScheduledRuntimePrunePolicyQuery, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({
+          schemaVersion: "scheduled-runtime-prune-policies.show/v1",
+          policy: null,
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_scheduled_runtime_prune_policy_show_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "capacity",
+        "policy",
+        "show",
+        "rtp_primary",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(ShowScheduledRuntimePrunePolicyQuery);
+    expect(queries[0]).toMatchObject({
+      policyId: "rtp_primary",
+    });
+  });
+
   test("[SRV-LIFE-ENTRY-005] server deactivate dispatches the application command", async () => {
     ensureReflectMetadata();
     const { DeactivateServerCommand, createExecutionContext } = await import(

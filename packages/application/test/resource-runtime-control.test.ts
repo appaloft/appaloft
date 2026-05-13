@@ -4,7 +4,9 @@ import { describe, expect, test } from "bun:test";
 import {
   CommandText,
   CreatedAt,
+  domainError,
   EnvironmentId,
+  err,
   HealthCheckExpectedStatusCode,
   HealthCheckHostText,
   HealthCheckHttpMethodValue,
@@ -48,6 +50,8 @@ import {
   type DeploymentSummary,
   type MutationCoordinator,
   type MutationCoordinatorRunExclusiveInput,
+  type ProcessAttemptRecord,
+  type ProcessAttemptRecorder,
   type ResourceReadModel,
   type ResourceRuntimeControlAttemptRecord,
   type ResourceRuntimeControlAttemptRecorder,
@@ -110,6 +114,23 @@ class RecordingRuntimeControlTargetPort implements ResourceRuntimeControlTargetP
   }
 }
 
+class FailingRuntimeControlTargetPort implements ResourceRuntimeControlTargetPort {
+  readonly requests: ResourceRuntimeControlTargetRequest[] = [];
+
+  async control(
+    _context: ExecutionContext,
+    request: ResourceRuntimeControlTargetRequest,
+  ): Promise<Result<ResourceRuntimeControlTargetResult>> {
+    this.requests.push(request);
+    return err(
+      domainError.provider("Docker command failed: secret token output", {
+        code: "runtime_control_adapter_failed",
+        retryable: true,
+      }),
+    );
+  }
+}
+
 class RecordingRuntimeControlAttemptRecorder implements ResourceRuntimeControlAttemptRecorder {
   readonly records: ResourceRuntimeControlAttemptRecord[] = [];
 
@@ -117,6 +138,18 @@ class RecordingRuntimeControlAttemptRecorder implements ResourceRuntimeControlAt
     _context: RepositoryContext,
     attempt: ResourceRuntimeControlAttemptRecord,
   ): Promise<Result<ResourceRuntimeControlAttemptRecord>> {
+    this.records.push(attempt);
+    return ok(attempt);
+  }
+}
+
+class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
+  readonly records: ProcessAttemptRecord[] = [];
+
+  async record(
+    _context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>> {
     this.records.push(attempt);
     return ok(attempt);
   }
@@ -292,12 +325,14 @@ async function createHarness(input?: {
 
   const targetPort = input?.targetPort ?? new RecordingRuntimeControlTargetPort();
   const attemptRecorder = new RecordingRuntimeControlAttemptRecorder();
+  const processAttemptRecorder = new RecordingProcessAttemptRecorder();
   const coordinator = input?.coordinator ?? new CapturingMutationCoordinator();
 
   return {
     attemptRecorder,
     context,
     coordinator,
+    processAttemptRecorder,
     targetPort,
     useCase: new ResourceRuntimeControlUseCase(
       resourceRepository,
@@ -308,13 +343,59 @@ async function createHarness(input?: {
       new SequenceIdGenerator(),
       new FixedClock("2026-01-01T00:00:10.000Z"),
       coordinator,
+      processAttemptRecorder,
+    ),
+  };
+}
+
+async function createHarnessWithTargetPort(
+  targetPort: ResourceRuntimeControlTargetPort,
+  input?: {
+    resource?: ResourceSummary;
+    deployments?: DeploymentSummary[];
+    coordinator?: CapturingMutationCoordinator;
+  },
+) {
+  const resourceRepository = new MemoryResourceRepository();
+  const context = createExecutionContext({
+    requestId: "req_resource_runtime_control_test",
+    entrypoint: "system",
+  });
+  const resource = applicationResourceFixture();
+  await resourceRepository.upsert(
+    toRepositoryContext(context),
+    resource,
+    UpsertResourceSpec.fromResource(resource),
+  );
+
+  const attemptRecorder = new RecordingRuntimeControlAttemptRecorder();
+  const processAttemptRecorder = new RecordingProcessAttemptRecorder();
+  const coordinator = input?.coordinator ?? new CapturingMutationCoordinator();
+
+  return {
+    attemptRecorder,
+    context,
+    coordinator,
+    processAttemptRecorder,
+    targetPort,
+    useCase: new ResourceRuntimeControlUseCase(
+      resourceRepository,
+      new StaticResourceReadModel(input?.resource ?? resourceSummary()),
+      new StaticDeploymentReadModel(input?.deployments ?? [deploymentSummary()]),
+      targetPort,
+      attemptRecorder,
+      new SequenceIdGenerator(),
+      new FixedClock("2026-01-01T00:00:10.000Z"),
+      coordinator,
+      processAttemptRecorder,
     ),
   };
 }
 
 describe("ResourceRuntimeControlUseCase", () => {
   test("[RUNTIME-CTRL-STOP-001] records stop attempt before adapter execution and sends normalized request", async () => {
-    const { attemptRecorder, context, targetPort, useCase } = await createHarness();
+    const { attemptRecorder, context, processAttemptRecorder, targetPort, useCase } =
+      await createHarness();
 
     const result = await useCase.execute(context, {
       operation: "stop",
@@ -339,6 +420,59 @@ describe("ResourceRuntimeControlUseCase", () => {
       runtimeState: "stopping",
       reason: "operator requested maintenance",
     });
+    expect(processAttemptRecorder.records).toEqual([
+      {
+        id: "rtc_0001",
+        kind: "runtime-maintenance",
+        status: "running",
+        operationKey: "resources.runtime.stop",
+        dedupeKey: "resource-runtime-control:res_web:rtc_0001",
+        correlationId: "req_resource_runtime_control_test",
+        requestId: "req_resource_runtime_control_test",
+        phase: "runtime-control",
+        step: "stop-running",
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+        serverId: "srv_demo",
+        startedAt: "2026-01-01T00:00:10.000Z",
+        updatedAt: "2026-01-01T00:00:10.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          operation: "stop",
+          runtimeState: "stopping",
+          providerKey: "local-shell",
+          runtimeKind: "docker-container",
+          targetKind: "single-server",
+          reason: "operator requested maintenance",
+        },
+      },
+      {
+        id: "rtc_0001",
+        kind: "runtime-maintenance",
+        status: "succeeded",
+        operationKey: "resources.runtime.stop",
+        dedupeKey: "resource-runtime-control:res_web:rtc_0001",
+        correlationId: "req_resource_runtime_control_test",
+        requestId: "req_resource_runtime_control_test",
+        phase: "runtime-control",
+        step: "stop-succeeded",
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+        serverId: "srv_demo",
+        startedAt: "2026-01-01T00:00:10.000Z",
+        updatedAt: "2026-01-01T00:00:10.000Z",
+        finishedAt: "2026-01-01T00:00:10.000Z",
+        nextActions: ["no-action"],
+        safeDetails: {
+          operation: "stop",
+          runtimeState: "stopped",
+          providerKey: "local-shell",
+          runtimeKind: "docker-container",
+          targetKind: "single-server",
+          reason: "operator requested maintenance",
+        },
+      },
+    ]);
     expect(targetPort.requests).toEqual([
       expect.objectContaining({
         runtimeControlAttemptId: "rtc_0001",
@@ -352,6 +486,60 @@ describe("ResourceRuntimeControlUseCase", () => {
         providerKey: "local-shell",
       }),
     ]);
+  });
+
+  test("[RUNTIME-CTRL-STOP-001] records safe process-attempt failure visibility when adapter execution fails", async () => {
+    const targetPort = new FailingRuntimeControlTargetPort();
+    const { attemptRecorder, context, processAttemptRecorder, useCase } =
+      await createHarnessWithTargetPort(targetPort);
+
+    const result = await useCase.execute(context, {
+      operation: "stop",
+      resourceId: "res_web",
+      reason: "operator requested maintenance",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_runtime_control_failed",
+      details: expect.objectContaining({
+        runtimeControlAttemptId: "rtc_0001",
+        operation: "stop",
+        safeAdapterErrorCode: "provider_error",
+      }),
+    });
+    expect(attemptRecorder.records).toHaveLength(2);
+    expect(processAttemptRecorder.records.map((record) => record.status)).toEqual([
+      "running",
+      "failed",
+    ]);
+    expect(processAttemptRecorder.records[1]).toMatchObject({
+      id: "rtc_0001",
+      kind: "runtime-maintenance",
+      status: "failed",
+      operationKey: "resources.runtime.stop",
+      dedupeKey: "resource-runtime-control:res_web:rtc_0001",
+      correlationId: "req_resource_runtime_control_test",
+      requestId: "req_resource_runtime_control_test",
+      phase: "runtime-control",
+      step: "stop-failed",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      serverId: "srv_demo",
+      errorCode: "provider_error",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: {
+        operation: "stop",
+        runtimeState: "unknown",
+        providerKey: "local-shell",
+        runtimeKind: "docker-container",
+        targetKind: "single-server",
+        reason: "operator requested maintenance",
+      },
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("secret token output");
   });
 
   test("[RUNTIME-CTRL-START-001] starts stopped runtime from retained placement metadata", async () => {

@@ -42,6 +42,9 @@ or diagnostic summaries. It is privileged manual operator access.
 5. The client attaches to the transport and renders terminal output.
 6. User input, resize, heartbeat, close, and backend output move as terminal session frames.
 7. Navigation away, explicit close, disconnect, timeout, or backend exit closes the PTY/SSH/process.
+8. Operators can list/show active sessions and explicitly close or expire sessions through
+   `terminal-sessions.list`, `terminal-sessions.show`, `terminal-sessions.close`, and
+   `terminal-sessions.expire` without reading terminal input/output.
 
 ## Ownership Rules
 
@@ -119,8 +122,12 @@ HTTP/WebSocket must:
 The first workflow slice is implemented for Web resource pages, Web server detail, HTTP/oRPC open,
 WebSocket attach, runtime local-shell/generic-SSH gateway, and CLI descriptor commands.
 
-CLI direct TTY attachment, local true PTY resize, timeout/audit handling, container exec, compose
-service shells, and deployment-detail deep links remain follow-up work.
+Active session list/show/close/expire is modeled as gateway-owned lifecycle over ephemeral
+sessions. Durable closed-session history remains part of the separate audit/event read-surface
+roadmap item.
+
+CLI direct TTY attachment, local true PTY resize, durable timeout/audit handling, container exec,
+compose service shells, and deployment-detail deep links remain follow-up work.
 
 ## Open Questions
 

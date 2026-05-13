@@ -17,8 +17,14 @@ import {
   type ProcessAttemptListFilter,
   type ProcessAttemptReadModel,
   type ProcessAttemptRecord,
+  type RemoteStateWorkReadModel,
+  type RemoteStateWorkSummary,
+  type RouteRealizationWorkReadModel,
+  type RouteRealizationWorkSummary,
   type ServerReadModel,
   type ServerSummary,
+  type SourceLinkReadModel,
+  type SourceLinkRecord,
 } from "../src/ports";
 
 const generatedAt = "2026-01-01T00:00:10.000Z";
@@ -111,6 +117,49 @@ class StaticProcessAttemptReadModel implements ProcessAttemptReadModel {
 
   async findOne(_context: RepositoryContext, id: string): Promise<ProcessAttemptRecord | null> {
     return this.attempts.find((attempt) => attempt.id === id) ?? null;
+  }
+}
+
+class StaticSourceLinkReadModel implements SourceLinkReadModel {
+  constructor(private readonly sourceLinks: SourceLinkRecord[]) {}
+
+  async list(
+    _context: RepositoryContext,
+    input?: Parameters<SourceLinkReadModel["list"]>[1],
+  ): Promise<SourceLinkRecord[]> {
+    return this.sourceLinks.filter(
+      (sourceLink) =>
+        (!input?.projectId || sourceLink.projectId === input.projectId) &&
+        (!input?.resourceId || sourceLink.resourceId === input.resourceId) &&
+        (!input?.serverId || sourceLink.serverId === input.serverId),
+    );
+  }
+}
+
+class StaticRouteRealizationWorkReadModel implements RouteRealizationWorkReadModel {
+  constructor(private readonly routes: RouteRealizationWorkSummary[]) {}
+
+  async list(
+    _context: RepositoryContext,
+    input?: Parameters<RouteRealizationWorkReadModel["list"]>[1],
+  ): Promise<RouteRealizationWorkSummary[]> {
+    return this.routes.filter(
+      (route) =>
+        (!input?.resourceId || route.resourceId === input.resourceId) &&
+        (!input?.serverId || route.serverId === input.serverId) &&
+        (!input?.deploymentId || route.deploymentId === input.deploymentId),
+    );
+  }
+}
+
+class StaticRemoteStateWorkReadModel implements RemoteStateWorkReadModel {
+  constructor(private readonly rows: RemoteStateWorkSummary[]) {}
+
+  async list(
+    _context: RepositoryContext,
+    input?: Parameters<RemoteStateWorkReadModel["list"]>[1],
+  ): Promise<RemoteStateWorkSummary[]> {
+    return this.rows.filter((row) => !input?.serverId || row.serverId === input.serverId);
   }
 }
 
@@ -243,6 +292,9 @@ function createService(input?: {
   bindings?: DomainBindingSummary[];
   certificates?: CertificateSummary[];
   processAttempts?: ProcessAttemptRecord[];
+  remoteStates?: RemoteStateWorkSummary[];
+  sourceLinks?: SourceLinkRecord[];
+  routeRealizations?: RouteRealizationWorkSummary[];
 }): OperatorWorkQueryService {
   return new OperatorWorkQueryService(
     new StaticDeploymentReadModel(input?.deployments ?? [deploymentSummary()]),
@@ -251,6 +303,9 @@ function createService(input?: {
     new StaticDomainBindingReadModel(input?.bindings ?? [domainBindingSummary()]),
     new FixedClock(),
     new StaticProcessAttemptReadModel(input?.processAttempts ?? []),
+    new StaticRemoteStateWorkReadModel(input?.remoteStates ?? []),
+    new StaticSourceLinkReadModel(input?.sourceLinks ?? []),
+    new StaticRouteRealizationWorkReadModel(input?.routeRealizations ?? []),
   );
 }
 
@@ -434,5 +489,259 @@ describe("operator work query service", () => {
     });
     expect(shown._unsafeUnwrap().item.id).toBe("pxy_attempt_1");
     expect(JSON.stringify(result)).not.toContain("PRIVATE_KEY");
+  });
+
+  test("[OP-WORK-QRY-007] lists source links without credential-bearing locators", async () => {
+    const service = createService({
+      deployments: [],
+      servers: [],
+      certificates: [],
+      sourceLinks: [
+        {
+          sourceFingerprint: "source-fingerprint:v1:sha256-safe",
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          serverId: "srv_primary",
+          destinationId: "dst_primary",
+          updatedAt: "2026-01-01T00:00:12.000Z",
+          reason: "action-deploy",
+        },
+      ],
+    });
+
+    const result = await service.list(
+      context(),
+      new ListOperatorWorkQuery("system", "succeeded", "res_web", "srv_primary", undefined, 10),
+    );
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        id: "source-link:source-fingerprint:v1:sha256-safe",
+        kind: "system",
+        status: "succeeded",
+        operationKey: "source-links.relink",
+        resourceId: "res_web",
+        serverId: "srv_primary",
+        nextActions: ["no-action"],
+      }),
+    ]);
+    expect(JSON.stringify(result)).not.toContain("https://user:token@");
+  });
+
+  test("[OP-WORK-QRY-008] lists route realization attempts with safe failure metadata", async () => {
+    const service = createService({
+      deployments: [],
+      servers: [],
+      certificates: [],
+      routeRealizations: [
+        {
+          id: "prj_demo:env_prod:res_web:srv_primary:dst_primary",
+          status: "failed",
+          operationKey: "deployments.create",
+          phase: "proxy-route-apply",
+          step: "failed",
+          projectId: "prj_demo",
+          resourceId: "res_web",
+          deploymentId: "dep_failed",
+          serverId: "srv_primary",
+          updatedAt: "2026-01-01T00:00:12.000Z",
+          finishedAt: "2026-01-01T00:00:12.000Z",
+          errorCode: "edge_proxy_host_port_conflict",
+          errorCategory: "async-processing",
+          retriable: true,
+          nextActions: ["diagnostic", "manual-review"],
+          safeDetails: {
+            routeSetId: "prj_demo:env_prod:res_web:srv_primary:dst_primary",
+            proxyKind: "caddy",
+            providerPayload: "SECRET_TOKEN=raw-value",
+          },
+        },
+      ],
+    });
+
+    const result = await service.list(
+      context(),
+      new ListOperatorWorkQuery(
+        "route-realization",
+        "failed",
+        "res_web",
+        "srv_primary",
+        "dep_failed",
+        10,
+      ),
+    );
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        id: "route-realization:prj_demo:env_prod:res_web:srv_primary:dst_primary",
+        kind: "route-realization",
+        status: "failed",
+        operationKey: "deployments.create",
+        deploymentId: "dep_failed",
+        errorCode: "edge_proxy_host_port_conflict",
+        retriable: true,
+      }),
+    ]);
+    expect(JSON.stringify(result)).not.toContain("SECRET_TOKEN");
+  });
+
+  test("[OP-WORK-QRY-009] lists worker and job status from durable process attempts", async () => {
+    const service = createService({
+      deployments: [],
+      servers: [],
+      certificates: [],
+      processAttempts: [
+        {
+          id: "task-worker-run-1",
+          kind: "runtime-maintenance",
+          status: "running",
+          operationKey: "scheduled-task-runs.run-now",
+          phase: "worker-execution",
+          step: "running",
+          resourceId: "res_web",
+          serverId: "srv_primary",
+          startedAt: "2026-01-01T00:00:11.000Z",
+          updatedAt: "2026-01-01T00:00:12.000Z",
+          nextActions: ["no-action"],
+          safeDetails: {
+            workerKind: "scheduled-task-runner",
+            commandLine: "PASSWORD=raw-value bun run task",
+          },
+        },
+      ],
+    });
+
+    const result = await service.list(
+      context(),
+      new ListOperatorWorkQuery(
+        "runtime-maintenance",
+        "running",
+        "res_web",
+        "srv_primary",
+        undefined,
+        10,
+      ),
+    );
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        id: "task-worker-run-1",
+        kind: "runtime-maintenance",
+        status: "running",
+        operationKey: "scheduled-task-runs.run-now",
+        phase: "worker-execution",
+      }),
+    ]);
+    expect(JSON.stringify(result)).not.toContain("PASSWORD");
+  });
+
+  test("[OP-WORK-QRY-010] lists remote SSH state locks, migrations, backups, and recovery markers safely", async () => {
+    const service = createService({
+      deployments: [],
+      servers: [],
+      certificates: [],
+      remoteStates: [
+        {
+          id: "srv_primary:lock",
+          status: "failed",
+          operationKey: "operator-work.list",
+          phase: "remote-state-lock",
+          step: "stale",
+          serverId: "srv_primary",
+          updatedAt: "2026-01-01T00:00:15.000Z",
+          errorCode: "remote_state_lock_stale",
+          errorCategory: "infra",
+          retriable: true,
+          nextActions: ["diagnostic", "manual-review"],
+          safeDetails: {
+            stateBackend: "ssh-pglite",
+            dataRoot: "/var/lib/appaloft/runtime/state",
+            owner: "workflow-123",
+            correlationId: "corr-123",
+            stale: true,
+            identityFile: "/Users/me/.ssh/id_ed25519",
+          },
+        },
+        {
+          id: "srv_primary:migration:1-to-2",
+          status: "succeeded",
+          operationKey: "operator-work.list",
+          phase: "remote-state-migration",
+          step: "schema-upgrade",
+          serverId: "srv_primary",
+          updatedAt: "2026-01-01T00:00:14.000Z",
+          finishedAt: "2026-01-01T00:00:14.000Z",
+          nextActions: ["no-action"],
+          safeDetails: {
+            stateBackend: "ssh-pglite",
+            fromVersion: 1,
+            toVersion: 2,
+          },
+        },
+        {
+          id: "srv_primary:backup:sync",
+          status: "succeeded",
+          operationKey: "operator-work.list",
+          phase: "remote-state-backup",
+          step: "sync-upload",
+          serverId: "srv_primary",
+          updatedAt: "2026-01-01T00:00:13.000Z",
+          nextActions: ["no-action"],
+          safeDetails: {
+            stateBackend: "ssh-pglite",
+            backupKind: "sync-upload",
+          },
+        },
+        {
+          id: "srv_primary:recovery:marker",
+          status: "failed",
+          operationKey: "operator-work.list",
+          phase: "remote-state-recovery",
+          step: "schema-marker-integrity",
+          serverId: "srv_primary",
+          updatedAt: "2026-01-01T00:00:12.000Z",
+          errorCode: "remote_state_schema_marker_invalid",
+          errorCategory: "infra",
+          retriable: true,
+          nextActions: ["diagnostic", "manual-review"],
+          safeDetails: {
+            stateBackend: "ssh-pglite",
+            marker: "recovery.json",
+          },
+        },
+      ],
+    });
+
+    const result = await service.list(
+      context(),
+      new ListOperatorWorkQuery("remote-state", undefined, undefined, "srv_primary", undefined, 10),
+    );
+
+    expect(result.items.map((item) => item.phase)).toEqual([
+      "remote-state-lock",
+      "remote-state-migration",
+      "remote-state-backup",
+      "remote-state-recovery",
+    ]);
+    expect(result.items[0]).toMatchObject({
+      id: "remote-state:srv_primary:lock",
+      kind: "remote-state",
+      status: "failed",
+      operationKey: "operator-work.list",
+      phase: "remote-state-lock",
+      serverId: "srv_primary",
+      errorCode: "remote_state_lock_stale",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: {
+        stateBackend: "ssh-pglite",
+        dataRoot: "/var/lib/appaloft/runtime/state",
+        owner: "workflow-123",
+        correlationId: "corr-123",
+        stale: true,
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("id_ed25519");
   });
 });

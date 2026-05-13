@@ -39,6 +39,17 @@ export interface ScheduledTaskRunnerConfig {
   batchSize: number;
 }
 
+export interface ScheduledRuntimePruneRunnerConfig {
+  enabled: boolean;
+  intervalSeconds: number;
+  batchSize: number;
+}
+
+export interface ScheduledHistoryRetentionRunnerConfig {
+  enabled: boolean;
+  intervalSeconds: number;
+}
+
 export interface PreviewCleanupRetrySchedulerConfig {
   enabled: boolean;
   intervalSeconds: number;
@@ -121,6 +132,8 @@ export interface AppConfig {
   previewCleanupRetryScheduler: PreviewCleanupRetrySchedulerConfig;
   dockerSwarmExecution: DockerSwarmExecutionConfig;
   scheduledTaskRunner: ScheduledTaskRunnerConfig;
+  scheduledRuntimePruneRunner: ScheduledRuntimePruneRunnerConfig;
+  scheduledHistoryRetentionRunner: ScheduledHistoryRetentionRunnerConfig;
   enabledSystemPlugins: string[];
   configFilePath?: string;
 }
@@ -188,6 +201,15 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
     enabled: false,
     intervalSeconds: 60,
     batchSize: 25,
+  },
+  scheduledRuntimePruneRunner: {
+    enabled: false,
+    intervalSeconds: 3600,
+    batchSize: 25,
+  },
+  scheduledHistoryRetentionRunner: {
+    enabled: false,
+    intervalSeconds: 3600,
   },
   enabledSystemPlugins: [],
 };
@@ -427,6 +449,14 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     source.flags?.scheduledTaskRunner ??
     fileConfig.scheduledTaskRunner ??
     defaults.scheduledTaskRunner;
+  const scheduledRuntimePruneRunner =
+    source.flags?.scheduledRuntimePruneRunner ??
+    fileConfig.scheduledRuntimePruneRunner ??
+    defaults.scheduledRuntimePruneRunner;
+  const scheduledHistoryRetentionRunner =
+    source.flags?.scheduledHistoryRetentionRunner ??
+    fileConfig.scheduledHistoryRetentionRunner ??
+    defaults.scheduledHistoryRetentionRunner;
   const dockerSwarmExecution =
     source.flags?.dockerSwarmExecution ??
     fileConfig.dockerSwarmExecution ??
@@ -456,6 +486,24 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(env.APPALOFT_SCHEDULED_TASK_RUNNER_BATCH_SIZE) ??
     parsePositiveInteger(scheduledTaskRunner.batchSize) ??
     defaults.scheduledTaskRunner.batchSize;
+  const scheduledRuntimePruneRunnerEnabled =
+    parseBoolean(env.APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_ENABLED) ??
+    scheduledRuntimePruneRunner.enabled;
+  const scheduledRuntimePruneRunnerIntervalSeconds =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_INTERVAL_SECONDS) ??
+    parsePositiveInteger(scheduledRuntimePruneRunner.intervalSeconds) ??
+    defaults.scheduledRuntimePruneRunner.intervalSeconds;
+  const scheduledRuntimePruneRunnerBatchSize =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_BATCH_SIZE) ??
+    parsePositiveInteger(scheduledRuntimePruneRunner.batchSize) ??
+    defaults.scheduledRuntimePruneRunner.batchSize;
+  const scheduledHistoryRetentionRunnerEnabled =
+    parseBoolean(env.APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED) ??
+    scheduledHistoryRetentionRunner.enabled;
+  const scheduledHistoryRetentionRunnerIntervalSeconds =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS) ??
+    parsePositiveInteger(scheduledHistoryRetentionRunner.intervalSeconds) ??
+    defaults.scheduledHistoryRetentionRunner.intervalSeconds;
   const dockerSwarmExecutionEnabled =
     parseBoolean(env.APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED) ?? dockerSwarmExecution.enabled;
   const dockerSwarmExecutionCommandTimeoutMs =
@@ -859,6 +907,15 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       enabled: scheduledTaskRunnerEnabled,
       intervalSeconds: scheduledTaskRunnerIntervalSeconds,
       batchSize: scheduledTaskRunnerBatchSize,
+    },
+    scheduledRuntimePruneRunner: {
+      enabled: scheduledRuntimePruneRunnerEnabled,
+      intervalSeconds: scheduledRuntimePruneRunnerIntervalSeconds,
+      batchSize: scheduledRuntimePruneRunnerBatchSize,
+    },
+    scheduledHistoryRetentionRunner: {
+      enabled: scheduledHistoryRetentionRunnerEnabled,
+      intervalSeconds: scheduledHistoryRetentionRunnerIntervalSeconds,
     },
     enabledSystemPlugins,
     ...(source.configFilePath ? { configFilePath: source.configFilePath } : {}),

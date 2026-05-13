@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 import { $ } from "bun";
 
@@ -31,9 +32,36 @@ function parsePort(argv: string[]): number {
   return Number(portFlag?.split("=")[1] ?? 4310);
 }
 
+async function reserveTcpPort(): Promise<number> {
+  return await new Promise<number>((resolvePort, reject) => {
+    const server = createServer();
+
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close();
+        reject(new Error("Failed to reserve a TCP port"));
+        return;
+      }
+
+      const { port } = address;
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolvePort(port);
+      });
+    });
+    server.on("error", reject);
+  });
+}
+
 function runCli(
   args: string[],
   options: {
+    controlPlanePort: number;
     dataDir: string;
     pgliteDataDir: string;
   },
@@ -43,11 +71,12 @@ function runCli(
     cwd: shellRoot,
     env: {
       ...process.env,
+      OTEL_SDK_DISABLED: "true",
       APPALOFT_DATABASE_DRIVER: "pglite",
       APPALOFT_DATA_DIR: options.dataDir,
       APPALOFT_PGLITE_DATA_DIR: options.pgliteDataDir,
       APPALOFT_HTTP_HOST: "127.0.0.1",
-      APPALOFT_HTTP_PORT: "3001",
+      APPALOFT_HTTP_PORT: String(options.controlPlanePort),
       APPALOFT_APP_VERSION: "0.1.0-smoke",
       APPALOFT_WEB_STATIC_DIR: "",
     },
@@ -66,8 +95,65 @@ function parseJson<T>(raw: string): T {
   return JSON.parse(raw) as T;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function deploymentLogEntries(raw: string): readonly Record<string, unknown>[] {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isRecord(parsed) || !Array.isArray(parsed.logs)) {
+      return [];
+    }
+
+    return parsed.logs.filter(isRecord);
+  } catch {
+    return [];
+  }
+}
+
+function assertDeploymentProducedRuntime(logs: string): void {
+  const entries = deploymentLogEntries(logs);
+  const errorEntry = entries.findLast(
+    (entry) =>
+      entry.level === "error" &&
+      entry.source !== "application" &&
+      typeof entry.message === "string",
+  );
+  if (errorEntry) {
+    const phase = typeof errorEntry.phase === "string" ? `${errorEntry.phase}: ` : "";
+    const context = entries
+      .filter(
+        (entry) =>
+          entry.phase === errorEntry.phase &&
+          typeof entry.message === "string" &&
+          entry.message !== errorEntry.message,
+      )
+      .slice(-5)
+      .map((entry) => entry.message)
+      .join("\n");
+    const evidence = context
+      ? `\nRecent ${errorEntry.phase ?? "deployment"} output:\n${context}`
+      : "";
+    throw new Error(
+      `Deployment failed before runtime URL was available: ${phase}${errorEntry.message}${evidence}`,
+    );
+  }
+}
+
 function dockerName(input: string): string {
   return input.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
+}
+
+function runDockerCleanup(args: string[]): void {
+  const dockerPath = Bun.which("docker");
+  if (!dockerPath) {
+    return;
+  }
+  Bun.spawnSync([dockerPath, ...args], {
+    stderr: "ignore",
+    stdout: "ignore",
+  });
 }
 
 function expectCliSuccess(
@@ -162,6 +248,8 @@ async function createComposeSourceDir(input: {
 }
 
 function parseRuntimeUrl(logs: string): string {
+  assertDeploymentProducedRuntime(logs);
+
   const runtimeUrl = /Container is reachable at (http:\/\/127\.0\.0\.1:\d+(?:\/[^"\\\s]*)?)/u.exec(
     logs,
   )?.[1];
@@ -175,6 +263,7 @@ function parseRuntimeUrl(logs: string): string {
 async function main(): Promise<void> {
   const method = parseMethod(process.argv.slice(2));
   const port = parsePort(process.argv.slice(2));
+  const controlPlanePort = await reserveTcpPort();
   const tempRoot = process.env.TMPDIR ?? "/tmp";
   const workspaceDir = await createWorkspaceDir(tempRoot);
   const dataDir = join(workspaceDir, ".appaloft", "data");
@@ -206,11 +295,12 @@ async function main(): Promise<void> {
       cwd: resolve("apps/shell"),
       env: {
         ...process.env,
+        OTEL_SDK_DISABLED: "true",
         APPALOFT_DATABASE_DRIVER: "pglite",
         APPALOFT_DATA_DIR: dataDir,
         APPALOFT_PGLITE_DATA_DIR: pgliteDataDir,
         APPALOFT_HTTP_HOST: "127.0.0.1",
-        APPALOFT_HTTP_PORT: "3001",
+        APPALOFT_HTTP_PORT: String(controlPlanePort),
         APPALOFT_APP_VERSION: "0.1.0-smoke",
         APPALOFT_WEB_STATIC_DIR: "",
       },
@@ -218,9 +308,10 @@ async function main(): Promise<void> {
       stderr: "ignore",
     });
 
-    await waitForHealth("http://127.0.0.1:3001/api/health");
+    await waitForHealth(`http://127.0.0.1:${controlPlanePort}/api/health`);
 
     const project = runCli(["project", "create", "--name", `Smoke ${method} ${suffix}`], {
+      controlPlanePort,
       dataDir,
       pgliteDataDir,
     });
@@ -240,14 +331,14 @@ async function main(): Promise<void> {
         "--proxy-kind",
         "none",
       ],
-      { dataDir, pgliteDataDir },
+      { controlPlanePort, dataDir, pgliteDataDir },
     );
     expectCliSuccess(server, "register local server");
     const serverId = parseJson<{ id: string }>(server.stdout).id;
 
     const environment = runCli(
       ["env", "create", "--project", projectId, "--name", "local", "--kind", "local"],
-      { dataDir, pgliteDataDir },
+      { controlPlanePort, dataDir, pgliteDataDir },
     );
     expectCliSuccess(environment, "create environment");
     const environmentId = parseJson<{ id: string }>(environment.stdout).id;
@@ -272,7 +363,7 @@ async function main(): Promise<void> {
         "--health-path",
         "/health",
         "--build",
-        "bun build.mjs",
+        "node build.mjs",
         "--start",
         "node dist/server.js",
       );
@@ -286,11 +377,11 @@ async function main(): Promise<void> {
       deployArgs.push("--publish-dir", "/dist", "--health-path", "/");
     }
 
-    const deployment = runCli(deployArgs, { dataDir, pgliteDataDir });
+    const deployment = runCli(deployArgs, { controlPlanePort, dataDir, pgliteDataDir });
     expectCliSuccess(deployment, "deploy");
 
     deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
-    const logs = runCli(["logs", deploymentId], { dataDir, pgliteDataDir });
+    const logs = runCli(["logs", deploymentId], { controlPlanePort, dataDir, pgliteDataDir });
     expectCliSuccess(logs, "logs");
 
     const appUrl = method === "docker-compose" ? null : parseRuntimeUrl(logs.stdout);
@@ -335,6 +426,7 @@ async function main(): Promise<void> {
           deploymentId,
           appUrl,
           payload,
+          controlPlaneUrl: `http://127.0.0.1:${controlPlanePort}`,
           dataDir,
           pgliteDataDir,
           rollback: rollbackCommand,
@@ -350,39 +442,20 @@ async function main(): Promise<void> {
     if (!preserveWorkspace) {
       if (deploymentId) {
         if (composeFile) {
-          Bun.spawnSync(
-            [
-              "docker",
-              "compose",
-              "-p",
-              dockerName(`appaloft-${deploymentId}`),
-              "-f",
-              composeFile,
-              "down",
-              "--remove-orphans",
-            ],
-            {
-              stderr: "ignore",
-              stdout: "ignore",
-            },
-          );
+          runDockerCleanup([
+            "compose",
+            "-p",
+            dockerName(`appaloft-${deploymentId}`),
+            "-f",
+            composeFile,
+            "down",
+            "--remove-orphans",
+          ]);
         }
-        Bun.spawnSync(["docker", "rm", "-f", dockerName(`appaloft-${deploymentId}`)], {
-          stderr: "ignore",
-          stdout: "ignore",
-        });
-        Bun.spawnSync(
-          ["docker", "image", "rm", "-f", dockerName(`appaloft-image-${deploymentId}`)],
-          {
-            stderr: "ignore",
-            stdout: "ignore",
-          },
-        );
+        runDockerCleanup(["rm", "-f", dockerName(`appaloft-${deploymentId}`)]);
+        runDockerCleanup(["image", "rm", "-f", dockerName(`appaloft-image-${deploymentId}`)]);
       }
-      Bun.spawnSync(["docker", "image", "rm", "-f", smokeImage], {
-        stderr: "ignore",
-        stdout: "ignore",
-      });
+      runDockerCleanup(["image", "rm", "-f", smokeImage]);
       await $`rm -rf ${workspaceDir}`;
     }
   }

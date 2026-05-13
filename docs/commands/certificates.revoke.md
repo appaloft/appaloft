@@ -35,7 +35,10 @@ The command must:
 7. Request secret-store deactivation when supported without exposing secret refs.
 8. Persist `status = revoked`.
 9. Publish `certificate-revoked`.
-10. Return `ok({ certificateId })`.
+10. For managed provider revocation, project running, succeeded, and retriable provider failure
+    outcomes into `operator-work.*` process-attempt visibility with safe provider/domain/
+    fingerprint context and no certificate material.
+11. Return `ok({ certificateId })`.
 
 ## Domain-Specific Error Codes
 
@@ -51,4 +54,6 @@ The command must:
 
 Implemented in the certificate lifecycle closure slice for managed provider-boundary revocation and
 imported Appaloft-local revocation. Live CA-specific revocation remains provider-adapter specific
-behind the provider-neutral port.
+behind the provider-neutral port. Managed provider revocation is operator-visible through the
+durable-process projection path for `PROC-DELIVERY-001` and `PROC-DELIVERY-004`; imported
+Appaloft-local revocation has no provider work to project.

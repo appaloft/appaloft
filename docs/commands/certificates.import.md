@@ -23,6 +23,8 @@ The command contract is:
 - success persists only secret references plus safe certificate metadata;
 - success publishes `certificate-imported`;
 - success must not publish `certificate-issued`;
+- success records a safe `certificates.import` process-attempt projection for `operator-work.*`
+  visibility without PEM, private-key, or passphrase material;
 - downstream `domain-ready` evaluation may still continue through the event/process-manager path.
 
 ## Global References
@@ -133,8 +135,11 @@ The command must:
 7. Store the certificate chain, private key, and optional passphrase through the secret store.
 8. Persist durable certificate state with `source = imported`, safe metadata, secret references,
    latest import attempt metadata, and idempotency linkage.
-9. Publish or record `certificate-imported`.
-10. Return `ok({ certificateId, attemptId })`.
+9. Record a safe process-attempt projection for operator-work visibility with the import attempt id,
+   related certificate/domain-binding/project/resource/server ids, provider key `manual-import`,
+   challenge type `manual-import`, reason, domain name, source `imported`, and expiry.
+10. Publish or record `certificate-imported`.
+11. Return `ok({ certificateId, attemptId })`.
 
 If secret storage or durable persistence cannot be completed safely, the command must return `err`
 and must not publish `certificate-imported`.
@@ -154,6 +159,17 @@ The minimum Code Round write-side contract for imported certificates is:
 
 Raw PEM bodies, decrypted private keys, and passphrase values must not be stored in aggregate state,
 events, read models, or structured errors.
+
+## Operator Work Projection
+
+Successful manual imports are visible through `operator-work.*` as terminal succeeded certificate
+process attempts. The projection is observational: it does not retry imported certificates, does not
+trigger provider work, and does not replace `certificates.list` or `certificates.show`.
+
+The safe projection may include certificate id, domain binding id, project id, resource id, server
+id, domain name, import reason, imported source marker, expiry, provider key `manual-import`, and
+challenge type `manual-import`. It must not include raw PEM bodies, decrypted private keys,
+passphrases, secret refs, file paths, or temporary storage details.
 
 ## Domain Readiness Interaction
 
@@ -220,7 +236,8 @@ It must not:
 
 `certificates.import` is now implemented in the write side, operation catalog, CLI entrypoint,
 HTTP/oRPC entrypoint, resource-scoped Web entrypoint, and durable PG/PGlite-backed certificate
-secret-store path, and it publishes `certificate-imported` on successful manual import.
+secret-store path, projects successful imports into `operator-work.*`, and publishes
+`certificate-imported` on successful manual import.
 
 Remaining migration gaps:
 

@@ -842,6 +842,7 @@ function toDeploymentConfigSnapshot(
 ): DeploymentConfigSnapshot {
   const healthCheckPath =
     config.runtime?.healthCheckPath ?? config.runtime?.healthCheck?.path ?? config.health?.path;
+  const runtimePrune = config.retention?.runtimePrune;
   const deployment: NonNullable<DeploymentConfigSnapshot["deployment"]> = {
     ...(config.runtime?.strategy ? { method: config.runtime.strategy } : {}),
     ...(config.runtime?.installCommand ? { installCommand: config.runtime.installCommand } : {}),
@@ -861,6 +862,7 @@ function toDeploymentConfigSnapshot(
   return {
     configFilePath,
     ...(Object.keys(deployment).length > 0 ? { deployment } : {}),
+    ...(runtimePrune ? { retention: { runtimePrune } } : {}),
   };
 }
 

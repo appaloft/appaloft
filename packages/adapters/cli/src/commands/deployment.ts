@@ -8,6 +8,7 @@ import {
   DeploymentPlanQuery,
   DeploymentRecoveryReadinessQuery,
   ListDeploymentsQuery,
+  PruneDeploymentLogsCommand,
   publicPreviewUrlsFromDeploymentSummary,
   RedeployDeploymentCommand,
   RetryDeploymentCommand,
@@ -137,6 +138,7 @@ const deploymentCursorOption = Options.text("cursor").pipe(Options.optional);
 const deploymentHistoryLimitOption = Options.text("history-limit").pipe(Options.withDefault("100"));
 const includeHistoryOption = Options.boolean("include-history").pipe(Options.withDefault(true));
 const untilTerminalOption = Options.boolean("until-terminal").pipe(Options.withDefault(true));
+const dryRunOption = Options.boolean("dry-run").pipe(Options.withDefault(true));
 const readinessGeneratedAtOption = Options.text("readiness-generated-at").pipe(Options.optional);
 const sourceDeploymentOption = Options.text("source-deployment").pipe(Options.optional);
 const rollbackCandidateOption = Options.text("candidate");
@@ -1502,6 +1504,32 @@ export const logsCommand = EffectCommand.make(
   ({ deploymentId }) => runQuery(DeploymentLogsQuery.create({ deploymentId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentLogs));
 
+const pruneDeploymentLogsCommand = EffectCommand.make(
+  "prune",
+  {
+    before: Options.text("before"),
+    deployment: Options.text("deployment").pipe(Options.optional),
+    resource: resourceOption,
+    server: serverOption,
+    dryRun: dryRunOption,
+  },
+  ({ before, deployment, dryRun, resource, server }) =>
+    runCommand(
+      PruneDeploymentLogsCommand.create({
+        before,
+        ...(optionalValue(deployment) ? { deploymentId: optionalValue(deployment) } : {}),
+        ...(optionalValue(resource) ? { resourceId: optionalValue(resource) } : {}),
+        ...(optionalValue(server) ? { serverId: optionalValue(server) } : {}),
+        dryRun,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentLogsPrune));
+
+const deploymentLogsMaintenanceCommand = EffectCommand.make("logs").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.deploymentLogs),
+  EffectCommand.withSubcommands([pruneDeploymentLogsCommand]),
+);
+
 const listDeploymentsCommand = EffectCommand.make(
   "list",
   {
@@ -1656,6 +1684,7 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
     retryDeploymentCommand,
     redeployDeploymentCommand,
     rollbackDeploymentCommand,
+    deploymentLogsMaintenanceCommand,
     streamDeploymentEventsCommand,
   ]),
 );
