@@ -36,6 +36,10 @@ describe("runtime target capacity diagnostics", () => {
     expect(script).toContain("df -P -k");
     expect(script).toContain("df -P -i");
     expect(script).toContain("docker system df");
+    expect(script).toContain("docker inspect --size");
+    expect(script).toContain("appaloft.managed=true");
+    expect(script).toContain("CAPACITY_APPALOFT_WORKSPACE");
+    expect(script).toContain(".appaloft-rollback-candidate");
     expect(script).toContain("du -sk");
     expect(script).not.toContain("docker system prune");
     expect(script).not.toContain("docker volume prune");
@@ -58,6 +62,8 @@ describe("runtime target capacity diagnostics", () => {
       "CAPACITY_DOCKER_DF\tContainers      3         1         12kB      8kB (66%)",
       "CAPACITY_DOCKER_DF\tLocal Volumes   2         1         20MB      0B (0%)",
       "CAPACITY_DOCKER_DF\tBuild Cache     42        0         7GB       6.5GB",
+      "CAPACITY_APPALOFT_CONTAINER\tcontainer123\t/app-api\ttrue\trunning\t4096\tdep_current\tprj_usage\tenv_prod\tres_api\tsrv_capacity\tdst_primary\tcontainer-image",
+      "CAPACITY_APPALOFT_WORKSPACE\tdep_current\t/var/lib/appaloft/runtime/ssh-deployments/dep_current\t8192\ttrue\tfalse",
       "CAPACITY_WARNING\tdocker-unavailable\tdocker system df failed",
     ].join("\n");
 
@@ -74,6 +80,31 @@ describe("runtime target capacity diagnostics", () => {
     expect(value.inodes[0]).toMatchObject({ path: "/", usePercent: 90 });
     expect(value.docker.reclaimableImagesSize).toBe(parseDockerSizeToBytes("6GB"));
     expect(value.docker.reclaimableBuildCacheSize).toBe(parseDockerSizeToBytes("6.5GB"));
+    expect(value.appaloftContainers).toEqual([
+      {
+        id: "container123",
+        name: "app-api",
+        running: true,
+        status: "running",
+        writableBytes: 4096,
+        deploymentId: "dep_current",
+        projectId: "prj_usage",
+        environmentId: "env_prod",
+        resourceId: "res_api",
+        serverId: "srv_capacity",
+        destinationId: "dst_primary",
+        artifactKind: "container-image",
+      },
+    ]);
+    expect(value.appaloftWorkspaces).toEqual([
+      {
+        deploymentId: "dep_current",
+        path: "/var/lib/appaloft/runtime/ssh-deployments/dep_current",
+        bytes: 8192,
+        activeMarker: true,
+        rollbackCandidateMarker: false,
+      },
+    ]);
     expect(value.appaloftRuntime.stateRoot.size).toBe(1024 * 1024);
     expect(value.safeReclaimableEstimate.total).toBe(
       parseDockerSizeToBytes("8kB") + parseDockerSizeToBytes("6GB") + parseDockerSizeToBytes("6.5GB"),

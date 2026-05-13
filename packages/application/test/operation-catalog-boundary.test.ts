@@ -318,6 +318,23 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[RT-USAGE-008] runtime usage inspect is exposed as a read-only query", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "runtime-usage.inspect");
+
+    expect(entry).toMatchObject({
+      kind: "query",
+      domain: "runtime-usage",
+      messageName: "InspectRuntimeUsageQuery",
+      handlerName: "InspectRuntimeUsageQueryHandler",
+      serviceName: "RuntimeUsageInspectionQueryService",
+      transports: {
+        cli: "appaloft runtime-usage inspect <scope>",
+        orpc: { method: "GET", path: "/api/runtime-usage/inspect" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[OP-WORK-CATALOG-001] operator work ledger exposes queries and lifecycle commands", () => {
     const listEntry = operationCatalog.find((candidate) => candidate.key === "operator-work.list");
     const showEntry = operationCatalog.find((candidate) => candidate.key === "operator-work.show");

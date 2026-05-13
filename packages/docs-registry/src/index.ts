@@ -1554,6 +1554,36 @@ export const publicDocsHelpTopics = {
     relatedOperation: "servers.capacity.inspect",
     aliases: ["capacity", "disk full", "build cache", "docker system df", "prune", "容量诊断"],
   },
+  "diagnostics.runtime-usage": {
+    id: "diagnostics.runtime-usage",
+    title: "Runtime usage attribution",
+    description:
+      "How to inspect safe point-in-time runtime usage attribution without cleanup, sample persistence, quota, or threshold enforcement.",
+    page: {
+      "zh-CN": "observe/diagnostics",
+      "en-US": "en/observe/diagnostics",
+    },
+    anchor: "runtime-usage-inspect",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "runtime-usage.inspect",
+    aliases: [
+      "runtime usage",
+      "usage attribution",
+      "resource usage",
+      "capacity attribution",
+      "运行时用量",
+      "资源归因",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-062-runtime-usage-attribution-boundary.md",
+      "docs/queries/runtime-usage.inspect.md",
+      "docs/testing/runtime-usage-attribution-test-matrix.md",
+    ],
+  },
   "diagnostics.scheduled-runtime-prune-policy": {
     id: "diagnostics.scheduled-runtime-prune-policy",
     title: "Scheduled runtime prune policy",
@@ -2267,6 +2297,11 @@ export const publicDocsOperationCoverage = [
     operationKey: "servers.capacity.inspect",
     status: "documented",
     topicId: "diagnostics.runtime-target-capacity",
+  },
+  {
+    operationKey: "runtime-usage.inspect",
+    status: "documented",
+    topicId: "diagnostics.runtime-usage",
   },
   {
     operationKey: "servers.capacity.prune",

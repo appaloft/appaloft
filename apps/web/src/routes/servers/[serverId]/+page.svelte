@@ -34,6 +34,7 @@
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
+  import RuntimeUsagePanel from "$lib/components/console/RuntimeUsagePanel.svelte";
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -43,6 +44,7 @@
   import * as Tabs from "$lib/components/ui/tabs";
   import { toDefaultAccessPolicyFormState } from "$lib/console/default-access-policy-form";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import { runtimeUsageQueryOptions } from "$lib/console/runtime-usage-query";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
   import { formatTime } from "$lib/console/utils";
@@ -115,6 +117,15 @@
       staleTime: 5_000,
     }),
   );
+  const serverRuntimeUsageQuery = createQuery(() =>
+    runtimeUsageQueryOptions(
+      {
+        kind: "server",
+        serverId,
+      },
+      browser && serverId.length > 0,
+    ),
+  );
   const projects = $derived(projectsQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const pageLoading = $derived(
@@ -149,6 +160,10 @@
     serverDeleteSafetyQuery.error ? readErrorMessage(serverDeleteSafetyQuery.error) : "",
   );
   const serverRollups = $derived(serverDetail?.rollups ?? null);
+  const serverRuntimeUsage = $derived(serverRuntimeUsageQuery.data ?? null);
+  const serverRuntimeUsageError = $derived(
+    serverRuntimeUsageQuery.error ? readErrorMessage(serverRuntimeUsageQuery.error) : "",
+  );
   const serverDeployments = $derived(
     server ? deployments.filter((deployment) => deployment.serverId === server.id) : [],
   );
@@ -685,6 +700,12 @@
             </div>
           </div>
         {/if}
+
+        <RuntimeUsagePanel
+          usage={serverRuntimeUsage}
+          loading={serverRuntimeUsageQuery.isPending}
+          error={serverRuntimeUsageError}
+        />
           </Tabs.Content>
 
           <Tabs.Content value="credentials" class="mt-0">

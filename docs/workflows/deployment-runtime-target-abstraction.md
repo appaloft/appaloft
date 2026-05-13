@@ -176,9 +176,10 @@ Operator-facing surfaces should expose this without making deployment admission 
 
 - `servers.capacity.inspect` is the first public read-only target capacity query. For the active
   single-server Docker/Compose backend it returns disk, inode, memory, CPU, Docker image usage,
-  build-cache usage, Appaloft runtime-root/state/source-workspace usage, safe reclaimable
-  estimates, and warnings. It is diagnostic-only and must not prune, delete, stop, repair, or
-  mutate target or Appaloft state.
+  build-cache usage, Appaloft runtime-root/state/source-workspace usage, Appaloft-managed container
+  label/size evidence, source workspace deployment-id metadata for attribution, safe reclaimable
+  estimates, and warnings. It is
+  diagnostic-only and must not prune, delete, stop, repair, or mutate target or Appaloft state.
 - `servers.capacity.prune` is the first public target capacity prune command. It is dry-run-first,
   deployment-target scoped, cutoff-based, and limited to stopped Appaloft-managed containers plus
   preview/source workspace candidates whose ownership and rollback-safety evidence can be proven.

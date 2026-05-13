@@ -14,6 +14,7 @@ export const tokens = {
   defaultAccessDomainPolicySupport: Symbol.for("appaloft.default_access_domain_policy_support"),
   serverConnectivityChecker: Symbol.for("appaloft.server_connectivity_checker"),
   runtimeTargetCapacityInspector: Symbol.for("appaloft.runtime_target_capacity_inspector"),
+  runtimeUsageInspector: Symbol.for("appaloft.runtime_usage_inspector"),
   runtimeTargetCapacityPruner: Symbol.for("appaloft.runtime_target_capacity_pruner"),
   serverEdgeProxyBootstrapper: Symbol.for("appaloft.server_edge_proxy_bootstrapper"),
   deploymentConfigReader: Symbol.for("appaloft.deployment_config_reader"),
@@ -186,6 +187,7 @@ export const tokens = {
   listServersQueryService: Symbol.for("appaloft.list_servers_query_service"),
   showServerQueryService: Symbol.for("appaloft.show_server_query_service"),
   inspectServerCapacityQueryService: Symbol.for("appaloft.inspect_server_capacity_query_service"),
+  runtimeUsageInspectionQueryService: Symbol.for("appaloft.runtime_usage_inspection_query_service"),
   pruneServerCapacityUseCase: Symbol.for("appaloft.prune_server_capacity_use_case"),
   scheduledRuntimePrunePolicyRepository: Symbol.for(
     "appaloft.scheduled_runtime_prune_policy_repository",
