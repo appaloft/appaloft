@@ -295,6 +295,29 @@ describe("preview policy operations", () => {
     expect(JSON.stringify(shown._unsafeUnwrap())).not.toContain("token");
   });
 
+  test("[PG-PREVIEW-SURFACE-001] preview environment list supports global console listing", async () => {
+    const readModel = new MemoryPreviewEnvironmentReadModel();
+    const clock = new FixedClock("2026-05-06T06:10:00.000Z");
+    const handler = new ListPreviewEnvironmentsQueryHandler(
+      new ListPreviewEnvironmentsQueryService(readModel, clock),
+    );
+    const context = contextFixture();
+
+    const listed = await handler.handle(
+      context,
+      ListPreviewEnvironmentsQuery.create({})._unsafeUnwrap(),
+    );
+
+    expect(listed.isOk()).toBe(true);
+    expect(readModel.listInput).toEqual({});
+    expect(listed._unsafeUnwrap()).toEqual({
+      schemaVersion: "preview-environments.list/v1",
+      items: [previewEnvironmentSummary],
+      nextCursor: "2026-05-06T06:05:00.000Z",
+      generatedAt: "2026-05-06T06:10:00.000Z",
+    });
+  });
+
   test("[PG-PREVIEW-SURFACE-001] preview environment catalog entries expose CLI and HTTP API transports", () => {
     const list = operationCatalog.find((entry) => entry.key === "preview-environments.list");
     const show = operationCatalog.find((entry) => entry.key === "preview-environments.show");

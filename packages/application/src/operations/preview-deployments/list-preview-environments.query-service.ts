@@ -1,4 +1,4 @@
-import { domainError, err, ok, type Result } from "@appaloft/core";
+import { ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
@@ -23,15 +23,6 @@ export class ListPreviewEnvironmentsQueryService {
     context: ExecutionContext,
     query: ListPreviewEnvironmentsQuery,
   ): Promise<Result<ListPreviewEnvironmentsResult>> {
-    if (!query.projectId && !query.resourceId) {
-      return err(
-        domainError.validation("Preview environment list requires project or Resource scope", {
-          phase: "preview-environment-read",
-          requiredScopeKind: "project-or-resource",
-        }),
-      );
-    }
-
     const page = await this.previewEnvironmentReadModel.list(toRepositoryContext(context), {
       ...(query.projectId ? { projectId: query.projectId } : {}),
       ...(query.environmentId ? { environmentId: query.environmentId } : {}),
