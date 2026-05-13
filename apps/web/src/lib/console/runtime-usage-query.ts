@@ -16,7 +16,7 @@ export function runtimeUsageQueryOptions(scope: RuntimeUsageScope, enabled: bool
         includeWarnings: true,
       }),
     enabled,
-    staleTime: 15_000,
-    refetchInterval: 30_000,
+    staleTime: 5_000,
+    refetchInterval: 10_000,
   });
 }

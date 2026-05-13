@@ -11,7 +11,9 @@ remain deferred until their own rows are activated by accepted specs.
 ## Governing Sources
 
 - [ADR-062: Runtime Usage Attribution Boundary](../decisions/ADR-062-runtime-usage-attribution-boundary.md)
+- [ADR-063: Runtime Monitoring Observation Boundary](../decisions/ADR-063-runtime-monitoring-observation-boundary.md)
 - [Runtime Usage Attribution And Monitoring](../specs/068-runtime-usage-attribution-and-monitoring/spec.md)
+- [Runtime Monitoring Observation Boundary](../specs/069-runtime-monitoring-observation-boundary/spec.md)
 - [runtime-usage.inspect Query Spec](../queries/runtime-usage.inspect.md)
 - [Runtime Target Capacity Test Matrix](./runtime-target-capacity-test-matrix.md)
 - [Adapter Command/Query Boundary](../architecture/adapter-command-query-boundary.md)
@@ -33,6 +35,24 @@ remain deferred until their own rows are activated by accepted specs.
 | RT-USAGE-009 | Usage thresholds are non-enforcing when later accepted and never throttle, stop, prune, redeploy, reject deployments, or mutate runtime targets without a separate governed command. | Future policy/application | Deferred until Slice 3. |
 | RT-USAGE-010 | Repository config, CLI, HTTP/oRPC, and Web continue rejecting unsupported CPU, memory, replicas, restart policy, rollout sizing, quota, and runtime enforcement fields until a separate runtime sizing ADR/spec is accepted. | Config/application/entrypoint | Existing rejection coverage remains in `packages/deployment-config/test/appaloft-config.test.ts`, `packages/adapters/cli/test/deployment-config.test.ts`, `packages/contracts/test/deployment-create-contract.test.ts`, and `packages/contracts/test/quick-deploy-workflow.test.ts`; add explicit runtime usage regression when sizing work is proposed. |
 
+## Runtime Monitoring Follow-Up Matrix
+
+These rows govern the post-`0.12.0` runtime monitoring observation slices. They are not implemented
+by the first `runtime-usage.inspect` Code Round.
+
+| ID | Behavior | Level | Automation |
+| --- | --- | --- | --- |
+| RT-MON-001 | Runtime monitoring collection stores only bounded sanitized samples with cadence, retention, freshness, partial state, warnings, source errors, and safe Appaloft labels. It never stores raw shell output, secrets, private paths, unbounded provider payloads, or runtime logs as samples. | Collector/persistence | Future Test-First Round before sample store implementation. |
+| RT-MON-002 | `runtime-monitoring.rollup` returns bounded time-window series and totals for server, project, environment, resource, and deployment scopes without mutating runtime targets or loading aggregates for business predicates. | Application/read model | Future Test-First Round before rollup query implementation. |
+| RT-MON-003 | `runtime-monitoring.samples.list` returns a bounded sanitized sample window for diagnostics and charts, with missing metric sources represented as partial/source-error state rather than zero usage. | Application/API | Future Test-First Round before sample query implementation. |
+| RT-MON-004 | Web chart deployment markers are derived from deployment events/read models and represent time correlation only; they do not claim causal analysis. | Web/API/read model | Future Web and query contract tests before Observe chart implementation. |
+| RT-MON-005 | Runtime logs, deployment logs, deployment events, health, access, and diagnostics remain separate governed query surfaces. The Observe UI may link and filter them by time window and stable ids, but must not duplicate log retention into monitoring samples. | Web/application | Future Web and application tests before Observe UI implementation. |
+| RT-MON-006 | Runtime monitoring thresholds are non-enforcing warning/critical policy. Crossed thresholds create readback/operator visibility only and never prune, stop, restart, redeploy, reject, throttle, resize, scale, bill, or mutate runtime targets. | Application/command/query | Future command/query tests before threshold policy implementation. |
+| RT-MON-007 | Server Observe surface shows server-level CPU, memory, disk, inode, Docker/cache, source workspace, runtime root, warnings, and resource/deployment rollups from typed DTOs and i18n keys. | Web | Short-term Monitor tab and browser-local CPU/memory/disk sparkline derivation are covered in `apps/web/src/lib/console/runtime-usage.test.ts`; full server Observe e2e remains future. |
+| RT-MON-008 | Resource Observe surface shows resource-level charts, current health/access/proxy state, latest deployment markers, runtime logs, deployment logs, and diagnostics links from typed DTOs and i18n keys. | Web | Short-term Monitor tab and logs/events/diagnostics links are covered in `apps/web/src/lib/console/runtime-usage.test.ts`; full resource Observe e2e remains future. |
+| RT-MON-009 | Project and environment monitoring stays rollup-only with top contributors and deep links to resource/server detail; those scopes do not become owners of runtime state or resource-level diagnosis. | Web/application | Future query/Web tests before project/environment monitoring release. |
+| RT-MON-010 | Prometheus-compatible storage/querying, custom metric ingestion, APM/tracing, dashboard builders, alert routing, billing analytics, quota, autoscaling, cleanup, and enforcement remain out of Appaloft runtime monitoring scope. | Contract/docs/review | Future contract/docs guard when external observability handoff is specified. |
+
 ## Current Gaps
 
 - The first application query boundary tests for `runtime-usage.inspect` exist in
@@ -47,6 +67,10 @@ remain deferred until their own rows are activated by accepted specs.
   deployment-id-only artifacts. Future MCP/tool tests remain pending.
 - RT-USAGE-007, RT-USAGE-009, and RT-USAGE-010 are guardrails for later slices. They must not be
   used to claim sample retention, thresholds, quota, or runtime sizing implementation is complete.
+- RT-MON-007 and RT-MON-008 now have short-term Web monitor coverage over the existing
+  `runtime-usage.inspect` query. Retained samples, backend rollups, threshold policy, and full
+  Observe e2e coverage still require local query/command specs and Test-First bindings before their
+  Code Rounds.
 - Real Docker and SSH usage smoke tests are opt-in because they touch local or remote runtime
   targets. The opt-in gates live in `packages/adapters/runtime/test/runtime-usage-smoke.test.ts`
   and run only with `APPALOFT_RUNTIME_USAGE_DOCKER_SMOKE=1` or

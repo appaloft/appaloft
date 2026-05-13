@@ -2188,6 +2188,16 @@ Deferred unless explicitly pulled into `0.12.0`:
 - [ ] Non-enforcing usage thresholds, warning/critical state, and operator visibility.
 - [ ] Runtime sizing, quotas, or enforcement.
 
+Post-`0.12.0` monitoring boundary:
+- [x] Runtime Monitoring Observation has an accepted boundary ADR and feature artifact that defines
+  bounded samples, rollups, charts, deployment markers, log/event/diagnostic linkage, and
+  non-enforcing thresholds without turning Appaloft into Prometheus, APM, custom metric ingestion,
+  dashboard building, alert routing, billing analytics, quota, cleanup, or runtime enforcement.
+- [ ] Select whether bounded samples, rollups, charts, and threshold visibility are GA-blocking for
+  `1.0.0-rc` or remain post-GA. If pulled into RC, complete the
+  [Runtime Monitoring Observation Boundary](./specs/069-runtime-monitoring-observation-boundary/spec.md)
+  Spec/Test-First/Code/Docs rounds before freezing RC scope.
+
 ## Phase 11: 1.0.0 Release Candidate
 
 Target: `1.0.0-rc`.
@@ -2327,9 +2337,12 @@ work below before GA.
 - [x] Runtime artifact/instance: internal snapshot and resource/deployment diagnostic context.
 - [ ] Runtime artifact/instance: capacity diagnostics, cleanup/prune, preview artifact cleanup, and
   rollback-candidate retention.
-- [ ] Runtime usage: read-only attribution and monitoring for server, project, environment,
-  resource, and deployment scopes. Governed by
+- [x] Runtime usage: read-only current attribution for server, project, environment, resource, and
+  deployment scopes. Governed by
   [Runtime Usage Attribution And Monitoring](./specs/068-runtime-usage-attribution-and-monitoring/spec.md).
+- [ ] Runtime monitoring: bounded samples, rollup charts, deployment markers, log/event/diagnostic
+  linkage, and non-enforcing threshold visibility. Governed by
+  [Runtime Monitoring Observation Boundary](./specs/069-runtime-monitoring-observation-boundary/spec.md).
 - [x] Default access policy: static/shell configuration selects provider; generated routes are
   visible through `ResourceAccessSummary`.
 - [x] Default access policy: configure, show, update/disable, preserve resource access projection.
