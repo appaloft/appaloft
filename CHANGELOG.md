@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/appaloft/appaloft/compare/v0.12.0...v0.12.1) (2026-05-13)
+
+
+### Bug Fixes
+
+* **runtime:** avoid blocking process probes ([a39ec26](https://github.com/appaloft/appaloft/commit/a39ec26d565f0e963fca80eaacd9f83eee8c8db3))
+
 ## [0.12.0](https://github.com/appaloft/appaloft/compare/v0.10.0...v0.12.0) (2026-05-13)
 
 
