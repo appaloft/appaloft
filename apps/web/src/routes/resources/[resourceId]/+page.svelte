@@ -62,6 +62,7 @@
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import ResourceProfileSummary from "$lib/components/console/ResourceProfileSummary.svelte";
+  import RuntimeMonitorPanel from "$lib/components/console/RuntimeMonitorPanel.svelte";
   import RuntimeUsagePanel from "$lib/components/console/RuntimeUsagePanel.svelte";
   import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
@@ -114,6 +115,7 @@
     | "deployments"
     | "scheduled-tasks"
     | "source-events"
+    | "monitor"
     | "logs"
     | "terminal";
   type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
@@ -159,6 +161,7 @@
     "deployments",
     "scheduled-tasks",
     "source-events",
+    "monitor",
     "logs",
     "terminal",
   ] as const;
@@ -2511,6 +2514,8 @@
         return $t(i18nKeys.console.resources.scheduledTasksTab);
       case "source-events":
         return $t(i18nKeys.console.resources.sourceEventsTab);
+      case "monitor":
+        return $t(i18nKeys.console.runtimeUsage.monitorTab);
       case "logs":
         return $t(i18nKeys.console.resources.logsTab);
       case "settings":
@@ -6224,6 +6229,17 @@
               {/if}
             </div>
           </div>
+        </Tabs.Content>
+
+        <Tabs.Content value="monitor" class="mt-0">
+          <RuntimeMonitorPanel
+            usage={resourceRuntimeUsage}
+            loading={resourceRuntimeUsageQuery.isPending}
+            error={resourceRuntimeUsageError}
+            logsHref={resourceTabHref("logs")}
+            eventsHref={resourceTabHref("deployments")}
+            diagnosticsHref={resourceSettingsSectionHref("diagnostics")}
+          />
         </Tabs.Content>
 
         <Tabs.Content value="logs" class="mt-0">

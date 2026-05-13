@@ -34,7 +34,7 @@
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
-  import RuntimeUsagePanel from "$lib/components/console/RuntimeUsagePanel.svelte";
+  import RuntimeMonitorPanel from "$lib/components/console/RuntimeMonitorPanel.svelte";
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -53,6 +53,7 @@
   const serverId = $derived(page.params.serverId ?? "");
   type ServerDetailTab =
     | "overview"
+    | "monitor"
     | "connectivity"
     | "credentials"
     | "proxy-access"
@@ -61,6 +62,7 @@
     | "danger";
   const serverDetailTabs = [
     "overview",
+    "monitor",
     "connectivity",
     "credentials",
     "proxy-access",
@@ -517,6 +519,8 @@
         return $t(i18nKeys.console.servers.dangerZoneTab);
       case "deployments":
         return $t(i18nKeys.common.domain.deployments);
+      case "monitor":
+        return $t(i18nKeys.console.runtimeUsage.monitorTab);
       case "overview":
         return $t(i18nKeys.console.servers.overviewTab);
       case "proxy-access":
@@ -701,10 +705,14 @@
           </div>
         {/if}
 
-        <RuntimeUsagePanel
+          </Tabs.Content>
+
+          <Tabs.Content value="monitor" class="mt-0">
+        <RuntimeMonitorPanel
           usage={serverRuntimeUsage}
           loading={serverRuntimeUsageQuery.isPending}
           error={serverRuntimeUsageError}
+          eventsHref={serverTabHref("deployments")}
         />
           </Tabs.Content>
 

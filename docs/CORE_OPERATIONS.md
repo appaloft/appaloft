@@ -190,6 +190,23 @@ Implemented operations:
   are returned; retained runtime identity metadata can add runtime ids when present. The query must
   not prune, repair, stop/start/restart workloads, deploy, enforce quota, persist samples, or mutate
   Appaloft records. Retained samples and rollup read models remain governed follow-up slices.
+
+Future runtime monitoring operations:
+
+| Capability | Kind | Operation Key | Current state |
+| --- | --- | --- | --- |
+| List runtime monitoring samples | Query | `runtime-monitoring.samples.list` | Future Spec/Test-First/Code Round after retained sample store and retention policy are accepted. |
+| Read runtime monitoring rollups | Query | `runtime-monitoring.rollup` | Future Spec/Test-First/Code Round after rollup query contract and chart DTOs are accepted. |
+| Configure runtime monitoring thresholds | Command | `runtime-monitoring-thresholds.configure` | Future Spec/Test-First/Code Round; thresholds are non-enforcing observation policy only. |
+| Show runtime monitoring thresholds | Query | `runtime-monitoring-thresholds.show` | Future Spec/Test-First/Code Round; readback only, no runtime enforcement. |
+
+- Runtime monitoring is governed by
+  [ADR-063: Runtime Monitoring Observation Boundary](./decisions/ADR-063-runtime-monitoring-observation-boundary.md)
+  and [Runtime Monitoring Observation Boundary](./specs/069-runtime-monitoring-observation-boundary/spec.md).
+  It may add bounded samples, rollups, charts, deployment markers, log/event/diagnostic links, and
+  non-enforcing threshold state. It must not become Prometheus-compatible storage, arbitrary metric
+  ingestion, APM/tracing, dashboard building, alert routing, billing analytics, quota, runtime
+  sizing, cleanup, or enforcement.
 - `servers.capacity.prune` is a runtime target maintenance mutation. It dry-runs by default,
   requires a cutoff, and may delete only safe target-owned stopped containers or materialized
   workspace candidates whose ownership, age, active-runtime, and rollback-safety evidence passes.
@@ -576,6 +593,7 @@ Current boundary:
   Storage attachments are Resource profile state for future deployment snapshot materialization;
   storage commands must not create deployments, mutate historical snapshots, apply live runtime
   mounts, provision provider-native volumes, or perform backup/restore.
+
 - `.env` import is an operation-local parser for pasted content. It rejects malformed or unsafe
   variable keys, classifies secret-like keys as runtime secrets by default, rejects build-time
   secret exposure, uses last pasted duplicate wins, and reports duplicate/existing override
