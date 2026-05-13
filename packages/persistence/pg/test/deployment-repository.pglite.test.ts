@@ -401,6 +401,30 @@ describe("pglite deployment repository", () => {
       rollbackCandidateDeploymentId: "dep_prev",
     });
 
+    await database.db
+      .updateTable("deployments")
+      .set({
+        logs: [
+          {
+            timestamp: "2026-01-01T00:00:04.000Z",
+            source: "yundu",
+            phase: "deploy",
+            level: "info",
+            message: "legacy provider log",
+          },
+        ],
+      })
+      .where("id", "=", "dep_active")
+      .execute();
+
+    const legacySummary = await deploymentReadModel.findOne(
+      context,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_active")),
+    );
+    expect(legacySummary?.logs[0]?.source).toBe("appaloft");
+    const legacyLogs = await deploymentReadModel.findLogs(context, "dep_active");
+    expect(legacyLogs[0]?.source).toBe("appaloft");
+
     await database.close();
   });
 
