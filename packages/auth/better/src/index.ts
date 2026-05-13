@@ -330,6 +330,32 @@ export class BetterAuthRuntime implements AuthRuntime {
     return socialProviders;
   }
 
+  private async firstVisibleOrganizationId(headers: Headers): Promise<string | undefined> {
+    const organizations = await this.auth.api.listOrganizations({ headers });
+    return toArray(organizations)
+      .map(
+        (organization) =>
+          readString(organization, "id") ?? readString(organization, "organizationId"),
+      )
+      .find((organizationId) => Boolean(organizationId));
+  }
+
+  private async firstAuthorizedOrganizationRole(
+    headers: Headers,
+  ): Promise<{ organizationId: string; role: ProductOrganizationRole } | null> {
+    const organizationId = await this.firstVisibleOrganizationId(headers);
+    if (!organizationId) {
+      return null;
+    }
+
+    const activeRole = await this.auth.api.getActiveMemberRole({
+      headers,
+      query: { organizationId },
+    });
+    const role = normalizeProductOrganizationRole(readString(activeRole, "role"));
+    return role ? { organizationId, role } : null;
+  }
+
   async authorizeProductSession(
     _context: ExecutionContext,
     input: ProductSessionAuthorizationInput,
@@ -355,8 +381,10 @@ export class BetterAuthRuntime implements AuthRuntime {
         return err(productAuthInvalid(input, "session-user-missing"));
       }
 
-      const organizationId =
+      const activeOrganizationId =
         input.organizationId ?? readString(sessionObject, "activeOrganizationId");
+      const organizationId =
+        activeOrganizationId ?? (await this.firstVisibleOrganizationId(headers));
       if (!organizationId) {
         return err(productAuthForbidden(input, "active-organization-missing"));
       }
@@ -367,7 +395,15 @@ export class BetterAuthRuntime implements AuthRuntime {
           organizationId,
         },
       });
-      const role = normalizeProductOrganizationRole(readString(activeRole, "role"));
+      let resolvedOrganizationId = organizationId;
+      let role = normalizeProductOrganizationRole(readString(activeRole, "role"));
+      if (!role && !input.organizationId) {
+        const fallback = await this.firstAuthorizedOrganizationRole(headers);
+        if (fallback) {
+          resolvedOrganizationId = fallback.organizationId;
+          role = fallback.role;
+        }
+      }
       if (!role) {
         return err(productAuthForbidden(input, "organization-member-missing"));
       }
@@ -383,7 +419,7 @@ export class BetterAuthRuntime implements AuthRuntime {
           ...(email ? { label: email } : {}),
         },
         ...(email ? { email } : {}),
-        organizationId,
+        organizationId: resolvedOrganizationId,
         role,
         userId,
       });
@@ -456,7 +492,7 @@ export class BetterAuthRuntime implements AuthRuntime {
 
       const organizations = await this.auth.api.listOrganizations({ headers });
       const organizationSummaries = toArray(organizations).map(mapContextOrganization);
-      const activeOrganizationId =
+      let activeOrganizationId =
         readString(sessionObject, "activeOrganizationId") ??
         organizationSummaries[0]?.organizationId;
       if (!activeOrganizationId) {
@@ -467,7 +503,15 @@ export class BetterAuthRuntime implements AuthRuntime {
         headers,
         query: { organizationId: activeOrganizationId },
       });
-      const currentRole = normalizeOrganizationTeamRole(readString(activeRole, "role"));
+      let currentRole = normalizeOrganizationTeamRole(readString(activeRole, "role"));
+      if (!currentRole && organizationSummaries[0]?.organizationId) {
+        activeOrganizationId = organizationSummaries[0].organizationId;
+        const fallbackRole = await this.auth.api.getActiveMemberRole({
+          headers,
+          query: { organizationId: activeOrganizationId },
+        });
+        currentRole = normalizeOrganizationTeamRole(readString(fallbackRole, "role"));
+      }
       if (!currentRole) {
         return err(productAuthForbidden(authInput, "organization-member-missing"));
       }
@@ -978,6 +1022,9 @@ function normalizeProductOrganizationRole(
     return "admin";
   }
   if (roles.includes("member")) {
+    return "member";
+  }
+  if (roles.includes("billing") || roles.includes("developer") || roles.includes("viewer")) {
     return "member";
   }
   return null;
