@@ -77,6 +77,10 @@ function sourceCommitShaFromRuntimePlan(runtimePlan: SerializedRuntimePlan): str
   );
 }
 
+function deploymentLogSource(source: unknown): "appaloft" | "application" {
+  return source === "application" ? "application" : "appaloft";
+}
+
 function toDeploymentSummary(
   row: Selectable<Database["deployments"]>,
 ): Awaited<ReturnType<DeploymentReadModel["list"]>>[number] {
@@ -250,7 +254,7 @@ function toDeploymentSummary(
     })),
     logs: logs.map((entry) => ({
       timestamp: entry.timestamp,
-      source: entry.source ?? "appaloft",
+      source: deploymentLogSource(entry.source),
       phase: entry.phase,
       level: entry.level,
       message: entry.message,
@@ -343,7 +347,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
           .executeTakeFirst();
         return ((row?.logs ?? []) as unknown as SerializedDeploymentLog[]).map((entry) => ({
           timestamp: entry.timestamp,
-          source: entry.source ?? "appaloft",
+          source: deploymentLogSource(entry.source),
           phase: entry.phase,
           level: entry.level,
           message: entry.message,
