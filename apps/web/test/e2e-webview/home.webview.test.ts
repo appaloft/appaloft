@@ -588,6 +588,12 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         { status: 401 },
       );
     },
+    "/api/auth/sign-out": () => {
+      selfHostedAuthE2eSignedIn = false;
+      return {
+        success: true,
+      };
+    },
     "/api/rpc/projects/list": {
       json: {
         items: [
@@ -1921,6 +1927,33 @@ async function clickButtonByAnyText(
   expect(found).toBe(true);
 }
 
+async function clickButtonByAnyAriaLabel(
+  view: Bun.WebView,
+  labels: [string, ...string[]],
+): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const labels = ${JSON.stringify(labels)};
+          const button = Array.from(document.querySelectorAll("button")).find((candidate) =>
+            labels.includes(candidate.getAttribute("aria-label") ?? "")
+          );
+          if (!(button instanceof HTMLButtonElement)) {
+            return false;
+          }
+
+          button.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected a button with one of aria-labels: ${labels.join(" | ")}`,
+  );
+
+  expect(found).toBe(true);
+}
+
 async function clickLinkByHref(view: Bun.WebView, hrefFragment: string): Promise<void> {
   const found = await waitFor(
     () =>
@@ -2100,6 +2133,27 @@ describe("console e2e with Bun.WebView", () => {
           serverId: "srv_demo",
         }),
       );
+    } finally {
+      resetSelfHostedAuthE2eState();
+    }
+  }, 45_000);
+
+  test("[SELF-HOSTED-AUTH-WEB-001] signs out from the console shell", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    resetSelfHostedAuthE2eState();
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/`);
+
+      await expectText(view, "Admin User");
+      await clickButtonByAnyAriaLabel(view, ["Sign out", "退出登录"]);
+      await expectLocation(view, "/login");
+
+      const signOutRequest = await waitForRecordedRequest("/api/auth/sign-out");
+      expect(signOutRequest.method).toBe("POST");
+      expect(signOutRequest.body).toBeNull();
     } finally {
       resetSelfHostedAuthE2eState();
     }
