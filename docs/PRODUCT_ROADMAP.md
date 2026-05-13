@@ -42,7 +42,8 @@ Version plan:
 - [x] `0.10.x` is the Phase 8 hardening line: installer/auth fixes, release packaging fixes, and
   backwards-compatible corrections only.
 - [x] `0.11.0` is Phase 9: Operator/Internal State Closure And Interface Parity.
-- [ ] `1.0.0-rc` is the GA release-candidate gate after Phase 9, not a separate feature phase.
+- [ ] `0.12.0` is Runtime Usage Attribution And Monitoring.
+- [ ] `1.0.0-rc` is the GA release-candidate gate after `0.12.0`, not a separate feature phase.
 - [ ] `1.0.0` is GA.
 - [x] Post-`1.0.0` tracks do not reserve `0.x` versions. If maintainers deliberately pull a
   post-`1.0.0` track before GA, first retarget this roadmap by adding or replacing an explicit
@@ -1874,8 +1875,9 @@ Release rule:
   are checked, except for the accepted deferred SSH smoke evidence gap recorded in this phase. If
   any other Phase 9 item remains unchecked, release a `0.10.x` patch or an explicitly requested
   prerelease instead.
-- [x] Do not select `1.0.0-rc` directly for Phase 9 work. The release-candidate line starts only
-  after Phase 9 has shipped or has been explicitly retargeted as complete.
+- [x] Do not select `1.0.0-rc` directly for Phase 9 work. The `0.12.0` runtime usage attribution
+  line starts only after Phase 9 has shipped or has been explicitly retargeted as complete, and the
+  release-candidate line starts only after `0.12.0` is complete or explicitly deferred.
 
 Already done:
 - [x] System provider/plugin/doctor/db status/db migrate baseline exists.
@@ -2141,15 +2143,50 @@ Exit criteria:
   release-preparation environment has no SSH target server, so no
   `dist/release/ssh-smoke-evidence.json` evidence file has been captured for `0.11.0`.
 
+## 0.12.0 Runtime Usage Attribution And Monitoring
+
+Target: `0.12.0`.
+
+Release rule:
+- [ ] Select `0.12.0` only after Phase 9 has shipped or has been explicitly retargeted as
+  complete, and only when the runtime usage attribution ADR/spec/test gates for the selected
+  `0.12.0` slice are complete.
+- [ ] Do not use `0.12.0` to silently accept runtime sizing, quotas, or enforcement. CPU, memory,
+  replicas, restart policy, rollout overlap/drain, quota, and destructive maintenance behavior
+  still require their own accepted ADR/spec/test coverage before implementation.
+- [ ] Do not select `1.0.0-rc` directly while required `0.12.0` items remain unchecked, unless
+  maintainers explicitly defer this track back to post-GA and record the deferral here.
+
+Governing planning document:
+- [Runtime Usage Attribution And Monitoring](./specs/068-runtime-usage-attribution-and-monitoring/spec.md)
+
+Required:
+- [ ] Add ADR for runtime usage attribution operation/read-model boundaries.
+- [ ] Add runtime usage test matrix with `RT-USAGE-*` rows.
+- [ ] Implement read-only `runtime-usage.inspect` for server, project, environment, resource, and
+  deployment scopes, using safe Appaloft ownership evidence and no mutation.
+- [ ] Prove the `0.12.0` slice answers objective operator questions about current attribution,
+  capacity pressure, disk ownership classes, current deployment/runtime context, and next
+  diagnostic action without adding dashboard-only metrics.
+- [ ] Expose the accepted query through CLI and HTTP/oRPC shared schemas; Web readback is included
+  only after query DTOs and i18n keys exist.
+- [ ] Preserve existing rejection for unsupported CPU/memory/replicas/runtime sizing config fields.
+
+Deferred unless explicitly pulled into `0.12.0`:
+- [ ] Bounded runtime usage sample retention and rollup queries for charts.
+- [ ] Non-enforcing usage thresholds, warning/critical state, and operator visibility.
+- [ ] Runtime sizing, quotas, or enforcement.
+
 ## 1.0.0 Release Candidate
 
 Target: `1.0.0-rc`.
 
 Release rule:
-- [ ] Select `1.0.0-rc` only after Phase 9 is complete, no unchecked Phase 9 release blocker
+- [ ] Select `1.0.0-rc` only after `0.12.0` is complete or explicitly deferred, no unchecked
+  pre-rc release blocker
   remains, and the candidate is being used for GA hardening rather than new feature scope.
 - [ ] If release-candidate verification finds feature gaps, return the gap to the owning roadmap
-  phase or release a `0.11.x` patch instead of expanding `1.0.0-rc` scope.
+  phase or release a `0.12.x` patch instead of expanding `1.0.0-rc` scope.
 
 Required:
 - [ ] Re-run the full `1.0.0 Definition Of Done` against current implementation, specs, operation
@@ -2279,6 +2316,9 @@ work below before GA.
 - [x] Runtime artifact/instance: internal snapshot and resource/deployment diagnostic context.
 - [ ] Runtime artifact/instance: capacity diagnostics, cleanup/prune, preview artifact cleanup, and
   rollback-candidate retention.
+- [ ] Runtime usage: read-only attribution and monitoring for server, project, environment,
+  resource, and deployment scopes. Governed by
+  [Runtime Usage Attribution And Monitoring](./specs/068-runtime-usage-attribution-and-monitoring/spec.md).
 - [x] Default access policy: static/shell configuration selects provider; generated routes are
   visible through `ResourceAccessSummary`.
 - [x] Default access policy: configure, show, update/disable, preserve resource access projection.
