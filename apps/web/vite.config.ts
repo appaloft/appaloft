@@ -108,14 +108,12 @@ async function bootstrapRequired(proxyTarget: string, req: IncomingMessage): Pro
 }
 
 function createFirstAdminBootstrapGatePlugin(proxyTarget: string): Plugin {
-  let bootstrapCompleted = false;
-
   const handle = async (
     req: IncomingMessage,
     res: ServerResponse,
     next: (error?: unknown) => void,
   ) => {
-    if (bootstrapCompleted || !shouldGateFirstAdminBootstrapNavigation(req)) {
+    if (!shouldGateFirstAdminBootstrapNavigation(req)) {
       next();
       return;
     }
@@ -126,8 +124,6 @@ function createFirstAdminBootstrapGatePlugin(proxyTarget: string): Plugin {
         redirectToFirstAdminBootstrap(res);
         return;
       }
-
-      bootstrapCompleted = true;
     } catch {
       // Keep Vite usable when the backend is not running yet.
     }
