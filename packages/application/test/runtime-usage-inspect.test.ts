@@ -544,6 +544,7 @@ describe("runtime-usage.inspect query", () => {
         mode: "current",
         includeArtifacts: true,
         includeWarnings: true,
+        collectionProfile: "attribution",
       },
     ]);
     const output = result._unsafeUnwrap();
@@ -651,6 +652,7 @@ describe("runtime-usage.inspect query", () => {
         mode: "current",
         includeArtifacts: true,
         includeWarnings: true,
+        collectionProfile: "attribution",
       },
     ]);
     const output = result._unsafeUnwrap();
