@@ -181,6 +181,8 @@ import { deleteStorageVolumeCommandInputSchema } from "./operations/storage-volu
 import { listStorageVolumesQueryInputSchema } from "./operations/storage-volumes/list-storage-volumes.query";
 import { renameStorageVolumeCommandInputSchema } from "./operations/storage-volumes/rename-storage-volume.command";
 import { showStorageVolumeQueryInputSchema } from "./operations/storage-volumes/show-storage-volume.query";
+import { applyInstanceUpgradeCommandInputSchema } from "./operations/system/apply-instance-upgrade.command";
+import { checkInstanceUpgradeQueryInputSchema } from "./operations/system/check-instance-upgrade.query";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
 import { closeTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/close-terminal-session.command";
 import { expireTerminalSessionsCommandInputSchema } from "./operations/terminal-sessions/expire-terminal-sessions.command";
@@ -2905,6 +2907,34 @@ export const operationCatalog = [
     serviceToken: tokens.doctorQueryService,
     transports: {
       cli: "appaloft doctor",
+    },
+  },
+  {
+    key: "system.instance-upgrade.check",
+    kind: "query",
+    domain: "system",
+    messageName: "CheckInstanceUpgradeQuery",
+    handlerName: "CheckInstanceUpgradeQueryHandler",
+    serviceName: "CheckInstanceUpgradeQueryService",
+    inputSchema: checkInstanceUpgradeQueryInputSchema,
+    serviceToken: tokens.checkInstanceUpgradeQueryService,
+    transports: {
+      cli: "appaloft upgrade check",
+      orpc: { method: "GET", path: "/api/instance-upgrade/check" },
+    },
+  },
+  {
+    key: "system.instance-upgrade.apply",
+    kind: "command",
+    domain: "system",
+    messageName: "ApplyInstanceUpgradeCommand",
+    handlerName: "ApplyInstanceUpgradeCommandHandler",
+    serviceName: "ApplyInstanceUpgradeUseCase",
+    inputSchema: applyInstanceUpgradeCommandInputSchema,
+    serviceToken: tokens.applyInstanceUpgradeUseCase,
+    transports: {
+      cli: "appaloft upgrade apply",
+      orpc: { method: "POST", path: "/api/instance-upgrade/apply" },
     },
   },
   {

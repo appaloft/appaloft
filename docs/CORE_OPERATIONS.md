@@ -1451,6 +1451,8 @@ Implemented operations:
 | List plugins | Query | `system.plugins.list` | `ListPluginsQuery` | none | `appaloft plugins list` | `GET /api/plugins` |
 | List GitHub repositories | Query | `system.github-repositories.list` | `ListGitHubRepositoriesQuery` | `ListGitHubRepositoriesQueryInput` | none yet | `GET /api/integrations/github/repositories` |
 | Doctor diagnostics | Query | `system.doctor` | `DoctorQuery` | none | `appaloft doctor` | none |
+| Check instance upgrade | Query | `system.instance-upgrade.check` | `CheckInstanceUpgradeQuery` | `CheckInstanceUpgradeQueryInput` | `appaloft upgrade check` | `GET /api/instance-upgrade/check` |
+| Apply instance upgrade | Command | `system.instance-upgrade.apply` | `ApplyInstanceUpgradeCommand` | `ApplyInstanceUpgradeCommandInput` | `appaloft upgrade apply --confirm` | `POST /api/instance-upgrade/apply` |
 | Database status | Query | `system.db-status` | `DbStatusQuery` | none | `appaloft db status` | none |
 | Database migrate | Command | `system.db-migrate` | `DbMigrateCommand` | none | `appaloft db migrate` | none |
 
@@ -1458,6 +1460,11 @@ Current boundary:
 - provider and plugin list operations are read-only diagnostics; they expose stable capability
   flags, optional capability details, and safe configuration diagnostics for operators and future
   tools
+- instance upgrade check is read-only and may return an SSH command even when the Web console cannot
+  execute the upgrade directly
+- instance upgrade apply requires explicit confirmation and a host-side process with
+  `APPALOFT_INSTANCE_UPGRADE_APPLY_ENABLED=1`; standard containerized self-hosting keeps direct Web
+  mutation disabled by default
 - provider and plugin list operations must not expose provider SDK types, raw SDK payloads, plugin
   implementation internals, access tokens, private keys, secret references, certificate material, or
   unredacted command output

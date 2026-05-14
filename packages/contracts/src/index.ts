@@ -35,6 +35,38 @@ export const versionResponseSchema = z.object({
     .optional(),
 });
 
+export const instanceUpgradeCheckStatusSchema = z.enum(["available", "current", "unknown"]);
+
+export const instanceUpgradeCheckResponseSchema = z.object({
+  schemaVersion: z.literal("system.instance-upgrade.check/v1"),
+  currentVersion: z.string(),
+  targetVersion: z.string(),
+  latestVersion: z.string().nullable(),
+  updateAvailable: z.boolean(),
+  checkedAt: z.string(),
+  checkStatus: instanceUpgradeCheckStatusSchema,
+  releaseNotesUrl: z.string().optional(),
+  upgradeCommand: z.string(),
+  applySupported: z.boolean(),
+  applyUnsupportedReason: z.string().optional(),
+});
+
+export const applyInstanceUpgradeInputSchema = z.object({
+  targetVersion: z.string().optional(),
+  confirm: z.literal(true),
+});
+
+export const instanceUpgradeApplyResponseSchema = z.object({
+  schemaVersion: z.literal("system.instance-upgrade.apply/v1"),
+  targetVersion: z.string(),
+  startedAt: z.string(),
+  completedAt: z.string(),
+  exitCode: z.number(),
+  command: z.array(z.string()),
+  stdoutTail: z.string(),
+  stderrTail: z.string(),
+});
+
 export const authProviderStatusSchema = z.object({
   key: z.enum(["github", "google", "oidc"]),
   title: z.string(),
@@ -5151,6 +5183,10 @@ export const consoleOverviewResponseSchema = z.object({
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export type ReadinessResponse = z.infer<typeof readinessResponseSchema>;
 export type VersionResponse = z.infer<typeof versionResponseSchema>;
+export type InstanceUpgradeCheckStatus = z.infer<typeof instanceUpgradeCheckStatusSchema>;
+export type InstanceUpgradeCheckResponse = z.infer<typeof instanceUpgradeCheckResponseSchema>;
+export type ApplyInstanceUpgradeInput = z.infer<typeof applyInstanceUpgradeInputSchema>;
+export type InstanceUpgradeApplyResponse = z.infer<typeof instanceUpgradeApplyResponseSchema>;
 export type ConsoleOverviewResponse = z.infer<typeof consoleOverviewResponseSchema>;
 export type AuthProviderStatus = z.infer<typeof authProviderStatusSchema>;
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>;

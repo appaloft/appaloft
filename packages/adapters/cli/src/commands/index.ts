@@ -27,6 +27,7 @@ import { sourceEventCommand } from "./source-event.js";
 import { sourceLinksCommand } from "./source-link.js";
 import { storageCommand } from "./storage.js";
 import { terminalSessionCommand } from "./terminal-session.js";
+import { upgradeCommand } from "./upgrade.js";
 
 export const mainCommand = EffectCommand.make("appaloft").pipe(
   EffectCommand.withDescription("AI Native local-to-cloud deployment platform"),
@@ -63,6 +64,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     remoteStateCommand,
     operatorWorkCommand,
     terminalSessionCommand,
+    upgradeCommand,
     pluginsCommand,
     providersCommand,
   ]),

@@ -347,6 +347,8 @@ flowchart TD
 | List plugins | Query | `system.plugins.list` | Plugin registry | Exposes plugin capabilities, compatibility, and safe configuration diagnostics without leaking plugin internals or secrets. | [Core Operations](./CORE_OPERATIONS.md), [Plugins](./PLUGINS.md), [System Diagnostics Test Matrix](./testing/system-diagnostics-test-matrix.md) |
 | List GitHub repositories | Query | `system.github-repositories.list` | Integration read adapter | Lets source selection choose GitHub repositories. | [Core Operations](./CORE_OPERATIONS.md) |
 | Doctor diagnostics | Query | `system.doctor` | Application/system diagnostics | Diagnoses local installation health. | [Core Operations](./CORE_OPERATIONS.md) |
+| Check instance upgrade | Query | `system.instance-upgrade.check` | Application/system diagnostics | Reads current, target, and latest Appaloft version metadata and returns the SSH installer command without mutating the host. | [Core Operations](./CORE_OPERATIONS.md), [Self-Hosting Upgrades](../apps/docs/src/content/docs/self-hosting/upgrades.md) |
+| Apply instance upgrade | Command | `system.instance-upgrade.apply` | Application/system operation | Runs the self-hosted installer for an explicit target version only when host-side upgrade execution is enabled and confirmed. | [Core Operations](./CORE_OPERATIONS.md), [Self-Hosting Upgrades](../apps/docs/src/content/docs/self-hosting/upgrades.md) |
 | Database status | Query | `system.db-status` | Persistence/system diagnostics | Observes database migration state. | [Core Operations](./CORE_OPERATIONS.md) |
 | Database migrate | Command | `system.db-migrate` | Persistence/system operation | Applies schema migration. | [Core Operations](./CORE_OPERATIONS.md) |
 

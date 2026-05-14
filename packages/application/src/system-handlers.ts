@@ -1,3 +1,5 @@
+export * from "./operations/system/apply-instance-upgrade.handler";
+export * from "./operations/system/check-instance-upgrade.handler";
 export * from "./operations/system/db-migrate.handler";
 export * from "./operations/system/db-status.handler";
 export * from "./operations/system/doctor.handler";
