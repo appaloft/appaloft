@@ -449,6 +449,7 @@ export class FakeDependencyResourceBackupProvider implements DependencyResourceB
   readonly restores: DependencyResourceRestoreProviderInput[] = [];
   private supported = new Set([
     "appaloft-managed-postgres:postgres",
+    "appaloft-managed-redis:redis",
     "external-postgres:postgres",
     "external-redis:redis",
   ]);

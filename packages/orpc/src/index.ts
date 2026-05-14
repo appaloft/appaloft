@@ -1006,7 +1006,7 @@ export const apiRouteDescriptions = {
     "storage.volume-lifecycle",
   ),
   provisionPostgresDependencyResource: routeDescription(
-    "Records provider-neutral Appaloft-managed Postgres dependency resource intent without creating provider-native database infrastructure.",
+    "Creates an Appaloft-managed Postgres dependency resource; when serverId is supplied, realizes Docker-backed database infrastructure on that single-server target.",
     "dependency.resource-lifecycle",
   ),
   importPostgresDependencyResource: routeDescription(
@@ -1014,7 +1014,7 @@ export const apiRouteDescriptions = {
     "dependency.resource-lifecycle",
   ),
   provisionRedisDependencyResource: routeDescription(
-    "Records provider-neutral Appaloft-managed Redis dependency resource intent without creating provider-native Redis infrastructure.",
+    "Creates an Appaloft-managed Redis dependency resource; when serverId is supplied, realizes Docker-backed Redis infrastructure on that single-server target.",
     "dependency.resource-lifecycle",
   ),
   importRedisDependencyResource: routeDescription(

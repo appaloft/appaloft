@@ -3,7 +3,8 @@
 ## Status
 
 - Round: Code Round
-- Artifact state: implemented with hermetic provider capability
+- Artifact state: implemented with Docker-backed managed Postgres/Redis shell capability and
+  hermetic external/fallback capability
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, additive dependency resource lifecycle commands and read
   models
@@ -19,6 +20,9 @@ This closes the first backup/restore gap in the Phase 7 dependency-resource loop
 Postgres and Redis dependency resources with provider capability support. It does not restart
 workloads, redeploy Resources, perform deployment rollback, schedule recurring backups, or delete
 backup artifacts.
+For Docker-backed Appaloft-managed Postgres/Redis, backup and restore execute against the
+single-server target encoded by the safe provider resource handle and resolve raw connection values
+only through `DependencyResourceSecretStore`.
 
 ## Discover Findings
 
@@ -36,6 +40,9 @@ backup artifacts.
    attempts are in progress, or while provider retention metadata requires preservation.
 6. Provider-specific backup APIs remain behind application/provider ports. Core stores only value
    objects and safe provider artifact handles.
+7. Docker-backed managed resources use provider artifact handles, not raw dump paths, in read
+   models. The shell provider derives the target-local artifact path from the safe handle during
+   restore.
 
 ## Ubiquitous Language
 
@@ -62,7 +69,9 @@ backup artifacts.
 | DEP-RES-BACKUP-008 | Surface restore failure | Provider restore fails after admission | The restore result is applied | Restore attempt status becomes `failed`, sanitized failure metadata is visible, original restore command remains accepted, and `dependency-resource-restore-failed` is emitted. |
 | DEP-RES-BACKUP-009 | Block unsafe restore | Restore point is missing, failed, deleted, belongs to another dependency resource, target is deleted/degraded, acknowledgements are missing, or provider capability is absent | `dependency-resources.restore-backup` is called | Admission returns structured blocked/not-found/unsupported error and does not start provider restore. |
 | DEP-RES-BACKUP-010 | Block delete while backups require retention | Dependency resource has retained ready backup or in-flight backup/restore attempt | `dependency-resources.delete` is called | Delete returns `dependency_resource_delete_blocked`, reports backup blocker metadata, and does not call provider delete. |
-| DEP-RES-BACKUP-011 | Entrypoint contract is explicit | CLI/oRPC/HTTP expose backup/restore after Code Round | Operation catalog and transports are inspected | Commands/queries dispatch explicit messages, reuse application schemas, and expose no provider SDK shape, raw dump, or raw secret field. |
+| DEP-RES-BACKUP-011 | Backup Docker-backed managed Postgres/Redis | Ready Appaloft-managed Docker-backed Postgres or Redis has a safe provider handle and resolvable connection secret | `dependency-resources.create-backup` is admitted | Shell provider executes `pg_dump` or Redis `SAVE`/`docker cp` on the owning single-server target, returns a safe provider artifact handle, and exposes no raw dump path or secret in read models. |
+| DEP-RES-BACKUP-012 | Restore Docker-backed managed Postgres/Redis | Ready restore point belongs to the Docker-backed managed dependency resource and acknowledgements are supplied | `dependency-resources.restore-backup` is admitted | Shell provider resolves the same single-server target from the provider handle and restores the target-local artifact in place without restarting Appaloft workloads or rewriting deployment snapshots. |
+| DEP-RES-BACKUP-013 | Entrypoint contract is explicit | CLI/oRPC/HTTP expose backup/restore after Code Round | Operation catalog and transports are inspected | Commands/queries dispatch explicit messages, reuse application schemas, and expose no provider SDK shape, raw dump, or raw secret field. |
 
 ## Domain Ownership
 
@@ -92,11 +101,13 @@ backup artifacts.
   - `appaloft dependency backup list <dependencyResourceId>`
   - `appaloft dependency backup show <backupId>`
   - `appaloft dependency backup restore <backupId>`
-- Web/UI: migration gap; no Web console affordance in this Code Round.
+- Web/UI: `/dependency-resources` lists dependency resources and exposes create backup, select
+  ready restore point, acknowledged restore, and safe delete actions without showing raw dumps or
+  raw connection secrets.
 - Events: add provider-safe lifecycle event specs for backup requested/completed/failed and restore
   requested/completed/failed.
-- Public docs/help: migration gap; CLI and HTTP descriptions point at the existing dependency
-  resource lifecycle help section until a Docs Round adds task-oriented public docs.
+- Public docs/help: CLI, HTTP descriptions, and the Web page point at the existing dependency
+  resource lifecycle help section.
 - Future MCP/tools: one operation per command/query over the same application schemas.
 
 ## Output Contracts
@@ -149,7 +160,8 @@ operation, phase, attempt id, blocker code, and sanitized provider failure metad
 
 - Code stores the latest restore attempt inside `DependencyResourceBackup` and persists it as safe
   JSON metadata in the backup repository.
-- Provider backup/restore execution is synchronous through a hermetic shell/test provider port in
-  this slice. Durable outbox/process retry remains a platform migration gap.
-- The first provider implementation supports Appaloft-managed Postgres and imported external
-  Postgres/Redis metadata. Provider-native Redis realization remains a separate Phase 7 gap.
+- Provider backup/restore execution is synchronous through the shell provider port in this slice.
+  Durable outbox/process retry remains a platform migration gap.
+- The first provider implementation supports Appaloft-managed Docker-backed Postgres/Redis and
+  imported external Postgres/Redis metadata/fallback handles. Scheduled policy, pruning, export,
+  and cross-resource restore remain open.

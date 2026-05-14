@@ -3,8 +3,9 @@
 ## Status
 
 - Round: Code Round
-- Artifact state: application realization, bind admission, and provider cleanup implemented;
-  persistence/contract/runtime verification follow-ups remain open
+- Artifact state: application realization, Docker-backed single-server shell capability, bind
+  admission, provider cleanup, runtime secret materialization, and verification coverage
+  implemented
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, semantic upgrade to managed Redis lifecycle
 - Decision state: no-ADR-needed; this reuses ADR-025, ADR-026, ADR-036, ADR-040, and ADR-041
@@ -20,7 +21,9 @@ resource only through explicit safety and provider cleanup rules.
 
 This closes the managed Redis realization gap left by the provider-neutral Redis baseline. It does
 not add provider-native Redis credential rotation, scheduled backup policies, runtime cleanup, or
-new dependency-specific fields on `deployments.create`.
+new dependency-specific fields on `deployments.create`. The default shell composition can realize
+Redis as a Docker container and named volume on a registered `local-shell` or `generic-ssh`
+single-server target when the command supplies `serverId`.
 
 ## Discover Findings
 
@@ -33,8 +36,9 @@ new dependency-specific fields on `deployments.create`.
    provider-native realization exists. Code Round should change only the managed-ready branch.
 4. ADR-041 requires Appaloft-owned connection values produced by provider realization to be stored
    behind safe dependency secret refs before runtime injection can be ready.
-5. Backup/restore is generic by dependency kind through provider capability checks. Managed Redis
-   can participate once ready and supported by the injected backup provider.
+5. Backup/restore is generic by dependency kind through provider capability checks. Docker-backed
+   managed Redis participates through the same provider handle and Appaloft-owned connection secret
+   used for runtime injection.
 
 ## Ubiquitous Language
 
@@ -58,7 +62,8 @@ new dependency-specific fields on `deployments.create`.
 | DEP-RES-REDIS-NATIVE-006 | Delete managed realized Redis safely | Realized managed Redis has no binding, backup, snapshot/reference, or provider blockers | `dependency-resources.delete` is called | Provider delete is requested/applied, process-attempt cleanup visibility is recorded, Appaloft tombstones the record only after cleanup state is durable, and no runtime state or deployment snapshot is mutated. |
 | DEP-RES-REDIS-NATIVE-007 | Block managed Redis delete while protected | Redis has active binding, backup retention, retained snapshot/reference, or provider unsafe blocker | `dependency-resources.delete` is called | Returns `dependency_resource_delete_blocked`, no provider cleanup is requested. |
 | DEP-RES-REDIS-NATIVE-008 | Provider unsupported | Selected provider lacks managed Redis realization | `dependency-resources.provision-redis` is called | Admission returns `provider_capability_unsupported`, `phase = dependency-resource-realization-admission`, and no resource is persisted unless a later spec adds explicit metadata-only mode. |
-| DEP-RES-REDIS-NATIVE-009 | Entrypoint contract remains stable | CLI/oRPC/HTTP call provision/delete/bind operations | Operation catalog and transports are inspected | Existing command/query schemas are reused or explicitly extended; no provider SDK shape or raw secret field leaks into transport contracts. |
+| DEP-RES-REDIS-NATIVE-009 | Realize on a single-server Docker target | Active project/environment, active `local-shell` or `generic-ssh` single-server target, and default managed Redis provider | `dependency-resources.provision-redis` includes `serverId` | Shell provider creates/replaces a Docker container, named Docker volume, and `appaloft-edge` network attachment; returns a safe Docker provider handle, masked endpoint, and raw Redis URL for Appaloft-owned secret storage. |
+| DEP-RES-REDIS-NATIVE-010 | Entrypoint contract remains stable | CLI/oRPC/HTTP call provision/delete/bind operations | Operation catalog and transports are inspected | Existing command/query schemas are reused or explicitly extended; no provider SDK shape or raw secret field leaks into transport contracts. |
 
 ## Domain Ownership
 
@@ -83,14 +88,17 @@ new dependency-specific fields on `deployments.create`.
 - API/oRPC: keep `POST /api/dependency-resources/redis/provision`,
   `POST /api/resources/{resourceId}/dependency-bindings`, and
   `DELETE /api/dependency-resources/{dependencyResourceId}` as the public operations.
-- CLI: keep `appaloft dependency redis provision`, `appaloft resource dependency bind`, and
+- CLI: keep `appaloft dependency redis provision`; add optional `--server <serverId>` for the
+  Docker-backed single-server target; keep `appaloft resource dependency bind` and
   `appaloft dependency delete`.
-- Web/UI: migration gap unless a Docs/Web round adds managed Redis affordances in the Code Round.
+- Web/UI: `/dependency-resources` can create Docker-backed managed Redis on a selected
+  single-server target and expose safe backup/restore/delete actions through existing HTTP/oRPC
+  contracts.
 - Config: no repository config fields.
 - Events: reuse provider-safe dependency realization lifecycle events. Consumers resolve kind from
   the dependency resource id/read model unless a Code Round explicitly extends the event payload.
-- Public docs/help: update the dependency resource public help anchor during Code Round or record a
-  user-visible migration gap.
+- Public docs/help: the Web page and CLI/API descriptions continue to point at the stable
+  dependency resource lifecycle help anchor.
 - Future MCP/tools: reuse the existing one-operation-per-command catalog entries.
 
 ## Output Contracts
@@ -143,6 +151,6 @@ attempt id, and sanitized provider error classification.
 - Whether the first Code Round uses the same generic managed provider port as Postgres or a
   Redis-specific sibling port is an implementation choice, but the application boundary must remain
   provider-SDK-free.
-- Concrete provider package support may begin with a hermetic fake provider; real cloud provider
-  onboarding and smoke tests can remain release enablement work if the safe capability contract is
-  implemented and tested.
+- The shell provider keeps a hermetic fallback when no `serverId` is supplied so existing local
+  development flows remain stable. Durable outbox/process ownership remains a platform migration
+  gap.

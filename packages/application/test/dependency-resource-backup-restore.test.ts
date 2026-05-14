@@ -30,6 +30,7 @@ import {
   MemoryDependencyResourceRepository,
   MemoryEnvironmentRepository,
   MemoryProjectRepository,
+  MemoryServerRepository,
   NoopLogger,
   SequenceIdGenerator,
 } from "@appaloft/testkit";
@@ -85,6 +86,7 @@ async function createHarness() {
   const backups = new MemoryDependencyResourceBackupRepository();
   const backupReadModel = new MemoryDependencyResourceBackupReadModel(backups);
   const dependencyResourceSecretStore = new FakeDependencyResourceSecretStore();
+  const servers = new MemoryServerRepository();
   const deleteSafetyReader = new MemoryDependencyResourceDeleteSafetyReader(undefined, backups);
   const eventBus = new CapturedEventBus();
   const managedPostgresProvider = new FakeManagedPostgresProvider();
@@ -122,6 +124,7 @@ async function createHarness() {
       dependencyResources,
       backups,
       backupProvider,
+      dependencyResourceSecretStore,
       clock,
       idGenerator,
       eventBus,
@@ -144,6 +147,7 @@ async function createHarness() {
     provisionPostgres: new ProvisionPostgresDependencyResourceUseCase(
       projects,
       environments,
+      servers,
       dependencyResources,
       dependencyResourceSecretStore,
       clock,
@@ -158,6 +162,7 @@ async function createHarness() {
       dependencyResources,
       backups,
       backupProvider,
+      dependencyResourceSecretStore,
       clock,
       idGenerator,
       eventBus,
