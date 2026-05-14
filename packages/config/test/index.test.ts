@@ -377,6 +377,11 @@ describe("resolveConfig", () => {
       intervalSeconds: 3600,
       batchSize: 25,
     });
+    expect(config.scheduledDependencyBackupRunner).toEqual({
+      enabled: false,
+      intervalSeconds: 3600,
+      batchSize: 25,
+    });
     expect(config.scheduledHistoryRetentionRunner).toEqual({
       enabled: false,
       intervalSeconds: 3600,
@@ -462,6 +467,22 @@ describe("resolveConfig", () => {
       enabled: true,
       intervalSeconds: 120,
       batchSize: 6,
+    });
+  });
+
+  test("[DEP-RES-BACKUP-POLICY-003] allows configuring the scheduled dependency backup runner through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_ENABLED: "true",
+        APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_INTERVAL_SECONDS: "240",
+        APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_BATCH_SIZE: "8",
+      },
+    });
+
+    expect(config.scheduledDependencyBackupRunner).toEqual({
+      enabled: true,
+      intervalSeconds: 240,
+      batchSize: 8,
     });
   });
 

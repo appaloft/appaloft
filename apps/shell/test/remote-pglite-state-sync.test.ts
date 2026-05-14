@@ -79,6 +79,11 @@ function testConfig(
       intervalSeconds: 3600,
       batchSize: 25,
     },
+    scheduledDependencyBackupRunner: {
+      enabled: false,
+      intervalSeconds: 3600,
+      batchSize: 25,
+    },
     scheduledHistoryRetentionRunner: {
       enabled: false,
       intervalSeconds: 3600,

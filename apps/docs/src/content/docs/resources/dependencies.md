@@ -112,6 +112,16 @@ appaloft dependency backup restore bkp_123
 恢复不会修改 ResourceBindings、deployment rollback/redeploy 状态、运行时进程或历史 deployment snapshot。
 如果有保留中的 backup 或 in-flight restore，dependency delete 必须被阻塞。
 
+Scheduled backup policy 是显式启用的策略记录。除非 self-hosted shell 启用了 scheduled dependency
+backup runner，否则策略不会执行。到期策略会调度和手动备份相同的
+`dependency-resources.create-backup` 操作，并记录安全的 process attempt 元数据供 operator 审查。
+
+```bash title="配置定时依赖备份"
+appaloft dependency backup policy configure dep_db --retention-days 7 --interval-hours 24
+appaloft dependency backup policy list dep_db
+appaloft dependency backup policy show dbp_123
+```
+
 <h2 id="dependency-delete-safety">删除安全</h2>
 
 删除 dependency resource 前，Appaloft 会检查活动 binding、backup retention、deployment snapshot

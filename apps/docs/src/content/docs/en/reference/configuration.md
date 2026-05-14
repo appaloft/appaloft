@@ -38,5 +38,8 @@ that should own the recurring work.
 | `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_ENABLED` | `false` | Runs scheduled runtime capacity prune policies. |
 | `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_INTERVAL_SECONDS` | `3600` | Poll interval for runtime capacity prune. |
 | `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_BATCH_SIZE` | `25` | Maximum runtime prune policies scanned per tick. |
+| `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_ENABLED` | `false` | Runs scheduled dependency backup policies. |
+| `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_INTERVAL_SECONDS` | `3600` | Poll interval for dependency backup policies. |
+| `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_BATCH_SIZE` | `25` | Maximum dependency backup policies scanned per tick. |
 | `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED` | `false` | Runs retention defaults through existing history prune commands. |
 | `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS` | `3600` | Poll interval for scheduled history retention. |

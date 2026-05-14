@@ -24,6 +24,8 @@ export * from "./operations/default-access-domain-policies/list-default-access-d
 export * from "./operations/default-access-domain-policies/show-default-access-domain-policy.query-service";
 export * from "./operations/dependency-resources/create-dependency-resource-backup.use-case";
 export * from "./operations/dependency-resources/delete-dependency-resource.use-case";
+export * from "./operations/dependency-resources/dependency-resource-backup-policy.types";
+export * from "./operations/dependency-resources/dependency-resource-scheduled-backup.service";
 export * from "./operations/dependency-resources/import-postgres-dependency-resource.use-case";
 export * from "./operations/dependency-resources/import-redis-dependency-resource.use-case";
 export * from "./operations/dependency-resources/list-dependency-resource-backups.query-service";

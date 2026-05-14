@@ -1,7 +1,9 @@
+export * from "./operations/dependency-resources/configure-dependency-resource-backup-policy.command";
 export * from "./operations/dependency-resources/create-dependency-resource-backup.command";
 export * from "./operations/dependency-resources/delete-dependency-resource.command";
 export * from "./operations/dependency-resources/import-postgres-dependency-resource.command";
 export * from "./operations/dependency-resources/import-redis-dependency-resource.command";
+export * from "./operations/dependency-resources/list-dependency-resource-backup-policies.query";
 export * from "./operations/dependency-resources/list-dependency-resource-backups.query";
 export * from "./operations/dependency-resources/list-dependency-resources.query";
 export * from "./operations/dependency-resources/provision-postgres-dependency-resource.command";
@@ -10,3 +12,4 @@ export * from "./operations/dependency-resources/rename-dependency-resource.comm
 export * from "./operations/dependency-resources/restore-dependency-resource-backup.command";
 export * from "./operations/dependency-resources/show-dependency-resource.query";
 export * from "./operations/dependency-resources/show-dependency-resource-backup.query";
+export * from "./operations/dependency-resources/show-dependency-resource-backup-policy.query";

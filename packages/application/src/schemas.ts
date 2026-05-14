@@ -17,10 +17,12 @@ export * from "./operations/certificates/show-certificate.schema";
 export * from "./operations/default-access-domain-policies/configure-default-access-domain-policy.schema";
 export * from "./operations/default-access-domain-policies/list-default-access-domain-policies.schema";
 export * from "./operations/default-access-domain-policies/show-default-access-domain-policy.schema";
+export * from "./operations/dependency-resources/configure-dependency-resource-backup-policy.command";
 export * from "./operations/dependency-resources/create-dependency-resource-backup.schema";
 export * from "./operations/dependency-resources/delete-dependency-resource.schema";
 export * from "./operations/dependency-resources/import-postgres-dependency-resource.schema";
 export * from "./operations/dependency-resources/import-redis-dependency-resource.schema";
+export * from "./operations/dependency-resources/list-dependency-resource-backup-policies.query";
 export * from "./operations/dependency-resources/list-dependency-resource-backups.schema";
 export * from "./operations/dependency-resources/list-dependency-resources.schema";
 export * from "./operations/dependency-resources/provision-postgres-dependency-resource.schema";
@@ -29,6 +31,7 @@ export * from "./operations/dependency-resources/rename-dependency-resource.sche
 export * from "./operations/dependency-resources/restore-dependency-resource-backup.schema";
 export * from "./operations/dependency-resources/show-dependency-resource.schema";
 export * from "./operations/dependency-resources/show-dependency-resource-backup.schema";
+export * from "./operations/dependency-resources/show-dependency-resource-backup-policy.query";
 export {
   type CreateDeployTokenCommandInput,
   createDeployTokenCommandInputSchema,
