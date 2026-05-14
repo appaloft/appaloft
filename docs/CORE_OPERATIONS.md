@@ -948,6 +948,9 @@ Current boundary:
   Appaloft project/environment/resource/server/destination/source-fingerprint context headers are
   supplied; repository or installation mapping remains future control-plane work. Managed domain
   lifecycle and scheduler leases remain future control-plane work.
+  Compatibility preview Resources that live in preview-kind Environments are omitted from default
+  `resources.list` results and may be deleted through explicit operator confirmation without
+  treating retained preview deployment/audit rows as product Resource blockers.
 
 Product-grade preview policy operations:
 

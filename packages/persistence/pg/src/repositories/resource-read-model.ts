@@ -232,6 +232,7 @@ export class PgResourceReadModel implements ResourceReadModel {
     input?: {
       projectId?: string;
       environmentId?: string;
+      includePreviewResources?: boolean;
     },
   ) {
     const executor = resolveRepositoryExecutor(this.db, context);
@@ -248,6 +249,14 @@ export class PgResourceReadModel implements ResourceReadModel {
           .selectAll()
           .where("lifecycle_status", "!=", "deleted")
           .orderBy("created_at", "desc");
+
+        if (!input?.includePreviewResources) {
+          query = query.where(
+            "environment_id",
+            "not in",
+            executor.selectFrom("environments").select("id").where("kind", "=", "preview"),
+          );
+        }
 
         if (input?.projectId) {
           query = query.where("project_id", "=", input.projectId);

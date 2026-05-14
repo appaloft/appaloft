@@ -1241,6 +1241,64 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
+  test("[PG-PREVIEW-ENV-001D] preview environment resources bypass retained-state delete blockers", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-preview-delete-blockers-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    const context = createRepositoryContext();
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgResourceDeletionBlockerReader } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "preview_delete_blocker", {
+        environmentKind: "preview",
+        environmentName: "preview",
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:01:00.000Z",
+      });
+      await insertDeploymentSnapshot(database.db, target, {
+        id: "dep_preview_delete_blocker",
+        createdAt: "2026-01-01T00:02:00.000Z",
+        routeSource: "generated-default",
+        hostname: "delete-blocker.preview.example.test",
+        sourceFingerprint: "source-fingerprint:v1:preview%3Apr%3A404",
+      });
+      await database.db
+        .insertInto("audit_logs")
+        .values({
+          id: "audit_preview_delete_blocker",
+          aggregate_id: target.resourceId,
+          event_type: "resource-archived",
+          payload: {
+            resourceId: target.resourceId,
+          },
+          created_at: "2026-01-01T00:03:00.000Z",
+        })
+        .execute();
+
+      const reader = new PgResourceDeletionBlockerReader(database.db);
+      const result = await reader.findBlockers(context, {
+        resourceId: target.resourceId,
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap()).toEqual([]);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("[SOURCE-LINK-STATE-015] pg source link store persists and reads mappings", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-source-links-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
@@ -2548,6 +2606,7 @@ describe("pglite persistence integration", () => {
 
       const cleaned = await listResourcesQueryService.execute(context, {
         projectId: target.projectId,
+        includePreviewResources: true,
       });
       const cleanedResource = cleaned.items.find((item) => item.id === target.resourceId);
       expect(cleanedResource?.deploymentCount).toBe(1);
@@ -2571,6 +2630,7 @@ describe("pglite persistence integration", () => {
 
       const active = await listResourcesQueryService.execute(context, {
         projectId: target.projectId,
+        includePreviewResources: true,
       });
       const activeResource = active.items.find((item) => item.id === target.resourceId);
       expect(activeResource?.accessSummary?.latestGeneratedAccessRoute).toMatchObject({
@@ -2578,6 +2638,56 @@ describe("pglite persistence integration", () => {
         deploymentId: "dep_cleaned_preview",
       });
       expect(activeResource?.accessSummary?.proxyRouteStatus).toBe("ready");
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[PG-PREVIEW-ENV-001C] pglite omits preview environment resources from default resource lists", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-preview-resource-list-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgResourceReadModel } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const productionTarget = await seedSourceLinkContext(database.db, "default_list_prod");
+      const previewTarget = await seedSourceLinkContext(database.db, "default_list_preview", {
+        environmentKind: "preview",
+        environmentName: "preview",
+      });
+      const context = createTestExecutionContext();
+      const listResourcesQueryService = new ListResourcesQueryService(
+        new PgResourceReadModel(database.db),
+        new EmptyDestinationRepository(),
+        new EmptyServerRepository(),
+        new DisabledDefaultAccessDomainProvider(),
+      );
+
+      const defaultList = await listResourcesQueryService.execute(context);
+      const previewProjectDefaultList = await listResourcesQueryService.execute(context, {
+        projectId: previewTarget.projectId,
+      });
+      const previewProjectIncludedList = await listResourcesQueryService.execute(context, {
+        projectId: previewTarget.projectId,
+        includePreviewResources: true,
+      });
+
+      expect(defaultList.items.map((item) => item.id)).toContain(productionTarget.resourceId);
+      expect(defaultList.items.map((item) => item.id)).not.toContain(previewTarget.resourceId);
+      expect(previewProjectDefaultList.items).toEqual([]);
+      expect(previewProjectIncludedList.items.map((item) => item.id)).toEqual([
+        previewTarget.resourceId,
+      ]);
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });
