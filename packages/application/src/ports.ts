@@ -7225,3 +7225,38 @@ export interface DiagnosticsPort {
     executed: string[];
   }>;
 }
+
+export type InstanceUpgradeCheckStatus = "available" | "current" | "unknown";
+
+export interface InstanceUpgradeCheckResult {
+  schemaVersion: "system.instance-upgrade.check/v1";
+  currentVersion: string;
+  targetVersion: string;
+  latestVersion: string | null;
+  updateAvailable: boolean;
+  checkedAt: string;
+  checkStatus: InstanceUpgradeCheckStatus;
+  releaseNotesUrl?: string;
+  upgradeCommand: string;
+  applySupported: boolean;
+  applyUnsupportedReason?: string;
+}
+
+export interface InstanceUpgradeApplyResult {
+  schemaVersion: "system.instance-upgrade.apply/v1";
+  targetVersion: string;
+  startedAt: string;
+  completedAt: string;
+  exitCode: number;
+  command: string[];
+  stdoutTail: string;
+  stderrTail: string;
+}
+
+export interface InstanceUpgradePort {
+  check(input: { targetVersion?: string }): Promise<Result<InstanceUpgradeCheckResult>>;
+  apply(input: {
+    targetVersion?: string;
+    confirm: boolean;
+  }): Promise<Result<InstanceUpgradeApplyResult>>;
+}

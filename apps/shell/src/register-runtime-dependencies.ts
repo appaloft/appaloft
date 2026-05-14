@@ -194,6 +194,7 @@ import {
 } from "./default-access-domain-policy-runtime";
 import { ShellDeploymentContextDefaultsPolicy } from "./deployment-context-defaults-policy";
 import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
+import { SelfHostedInstanceUpgradePort } from "./self-hosted-instance-upgrade";
 import { SshMutationCoordinator } from "./ssh-mutation-coordinator";
 
 class SystemClock implements Clock {
@@ -1508,6 +1509,9 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       () => new PgDiagnostics(input.database.db, input.migrator, input.database.descriptor),
     ),
+  });
+  container.register(tokens.instanceUpgrade, {
+    useFactory: instanceCachingFactory(() => new SelfHostedInstanceUpgradePort(input.config)),
   });
   container.register(tokens.mutationCoordinator, {
     useFactory: instanceCachingFactory((dependencyContainer) => {

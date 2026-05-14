@@ -1,6 +1,8 @@
 import {
   ApplyActionPreviewRouteCommandHandler,
   ApplyActionPreviewRouteUseCase,
+  ApplyInstanceUpgradeCommandHandler,
+  ApplyInstanceUpgradeUseCase,
   ArchiveEnvironmentCommandHandler,
   ArchiveEnvironmentUseCase,
   ArchiveProjectCommandHandler,
@@ -29,6 +31,8 @@ import {
   ChangeOrganizationMemberRoleUseCase,
   CheckDomainBindingDeleteSafetyQueryHandler,
   CheckDomainBindingDeleteSafetyQueryService,
+  CheckInstanceUpgradeQueryHandler,
+  CheckInstanceUpgradeQueryService,
   CheckServerDeleteSafetyQueryHandler,
   CheckServerDeleteSafetyQueryService,
   CleanupPreviewCommandHandler,
@@ -529,6 +533,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(LockEnvironmentCommandHandler);
   container.registerSingleton(UnlockEnvironmentCommandHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
+  container.registerSingleton(CheckInstanceUpgradeQueryHandler);
+  container.registerSingleton(ApplyInstanceUpgradeCommandHandler);
   container.registerSingleton(CheckDomainBindingDeleteSafetyQueryHandler);
   container.registerSingleton(CheckServerDeleteSafetyQueryHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
@@ -1209,4 +1215,9 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.doctorQueryService, DoctorQueryService);
   container.registerSingleton(tokens.dbStatusQueryService, DbStatusQueryService);
   container.registerSingleton(tokens.dbMigrateUseCase, DbMigrateUseCase);
+  container.registerSingleton(
+    tokens.checkInstanceUpgradeQueryService,
+    CheckInstanceUpgradeQueryService,
+  );
+  container.registerSingleton(tokens.applyInstanceUpgradeUseCase, ApplyInstanceUpgradeUseCase);
 }

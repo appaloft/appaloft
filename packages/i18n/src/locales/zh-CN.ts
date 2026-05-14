@@ -393,7 +393,13 @@ export const zhCN = {
       actionControlPlaneTitle: "GitHub Actions",
       actionControlPlaneBody:
         "仓库选择 control-plane-mode: self-hosted 时，把这个 origin 作为 control-plane-url。",
+      applyUnsupported: "当前进程没有启用宿主侧更新执行器；请使用下面的命令在 SSH 中更新。",
+      applyUpgrade: "立即更新",
+      applyingUpgrade: "正在更新",
+      checkForUpdates: "检查更新",
+      checkingForUpdates: "正在检查",
       currentOriginLabel: "当前 console origin",
+      currentVersionLabel: "当前版本",
       directInstallBody: "没有域名时，Appaloft 会通过服务器 IP 和直连 console 端口访问。",
       directInstallTitle: "使用 IP 直连安装",
       domainInstallBody:
@@ -401,6 +407,7 @@ export const zhCN = {
       domainInstallTitle: "使用 console 域名安装",
       domainRouteBadge: "托管 Traefik route",
       fallbackRouteBadge: "直连端口 fallback",
+      latestVersionLabel: "最新版本",
       pageDescription: "这个 instance 的 bootstrap proxy、域名和 Action 连接指引",
       pageTitle: "Instance",
       proxyTitle: "托管代理",
@@ -408,6 +415,15 @@ export const zhCN = {
       rerunBody:
         "要修改 console 域名，使用新域名重新运行安装器；操作是幂等的，会保留已有数据库卷。",
       rerunTitle: "修改 console 域名",
+      targetVersionLabel: "目标版本",
+      unknownUpdateBadge: "无法确认",
+      updateAvailableBadge: "有可用更新",
+      updatesBody: "检查当前 instance 版本，并在支持宿主执行器时直接触发安装器更新。",
+      updatesTitle: "Appaloft 更新",
+      upgradeCommandTitle: "SSH 更新命令",
+      upgradeFailedTitle: "更新失败",
+      upgradeSucceededTitle: "更新已完成",
+      upToDateBadge: "已是最新",
     },
     nav: {
       deploy: "新部署",
