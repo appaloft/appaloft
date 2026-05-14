@@ -15,6 +15,23 @@ type RecordedApiRequest = {
   pathname: string;
   body: unknown;
 };
+type DependencyResourceFixtureKind = "postgres" | "redis";
+
+const dependencyResourceFixtureKinds: Record<
+  DependencyResourceFixtureKind,
+  {
+    port: number;
+    databaseName?: string;
+  }
+> = {
+  postgres: {
+    port: 5432,
+    databaseName: "appaloft",
+  },
+  redis: {
+    port: 6379,
+  },
+};
 
 const selfHostedAuthE2eGeneratedPassword = "generated-local-admin-password";
 let selfHostedAuthE2eAdminCreated = true;
@@ -420,6 +437,7 @@ function serverDetailFixture(
       host: "127.0.0.1",
       port: 22,
       providerKey: "generic-ssh",
+      targetKind: "single-server",
       lifecycleStatus: "active",
       edgeProxy: {
         kind: input.edgeProxyKind ?? "traefik",
@@ -478,6 +496,76 @@ function serverDetailFixture(
       },
     },
     generatedAt: "2026-01-01T00:00:02.000Z",
+  };
+}
+
+function dependencyResourceFixture(input: {
+  id: string;
+  name: string;
+  kind: DependencyResourceFixtureKind;
+  maskedConnection: string;
+  host: string;
+  providerResourceHandle: string;
+}) {
+  const kindDefinition = dependencyResourceFixtureKinds[input.kind];
+  return {
+    id: input.id,
+    projectId: "prj_demo",
+    environmentId: "env_demo",
+    name: input.name,
+    slug: input.name,
+    kind: input.kind,
+    sourceMode: "appaloft-managed",
+    providerKey: `appaloft-managed-${input.kind}`,
+    providerManaged: true,
+    lifecycleStatus: "ready",
+    connection: {
+      host: input.host,
+      port: kindDefinition.port,
+      ...(kindDefinition.databaseName ? { databaseName: kindDefinition.databaseName } : {}),
+      maskedConnection: input.maskedConnection,
+      secretRef: `secret://dependency-resources/${input.id}/connection`,
+    },
+    providerRealization: {
+      status: "ready",
+      attemptId: `attempt_${input.id}`,
+      attemptedAt: "2026-01-01T00:00:00.000Z",
+      providerResourceHandle: input.providerResourceHandle,
+      realizedAt: "2026-01-01T00:00:02.000Z",
+    },
+    bindingReadiness: {
+      status: "ready",
+    },
+    backupRelationship: {
+      retentionRequired: true,
+      reason: "required before restore drills",
+    },
+    deleteSafety: {
+      blockers: [],
+    },
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+function dependencyResourceBackupFixture(input: {
+  id: string;
+  dependencyResourceId: string;
+  dependencyKind: DependencyResourceFixtureKind;
+}) {
+  return {
+    id: input.id,
+    dependencyResourceId: input.dependencyResourceId,
+    projectId: "prj_demo",
+    environmentId: "env_demo",
+    dependencyKind: input.dependencyKind,
+    providerKey: `appaloft-managed-${input.dependencyKind}`,
+    status: "ready",
+    attemptId: `attempt_${input.id}`,
+    requestedAt: "2026-01-01T00:00:03.000Z",
+    completedAt: "2026-01-01T00:00:04.000Z",
+    retentionStatus: "retained",
+    providerArtifactHandle: `backup://${input.id}`,
+    createdAt: "2026-01-01T00:00:03.000Z",
   };
 }
 
@@ -646,6 +734,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             host: "127.0.0.1",
             port: 22,
             providerKey: "generic-ssh",
+            targetKind: "single-server",
             lifecycleStatus: "active",
             createdAt: "2026-01-01T00:00:00.000Z",
           },
@@ -805,6 +894,88 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
           },
         ],
       },
+    },
+    "/api/rpc/dependencyResources/list": {
+      json: {
+        schemaVersion: "dependency-resources.list/v1",
+        items: [
+          dependencyResourceFixture({
+            id: "dres_pg",
+            name: "primary-postgres",
+            kind: "postgres",
+            host: "primary-postgres",
+            maskedConnection: "postgresql://appaloft:****@primary-postgres:5432/appaloft",
+            providerResourceHandle: "appaloft-postgres-dres_pg",
+          }),
+          dependencyResourceFixture({
+            id: "dres_redis",
+            name: "cache-redis",
+            kind: "redis",
+            host: "cache-redis",
+            maskedConnection: "redis://:****@cache-redis:6379/0",
+            providerResourceHandle: "appaloft-redis-dres_redis",
+          }),
+        ],
+        generatedAt: "2026-01-01T00:00:05.000Z",
+      },
+    },
+    "/api/rpc/dependencyResources/provisionPostgres": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { name?: string } | null;
+      return {
+        json: {
+          id: `dres_${input?.name ?? "postgres"}`,
+        },
+      };
+    },
+    "/api/rpc/dependencyResources/provisionRedis": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { name?: string } | null;
+      return {
+        json: {
+          id: `dres_${input?.name ?? "redis"}`,
+        },
+      };
+    },
+    "/api/rpc/dependencyResources/createBackup": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { dependencyResourceId?: string } | null;
+      return {
+        json: {
+          id: `bak_${input?.dependencyResourceId ?? "dependency"}`,
+        },
+      };
+    },
+    "/api/rpc/dependencyResources/listBackups": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { dependencyResourceId?: string } | null;
+      const dependencyResourceId = input?.dependencyResourceId ?? "dres_pg";
+      const dependencyKind = dependencyResourceId === "dres_redis" ? "redis" : "postgres";
+      return {
+        json: {
+          schemaVersion: "dependency-resources.backups.list/v1",
+          items: [
+            dependencyResourceBackupFixture({
+              id: `bak_${dependencyResourceId}`,
+              dependencyResourceId,
+              dependencyKind,
+            }),
+          ],
+          generatedAt: "2026-01-01T00:00:06.000Z",
+        },
+      };
+    },
+    "/api/rpc/dependencyResources/restoreBackup": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { backupId?: string } | null;
+      return {
+        json: {
+          id: input?.backupId ?? "bak_dres_pg",
+        },
+      };
+    },
+    "/api/rpc/dependencyResources/delete": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { dependencyResourceId?: string } | null;
+      return {
+        json: {
+          id: input?.dependencyResourceId ?? "dres_pg",
+        },
+      };
     },
     "/api/rpc/resources/show": {
       json: {
@@ -1498,6 +1669,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             host: "127.0.0.1",
             port: 22,
             providerKey: "generic-ssh",
+            targetKind: "single-server",
             lifecycleStatus: "active",
             createdAt: "2026-01-01T00:00:00.000Z",
           },
@@ -1954,6 +2126,29 @@ async function clickButtonByAnyAriaLabel(
   expect(found).toBe(true);
 }
 
+async function clickElementBySelector(view: Bun.WebView, selector: string): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const element = document.querySelector(${JSON.stringify(selector)});
+          if (!(element instanceof HTMLButtonElement || element instanceof HTMLAnchorElement)) {
+            return false;
+          }
+          if (element instanceof HTMLButtonElement && element.disabled) {
+            return false;
+          }
+          element.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected clickable element: ${selector}`,
+  );
+
+  expect(found).toBe(true);
+}
+
 async function clickLinkByHref(view: Bun.WebView, hrefFragment: string): Promise<void> {
   const found = await waitFor(
     () =>
@@ -1993,6 +2188,32 @@ async function setInputValue(view: Bun.WebView, selector: string, value: string)
       ),
     Boolean,
     `Expected input: ${selector}`,
+  );
+
+  expect(found).toBe(true);
+}
+
+async function setCheckboxChecked(
+  view: Bun.WebView,
+  selector: string,
+  checked: boolean,
+): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const input = document.querySelector(${JSON.stringify(selector)});
+          if (!(input instanceof HTMLInputElement) || input.type !== "checkbox") {
+            return false;
+          }
+          input.checked = ${JSON.stringify(checked)};
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected checkbox: ${selector}`,
   );
 
   expect(found).toBe(true);
@@ -2080,6 +2301,72 @@ describe("console e2e with Bun.WebView", () => {
       "GitHub OAuth is not configured on the backend.",
       "后端尚未配置 GitHub OAuth",
     ]);
+  }, 45_000);
+
+  test("[DEP-RES-WEB-001] manages Docker-backed dependency resources from the console", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/dependency-resources`);
+
+    await expectAnyText(view, ["Dependency resources", "依赖资源"]);
+    await expectText(view, "primary-postgres");
+    await expectText(view, "cache-redis");
+    await expectText(view, "appaloft-postgres-dres_pg");
+    await expectText(view, "postgresql://appaloft:****@primary-postgres:5432/appaloft");
+
+    await setInputValue(view, "#dependency-resource-name-input", "reporting-db");
+    await setCheckboxChecked(view, "#dependency-resource-backup-retention-input", true);
+    await setInputValue(
+      view,
+      "#dependency-resource-backup-retention-reason-input",
+      "before migration",
+    );
+    await clickFormSubmit(view, "#dependency-resource-create-form");
+
+    const provisionRequest = await waitForRecordedRequest(
+      "/api/rpc/dependencyResources/provisionPostgres",
+    );
+    expect(readOrpcJsonPayload(provisionRequest.body)).toEqual(
+      expect.objectContaining({
+        backupRelationship: {
+          reason: "before migration",
+          retentionRequired: true,
+        },
+        environmentId: "env_demo",
+        name: "reporting-db",
+        projectId: "prj_demo",
+        serverId: "srv_demo",
+      }),
+    );
+    await expectText(view, "dres_reporting-db");
+
+    await clickElementBySelector(view, "#dependency-resource-backup-action-dres_pg");
+    const backupRequest = await waitForRecordedRequest("/api/rpc/dependencyResources/createBackup");
+    expect(readOrpcJsonPayload(backupRequest.body)).toEqual({
+      dependencyResourceId: "dres_pg",
+    });
+
+    await expectText(view, "bak_dres_pg");
+    await setCheckboxChecked(view, "#dependency-resource-restore-data-ack-input", true);
+    await setCheckboxChecked(view, "#dependency-resource-restore-runtime-ack-input", true);
+    await clickButtonByAnyText(view, ["Restore backup", "恢复备份"]);
+
+    const restoreRequest = await waitForRecordedRequest(
+      "/api/rpc/dependencyResources/restoreBackup",
+    );
+    expect(readOrpcJsonPayload(restoreRequest.body)).toEqual({
+      acknowledgeDataOverwrite: true,
+      acknowledgeRuntimeNotRestarted: true,
+      backupId: "bak_dres_pg",
+    });
+
+    await clickElementBySelector(view, "#dependency-resource-delete-action-dres_pg");
+    const deleteRequest = await waitForRecordedRequest("/api/rpc/dependencyResources/delete");
+    expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
+      dependencyResourceId: "dres_pg",
+    });
   }, 45_000);
 
   test("[SELF-HOSTED-AUTH-E2E-001] bootstraps first admin, signs in locally, and deploys from console", async () => {

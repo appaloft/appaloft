@@ -22,6 +22,7 @@ import {
   type ConfigureServerCredentialCommandInput,
   type ConfigureServerEdgeProxyCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
+  type CreateDependencyResourceBackupCommandInput,
   type CreateDeploymentCommandInput,
   type CreateDeployTokenCommandInput,
   type CreateDomainBindingCommandInput,
@@ -32,6 +33,7 @@ import {
   type CreateSshCredentialCommandInput,
   type DeactivateServerCommandInput,
   type DeleteCertificateCommandInput,
+  type DeleteDependencyResourceCommandInput,
   type DeleteDomainBindingCommandInput,
   type DeletePreviewEnvironmentCommandInput,
   type DeleteResourceCommandInput,
@@ -46,12 +48,16 @@ import {
   type GetAuthBootstrapStatusQueryInput,
   type GetCurrentOrganizationContextQueryInput,
   type ImportCertificateCommandInput,
+  type ImportPostgresDependencyResourceCommandInput,
+  type ImportRedisDependencyResourceCommandInput,
   type ImportResourceVariablesCommandInput,
   type InspectRuntimeUsageQueryInput,
   type InviteOrganizationMemberCommandInput,
   type IssueOrRenewCertificateCommandInput,
   type ListCertificatesQueryInput,
   type ListDefaultAccessDomainPoliciesQueryInput,
+  type ListDependencyResourceBackupsQueryInput,
+  type ListDependencyResourcesQueryInput,
   type ListDeploymentsQueryInput,
   type ListDeployTokensQueryInput,
   type ListDomainBindingsQueryInput,
@@ -69,10 +75,13 @@ import {
   type LockEnvironmentCommandInput,
   type OpenTerminalSessionCommandInput,
   type PromoteEnvironmentCommandInput,
+  type ProvisionPostgresDependencyResourceCommandInput,
+  type ProvisionRedisDependencyResourceCommandInput,
   type RedeployDeploymentCommandInput,
   type RegisterServerCommandInput,
   type RelinkSourceLinkCommandInput,
   type RemoveOrganizationMemberCommandInput,
+  type RenameDependencyResourceCommandInput,
   type RenameEnvironmentCommandInput,
   type RenameProjectCommandInput,
   type RenameServerCommandInput,
@@ -83,6 +92,7 @@ import {
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
   type RestartResourceRuntimeCommandInput,
+  type RestoreDependencyResourceBackupCommandInput,
   type RetryCertificateCommandInput,
   type RetryDeploymentCommandInput,
   type RetryDomainBindingVerificationCommandInput,
@@ -97,6 +107,8 @@ import {
   type SetResourceVariableCommandInput,
   type ShowCertificateQueryInput,
   type ShowDefaultAccessDomainPolicyQueryInput,
+  type ShowDependencyResourceBackupQueryInput,
+  type ShowDependencyResourceQueryInput,
   type ShowDeploymentQueryInput,
   type ShowDeployTokenQueryInput,
   type ShowDomainBindingQueryInput,
@@ -158,6 +170,7 @@ import {
   type DeleteScheduledTaskResponse,
   type DeleteServerResponse,
   type DeleteSshCredentialResponse,
+  type DependencyResourceResponse,
   type DeploymentEventStreamEnvelope,
   type DeploymentEventStreamResponse,
   type DeploymentEventStreamStreamResponse,
@@ -175,6 +188,8 @@ import {
   type IssueOrRenewCertificateResponse,
   type ListCertificatesResponse,
   type ListDefaultAccessDomainPoliciesResponse,
+  type ListDependencyResourceBackupsResponse,
+  type ListDependencyResourcesResponse,
   type ListDeploymentsResponse,
   type ListDeployTokensResponse,
   type ListDomainBindingsResponse,
@@ -225,6 +240,8 @@ import {
   type SetResourceVariableResponse,
   type ShowCertificateResponse,
   type ShowDefaultAccessDomainPolicyResponse,
+  type ShowDependencyResourceBackupResponse,
+  type ShowDependencyResourceResponse,
   type ShowDeploymentResponse,
   type ShowDeployTokenResponse,
   type ShowDomainBindingResponse,
@@ -758,6 +775,80 @@ export type AppaloftOrpcClientContract = {
         AppaloftClientError
       >;
     };
+  };
+  dependencyResources: {
+    provisionPostgres: Client<
+      AppaloftClientContext,
+      ProvisionPostgresDependencyResourceCommandInput,
+      DependencyResourceResponse,
+      AppaloftClientError
+    >;
+    importPostgres: Client<
+      AppaloftClientContext,
+      ImportPostgresDependencyResourceCommandInput,
+      DependencyResourceResponse,
+      AppaloftClientError
+    >;
+    provisionRedis: Client<
+      AppaloftClientContext,
+      ProvisionRedisDependencyResourceCommandInput,
+      DependencyResourceResponse,
+      AppaloftClientError
+    >;
+    importRedis: Client<
+      AppaloftClientContext,
+      ImportRedisDependencyResourceCommandInput,
+      DependencyResourceResponse,
+      AppaloftClientError
+    >;
+    list: Client<
+      AppaloftClientContext,
+      ListDependencyResourcesQueryInput,
+      ListDependencyResourcesResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowDependencyResourceQueryInput,
+      ShowDependencyResourceResponse,
+      AppaloftClientError
+    >;
+    rename: Client<
+      AppaloftClientContext,
+      RenameDependencyResourceCommandInput,
+      DependencyResourceResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeleteDependencyResourceCommandInput,
+      DependencyResourceResponse,
+      AppaloftClientError
+    >;
+    createBackup: Client<
+      AppaloftClientContext,
+      CreateDependencyResourceBackupCommandInput,
+      DependencyResourceResponse,
+      AppaloftClientError
+    >;
+    listBackups: Client<
+      AppaloftClientContext,
+      ListDependencyResourceBackupsQueryInput,
+      ListDependencyResourceBackupsResponse,
+      AppaloftClientError
+    >;
+    showBackup: Client<
+      AppaloftClientContext,
+      ShowDependencyResourceBackupQueryInput,
+      ShowDependencyResourceBackupResponse,
+      AppaloftClientError
+    >;
+    restoreBackup: Client<
+      AppaloftClientContext,
+      RestoreDependencyResourceBackupCommandInput,
+      DependencyResourceResponse,
+      AppaloftClientError
+    >;
   };
   scheduledTasks: {
     list: Client<

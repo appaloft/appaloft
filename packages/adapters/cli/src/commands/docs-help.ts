@@ -540,7 +540,7 @@ export const cliCommandDescriptions = {
     "dependency.resource-lifecycle",
   ),
   dependencyPostgresProvision: withDocs(
-    "Create an Appaloft-managed Postgres dependency resource record",
+    "Create an Appaloft-managed Postgres dependency resource; pass --server for Docker-backed single-server realization",
     "dependency.resource-lifecycle",
   ),
   dependencyPostgresImport: withDocs(
@@ -552,7 +552,7 @@ export const cliCommandDescriptions = {
     "dependency.resource-lifecycle",
   ),
   dependencyRedisProvision: withDocs(
-    "Create an Appaloft-managed Redis dependency resource record",
+    "Create an Appaloft-managed Redis dependency resource; pass --server for Docker-backed single-server realization",
     "dependency.resource-lifecycle",
   ),
   dependencyRedisImport: withDocs(

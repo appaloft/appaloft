@@ -24,6 +24,7 @@ const environmentOption = Options.text("environment");
 const optionalProjectOption = Options.text("project").pipe(Options.optional);
 const optionalEnvironmentOption = Options.text("environment").pipe(Options.optional);
 const nameOption = Options.text("name");
+const serverOption = Options.text("server").pipe(Options.optional);
 const providerKeyOption = Options.text("provider-key").pipe(Options.optional);
 const descriptionOption = Options.text("description").pipe(Options.optional);
 const connectionUrlOption = Options.text("connection-url");
@@ -45,6 +46,7 @@ const provisionPostgresCommand = EffectCommand.make(
     project: projectOption,
     environment: environmentOption,
     name: nameOption,
+    server: serverOption,
     providerKey: providerKeyOption,
     description: descriptionOption,
     backupRetentionRequired: backupRetentionOption,
@@ -58,6 +60,7 @@ const provisionPostgresCommand = EffectCommand.make(
     name,
     project,
     providerKey,
+    server,
   }) => {
     const backupReasonValue = optionalValue(backupReason);
     return runCommand(
@@ -65,6 +68,7 @@ const provisionPostgresCommand = EffectCommand.make(
         projectId: project,
         environmentId: environment,
         name,
+        ...(optionalValue(server) ? { serverId: optionalValue(server) } : {}),
         ...(optionalValue(providerKey) ? { providerKey: optionalValue(providerKey) } : {}),
         ...(optionalValue(description) ? { description: optionalValue(description) } : {}),
         ...(backupRetentionRequired || backupReasonValue
@@ -130,6 +134,7 @@ const provisionRedisCommand = EffectCommand.make(
     project: projectOption,
     environment: environmentOption,
     name: nameOption,
+    server: serverOption,
     providerKey: providerKeyOption,
     description: descriptionOption,
     backupRetentionRequired: backupRetentionOption,
@@ -143,6 +148,7 @@ const provisionRedisCommand = EffectCommand.make(
     name,
     project,
     providerKey,
+    server,
   }) => {
     const backupReasonValue = optionalValue(backupReason);
     return runCommand(
@@ -150,6 +156,7 @@ const provisionRedisCommand = EffectCommand.make(
         projectId: project,
         environmentId: environment,
         name,
+        ...(optionalValue(server) ? { serverId: optionalValue(server) } : {}),
         ...(optionalValue(providerKey) ? { providerKey: optionalValue(providerKey) } : {}),
         ...(optionalValue(description) ? { description: optionalValue(description) } : {}),
         ...(backupRetentionRequired || backupReasonValue

@@ -394,10 +394,13 @@ Current boundary:
 - provider-backed dependency resources remain `ResourceInstance`; they are not the same aggregate
   as project resources
 - Postgres dependency resources are `ResourceInstance` records. Appaloft-managed Postgres records
-  now carry provider-native realization state through a hermetic provider capability, imported
+  now carry provider-native realization state through the shell provider capability, imported
   external Postgres delete removes only Appaloft's record, and list/show output masks connection
-  secrets. Provider realization/delete attempts are mirrored into safe operator-work process
-  attempts for visibility and repair.
+  secrets. When provision receives `serverId`, the shell provider creates a Docker-backed Postgres
+  container and named volume on that `local-shell` or `generic-ssh` single-server target, stores the
+  raw connection value through `DependencyResourceSecretStore`, and records only safe provider
+  handle/endpoint metadata. Provider realization/delete attempts are mirrored into safe
+  operator-work process attempts for visibility and repair.
 - Provider-native Postgres realization is implemented through the existing
   `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
   `dependency-resources.delete` boundaries. It is governed by
@@ -407,12 +410,14 @@ Current boundary:
 - Provider-native Redis realization is implemented at the application boundary by
   [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md) for
   the existing `dependency-resources.provision-redis`, `resources.bind-dependency`, and
-  `dependency-resources.delete` boundaries. It uses a hermetic managed Redis provider capability,
-  safe realization state, ready binding admission, unsupported-provider admission rejection, and
-  managed Redis provider cleanup on delete. Persistence/contract/runtime materialization coverage
-  is implemented for safe realization metadata, deployment snapshots, single-server secret
-  resolution, and Swarm secret handle rendering. Provider realization/delete attempts are mirrored
-  into safe operator-work process attempts for visibility and repair.
+  `dependency-resources.delete` boundaries. When provision receives `serverId`, the shell provider
+  creates a Docker-backed Redis container and named volume on that `local-shell` or `generic-ssh`
+  single-server target, stores the raw Redis URL through `DependencyResourceSecretStore`, and
+  records only safe provider handle/endpoint metadata. Safe realization state, ready binding
+  admission, unsupported-provider admission rejection, managed Redis provider cleanup on delete,
+  deployment snapshots, single-server secret resolution, and Swarm secret handle rendering are
+  implemented. Provider realization/delete attempts are mirrored into safe operator-work process
+  attempts for visibility and repair.
 - Resource dependency bindings are provider-neutral `ResourceBinding` records in this slice. Bind
   requires matching project/environment ownership, stores only safe target metadata and secret
   reference pointers, and reports safe deployment snapshot-reference readiness. Unbind removes only
@@ -437,19 +442,26 @@ Current boundary:
   credentials, inject runtime environment variables, schedule redeploy, or rewrite historical
   deployment snapshots.
 - Redis dependency resources are `ResourceInstance` records. Appaloft-managed Redis now carries
-  provider-native realization state through a hermetic provider capability, imported external Redis
+  provider-native realization state through the shell provider capability, imported external Redis
   delete removes only Appaloft's record, list/show output masks Redis connection secrets, and ready
   imported or realized managed Redis records can be bound as safe dependency references. Runtime
-  materialization coverage for managed Redis remains open.
+  materialization coverage for managed Redis is implemented for the single-server and Swarm
+  dependency-secret paths described above.
 - Dependency resource backup/restore is governed by
   [ADR-036](./decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md) and
   [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md).
   The active operations create safe restore points and restore them in place through provider
   capabilities without exposing raw dumps, restarting workloads, redeploying Resources, or rewriting
-  deployment snapshots. Backup and restore provider attempts are also projected into
+  deployment snapshots. Docker-backed managed Postgres/Redis use the safe provider resource handle
+  to resolve the owning single-server target for backup/restore. Backup and restore provider
+  attempts are also projected into
   `operator-work.*` through durable process-attempt rows with safe dependency/provider metadata;
   provider execution still runs inline through the command use cases rather than process-attempt
   atomic claim/completion.
+- The Web console exposes these lifecycle controls at `/dependency-resources`: create
+  Docker-backed Appaloft-managed Postgres/Redis on an active single-server target, list safe
+  realization/connection metadata, create backups, restore ready backup artifacts with explicit
+  overwrite/runtime acknowledgements, and delete unblocked dependency resources.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).
@@ -908,6 +920,15 @@ Current boundary:
   to create a preview-scoped source fingerprint and environment/resource selection outside
   committed config, derive preview runtime naming intent, then dispatch ids-only
   `deployments.create`.
+- This repository dogfoods that path for PR-scoped Web console previews through
+  `.github/workflows/deploy-console-preview.yml`. The workflow deploys the PR source with the
+  repository `Dockerfile` as an application Resource through the CLI to the shared SSH target,
+  serves Web assets and `/api` from the same preview origin, configures preview-scoped auth origin
+  values through trusted environment flags, and uses a backend-preview config fingerprint so it does
+  not drift against earlier static console preview Resources. The workflow also runs legacy static
+  preview cleanup before deploying the backend preview so an older static route cannot keep the same
+  PR hostname. Full operator-owned self-hosted control-plane installation remains owned by
+  `.github/workflows/deploy-console.yml` and `command: install-console`.
 - When preview-specific profile input does not override runtime naming, the default preview runtime
   name seed is `preview-{pr_number}` so effective runtime/container names remain human-recognizable
   while adapters still preserve uniqueness during safe replacement.

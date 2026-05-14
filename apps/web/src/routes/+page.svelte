@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import { Activity, ArrowRight, Database, Rocket } from "@lucide/svelte";
 
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -14,6 +15,7 @@
     projectDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
+  import { orpcClient } from "$lib/orpc";
 
   const { consoleOverviewQuery } = createConsoleQueries(browser, {
     authSession: false,
@@ -29,8 +31,17 @@
     servers: false,
     version: false,
   });
+  const dependencyResourcesQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["dependency-resources", "home"],
+      queryFn: () => orpcClient.dependencyResources.list({}),
+      enabled: browser,
+      staleTime: 5_000,
+    }),
+  );
 
   const overview = $derived(consoleOverviewQuery.data ?? null);
+  const dependencyResourceCount = $derived(dependencyResourcesQuery.data?.items.length ?? 0);
   const projects = $derived(overview?.projects ?? []);
   const servers = $derived(overview?.deploymentTargets ?? []);
   const environments = $derived(overview?.environments ?? []);
@@ -172,6 +183,22 @@
         </div>
       </section>
 
+      <section class="nothing-feature-strip">
+        <div>
+          <p class="nothing-label">{$t(i18nKeys.console.nav.dependencyResources)}</p>
+          <h2>{$t(i18nKeys.console.home.dependencyResourcesTitle)}</h2>
+          <p class="nothing-copy">{$t(i18nKeys.console.home.dependencyResourcesDescription)}</p>
+        </div>
+        <div class="nothing-feature-actions">
+          <strong>{dependencyResourcesQuery.isPending ? "-" : dependencyResourceCount}</strong>
+          <span>{$t(i18nKeys.console.home.dependencyResourcesCount)}</span>
+          <Button href="/dependency-resources" variant="outline" class="nothing-button-secondary">
+            <Database class="size-4" />
+            {$t(i18nKeys.console.home.dependencyResourcesCta)}
+          </Button>
+        </div>
+      </section>
+
       <section class="nothing-metric-grid">
         <a href="/projects" class="nothing-metric-cell">
           <span>{$t(i18nKeys.common.domain.projects)}</span>
@@ -307,6 +334,7 @@
   .nothing-hero-primary,
   .nothing-instrument-panel,
   .nothing-flow-panel,
+  .nothing-feature-strip,
   .nothing-section,
   .nothing-inline-alert,
   .nothing-empty-state {
@@ -366,6 +394,55 @@
     display: grid;
     align-content: start;
     gap: 24px;
+  }
+
+  .nothing-feature-strip {
+    display: grid;
+    gap: 24px;
+    align-items: end;
+  }
+
+  @media (min-width: 1024px) {
+    .nothing-feature-strip {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+  }
+
+  .nothing-feature-strip h2 {
+    margin-top: 8px;
+    color: var(--text-display);
+    font-size: 28px;
+    font-weight: 500;
+    line-height: 1.1;
+  }
+
+  .nothing-feature-actions {
+    display: grid;
+    gap: 8px;
+    justify-items: start;
+  }
+
+  @media (min-width: 1024px) {
+    .nothing-feature-actions {
+      justify-items: end;
+      text-align: right;
+    }
+  }
+
+  .nothing-feature-actions strong {
+    color: var(--text-display);
+    font-family: var(--font-mono);
+    font-size: 48px;
+    font-weight: 400;
+    line-height: 1;
+  }
+
+  .nothing-feature-actions span {
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .nothing-flow-list,

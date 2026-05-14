@@ -27,6 +27,7 @@ import {
   type DependencyResourceBackupProviderPort,
   type DependencyResourceBackupRepository,
   type DependencyResourceRepository,
+  type DependencyResourceSecretStore,
   type EventBus,
   type IdGenerator,
   type ProcessAttemptRecorder,
@@ -35,6 +36,12 @@ import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDependencyResourceBackupCommandInput } from "./create-dependency-resource-backup.command";
+
+const appaloftOwnedDependencySecretRefPrefix = "appaloft://dependency-resources/";
+
+function isAppaloftOwnedDependencySecretRef(secretRef: string): boolean {
+  return secretRef.startsWith(appaloftOwnedDependencySecretRefPrefix);
+}
 
 @injectable()
 export class CreateDependencyResourceBackupUseCase {
@@ -45,6 +52,8 @@ export class CreateDependencyResourceBackupUseCase {
     private readonly dependencyResourceBackupRepository: DependencyResourceBackupRepository,
     @inject(tokens.dependencyResourceBackupProvider)
     private readonly dependencyResourceBackupProvider: DependencyResourceBackupProviderPort,
+    @inject(tokens.dependencyResourceSecretStore)
+    private readonly dependencyResourceSecretStore: DependencyResourceSecretStore,
     @inject(tokens.clock)
     private readonly clock: Clock,
     @inject(tokens.idGenerator)
@@ -67,6 +76,7 @@ export class CreateDependencyResourceBackupUseCase {
       dependencyResourceBackupProvider,
       dependencyResourceBackupRepository,
       dependencyResourceRepository,
+      dependencyResourceSecretStore,
       eventBus,
       idGenerator,
       logger,
@@ -123,6 +133,16 @@ export class CreateDependencyResourceBackupUseCase {
           ),
         );
       }
+      const connectionSecretValue =
+        dependencyState.connectionSecretRef &&
+        isAppaloftOwnedDependencySecretRef(dependencyState.connectionSecretRef.value)
+          ? await dependencyResourceSecretStore.resolve(context, {
+              secretRef: dependencyState.connectionSecretRef.value,
+            })
+          : undefined;
+      if (connectionSecretValue?.isErr()) {
+        return err(connectionSecretValue.error);
+      }
 
       const requestedAt = yield* OccurredAt.create(clock.now());
       const createdAt = yield* CreatedAt.create(clock.now());
@@ -158,6 +178,15 @@ export class CreateDependencyResourceBackupUseCase {
         dependencyResourceId: dependencyResourceId.value,
         dependencyKind,
         providerKey: providerKey.value,
+        ...(dependencyState.providerRealization?.providerResourceHandle
+          ? {
+              providerResourceHandle:
+                dependencyState.providerRealization.providerResourceHandle.value,
+            }
+          : {}),
+        ...(connectionSecretValue?.isOk()
+          ? { connectionSecretValue: connectionSecretValue.value.secretValue }
+          : {}),
         attemptId: attemptId.value,
         requestedAt: requestedAt.value,
       });

@@ -3,17 +3,26 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   CreatedAt,
+  DeploymentTarget,
+  DeploymentTargetId,
+  DeploymentTargetLifecycleStatusValue,
+  DeploymentTargetName,
   domainError,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
   EnvironmentName,
   err,
+  HostAddress,
   ok,
+  PortNumber,
   Project,
   ProjectId,
   ProjectName,
+  ProviderKey,
   type Result,
+  TargetKindValue,
+  UpsertDeploymentTargetSpec,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
 } from "@appaloft/core";
@@ -28,6 +37,7 @@ import {
   MemoryDependencyResourceRepository,
   MemoryEnvironmentRepository,
   MemoryProjectRepository,
+  MemoryServerRepository,
   NoopLogger,
   SequenceIdGenerator,
 } from "@appaloft/testkit";
@@ -71,6 +81,19 @@ class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
   }
 }
 
+function singleServerTarget() {
+  return DeploymentTarget.rehydrate({
+    id: DeploymentTargetId.rehydrate("srv_demo"),
+    name: DeploymentTargetName.rehydrate("Demo server"),
+    providerKey: ProviderKey.rehydrate("local-shell"),
+    targetKind: TargetKindValue.rehydrate("single-server"),
+    host: HostAddress.rehydrate("127.0.0.1"),
+    port: PortNumber.rehydrate(22),
+    lifecycleStatus: DeploymentTargetLifecycleStatusValue.active(),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
+}
+
 async function createHarness() {
   const context = createContext();
   const repositoryContext = toRepositoryContext(context);
@@ -79,6 +102,7 @@ async function createHarness() {
   const environments = new MemoryEnvironmentRepository();
   const dependencyResources = new MemoryDependencyResourceRepository();
   const dependencyResourceSecretStore = new FakeDependencyResourceSecretStore();
+  const servers = new MemoryServerRepository();
   const deleteSafetyReader = new MemoryDependencyResourceDeleteSafetyReader();
   const readModel = new MemoryDependencyResourceReadModel(dependencyResources, deleteSafetyReader);
   const eventBus = new CapturedEventBus();
@@ -107,6 +131,12 @@ async function createHarness() {
     environment,
     UpsertEnvironmentSpec.fromEnvironment(environment),
   );
+  const server = singleServerTarget();
+  await servers.upsert(
+    repositoryContext,
+    server,
+    UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
+  );
 
   return {
     context,
@@ -127,6 +157,7 @@ async function createHarness() {
     eventBus,
     managedPostgresProvider,
     managedRedisProvider,
+    servers,
     importPostgres: new ImportPostgresDependencyResourceUseCase(
       projects,
       environments,
@@ -151,6 +182,7 @@ async function createHarness() {
     provisionPostgres: new ProvisionPostgresDependencyResourceUseCase(
       projects,
       environments,
+      servers,
       dependencyResources,
       dependencyResourceSecretStore,
       clock,
@@ -163,6 +195,7 @@ async function createHarness() {
     provisionRedis: new ProvisionRedisDependencyResourceUseCase(
       projects,
       environments,
+      servers,
       dependencyResources,
       dependencyResourceSecretStore,
       clock,
@@ -447,6 +480,26 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       },
     });
     expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("secret token output");
+  });
+
+  test("[DEP-RES-PG-NATIVE-008] passes single-server target to managed Postgres provider", async () => {
+    const { context, managedPostgresProvider, provisionPostgres } = await createHarness();
+
+    const result = await provisionPostgres.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main DB",
+      serverId: "srv_demo",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(managedPostgresProvider.realized[0]?.target).toMatchObject({
+      serverId: "srv_demo",
+      providerKey: "local-shell",
+      targetKind: "single-server",
+      host: "127.0.0.1",
+      port: 22,
+    });
   });
 
   test("[DEP-RES-PG-NATIVE-007] rejects unsupported managed Postgres provider before persistence", async () => {
@@ -1098,6 +1151,26 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       },
     });
     expect(JSON.stringify(processAttemptRecorder.records)).not.toContain("secret token output");
+  });
+
+  test("[DEP-RES-REDIS-NATIVE-009] passes single-server target to managed Redis provider", async () => {
+    const { context, managedRedisProvider, provisionRedis } = await createHarness();
+
+    const result = await provisionRedis.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main Cache",
+      serverId: "srv_demo",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(managedRedisProvider.realized[0]?.target).toMatchObject({
+      serverId: "srv_demo",
+      providerKey: "local-shell",
+      targetKind: "single-server",
+      host: "127.0.0.1",
+      port: 22,
+    });
   });
 
   test("[DEP-RES-REDIS-NATIVE-008] rejects unsupported managed Redis provider before persistence", async () => {

@@ -24,6 +24,7 @@ import {
   type DependencyResourceBackupProviderPort,
   type DependencyResourceBackupRepository,
   type DependencyResourceRepository,
+  type DependencyResourceSecretStore,
   type EventBus,
   type IdGenerator,
   type ProcessAttemptRecorder,
@@ -32,6 +33,12 @@ import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type RestoreDependencyResourceBackupCommandInput } from "./restore-dependency-resource-backup.command";
+
+const appaloftOwnedDependencySecretRefPrefix = "appaloft://dependency-resources/";
+
+function isAppaloftOwnedDependencySecretRef(secretRef: string): boolean {
+  return secretRef.startsWith(appaloftOwnedDependencySecretRefPrefix);
+}
 
 @injectable()
 export class RestoreDependencyResourceBackupUseCase {
@@ -42,6 +49,8 @@ export class RestoreDependencyResourceBackupUseCase {
     private readonly dependencyResourceBackupRepository: DependencyResourceBackupRepository,
     @inject(tokens.dependencyResourceBackupProvider)
     private readonly dependencyResourceBackupProvider: DependencyResourceBackupProviderPort,
+    @inject(tokens.dependencyResourceSecretStore)
+    private readonly dependencyResourceSecretStore: DependencyResourceSecretStore,
     @inject(tokens.clock)
     private readonly clock: Clock,
     @inject(tokens.idGenerator)
@@ -64,6 +73,7 @@ export class RestoreDependencyResourceBackupUseCase {
       dependencyResourceBackupProvider,
       dependencyResourceBackupRepository,
       dependencyResourceRepository,
+      dependencyResourceSecretStore,
       eventBus,
       idGenerator,
       logger,
@@ -130,6 +140,17 @@ export class RestoreDependencyResourceBackupUseCase {
           ),
         );
       }
+      const dependencyState = dependencyResource.toState();
+      const connectionSecretValue =
+        dependencyState.connectionSecretRef &&
+        isAppaloftOwnedDependencySecretRef(dependencyState.connectionSecretRef.value)
+          ? await dependencyResourceSecretStore.resolve(context, {
+              secretRef: dependencyState.connectionSecretRef.value,
+            })
+          : undefined;
+      if (connectionSecretValue?.isErr()) {
+        return err(connectionSecretValue.error);
+      }
 
       const restoreAttemptId = DependencyResourceRestoreAttemptId.rehydrate(
         idGenerator.next("dra"),
@@ -156,6 +177,15 @@ export class RestoreDependencyResourceBackupUseCase {
         dependencyKind,
         providerKey: backupState.providerKey.value,
         providerArtifactHandle: providerArtifactHandle.value,
+        ...(dependencyState.providerRealization?.providerResourceHandle
+          ? {
+              providerResourceHandle:
+                dependencyState.providerRealization.providerResourceHandle.value,
+            }
+          : {}),
+        ...(connectionSecretValue?.isOk()
+          ? { connectionSecretValue: connectionSecretValue.value.secretValue }
+          : {}),
         restoreAttemptId: restoreAttemptId.value,
         requestedAt: requestedAt.value,
       });
