@@ -401,6 +401,10 @@ export const i18nKeys = {
     },
     home: {
       databaseCard: "console:home.databaseCard",
+      dependencyResourcesCount: "console:home.dependencyResourcesCount",
+      dependencyResourcesCta: "console:home.dependencyResourcesCta",
+      dependencyResourcesDescription: "console:home.dependencyResourcesDescription",
+      dependencyResourcesTitle: "console:home.dependencyResourcesTitle",
       deploymentBaseBody: "console:home.deploymentBaseBody",
       deploymentBaseTitle: "console:home.deploymentBaseTitle",
       deploymentFlowCreateEnvironment: "console:home.deploymentFlowCreateEnvironment",

@@ -411,6 +411,11 @@ export const zhCN = {
     },
     home: {
       databaseCard: "Database",
+      dependencyResourcesCount: "托管服务",
+      dependencyResourcesCta: "打开依赖资源",
+      dependencyResourcesDescription:
+        "在活跃的单机目标上创建 Docker-backed Postgres 和 Redis，并在同一个入口管理脱敏连接、备份、恢复和安全删除。",
+      dependencyResourcesTitle: "托管 Postgres / Redis",
       deploymentBaseBody:
         "选择本地目录、GitHub 仓库、远程 Git 或镜像后，Appaloft 会在同一个部署向导里串起项目关系、目标服务器、环境快照和部署记录。",
       deploymentBaseTitle: "从一次部署开始，项目关系会自动建立。",

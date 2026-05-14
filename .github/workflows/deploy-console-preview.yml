@@ -34,7 +34,7 @@ jobs:
           console_preview_required=false
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/deploy-console-preview.yml|.github/workflows/deploy-console.yml|.github/actions/remote-state-lock-preflight/*|.github/actions/remote-runtime-capacity-preflight/*|appaloft.console-preview.yml|apps/web/*|apps/shell/*|packages/adapters/*|packages/application/*|packages/auth/*|packages/cli-logging/*|packages/config/*|packages/contracts/*|packages/core/*|packages/deployment-config/*|packages/design/*|packages/docs-registry/*|packages/i18n/*|packages/integrations/*|packages/observability/*|packages/orpc/*|packages/persistence/*|packages/plugins/*|packages/providers/*|bun.lock|package.json|tsconfig.base.json|tsconfig.json|turbo.json)
+              .github/workflows/deploy-console-preview.yml|.github/workflows/deploy-console.yml|.github/actions/remote-state-lock-preflight/*|.github/actions/remote-runtime-capacity-preflight/*|appaloft.console-backend-preview.yml|appaloft.console-preview.yml|Dockerfile|apps/web/*|apps/shell/*|packages/adapters/*|packages/application/*|packages/auth/*|packages/cli-logging/*|packages/config/*|packages/contracts/*|packages/core/*|packages/deployment-config/*|packages/design/*|packages/docs-registry/*|packages/i18n/*|packages/integrations/*|packages/observability/*|packages/orpc/*|packages/persistence/*|packages/plugins/*|packages/providers/*|bun.lock|package.json|tsconfig.base.json|tsconfig.json|turbo.json)
                 console_preview_required=true
                 break
                 ;;
@@ -79,8 +79,6 @@ jobs:
           APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
           APPALOFT_SSH_USER: ${{ vars.APPALOFT_SSH_USER }}
           APPALOFT_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
-          APPALOFT_CONSOLE_ORIGIN: ${{ vars.APPALOFT_CONSOLE_ORIGIN }}
-          APPALOFT_CONSOLE_PREVIEW_API_BASE_URL: ${{ vars.APPALOFT_CONSOLE_PREVIEW_API_BASE_URL }}
         run: |
           set -euo pipefail
 
@@ -94,17 +92,10 @@ jobs:
             missing=1
           fi
 
-          api_base_url="${APPALOFT_CONSOLE_PREVIEW_API_BASE_URL:-${APPALOFT_CONSOLE_ORIGIN:-}}"
-          if [ -z "$api_base_url" ]; then
-            echo "::error::Missing APPALOFT_CONSOLE_PREVIEW_API_BASE_URL or APPALOFT_CONSOLE_ORIGIN repository variable."
-            missing=1
-          fi
-
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
 
-          api_base_url="${api_base_url%/}"
           preview_host="console-pr-${PR_NUMBER}.preview.appaloft.com"
           preview_url="http://${preview_host}"
 
@@ -113,15 +104,14 @@ jobs:
             echo "preview_host=${preview_host}"
             echo "preview_url=${preview_url}"
             echo "preview_tls_mode=disabled"
-            echo "resource_name=appaloft-console-preview-pr-${PR_NUMBER}"
-            echo "api_base_url=${api_base_url}"
+            echo "resource_name=appaloft-console-backend-preview-pr-${PR_NUMBER}"
           } >> "$GITHUB_OUTPUT"
 
           {
             echo "### Console preview"
             echo "- Preview URL: ${preview_url}"
             echo "- Preview host: ${preview_host}"
-            echo "- API base URL: ${api_base_url}"
+            echo "- Backend: PR-scoped Appaloft container"
             echo "- TLS mode: disabled"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -150,7 +140,7 @@ jobs:
           PREVIEW_TLS_MODE: ${{ steps.settings.outputs.preview_tls_mode }}
           PREVIEW_URL: ${{ steps.settings.outputs.preview_url }}
           RESOURCE_NAME: ${{ steps.settings.outputs.resource_name }}
-          API_BASE_URL: ${{ steps.settings.outputs.api_base_url }}
+          APPALOFT_BETTER_AUTH_SECRET: ${{ secrets.APPALOFT_CONSOLE_PREVIEW_AUTH_SECRET || secrets.APPALOFT_BETTER_AUTH_SECRET }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
@@ -159,21 +149,45 @@ jobs:
           printf '%s\n' "$APPALOFT_SSH_PRIVATE_KEY" > "$key_file"
           chmod 600 "$key_file"
 
-          build_command="VITE_APPALOFT_API_BASE_URL=$API_BASE_URL bun run --cwd apps/web build"
+          if [ -z "${APPALOFT_BETTER_AUTH_SECRET:-}" ]; then
+            APPALOFT_BETTER_AUTH_SECRET="$(bun -e 'const bytes = crypto.getRandomValues(new Uint8Array(48)); console.log(Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(""));')"
+            export APPALOFT_BETTER_AUTH_SECRET
+          fi
+          APPALOFT_APP_VERSION="$(bun -e 'const packageJson = await Bun.file("package.json").json(); if (typeof packageJson.version !== "string" || packageJson.version.length === 0) process.exit(1); console.log(packageJson.version);')"
+          export APPALOFT_APP_VERSION
+
+          bun run apps/shell/src/index.ts preview cleanup . \
+            --config appaloft.console-preview.yml \
+            --preview pull-request \
+            --preview-id "pr-${PR_NUMBER}" \
+            --server-host "$APPALOFT_SSH_HOST" \
+            --server-provider generic-ssh \
+            --server-ssh-username "$APPALOFT_SSH_USER" \
+            --server-ssh-private-key-file "$key_file" \
+            --state-backend ssh-pglite
 
           bun run apps/shell/src/index.ts deploy . \
-            --config appaloft.console-preview.yml \
-            --method static \
+            --config appaloft.console-backend-preview.yml \
+            --method dockerfile \
             --resource-name "$RESOURCE_NAME" \
-            --resource-kind static-site \
+            --resource-kind application \
             --runtime-name "$RESOURCE_NAME" \
-            --install "bun install --frozen-lockfile" \
-            --build "$build_command" \
-            --publish-dir apps/web/build \
-            --port 80 \
+            --dockerfile-path Dockerfile \
+            --port 3001 \
             --upstream-protocol http \
             --exposure-mode reverse-proxy \
-            --health-path / \
+            --health-path /api/health \
+            --env "APPALOFT_APP_NAME=Appaloft Preview PR ${PR_NUMBER}" \
+            --env "APPALOFT_APP_VERSION=$APPALOFT_APP_VERSION" \
+            --env "APPALOFT_ENV=preview" \
+            --env "APPALOFT_AUTO_MIGRATE=true" \
+            --env "APPALOFT_WEB_ORIGIN=$PREVIEW_URL" \
+            --env "APPALOFT_BETTER_AUTH_URL=$PREVIEW_URL" \
+            --env "APPALOFT_BETTER_AUTH_COOKIE_DOMAIN=" \
+            --env "APPALOFT_BETTER_AUTH_TRUSTED_ORIGINS=$PREVIEW_URL" \
+            --env "APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS=true" \
+            --env "APPALOFT_LOCALE_COOKIE_DOMAIN=" \
+            --secret "APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_BETTER_AUTH_SECRET" \
             --preview pull-request \
             --preview-id "pr-${PR_NUMBER}" \
             --preview-domain-template "$PREVIEW_HOST" \
@@ -267,6 +281,16 @@ jobs:
 
           bun run apps/shell/src/index.ts preview cleanup . \
             --config appaloft.console-preview.yml \
+            --preview pull-request \
+            --preview-id "$PREVIEW_ID" \
+            --server-host "$APPALOFT_SSH_HOST" \
+            --server-provider generic-ssh \
+            --server-ssh-username "$APPALOFT_SSH_USER" \
+            --server-ssh-private-key-file "$key_file" \
+            --state-backend ssh-pglite
+
+          bun run apps/shell/src/index.ts preview cleanup . \
+            --config appaloft.console-backend-preview.yml \
             --preview pull-request \
             --preview-id "$PREVIEW_ID" \
             --server-host "$APPALOFT_SSH_HOST" \

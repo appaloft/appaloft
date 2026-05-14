@@ -421,6 +421,11 @@ export const enUS = {
     },
     home: {
       databaseCard: "Database",
+      dependencyResourcesCount: "Managed services",
+      dependencyResourcesCta: "Open dependency resources",
+      dependencyResourcesDescription:
+        "Provision Docker-backed Postgres and Redis on active single-server targets, then manage masked endpoints, backups, restores, and safe deletion from one place.",
+      dependencyResourcesTitle: "Managed Postgres and Redis",
       deploymentBaseBody:
         "Choose a local folder, GitHub repository, remote Git URL, or image. Appaloft connects the project link, target server, environment snapshot, and deployment record in one deployment flow.",
       deploymentBaseTitle: "Start with one deployment; project links are created from there.",
