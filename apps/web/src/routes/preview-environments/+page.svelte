@@ -17,6 +17,7 @@
     findResource,
     formatTime,
     previewEnvironmentDetailHref,
+    resourcePreviewEnvironmentDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
 
@@ -239,7 +240,12 @@
                   </Table.Cell>
                   <Table.Cell class="text-right">
                     <a
-                      href={previewEnvironmentDetailHref(previewEnvironment.previewEnvironmentId)}
+                      href={resource
+                        ? resourcePreviewEnvironmentDetailHref(
+                            resource,
+                            previewEnvironment.previewEnvironmentId,
+                          )
+                        : previewEnvironmentDetailHref(previewEnvironment.previewEnvironmentId)}
                       aria-label={$t(i18nKeys.common.actions.viewDetails)}
                       class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
