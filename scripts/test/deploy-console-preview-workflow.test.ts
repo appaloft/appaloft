@@ -30,6 +30,7 @@ test("[CONTROL-PLANE-INSTALL-007] deploy-console-preview keeps preview routing a
   expect(workflow).toContain("--config appaloft.console-preview.yml");
   expect(config).toContain("controlPlane:");
   expect(config).toContain("mode: none");
+  expect(config).not.toContain("baseDirectory");
 });
 
 test("[CONTROL-PLANE-INSTALL-007] deploy-console-preview requires an explicit API base URL", () => {

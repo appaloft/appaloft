@@ -1,5 +1,2 @@
 controlPlane:
   mode: none
-
-source:
-  baseDirectory: .
