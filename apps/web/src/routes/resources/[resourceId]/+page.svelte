@@ -310,6 +310,7 @@
   const environment = $derived(
     resource ? findEnvironment(environments, resource.environmentId) : null,
   );
+  const isPreviewEnvironmentResource = $derived(environment?.kind === "preview");
   const latestDeployment = $derived(
     resource ? deployments.find((deployment) => deployment.resourceId === resource.id) : null,
   );
@@ -1289,6 +1290,41 @@
       };
     },
   }));
+  const deletePreviewResourceMutation = createMutation(() => ({
+    mutationFn: async (input: DeleteResourceInput & { archiveBeforeDelete: boolean }) => {
+      if (input.archiveBeforeDelete) {
+        await orpcClient.resources.archive({
+          resourceId: input.resourceId,
+          reason: "preview-resource-cleanup",
+        });
+      }
+
+      return orpcClient.resources.delete({
+        resourceId: input.resourceId,
+        confirmation: input.confirmation,
+      });
+    },
+    onSuccess: (result) => {
+      deleteFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.deleteSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "health", resourceId, "detail"],
+      });
+      void goto(project ? projectDetailHref(project.id) : "/projects");
+    },
+    onError: (error) => {
+      deleteFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.deleteFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
 
   let defaultedResourceId = $state("");
 
@@ -1617,6 +1653,34 @@
     deleteFeedback = null;
     deleteResourceMutation.mutate({
       resourceId: resource.id,
+      confirmation: {
+        resourceSlug,
+      },
+    });
+  }
+
+  function deletePreviewResource(): void {
+    if (
+      !browser ||
+      !resource ||
+      !isPreviewEnvironmentResource ||
+      deletePreviewResourceMutation.isPending
+    ) {
+      return;
+    }
+
+    const resourceSlug = window.prompt(
+      `${$t(i18nKeys.console.resources.deleteConfirmPrompt)}\n${resource.slug}`,
+    );
+    if (resourceSlug === null) {
+      return;
+    }
+
+    archiveFeedback = null;
+    deleteFeedback = null;
+    deletePreviewResourceMutation.mutate({
+      resourceId: resource.id,
+      archiveBeforeDelete: !isResourceArchived,
       confirmation: {
         resourceSlug,
       },
@@ -3358,34 +3422,52 @@
                 {/if}
               </Popover.Content>
             </Popover.Root>
-            <Button href={resourceDeploymentHref()} disabled={isResourceArchived}>
+            <Button
+              href={resourceDeploymentHref()}
+              disabled={isResourceArchived || isPreviewEnvironmentResource}
+            >
               <Plus class="size-4" />
               {$t(i18nKeys.common.actions.newDeployment)}
             </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={isResourceArchived || archiveResourceMutation.isPending}
-              onclick={archiveResource}
-            >
-              <Archive class="size-4" />
-              {archiveResourceMutation.isPending
-                ? $t(i18nKeys.common.actions.saving)
-                : $t(i18nKeys.console.resources.archiveAction)}
-            </Button>
-            {#if isResourceArchived}
+            {#if isPreviewEnvironmentResource}
               <Button
                 id="resource-delete-action"
                 type="button"
                 variant="destructive"
-                disabled={deleteResourceMutation.isPending}
-                onclick={deleteResource}
+                disabled={deletePreviewResourceMutation.isPending}
+                onclick={deletePreviewResource}
               >
                 <Trash2 class="size-4" />
-                {deleteResourceMutation.isPending
+                {deletePreviewResourceMutation.isPending
                   ? $t(i18nKeys.common.actions.saving)
                   : $t(i18nKeys.console.resources.deleteAction)}
               </Button>
+            {:else}
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={isResourceArchived || archiveResourceMutation.isPending}
+                onclick={archiveResource}
+              >
+                <Archive class="size-4" />
+                {archiveResourceMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.console.resources.archiveAction)}
+              </Button>
+              {#if isResourceArchived}
+                <Button
+                  id="resource-delete-action"
+                  type="button"
+                  variant="destructive"
+                  disabled={deleteResourceMutation.isPending}
+                  onclick={deleteResource}
+                >
+                  <Trash2 class="size-4" />
+                  {deleteResourceMutation.isPending
+                    ? $t(i18nKeys.common.actions.saving)
+                    : $t(i18nKeys.console.resources.deleteAction)}
+                </Button>
+              {/if}
             {/if}
           </div>
         </div>

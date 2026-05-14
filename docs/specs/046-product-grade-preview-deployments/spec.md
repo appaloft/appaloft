@@ -42,6 +42,7 @@ or preview fields to `deployments.create`.
 | Product-grade preview deployment | A control-plane-owned preview lifecycle for a source change, usually a pull request, with policy, scoped identity, deployment, feedback, cleanup, and audit. | Source integration / release orchestration | GitHub App preview, managed preview |
 | Preview policy | Control-plane policy deciding which repositories, branches, fork states, event kinds, quotas, domains, and secret scopes may create previews. | Integration policy | Preview environment policy |
 | Preview environment | Durable control-plane identity for one temporary runtime surface derived from a parent Resource for one preview scope, such as a pull request. It links project/environment/resource/server context, source fingerprint, route state, deployment attempts, feedback, cleanup, and audit without becoming a peer long-lived Resource in the console IA. | Workspace / release orchestration | Preview app, PR environment, review app |
+| Legacy preview resource | Compatibility artifact for earlier preview flows where the runtime surface was represented as a Resource inside a preview-kind Environment. Default Resource lists omit these artifacts, while direct links remain recoverable for explicit operator cleanup. | Workspace compatibility / operator recovery | Orphan preview resource |
 | Preview source event | Provider-normalized source event that may request preview create, update, or cleanup after verification. | Source event application service | PR event |
 | Preview feedback | Idempotent GitHub App comment, check run, deployment status, or equivalent integration status pointing users to preview state and diagnostics. | Integration adapter | Comment/check/status |
 | Preview cleanup attempt | Durable cleanup work for preview runtime, route state, source link, feedback, and provider metadata, with retry and audit ownership. | Release orchestration / operator work | Cleanup retry |
@@ -100,6 +101,7 @@ Non-scheduled compensation must exist even when the periodic scheduler is disabl
 - duplicate close/delete requests must be idempotent and return the existing cleanup state when possible;
 - retriable runtime, route, source-link, provider metadata, or feedback failures must create durable retry/manual-review state with safe details;
 - Web Resource detail must expose active, cleanup-requested, and expired derived previews with a direct cleanup action so an operator can repair missed GitHub or provider callbacks.
+- default Resource lists must omit legacy preview-kind Environment Resources; direct Resource detail remains available for recovery, and confirmed deletion may bypass retained deployment/audit blockers for those temporary artifacts.
 
 ## Scenarios And Acceptance Criteria
 
