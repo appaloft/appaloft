@@ -404,7 +404,14 @@ export const enUS = {
       actionControlPlaneTitle: "GitHub Actions",
       actionControlPlaneBody:
         "Use this origin as control-plane-url when a repository selects control-plane-mode: self-hosted.",
+      applyUnsupported:
+        "Host-side upgrade execution is not enabled for this process; use the SSH command below.",
+      applyUpgrade: "Update now",
+      applyingUpgrade: "Updating",
+      checkForUpdates: "Check updates",
+      checkingForUpdates: "Checking",
       currentOriginLabel: "Current console origin",
+      currentVersionLabel: "Current version",
       directInstallBody:
         "Without a domain, Appaloft remains reachable through the host IP and direct console port.",
       directInstallTitle: "Install with direct IP access",
@@ -413,6 +420,7 @@ export const enUS = {
       domainInstallTitle: "Install with a console domain",
       domainRouteBadge: "managed Traefik route",
       fallbackRouteBadge: "direct port fallback",
+      latestVersionLabel: "Latest version",
       pageDescription: "Bootstrap proxy, domain, and Action connection guidance for this instance",
       pageTitle: "Instance",
       proxyTitle: "Managed proxy",
@@ -421,6 +429,16 @@ export const enUS = {
       rerunBody:
         "Change the console domain by rerunning the installer with the new domain; the operation is idempotent and keeps the existing database volume.",
       rerunTitle: "Change the console domain",
+      targetVersionLabel: "Target version",
+      unknownUpdateBadge: "Unknown",
+      updateAvailableBadge: "Update available",
+      updatesBody:
+        "Check this instance version and run the installer directly when a host-side executor is enabled.",
+      updatesTitle: "Appaloft updates",
+      upgradeCommandTitle: "SSH update command",
+      upgradeFailedTitle: "Update failed",
+      upgradeSucceededTitle: "Update completed",
+      upToDateBadge: "Up to date",
     },
     nav: {
       deploy: "New deployment",

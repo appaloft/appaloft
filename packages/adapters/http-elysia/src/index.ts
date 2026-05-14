@@ -3,8 +3,10 @@ import { join, resolve, sep } from "node:path";
 import {
   type ActionDeployTokenAuthorizationPort,
   type AppLogger,
+  ApplyInstanceUpgradeCommand,
   type AutomaticRouteContextLookup,
   type CertificateHttpChallengeTokenStore,
+  CheckInstanceUpgradeQuery,
   type CommandBus,
   type DeploymentProgressObserver,
   DoctorQuery,
@@ -171,6 +173,10 @@ function unwrapResult<T>(context: ExecutionContext, result: Result<T>): T {
       throw new Error(translateDomainError(error, context.t));
     },
   );
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function isActiveDeploymentStatus(
@@ -547,6 +553,34 @@ export function createHttpApp(input: {
   const terminalSessionsBySessionId = new Map<string, TerminalSession>();
   const requestStartTimes = new WeakMap<Request, number>();
   let firstAdminBootstrapCompleted = false;
+
+  function createHttpExecutionContext(request: Request): ExecutionContext {
+    const requestId = request.headers.get("x-request-id");
+    return input.executionContextFactory.create({
+      entrypoint: "http",
+      locale: resolveAppaloftLocaleFromHeaders(request.headers),
+      ...(requestId ? { requestId } : {}),
+    });
+  }
+
+  async function authorizeAdminRequest(request: Request, context: ExecutionContext): Promise<void> {
+    if (!input.authRuntime) {
+      return;
+    }
+
+    const url = new URL(request.url);
+    const authorization = request.headers.get("authorization");
+    const cookie = request.headers.get("cookie");
+    const result = await input.authRuntime.authorizeProductSession(context, {
+      method: request.method,
+      path: url.pathname,
+      requiredRole: "admin",
+      ...(authorization ? { authorizationHeader: authorization } : {}),
+      ...(cookie ? { cookieHeader: cookie } : {}),
+    });
+
+    unwrapResult(context, result);
+  }
 
   async function consoleOverview(request: Request): Promise<ConsoleOverviewResponse> {
     const requestId = request.headers.get("x-request-id");
@@ -1120,6 +1154,38 @@ export function createHttpApp(input: {
         serverSideConfigBootstrap: Boolean(input.actionSourcePackageConfigReader),
       },
     }))
+    .get("/api/instance-upgrade/check", async ({ request }) => {
+      const context = createHttpExecutionContext(request);
+      const url = new URL(request.url);
+      const query = unwrapResult(
+        context,
+        CheckInstanceUpgradeQuery.create({
+          ...(url.searchParams.get("version")
+            ? { targetVersion: url.searchParams.get("version") as string }
+            : {}),
+        }),
+      );
+      const result = await input.queryBus.execute(context, query);
+      return unwrapResult(context, result);
+    })
+    .post("/api/instance-upgrade/apply", async ({ request }) => {
+      const context = createHttpExecutionContext(request);
+      await authorizeAdminRequest(request, context);
+
+      const body: unknown = await request.json().catch(() => ({}));
+      const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+      const command = unwrapResult(
+        context,
+        ApplyInstanceUpgradeCommand.create({
+          confirm: record.confirm === true,
+          ...(optionalString(record.targetVersion)
+            ? { targetVersion: optionalString(record.targetVersion) }
+            : {}),
+        }),
+      );
+      const result = await input.commandBus.execute(context, command);
+      return unwrapResult(context, result);
+    })
     .get("/api/console-overview", ({ request }) => consoleOverview(request))
     .get("/.well-known/acme-challenge/:token", ({ request, params }) =>
       serveHttpChallenge(request, params.token),

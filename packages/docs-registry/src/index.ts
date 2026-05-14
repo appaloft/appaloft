@@ -1819,6 +1819,23 @@ export const publicDocsHelpTopics = {
     relatedOperation: "system.doctor",
     aliases: ["doctor", "database", "control plane", "控制面"],
   },
+  "self-hosting.upgrades": {
+    id: "self-hosting.upgrades",
+    title: "Self-hosted upgrades",
+    description: "Check and apply Appaloft instance upgrades from CLI or the Web console.",
+    page: {
+      "zh-CN": "self-hosting/upgrades",
+      "en-US": "en/self-hosting/upgrades",
+    },
+    anchor: "self-hosting-upgrade-check",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "web"],
+    relatedOperation: "system.instance-upgrade.check",
+    aliases: ["upgrade", "update", "instance upgrade", "self-hosting upgrade", "升级", "更新"],
+  },
   "self-hosting.action-deploy-token-auth": {
     id: "self-hosting.action-deploy-token-auth",
     title: "Self-hosted Action deploy token auth",
@@ -3071,6 +3088,16 @@ export const publicDocsOperationCoverage = [
     topicId: "deployment.source",
   },
   { operationKey: "system.doctor", status: "documented", topicId: "advanced.control-plane" },
+  {
+    operationKey: "system.instance-upgrade.check",
+    status: "documented",
+    topicId: "self-hosting.upgrades",
+  },
+  {
+    operationKey: "system.instance-upgrade.apply",
+    status: "documented",
+    topicId: "self-hosting.upgrades",
+  },
   { operationKey: "system.db-status", status: "documented", topicId: "advanced.control-plane" },
   { operationKey: "system.db-migrate", status: "documented", topicId: "advanced.control-plane" },
 ] as const satisfies readonly PublicDocsOperationCoverage[];
