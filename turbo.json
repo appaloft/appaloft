@@ -68,7 +68,7 @@
     },
     "test:unit": {
       "dependsOn": ["^test:unit"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     },
     "test:integration": {
       "dependsOn": ["^test:integration"],
