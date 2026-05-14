@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.12.2](https://github.com/appaloft/appaloft/compare/v0.12.1...v0.12.2) (2026-05-14)
+
+
+### Features
+
+* add runtime monitor observe surface ([41542ec](https://github.com/appaloft/appaloft/commit/41542ecfa99c6f6b1e85d279917eb9dc61323988))
+
+
+### Bug Fixes
+
+* **release:** publish npm packages from local paths ([6432560](https://github.com/appaloft/appaloft/commit/6432560c36399a33e551a457837a987668211485))
+* **release:** publish npm packages from local paths ([0e5b5bb](https://github.com/appaloft/appaloft/commit/0e5b5bbb7c2d35ef0944af83de738614531a89db))
+* **web:** separate organization and instance management ([334aad4](https://github.com/appaloft/appaloft/commit/334aad4edeb8048e7b2b107dbf1e4a3c7de81827))
+
 ## [0.12.1](https://github.com/appaloft/appaloft/compare/v0.12.0...v0.12.1) (2026-05-13)
 
 
