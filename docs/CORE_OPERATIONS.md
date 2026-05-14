@@ -920,6 +920,12 @@ Current boundary:
   to create a preview-scoped source fingerprint and environment/resource selection outside
   committed config, derive preview runtime naming intent, then dispatch ids-only
   `deployments.create`.
+- This repository dogfoods that path for static Web console previews through
+  `.github/workflows/deploy-console-preview.yml`. The workflow builds `apps/web` with an explicit
+  `VITE_APPALOFT_API_BASE_URL`, deploys `apps/web/build` as a PR-scoped static-site Resource through
+  the CLI to the shared SSH target, and cleans it up with `preview cleanup` when the PR closes. It
+  previews the console front-end assets only; full self-hosted control-plane installation remains
+  owned by `.github/workflows/deploy-console.yml` and `command: install-console`.
 - When preview-specific profile input does not override runtime naming, the default preview runtime
   name seed is `preview-{pr_number}` so effective runtime/container names remain human-recognizable
   while adapters still preserve uniqueness during safe replacement.
