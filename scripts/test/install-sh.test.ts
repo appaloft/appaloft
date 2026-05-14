@@ -209,6 +209,15 @@ test("install.sh rejects unknown Docker orchestrators", async () => {
   expect(result.stderr).toContain("--orchestrator must be compose or swarm");
 });
 
+test("install.sh rejects unknown tracing stacks", async () => {
+  const result = await run(["sh", installScript, "--dry-run", "--trace", "zipkin"], {
+    APPALOFT_HOME: join(tmpdir(), "appaloft-install-test-home"),
+  });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr).toContain("--trace must be none or jaeger");
+});
+
 test("install.sh rejects unsafe console domains", async () => {
   const result = await run(["sh", installScript, "--dry-run", "--domain", "https://"], {
     APPALOFT_HOME: join(tmpdir(), "appaloft-install-test-home"),
@@ -239,6 +248,31 @@ test("install.sh dry-run accepts an existing full image ref and skipped Docker b
   expect(result.stdout).toContain("image: registry.example.test/appaloft/appaloft:edge");
   expect(result.stdout).toContain("bind: 0.0.0.0:3900");
   expect(result.stdout).toContain("install docker: no");
+});
+
+test("install.sh dry-run reports optional Jaeger tracing", async () => {
+  const result = await run(
+    [
+      "sh",
+      installScript,
+      "--dry-run",
+      "--trace",
+      "jaeger",
+      "--jaeger-ui-host",
+      "0.0.0.0",
+      "--jaeger-ui-port",
+      "16687",
+    ],
+    {
+      APPALOFT_HOME: join(tmpdir(), "appaloft-install-test-home"),
+    },
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toContain("trace: jaeger");
+  expect(result.stdout).toContain("jaeger image: jaegertracing/all-in-one:latest");
+  expect(result.stdout).toContain("jaeger ui: http://0.0.0.0:16687");
+  expect(result.stdout).toContain("otlp endpoint: http://jaeger:4318");
 });
 
 test("install.sh writes a Compose self-host stack and starts it with Docker", async () => {
@@ -320,6 +354,70 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} pull`);
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
     expect(dockerLog).toContain("exec -T app sh -c");
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh can attach Appaloft to an optional Jaeger trace collector", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--web-origin",
+        "https://appaloft.example.test",
+        "--postgres-password",
+        "fixture-password",
+        "--proxy",
+        "none",
+        "--trace",
+        "jaeger",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode).toBe(0);
+    expect(install.stdout).toContain("Trace: jaeger");
+    expect(install.stdout).toContain("Jaeger UI: http://127.0.0.1:16686");
+    expect(install.stdout).toContain("Trace UI:      http://127.0.0.1:16686");
+
+    const compose = await Bun.file(join(home, "docker-compose.yml")).text();
+    expect(compose).toContain("APPALOFT_OTEL_ENABLED: $" + "{APPALOFT_OTEL_ENABLED}");
+    expect(compose).toContain("OTEL_SERVICE_NAME: $" + "{APPALOFT_OTEL_SERVICE_NAME}");
+    expect(compose).toContain(
+      "OTEL_EXPORTER_OTLP_ENDPOINT: $" + "{APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT}",
+    );
+    expect(compose).toContain("TRACE_LINK_BASE_URL: $" + "{APPALOFT_TRACE_LINK_BASE_URL}");
+    expect(compose).toContain("jaeger:");
+    expect(compose).toContain("image: $" + "{APPALOFT_JAEGER_IMAGE}");
+    expect(compose).toContain('COLLECTOR_OTLP_ENABLED: "true"');
+    expect(compose).toContain(
+      '"$' + "{APPALOFT_JAEGER_UI_HOST}:$" + '{APPALOFT_JAEGER_UI_PORT}:16686"',
+    );
+    expect(compose).toContain("condition: service_started");
+
+    const env = await Bun.file(join(home, ".env")).text();
+    expect(env).toContain("APPALOFT_SELF_HOST_TRACE=jaeger");
+    expect(env).toContain("APPALOFT_JAEGER_IMAGE=jaegertracing/all-in-one:latest");
+    expect(env).toContain("APPALOFT_JAEGER_UI_HOST=127.0.0.1");
+    expect(env).toContain("APPALOFT_JAEGER_UI_PORT=16686");
+    expect(env).toContain("APPALOFT_OTEL_ENABLED=true");
+    expect(env).toContain("APPALOFT_OTEL_SERVICE_NAME=appaloft-self-host");
+    expect(env).toContain("APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318");
+    expect(env).toContain("APPALOFT_TRACE_LINK_BASE_URL=http://127.0.0.1:16686");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }

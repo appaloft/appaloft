@@ -65,6 +65,11 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --domain console.exam
 创建 deployment snapshot 或 DomainBinding。之后如果要换 console 域名，可以用新的 `--domain`
 重新运行安装器。只有在外部反向代理已经负责公开入口时，才使用 `--proxy none`。
 
+安装时如果需要 trace，可以传 `--trace jaeger`。安装器会启动一个 Jaeger all-in-one 容器，把
+Appaloft 的 OTLP endpoint 指到内部 collector `http://jaeger:4318`，并把 trace link 写回
+Jaeger UI。UI 默认绑定在 `127.0.0.1:16686`；需要从运维网络直接访问时，可以用 SSH tunnel，
+或显式覆盖 `--jaeger-ui-host` 和 `--jaeger-ui-port`。
+
 首次安装后，使用安装器创建本地管理员并登录 console。管理员 email、生成的一次性密码、OAuth
 可选配置和恢复步骤见 [First admin bootstrap](/docs/self-hosting/first-admin-bootstrap/)。
 
