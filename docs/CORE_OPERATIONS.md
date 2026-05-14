@@ -938,15 +938,16 @@ Current boundary:
   summaries, including same-repository, fork, secret-backed, active preview quota, and preview TTL
   settings.
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete` now
-  expose CLI and HTTP/oRPC routes over safe preview environment read models and cleanup-service
-  input. Future MCP tool contracts are generated from the operation catalog for these preview
-  operations. Web now exposes `/preview-policies` controls for policy readback/configuration and a
-  `/preview-environments` console surface backed by preview environment list/show/delete
-  operations. The GitHub source-event HTTP route now accepts verified `pull_request` deliveries for
-  the first product-grade preview slice when trusted Appaloft project/environment/resource/server/
-  destination/source-fingerprint context headers are supplied; repository or installation mapping
-  remains future control-plane work. Managed domain lifecycle and scheduler leases remain future
-  control-plane work.
+  expose CLI and HTTP/oRPC routes over safe Resource-derived preview environment read models and
+  cleanup-service input. Future MCP tool contracts are generated from the operation catalog for
+  these preview operations. Web exposes `/preview-policies` controls for policy
+  readback/configuration, Resource detail exposes previews as temporary derived runtime
+  environments under the parent Resource, and `/preview-environments` remains a secondary
+  all-project rollup rather than a peer Resource collection. The GitHub source-event HTTP route now
+  accepts verified `pull_request` deliveries for the first product-grade preview slice when trusted
+  Appaloft project/environment/resource/server/destination/source-fingerprint context headers are
+  supplied; repository or installation mapping remains future control-plane work. Managed domain
+  lifecycle and scheduler leases remain future control-plane work.
 
 Product-grade preview policy operations:
 

@@ -1221,6 +1221,14 @@ export const enUS = {
       sourceEventStatusDeduped: "Deduped",
       sourceEventStatusDispatched: "Dispatched",
       sourceEventStatusIgnored: "Ignored",
+      previewEnvironmentsDescription:
+        "Temporary runtime environments derived from this Resource for pull request review, with owner, expiry, and cleanup state kept together.",
+      previewEnvironmentsEmpty: "This resource has no tracked preview environments yet.",
+      previewEnvironmentsExpired: "Expired",
+      previewEnvironmentsLoadFailed: "Unable to load preview environments",
+      previewEnvironmentsRefresh: "Refresh previews",
+      previewEnvironmentsTab: "Previews",
+      previewEnvironmentsTitle: "Derived preview environments",
       sourceLocator: "Source locator",
       sourceProfileFormDescription:
         "Change the durable source profile used by future deployment admission.",

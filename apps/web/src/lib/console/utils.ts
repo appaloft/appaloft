@@ -101,6 +101,13 @@ export function previewEnvironmentDetailHref(previewEnvironmentId: string): stri
   return `/preview-environments/${encodeURIComponent(previewEnvironmentId)}`;
 }
 
+export function resourcePreviewEnvironmentDetailHref(
+  resource: Pick<ResourceSummary, "id" | "projectId" | "environmentId">,
+  previewEnvironmentId: string,
+): string {
+  return `${resourceDetailHref(resource)}/preview-environments/${encodeURIComponent(previewEnvironmentId)}`;
+}
+
 export function resourceNewDeploymentHref(
   resource: Pick<ResourceSummary, "id" | "projectId" | "environmentId">,
 ): string {
