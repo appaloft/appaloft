@@ -209,6 +209,8 @@ export * from "./operations/storage-volumes/delete-storage-volume.use-case";
 export * from "./operations/storage-volumes/list-storage-volumes.query-service";
 export * from "./operations/storage-volumes/rename-storage-volume.use-case";
 export * from "./operations/storage-volumes/show-storage-volume.query-service";
+export * from "./operations/system/apply-instance-upgrade.use-case";
+export * from "./operations/system/check-instance-upgrade.query-service";
 export * from "./operations/system/db-migrate.use-case";
 export * from "./operations/system/db-status.query-service";
 export * from "./operations/system/doctor.query-service";
