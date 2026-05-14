@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.12.4](https://github.com/appaloft/appaloft/compare/v0.12.3...v0.12.4) (2026-05-14)
+
+
+### Features
+
+* **system:** add instance upgrade entrypoints ([3d93cb8](https://github.com/appaloft/appaloft/commit/3d93cb858ce228f05b756cc8c327255b59042307))
+* **system:** add instance upgrade entrypoints ([934d757](https://github.com/appaloft/appaloft/commit/934d7578e711569bb10fd5b94aa23546441f4f8b))
+
+
+### Bug Fixes
+
+* recover legacy preview resources ([ace54b8](https://github.com/appaloft/appaloft/commit/ace54b89244cf88d6d739c217278faebc36ff488))
+* recover legacy preview resources ([e97cebd](https://github.com/appaloft/appaloft/commit/e97cebd686fcf19aca39c0704cf42e83a6de323a))
+* **runtime:** bound usage attribution inspection ([5815358](https://github.com/appaloft/appaloft/commit/5815358042b673ec3e437e6f8236e6523003a7be))
+* **runtime:** bound usage attribution inspection ([52f9372](https://github.com/appaloft/appaloft/commit/52f9372dbd69f2905a42a9857d2b8b351700adf7))
+
 ## [0.12.3](https://github.com/appaloft/appaloft/compare/v0.12.2...v0.12.3) (2026-05-14)
 
 
