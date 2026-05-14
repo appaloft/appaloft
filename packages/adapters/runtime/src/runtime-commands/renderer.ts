@@ -125,6 +125,7 @@ function renderDockerComposeUpCommand(
     spec.projectName ? `-p ${options.quote(spec.projectName.value)}` : "",
     "-f",
     options.quote(spec.composeFile.value),
+    ...spec.additionalComposeFiles.flatMap((composeFile) => ["-f", options.quote(composeFile.value)]),
     "up",
     spec.detach ? "-d" : "",
     spec.build ? "--build" : "",
