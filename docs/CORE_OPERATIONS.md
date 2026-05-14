@@ -854,10 +854,12 @@ Current boundary:
   `controlPlane.install.orchestrator` is configured. Swarm installation requires an existing manager
   unless `console-swarm-init` or `controlPlane.install.swarmInit` is explicitly selected. Operators
   may choose embedded single-instance storage with explicit `console-database: pglite` and may opt
-  out of the resident proxy with `console-proxy: none` or `controlPlane.install.proxy: none`. It is
-  separate from `command: deploy`, so existing SSH CLI deployments with `control-plane-mode: none`
-  continue to mutate SSH-server `ssh-pglite` directly until the operator selects a self-hosted
-  control-plane API mode.
+  out of the resident proxy with `console-proxy: none` or `controlPlane.install.proxy: none`.
+  Operators may also opt into installer-owned tracing with `--trace jaeger`; that adds a Jaeger
+  sidecar collector/UI and wires only the Appaloft instance process to standard OTLP environment
+  variables. It is separate from `command: deploy`, so existing SSH CLI deployments with
+  `control-plane-mode: none` continue to mutate SSH-server `ssh-pglite` directly until the operator
+  selects a self-hosted control-plane API mode.
 - In `control-plane-mode: self-hosted`, the deploy action uses server API trigger mode for the
   first 0.9.x slice: it does not install or invoke the CLI, open SSH, select a state backend, or
   mutate SSH-server PGlite. It calls the self-hosted server's `/api/version` endpoint, then uses
