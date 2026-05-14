@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.12.3](https://github.com/appaloft/appaloft/compare/v0.12.2...v0.12.3) (2026-05-14)
+
+
+### Features
+
+* surface preview environments as resource derivatives ([363574d](https://github.com/appaloft/appaloft/commit/363574d0fc438190754d0c1e1c239478fe56c99a))
+* surface preview environments as resource derivatives ([8dfa560](https://github.com/appaloft/appaloft/commit/8dfa5608d7c6070c02853a1eb68cf455c4e7e06b))
+
+
+### Bug Fixes
+
+* **runtime:** add compose ownership labels for usage attribution ([c9b6f68](https://github.com/appaloft/appaloft/commit/c9b6f68ff7019698e17d28e47e64a0b714987159))
+* **runtime:** add compose ownership labels for usage attribution ([7f7d9d0](https://github.com/appaloft/appaloft/commit/7f7d9d05dab729d93b8633f33ed1dbf078c98501))
+
 ## [0.12.2](https://github.com/appaloft/appaloft/compare/v0.12.1...v0.12.2) (2026-05-14)
 
 
