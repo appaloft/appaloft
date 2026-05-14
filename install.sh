@@ -14,6 +14,13 @@ APPALOFT_SELF_HOST_ORCHESTRATOR="${APPALOFT_SELF_HOST_ORCHESTRATOR:-compose}"
 APPALOFT_SELF_HOST_PROXY="${APPALOFT_SELF_HOST_PROXY:-traefik}"
 APPALOFT_EDGE_NETWORK_NAME="${APPALOFT_EDGE_NETWORK_NAME:-appaloft-edge}"
 APPALOFT_TRAEFIK_IMAGE="${APPALOFT_TRAEFIK_IMAGE:-traefik:v3.6.2}"
+APPALOFT_SELF_HOST_TRACE="${APPALOFT_SELF_HOST_TRACE:-none}"
+APPALOFT_JAEGER_IMAGE="${APPALOFT_JAEGER_IMAGE:-jaegertracing/all-in-one:latest}"
+APPALOFT_JAEGER_UI_HOST="${APPALOFT_JAEGER_UI_HOST:-127.0.0.1}"
+APPALOFT_JAEGER_UI_PORT="${APPALOFT_JAEGER_UI_PORT:-16686}"
+APPALOFT_OTEL_SERVICE_NAME="${APPALOFT_OTEL_SERVICE_NAME:-appaloft-self-host}"
+APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT="${APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+APPALOFT_TRACE_LINK_BASE_URL="${APPALOFT_TRACE_LINK_BASE_URL:-}"
 APPALOFT_POSTGRES_IMAGE="${APPALOFT_POSTGRES_IMAGE:-postgres:16}"
 APPALOFT_POSTGRES_PASSWORD="${APPALOFT_POSTGRES_PASSWORD:-}"
 APPALOFT_BOOTSTRAP_DEPLOY_TOKEN="${APPALOFT_BOOTSTRAP_DEPLOY_TOKEN:-0}"
@@ -117,6 +124,9 @@ print_next_steps() {
       "$appaloft_color_reset" \
       "$APPALOFT_CONSOLE_DOMAIN"
   fi
+  if [ "$APPALOFT_SELF_HOST_TRACE" = "jaeger" ]; then
+    printf '  %sTrace UI:%s      %s\n' "$appaloft_color_bold" "$appaloft_color_reset" "$appaloft_trace_link_base_url"
+  fi
   printf '  %sGitHub Action:%s use this console URL when switching deployments to self-hosted server mode.\n' \
     "$appaloft_color_bold" \
     "$appaloft_color_reset"
@@ -142,6 +152,10 @@ Options:
   --database <postgres|pglite>      Persistence backend. Defaults to postgres.
   --orchestrator <compose|swarm>    Docker orchestrator. Defaults to compose.
   --proxy <traefik|none>            Managed self-host proxy. Defaults to traefik.
+  --trace <none|jaeger>             Optional tracing stack. Defaults to none.
+  --jaeger-image <image>            Jaeger all-in-one image when --trace jaeger is used.
+  --jaeger-ui-host <host>           Jaeger UI bind host. Defaults to 127.0.0.1.
+  --jaeger-ui-port <port>           Jaeger UI host port. Defaults to 16686.
   --postgres-password <password>   PostgreSQL password. Existing installs reuse .env.
   --auth-secret <secret>           Product auth session secret. Existing installs reuse .env.
   --bootstrap-deploy-token         Create an initial GitHub Action deploy token and print it once.
@@ -172,6 +186,13 @@ Environment:
   APPALOFT_SELF_HOST_PROXY=traefik|none
   APPALOFT_EDGE_NETWORK_NAME
   APPALOFT_TRAEFIK_IMAGE
+  APPALOFT_SELF_HOST_TRACE=none|jaeger
+  APPALOFT_JAEGER_IMAGE
+  APPALOFT_JAEGER_UI_HOST
+  APPALOFT_JAEGER_UI_PORT
+  APPALOFT_OTEL_SERVICE_NAME
+  APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT
+  APPALOFT_TRACE_LINK_BASE_URL
   APPALOFT_POSTGRES_IMAGE
   APPALOFT_POSTGRES_PASSWORD
   APPALOFT_BETTER_AUTH_SECRET
@@ -284,6 +305,38 @@ while [ "$#" -gt 0 ]; do
       ;;
     --proxy=*)
       APPALOFT_SELF_HOST_PROXY="${1#--proxy=}"
+      ;;
+    --trace)
+      shift
+      [ "$#" -gt 0 ] || fail "--trace requires a value"
+      APPALOFT_SELF_HOST_TRACE="$1"
+      ;;
+    --trace=*)
+      APPALOFT_SELF_HOST_TRACE="${1#--trace=}"
+      ;;
+    --jaeger-image)
+      shift
+      [ "$#" -gt 0 ] || fail "--jaeger-image requires a value"
+      APPALOFT_JAEGER_IMAGE="$1"
+      ;;
+    --jaeger-image=*)
+      APPALOFT_JAEGER_IMAGE="${1#--jaeger-image=}"
+      ;;
+    --jaeger-ui-host)
+      shift
+      [ "$#" -gt 0 ] || fail "--jaeger-ui-host requires a value"
+      APPALOFT_JAEGER_UI_HOST="$1"
+      ;;
+    --jaeger-ui-host=*)
+      APPALOFT_JAEGER_UI_HOST="${1#--jaeger-ui-host=}"
+      ;;
+    --jaeger-ui-port)
+      shift
+      [ "$#" -gt 0 ] || fail "--jaeger-ui-port requires a value"
+      APPALOFT_JAEGER_UI_PORT="$1"
+      ;;
+    --jaeger-ui-port=*)
+      APPALOFT_JAEGER_UI_PORT="${1#--jaeger-ui-port=}"
       ;;
     --postgres-password)
       shift
@@ -459,6 +512,14 @@ validate_port() {
   [ "$APPALOFT_HTTP_PORT" -gt 0 ] || fail "--port must be a positive integer"
 }
 
+validate_jaeger_ui_port() {
+  case "$APPALOFT_JAEGER_UI_PORT" in
+    '' | *[!0-9]*) fail "--jaeger-ui-port must be a positive integer" ;;
+  esac
+
+  [ "$APPALOFT_JAEGER_UI_PORT" -gt 0 ] || fail "--jaeger-ui-port must be a positive integer"
+}
+
 validate_database() {
   APPALOFT_SELF_HOST_DATABASE="$(printf '%s' "$APPALOFT_SELF_HOST_DATABASE" | tr '[:upper:]' '[:lower:]')"
 
@@ -483,6 +544,15 @@ validate_proxy() {
   case "$APPALOFT_SELF_HOST_PROXY" in
     traefik | none) return 0 ;;
     *) fail "--proxy must be traefik or none" ;;
+  esac
+}
+
+validate_trace() {
+  APPALOFT_SELF_HOST_TRACE="$(printf '%s' "$APPALOFT_SELF_HOST_TRACE" | tr '[:upper:]' '[:lower:]')"
+
+  case "$APPALOFT_SELF_HOST_TRACE" in
+    none | jaeger) return 0 ;;
+    *) fail "--trace must be none or jaeger" ;;
   esac
 }
 
@@ -545,6 +615,28 @@ resolve_web_origin() {
   fi
 
   printf 'http://%s:%s\n' "$(detect_public_host)" "$APPALOFT_HTTP_PORT"
+}
+
+resolve_otel_exporter_endpoint() {
+  if [ -n "$APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT" ]; then
+    printf '%s\n' "$APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT"
+    return
+  fi
+
+  if [ "$APPALOFT_SELF_HOST_TRACE" = "jaeger" ]; then
+    printf 'http://jaeger:4318\n'
+  fi
+}
+
+resolve_trace_link_base_url() {
+  if [ -n "$APPALOFT_TRACE_LINK_BASE_URL" ]; then
+    printf '%s\n' "$APPALOFT_TRACE_LINK_BASE_URL"
+    return
+  fi
+
+  if [ "$APPALOFT_SELF_HOST_TRACE" = "jaeger" ]; then
+    printf 'http://%s:%s\n' "$APPALOFT_JAEGER_UI_HOST" "$APPALOFT_JAEGER_UI_PORT"
+  fi
 }
 
 run_as_root() {
@@ -826,11 +918,16 @@ services:
       APPALOFT_FIRST_ADMIN_EMAIL: ${APPALOFT_FIRST_ADMIN_EMAIL}
       APPALOFT_FIRST_ADMIN_DISPLAY_NAME: ${APPALOFT_FIRST_ADMIN_DISPLAY_NAME}
       APPALOFT_FIRST_ADMIN_PASSWORD: ${APPALOFT_FIRST_ADMIN_PASSWORD}
+      APPALOFT_OTEL_ENABLED: ${APPALOFT_OTEL_ENABLED}
+      OTEL_SERVICE_NAME: ${APPALOFT_OTEL_SERVICE_NAME}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT}
+      TRACE_LINK_BASE_URL: ${APPALOFT_TRACE_LINK_BASE_URL}
     ports:
       - "${APPALOFT_HTTP_HOST}:${APPALOFT_HTTP_PORT}:3001"
     volumes:
       - appaloft-data:/appaloft-data
 COMPOSE
+    write_app_trace_depends_on_compose_section "$destination"
     write_app_proxy_compose_section "$destination"
     cat >>"$destination" <<'COMPOSE'
     deploy:
@@ -842,6 +939,7 @@ COMPOSE
           - node.role == manager
 
 COMPOSE
+    write_trace_service_compose_section "$destination"
     write_proxy_service_compose_section "$destination"
     cat >>"$destination" <<'COMPOSE'
 volumes:
@@ -872,6 +970,10 @@ services:
       APPALOFT_FIRST_ADMIN_EMAIL: ${APPALOFT_FIRST_ADMIN_EMAIL}
       APPALOFT_FIRST_ADMIN_DISPLAY_NAME: ${APPALOFT_FIRST_ADMIN_DISPLAY_NAME}
       APPALOFT_FIRST_ADMIN_PASSWORD: ${APPALOFT_FIRST_ADMIN_PASSWORD}
+      APPALOFT_OTEL_ENABLED: ${APPALOFT_OTEL_ENABLED}
+      OTEL_SERVICE_NAME: ${APPALOFT_OTEL_SERVICE_NAME}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT}
+      TRACE_LINK_BASE_URL: ${APPALOFT_TRACE_LINK_BASE_URL}
     ports:
       - "${APPALOFT_HTTP_HOST}:${APPALOFT_HTTP_PORT}:3001"
 COMPOSE
@@ -880,6 +982,9 @@ COMPOSE
     depends_on:
       postgres:
         condition: service_healthy
+COMPOSE
+  write_app_trace_depends_on_entry_compose_section "$destination"
+  cat >>"$destination" <<'COMPOSE'
     deploy:
 COMPOSE
   write_app_proxy_deploy_labels_compose_section "$destination"
@@ -908,12 +1013,40 @@ COMPOSE
           - node.role == manager
 
 COMPOSE
+  write_trace_service_compose_section "$destination"
   write_proxy_service_compose_section "$destination"
   cat >>"$destination" <<'COMPOSE'
 volumes:
   postgres-data:
 COMPOSE
   write_proxy_footer_compose_section "$destination"
+}
+
+write_app_trace_depends_on_compose_section() {
+  destination="$1"
+
+  if [ "$APPALOFT_SELF_HOST_TRACE" != "jaeger" ]; then
+    return
+  fi
+
+  cat >>"$destination" <<'COMPOSE'
+    depends_on:
+      jaeger:
+        condition: service_started
+COMPOSE
+}
+
+write_app_trace_depends_on_entry_compose_section() {
+  destination="$1"
+
+  if [ "$APPALOFT_SELF_HOST_TRACE" != "jaeger" ]; then
+    return
+  fi
+
+  cat >>"$destination" <<'COMPOSE'
+      jaeger:
+        condition: service_started
+COMPOSE
 }
 
 write_app_proxy_compose_section() {
@@ -946,6 +1079,29 @@ COMPOSE
     networks:
       - default
       - appaloft-edge
+COMPOSE
+}
+
+write_trace_service_compose_section() {
+  destination="$1"
+
+  if [ "$APPALOFT_SELF_HOST_TRACE" != "jaeger" ]; then
+    return
+  fi
+
+  cat >>"$destination" <<'COMPOSE'
+
+  jaeger:
+    image: ${APPALOFT_JAEGER_IMAGE}
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "${APPALOFT_JAEGER_UI_HOST}:${APPALOFT_JAEGER_UI_PORT}:16686"
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
 COMPOSE
 }
 
@@ -1071,6 +1227,14 @@ APPALOFT_SELF_HOST_ORCHESTRATOR=$APPALOFT_SELF_HOST_ORCHESTRATOR
 APPALOFT_SELF_HOST_PROXY=$APPALOFT_SELF_HOST_PROXY
 APPALOFT_EDGE_NETWORK_NAME=$APPALOFT_EDGE_NETWORK_NAME
 APPALOFT_TRAEFIK_IMAGE=$APPALOFT_TRAEFIK_IMAGE
+APPALOFT_SELF_HOST_TRACE=$APPALOFT_SELF_HOST_TRACE
+APPALOFT_JAEGER_IMAGE=$APPALOFT_JAEGER_IMAGE
+APPALOFT_JAEGER_UI_HOST=$APPALOFT_JAEGER_UI_HOST
+APPALOFT_JAEGER_UI_PORT=$APPALOFT_JAEGER_UI_PORT
+APPALOFT_OTEL_ENABLED=$appaloft_otel_enabled
+APPALOFT_OTEL_SERVICE_NAME=$APPALOFT_OTEL_SERVICE_NAME
+APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT=$appaloft_otel_exporter_endpoint
+APPALOFT_TRACE_LINK_BASE_URL=$appaloft_trace_link_base_url
 APPALOFT_SWARM_STACK_NAME=$APPALOFT_SWARM_STACK_NAME
 APPALOFT_BOOTSTRAP_DEPLOY_TOKEN=$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN
 APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE=$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE
@@ -1095,6 +1259,14 @@ APPALOFT_SELF_HOST_ORCHESTRATOR=$APPALOFT_SELF_HOST_ORCHESTRATOR
 APPALOFT_SELF_HOST_PROXY=$APPALOFT_SELF_HOST_PROXY
 APPALOFT_EDGE_NETWORK_NAME=$APPALOFT_EDGE_NETWORK_NAME
 APPALOFT_TRAEFIK_IMAGE=$APPALOFT_TRAEFIK_IMAGE
+APPALOFT_SELF_HOST_TRACE=$APPALOFT_SELF_HOST_TRACE
+APPALOFT_JAEGER_IMAGE=$APPALOFT_JAEGER_IMAGE
+APPALOFT_JAEGER_UI_HOST=$APPALOFT_JAEGER_UI_HOST
+APPALOFT_JAEGER_UI_PORT=$APPALOFT_JAEGER_UI_PORT
+APPALOFT_OTEL_ENABLED=$appaloft_otel_enabled
+APPALOFT_OTEL_SERVICE_NAME=$APPALOFT_OTEL_SERVICE_NAME
+APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT=$appaloft_otel_exporter_endpoint
+APPALOFT_TRACE_LINK_BASE_URL=$appaloft_trace_link_base_url
 APPALOFT_SWARM_STACK_NAME=$APPALOFT_SWARM_STACK_NAME
 APPALOFT_POSTGRES_IMAGE=$APPALOFT_POSTGRES_IMAGE
 APPALOFT_BOOTSTRAP_DEPLOY_TOKEN=$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN
@@ -1149,6 +1321,14 @@ docker_stack_deploy() {
     APPALOFT_SELF_HOST_PROXY="$APPALOFT_SELF_HOST_PROXY" \
     APPALOFT_EDGE_NETWORK_NAME="$APPALOFT_EDGE_NETWORK_NAME" \
     APPALOFT_TRAEFIK_IMAGE="$APPALOFT_TRAEFIK_IMAGE" \
+    APPALOFT_SELF_HOST_TRACE="$APPALOFT_SELF_HOST_TRACE" \
+    APPALOFT_JAEGER_IMAGE="$APPALOFT_JAEGER_IMAGE" \
+    APPALOFT_JAEGER_UI_HOST="$APPALOFT_JAEGER_UI_HOST" \
+    APPALOFT_JAEGER_UI_PORT="$APPALOFT_JAEGER_UI_PORT" \
+    APPALOFT_OTEL_ENABLED="$appaloft_otel_enabled" \
+    APPALOFT_OTEL_SERVICE_NAME="$APPALOFT_OTEL_SERVICE_NAME" \
+    APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT="$appaloft_otel_exporter_endpoint" \
+    APPALOFT_TRACE_LINK_BASE_URL="$appaloft_trace_link_base_url" \
     APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE="$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE" \
     APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE="$APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE" \
     APPALOFT_FIRST_ADMIN_EMAIL="$APPALOFT_FIRST_ADMIN_EMAIL" \
@@ -1337,6 +1517,10 @@ validate_port
 validate_database
 validate_orchestrator
 validate_proxy
+validate_trace
+if [ "$APPALOFT_SELF_HOST_TRACE" = "jaeger" ]; then
+  validate_jaeger_ui_port
+fi
 case "$APPALOFT_BOOTSTRAP_DEPLOY_TOKEN" in
   1 | true | TRUE | yes | YES | on | ON)
     APPALOFT_BOOTSTRAP_DEPLOY_TOKEN=1
@@ -1362,6 +1546,13 @@ appaloft_version="$(normalize_version "$APPALOFT_VERSION")"
 appaloft_image_ref="$(image_ref "$appaloft_version")"
 appaloft_home="$(choose_home)"
 appaloft_web_origin="$(resolve_web_origin)"
+appaloft_otel_exporter_endpoint="$(resolve_otel_exporter_endpoint)"
+appaloft_trace_link_base_url="$(resolve_trace_link_base_url)"
+if [ "$APPALOFT_SELF_HOST_TRACE" = "jaeger" ]; then
+  appaloft_otel_enabled=true
+else
+  appaloft_otel_enabled=false
+fi
 compose_file="$appaloft_home/docker-compose.yml"
 env_file="$appaloft_home/.env"
 
@@ -1388,6 +1579,12 @@ if [ "$APPALOFT_INSTALL_DRY_RUN" = "1" ]; then
     say "console domain: $APPALOFT_CONSOLE_DOMAIN"
   fi
   say "proxy: $APPALOFT_SELF_HOST_PROXY"
+  say "trace: $APPALOFT_SELF_HOST_TRACE"
+  if [ "$APPALOFT_SELF_HOST_TRACE" = "jaeger" ]; then
+    say "jaeger image: $APPALOFT_JAEGER_IMAGE"
+    say "jaeger ui: $appaloft_trace_link_base_url"
+    say "otlp endpoint: $appaloft_otel_exporter_endpoint"
+  fi
   say "database: $APPALOFT_SELF_HOST_DATABASE"
   if truthy "$APPALOFT_SKIP_DOCKER_INSTALL"; then
     say "install docker: no"
@@ -1448,6 +1645,10 @@ fi
 say "Database: $APPALOFT_SELF_HOST_DATABASE"
 say "Orchestrator: $APPALOFT_SELF_HOST_ORCHESTRATOR"
 say "Proxy: $APPALOFT_SELF_HOST_PROXY"
+say "Trace: $APPALOFT_SELF_HOST_TRACE"
+if [ "$APPALOFT_SELF_HOST_TRACE" = "jaeger" ]; then
+  say "Jaeger UI: $appaloft_trace_link_base_url"
+fi
 if [ "${appaloft_traefik_service_external:-0}" = "1" ]; then
   say "Traefik: existing appaloft-traefik container"
 fi
