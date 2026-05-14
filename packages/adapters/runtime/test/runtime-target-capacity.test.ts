@@ -42,10 +42,29 @@ describe("runtime target capacity diagnostics", () => {
     expect(script).toContain("CAPACITY_APPALOFT_WORKSPACE");
     expect(script).toContain(".appaloft-rollback-candidate");
     expect(script).toContain("du -sk");
+    expect(script.indexOf("CAPACITY_APPALOFT_CONTAINER")).toBeLessThan(
+      script.indexOf("docker system df"),
+    );
     expect(script).not.toContain("docker system prune");
     expect(script).not.toContain("docker volume prune");
     expect(script).not.toContain(" rm ");
     expect(script).not.toContain("rm -rf");
+  });
+
+  test("[RT-USAGE-002][RT-USAGE-004] renders a bounded attribution profile before expensive capacity checks", () => {
+    const script = renderRuntimeTargetCapacityScript({
+      runtimeRoot: "/var/lib/appaloft/runtime",
+      profile: "attribution",
+    });
+
+    expect(script).toContain("APPALOFT_CAPACITY_PROFILE='attribution'");
+    expect(script).toContain("CAPACITY_APPALOFT_CONTAINER");
+    expect(script).toContain("CAPACITY_APPALOFT_WORKSPACE");
+    expect(script).toContain("exit 0");
+    expect(script.indexOf("CAPACITY_APPALOFT_CONTAINER")).toBeLessThan(script.indexOf("exit 0"));
+    expect(script.indexOf("CAPACITY_APPALOFT_WORKSPACE")).toBeLessThan(script.indexOf("exit 0"));
+    expect(script.indexOf("exit 0")).toBeLessThan(script.indexOf("docker system df"));
+    expect(script.indexOf("exit 0")).toBeLessThan(script.indexOf("df -P -k"));
   });
 
   test("[RUNTIME-CAPACITY-INSPECT-002] parses disk, inode, Docker, runtime, and warning output", () => {

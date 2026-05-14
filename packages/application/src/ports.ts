@@ -1557,6 +1557,7 @@ export interface RuntimeTargetCapacityInspector {
     context: ExecutionContext,
     input: {
       server: DeploymentTargetState;
+      profile?: "full" | "attribution";
     },
   ): Promise<Result<RuntimeTargetCapacityInspection>>;
 }
@@ -1716,6 +1717,7 @@ export interface RuntimeUsageInspectorInput {
   mode: "current";
   includeArtifacts: boolean;
   includeWarnings: boolean;
+  collectionProfile?: "full" | "attribution";
 }
 
 export interface RuntimeUsageInspector {

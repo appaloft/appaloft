@@ -81,17 +81,59 @@ export function renderRuntimeTargetCapacityScript(input: {
   runtimeRoot: string;
   stateRoot?: string;
   sourceWorkspaceRoot?: string;
+  profile?: "full" | "attribution";
 }): string {
   const runtimeRoot = input.runtimeRoot.replace(/\/+$/, "");
   const stateRoot = input.stateRoot ?? `${runtimeRoot}/state`;
   const sourceWorkspaceRoot = input.sourceWorkspaceRoot ?? `${runtimeRoot}/ssh-deployments`;
+  const profile = input.profile ?? "full";
 
   return [
     "set +e",
     `APPALOFT_RUNTIME_ROOT=${shellQuote(runtimeRoot)}`,
     `APPALOFT_STATE_ROOT=${shellQuote(stateRoot)}`,
     `APPALOFT_SOURCE_WORKSPACE_ROOT=${shellQuote(sourceWorkspaceRoot)}`,
+    `APPALOFT_CAPACITY_PROFILE=${shellQuote(profile)}`,
     "printf 'APPALOFT_CAPACITY_V1\\n'",
+    "if command -v docker >/dev/null 2>&1; then",
+    "  APPALOFT_DOCKER_AVAILABLE=1",
+    "  docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do",
+    "    [ -n \"$container_id\" ] || continue",
+    `    docker inspect --size --format ${shellQuote(
+      [
+        "CAPACITY_APPALOFT_CONTAINER",
+        "{{.Id}}",
+        "{{.Name}}",
+        "{{.State.Running}}",
+        "{{.State.Status}}",
+        "{{.SizeRw}}",
+        '{{ index .Config.Labels "appaloft.deployment-id" }}',
+        '{{ index .Config.Labels "appaloft.project-id" }}',
+        '{{ index .Config.Labels "appaloft.environment-id" }}',
+        '{{ index .Config.Labels "appaloft.resource-id" }}',
+        '{{ index .Config.Labels "appaloft.server-id" }}',
+        '{{ index .Config.Labels "appaloft.destination-id" }}',
+        '{{ index .Config.Labels "appaloft.artifact-kind" }}',
+      ].join("\\t"),
+    )} "$container_id" 2>/dev/null`,
+    "  done",
+    "else",
+    "  APPALOFT_DOCKER_AVAILABLE=0",
+    "  printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
+    "fi",
+    "if [ \"$APPALOFT_CAPACITY_PROFILE\" = \"attribution\" ]; then",
+    "  if [ -d \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" ]; then",
+    "    find \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do",
+    "      name=$(basename \"$workspace\")",
+    "      active_marker=false",
+    "      rollback_marker=false",
+    "      [ -e \"$workspace/.appaloft-active\" ] && active_marker=true",
+    "      [ -e \"$workspace/.appaloft-rollback-candidate\" ] && rollback_marker=true",
+    "      printf 'CAPACITY_APPALOFT_WORKSPACE\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$name\" \"$workspace\" \"\" \"$active_marker\" \"$rollback_marker\"",
+    "    done",
+    "  fi",
+    "  exit 0",
+    "fi",
     "emit_disk() {",
     "  target_path=\"$1\"",
     "  df -P -k \"$target_path\" 2>/dev/null | awk -v p=\"$target_path\" 'NR==2 {gsub(/%/, \"\", $5); printf \"CAPACITY_DISK\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n\", p, $6, $2, $3, $4, $5}'",
@@ -137,7 +179,7 @@ export function renderRuntimeTargetCapacityScript(input: {
     "else",
     "  printf 'CAPACITY_CPU\\t%s\\t\\t\\t\\n' \"${cores:-}\"",
     "fi",
-    "if command -v docker >/dev/null 2>&1; then",
+    "if [ \"$APPALOFT_DOCKER_AVAILABLE\" = \"1\" ]; then",
     "  docker_system_df_output=$(docker system df 2>&1)",
     "  docker_status=$?",
     "  if [ \"$docker_status\" = \"0\" ]; then",
@@ -145,28 +187,6 @@ export function renderRuntimeTargetCapacityScript(input: {
     "  else",
     "    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker system df failed\\n'",
     "  fi",
-    "  docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do",
-    "    [ -n \"$container_id\" ] || continue",
-    `    docker inspect --size --format ${shellQuote(
-      [
-        "CAPACITY_APPALOFT_CONTAINER",
-        "{{.Id}}",
-        "{{.Name}}",
-        "{{.State.Running}}",
-        "{{.State.Status}}",
-        "{{.SizeRw}}",
-        '{{ index .Config.Labels "appaloft.deployment-id" }}',
-        '{{ index .Config.Labels "appaloft.project-id" }}',
-        '{{ index .Config.Labels "appaloft.environment-id" }}',
-        '{{ index .Config.Labels "appaloft.resource-id" }}',
-        '{{ index .Config.Labels "appaloft.server-id" }}',
-        '{{ index .Config.Labels "appaloft.destination-id" }}',
-        '{{ index .Config.Labels "appaloft.artifact-kind" }}',
-      ].join("\\t"),
-    )} "$container_id" 2>/dev/null`,
-    "  done",
-    "else",
-    "  printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
     "fi",
   ].join("\n");
 }
@@ -867,6 +887,7 @@ export class RuntimeTargetCapacityInspectorAdapter implements RuntimeTargetCapac
     _context: ExecutionContext,
     input: {
       server: DeploymentTargetState;
+      profile?: "full" | "attribution";
     },
   ): Promise<Result<RuntimeTargetCapacityInspection>> {
     const providerKey = input.server.providerKey.value;
@@ -884,6 +905,7 @@ export class RuntimeTargetCapacityInspectorAdapter implements RuntimeTargetCapac
 
     const script = renderRuntimeTargetCapacityScript({
       runtimeRoot: providerKey === "generic-ssh" ? this.remoteRuntimeRoot : this.localRuntimeRoot,
+      profile: input.profile ?? "full",
     });
     const result =
       providerKey === "generic-ssh"
