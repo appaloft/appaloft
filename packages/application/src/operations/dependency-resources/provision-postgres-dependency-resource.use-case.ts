@@ -7,6 +7,8 @@ import {
   DependencyResourceProviderResourceHandle,
   DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
+  DeploymentTargetByIdSpec,
+  DeploymentTargetId,
   DescriptionText,
   domainError,
   EnvironmentByIdSpec,
@@ -38,9 +40,11 @@ import {
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
+  type ManagedDependencySingleServerTarget,
   type ManagedPostgresProviderPort,
   type ProcessAttemptRecorder,
   type ProjectRepository,
+  type ServerRepository,
 } from "../../ports";
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
@@ -97,6 +101,8 @@ export class ProvisionPostgresDependencyResourceUseCase {
     private readonly projectRepository: ProjectRepository,
     @inject(tokens.environmentRepository)
     private readonly environmentRepository: EnvironmentRepository,
+    @inject(tokens.serverRepository)
+    private readonly serverRepository: ServerRepository,
     @inject(tokens.dependencyResourceRepository)
     private readonly dependencyResourceRepository: DependencyResourceRepository,
     @inject(tokens.dependencyResourceSecretStore)
@@ -131,6 +137,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
       managedPostgresProvider,
       processAttemptRecorder,
       projectRepository,
+      serverRepository,
     } = this;
 
     return safeTry(async function* () {
@@ -183,6 +190,16 @@ export class ProvisionPostgresDependencyResourceUseCase {
           }),
         );
       }
+
+      const realizationTargetResult = input.serverId
+        ? await resolveSingleServerTarget({
+            context,
+            serverRepository,
+            serverId: input.serverId,
+            operation: "dependency-resources.provision-postgres",
+          })
+        : ok(undefined);
+      const realizationTarget = yield* realizationTargetResult;
 
       const existing = await dependencyResourceRepository.findOne(
         repositoryContext,
@@ -253,31 +270,62 @@ export class ProvisionPostgresDependencyResourceUseCase {
         slug: slug.value,
         attemptId: realizationAttemptId.value,
         requestedAt: attemptedAt.value,
+        ...(realizationTarget ? { target: realizationTarget } : {}),
       });
       if (realization.isOk()) {
         const realizedAt = yield* OccurredAt.create(realization.value.realizedAt);
         const providerResourceHandle = yield* DependencyResourceProviderResourceHandle.create(
           realization.value.providerResourceHandle,
         );
-        const connectionSecretRef = realization.value.secretRef
-          ? DependencyResourceSecretRef.create(realization.value.secretRef)
+        let realizedSecretRef = realization.value.secretRef;
+        let secretStoreFailureMessage: string | undefined;
+        if (realization.value.connectionSecretValue) {
+          const storedConnection = await dependencyResourceSecretStore.storeConnection(context, {
+            dependencyResourceId: dependencyResourceId.value,
+            projectId: projectId.value,
+            environmentId: environmentId.value,
+            kind: "postgres",
+            purpose: "connection",
+            secretValue: realization.value.connectionSecretValue,
+            storedAt: realizedAt.value,
+          });
+          if (storedConnection.isErr()) {
+            secretStoreFailureMessage = storedConnection.error.message;
+          } else {
+            realizedSecretRef = storedConnection.value.secretRef;
+          }
+        }
+        const connectionSecretRef = realizedSecretRef
+          ? DependencyResourceSecretRef.create(realizedSecretRef)
           : undefined;
         const bindingReadiness = await resolveManagedPostgresBindingReadiness({
           context,
           dependencyResourceSecretStore,
-          ...(realization.value.secretRef ? { secretRef: realization.value.secretRef } : {}),
+          ...(realizedSecretRef ? { secretRef: realizedSecretRef } : {}),
           secretRefValid: connectionSecretRef ? connectionSecretRef.isOk() : false,
         });
-        yield* dependencyResource.markProviderRealized({
-          attemptId: realizationAttemptId,
-          providerResourceHandle,
-          endpoint: realization.value.endpoint,
-          ...(connectionSecretRef?.isOk()
-            ? { connectionSecretRef: connectionSecretRef.value }
-            : {}),
-          bindingReadiness,
-          realizedAt,
-        });
+        if (secretStoreFailureMessage) {
+          const failureCode = yield* DependencyResourceProviderFailureCode.create(
+            "dependency_secret_store_error",
+          );
+          yield* dependencyResource.markProviderRealizationFailed({
+            attemptId: realizationAttemptId,
+            failureCode,
+            failureMessage: DescriptionText.rehydrate(secretStoreFailureMessage),
+            failedAt: realizedAt,
+          });
+        } else {
+          yield* dependencyResource.markProviderRealized({
+            attemptId: realizationAttemptId,
+            providerResourceHandle,
+            endpoint: realization.value.endpoint,
+            ...(connectionSecretRef?.isOk()
+              ? { connectionSecretRef: connectionSecretRef.value }
+              : {}),
+            bindingReadiness,
+            realizedAt,
+          });
+        }
       } else {
         const failedAt = yield* OccurredAt.create(clock.now());
         const failureCode = yield* DependencyResourceProviderFailureCode.create(
@@ -307,6 +355,60 @@ export class ProvisionPostgresDependencyResourceUseCase {
       return ok({ id: dependencyResource.toState().id.value });
     });
   }
+}
+
+async function resolveSingleServerTarget(input: {
+  context: ExecutionContext;
+  serverRepository: ServerRepository;
+  serverId: string;
+  operation: string;
+}): Promise<Result<ManagedDependencySingleServerTarget>> {
+  const serverId = DeploymentTargetId.rehydrate(input.serverId);
+  const server = await input.serverRepository.findOne(
+    toRepositoryContext(input.context),
+    DeploymentTargetByIdSpec.create(serverId),
+  );
+  if (!server) {
+    return err(domainError.notFound("server", input.serverId));
+  }
+  const lifecycleGuard = server.ensureCanAcceptNewWork(input.operation);
+  if (lifecycleGuard.isErr()) {
+    return err(lifecycleGuard.error);
+  }
+  const state = server.toState();
+  if (state.targetKind.value !== "single-server") {
+    return err(
+      domainError.providerCapabilityUnsupported("Managed dependency target must be single-server", {
+        phase: "dependency-resource-realization-admission",
+        serverId: input.serverId,
+        targetKind: state.targetKind.value,
+        operation: input.operation,
+      }),
+    );
+  }
+  const providerKey = state.providerKey.value;
+  if (providerKey !== "local-shell" && providerKey !== "generic-ssh") {
+    return err(
+      domainError.providerCapabilityUnsupported(
+        "Managed dependency target must use local-shell or generic-ssh",
+        {
+          phase: "dependency-resource-realization-admission",
+          serverId: input.serverId,
+          providerKey,
+          operation: input.operation,
+        },
+      ),
+    );
+  }
+  return ok({
+    serverId: state.id.value,
+    providerKey,
+    targetKind: "single-server",
+    host: state.host.value,
+    port: state.port.value,
+    ...(state.credential?.username ? { username: state.credential.username.value } : {}),
+    ...(state.credential?.privateKey ? { privateKey: state.credential.privateKey.value } : {}),
+  });
 }
 
 async function recordManagedPostgresRealizationProcessAttempt(input: {

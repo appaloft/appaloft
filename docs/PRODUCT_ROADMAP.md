@@ -2525,6 +2525,10 @@ External baseline research points to this practical minimum:
 - [ ] Full HTTPS/ACME, force HTTPS, and redirect lifecycle closure.
 - [ ] Environment variables, build-time arguments, build secrets, and secret masking.
 - [ ] Persistent storage and databases with service binding, backup/restore, and deletion behavior.
+  Docker-backed Appaloft-managed Postgres/Redis for `local-shell` and `generic-ssh`
+  single-server targets now covers provision, safe secret storage, bind-ready runtime injection,
+  backup/restore, provider cleanup, and Web console lifecycle controls; storage-volume parity,
+  scheduled backup policy, and broader database/provider catalog coverage remain open.
 - [ ] Git source binding, webhooks, auto-deploy, Action PR previews, and product-grade preview
   deployments.
 - [ ] Deployment history, standalone event stream, health checks, rollbacks, and resource limits.
@@ -2559,6 +2563,8 @@ Recommended next Spec Rounds before broad Code Rounds:
 - [ ] Access/domain/TLS closure: domain binding show/update/delete/retry and certificate
   import/revoke/retry.
 - [ ] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,
-  backup/restore, and delete.
+  backup/restore, and delete. Docker-backed Appaloft-managed Postgres/Redis for single-server
+  targets is implemented in the shell provider and Web console; remaining work is scheduled
+  policy/prune/export, storage-volume parity, and broader provider catalog coverage.
 - [ ] Operator state closure: outbox/inbox/jobs, remote SSH state diagnostics, runtime target
   capacity diagnostics, audit/event retention, and prune/recovery commands.

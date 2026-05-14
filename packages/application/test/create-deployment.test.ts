@@ -820,6 +820,7 @@ async function createDeploymentFixture(
       dependencyResources,
       dependencyResourceBackups,
       dependencyResourceBackupProvider,
+      dependencyResourceSecretStore,
       clock,
       idGenerator,
       eventBus,
@@ -845,6 +846,7 @@ async function createDeploymentFixture(
     provisionPostgres: new ProvisionPostgresDependencyResourceUseCase(
       projects,
       environments,
+      servers,
       dependencyResources,
       dependencyResourceSecretStore,
       clock,
@@ -856,6 +858,7 @@ async function createDeploymentFixture(
     provisionRedis: new ProvisionRedisDependencyResourceUseCase(
       projects,
       environments,
+      servers,
       dependencyResources,
       dependencyResourceSecretStore,
       clock,
@@ -871,6 +874,7 @@ async function createDeploymentFixture(
       dependencyResources,
       dependencyResourceBackups,
       dependencyResourceBackupProvider,
+      dependencyResourceSecretStore,
       clock,
       idGenerator,
       eventBus,

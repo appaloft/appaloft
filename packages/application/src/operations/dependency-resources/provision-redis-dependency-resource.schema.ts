@@ -6,6 +6,7 @@ import { dependencyResourceBackupRelationshipInputSchema } from "./dependency-re
 export const provisionRedisDependencyResourceCommandInputSchema = z.object({
   projectId: nonEmptyTrimmedString("Project id"),
   environmentId: nonEmptyTrimmedString("Environment id"),
+  serverId: nonEmptyTrimmedString("Server id").optional(),
   name: nonEmptyTrimmedString("Dependency resource name"),
   providerKey: nonEmptyTrimmedString("Provider key").optional(),
   description: nonEmptyTrimmedString("Description").optional(),

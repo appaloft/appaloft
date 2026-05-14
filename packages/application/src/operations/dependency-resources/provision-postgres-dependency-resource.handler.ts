@@ -24,6 +24,7 @@ export class ProvisionPostgresDependencyResourceCommandHandler
     return this.useCase.execute(context, {
       projectId: command.projectId,
       environmentId: command.environmentId,
+      ...(command.serverId ? { serverId: command.serverId } : {}),
       name: command.name,
       ...(command.providerKey ? { providerKey: command.providerKey } : {}),
       ...(command.description ? { description: command.description } : {}),

@@ -7,6 +7,8 @@ import {
   DependencyResourceProviderResourceHandle,
   DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
+  DeploymentTargetByIdSpec,
+  DeploymentTargetId,
   DescriptionText,
   domainError,
   EnvironmentByIdSpec,
@@ -38,9 +40,11 @@ import {
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
+  type ManagedDependencySingleServerTarget,
   type ManagedRedisProviderPort,
   type ProcessAttemptRecorder,
   type ProjectRepository,
+  type ServerRepository,
 } from "../../ports";
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
@@ -97,6 +101,8 @@ export class ProvisionRedisDependencyResourceUseCase {
     private readonly projectRepository: ProjectRepository,
     @inject(tokens.environmentRepository)
     private readonly environmentRepository: EnvironmentRepository,
+    @inject(tokens.serverRepository)
+    private readonly serverRepository: ServerRepository,
     @inject(tokens.dependencyResourceRepository)
     private readonly dependencyResourceRepository: DependencyResourceRepository,
     @inject(tokens.dependencyResourceSecretStore)
@@ -131,6 +137,7 @@ export class ProvisionRedisDependencyResourceUseCase {
       managedRedisProvider,
       processAttemptRecorder,
       projectRepository,
+      serverRepository,
     } = this;
 
     return safeTry(async function* () {
@@ -181,6 +188,16 @@ export class ProvisionRedisDependencyResourceUseCase {
           }),
         );
       }
+
+      const realizationTargetResult = input.serverId
+        ? await resolveSingleServerTarget({
+            context,
+            serverRepository,
+            serverId: input.serverId,
+            operation: "dependency-resources.provision-redis",
+          })
+        : ok(undefined);
+      const realizationTarget = yield* realizationTargetResult;
 
       const existing = await dependencyResourceRepository.findOne(
         repositoryContext,
@@ -251,6 +268,7 @@ export class ProvisionRedisDependencyResourceUseCase {
         slug: slug.value,
         attemptId: realizationAttemptId.value,
         requestedAt: attemptedAt.value,
+        ...(realizationTarget ? { target: realizationTarget } : {}),
       });
       if (realization.isOk()) {
         const realizedAt = yield* OccurredAt.create(realization.value.realizedAt);
@@ -334,6 +352,60 @@ export class ProvisionRedisDependencyResourceUseCase {
       return ok({ id: dependencyResourceId.value });
     });
   }
+}
+
+async function resolveSingleServerTarget(input: {
+  context: ExecutionContext;
+  serverRepository: ServerRepository;
+  serverId: string;
+  operation: string;
+}): Promise<Result<ManagedDependencySingleServerTarget>> {
+  const serverId = DeploymentTargetId.rehydrate(input.serverId);
+  const server = await input.serverRepository.findOne(
+    toRepositoryContext(input.context),
+    DeploymentTargetByIdSpec.create(serverId),
+  );
+  if (!server) {
+    return err(domainError.notFound("server", input.serverId));
+  }
+  const lifecycleGuard = server.ensureCanAcceptNewWork(input.operation);
+  if (lifecycleGuard.isErr()) {
+    return err(lifecycleGuard.error);
+  }
+  const state = server.toState();
+  if (state.targetKind.value !== "single-server") {
+    return err(
+      domainError.providerCapabilityUnsupported("Managed dependency target must be single-server", {
+        phase: "dependency-resource-realization-admission",
+        serverId: input.serverId,
+        targetKind: state.targetKind.value,
+        operation: input.operation,
+      }),
+    );
+  }
+  const providerKey = state.providerKey.value;
+  if (providerKey !== "local-shell" && providerKey !== "generic-ssh") {
+    return err(
+      domainError.providerCapabilityUnsupported(
+        "Managed dependency target must use local-shell or generic-ssh",
+        {
+          phase: "dependency-resource-realization-admission",
+          serverId: input.serverId,
+          providerKey,
+          operation: input.operation,
+        },
+      ),
+    );
+  }
+  return ok({
+    serverId: state.id.value,
+    providerKey,
+    targetKind: "single-server",
+    host: state.host.value,
+    port: state.port.value,
+    ...(state.credential?.username ? { username: state.credential.username.value } : {}),
+    ...(state.credential?.privateKey ? { privateKey: state.credential.privateKey.value } : {}),
+  });
 }
 
 async function recordManagedRedisRealizationProcessAttempt(input: {

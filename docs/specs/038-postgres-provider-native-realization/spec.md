@@ -3,7 +3,8 @@
 ## Status
 
 - Round: Code Round / Post-Implementation Sync
-- Artifact state: implemented with hermetic provider capability and source-of-truth alignment
+- Artifact state: implemented with Docker-backed single-server shell capability, hermetic fallback,
+  and source-of-truth alignment
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, semantic upgrade to managed Postgres lifecycle
 - Decision state: no-ADR-needed
@@ -15,8 +16,10 @@ the provider-native database through an injected provider capability, then bind 
 delete it only through explicit safety and provider cleanup rules.
 
 This closes the realization/delete gap between the provider-neutral Postgres record baseline and
-the first useful managed-database loop. It does not yet run backup/restore, inject runtime
-environment values into running workloads, or add Redis provider-native lifecycle.
+the first useful managed-database loop. The default shell composition can now realize Postgres as a
+Docker container and named volume on a registered `local-shell` or `generic-ssh` single-server
+target when the command supplies `serverId`. It does not rotate provider credentials, restart
+running workloads, or schedule recurring backups.
 
 ## Discover Findings
 
@@ -33,8 +36,9 @@ environment values into running workloads, or add Redis provider-native lifecycl
 5. `dependency-resources.delete` remains fail-closed. For Appaloft-managed realized Postgres it must
    first pass binding, backup, snapshot, and provider safety checks, then use provider cleanup before
    tombstoning the Appaloft record.
-6. Backup/restore execution remains a following Phase 7 slice. This spec only defines the lifecycle
-   fields and blockers needed so backup ownership can fail delete closed.
+6. Docker-backed single-server realization uses a safe provider handle to retain the owning server
+   id and container name. The shell provider resolves that handle for delete, backup, and restore;
+   raw connection URLs are stored only through `DependencyResourceSecretStore`.
 
 ## Ubiquitous Language
 
@@ -57,7 +61,8 @@ environment values into running workloads, or add Redis provider-native lifecycl
 | DEP-RES-PG-NATIVE-005 | Delete managed realized Postgres safely | Realized managed Postgres has no binding, backup, snapshot, or provider safety blockers | `dependency-resources.delete` is called | Provider delete is requested/applied, process-attempt cleanup visibility is recorded, Appaloft record is tombstoned only after cleanup state is durable, and no runtime or deployment snapshot is mutated. |
 | DEP-RES-PG-NATIVE-006 | Block managed delete while protected | Resource has active binding, backup retention, retained snapshot, or provider unsafe blocker | `dependency-resources.delete` is called | Returns `dependency_resource_delete_blocked`, no provider cleanup is requested. |
 | DEP-RES-PG-NATIVE-007 | Provider unsupported | Selected provider lacks managed Postgres realization | `dependency-resources.provision-postgres` is called | Admission returns `provider_capability_unsupported`, `phase = dependency-resource-realization-admission`, no resource is persisted unless caller explicitly requested metadata-only mode. |
-| DEP-RES-PG-NATIVE-008 | Entrypoint contract remains stable | CLI/oRPC/HTTP call provision/delete/bind operations | Operation catalog and transports are inspected | Existing command/query schemas are reused or explicitly extended; no provider SDK shape or raw secret field leaks into transport contracts. |
+| DEP-RES-PG-NATIVE-008 | Realize on a single-server Docker target | Active project/environment, active `local-shell` or `generic-ssh` single-server target, and default managed Postgres provider | `dependency-resources.provision-postgres` includes `serverId` | Shell provider creates/replaces a Docker container, named Docker volume, and `appaloft-edge` network attachment; returns a safe Docker provider handle, masked endpoint, and raw connection value for Appaloft-owned secret storage. |
+| DEP-RES-PG-NATIVE-009 | Entrypoint contract remains stable | CLI/oRPC/HTTP call provision/delete/bind operations | Operation catalog and transports are inspected | Existing command/query schemas are reused or explicitly extended; no provider SDK shape or raw secret field leaks into transport contracts. |
 
 ## Domain Ownership
 
@@ -79,8 +84,11 @@ environment values into running workloads, or add Redis provider-native lifecycl
 
 - API/oRPC: keep `POST /api/dependency-resources/postgres/provision` for managed creation and
   `DELETE /api/dependency-resources/{dependencyResourceId}` for managed cleanup after safety.
-- CLI: keep `appaloft dependency postgres provision` and `appaloft dependency delete`.
-- Web/UI: migration gap unless a Docs/Web round adds affordances in the same PR.
+- CLI: keep `appaloft dependency postgres provision`; add optional `--server <serverId>` for the
+  Docker-backed single-server target; keep `appaloft dependency delete`.
+- Web/UI: `/dependency-resources` can create Docker-backed managed Postgres on a selected
+  single-server target and expose safe backup/restore/delete actions through existing HTTP/oRPC
+  contracts.
 - Events: add provider-safe lifecycle event specs during Code Round:
   `dependency-resource-realization-requested`, `dependency-resource-realized`,
   `dependency-resource-realization-failed`, and `dependency-resource-provider-delete-requested`.
@@ -118,15 +126,15 @@ attempt id, and sanitized provider error code/message.
 
 ## Non-Goals
 
-- No Redis provider-native lifecycle.
-- No backup/restore execution.
-- No runtime environment injection into running workloads.
+- No Redis provider-native lifecycle in this spec.
+- No scheduled backup policy or backup pruning.
+- No runtime restart or forced redeploy of running workloads.
 - No deployment retry/redeploy/rollback.
 - No provider SDK types in `core`, contracts, CLI, or Web.
 - No mutation of historical deployment snapshots.
 
 ## Open Questions
 
-The Code Round uses an injected hermetic provider capability with the same safe durable status shape
-that a later background provider worker must preserve. Durable outbox/process ownership remains a
-platform migration gap.
+The Code Round still keeps a hermetic fallback when no `serverId` is supplied so existing tests and
+metadata-only development flows remain stable. Durable outbox/process ownership remains a platform
+migration gap.

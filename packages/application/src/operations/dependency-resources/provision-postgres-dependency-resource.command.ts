@@ -16,6 +16,7 @@ export class ProvisionPostgresDependencyResourceCommand extends Command<{ id: st
   constructor(
     public readonly projectId: string,
     public readonly environmentId: string,
+    public readonly serverId: string | undefined,
     public readonly name: string,
     public readonly providerKey?: string,
     public readonly description?: string,
@@ -32,6 +33,7 @@ export class ProvisionPostgresDependencyResourceCommand extends Command<{ id: st
         new ProvisionPostgresDependencyResourceCommand(
           parsed.projectId,
           parsed.environmentId,
+          parsed.serverId,
           parsed.name,
           parsed.providerKey,
           parsed.description,

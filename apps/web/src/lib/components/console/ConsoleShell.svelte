@@ -4,6 +4,7 @@
   import { page } from "$app/state";
   import {
     BookOpen,
+    Database,
     ChevronUp,
     FolderOpen,
     Gauge,
@@ -89,6 +90,11 @@
     { href: "/", labelKey: i18nKeys.console.nav.home, icon: Gauge },
     { href: "/projects", labelKey: i18nKeys.console.nav.projects, icon: FolderOpen },
     { href: "/servers", labelKey: i18nKeys.console.nav.servers, icon: Server },
+    {
+      href: "/dependency-resources",
+      labelKey: i18nKeys.console.nav.dependencyResources,
+      icon: Database,
+    },
     { href: "/domain-bindings", labelKey: i18nKeys.console.nav.domainBindings, icon: Globe2 },
     { href: "/deployments", labelKey: i18nKeys.console.nav.deployments, icon: Rocket },
     {

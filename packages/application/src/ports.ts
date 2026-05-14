@@ -6413,6 +6413,7 @@ export interface ManagedPostgresRealizationInput {
   slug: string;
   attemptId: string;
   requestedAt: string;
+  target?: ManagedDependencySingleServerTarget;
 }
 
 export interface ManagedPostgresRealizationResult {
@@ -6424,6 +6425,7 @@ export interface ManagedPostgresRealizationResult {
     maskedConnection: string;
   };
   secretRef?: string;
+  connectionSecretValue?: string;
   realizedAt: string;
 }
 
@@ -6433,6 +6435,7 @@ export interface ManagedPostgresDeleteInput {
   providerResourceHandle: string;
   attemptId: string;
   requestedAt: string;
+  target?: ManagedDependencySingleServerTarget;
 }
 
 export interface ManagedPostgresDeleteResult {
@@ -6460,6 +6463,7 @@ export interface ManagedRedisRealizationInput {
   slug: string;
   attemptId: string;
   requestedAt: string;
+  target?: ManagedDependencySingleServerTarget;
 }
 
 export interface ManagedRedisRealizationResult {
@@ -6481,6 +6485,7 @@ export interface ManagedRedisDeleteInput {
   providerResourceHandle: string;
   attemptId: string;
   requestedAt: string;
+  target?: ManagedDependencySingleServerTarget;
 }
 
 export interface ManagedRedisDeleteResult {
@@ -6504,6 +6509,8 @@ export interface DependencyResourceBackupProviderInput {
   dependencyResourceId: string;
   dependencyKind: DependencyResourceKind;
   providerKey: string;
+  providerResourceHandle?: string;
+  connectionSecretValue?: string;
   attemptId: string;
   requestedAt: string;
 }
@@ -6520,6 +6527,8 @@ export interface DependencyResourceRestoreProviderInput {
   dependencyKind: DependencyResourceKind;
   providerKey: string;
   providerArtifactHandle: string;
+  providerResourceHandle?: string;
+  connectionSecretValue?: string;
   restoreAttemptId: string;
   requestedAt: string;
 }
@@ -6538,6 +6547,16 @@ export interface DependencyResourceBackupProviderPort {
     context: ExecutionContext,
     input: DependencyResourceRestoreProviderInput,
   ): Promise<Result<DependencyResourceRestoreProviderResult, DomainError>>;
+}
+
+export interface ManagedDependencySingleServerTarget {
+  serverId: string;
+  providerKey: "local-shell" | "generic-ssh";
+  targetKind: "single-server";
+  host: string;
+  port: number;
+  username?: string;
+  privateKey?: string;
 }
 
 export interface DeploymentReadModel {
