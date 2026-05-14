@@ -48,6 +48,16 @@ export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerR
       },
       async () => {
         try {
+          const resourceEnvironment = await executor
+            .selectFrom("resources")
+            .innerJoin("environments", "environments.id", "resources.environment_id")
+            .select("environments.kind as environment_kind")
+            .where("resources.id", "=", input.resourceId)
+            .executeTakeFirst();
+          if (resourceEnvironment?.environment_kind === "preview") {
+            return ok([]);
+          }
+
           const deploymentRows = await executor
             .selectFrom("deployments")
             .select("id")

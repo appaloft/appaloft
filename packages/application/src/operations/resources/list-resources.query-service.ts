@@ -33,6 +33,7 @@ export class ListResourcesQueryService {
     input?: {
       projectId?: string;
       environmentId?: string;
+      includePreviewResources?: boolean;
     },
   ): Promise<{ items: Awaited<ReturnType<ResourceReadModel["list"]>> }> {
     const repositoryContext = toRepositoryContext(context);

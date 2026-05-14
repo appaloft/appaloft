@@ -6336,6 +6336,7 @@ export interface ResourceReadModel {
     input?: {
       projectId?: string;
       environmentId?: string;
+      includePreviewResources?: boolean;
     },
   ): Promise<ResourceSummary[]>;
   findOne(context: RepositoryContext, spec: ResourceSelectionSpec): Promise<ResourceSummary | null>;
