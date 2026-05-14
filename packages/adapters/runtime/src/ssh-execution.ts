@@ -68,6 +68,7 @@ import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secret
 import { normalizeGeneratedDockerBuildAssetPath } from "./generated-docker-build-assets";
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
+import { renderComposeOwnershipLabelOverrideScript } from "./compose-label-overrides";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -2498,6 +2499,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       const remoteComposeFile = composeFile.startsWith("/")
         ? composeFile
         : `${remoteWorkdir}/${composeFile}`;
+      const remoteComposeOwnershipOverrideFile = `${remoteWorkdir}/.appaloft.compose.labels.override.yml`;
       const deployOwnershipResult = await this.ensureExecutionStillOwned(context, deployment, {
         step: "before-compose-up",
       });
@@ -2513,9 +2515,47 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (runtimeEnv.isErr()) {
         return err(runtimeEnv.error);
       }
+      const composeOwnershipLabels = dockerLabelsFromAssignments(
+        appaloftDockerContainerLabelsForDeployment(state),
+      );
+      logs.push(phaseLog("deploy", "Generate Appaloft compose ownership labels override"));
+      const composeOverride = await this.runRemoteCommandStreaming({
+        target,
+        command: renderComposeOwnershipLabelOverrideScript({
+          composeFile: remoteComposeFile,
+          overrideFile: remoteComposeOwnershipOverrideFile,
+          labels: composeOwnershipLabels,
+          quote: shellQuote,
+        }),
+        cwd: runtimeDir,
+        env: runtimeEnv.value.env,
+        redactions: runtimeEnv.value.redactions,
+        onOutput: this.createStreamingOutputSink(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "deploy",
+        }),
+      });
+      if (composeOverride.failed) {
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "ssh_docker_compose_label_override_failed",
+            retryable: false,
+            metadata: {
+              composeFile: remoteComposeFile,
+              composeProjectName: runtimeInstanceNames.composeProjectName,
+              composeOwnershipOverrideFile: remoteComposeOwnershipOverrideFile,
+              host: target.host,
+              ...prepared.source.metadata,
+            },
+          }),
+        });
+      }
       const upCommand = renderRuntimeCommandString(
         RuntimeCommandBuilder.docker().composeUp({
           composeFile: remoteComposeFile,
+          additionalComposeFiles: [remoteComposeOwnershipOverrideFile],
           projectName: runtimeInstanceNames.composeProjectName,
           workingDirectory: remoteWorkdir,
         }),
@@ -2555,6 +2595,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               remoteWorkdir,
               composeFile: remoteComposeFile,
               composeProjectName: runtimeInstanceNames.composeProjectName,
+              composeOwnershipOverrideFile: remoteComposeOwnershipOverrideFile,
               ...prepared.source.metadata,
             },
           }),
@@ -2574,6 +2615,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             remoteWorkdir,
             composeFile: remoteComposeFile,
             composeProjectName: runtimeInstanceNames.composeProjectName,
+            composeOwnershipOverrideFile: remoteComposeOwnershipOverrideFile,
             ...prepared.source.metadata,
           },
         }),
