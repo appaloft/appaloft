@@ -69,6 +69,12 @@ custom domain, deployment snapshot, or DomainBinding. To change the console doma
 installer with the new `--domain`. Use `--proxy none` only when an external reverse proxy already
 owns public routing.
 
+For install-time tracing, pass `--trace jaeger`. The installer starts a Jaeger all-in-one container,
+sets Appaloft's OTLP endpoint to the internal collector at `http://jaeger:4318`, and writes trace
+links back to the Jaeger UI. The UI binds to `127.0.0.1:16686` by default; use an SSH tunnel or
+override `--jaeger-ui-host` and `--jaeger-ui-port` when an operator network should reach it
+directly.
+
 After the first install, create a local admin and log in to the console. See
 [First admin bootstrap](/docs/en/self-hosting/first-admin-bootstrap/) for admin email, generated
 one-time passwords, optional OAuth, and recovery steps.
