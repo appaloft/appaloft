@@ -649,6 +649,7 @@
                       {$t(i18nKeys.common.actions.viewDetails)}
                     </Button>
                     <Button
+                      id={`dependency-resource-backup-action-${resource.id}`}
                       size="sm"
                       variant="outline"
                       disabled={createBackupMutation.isPending}
@@ -658,6 +659,7 @@
                       {$t(i18nKeys.console.dependencyResources.backup)}
                     </Button>
                     <Button
+                      id={`dependency-resource-delete-action-${resource.id}`}
                       size="sm"
                       variant="outline"
                       disabled={deleteDependencyResourceMutation.isPending}

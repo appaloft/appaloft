@@ -2126,6 +2126,29 @@ async function clickButtonByAnyAriaLabel(
   expect(found).toBe(true);
 }
 
+async function clickElementBySelector(view: Bun.WebView, selector: string): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const element = document.querySelector(${JSON.stringify(selector)});
+          if (!(element instanceof HTMLButtonElement || element instanceof HTMLAnchorElement)) {
+            return false;
+          }
+          if (element instanceof HTMLButtonElement && element.disabled) {
+            return false;
+          }
+          element.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected clickable element: ${selector}`,
+  );
+
+  expect(found).toBe(true);
+}
+
 async function clickLinkByHref(view: Bun.WebView, hrefFragment: string): Promise<void> {
   const found = await waitFor(
     () =>
@@ -2319,7 +2342,7 @@ describe("console e2e with Bun.WebView", () => {
     );
     await expectText(view, "dres_reporting-db");
 
-    await clickButtonByAnyText(view, ["Backup", "备份"]);
+    await clickElementBySelector(view, "#dependency-resource-backup-action-dres_pg");
     const backupRequest = await waitForRecordedRequest("/api/rpc/dependencyResources/createBackup");
     expect(readOrpcJsonPayload(backupRequest.body)).toEqual({
       dependencyResourceId: "dres_pg",
@@ -2339,7 +2362,7 @@ describe("console e2e with Bun.WebView", () => {
       backupId: "bak_dres_pg",
     });
 
-    await clickButtonByAnyText(view, ["Delete", "删除"]);
+    await clickElementBySelector(view, "#dependency-resource-delete-action-dres_pg");
     const deleteRequest = await waitForRecordedRequest("/api/rpc/dependencyResources/delete");
     expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
       dependencyResourceId: "dres_pg",
