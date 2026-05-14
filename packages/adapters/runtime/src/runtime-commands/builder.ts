@@ -46,6 +46,7 @@ export interface DockerBuildImageInput {
 
 export interface DockerComposeUpInput {
   composeFile: string;
+  additionalComposeFiles?: readonly string[];
   projectName?: string;
   workingDirectory?: string;
   detach?: boolean;
@@ -100,6 +101,9 @@ export class DockerCommandBuilder {
     return {
       kind: "docker-compose-up",
       composeFile: FilePathText.rehydrate(input.composeFile),
+      additionalComposeFiles: (input.additionalComposeFiles ?? []).map((composeFile) =>
+        FilePathText.rehydrate(composeFile),
+      ),
       ...(input.projectName ? { projectName: DisplayNameText.rehydrate(input.projectName) } : {}),
       ...(input.workingDirectory
         ? { workingDirectory: FilePathText.rehydrate(input.workingDirectory) }
