@@ -221,6 +221,9 @@ paths, credentials, environment values, registry secrets, tokens, or unbounded p
 - Appaloft-managed Docker containers labeled with `appaloft.managed=true` now provide current
   container writable bytes, artifact ownership, deployment/resource rollups, and runtime ids when
   ownership labels are present.
+- Docker Compose stack deployments generate an Appaloft-owned compose override file during
+  deployment so compose-created service containers receive the same ownership labels as
+  `docker-container` deployments and can participate in resource/deployment attribution.
 - Source workspace directories under the Appaloft source workspace root now provide
   workspace-metadata evidence keyed by deployment id; deployment read models enrich those artifacts
   before project, environment, resource, and deployment rollups are returned.

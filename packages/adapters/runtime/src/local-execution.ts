@@ -66,6 +66,7 @@ import {
 import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
+import { renderComposeOwnershipLabelOverrideScript } from "./compose-label-overrides";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -2255,6 +2256,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         state.runtimePlan.execution.composeFile === state.runtimePlan.source.locator)
         ? resolve(workdir, "docker-compose.yml")
         : (state.runtimePlan.execution.composeFile ?? state.runtimePlan.source.locator);
+    const composeOwnershipOverrideFile = resolve(workdir, ".appaloft.compose.labels.override.yml");
     logs.push(phaseLog("plan", `Compose working directory: ${workdir}`));
     const deployOwnershipResult = await this.ensureExecutionStillOwned(context, deployment, {
       phase: "deploy",
@@ -2263,14 +2265,6 @@ export class LocalExecutionBackend implements ExecutionBackend {
     if (deployOwnershipResult.isErr()) {
       return deployOwnershipResult.map(() => ({ deployment }));
     }
-    const upCommand = renderRuntimeCommandString(
-      RuntimeCommandBuilder.docker().composeUp({
-        composeFile,
-        projectName: runtimeInstanceNames.composeProjectName,
-      }),
-      { quote: shellQuote },
-    );
-    logs.push(phaseLog("deploy", upCommand));
     const runtimeEnv = await resolveDependencyRuntimeEnvironment({
       context,
       deployment,
@@ -2280,6 +2274,61 @@ export class LocalExecutionBackend implements ExecutionBackend {
     if (runtimeEnv.isErr()) {
       return err(runtimeEnv.error);
     }
+    const composeOwnershipLabels = dockerLabelsFromAssignments(
+      appaloftDockerContainerLabelsForDeployment(state),
+    );
+    logs.push(phaseLog("deploy", "Generate Appaloft compose ownership labels override"));
+    const composeOverride = await runShellCommand({
+      command: renderComposeOwnershipLabelOverrideScript({
+        composeFile,
+        overrideFile: composeOwnershipOverrideFile,
+        labels: composeOwnershipLabels,
+        quote: shellQuote,
+      }),
+      cwd: workdir,
+      env: runtimeEnv.value.env,
+      redactions: runtimeEnv.value.redactions,
+    });
+    this.pushCommandOutput(logs, {
+      context,
+      deploymentId: state.id.value,
+      phase: "deploy",
+      output: composeOverride.stdout,
+      level: "info",
+      stream: "stdout",
+    });
+    this.pushCommandOutput(logs, {
+      context,
+      deploymentId: state.id.value,
+      phase: "deploy",
+      output: composeOverride.stderr,
+      level: "warn",
+      stream: "stderr",
+    });
+    if (composeOverride.failed) {
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          logs,
+          errorCode: "docker_compose_label_override_failed",
+          retryable: false,
+          metadata: {
+            composeFile,
+            composeProjectName: runtimeInstanceNames.composeProjectName,
+            composeOwnershipOverrideFile,
+            ...preparedSource.metadata,
+          },
+        }).deployment,
+      });
+    }
+    const upCommand = renderRuntimeCommandString(
+      RuntimeCommandBuilder.docker().composeUp({
+        composeFile,
+        additionalComposeFiles: [composeOwnershipOverrideFile],
+        projectName: runtimeInstanceNames.composeProjectName,
+      }),
+      { quote: shellQuote },
+    );
+    logs.push(phaseLog("deploy", upCommand));
     this.report(context, {
       deploymentId: state.id.value,
       phase: "deploy",
@@ -2330,6 +2379,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           metadata: {
             composeFile,
             composeProjectName: runtimeInstanceNames.composeProjectName,
+            composeOwnershipOverrideFile,
             workdir,
             ...preparedSource.metadata,
           },
@@ -2359,6 +2409,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       metadata: {
         composeFile,
         composeProjectName: runtimeInstanceNames.composeProjectName,
+        composeOwnershipOverrideFile,
         workdir,
         ...preparedSource.metadata,
       },
