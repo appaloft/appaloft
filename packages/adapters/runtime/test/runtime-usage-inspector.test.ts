@@ -148,15 +148,15 @@ function capacityInspection(): RuntimeTargetCapacityInspection {
 }
 
 class RecordingCapacityInspector implements RuntimeTargetCapacityInspector {
-  readonly inputs: DeploymentTargetState[] = [];
+  readonly inputs: Array<{ server: DeploymentTargetState; profile?: "full" | "attribution" }> = [];
 
   constructor(private readonly result: Result<RuntimeTargetCapacityInspection>) {}
 
   async inspect(
     _context: ExecutionContext,
-    input: { server: DeploymentTargetState },
+    input: { server: DeploymentTargetState; profile?: "full" | "attribution" },
   ): Promise<Result<RuntimeTargetCapacityInspection>> {
-    this.inputs.push(input.server);
+    this.inputs.push(input);
     return this.result;
   }
 }
@@ -178,7 +178,30 @@ describe("runtime usage capacity inspector adapter", () => {
 
     expect(result.isOk()).toBe(true);
     expect(capacityInspector.inputs).toHaveLength(1);
+    expect(capacityInspector.inputs[0]?.server.id.value).toBe("srv_capacity");
+    expect(capacityInspector.inputs[0]?.profile).toBe("full");
     expect(result._unsafeUnwrap().schemaVersion).toBe("runtime-usage.inspect/v1");
+  });
+
+  test("[RT-USAGE-002][RT-USAGE-004] uses bounded capacity attribution for scope rollup reads", async () => {
+    const capacityInspector = new RecordingCapacityInspector(ok(capacityInspection()));
+    const adapter = new RuntimeUsageCapacityInspectorAdapter(
+      async () => ok(server()),
+      capacityInspector,
+    );
+
+    const result = await adapter.inspect(context(), {
+      scope: { kind: "server", serverId: "srv_capacity" },
+      mode: "current",
+      includeArtifacts: true,
+      includeWarnings: true,
+      collectionProfile: "attribution",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(capacityInspector.inputs).toHaveLength(1);
+    expect(capacityInspector.inputs[0]?.server.id.value).toBe("srv_capacity");
+    expect(capacityInspector.inputs[0]?.profile).toBe("attribution");
   });
 
   test("[RT-USAGE-004] converts unsupported capacity inspection into partial usage output", async () => {

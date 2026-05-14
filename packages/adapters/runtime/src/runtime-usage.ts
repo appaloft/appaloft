@@ -494,7 +494,10 @@ export class RuntimeUsageCapacityInspectorAdapter implements RuntimeUsageInspect
     }
 
     const server = serverResult.value;
-    const capacityResult = await this.capacityInspector.inspect(context, { server });
+    const capacityResult = await this.capacityInspector.inspect(context, {
+      server,
+      profile: input.collectionProfile === "attribution" ? "attribution" : "full",
+    });
     if (capacityResult.isErr()) {
       const error = capacityResult.error;
       return ok(

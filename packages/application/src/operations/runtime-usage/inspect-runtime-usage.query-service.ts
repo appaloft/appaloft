@@ -471,6 +471,7 @@ export class RuntimeUsageInspectionQueryService {
           ...input,
           scope: { kind: "server", serverId },
           includeArtifacts: true,
+          collectionProfile: "attribution",
         }),
       ),
     );
