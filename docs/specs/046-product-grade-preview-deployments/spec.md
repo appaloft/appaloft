@@ -41,7 +41,7 @@ or preview fields to `deployments.create`.
 | --- | --- | --- | --- |
 | Product-grade preview deployment | A control-plane-owned preview lifecycle for a source change, usually a pull request, with policy, scoped identity, deployment, feedback, cleanup, and audit. | Source integration / release orchestration | GitHub App preview, managed preview |
 | Preview policy | Control-plane policy deciding which repositories, branches, fork states, event kinds, quotas, domains, and secret scopes may create previews. | Integration policy | Preview environment policy |
-| Preview environment | Durable control-plane identity for one preview scope, such as a pull request, linked to project/environment/resource/server context, source fingerprint, route state, deployment attempts, feedback, cleanup, and audit. | Workspace / release orchestration | Preview app, PR environment |
+| Preview environment | Durable control-plane identity for one temporary runtime surface derived from a parent Resource for one preview scope, such as a pull request. It links project/environment/resource/server context, source fingerprint, route state, deployment attempts, feedback, cleanup, and audit without becoming a peer long-lived Resource in the console IA. | Workspace / release orchestration | Preview app, PR environment, review app |
 | Preview source event | Provider-normalized source event that may request preview create, update, or cleanup after verification. | Source event application service | PR event |
 | Preview feedback | Idempotent GitHub App comment, check run, deployment status, or equivalent integration status pointing users to preview state and diagnostics. | Integration adapter | Comment/check/status |
 | Preview cleanup attempt | Durable cleanup work for preview runtime, route state, source link, feedback, and provider metadata, with retry and audit ownership. | Release orchestration / operator work | Cleanup retry |
@@ -56,9 +56,9 @@ candidate operations:
 | `source-events.ingest` | Active command / integration boundary | May be extended by a future Code Round to normalize GitHub pull request events after GitHub App verification. It must still persist safe source event state and dedupe before preview policy evaluation. |
 | `preview-policies.show` | Active CLI, HTTP/oRPC, and Web query | Reads effective preview policy, fork/secret/domain/quota rules, and selected execution owner for a project or resource scope. |
 | `preview-policies.configure` | Active CLI, HTTP/oRPC, and Web command | Changes preview policy explicitly. It must not mutate Resource source/runtime/network profile or deployment history as a side effect. |
-| `preview-environments.list` | Active CLI, HTTP/oRPC, and Web query | Lists durable preview environments with source event, deployment, route, feedback, cleanup, expiry, and audit summaries. |
-| `preview-environments.show` | Active CLI, HTTP/oRPC, and Web query | Reads one preview environment and its safe latest deployment, route, feedback, policy, cleanup, and diagnostic state. |
-| `preview-environments.delete` | Active CLI, HTTP/oRPC, and Web command | Requests explicit preview cleanup/deletion. It dispatches preview-lifecycle cleanup and preserves deployment history/audit. |
+| `preview-environments.list` | Active CLI, HTTP/oRPC, and Web query | Lists durable preview environments with source event, parent Resource, deployment, route, feedback, cleanup, expiry, and audit summaries. Web should default to Resource-scoped list placement; global rollups are secondary operator views. |
+| `preview-environments.show` | Active CLI, HTTP/oRPC, and Web query | Reads one Resource-derived preview environment and its safe latest deployment, route, feedback, policy, cleanup, and diagnostic state. |
+| `preview-environments.delete` | Active CLI, HTTP/oRPC, and Web command | Requests explicit preview cleanup/deletion for one parent Resource plus preview environment id. It dispatches preview-lifecycle cleanup and preserves deployment history/audit. |
 | `deployments.create` | Active command, unchanged input | Creates the actual deployment attempt after preview policy selects or creates the preview Resource/environment context. No preview fields are added. |
 | `deployments.cleanup-preview` | Active command | Remains the narrow runtime/route/source-link cleanup primitive. Product-grade cleanup may call it as part of a broader control-plane cleanup process, but must not expand the command into provider metadata, comments/checks, or generic delete behavior. |
 
@@ -75,7 +75,8 @@ GitHub App pull_request or push webhook
   -> transport verifies signature, installation, repository, and event trust
   -> source-events.ingest normalizes and dedupes safe event facts
   -> preview policy evaluates event kind, ref, fork trust, secret eligibility, quotas, and expiry
-  -> preview environment is created or updated with scoped source link and selected Resource context
+  -> preview environment is created or updated as a temporary derived runtime surface under the selected parent Resource
+  -> scoped source link and selected Resource context remain the durable ownership anchor
   -> preview-scoped config and secret references are resolved without leaking production secrets
   -> deployments.create is dispatched with ids only
   -> feedback writer publishes or updates comments, checks, deployment statuses, and diagnostics
@@ -92,11 +93,19 @@ GitHub App pull_request closed, policy expiry, or preview-environments.delete
   -> scheduler retries retriable cleanup until policy retention ends or an operator intervenes
 ```
 
+Non-scheduled compensation must exist even when the periodic scheduler is disabled or delayed:
+
+- verified pull-request `closed` deliveries must route to preview cleanup by source scope;
+- explicit `preview-environments.delete` remains a manual operator compensation path;
+- duplicate close/delete requests must be idempotent and return the existing cleanup state when possible;
+- retriable runtime, route, source-link, provider metadata, or feedback failures must create durable retry/manual-review state with safe details;
+- Web Resource detail must expose active, cleanup-requested, and expired derived previews with a direct cleanup action so an operator can repair missed GitHub or provider callbacks.
+
 ## Scenarios And Acceptance Criteria
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| PG-PREVIEW-SPEC-001 | Pull request event is policy-eligible | A GitHub App webhook for a same-repository pull request is verified and the effective preview policy allows the event | Preview policy evaluates the normalized source event | A preview environment is created or updated, linked to scoped source identity, and a deployment attempt is dispatched through ids-only `deployments.create`. |
+| PG-PREVIEW-SPEC-001 | Pull request event is policy-eligible | A GitHub App webhook for a same-repository pull request is verified and the effective preview policy allows the event | Preview policy evaluates the normalized source event | A Resource-derived preview environment is created or updated under the selected parent Resource, linked to scoped source identity, and a deployment attempt is dispatched through ids-only `deployments.create`. |
 | PG-PREVIEW-SPEC-002 | Fork event is not trusted for secrets | A pull request comes from a fork and policy does not allow secret-backed fork previews | Preview policy evaluates the event | No deployment is created; the preview event read model records ignored/blocked status with safe fork-policy detail and no secret resolution. |
 | PG-PREVIEW-SPEC-003 | Scoped preview configuration is isolated | A preview policy provides preview-only variables, secret references, or route policy | The preview environment is materialized | Preview config is scoped to the preview Resource/environment identity; production environment secrets and durable production routes are not copied unless policy explicitly references safe preview-scoped material. |
 | PG-PREVIEW-SPEC-004 | Duplicate source event is idempotent | GitHub redelivers the same pull request synchronization event | The event is ingested again | The existing source/preview event result is returned or projected; no duplicate preview environment, deployment, feedback, or cleanup attempt is created. |
@@ -104,7 +113,7 @@ GitHub App pull_request closed, policy expiry, or preview-environments.delete
 | PG-PREVIEW-SPEC-006 | Cleanup preserves history | A pull request is closed or a user deletes the preview environment | Cleanup is accepted | Preview runtime, route state, source link, provider metadata, and feedback are cleaned or marked already clean; deployment history and audit remain readable. |
 | PG-PREVIEW-SPEC-007 | Cleanup retry is durable | Runtime cleanup, provider metadata deletion, or feedback update fails with a retriable error | Cleanup processing records the failure | Retry state records owner, attempt id, next retry timing, safe phase, and sanitized provider detail; a later retry creates a new attempt id. |
 | PG-PREVIEW-SPEC-008 | Quota and expiry are enforced | A repository or project exceeds preview count, age, or resource quota | Preview policy evaluates a create/update event or scheduler scans previews | New previews are blocked or old previews are scheduled for cleanup according to policy, with read-model visibility and safe user guidance. |
-| PG-PREVIEW-SPEC-009 | Public surfaces stay normalized | Web, CLI, HTTP/oRPC, or future MCP surfaces inspect product-grade previews | Users list, show, configure, deploy, or delete previews | Output uses Appaloft preview policy/environment language with stable operation keys and help anchors, not provider-native webhook payloads or GitHub API objects. |
+| PG-PREVIEW-SPEC-009 | Public surfaces stay normalized | Web, CLI, HTTP/oRPC, or future MCP surfaces inspect product-grade previews | Users list, show, configure, deploy, or delete previews | Output uses Appaloft preview policy/environment language with stable operation keys and help anchors, not provider-native webhook payloads or GitHub API objects. Web presents previews as derived runtime environments under Resources by default; global preview views are secondary rollups, not primary resource peers. |
 
 ## Error And Async Semantics
 
@@ -132,9 +141,10 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
 
 - Bounded contexts: Source integration, workspace/resource configuration, release orchestration,
   runtime topology, and operator work.
-- Aggregate/resource owner: `Resource` owns reusable source/runtime/network profile; preview
-  lifecycle owns preview environment identity and policy-specific scoped configuration; `Deployment`
-  owns accepted attempts and immutable runtime plan snapshots.
+- Aggregate/resource owner: `Resource` owns reusable source/runtime/network profile and is the
+  parent owner for derived preview runtime environments; preview lifecycle owns preview environment
+  identity and policy-specific scoped configuration; `Deployment` owns accepted attempts and
+  immutable runtime plan snapshots.
 - Adapter owner: GitHub App transport and feedback adapters verify and map webhook/status details;
   runtime adapters own runtime cleanup mechanics; persistence adapters own durable preview/source/
   cleanup read models.

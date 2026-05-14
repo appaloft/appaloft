@@ -38,6 +38,7 @@
     DomainBindingSummary,
     ImportCertificateInput,
     ProxyConfigurationView,
+    PreviewEnvironmentSummary,
     ResourceConfigEntry,
     ResourceDetail,
     ResourceEffectiveConfig,
@@ -93,6 +94,7 @@
     findServer,
     formatTime,
     projectDetailHref,
+    resourcePreviewEnvironmentDetailHref,
     resourceNewDeploymentHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -115,6 +117,7 @@
     | "deployments"
     | "scheduled-tasks"
     | "source-events"
+    | "previews"
     | "monitor"
     | "logs"
     | "terminal";
@@ -161,6 +164,7 @@
     "deployments",
     "scheduled-tasks",
     "source-events",
+    "previews",
     "monitor",
     "logs",
     "terminal",
@@ -232,6 +236,18 @@
         orpcClient.sourceEvents.list({
           resourceId,
           limit: 25,
+        }),
+      enabled: browser && resourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+  const resourcePreviewEnvironmentsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["preview-environments", "resource", resourceId],
+      queryFn: () =>
+        orpcClient.previewEnvironments.list({
+          resourceId,
+          limit: 50,
         }),
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
@@ -315,6 +331,19 @@
     resourceEffectiveConfigQuery.data ?? null,
   );
   const resourceSourceEvents = $derived(resourceSourceEventsQuery.data?.items ?? []);
+  const resourcePreviewEnvironments = $derived(
+    resourcePreviewEnvironmentsQuery.data?.items ?? [],
+  );
+  const activePreviewEnvironmentCount = $derived(
+    resourcePreviewEnvironments.filter(
+      (previewEnvironment) => previewEnvironment.status === "active",
+    ).length,
+  );
+  const cleanupRequestedPreviewEnvironmentCount = $derived(
+    resourcePreviewEnvironments.filter(
+      (previewEnvironment) => previewEnvironment.status === "cleanup-requested",
+    ).length,
+  );
   const scheduledTasks = $derived(scheduledTasksQuery.data?.items ?? []);
   const scheduledTaskRuns = $derived(scheduledTaskRunsQuery.data?.items ?? []);
   const resourceRuntimeUsage = $derived(resourceRuntimeUsageQuery.data ?? null);
@@ -421,6 +450,11 @@
   let sourceLinkServerId = $state("");
   let sourceLinkDestinationId = $state("");
   let sourceLinkFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let previewEnvironmentFeedback = $state<{
     kind: "success" | "error";
     title: string;
     detail: string;
@@ -914,6 +948,28 @@
       autoDeployFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.autoDeploySaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const cleanupPreviewEnvironmentMutation = createMutation(() => ({
+    mutationFn: (input: { previewEnvironmentId: string; resourceId: string }) =>
+      orpcClient.previewEnvironments.delete(input),
+    onSuccess: (result) => {
+      previewEnvironmentFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.previewEnvironments.cleanupSucceeded),
+        detail: result.attemptId,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["preview-environments"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["preview-environments", "resource", resourceId],
+      });
+    },
+    onError: (error) => {
+      previewEnvironmentFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.previewEnvironments.cleanupFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -2514,6 +2570,8 @@
         return $t(i18nKeys.console.resources.scheduledTasksTab);
       case "source-events":
         return $t(i18nKeys.console.resources.sourceEventsTab);
+      case "previews":
+        return $t(i18nKeys.console.resources.previewEnvironmentsTab);
       case "monitor":
         return $t(i18nKeys.console.runtimeUsage.monitorTab);
       case "logs":
@@ -2523,6 +2581,50 @@
       case "terminal":
         return $t(i18nKeys.console.terminal.title);
     }
+  }
+
+  function previewEnvironmentStatusLabel(
+    status: PreviewEnvironmentSummary["status"],
+  ): string {
+    return status === "cleanup-requested"
+      ? $t(i18nKeys.console.previewEnvironments.statusCleanupRequested)
+      : $t(i18nKeys.console.previewEnvironments.statusActive);
+  }
+
+  function previewEnvironmentStatusVariant(
+    status: PreviewEnvironmentSummary["status"],
+  ): "default" | "secondary" {
+    return status === "cleanup-requested" ? "secondary" : "default";
+  }
+
+  function previewEnvironmentExpired(previewEnvironment: PreviewEnvironmentSummary): boolean {
+    return previewEnvironment.expiresAt
+      ? Date.parse(previewEnvironment.expiresAt) <= Date.now()
+      : false;
+  }
+
+  function cleanupPreviewEnvironment(previewEnvironment: PreviewEnvironmentSummary): void {
+    if (
+      !browser ||
+      cleanupPreviewEnvironmentMutation.isPending ||
+      previewEnvironment.status !== "active"
+    ) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      $t(i18nKeys.console.previewEnvironments.cleanupConfirm, {
+        previewEnvironmentId: previewEnvironment.previewEnvironmentId,
+      }),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    cleanupPreviewEnvironmentMutation.mutate({
+      previewEnvironmentId: previewEnvironment.previewEnvironmentId,
+      resourceId: previewEnvironment.resourceId,
+    });
   }
 
   function resourceSettingsSectionHref(section: ResourceSettingsSection): string {
@@ -3849,6 +3951,179 @@
                           {/each}
                         </div>
                       {/if}
+                    </div>
+                  </article>
+                {/each}
+              </div>
+            {/if}
+          </section>
+        </Tabs.Content>
+
+        <Tabs.Content value="previews" class="mt-0">
+          <section id="resource-preview-environments" class="space-y-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.resources.previewEnvironmentsTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.productGradePreviews}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                  />
+                </div>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.previewEnvironmentsDescription)}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={resourcePreviewEnvironmentsQuery.isFetching}
+                onclick={() => resourcePreviewEnvironmentsQuery.refetch()}
+              >
+                <RefreshCw
+                  class={[
+                    "size-4",
+                    resourcePreviewEnvironmentsQuery.isFetching ? "animate-spin" : "",
+                  ]}
+                />
+                {$t(i18nKeys.console.resources.previewEnvironmentsRefresh)}
+              </Button>
+            </div>
+
+            <section class="console-metric-strip sm:grid-cols-3">
+              <div>
+                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.previewEnvironments.totalCount)}
+                </p>
+                <p class="mt-1 text-2xl font-semibold">{resourcePreviewEnvironments.length}</p>
+              </div>
+              <div>
+                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.previewEnvironments.activeCount)}
+                </p>
+                <p class="mt-1 text-2xl font-semibold">{activePreviewEnvironmentCount}</p>
+              </div>
+              <div>
+                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.previewEnvironments.cleanupRequestedCount)}
+                </p>
+                <p class="mt-1 text-2xl font-semibold">
+                  {cleanupRequestedPreviewEnvironmentCount}
+                </p>
+              </div>
+            </section>
+
+            {#if previewEnvironmentFeedback}
+              <div
+                class={[
+                  "rounded-md border px-3 py-2 text-sm",
+                  previewEnvironmentFeedback.kind === "success"
+                    ? "border-primary/25 bg-primary/5"
+                    : "border-destructive/30 bg-destructive/5 text-destructive",
+                ]}
+              >
+                <p class="font-medium">{previewEnvironmentFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{previewEnvironmentFeedback.detail}</p>
+              </div>
+            {/if}
+
+            {#if resourcePreviewEnvironmentsQuery.isPending}
+              <div class="space-y-3">
+                <Skeleton class="h-28 w-full" />
+                <Skeleton class="h-28 w-full" />
+              </div>
+            {:else if resourcePreviewEnvironmentsQuery.error}
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                <p class="font-medium">
+                  {$t(i18nKeys.console.resources.previewEnvironmentsLoadFailed)}
+                </p>
+                <p class="mt-1 break-all text-xs">
+                  {readErrorMessage(resourcePreviewEnvironmentsQuery.error)}
+                </p>
+              </div>
+            {:else if resourcePreviewEnvironments.length === 0}
+              <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.resources.previewEnvironmentsEmpty)}
+              </div>
+            {:else}
+              <div class="space-y-3">
+                {#each resourcePreviewEnvironments as previewEnvironment (previewEnvironment.previewEnvironmentId)}
+                  {@const isExpired = previewEnvironmentExpired(previewEnvironment)}
+                  <article class="rounded-md border bg-card p-4">
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div class="min-w-0 space-y-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="bg-muted p-2">
+                            <GitBranch class="size-4" />
+                          </div>
+                          <span class="font-mono text-sm font-medium">
+                            {previewEnvironment.previewEnvironmentId}
+                          </span>
+                          <Badge variant={previewEnvironmentStatusVariant(previewEnvironment.status)}>
+                            {previewEnvironmentStatusLabel(previewEnvironment.status)}
+                          </Badge>
+                          {#if isExpired && previewEnvironment.status === "active"}
+                            <Badge variant="destructive">
+                              {$t(i18nKeys.console.resources.previewEnvironmentsExpired)}
+                            </Badge>
+                          {/if}
+                        </div>
+                        <p class="truncate text-sm font-medium">
+                          {previewEnvironment.source.repositoryFullName} #{previewEnvironment.source.pullRequestNumber}
+                        </p>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span>
+                            {$t(i18nKeys.console.previewEnvironments.baseRef)}:
+                            <code class="rounded bg-muted px-1 py-0.5">
+                              {previewEnvironment.source.baseRef}
+                            </code>
+                          </span>
+                          <span>
+                            {$t(i18nKeys.console.previewEnvironments.expiresAt)}:
+                            {previewEnvironment.expiresAt
+                              ? formatTime(previewEnvironment.expiresAt)
+                              : $t(i18nKeys.console.previewEnvironments.noExpiry)}
+                          </span>
+                          <span>
+                            {$t(i18nKeys.console.previewEnvironments.updatedAt)}:
+                            {formatTime(previewEnvironment.updatedAt)}
+                          </span>
+                        </div>
+                        <p class="break-all font-mono text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.previewEnvironments.sourceBinding)}:
+                          {previewEnvironment.source.sourceBindingFingerprint}
+                        </p>
+                      </div>
+
+                      <div class="flex flex-wrap gap-2 lg:justify-end">
+                        {#if resource}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            href={resourcePreviewEnvironmentDetailHref(
+                              resource,
+                              previewEnvironment.previewEnvironmentId,
+                            )}
+                          >
+                            {$t(i18nKeys.common.actions.viewDetails)}
+                          </Button>
+                        {/if}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={isExpired ? "default" : "outline"}
+                          disabled={
+                            cleanupPreviewEnvironmentMutation.isPending ||
+                            previewEnvironment.status !== "active"
+                          }
+                          onclick={() => cleanupPreviewEnvironment(previewEnvironment)}
+                        >
+                          <Trash2 class="size-4" />
+                          {$t(i18nKeys.console.previewEnvironments.cleanupAction)}
+                        </Button>
+                      </div>
                     </div>
                   </article>
                 {/each}

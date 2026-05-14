@@ -36,6 +36,32 @@
     }),
   );
   const previewEnvironment = $derived(previewEnvironmentQuery.data?.previewEnvironment ?? null);
+  const previewEnvironmentResourceHref = $derived(
+    previewEnvironment
+      ? resourceDetailHref({
+          id: previewEnvironment.resourceId,
+          projectId: previewEnvironment.projectId,
+          environmentId: previewEnvironment.environmentId,
+        })
+      : "",
+  );
+  const previewEnvironmentBreadcrumbs = $derived([
+    { label: $t(i18nKeys.console.nav.home), href: "/" },
+    ...(previewEnvironment
+      ? [
+          {
+            label: previewEnvironment.resourceId,
+            href: `${previewEnvironmentResourceHref}?tab=previews`,
+          },
+        ]
+      : [
+          {
+            label: $t(i18nKeys.console.previewEnvironments.pageTitle),
+            href: "/preview-environments",
+          },
+        ]),
+    { label: previewEnvironmentId },
+  ]);
   const cleanupPreviewEnvironmentMutation = createMutation(() => ({
     mutationFn: (input: { previewEnvironmentId: string; resourceId: string }) =>
       orpcClient.previewEnvironments.delete(input),
@@ -95,11 +121,7 @@
 <ConsoleShell
   title={$t(i18nKeys.console.previewEnvironments.detailTitle)}
   description={$t(i18nKeys.console.previewEnvironments.detailDescription)}
-  breadcrumbs={[
-    { label: $t(i18nKeys.console.nav.home), href: "/" },
-    { label: $t(i18nKeys.console.previewEnvironments.pageTitle), href: "/preview-environments" },
-    { label: previewEnvironmentId },
-  ]}
+  breadcrumbs={previewEnvironmentBreadcrumbs}
 >
   {#if previewEnvironmentQuery.isPending}
     <div class="space-y-5">
@@ -150,11 +172,7 @@
         </div>
         <div class="flex flex-wrap gap-2">
           <Button
-            href={resourceDetailHref({
-              id: previewEnvironment.resourceId,
-              projectId: previewEnvironment.projectId,
-              environmentId: previewEnvironment.environmentId,
-            })}
+            href={`${previewEnvironmentResourceHref}?tab=previews`}
             variant="outline"
           >
             {$t(i18nKeys.common.actions.openResource)}
@@ -288,9 +306,9 @@
         </div>
       </section>
 
-      <Button onclick={() => goto("/preview-environments")} variant="outline">
+      <Button onclick={() => goto(`${previewEnvironmentResourceHref}?tab=previews`)} variant="outline">
         <ArrowLeft class="size-4" />
-        {$t(i18nKeys.console.previewEnvironments.pageTitle)}
+        {$t(i18nKeys.common.actions.openResource)}
       </Button>
     </div>
   {/if}

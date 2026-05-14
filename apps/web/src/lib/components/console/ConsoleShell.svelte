@@ -92,11 +92,6 @@
     { href: "/domain-bindings", labelKey: i18nKeys.console.nav.domainBindings, icon: Globe2 },
     { href: "/deployments", labelKey: i18nKeys.console.nav.deployments, icon: Rocket },
     {
-      href: "/preview-environments",
-      labelKey: i18nKeys.console.nav.previewEnvironments,
-      icon: GitBranch,
-    },
-    {
       href: "/preview-policies",
       labelKey: i18nKeys.console.nav.previewPolicies,
       icon: ShieldCheck,
