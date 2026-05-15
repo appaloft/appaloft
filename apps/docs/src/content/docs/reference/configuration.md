@@ -38,5 +38,8 @@ sidebar:
 | `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_ENABLED` | `false` | 运行 scheduled runtime capacity prune policies。 |
 | `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_INTERVAL_SECONDS` | `3600` | runtime capacity prune 轮询间隔。 |
 | `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_BATCH_SIZE` | `25` | 每次 tick 最多扫描的 runtime prune policies。 |
+| `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_ENABLED` | `false` | 运行 scheduled dependency backup policies。 |
+| `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_INTERVAL_SECONDS` | `3600` | dependency backup policy 轮询间隔。 |
+| `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_BATCH_SIZE` | `25` | 每次 tick 最多扫描的 dependency backup policies。 |
 | `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED` | `false` | 通过已有 history prune commands 运行 retention defaults。 |
 | `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS` | `3600` | scheduled history retention 轮询间隔。 |

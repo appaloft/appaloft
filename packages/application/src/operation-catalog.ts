@@ -24,10 +24,12 @@ import { showCertificateQueryInputSchema } from "./operations/certificates/show-
 import { configureDefaultAccessDomainPolicyCommandInputSchema } from "./operations/default-access-domain-policies/configure-default-access-domain-policy.command";
 import { listDefaultAccessDomainPoliciesQueryInputSchema } from "./operations/default-access-domain-policies/list-default-access-domain-policies.query";
 import { showDefaultAccessDomainPolicyQueryInputSchema } from "./operations/default-access-domain-policies/show-default-access-domain-policy.query";
+import { configureDependencyResourceBackupPolicyCommandInputSchema } from "./operations/dependency-resources/configure-dependency-resource-backup-policy.command";
 import { createDependencyResourceBackupCommandInputSchema } from "./operations/dependency-resources/create-dependency-resource-backup.command";
 import { deleteDependencyResourceCommandInputSchema } from "./operations/dependency-resources/delete-dependency-resource.command";
 import { importPostgresDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-postgres-dependency-resource.command";
 import { importRedisDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-redis-dependency-resource.command";
+import { listDependencyResourceBackupPoliciesQueryInputSchema } from "./operations/dependency-resources/list-dependency-resource-backup-policies.query";
 import { listDependencyResourceBackupsQueryInputSchema } from "./operations/dependency-resources/list-dependency-resource-backups.query";
 import { listDependencyResourcesQueryInputSchema } from "./operations/dependency-resources/list-dependency-resources.query";
 import { provisionPostgresDependencyResourceCommandInputSchema } from "./operations/dependency-resources/provision-postgres-dependency-resource.command";
@@ -36,6 +38,7 @@ import { renameDependencyResourceCommandInputSchema } from "./operations/depende
 import { restoreDependencyResourceBackupCommandInputSchema } from "./operations/dependency-resources/restore-dependency-resource-backup.command";
 import { showDependencyResourceQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource.query";
 import { showDependencyResourceBackupQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource-backup.query";
+import { showDependencyResourceBackupPolicyQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource-backup-policy.query";
 import { createDeployTokenCommandInputSchema } from "./operations/deploy-tokens/create-deploy-token.schema";
 import { listDeployTokensQueryInputSchema } from "./operations/deploy-tokens/list-deploy-tokens.schema";
 import { revokeDeployTokenCommandInputSchema } from "./operations/deploy-tokens/revoke-deploy-token.schema";
@@ -1518,6 +1521,48 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft dependency backup restore <backupId>",
       orpc: { method: "POST", path: "/api/dependency-resources/backups/{backupId}/restore" },
+    },
+  },
+  {
+    key: "dependency-resources.backup-policies.configure",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "ConfigureDependencyResourceBackupPolicyCommand",
+    handlerName: "ConfigureDependencyResourceBackupPolicyCommandHandler",
+    serviceName: "ConfigureDependencyResourceBackupPolicyUseCase",
+    inputSchema: configureDependencyResourceBackupPolicyCommandInputSchema,
+    serviceToken: tokens.configureDependencyResourceBackupPolicyUseCase,
+    transports: {
+      cli: "appaloft dependency backup policy configure <dependencyResourceId>",
+      orpc: { method: "POST", path: "/api/dependency-resources/backup-policies" },
+    },
+  },
+  {
+    key: "dependency-resources.backup-policies.list",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "ListDependencyResourceBackupPoliciesQuery",
+    handlerName: "ListDependencyResourceBackupPoliciesQueryHandler",
+    serviceName: "ListDependencyResourceBackupPoliciesQueryService",
+    inputSchema: listDependencyResourceBackupPoliciesQueryInputSchema,
+    serviceToken: tokens.listDependencyResourceBackupPoliciesQueryService,
+    transports: {
+      cli: "appaloft dependency backup policy list",
+      orpc: { method: "GET", path: "/api/dependency-resources/backup-policies" },
+    },
+  },
+  {
+    key: "dependency-resources.backup-policies.show",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "ShowDependencyResourceBackupPolicyQuery",
+    handlerName: "ShowDependencyResourceBackupPolicyQueryHandler",
+    serviceName: "ShowDependencyResourceBackupPolicyQueryService",
+    inputSchema: showDependencyResourceBackupPolicyQueryInputSchema,
+    serviceToken: tokens.showDependencyResourceBackupPolicyQueryService,
+    transports: {
+      cli: "appaloft dependency backup policy show <policyId>",
+      orpc: { method: "GET", path: "/api/dependency-resources/backup-policies/{policyId}" },
     },
   },
   {

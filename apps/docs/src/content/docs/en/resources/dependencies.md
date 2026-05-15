@@ -117,6 +117,17 @@ Restore does not mutate ResourceBindings, deployment rollback/redeploy state, wo
 historical deployment snapshots. Dependency delete must be blocked while retained backups or
 in-flight restores remain.
 
+Scheduled backup policies are opt-in records. They do not run unless the self-hosted shell enables
+the scheduled dependency backup runner. A due policy dispatches the same
+`dependency-resources.create-backup` operation as manual backup creation and records safe process
+attempt metadata for operator review.
+
+```bash title="Configure scheduled dependency backups"
+appaloft dependency backup policy configure dep_db --retention-days 7 --interval-hours 24
+appaloft dependency backup policy list dep_db
+appaloft dependency backup policy show dbp_123
+```
+
 <h2 id="dependency-delete-safety">Delete safety</h2>
 
 Before deleting a dependency resource, Appaloft checks active bindings, backup retention, deployment
