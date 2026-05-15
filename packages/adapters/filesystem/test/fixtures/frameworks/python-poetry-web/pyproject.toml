@@ -3,7 +3,12 @@ name = "python-poetry-web"
 version = "0.1.0"
 description = "Appaloft Python Poetry fixture"
 authors = ["Appaloft <dev@appaloft.local>"]
+packages = [{ include = "python_poetry_web" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"
 Flask = "3.1.0"
+
+[build-system]
+requires = ["poetry-core==1.9.1"]
+build-backend = "poetry.core.masonry.api"

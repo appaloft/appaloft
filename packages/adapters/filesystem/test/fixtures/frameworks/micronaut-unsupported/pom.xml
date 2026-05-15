@@ -1,0 +1,13 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>io.appaloft.fixtures</groupId>
+  <artifactId>micronaut-unsupported</artifactId>
+  <version>1.0.0</version>
+  <dependencies>
+    <dependency>
+      <groupId>io.micronaut</groupId>
+      <artifactId>micronaut-http-server-netty</artifactId>
+      <version>4.8.2</version>
+    </dependency>
+  </dependencies>
+</project>

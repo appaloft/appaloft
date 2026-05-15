@@ -22,6 +22,7 @@ import {
 
 export type PythonPackageManager = "pip" | "poetry" | "uv";
 export type PythonAppProtocol = "asgi" | "wsgi";
+const uvBaseImageVersion = "0.9.26";
 
 export interface PythonAppTarget {
   protocol: PythonAppProtocol;
@@ -56,6 +57,11 @@ export function resolvePythonPackageManager(
 
 export function pythonBaseImage(inspection?: SourceInspectionSnapshot): string {
   const version = inspection?.runtimeVersion ?? "3.12";
+
+  if (resolvePythonPackageManager(inspection) === "uv") {
+    return `ghcr.io/astral-sh/uv:${uvBaseImageVersion}-python${version}-bookworm-slim`;
+  }
+
   return `python:${version}-slim`;
 }
 
@@ -65,13 +71,13 @@ export function pythonInstallCommand(input: WorkspacePlannerInput): string | und
   return (
     input.requestedDeployment.installCommand ??
     (packageManager === "uv"
-      ? "pip install --no-cache-dir uv && uv sync --frozen --no-dev"
+      ? "uv sync --frozen --no-dev"
       : packageManager === "poetry"
-        ? "pip install --no-cache-dir poetry && poetry install --only main --no-root"
-        : input.source.inspection?.hasDetectedFile("requirements-txt")
-          ? "pip install --no-cache-dir -r requirements.txt"
+        ? "pip install --no-cache-dir --retries 10 --timeout 120 ."
+      : input.source.inspection?.hasDetectedFile("requirements-txt")
+          ? "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt"
           : input.source.inspection?.hasDetectedFile("pyproject-toml")
-            ? "pip install --no-cache-dir ."
+            ? "pip install --no-cache-dir --retries 10 --timeout 120 ."
             : undefined)
   );
 }
@@ -84,7 +90,7 @@ export function pythonRunCommandFor(
     case "uv":
       return `uv run ${command}`;
     case "poetry":
-      return `poetry run ${command}`;
+      return command;
     case "pip":
       return command;
   }

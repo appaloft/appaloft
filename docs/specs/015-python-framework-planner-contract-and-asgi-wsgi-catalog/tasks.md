@@ -27,7 +27,8 @@
 
 ## Entrypoints And Docs
 
-- [x] Update roadmap and implementation notes to mark Python tested catalog closure without claiming full real Docker/SSH fixture coverage.
+- [x] Update roadmap and implementation notes to mark Python tested catalog closure while pointing to
+  the shared GitHub Actions/local explicit Docker/generic-SSH fixture smoke coverage and keeping fast CI contract-oriented.
 - [x] Update `deployments.plan` query/test matrix status for Python preview parity.
 - [x] Record public docs/help outcome for this behavior.
 

@@ -65,20 +65,23 @@ Every tested JVM row must prove:
   contract ids `DPP-CATALOG-005` through `DPP-CATALOG-006`.
 - Test-first rows: bind JVM/Spring fixture catalog tests to the new JVM ids before marking the
   roadmap item complete.
-- Acceptance/e2e: keep representative opt-in local Docker smoke under existing smoke rows; full
-  fixture-by-fixture real Docker/SSH smoke remains a migration gap.
+- Acceptance/e2e: keep JVM local Docker and generic-SSH fixture smoke in the existing smoke rows;
+  both use the shared framework smoke descriptor list and run as GitHub Actions/local explicit gates
+  because they mutate Docker or SSH targets.
 - Contract/integration/unit: filesystem fixture tests prove JVM/Spring evidence; runtime fixture
   tests prove planner/base image/command/artifact/port/health shape; contract tests prove
   `deployments.plan/v1` can expose the same JVM planner shape.
 
 ## Risks And Migration Gaps
 
-- Quarkus and Micronaut are not promoted in this round unless deterministic evidence and fixtures
-  are added under the same contract.
+- Quarkus Maven JVM jar mode is promoted under the same deterministic evidence and fixture
+  contract. Micronaut is not promoted in this round unless deterministic evidence and fixtures are
+  added under the same contract.
 - Full browser-level Web/CLI parity for every JVM fixture remains broader hardening; current parity
   is shared draft vocabulary plus preview contract.
-- Full real Docker/SSH smoke for every JVM fixture remains a migration gap; headless Docker/OCI
-  readiness is the tested catalog closure for this round.
+- Micronaut remains a future planner family. Local Docker and generic-SSH JVM fixture smoke coverage
+  for active JVM fixtures, including Quarkus Maven, is available through the shared GitHub
+  Actions/local explicit framework smoke gates, while fast local automation stays hermetic.
 - Buildpack-style detection remains a future adapter-owned accelerator. It must not replace
   explicit Spring Boot planner support or become a public deployment input.
 
