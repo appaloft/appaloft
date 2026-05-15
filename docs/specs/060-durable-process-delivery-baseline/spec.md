@@ -4,13 +4,14 @@
 
 - Round: Code Round plus Post-Implementation Sync
 - Artifact state: implemented for scheduled-task, scheduled runtime prune, scheduled history
-  retention durable worker bindings, plus preview cleanup, certificate issuance, certificate
-  import, managed certificate revocation, proxy bootstrap, resource runtime control, source-event
-  auto-deploy, dependency resource backup/restore, provider-native dependency resource
-  realization/delete, deployment create execution, domain binding verification retry, and domain
-  binding create operator-visible process-attempt projection, plus deployment retry execution
-  operator-visible process-attempt projection and deployment rollback execution operator-visible
-  process-attempt projection; broader workflow opt-in remains incremental.
+  retention durable worker bindings, runtime monitoring collection worker binding, and dependency
+  resource backup/restore process-attempt claim/completion binding when a journal is available.
+  Preview cleanup, certificate issuance, certificate import, managed certificate revocation, proxy
+  bootstrap, resource runtime control, source-event auto-deploy, provider-native dependency resource
+  realization/delete, deployment create execution, domain binding verification retry, domain
+  binding create, deployment retry execution, and deployment rollback execution remain
+  operator-visible process-attempt projection bindings until governed worker slices promote them;
+  broader workflow opt-in remains incremental.
 
 ## Business Outcome
 
@@ -85,17 +86,22 @@ baseline before retry execution and production automation can depend on backgrou
   completes success/retry-scheduled state, and exposes safe operator-work visibility. It creates a
   fresh scheduled maintenance attempt per policy tick rather than using generic retry generation.
 - Scheduled history retention is the third durable worker binding. It records scheduled retention
-  category work, claims the durable attempt, dispatches existing manual history prune commands
-  through the command bus, completes success/retry-scheduled state, and preserves each
-  category-specific retention guard. It creates fresh scheduled attempts from retention-default
-  policy ticks rather than using generic retry generation.
-- Preview cleanup is the fourth operator-visible process-attempt binding. Product-grade preview
-  cleanup records every cleanup attempt outcome into the process attempt journal with stable
-  preview cleanup dedupe authority, safe preview scope details, retry-scheduled failure visibility,
-  and `operator-work.*` read/repair visibility. Its retry scheduler still reads the existing
-  `preview_cleanup_attempts` store and runs under the `preview-lifecycle` mutation-coordinator
-  lease rather than process-attempt atomic claim/completion; converting that scheduler to a full
-  process-attempt worker remains a future opt-in slice.
+  category work, claims the durable attempt, runs existing manual history prune commands through
+  the command bus or governed direct retention stores, completes success/retry-scheduled state, and
+  preserves each category-specific retention guard. It creates fresh scheduled attempts from
+  retention-default policy ticks rather than using generic retry generation.
+- Runtime monitoring collection is an internal runtime-maintenance process-attempt binding. It
+  records collection work, claims the durable attempt, calls the read-only runtime usage inspection
+  query boundary, writes sanitized retained samples, and records retry-scheduled failure visibility
+  without mutating runtime targets. The shell runner is disabled by default and currently discovers
+  active server targets plus resource/deployment/project/environment targets derived from
+  runtime-owning resources.
+- Preview cleanup is the fourth process-attempt worker binding. Product-grade preview cleanup
+  records every cleanup attempt outcome into the process attempt journal with stable preview cleanup
+  dedupe authority, safe preview scope details, retry-scheduled failure visibility, and
+  `operator-work.*` read/repair visibility. Its retry scheduler generates due retries from the
+  process attempt journal, then executes cleanup only after atomic process-attempt claim/completion.
+  `preview_cleanup_attempts` remains compatibility cleanup history.
 - Certificate issuance is the fifth operator-visible process-attempt binding. Certificate request,
   provider issuance, success, and retry-scheduled provider failure states are recorded into the
   process attempt journal with certificate/domain-binding ids, safe certificate context, and
@@ -142,14 +148,14 @@ baseline before retry execution and production automation can depend on backgrou
   source-event record plus inline dispatcher path; source-event auto-deploy does not consume
   process-attempt atomic claim/completion as a durable worker yet.
 - Dependency resource backup/restore is the eleventh operator-visible process-attempt binding.
-  `dependency-resources.create-backup` and `dependency-resources.restore-backup` record running,
-  succeeded, and failed provider backup/restore attempts into the process attempt journal with
+  `dependency-resources.create-backup` and `dependency-resources.restore-backup` record pending,
+  claimed/completed, succeeded, and failed provider backup/restore attempts into the process attempt journal with
   backup/restore attempt ids, stable dependency-resource backup/restore dedupe authority, safe
   dependency kind/provider/backup metadata, async-processing failure category, retriable provider
   failure visibility, and `operator-work.*` read/repair visibility. Provider backup and restore
   still execute inline through the existing command use cases after `DependencyResourceBackup`
-  state is persisted; they do not consume process-attempt atomic claim/completion as durable
-  workers yet.
+  state is persisted, but consume process-attempt atomic claim/completion when a process journal is
+  available. Background retry execution remains a governed worker slice.
 - Provider-native dependency resource realization/delete is the twelfth operator-visible
   process-attempt binding. `dependency-resources.provision-postgres`,
   `dependency-resources.provision-redis`, and provider-managed
@@ -196,7 +202,8 @@ baseline before retry execution and production automation can depend on backgrou
   details. Rollback execution still runs inline through the rollback use case after rollback
   admission/start state is persisted; it does not consume process-attempt atomic claim/completion
   as a durable deployment worker yet.
-- Other long-running workflows remain future opt-in slices.
+- Other long-running workflows require governed explicitly-enabled worker slices before automatic
+  retry execution can run provider or runtime work.
 - Retry policy defaults remain workflow-local before 1.0; the scheduled-task first binding uses the
   existing retry-scheduled process attempt timing and does not introduce organization-level retry
   defaults.

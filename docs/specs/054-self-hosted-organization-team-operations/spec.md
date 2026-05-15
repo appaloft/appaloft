@@ -2,8 +2,9 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: accepted-candidate
+- Round: Post-Implementation Sync
+- Artifact state: active baseline; broader browser-driven self-hosted auth end-to-end coverage and
+  concrete future MCP descriptors remain Phase 8 follow-up gaps
 
 ## Business Outcome
 
@@ -48,13 +49,15 @@ contracts, Web, CLI, or public docs.
 ## Public Surfaces
 
 - API/oRPC: admin-protected organization/team operations dispatch Appaloft messages.
-- CLI: organization/team management commands may be added for operators who manage self-hosted
-  instances without using Web.
+- CLI: organization/team management commands dispatch the same Appaloft messages for operators who
+  manage self-hosted instances without using Web.
 - Web/UI: current organization context, current organization switching, member list, invitation,
-  role update, and member removal are Phase 8 Web surfaces and must use `packages/i18n` keys.
+  role update, member removal, and deploy-token management are active Web `/organization` surfaces
+  and use `packages/i18n` keys.
 - Public docs/help: explain current organization context and switching, inviting operators, role
   changes, member removal, and common `401`/`403` recovery without exposing Better Auth internals.
-- Future MCP: organization/team tools should use the same command/query schemas as HTTP/oRPC.
+- Future MCP: concrete organization/team tools remain a Phase 8 follow-up gap and should use the
+  same command/query schemas as HTTP/oRPC when added.
 
 ## Non-Goals
 

@@ -4,6 +4,8 @@ import {
   type PreviewEnvironmentReadModel,
   type PreviewEnvironmentRepository,
   type PreviewEnvironmentSummary,
+  type PreviewExpiredEnvironmentCandidate,
+  type PreviewExpiredEnvironmentCandidateReader,
   type RepositoryContext,
 } from "@appaloft/application";
 import {
@@ -36,7 +38,7 @@ import {
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { resolveRepositoryExecutor } from "./shared";
+import { normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
 
 type PreviewEnvironmentRow = Selectable<Database["preview_environments"]>;
 type PreviewEnvironmentSelectionQuery = SelectQueryBuilder<
@@ -291,6 +293,56 @@ export class PgPreviewEnvironmentReadModel implements PreviewEnvironmentReadMode
 
     const row = await query.executeTakeFirst();
     return row ? summaryFromRow(row) : null;
+  }
+}
+
+export class PgPreviewExpiredEnvironmentCandidateReader
+  implements PreviewExpiredEnvironmentCandidateReader
+{
+  constructor(private readonly db: Kysely<Database>) {}
+
+  async listExpiredActive(
+    context: RepositoryContext,
+    input: {
+      now: string;
+      limit: number;
+    },
+  ): Promise<PreviewExpiredEnvironmentCandidate[]> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createRepositorySpanName("preview_environment", "list_expired_active"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.repositoryName]: "preview_environment",
+          [appaloftTraceAttributes.selectionSpecName]: "PreviewExpiredEnvironmentCandidateReader",
+        },
+      },
+      async () => {
+        const rows = await executor
+          .selectFrom("preview_environments")
+          .select(["id", "resource_id", "expires_at"])
+          .where("status", "=", "active")
+          .where("expires_at", "is not", null)
+          .where("expires_at", "<=", input.now)
+          .orderBy("expires_at", "asc")
+          .orderBy("id", "asc")
+          .limit(input.limit)
+          .execute();
+
+        return rows.flatMap((row) => {
+          const expiresAt = normalizeTimestamp(row.expires_at);
+          return expiresAt
+            ? [
+                {
+                  previewEnvironmentId: row.id,
+                  resourceId: row.resource_id,
+                  expiresAt,
+                },
+              ]
+            : [];
+        });
+      },
+    );
   }
 }
 

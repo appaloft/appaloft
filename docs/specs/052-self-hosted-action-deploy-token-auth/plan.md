@@ -28,9 +28,10 @@
   - HTTP/oRPC protects `POST /api/action/deployments/from-source-link`,
     `POST /api/action/deployments/from-config-package`, and self-hosted Action
     `POST /api/deployments/cleanup-preview`;
-  - installer and deploy-action wrapper need token creation/passing surfaces;
-  - Web/CLI token management can be implemented after the first guarded endpoint slice if recorded
-    as a migration gap.
+  - installer and deploy-action wrapper provide token bootstrap/passing surfaces;
+  - CLI, HTTP/oRPC, and Web `/organization` expose deploy-token lifecycle management through the
+    same application command/query messages; concrete future MCP descriptors remain a named Phase 8
+    migration gap.
 - Persistence/migration impact:
   - add deploy token tables or extend Better Auth-compatible storage only through
     `packages/persistence/pg`;
@@ -66,8 +67,8 @@
 ## Risks And Migration Gaps
 
 - First-admin login and OAuth remain separate Phase 8 slices.
-- Web token management can remain a migration gap only if installer/CLI token bootstrap and
-  rotation/revocation have another supported operator path.
+- Concrete future MCP token management remains a named migration gap; CLI, HTTP/oRPC, Web
+  `/organization`, installer bootstrap, and deploy-action bearer forwarding are active surfaces.
 - Existing users of self-hosted Action server mode need a migration note because Action mutation
   endpoints become token-required.
 - Authorization must fail closed when token storage or verifier configuration is unavailable.

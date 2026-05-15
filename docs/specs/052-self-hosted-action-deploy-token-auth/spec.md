@@ -2,8 +2,9 @@
 
 ## Status
 
-- Round: Code Round started
-- Artifact state: accepted-candidate with partial source-link/server-config endpoint guard
+- Round: Post-Implementation Sync
+- Artifact state: active baseline for Action endpoint admission and deploy-token lifecycle;
+  concrete future MCP descriptors remain a named Phase 8 migration gap
 
 ## Business Outcome
 
@@ -57,8 +58,9 @@ workflows without requiring external OAuth or an interactive user session.
 - CLI: installer and `appaloft deploy-token create/list/show/rotate/revoke` surfaces may create,
   rotate, revoke, and print one-time raw token output. Pure SSH CLI mode with
   `control-plane-mode: none` does not require deploy tokens.
-- Web/UI: token management and onboarding are Phase 8 surfaces; initial Code Round may record them
-  as a migration gap unless implemented with i18n keys and stable help anchors.
+- Web/UI: Web `/organization` exposes deploy-token list/create/rotate/revoke controls through the
+  same admin-protected oRPC contracts and stable public docs anchor. Future MCP token management
+  remains a named Phase 8 migration gap.
 - Config: repository config must not contain deploy tokens. GitHub Actions should provide the token
   through trusted secret inputs or environment variables.
 - Events: token lifecycle events are safe audit facts only; they must not include raw token values.
@@ -88,7 +90,9 @@ workflows without requiring external OAuth or an interactive user session.
 - 2026-05-10 Code Round added an application `ActionDeployTokenAuthorizationPort`, authenticated
   `deploy-token` actor context, oRPC bearer-token admission, Better Auth package static-token
   verification from `APPALOFT_ACTION_DEPLOY_TOKEN`, and
-  `/api/version.features.actionDeployTokenAuth`.
+  `/api/version.features.actionDeployTokenAuth`. Later Code Rounds replaced the static verifier as
+  the default path with persisted deploy-token storage while preserving the static verifier as an
+  operator-provided bootstrap fallback.
 - Better Auth is an implementation detail of `@appaloft/auth-better`. Core must not import it, and
   application may only depend on Appaloft-owned ports/interfaces so the auth library can be swapped
   without changing domain or use-case semantics.
@@ -139,6 +143,6 @@ workflows without requiring external OAuth or an interactive user session.
   material. Plain SSH install does not create a deploy token by default.
 - Concrete future MCP token management descriptors remain a named Phase 8 migration gap.
 - Public docs now cover installer bootstrap output, `APPALOFT_TOKEN` GitHub Secret wiring,
-  deploy-token scope meaning, `401`/`403` recovery, and CLI plus admin-protected lifecycle
-  endpoints at
+  deploy-token scope meaning, `401`/`403` recovery, CLI plus admin-protected lifecycle endpoints,
+  and Web `/organization` token management at
   `self-hosting/action-deploy-token-auth#self-hosting-action-deploy-token-auth`.

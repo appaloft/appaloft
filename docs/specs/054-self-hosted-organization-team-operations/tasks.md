@@ -34,7 +34,7 @@
 - [x] Add ADR-045 for organization/team operation ownership and Better Auth boundary.
 - [x] Add feature artifact `docs/specs/054-self-hosted-organization-team-operations`.
 - [x] Position organization/team operations in `docs/BUSINESS_OPERATION_MAP.md`.
-- [x] Add accepted-candidate organization/team operations to `docs/CORE_OPERATIONS.md`.
+- [x] Add active organization/team operations to `docs/CORE_OPERATIONS.md`.
 - [x] Add command/query specs for current context, member list, invitation list, invite member,
   change member role, and remove member.
 - [x] Add command spec for current organization switching.

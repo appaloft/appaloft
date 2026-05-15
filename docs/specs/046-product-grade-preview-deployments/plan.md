@@ -76,10 +76,11 @@ cleanup retries.
   retry state, quota/expiry, and public-surface normalization.
 - Unit/integration: application use cases and process managers should use fake integration/runtime
   adapters first.
-- Acceptance/e2e: GitHub App webhook and feedback tests should be hermetic by default, with
-  opt-in provider smoke tests only after credentials and sandbox safety exist.
+- Acceptance/e2e: GitHub App webhook and feedback adapter tests use contract/fake-provider coverage
+  by default. A secret-gated live GitHub PR-comment feedback smoke exists; broader hosted provider
+  smoke tests remain governed public enablement gates after credentials and sandbox safety exist.
 
-## Risks And Migration Gaps
+## Risks And Governed Follow-Ups
 
 - Durable outbox/inbox work in Phase 8 may become a prerequisite for production cleanup retries and
   feedback reliability.
