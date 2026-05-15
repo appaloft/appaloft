@@ -45,6 +45,13 @@ Disabling a task prevents automatic scheduling. Deleting a task removes the defi
 trigger entrypoint only. It does not delete the Resource, Deployments, runtime process, or external
 dependencies.
 
+For self-hosted runtime execution, scheduled tasks run against the Resource's latest runtime-owning
+deployment when that deployment is on a supported Docker runtime target: local-shell Docker,
+generic-SSH Docker, Docker Compose, or Docker Swarm image services. Appaloft starts a temporary
+task container, Compose run, or Swarm replicated-job in the retained runtime context, so the command
+can reach the same internal runtime network without replacing the serving process. The long-running
+scheduled task runner is still disabled by default and must be enabled in configuration.
+
 <h2 id="scheduled-task-run-now">Run now</h2>
 
 `scheduled-tasks.run-now` accepts one manual run attempt. After the command returns a run id,
@@ -57,6 +64,16 @@ appaloft scheduled-task run tsk_daily_migration --resource-id res_web
 If the Resource is archived, the task is disabled, the task does not belong to the given Resource, or
 the default `forbid` concurrency policy finds another non-terminal run, Appaloft rejects or skips
 the run before starting the task command.
+
+For Resources deployed on local-shell, generic-SSH, or Docker Swarm Docker targets, Appaloft runs
+the task inside the current runtime context. Docker container deployments use a one-off task
+container attached to the Resource container network namespace; Docker Compose deployments use a
+one-off Compose service run for the retained target service; Docker Swarm image-service deployments
+use a temporary Appaloft-labeled job service on the retained Swarm network.
+
+Task processes also receive system-owned `APPALOFT_*` context variables for the run id, task id,
+Resource id, and runtime-owning deployment identity. Appaloft overwrites those reserved keys if a
+manual run supplies the same names.
 
 <h2 id="scheduled-task-run-history">Run history</h2>
 

@@ -2,7 +2,8 @@
 
 ## Status
 
-Code Round implemented. The scheduled task runner remains opt-in for shell processes.
+Code Round implemented. The scheduled task runner is disabled by default and starts only when shell
+processes explicitly enable it.
 
 ## Problem
 
@@ -85,10 +86,18 @@ to the same anchor from the scheduled-task tab.
   a scheduler-specific port, dispatches each due candidate through the same shared run admission
   service as run-now, records accepted `scheduled` trigger runs, and reports per-candidate
   admission failures without starting runtime execution.
-- Scheduled-task runtime adapter support exists. The application owns a one-off task
-  runtime port contract, and the runtime adapter package provides a hermetic implementation that
-  returns scheduled-task-run-scoped stdout/stderr log entries, terminal status, exit code,
-  timestamps, and masked secret-looking output without using deployment/resource runtime logs.
+- Durable process attempts preserve trigger-source operation identity: manual run-now attempts record
+  the active catalog key `scheduled-tasks.run-now`, while scheduler-fired attempts record the
+  internal delivery key `scheduled-task-runs.run-due` used by the shell runner.
+- Scheduled-task runtime adapter support exists. The application owns a one-off task runtime port
+  contract, and the runtime adapter package provides the real runtime-target implementation for
+  local-shell and generic-SSH Docker container plans, Docker Compose plans, and Docker Swarm
+  OCI-image service plans. Docker container task runs resolve the Resource's latest runtime-owning
+  deployment, start a one-off `docker run --rm` task container on the selected target, join the
+  current Resource container's network namespace, and return scheduled-task-run-scoped stdout/stderr
+  log entries, terminal status, exit code, timestamps, and masked secret-looking output without
+  writing deployment/resource runtime logs. A separate hermetic implementation remains available
+  only for adapter tests and development fixtures.
 - Accepted-run worker support exists. It loads an accepted run attempt, loads the owning
   task definition, persists the running transition, invokes the scheduled-task runtime port,
   records runtime logs through the scheduled-task run-log recorder, and persists the terminal
@@ -113,9 +122,33 @@ to the same anchor from the scheduled-task tab.
   and suppresses candidates already admitted as scheduled runs in that same minute.
 - Shell composition registrations exist for scheduled-task repositories, read models, due-candidate
   reader, run-log recorder, runtime port, handlers, use cases, scheduler, and accepted-run worker.
-  An opt-in scheduled task runner config can start a shell timer that scans due tasks and drains
-  admitted runs through the worker in long-running shell processes.
+  An explicitly enabled scheduled task runner config can start a shell timer that scans due tasks
+  and drains admitted runs through the worker in long-running shell processes.
 - Operation catalog entries, CLI commands, HTTP/oRPC routes, Web controls, and public docs/help
   anchors are active for scheduled tasks and run history. Generated MCP descriptors consume the
   active operation catalog entries.
 - The scheduled task runner is disabled by default until operators explicitly enable it.
+- Scheduled task real runtime execution currently covers `local-shell` and `generic-ssh`
+  `docker-container` and Docker Compose runtime plans, plus Docker Swarm OCI-image services.
+  Docker container task runs start a one-off task container in the Resource container's network
+  namespace. Docker Compose task runs start a one-off Compose service container using retained
+  `composeFile`, `composeProjectName`, and target service metadata. Docker Swarm task runs create a
+  temporary Appaloft-labeled replicated-job service on the retained Swarm network, stream its
+  service logs into the run, and remove the temporary service after success, failure, or timeout.
+- Scheduled task runtime ports inject stable `APPALOFT_*` context variables into every task process:
+  run id, task id, Resource id, and, when a runtime-owning deployment exists, deployment, project,
+  environment, destination, server, runtime provider, target kind, and execution kind. These
+  system-owned context variables override user-supplied variables with the same names to prevent a
+  task from spoofing its own Appaloft runtime identity.
+- Real runtime smoke gates exist for the Appaloft-owned runtime baseline:
+  `bun run smoke:scheduled-task:docker` starts a real local Docker source container and proves the
+  scheduled-task runtime can execute a one-off task container beside it, while
+  `bun run smoke:scheduled-task:ssh` runs the same proof through generic SSH after the shared SSH
+  preflight. `bun run smoke:scheduled-task` composes both gates for local environments that have
+  Docker and a configured SSH Docker target. `.github/workflows/scheduled-task-e2e.yml` runs the
+  Docker gate from nightly/release and runs the SSH gate when secrets exist; release dispatch can
+  require SSH evidence and fail closed when the target secrets are absent.
+- Provider-native scheduled jobs are a future provider-extension slice. The current scheduled-task
+  baseline runs through Appaloft-owned runtime execution for local Docker, generic SSH Docker,
+  Docker Compose, and Docker Swarm OCI-image services, with hermetic execution limited to tests and
+  development fixtures.

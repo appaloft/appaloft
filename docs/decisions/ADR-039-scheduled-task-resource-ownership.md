@@ -108,15 +108,28 @@ logs. Deployment logs remain deployment-attempt logs.
 
 ## Current Implementation Notes And Migration Gaps
 
-No scheduled-task aggregate, repository, operation catalog entry, CLI command, HTTP route, Web
-surface, scheduler process manager, or runtime backend execution path is active yet.
+The first Resource-owned scheduled task baseline is active. Core scheduled-task definition and
+run-attempt state, application command/query handlers, explicit repository/read-model ports,
+Postgres/PGlite persistence, run-log readback, operation catalog entries, CLI commands, HTTP/oRPC
+routes, Web Resource-detail controls, generated MCP descriptors, public docs/help links, scheduler
+admission, and the accepted-run worker are implemented.
 
-The first Code Round must define the persisted state shape, run-attempt state machine, query models,
-runtime target execution port, and log reader boundary before exposing public entrypoints.
+Runtime execution is Appaloft-owned rather than server-local cron. The runtime port resolves the
+Resource's latest runtime-owning deployment and runs one-off task commands without creating
+Deployment attempts or replacing the serving runtime. Current real runtime target coverage includes
+`local-shell` and `generic-ssh` Docker container targets, Docker Compose targets with retained
+compose metadata, and Docker Swarm OCI-image services through temporary labeled replicated-job
+services. The hermetic runtime remains available for deterministic adapter tests and development
+fixtures.
+
+The long-running scheduled task runner is still disabled by default for shell processes and must be
+enabled explicitly by operators. Provider-native scheduled jobs remain a future provider-extension
+slice; the active baseline uses Appaloft-owned runtime execution and keeps provider-specific
+scheduler APIs out of core/application contracts.
 
 ## Open Questions
 
 - Should skipped due fires be persisted as run attempts or summarized counters?
 - Which cron expression subset and timezone validation library should be accepted first?
-- Should the first runtime backend run scheduled tasks from latest successful deployment artifact,
-  current Resource profile rebuild, or a task-specific artifact snapshot?
+- Should a future provider-extension expose provider-native scheduled jobs while preserving the
+  same Resource-owned task/run/readback contract?
