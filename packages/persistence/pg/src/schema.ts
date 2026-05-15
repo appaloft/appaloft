@@ -227,6 +227,20 @@ export interface DependencyResourceBackupsTable {
   created_at: TimestampColumn;
 }
 
+export interface DependencyResourceBackupPoliciesTable {
+  id: string;
+  version: string;
+  dependency_resource_id: string;
+  retention_days: number;
+  schedule_interval_hours: number;
+  provider_key: string | null;
+  retry_on_failure: boolean;
+  enabled: boolean;
+  last_run_at: NullableUpdatableTimestampColumn;
+  next_run_at: UpdatableTimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
 export interface ResourceRuntimeLogArchivesTable {
   id: string;
   resource_id: string;
@@ -913,6 +927,7 @@ export interface Database {
   resource_variables: ResourceVariablesTable;
   dependency_resources: DependencyResourcesTable;
   dependency_resource_backups: DependencyResourceBackupsTable;
+  dependency_resource_backup_policies: DependencyResourceBackupPoliciesTable;
   resource_dependency_bindings: ResourceDependencyBindingsTable;
   resource_runtime_log_archives: ResourceRuntimeLogArchivesTable;
   dependency_binding_secrets: DependencyBindingSecretsTable;

@@ -381,6 +381,9 @@ Phase 7 dependency resource operations:
 | List dependency resource backups | Query | `dependency-resources.list-backups` | `ListDependencyResourceBackupsQuery` | `ListDependencyResourceBackupsQueryInput` | `appaloft dependency backup list <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}/backups` |
 | Show dependency resource backup | Query | `dependency-resources.show-backup` | `ShowDependencyResourceBackupQuery` | `ShowDependencyResourceBackupQueryInput` | `appaloft dependency backup show <backupId>` | `GET /api/dependency-resources/backups/{backupId}` |
 | Restore dependency resource backup | Command | `dependency-resources.restore-backup` | `RestoreDependencyResourceBackupCommand` | `RestoreDependencyResourceBackupCommandInput` | `appaloft dependency backup restore <backupId>` | `POST /api/dependency-resources/backups/{backupId}/restore` |
+| Configure dependency resource backup policy | Command | `dependency-resources.backup-policies.configure` | `ConfigureDependencyResourceBackupPolicyCommand` | `ConfigureDependencyResourceBackupPolicyCommandInput` | `appaloft dependency backup policy configure <dependencyResourceId>` | `POST /api/dependency-resources/backup-policies` |
+| List dependency resource backup policies | Query | `dependency-resources.backup-policies.list` | `ListDependencyResourceBackupPoliciesQuery` | `ListDependencyResourceBackupPoliciesQueryInput` | `appaloft dependency backup policy list` | `GET /api/dependency-resources/backup-policies` |
+| Show dependency resource backup policy | Query | `dependency-resources.backup-policies.show` | `ShowDependencyResourceBackupPolicyQuery` | `ShowDependencyResourceBackupPolicyQueryInput` | `appaloft dependency backup policy show <policyId>` | `GET /api/dependency-resources/backup-policies/{policyId}` |
 | Bind dependency to resource | Command | `resources.bind-dependency` | `BindResourceDependencyCommand` | `BindResourceDependencyCommandInput` | `appaloft resource dependency bind <resourceId>` | `POST /api/resources/{resourceId}/dependency-bindings` |
 | Unbind dependency from resource | Command | `resources.unbind-dependency` | `UnbindResourceDependencyCommand` | `UnbindResourceDependencyCommandInput` | `appaloft resource dependency unbind <resourceId> <bindingId>` | `DELETE /api/resources/{resourceId}/dependency-bindings/{bindingId}` |
 | Rotate resource dependency binding secret | Command | `resources.rotate-dependency-binding-secret` | `RotateResourceDependencyBindingSecretCommand` | `RotateResourceDependencyBindingSecretCommandInput` | `appaloft resource dependency rotate-secret <resourceId> <bindingId>` | `POST /api/resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations` |
@@ -458,10 +461,18 @@ Current boundary:
   `operator-work.*` through durable process-attempt rows with safe dependency/provider metadata;
   provider execution still runs inline through the command use cases rather than process-attempt
   atomic claim/completion.
+- Dependency resource scheduled backup policy is governed by
+  [Dependency Resource Scheduled Backup Policy](./specs/070-dependency-resource-scheduled-backup-policy/spec.md).
+  Policies are opt-in records per dependency resource with retention metadata, interval hours,
+  enabled state, last/next run timestamps, and optional provider key. The disabled-by-default shell
+  runner scans due policies and dispatches the existing `dependency-resources.create-backup`
+  command; it does not create a parallel backup provider path, expose raw dumps, prune retained
+  backups, export backup artifacts, or mutate workload runtime state.
 - The Web console exposes these lifecycle controls at `/dependency-resources`: create
   Docker-backed Appaloft-managed Postgres/Redis on an active single-server target, list safe
-  realization/connection metadata, create backups, restore ready backup artifacts with explicit
-  overwrite/runtime acknowledgements, and delete unblocked dependency resources.
+  realization/connection metadata, create backups, configure scheduled backup policy, restore ready
+  backup artifacts with explicit overwrite/runtime acknowledgements, and delete unblocked dependency
+  resources.
 - `resources.create` is the explicit command for creating the minimum durable resource
   profile. It is governed by
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).

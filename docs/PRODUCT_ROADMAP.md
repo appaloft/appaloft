@@ -201,8 +201,9 @@ Still blocking 1.0.0:
   complete.
 - [ ] Generated access, proxy preview, server-applied domains, and durable domain routes still need
   broader API/Web/CLI regression coverage.
-- [ ] Dependency resources and bindings exist in core but lack provisioning, binding, backup, and
-  deletion commands.
+- [x] Dependency resources now cover Postgres/Redis provision/import/list/show/rename/delete,
+  resource binding, backup/restore, and opt-in scheduled backup policy surfaces. Remaining work is
+  prune/export automation, storage-volume parity, and broader provider catalog coverage.
 - [ ] Framework coverage is narrower than the target product catalog.
 - [x] Docker Swarm support is specified and implemented as the first cluster runtime target backend.
 - [ ] Durable outbox/inbox, job state, process attempts, dead-letter/retry state, remote-state
@@ -2369,7 +2370,8 @@ work below before GA.
 - [ ] Environment/resource secrets: secret reference create/list/show/update/delete, masking,
   build/runtime scope.
 - [ ] Storage volume: create/list/show/update/delete, attach/detach, backup relationship.
-- [ ] Dependency resource instance: provision/import/list/show/update/delete for Postgres and Redis.
+- [x] Dependency resource instance: provision/import/list/show/rename/delete for Postgres and
+  Redis.
 - [ ] Resource binding: bind/unbind/list/show/rotate, immutable deployment snapshot.
 - [ ] Webhook/auto-deploy: create/list/show/update/delete, delivery attempts, replay, secret
   rotation.
@@ -2562,9 +2564,10 @@ Recommended next Spec Rounds before broad Code Rounds:
   decisions.
 - [ ] Access/domain/TLS closure: domain binding show/update/delete/retry and certificate
   import/revoke/retry.
-- [ ] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,
-  backup/restore, and delete. Docker-backed Appaloft-managed Postgres/Redis for single-server
-  targets is implemented in the shell provider and Web console; remaining work is scheduled
-  policy/prune/export, storage-volume parity, and broader provider catalog coverage.
+- [x] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,
+  backup/restore, delete, and opt-in scheduled backup policy configuration. Docker-backed
+  Appaloft-managed Postgres/Redis for single-server targets is implemented in the shell provider and
+  Web console; remaining work is backup prune/export, storage-volume parity, and broader provider
+  catalog coverage.
 - [ ] Operator state closure: outbox/inbox/jobs, remote SSH state diagnostics, runtime target
   capacity diagnostics, audit/event retention, and prune/recovery commands.

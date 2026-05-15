@@ -73,6 +73,7 @@ import { auditEventLegalHoldsMigration } from "./migrations/064_audit_event_lega
 import { auditEventArchivesMigration } from "./migrations/065_audit_event_archives";
 import { domainEventStreamRecordsMigration } from "./migrations/066_domain_event_stream_records";
 import { retentionDefaultsMigration } from "./migrations/067_retention_defaults";
+import { dependencyResourceBackupPoliciesMigration } from "./migrations/068_dependency_resource_backup_policies";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -236,6 +237,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "065_audit_event_archives": auditEventArchivesMigration,
       "066_domain_event_stream_records": domainEventStreamRecordsMigration,
       "067_retention_defaults": retentionDefaultsMigration,
+      "068_dependency_resource_backup_policies": dependencyResourceBackupPoliciesMigration,
     };
   }
 }

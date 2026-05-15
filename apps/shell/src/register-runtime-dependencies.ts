@@ -39,6 +39,7 @@ import {
   CommandBus,
   type DefaultAccessDomainPolicyRepository,
   DefaultAccessDomainRuntimePlanResolver,
+  type DependencyResourceBackupPolicyRepository,
   type DeploymentProgressReporter,
   type DomainEventStreamRecorder,
   EmptyRemoteStateWorkReadModel,
@@ -112,6 +113,7 @@ import {
   PgCertificateSecretStore,
   PgDefaultAccessDomainPolicyRepository,
   PgDependencyBindingSecretStore,
+  PgDependencyResourceBackupPolicyRepository,
   PgDependencyResourceBackupReadModel,
   PgDependencyResourceBackupRepository,
   PgDependencyResourceDeleteSafetyReader,
@@ -801,6 +803,7 @@ export interface RegisterRuntimeDependenciesInput {
   retentionDefaultRepository?: RetentionDefaultRepository;
   scheduledRuntimePrunePolicyRepository?: ScheduledRuntimePrunePolicyRepository;
   scheduledRuntimePrunePolicyReadModel?: ScheduledRuntimePrunePolicyReadModel;
+  dependencyResourceBackupPolicyRepository?: DependencyResourceBackupPolicyRepository;
   resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined;
 }
 
@@ -1122,6 +1125,20 @@ export function registerRuntimeDependencies(
       () =>
         input.scheduledRuntimePrunePolicyRepository ??
         new PgScheduledRuntimePrunePolicyReadModel(input.database.db),
+    ),
+  });
+  container.register(tokens.dependencyResourceBackupPolicyReadModel, {
+    useFactory: instanceCachingFactory(
+      () =>
+        input.dependencyResourceBackupPolicyRepository ??
+        new PgDependencyResourceBackupPolicyRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.dependencyResourceBackupPolicyRepository, {
+    useFactory: instanceCachingFactory(
+      () =>
+        input.dependencyResourceBackupPolicyRepository ??
+        new PgDependencyResourceBackupPolicyRepository(input.database.db),
     ),
   });
   container.register(tokens.sourceEventRecorder, {

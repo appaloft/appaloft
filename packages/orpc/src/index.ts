@@ -31,6 +31,7 @@ import {
   type CommandBus,
   ConfigureAuditEventLegalHoldCommand,
   ConfigureDefaultAccessDomainPolicyCommand,
+  ConfigureDependencyResourceBackupPolicyCommand,
   ConfigureDomainBindingRouteCommand,
   ConfigurePreviewPolicyCommand,
   ConfigureResourceAccessCommand,
@@ -68,6 +69,7 @@ import {
   closeTerminalSessionCommandInputSchema,
   configureAuditEventLegalHoldCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
+  configureDependencyResourceBackupPolicyCommandInputSchema,
   configureDomainBindingRouteCommandInputSchema,
   configurePreviewPolicyCommandInputSchema,
   configureResourceAccessCommandInputSchema,
@@ -168,6 +170,7 @@ import {
   ListAuditEventsQuery,
   ListCertificatesQuery,
   ListDefaultAccessDomainPoliciesQuery,
+  ListDependencyResourceBackupPoliciesQuery,
   ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
   ListDeploymentsQuery,
@@ -200,6 +203,7 @@ import {
   listAuditEventsQueryInputSchema,
   listCertificatesQueryInputSchema,
   listDefaultAccessDomainPoliciesQueryInputSchema,
+  listDependencyResourceBackupPoliciesQueryInputSchema,
   listDependencyResourceBackupsQueryInputSchema,
   listDependencyResourcesQueryInputSchema,
   listDeploymentsQueryInputSchema,
@@ -326,6 +330,7 @@ import {
   ShowAuditEventQuery,
   ShowCertificateQuery,
   ShowDefaultAccessDomainPolicyQuery,
+  ShowDependencyResourceBackupPolicyQuery,
   ShowDependencyResourceBackupQuery,
   ShowDependencyResourceQuery,
   ShowDeploymentQuery,
@@ -363,6 +368,7 @@ import {
   showAuditEventQueryInputSchema,
   showCertificateQueryInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
+  showDependencyResourceBackupPolicyQueryInputSchema,
   showDependencyResourceBackupQueryInputSchema,
   showDependencyResourceQueryInputSchema,
   showDeploymentQueryInputSchema,
@@ -419,6 +425,7 @@ import {
   cloneEnvironmentResponseSchema,
   closeTerminalSessionResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
+  configureDependencyResourceBackupPolicyResponseSchema,
   configureDomainBindingRouteResponseSchema,
   configurePreviewPolicyResponseSchema,
   configureResourceAccessResponseSchema,
@@ -476,6 +483,7 @@ import {
   listAuditEventsResponseSchema,
   listCertificatesResponseSchema,
   listDefaultAccessDomainPoliciesResponseSchema,
+  listDependencyResourceBackupPoliciesResponseSchema,
   listDependencyResourceBackupsResponseSchema,
   listDependencyResourcesResponseSchema,
   listDeploymentsResponseSchema,
@@ -549,6 +557,7 @@ import {
   showAuditEventResponseSchema,
   showCertificateResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
+  showDependencyResourceBackupPolicyResponseSchema,
   showDependencyResourceBackupResponseSchema,
   showDependencyResourceResponseSchema,
   showDeploymentResponseSchema,
@@ -1051,6 +1060,18 @@ export const apiRouteDescriptions = {
   ),
   restoreDependencyResourceBackup: routeDescription(
     "Restores a ready dependency resource backup after explicit data-overwrite acknowledgements.",
+    "dependency.resource-lifecycle",
+  ),
+  configureDependencyResourceBackupPolicy: routeDescription(
+    "Configures an opt-in scheduled dependency backup policy used by the scheduler handoff.",
+    "dependency.resource-lifecycle",
+  ),
+  listDependencyResourceBackupPolicies: routeDescription(
+    "Lists scheduled dependency backup policies and due-run metadata without exposing provider secrets.",
+    "dependency.resource-lifecycle",
+  ),
+  showDependencyResourceBackupPolicy: routeDescription(
+    "Reads one scheduled dependency backup policy and its last/next run metadata.",
     "dependency.resource-lifecycle",
   ),
   bindResourceDependency: routeDescription(
@@ -4328,6 +4349,45 @@ export const restoreDependencyResourceBackupProcedure = base
     executeCommand(context, RestoreDependencyResourceBackupCommand.create(input)),
   );
 
+export const configureDependencyResourceBackupPolicyProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/backup-policies",
+    description: apiRouteDescriptions.configureDependencyResourceBackupPolicy,
+    successStatus: 201,
+  })
+  .input(configureDependencyResourceBackupPolicyCommandInputSchema)
+  .output(configureDependencyResourceBackupPolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureDependencyResourceBackupPolicyCommand.create(input)),
+  );
+
+export const listDependencyResourceBackupPoliciesProcedure = base
+  .route({
+    method: "GET",
+    path: "/dependency-resources/backup-policies",
+    description: apiRouteDescriptions.listDependencyResourceBackupPolicies,
+    successStatus: 200,
+  })
+  .input(listDependencyResourceBackupPoliciesQueryInputSchema)
+  .output(listDependencyResourceBackupPoliciesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListDependencyResourceBackupPoliciesQuery.create(input)),
+  );
+
+export const showDependencyResourceBackupPolicyProcedure = base
+  .route({
+    method: "GET",
+    path: "/dependency-resources/backup-policies/{policyId}",
+    description: apiRouteDescriptions.showDependencyResourceBackupPolicy,
+    successStatus: 200,
+  })
+  .input(showDependencyResourceBackupPolicyQueryInputSchema)
+  .output(showDependencyResourceBackupPolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowDependencyResourceBackupPolicyQuery.create(input)),
+  );
+
 export const bindResourceDependencyProcedure = base
   .route({
     method: "POST",
@@ -4652,6 +4712,9 @@ export const appaloftOrpcRouter = {
     listBackups: listDependencyResourceBackupsProcedure,
     showBackup: showDependencyResourceBackupProcedure,
     restoreBackup: restoreDependencyResourceBackupProcedure,
+    configureBackupPolicy: configureDependencyResourceBackupPolicyProcedure,
+    listBackupPolicies: listDependencyResourceBackupPoliciesProcedure,
+    showBackupPolicy: showDependencyResourceBackupPolicyProcedure,
   },
   terminalSessions: {
     open: openTerminalSessionProcedure,
@@ -6556,6 +6619,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/dependency-resources/redis/import",
     "/api/dependency-resources/backups/:backupId",
     "/api/dependency-resources/backups/:backupId/restore",
+    "/api/dependency-resources/backup-policies",
+    "/api/dependency-resources/backup-policies/:policyId",
     "/api/dependency-resources/:dependencyResourceId",
     "/api/dependency-resources/:dependencyResourceId/backups",
     "/api/dependency-resources/:dependencyResourceId/rename",

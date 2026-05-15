@@ -18,6 +18,7 @@ import {
   type CertificateRetryScheduler,
   type Clock,
   type CommandBus,
+  type DependencyResourceBackupPolicyRepository,
   type DeployTokenRepository,
   type ExecutionContext,
   type GitHubPreviewPullRequestWebhookVerifier,
@@ -33,6 +34,7 @@ import {
   type ProcessAttemptRetryGenerator,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
+  type ScheduledDependencyBackupService,
   type ScheduledHistoryRetentionService,
   type ScheduledRuntimePrunePolicyReadModel,
   type ScheduledRuntimePruneService,
@@ -87,6 +89,7 @@ import { createReloadableDatabase } from "./reloadable-database";
 import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
 import { SshRemoteStateWorkReadModel } from "./remote-state-work-read-model";
 import { resourceAccessFailureRendererTargetForStartedServer } from "./resource-access-failure-renderer-target";
+import { createScheduledDependencyBackupRunner } from "./scheduled-dependency-backup-runner";
 import { createScheduledHistoryRetentionRunner } from "./scheduled-history-retention-runner";
 import { createScheduledRuntimePruneRunner } from "./scheduled-runtime-prune-runner";
 import { createScheduledTaskRunner } from "./scheduled-task-runner";
@@ -518,6 +521,10 @@ export async function createAppComposition(
     childContainer,
     tokens.scheduledRuntimePruneService,
   );
+  const scheduledDependencyBackupService = resolveToken<ScheduledDependencyBackupService>(
+    childContainer,
+    tokens.scheduledDependencyBackupService,
+  );
   const scheduledHistoryRetentionService = resolveToken<ScheduledHistoryRetentionService>(
     childContainer,
     tokens.scheduledHistoryRetentionService,
@@ -526,6 +533,11 @@ export async function createAppComposition(
     childContainer,
     tokens.scheduledRuntimePrunePolicyReadModel,
   );
+  const dependencyResourceBackupPolicyRepository =
+    resolveToken<DependencyResourceBackupPolicyRepository>(
+      childContainer,
+      tokens.dependencyResourceBackupPolicyRepository,
+    );
   const scheduledTaskRunner = createScheduledTaskRunner({
     config: config.scheduledTaskRunner,
     scheduler: scheduledTaskScheduler,
@@ -540,6 +552,13 @@ export async function createAppComposition(
     config: config.scheduledRuntimePruneRunner,
     policyReadModel: scheduledRuntimePrunePolicyReadModel,
     service: scheduledRuntimePruneService,
+    executionContextFactory,
+    logger,
+  });
+  const scheduledDependencyBackupRunner = createScheduledDependencyBackupRunner({
+    config: config.scheduledDependencyBackupRunner,
+    policyRepository: dependencyResourceBackupPolicyRepository,
+    service: scheduledDependencyBackupService,
     executionContextFactory,
     logger,
   });
@@ -607,6 +626,7 @@ export async function createAppComposition(
     previewCleanupRetrySchedulerRunner.start();
     scheduledTaskRunner.start();
     scheduledRuntimePruneRunner.start();
+    scheduledDependencyBackupRunner.start();
     scheduledHistoryRetentionRunner.start();
   };
 
@@ -662,6 +682,7 @@ export async function createAppComposition(
       previewCleanupRetrySchedulerRunner.stop();
       scheduledTaskRunner.stop();
       scheduledRuntimePruneRunner.stop();
+      scheduledDependencyBackupRunner.stop();
       scheduledHistoryRetentionRunner.stop();
       serverHandle?.stop?.();
       await telemetry.shutdown();

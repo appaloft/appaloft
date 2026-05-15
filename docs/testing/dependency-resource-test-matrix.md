@@ -20,9 +20,10 @@ This matrix covers the Phase 7 dependency resource lifecycle baseline:
 - provider-native Postgres realization scenarios
 - provider-native Redis realization scenarios
 - dependency resource backup/restore scenarios
+- dependency resource scheduled backup policy scenarios
 
-It does not cover provider-native credential rotation, runtime cleanup, scheduled backup policies,
-backup prune/delete, or cross-resource restore.
+It does not cover provider-native credential rotation, runtime cleanup, backup prune/delete,
+backup export, or cross-resource restore.
 
 ## Global References
 
@@ -35,6 +36,7 @@ backup prune/delete, or cross-resource restore.
 - [Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md)
 - [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md)
 - [Redis Provider-Native Realization](../specs/049-redis-provider-native-realization/spec.md)
+- [Dependency Resource Scheduled Backup Policy](../specs/070-dependency-resource-scheduled-backup-policy/spec.md)
 - [ADR-040: Dependency Binding Runtime Injection Boundary](../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md)
 - [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
 - [dependency-resource-backup-requested](../events/dependency-resource-backup-requested.md)
@@ -144,6 +146,10 @@ backup prune/delete, or cross-resource restore.
 | DEP-RES-BACKUP-009 | `dependency-resources.restore-backup` | Application/provider | Restore point is missing, failed, deleted, cross-resource, target is unusable, acknowledgements are missing, or provider capability is absent. | Admission returns structured blocked/not-found/unsupported error and does not start provider restore. | `packages/application/test/dependency-resource-backup-restore.test.ts` |
 | DEP-RES-BACKUP-010 | `dependency-resources.delete` | Core/application/persistence | Dependency resource has retained ready backup or in-flight backup/restore attempt. | Delete returns `dependency_resource_delete_blocked`, reports backup blocker metadata, and does not call provider delete. | `packages/core/test/dependency-resource-backup.test.ts`; `packages/application/test/dependency-resource-backup-restore.test.ts`; `packages/persistence/pg/test/dependency-resource-backup.pglite.test.ts` |
 | DEP-RES-BACKUP-011 | Operation catalog / CLI / oRPC / HTTP | Entrypoint/contract | Backup/restore operations are active. | Entrypoints dispatch explicit command/query messages, reuse schemas, and expose no provider SDK shape, raw dump, or raw secret field. | `packages/application/test/operation-catalog-boundary.test.ts`; `packages/adapters/cli/test/dependency-command.test.ts`; `packages/orpc/test/dependency-resource.http.test.ts` |
+| DEP-RES-BACKUP-POLICY-001 | `dependency-resources.backup-policies.configure` | Application/persistence | Configure a policy for one dependency resource. | Persists interval hours, retention metadata, provider key, enabled state, retry preference, next run time, and returns `ok({ id })` without running a backup immediately. | `packages/application/test/dependency-resource-scheduled-backup-policy.test.ts`; `packages/persistence/pg/test/dependency-resource-backup-policy.pglite.test.ts` |
+| DEP-RES-BACKUP-POLICY-002 | `dependency-resources.backup-policies.list`; `dependency-resources.backup-policies.show` | Query/read model/contract | Policies exist across resources and due times. | Returns safe policy metadata filtered by dependency resource, enabled state, and due timestamp without raw backup artifacts or provider payloads. | `packages/application/test/dependency-resource-scheduled-backup-policy.test.ts`; `packages/persistence/pg/test/dependency-resource-backup-policy.pglite.test.ts`; `packages/contracts/test/dependency-resource-backup-policy-contract.test.ts` |
+| DEP-RES-BACKUP-POLICY-003 | scheduled dependency backup worker | Application/shell | An enabled policy is due. | The disabled-by-default runner dispatches `dependency-resources.create-backup`, records durable process-attempt visibility, advances last/next run after success, and does not call provider backup APIs directly. | `packages/application/test/dependency-resource-scheduled-backup-policy.test.ts`; `apps/shell/test/scheduled-dependency-backup-runner.test.ts` |
+| DEP-RES-BACKUP-POLICY-004 | Operation catalog / CLI / oRPC / HTTP / Web | Entrypoint/contract | Scheduled backup policy operations are public. | Entrypoints dispatch explicit command/query messages, reuse schemas, and the Web console configures policy through i18n-backed controls. | `packages/application/test/operation-catalog-boundary.test.ts`; `packages/adapters/cli/test/dependency-command.test.ts`; `packages/orpc/test/dependency-resource.http.test.ts`; `apps/web` typecheck |
 
 ## Required Non-Coverage Assertions
 

@@ -45,6 +45,12 @@ export interface ScheduledRuntimePruneRunnerConfig {
   batchSize: number;
 }
 
+export interface ScheduledDependencyBackupRunnerConfig {
+  enabled: boolean;
+  intervalSeconds: number;
+  batchSize: number;
+}
+
 export interface ScheduledHistoryRetentionRunnerConfig {
   enabled: boolean;
   intervalSeconds: number;
@@ -133,6 +139,7 @@ export interface AppConfig {
   dockerSwarmExecution: DockerSwarmExecutionConfig;
   scheduledTaskRunner: ScheduledTaskRunnerConfig;
   scheduledRuntimePruneRunner: ScheduledRuntimePruneRunnerConfig;
+  scheduledDependencyBackupRunner: ScheduledDependencyBackupRunnerConfig;
   scheduledHistoryRetentionRunner: ScheduledHistoryRetentionRunnerConfig;
   enabledSystemPlugins: string[];
   configFilePath?: string;
@@ -203,6 +210,11 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
     batchSize: 25,
   },
   scheduledRuntimePruneRunner: {
+    enabled: false,
+    intervalSeconds: 3600,
+    batchSize: 25,
+  },
+  scheduledDependencyBackupRunner: {
     enabled: false,
     intervalSeconds: 3600,
     batchSize: 25,
@@ -453,6 +465,10 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     source.flags?.scheduledRuntimePruneRunner ??
     fileConfig.scheduledRuntimePruneRunner ??
     defaults.scheduledRuntimePruneRunner;
+  const scheduledDependencyBackupRunner =
+    source.flags?.scheduledDependencyBackupRunner ??
+    fileConfig.scheduledDependencyBackupRunner ??
+    defaults.scheduledDependencyBackupRunner;
   const scheduledHistoryRetentionRunner =
     source.flags?.scheduledHistoryRetentionRunner ??
     fileConfig.scheduledHistoryRetentionRunner ??
@@ -497,6 +513,17 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(env.APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_BATCH_SIZE) ??
     parsePositiveInteger(scheduledRuntimePruneRunner.batchSize) ??
     defaults.scheduledRuntimePruneRunner.batchSize;
+  const scheduledDependencyBackupRunnerEnabled =
+    parseBoolean(env.APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_ENABLED) ??
+    scheduledDependencyBackupRunner.enabled;
+  const scheduledDependencyBackupRunnerIntervalSeconds =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_INTERVAL_SECONDS) ??
+    parsePositiveInteger(scheduledDependencyBackupRunner.intervalSeconds) ??
+    defaults.scheduledDependencyBackupRunner.intervalSeconds;
+  const scheduledDependencyBackupRunnerBatchSize =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_BATCH_SIZE) ??
+    parsePositiveInteger(scheduledDependencyBackupRunner.batchSize) ??
+    defaults.scheduledDependencyBackupRunner.batchSize;
   const scheduledHistoryRetentionRunnerEnabled =
     parseBoolean(env.APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED) ??
     scheduledHistoryRetentionRunner.enabled;
@@ -912,6 +939,11 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       enabled: scheduledRuntimePruneRunnerEnabled,
       intervalSeconds: scheduledRuntimePruneRunnerIntervalSeconds,
       batchSize: scheduledRuntimePruneRunnerBatchSize,
+    },
+    scheduledDependencyBackupRunner: {
+      enabled: scheduledDependencyBackupRunnerEnabled,
+      intervalSeconds: scheduledDependencyBackupRunnerIntervalSeconds,
+      batchSize: scheduledDependencyBackupRunnerBatchSize,
     },
     scheduledHistoryRetentionRunner: {
       enabled: scheduledHistoryRetentionRunnerEnabled,

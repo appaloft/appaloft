@@ -586,6 +586,22 @@ export const cliCommandDescriptions = {
     "Restore a dependency resource backup in place",
     "dependency.resource-lifecycle",
   ),
+  dependencyBackupPolicy: withDocs(
+    "Scheduled dependency backup policy operations",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyBackupPolicyConfigure: withDocs(
+    "Configure a scheduled dependency backup policy",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyBackupPolicyList: withDocs(
+    "List scheduled dependency backup policies",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyBackupPolicyShow: withDocs(
+    "Show scheduled dependency backup policy detail",
+    "dependency.resource-lifecycle",
+  ),
   resourceSetVariable: withDocs(
     "Set a resource-scoped variable override",
     "environment.variable-precedence",

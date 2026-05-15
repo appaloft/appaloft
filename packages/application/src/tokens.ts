@@ -30,6 +30,12 @@ export const tokens = {
   scheduledTaskDueCandidateReader: Symbol.for("appaloft.scheduled_task_due_candidate_reader"),
   dependencyResourceRepository: Symbol.for("appaloft.dependency_resource_repository"),
   dependencyResourceBackupRepository: Symbol.for("appaloft.dependency_resource_backup_repository"),
+  dependencyResourceBackupPolicyRepository: Symbol.for(
+    "appaloft.dependency_resource_backup_policy_repository",
+  ),
+  dependencyResourceBackupPolicyReadModel: Symbol.for(
+    "appaloft.dependency_resource_backup_policy_read_model",
+  ),
   previewEnvironmentRepository: Symbol.for("appaloft.preview_environment_repository"),
   previewPolicyRepository: Symbol.for("appaloft.preview_policy_repository"),
   previewPolicyDecisionRecorder: Symbol.for("appaloft.preview_policy_decision_recorder"),
@@ -251,6 +257,16 @@ export const tokens = {
   rotateResourceDependencyBindingSecretUseCase: Symbol.for(
     "appaloft.rotate_resource_dependency_binding_secret_use_case",
   ),
+  configureDependencyResourceBackupPolicyUseCase: Symbol.for(
+    "appaloft.configure_dependency_resource_backup_policy_use_case",
+  ),
+  listDependencyResourceBackupPoliciesQueryService: Symbol.for(
+    "appaloft.list_dependency_resource_backup_policies_query_service",
+  ),
+  showDependencyResourceBackupPolicyQueryService: Symbol.for(
+    "appaloft.show_dependency_resource_backup_policy_query_service",
+  ),
+  scheduledDependencyBackupService: Symbol.for("appaloft.scheduled_dependency_backup_service"),
   listResourcesQueryService: Symbol.for("appaloft.list_resources_query_service"),
   showResourceQueryService: Symbol.for("appaloft.show_resource_query_service"),
   listResourceDependencyBindingsQueryService: Symbol.for(

@@ -1,14 +1,17 @@
 import {
+  ConfigureDependencyResourceBackupPolicyCommand,
   CreateDependencyResourceBackupCommand,
   DeleteDependencyResourceCommand,
   ImportPostgresDependencyResourceCommand,
   ImportRedisDependencyResourceCommand,
+  ListDependencyResourceBackupPoliciesQuery,
   ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
   ProvisionPostgresDependencyResourceCommand,
   ProvisionRedisDependencyResourceCommand,
   RenameDependencyResourceCommand,
   RestoreDependencyResourceBackupCommand,
+  ShowDependencyResourceBackupPolicyQuery,
   ShowDependencyResourceBackupQuery,
   ShowDependencyResourceQuery,
 } from "@appaloft/application";
@@ -19,6 +22,7 @@ import { cliCommandDescriptions } from "./docs-help.js";
 
 const dependencyResourceIdArg = Args.text({ name: "dependencyResourceId" });
 const backupIdArg = Args.text({ name: "backupId" });
+const policyIdArg = Args.text({ name: "policyId" });
 const projectOption = Options.text("project");
 const environmentOption = Options.text("environment");
 const optionalProjectOption = Options.text("project").pipe(Options.optional);
@@ -39,6 +43,13 @@ const confirmDataOverwriteOption = Options.boolean("confirm-data-overwrite").pip
 const confirmRuntimeNotRestartedOption = Options.boolean("confirm-runtime-not-restarted").pipe(
   Options.withDefault(false),
 );
+const retentionDaysOption = Options.integer("retention-days");
+const scheduleIntervalHoursOption = Options.integer("interval-hours");
+const enabledOption = Options.boolean("enabled").pipe(Options.withDefault(true));
+const retryOnFailureOption = Options.boolean("retry-on-failure").pipe(Options.withDefault(true));
+const nextRunAtOption = Options.text("next-run-at").pipe(Options.optional);
+const enabledOnlyOption = Options.boolean("enabled-only").pipe(Options.withDefault(false));
+const dueAtOption = Options.text("due-at").pipe(Options.optional);
 
 const provisionPostgresCommand = EffectCommand.make(
   "provision",
@@ -310,6 +321,78 @@ const backupRestoreCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyBackupRestore));
 
+const backupPolicyConfigureCommand = EffectCommand.make(
+  "configure",
+  {
+    dependencyResourceId: dependencyResourceIdArg,
+    policyId: Options.text("policy-id").pipe(Options.optional),
+    retentionDays: retentionDaysOption,
+    scheduleIntervalHours: scheduleIntervalHoursOption,
+    providerKey: providerKeyOption,
+    retryOnFailure: retryOnFailureOption,
+    enabled: enabledOption,
+    nextRunAt: nextRunAtOption,
+  },
+  ({
+    dependencyResourceId,
+    enabled,
+    nextRunAt,
+    policyId,
+    providerKey,
+    retentionDays,
+    retryOnFailure,
+    scheduleIntervalHours,
+  }) =>
+    runCommand(
+      ConfigureDependencyResourceBackupPolicyCommand.create({
+        dependencyResourceId,
+        retentionDays,
+        scheduleIntervalHours,
+        enabled,
+        retryOnFailure,
+        ...(optionalValue(policyId) ? { policyId: optionalValue(policyId) } : {}),
+        ...(optionalValue(providerKey) ? { providerKey: optionalValue(providerKey) } : {}),
+        ...(optionalValue(nextRunAt) ? { nextRunAt: optionalValue(nextRunAt) } : {}),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyBackupPolicyConfigure));
+
+const backupPolicyListCommand = EffectCommand.make(
+  "list",
+  {
+    dependencyResourceId: Args.text({ name: "dependencyResourceId" }).pipe(Args.optional),
+    enabledOnly: enabledOnlyOption,
+    dueAt: dueAtOption,
+  },
+  ({ dependencyResourceId, dueAt, enabledOnly }) =>
+    runQuery(
+      ListDependencyResourceBackupPoliciesQuery.create({
+        ...(optionalValue(dependencyResourceId)
+          ? { dependencyResourceId: optionalValue(dependencyResourceId) }
+          : {}),
+        enabledOnly,
+        ...(optionalValue(dueAt) ? { dueAt: optionalValue(dueAt) } : {}),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyBackupPolicyList));
+
+const backupPolicyShowCommand = EffectCommand.make(
+  "show",
+  {
+    policyId: policyIdArg,
+  },
+  ({ policyId }) => runQuery(ShowDependencyResourceBackupPolicyQuery.create({ policyId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyBackupPolicyShow));
+
+const backupPolicyCommand = EffectCommand.make("policy").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.dependencyBackupPolicy),
+  EffectCommand.withSubcommands([
+    backupPolicyConfigureCommand,
+    backupPolicyListCommand,
+    backupPolicyShowCommand,
+  ]),
+);
+
 const postgresCommand = EffectCommand.make("postgres").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.dependencyPostgres),
   EffectCommand.withSubcommands([provisionPostgresCommand, importPostgresCommand]),
@@ -327,6 +410,7 @@ const backupCommand = EffectCommand.make("backup").pipe(
     backupListCommand,
     backupShowCommand,
     backupRestoreCommand,
+    backupPolicyCommand,
   ]),
 );
 

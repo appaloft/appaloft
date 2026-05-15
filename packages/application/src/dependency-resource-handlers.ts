@@ -1,3 +1,5 @@
+export * from "./operations/dependency-resources/configure-dependency-resource-backup-policy.handler";
+export * from "./operations/dependency-resources/configure-dependency-resource-backup-policy.use-case";
 export * from "./operations/dependency-resources/create-dependency-resource-backup.handler";
 export * from "./operations/dependency-resources/create-dependency-resource-backup.use-case";
 export * from "./operations/dependency-resources/delete-dependency-resource.handler";
@@ -6,6 +8,8 @@ export * from "./operations/dependency-resources/import-postgres-dependency-reso
 export * from "./operations/dependency-resources/import-postgres-dependency-resource.use-case";
 export * from "./operations/dependency-resources/import-redis-dependency-resource.handler";
 export * from "./operations/dependency-resources/import-redis-dependency-resource.use-case";
+export * from "./operations/dependency-resources/list-dependency-resource-backup-policies.handler";
+export * from "./operations/dependency-resources/list-dependency-resource-backup-policies.query-service";
 export * from "./operations/dependency-resources/list-dependency-resource-backups.handler";
 export * from "./operations/dependency-resources/list-dependency-resource-backups.query-service";
 export * from "./operations/dependency-resources/list-dependency-resources.handler";
@@ -22,3 +26,5 @@ export * from "./operations/dependency-resources/show-dependency-resource.handle
 export * from "./operations/dependency-resources/show-dependency-resource.query-service";
 export * from "./operations/dependency-resources/show-dependency-resource-backup.handler";
 export * from "./operations/dependency-resources/show-dependency-resource-backup.query-service";
+export * from "./operations/dependency-resources/show-dependency-resource-backup-policy.handler";
+export * from "./operations/dependency-resources/show-dependency-resource-backup-policy.query-service";

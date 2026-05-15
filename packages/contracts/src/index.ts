@@ -1048,6 +1048,35 @@ export const showScheduledRuntimePrunePolicyResponseSchema = z.object({
   policy: scheduledRuntimePrunePolicyReadSchema.nullable(),
 });
 
+export const dependencyResourceBackupPolicyReadSchema = z.object({
+  schemaVersion: z.literal("dependency-resource-backup-policies.policy/v1"),
+  id: z.string(),
+  version: z.string(),
+  dependencyResourceId: z.string(),
+  retentionDays: z.number(),
+  scheduleIntervalHours: z.number(),
+  providerKey: z.string().nullable(),
+  retryOnFailure: z.boolean(),
+  enabled: z.boolean(),
+  lastRunAt: z.string().nullable(),
+  nextRunAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const configureDependencyResourceBackupPolicyResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const listDependencyResourceBackupPoliciesResponseSchema = z.object({
+  schemaVersion: z.literal("dependency-resource-backup-policies.list/v1"),
+  items: z.array(dependencyResourceBackupPolicyReadSchema),
+});
+
+export const showDependencyResourceBackupPolicyResponseSchema = z.object({
+  schemaVersion: z.literal("dependency-resource-backup-policies.show/v1"),
+  policy: dependencyResourceBackupPolicyReadSchema.nullable(),
+});
+
 export const retentionDefaultScopeSchema = z.enum(["organization", "system"]);
 
 export const retentionDefaultCategorySchema = z.enum([
@@ -5248,6 +5277,18 @@ export type ListScheduledRuntimePrunePoliciesResponse = z.infer<
 >;
 export type ShowScheduledRuntimePrunePolicyResponse = z.infer<
   typeof showScheduledRuntimePrunePolicyResponseSchema
+>;
+export type DependencyResourceBackupPolicyRead = z.infer<
+  typeof dependencyResourceBackupPolicyReadSchema
+>;
+export type ConfigureDependencyResourceBackupPolicyResponse = z.infer<
+  typeof configureDependencyResourceBackupPolicyResponseSchema
+>;
+export type ListDependencyResourceBackupPoliciesResponse = z.infer<
+  typeof listDependencyResourceBackupPoliciesResponseSchema
+>;
+export type ShowDependencyResourceBackupPolicyResponse = z.infer<
+  typeof showDependencyResourceBackupPolicyResponseSchema
 >;
 export type RetentionDefaultScope = z.infer<typeof retentionDefaultScopeSchema>;
 export type RetentionDefaultCategory = z.infer<typeof retentionDefaultCategorySchema>;

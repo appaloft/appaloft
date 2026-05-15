@@ -44,6 +44,8 @@ import {
   ConfigureAuditEventLegalHoldUseCase,
   ConfigureDefaultAccessDomainPolicyCommandHandler,
   ConfigureDefaultAccessDomainPolicyUseCase,
+  ConfigureDependencyResourceBackupPolicyCommandHandler,
+  ConfigureDependencyResourceBackupPolicyUseCase,
   ConfigureDomainBindingRouteCommandHandler,
   ConfigureDomainBindingRouteUseCase,
   ConfigurePreviewPolicyCommandHandler,
@@ -170,6 +172,8 @@ import {
   ListCertificatesQueryService,
   ListDefaultAccessDomainPoliciesQueryHandler,
   ListDefaultAccessDomainPoliciesQueryService,
+  ListDependencyResourceBackupPoliciesQueryHandler,
+  ListDependencyResourceBackupPoliciesQueryService,
   ListDependencyResourceBackupsQueryHandler,
   ListDependencyResourceBackupsQueryService,
   ListDependencyResourcesQueryHandler,
@@ -310,6 +314,7 @@ import {
   RunScheduledTaskNowUseCase,
   RuntimePlanResolutionInputBuilder,
   RuntimeUsageInspectionQueryService,
+  ScheduledDependencyBackupService,
   ScheduledHistoryRetentionService,
   ScheduledRuntimePrunePolicyResolver,
   ScheduledRuntimePruneService,
@@ -331,6 +336,8 @@ import {
   ShowCertificateQueryService,
   ShowDefaultAccessDomainPolicyQueryHandler,
   ShowDefaultAccessDomainPolicyQueryService,
+  ShowDependencyResourceBackupPolicyQueryHandler,
+  ShowDependencyResourceBackupPolicyQueryService,
   ShowDependencyResourceBackupQueryHandler,
   ShowDependencyResourceBackupQueryService,
   ShowDependencyResourceQueryHandler,
@@ -563,10 +570,13 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(DeleteDependencyResourceCommandHandler);
   container.registerSingleton(CreateDependencyResourceBackupCommandHandler);
   container.registerSingleton(RestoreDependencyResourceBackupCommandHandler);
+  container.registerSingleton(ConfigureDependencyResourceBackupPolicyCommandHandler);
   container.registerSingleton(ListDependencyResourcesQueryHandler);
   container.registerSingleton(ShowDependencyResourceQueryHandler);
   container.registerSingleton(ListDependencyResourceBackupsQueryHandler);
   container.registerSingleton(ShowDependencyResourceBackupQueryHandler);
+  container.registerSingleton(ListDependencyResourceBackupPoliciesQueryHandler);
+  container.registerSingleton(ShowDependencyResourceBackupPolicyQueryHandler);
   container.registerSingleton(RenameStorageVolumeCommandHandler);
   container.registerSingleton(DeleteStorageVolumeCommandHandler);
   container.registerSingleton(ListStorageVolumesQueryHandler);
@@ -801,6 +811,22 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.showDependencyResourceBackupQueryService,
     ShowDependencyResourceBackupQueryService,
+  );
+  container.registerSingleton(
+    tokens.configureDependencyResourceBackupPolicyUseCase,
+    ConfigureDependencyResourceBackupPolicyUseCase,
+  );
+  container.registerSingleton(
+    tokens.listDependencyResourceBackupPoliciesQueryService,
+    ListDependencyResourceBackupPoliciesQueryService,
+  );
+  container.registerSingleton(
+    tokens.showDependencyResourceBackupPolicyQueryService,
+    ShowDependencyResourceBackupPolicyQueryService,
+  );
+  container.registerSingleton(
+    tokens.scheduledDependencyBackupService,
+    ScheduledDependencyBackupService,
   );
   container.registerSingleton(tokens.bindResourceDependencyUseCase, BindResourceDependencyUseCase);
   container.registerSingleton(

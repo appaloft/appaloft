@@ -251,6 +251,15 @@ export const enUS = {
       backupRetentionReason: "Retention reason",
       backupRetentionReasonPlaceholder: "For example: production data protection",
       backupStatus: "Backup status",
+      backupPolicy: "Scheduled backup policy",
+      backupPolicyConfigured: "Backup policy configured",
+      backupPolicyConfigureFailed: "Backup policy failed",
+      backupPolicyDescription:
+        "Opt in to periodic backups for the selected dependency resource. The shell runner must be enabled before policies execute.",
+      backupPolicyEnabled: "Enabled",
+      backupPolicyIntervalHours: "Interval hours",
+      backupPolicyNextRun: "Next run",
+      backupPolicyRetentionDays: "Retention days",
       bindingReadiness: "Binding readiness",
       createAction: "Create managed service",
       createDescription:

@@ -11,6 +11,7 @@
     Trash2,
   } from "@lucide/svelte";
   import type {
+    DependencyResourceBackupPolicyRead,
     DependencyResourceBackupSummary,
     DependencyResourceSummary,
     EnvironmentSummary,
@@ -98,6 +99,9 @@
   let selectedBackupId = $state("");
   let restoreAcknowledgeData = $state(false);
   let restoreAcknowledgeRuntime = $state(false);
+  let backupPolicyRetentionDays = $state("7");
+  let backupPolicyIntervalHours = $state("24");
+  let backupPolicyEnabled = $state(true);
   let feedback = $state<Feedback | null>(null);
 
   const projects = $derived(projectsQuery.data?.items ?? []);
@@ -144,7 +148,22 @@
       staleTime: 5_000,
     }),
   );
+  const backupPoliciesQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["dependency-resources", selectedDependencyResourceId, "backup-policies"],
+      queryFn: () =>
+        orpcClient.dependencyResources.listBackupPolicies({
+          dependencyResourceId: selectedDependencyResourceId,
+        }),
+      enabled: browser && selectedDependencyResourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const selectedBackups = $derived(selectedResourceBackupsQuery.data?.items ?? []);
+  const selectedBackupPolicies = $derived(backupPoliciesQuery.data?.items ?? []);
+  const selectedBackupPolicy = $derived(
+    (selectedBackupPolicies[0] ?? null) as DependencyResourceBackupPolicyRead | null,
+  );
   const readyBackups = $derived(selectedBackups.filter((backup) => backup.status === "ready"));
   const latestBackup = $derived(readyBackups[0] ?? selectedBackups[0] ?? null);
   const canCreate = $derived(
@@ -155,6 +174,11 @@
   );
   const canRestore = $derived(
     selectedBackupId.length > 0 && restoreAcknowledgeData && restoreAcknowledgeRuntime,
+  );
+  const canConfigureBackupPolicy = $derived(
+    selectedDependencyResourceId.length > 0 &&
+      Number.parseInt(backupPolicyRetentionDays, 10) > 0 &&
+      Number.parseInt(backupPolicyIntervalHours, 10) > 0,
   );
 
   const createDependencyResourceMutation = createMutation(() => ({
@@ -246,6 +270,30 @@
       };
     },
   }));
+  const configureBackupPolicyMutation = createMutation(() => ({
+    mutationFn: (input: {
+      dependencyResourceId: string;
+      retentionDays: number;
+      scheduleIntervalHours: number;
+      enabled: boolean;
+      policyId?: string;
+    }) => orpcClient.dependencyResources.configureBackupPolicy(input),
+    onSuccess: (result) => {
+      feedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.dependencyResources.backupPolicyConfigured),
+        detail: result.id,
+      };
+      void invalidateDependencyResourceQueries();
+    },
+    onError: (error) => {
+      feedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.dependencyResources.backupPolicyConfigureFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
 
   $effect(() => {
     if (!selectedProjectId && projects.length > 0) {
@@ -300,6 +348,9 @@
       queryClient.invalidateQueries({ queryKey: ["dependency-resources"] }),
       queryClient.invalidateQueries({
         queryKey: ["dependency-resources", selectedDependencyResourceId, "backups"],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["dependency-resources", selectedDependencyResourceId, "backup-policies"],
       }),
     ]);
   }
@@ -383,6 +434,21 @@
     restoreBackupMutation.mutate(selectedBackupId);
   }
 
+  function configureBackupPolicy(event: SubmitEvent): void {
+    event.preventDefault();
+    if (!canConfigureBackupPolicy || configureBackupPolicyMutation.isPending) {
+      return;
+    }
+
+    configureBackupPolicyMutation.mutate({
+      dependencyResourceId: selectedDependencyResourceId,
+      retentionDays: Number.parseInt(backupPolicyRetentionDays, 10),
+      scheduleIntervalHours: Number.parseInt(backupPolicyIntervalHours, 10),
+      enabled: backupPolicyEnabled,
+      ...(selectedBackupPolicy ? { policyId: selectedBackupPolicy.id } : {}),
+    });
+  }
+
   function backupLabel(backup: DependencyResourceBackupSummary): string {
     return `${backup.id} · ${formatTime(backup.completedAt ?? backup.requestedAt)}`;
   }
@@ -393,6 +459,14 @@
       ? backupLabel(backup)
       : $t(i18nKeys.console.dependencyResources.selectBackup);
   }
+
+  $effect(() => {
+    if (selectedBackupPolicy) {
+      backupPolicyRetentionDays = String(selectedBackupPolicy.retentionDays);
+      backupPolicyIntervalHours = String(selectedBackupPolicy.scheduleIntervalHours);
+      backupPolicyEnabled = selectedBackupPolicy.enabled;
+    }
+  });
 </script>
 
 <svelte:head>
@@ -771,6 +845,63 @@
                 </div>
               {/if}
             </div>
+
+            <form class="console-section space-y-3" onsubmit={configureBackupPolicy}>
+              <div class="space-y-1">
+                <h3 class="font-semibold">
+                  {$t(i18nKeys.console.dependencyResources.backupPolicy)}
+                </h3>
+                <p class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.dependencyResources.backupPolicyDescription)}
+                </p>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span class="console-field-label">
+                    {$t(i18nKeys.console.dependencyResources.backupPolicyRetentionDays)}
+                  </span>
+                  <Input
+                    id="dependency-resource-backup-policy-retention-input"
+                    type="number"
+                    min="1"
+                    bind:value={backupPolicyRetentionDays}
+                  />
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span class="console-field-label">
+                    {$t(i18nKeys.console.dependencyResources.backupPolicyIntervalHours)}
+                  </span>
+                  <Input
+                    id="dependency-resource-backup-policy-interval-input"
+                    type="number"
+                    min="1"
+                    bind:value={backupPolicyIntervalHours}
+                  />
+                </label>
+              </div>
+              <label class="flex gap-2 text-sm text-muted-foreground">
+                <input
+                  id="dependency-resource-backup-policy-enabled-input"
+                  class="mt-0.5 size-4 accent-primary"
+                  type="checkbox"
+                  bind:checked={backupPolicyEnabled}
+                />
+                <span>{$t(i18nKeys.console.dependencyResources.backupPolicyEnabled)}</span>
+              </label>
+              <p class="text-xs text-muted-foreground">
+                {$t(i18nKeys.console.dependencyResources.backupPolicyNextRun)}:
+                {selectedBackupPolicy ? formatTime(selectedBackupPolicy.nextRunAt) : "-"}
+              </p>
+              <Button
+                id="dependency-resource-backup-policy-configure-action"
+                class="w-full"
+                type="submit"
+                disabled={!canConfigureBackupPolicy || configureBackupPolicyMutation.isPending}
+              >
+                <HardDriveDownload class="size-4" />
+                {$t(i18nKeys.common.actions.save)}
+              </Button>
+            </form>
           {:else}
             <div class="space-y-3 text-sm text-muted-foreground">
               <Server class="size-5" />

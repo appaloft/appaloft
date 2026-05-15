@@ -10,6 +10,7 @@ import {
   type CleanupPreviewCommandInput,
   type CloneEnvironmentCommandInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
+  type ConfigureDependencyResourceBackupPolicyCommandInput,
   type ConfigureDomainBindingRouteCommandInput,
   type ConfigurePreviewPolicyCommandInput,
   type ConfigureResourceAccessCommandInput,
@@ -56,6 +57,7 @@ import {
   type IssueOrRenewCertificateCommandInput,
   type ListCertificatesQueryInput,
   type ListDefaultAccessDomainPoliciesQueryInput,
+  type ListDependencyResourceBackupPoliciesQueryInput,
   type ListDependencyResourceBackupsQueryInput,
   type ListDependencyResourcesQueryInput,
   type ListDeploymentsQueryInput,
@@ -107,6 +109,7 @@ import {
   type SetResourceVariableCommandInput,
   type ShowCertificateQueryInput,
   type ShowDefaultAccessDomainPolicyQueryInput,
+  type ShowDependencyResourceBackupPolicyQueryInput,
   type ShowDependencyResourceBackupQueryInput,
   type ShowDependencyResourceQueryInput,
   type ShowDeploymentQueryInput,
@@ -144,6 +147,7 @@ import {
   type CleanupPreviewResponse,
   type CloneEnvironmentResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
+  type ConfigureDependencyResourceBackupPolicyResponse,
   type ConfigureDomainBindingRouteResponse,
   type ConfigurePreviewPolicyResponse,
   type ConfigureResourceAccessResponse,
@@ -188,6 +192,7 @@ import {
   type IssueOrRenewCertificateResponse,
   type ListCertificatesResponse,
   type ListDefaultAccessDomainPoliciesResponse,
+  type ListDependencyResourceBackupPoliciesResponse,
   type ListDependencyResourceBackupsResponse,
   type ListDependencyResourcesResponse,
   type ListDeploymentsResponse,
@@ -240,6 +245,7 @@ import {
   type SetResourceVariableResponse,
   type ShowCertificateResponse,
   type ShowDefaultAccessDomainPolicyResponse,
+  type ShowDependencyResourceBackupPolicyResponse,
   type ShowDependencyResourceBackupResponse,
   type ShowDependencyResourceResponse,
   type ShowDeploymentResponse,
@@ -847,6 +853,24 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       RestoreDependencyResourceBackupCommandInput,
       DependencyResourceResponse,
+      AppaloftClientError
+    >;
+    configureBackupPolicy: Client<
+      AppaloftClientContext,
+      ConfigureDependencyResourceBackupPolicyCommandInput,
+      ConfigureDependencyResourceBackupPolicyResponse,
+      AppaloftClientError
+    >;
+    listBackupPolicies: Client<
+      AppaloftClientContext,
+      ListDependencyResourceBackupPoliciesQueryInput,
+      ListDependencyResourceBackupPoliciesResponse,
+      AppaloftClientError
+    >;
+    showBackupPolicy: Client<
+      AppaloftClientContext,
+      ShowDependencyResourceBackupPolicyQueryInput,
+      ShowDependencyResourceBackupPolicyResponse,
       AppaloftClientError
     >;
   };
