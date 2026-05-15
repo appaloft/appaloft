@@ -4,6 +4,10 @@ export {
   dockerLabelFromAssignment,
   dockerLabelsFromAssignments,
 } from "./builder";
+export type {
+  DockerEnvironmentVariableInput,
+  DockerRunMountInput,
+} from "./builder";
 export {
   renderRuntimeCommand,
   renderRuntimeCommandString,
@@ -18,6 +22,8 @@ export type {
   DockerRemoveContainerCommandSpec,
   DockerRemoveResourceContainersCommandSpec,
   DockerRunContainerCommandSpec,
+  DockerRunMountSpec,
+  DockerRunMountType,
   ProcessExecCommandSpec,
   RenderedRuntimeCommand,
   RuntimeCommandEnvironmentVariable,

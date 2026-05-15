@@ -1,7 +1,17 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
-  import { ArrowRight, KeyRound, Network, RotateCcw, Server, ShieldCheck, Trash2, TriangleAlert } from "@lucide/svelte";
+  import {
+    ArrowRight,
+    KeyRound,
+    Network,
+    RotateCcw,
+    Server,
+    ShieldCheck,
+    Terminal,
+    Trash2,
+    TriangleAlert,
+  } from "@lucide/svelte";
   import type {
     ConfigureDefaultAccessDomainPolicyInput,
     DeleteSshCredentialInput,
@@ -225,6 +235,14 @@
 
   function countServerDeployments(server: ServerSummary): number {
     return deployments.filter((deployment) => deployment.serverId === server.id).length;
+  }
+
+  function serverDetailHref(serverId: string): string {
+    return `/servers/${encodeURIComponent(serverId)}`;
+  }
+
+  function serverTerminalHref(serverId: string): string {
+    return `${serverDetailHref(serverId)}?tab=terminal`;
   }
 
   function submitSystemPolicy(event: SubmitEvent): void {
@@ -525,8 +543,7 @@
 
         <div class="console-record-list">
           {#each servers as server (server.id)}
-            <a
-              href={`/servers/${server.id}`}
+            <div
               class="console-record-row group lg:grid-cols-[minmax(12rem,1.1fr)_minmax(10rem,0.9fr)_8rem_10rem_auto] lg:items-center"
             >
               <div class="min-w-0 space-y-1.5">
@@ -553,13 +570,22 @@
 
               <span class="text-sm text-muted-foreground">{formatTime(server.createdAt)}</span>
 
-              <span
-                class="console-inline-action inline-flex items-center gap-1 text-sm font-medium lg:justify-end"
-              >
-                {$t(i18nKeys.common.actions.viewDetails)}
-                <ArrowRight class="size-4" />
-              </span>
-            </a>
+              <div class="flex flex-wrap justify-start gap-2 lg:justify-end">
+                <Button href={serverTerminalHref(server.id)} size="sm" variant="outline">
+                  <Terminal class="size-3.5" />
+                  {$t(i18nKeys.common.actions.openTerminal)}
+                </Button>
+                <Button
+                  class="console-inline-action"
+                  href={serverDetailHref(server.id)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  {$t(i18nKeys.common.actions.viewDetails)}
+                  <ArrowRight class="size-4" />
+                </Button>
+              </div>
+            </div>
           {/each}
         </div>
       </section>

@@ -43,6 +43,7 @@ export interface DockerContainerIdentity {
   previewNumber?: string | undefined;
   previewMode?: string | undefined;
   previewBranch?: string | undefined;
+  sourceFingerprint?: string | undefined;
 }
 
 function normalizeDockerLabelValue(value: string | undefined): string | undefined {
@@ -120,6 +121,7 @@ export function appaloftDockerContainerLabels(identity: DockerContainerIdentity)
     dockerLabel("appaloft.preview-number", identity.previewNumber ?? previewIdentity.previewNumber),
     dockerLabel("appaloft.preview-mode", identity.previewMode ?? previewIdentity.previewMode),
     dockerLabel("appaloft.preview-branch", identity.previewBranch),
+    dockerLabel("appaloft.source-fingerprint", identity.sourceFingerprint),
     requiredDockerLabel("appaloft.resource-id", identity.resourceId),
     dockerLabel("appaloft.resource-name", identity.resourceName),
     dockerLabel("appaloft.resource-slug", identity.resourceSlug),
@@ -204,6 +206,7 @@ export function appaloftDockerContainerLabelsForDeployment(
     previewNumber: metadata["preview.number"],
     previewMode: metadata["preview.mode"],
     previewBranch: metadata["preview.branch"],
+    sourceFingerprint: metadata["access.sourceFingerprint"] ?? metadata["context.sourceFingerprint"],
   });
 }
 

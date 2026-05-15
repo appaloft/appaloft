@@ -6,6 +6,7 @@ import type {
   DockerRemoveContainerCommandSpec,
   DockerRemoveResourceContainersCommandSpec,
   DockerRunContainerCommandSpec,
+  DockerRunMountSpec,
   ProcessExecCommandSpec,
   RenderedRuntimeCommand,
   RuntimeCommandEnvironmentVariable,
@@ -106,6 +107,7 @@ function renderDockerRunContainerCommand(
     options.quote(spec.containerName.value),
     spec.networkName ? `--network ${options.quote(spec.networkName.value)}` : "",
     ...spec.publishedPorts.map((port) => renderPublishedPort(port.mode, port.containerPort.value)),
+    ...spec.mounts.map((mount) => renderMount(mount, options)),
     ...spec.env.map((variable) => renderEnvFlag(variable, options)),
     ...spec.labels.map((label) =>
       `--label ${options.quote(`${label.name.value}=${label.value.value}`)}`,
@@ -197,6 +199,20 @@ function renderDockerLogsCommand(
   ]
     .filter((part) => part.length > 0)
     .join(" ");
+}
+
+function renderMount(mount: DockerRunMountSpec, options: RuntimeCommandRenderOptions): string {
+  return [
+    "--mount",
+    [
+      `type=${mount.type}`,
+      `source=${options.quote(mount.source.value)}`,
+      `target=${options.quote(mount.target.value)}`,
+      mount.readOnly ? "readonly" : "",
+    ]
+      .filter((part) => part.length > 0)
+      .join(","),
+  ].join(" ");
 }
 
 function renderEnvFlag(

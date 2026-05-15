@@ -191,8 +191,8 @@ Required top-level behavior:
 - `runtime` reports current runtime lifecycle and health, including container/process health when
   available.
 - `latestRuntimeControl` reports the most recent Resource-owned runtime stop/start/restart attempt
-  when the candidate runtime-control operations become active. It is readback only and must not
-  imply retry, redeploy, rollback, source refresh, or profile application.
+  for the active runtime-control command slice. It is readback only and must not imply retry,
+  redeploy, rollback, source refresh, or profile application.
 - `healthPolicy` reports whether a health check is enabled, missing, or unsupported.
 - `publicAccess` reports the current resource URL being checked. Durable resource domain bindings
   take precedence over server-applied config domains, and server-applied config domains take
@@ -227,8 +227,7 @@ The query must resolve overall status using these rules:
 
 The query may include `latestRuntimeControl` after `resources.runtime.stop`,
 `resources.runtime.start`, or `resources.runtime.restart` is accepted and records an attempt. The
-field is optional when no runtime-control attempt exists or the implementation slice has not
-activated runtime controls.
+field is optional when no runtime-control attempt exists.
 
 Runtime-control readback must:
 
@@ -334,11 +333,11 @@ attempt-scoped and is not the long-lived resource health model.
 The Web resource header, resource detail health panel, sidebar, project list, and project resource
 list now use `ResourceHealthSummary.overall` rather than `lastDeploymentStatus`.
 
-Resource runtime-control readback is specified but not implemented. The first Code Round for
-`resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart` should embed
-the latest safe attempt summary in `latestRuntimeControl` rather than adding a separate history
-query. A separate runtime-control query remains deferred until attempt history, pagination, or audit
-needs require it.
+Resource runtime-control readback is implemented through `latestRuntimeControl` for
+`resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart`. The latest
+safe attempt summary is embedded in this query rather than exposed through a separate history query.
+A separate runtime-control query remains deferred until attempt history, pagination, or audit needs
+require it.
 
 ## Open Questions
 

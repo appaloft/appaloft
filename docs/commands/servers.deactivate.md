@@ -147,7 +147,7 @@ All errors use [Deployment Target Lifecycle Error Spec](../errors/servers.lifecy
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Server detail shows lifecycle status. Owner-scoped deactivate action UI waits for confirmation/undo affordances. | Partial / action gap |
+| Web | Server detail shows lifecycle status, exposes a typed-confirmation deactivate action for active servers, and dispatches the typed `servers.deactivate` oRPC client. | Active |
 | CLI | `appaloft server deactivate <serverId> [--reason ...] [--json]`. | Active |
 | oRPC / HTTP | `POST /api/servers/{serverId}/deactivate` using the command schema. | Active |
 | Repository config files | Not applicable. Repository config cannot deactivate deployment targets. | Not applicable |
@@ -163,11 +163,10 @@ Canonical event spec:
 
 ## Current Implementation Notes And Migration Gaps
 
-The first active slice exposes API/oRPC and CLI for deactivation, blocks `deployments.create`
-from admitting inactive servers, and shows inactive status on Web server detail.
-
-Web does not yet expose the deactivate action UI. That control needs explicit confirmation
-affordances and must call this command when it is added. Reactivation remains future work.
+The active implementation exposes API/oRPC, CLI, and Web for deactivation, blocks
+`deployments.create` from admitting inactive servers, and shows inactive status on Web server
+detail. Web server detail requires exact typed server-id confirmation before dispatching the shared
+command schema through the typed oRPC client. Reactivation remains future work.
 
 ## Open Questions
 

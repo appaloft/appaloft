@@ -219,7 +219,7 @@ All errors use [Deployment Target Lifecycle Error Spec](../errors/servers.lifecy
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Server detail shows read-only delete eligibility. Destructive delete button remains deferred until typed confirmation UX is implemented. | Read-only / action gap |
+| Web | Server detail shows delete eligibility, blocks destructive action while delete-check is ineligible, requires exact typed `serverId` confirmation, and dispatches the typed `servers.delete` oRPC client before returning to the server list. | Active |
 | CLI | `appaloft server delete <serverId> --confirm <serverId> [--json]`. | Active |
 | oRPC / HTTP | `DELETE /api/servers/{serverId}` using the command schema; JSON body carries `confirmation.serverId`. | Active |
 | Repository config files | Not applicable. Repository config cannot request destructive control-plane lifecycle deletion. | Not applicable |
@@ -239,8 +239,10 @@ The first active implementation uses soft delete / lifecycle `deleted` state bec
 would conflict with historical deployment, route, log, and audit references. Normal list/show paths
 omit deleted servers; historical read surfaces keep their existing server ids.
 
-Web server detail remains read-only for delete eligibility. The destructive button and typed
-confirmation modal are a Web action migration gap.
+Web server detail includes the destructive delete button and typed confirmation modal. The button is
+enabled only when shared `servers.delete-check` readback reports `eligible = true`; the form submits
+the same `confirmation.serverId` command input as CLI and HTTP/oRPC and returns to the server list
+after success.
 
 Terminal-session and external runtime-task blockers remain extension points until durable tables
 exist, matching `servers.delete-check`.

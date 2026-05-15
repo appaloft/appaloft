@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import {
@@ -54,14 +54,18 @@ function localServer(): DeploymentTargetState {
 }
 
 function sshServer(): DeploymentTargetState {
-  const privateKey = Bun.env.APPALOFT_RUNTIME_USAGE_SSH_PRIVATE_KEY;
-  const username = Bun.env.APPALOFT_RUNTIME_USAGE_SSH_USERNAME;
+  const privateKey = sshPrivateKeyText();
+  const username = Bun.env.APPALOFT_RUNTIME_USAGE_SSH_USERNAME ?? Bun.env.APPALOFT_E2E_SSH_USERNAME;
 
   return {
     id: DeploymentTargetId.rehydrate("srv_runtime_usage_ssh_smoke"),
     name: DeploymentTargetName.rehydrate("runtime-usage-ssh-smoke"),
-    host: HostAddress.rehydrate(Bun.env.APPALOFT_RUNTIME_USAGE_SSH_HOST ?? "127.0.0.1"),
-    port: PortNumber.rehydrate(Number(Bun.env.APPALOFT_RUNTIME_USAGE_SSH_PORT ?? "22")),
+    host: HostAddress.rehydrate(
+      Bun.env.APPALOFT_RUNTIME_USAGE_SSH_HOST ?? Bun.env.APPALOFT_E2E_SSH_HOST ?? "127.0.0.1",
+    ),
+    port: PortNumber.rehydrate(
+      Number(Bun.env.APPALOFT_RUNTIME_USAGE_SSH_PORT ?? Bun.env.APPALOFT_E2E_SSH_PORT ?? "22"),
+    ),
     providerKey: ProviderKey.rehydrate("generic-ssh"),
     targetKind: TargetKindValue.rehydrate("single-server"),
     ...(privateKey || username
@@ -79,12 +83,34 @@ function sshServer(): DeploymentTargetState {
   };
 }
 
+function sshPrivateKeyText(): string | undefined {
+  if (Bun.env.APPALOFT_RUNTIME_USAGE_SSH_PRIVATE_KEY) {
+    return Bun.env.APPALOFT_RUNTIME_USAGE_SSH_PRIVATE_KEY;
+  }
+
+  const keyPath = Bun.env.APPALOFT_E2E_SSH_PRIVATE_KEY;
+  if (!keyPath) {
+    return undefined;
+  }
+
+  const expandedKeyPath = expandHome(keyPath);
+  if (!existsSync(expandedKeyPath)) {
+    throw new Error(`SSH private key file does not exist: ${expandedKeyPath}`);
+  }
+
+  return readFileSync(expandedKeyPath, "utf8");
+}
+
+function expandHome(path: string): string {
+  return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(2)) : path;
+}
+
 const dockerSmokeTest = Bun.env.APPALOFT_RUNTIME_USAGE_DOCKER_SMOKE === "1" ? test : test.skip;
 const sshSmokeTest = Bun.env.APPALOFT_RUNTIME_USAGE_SSH_SMOKE === "1" ? test : test.skip;
 
-describe("runtime usage opt-in smoke", () => {
+describe("runtime usage local explicit smoke", () => {
   dockerSmokeTest(
-    "[RT-USAGE-001][RT-USAGE-002] opt-in local Docker/runtime usage smoke is read-only",
+    "[RT-USAGE-001][RT-USAGE-002] local explicit Docker/runtime usage smoke is read-only",
     async () => {
       const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-runtime-usage-smoke-"));
       const workspace = join(runtimeRoot, "ssh-deployments", "dep_smoke");
@@ -125,11 +151,11 @@ describe("runtime usage opt-in smoke", () => {
   );
 
   sshSmokeTest(
-    "[RT-USAGE-001] opt-in SSH runtime usage smoke is read-only",
+    "[RT-USAGE-001] local explicit SSH runtime usage smoke is read-only",
     async () => {
-      const host = Bun.env.APPALOFT_RUNTIME_USAGE_SSH_HOST;
+      const host = Bun.env.APPALOFT_RUNTIME_USAGE_SSH_HOST ?? Bun.env.APPALOFT_E2E_SSH_HOST;
       if (!host) {
-        throw new Error("APPALOFT_RUNTIME_USAGE_SSH_HOST is required for SSH smoke.");
+        throw new Error("APPALOFT_E2E_SSH_HOST is required for SSH smoke.");
       }
 
       const inspector = new RuntimeTargetCapacityInspectorAdapter(

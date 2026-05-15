@@ -101,14 +101,15 @@ Tests must assert:
 - no raw secrets, command input, command output, or private keys in error details;
 - disconnect closes backend PTY/SSH/process resources.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Admission errors are implemented for command validation, context mismatch, workspace unavailable,
 policy denied, missing configuration, unsupported providers, open failure, and attach-not-found.
 The WebSocket transport emits `terminal_session_stream_failed` as a structured error frame for
 post-acceptance stream failures.
 
-Timeout policy, durable audit errors, and provider-native terminal errors remain future scope.
+Timeout policy, durable audit error translation, and provider-native terminal errors remain
+governed terminal/provider follow-ups.
 
 ## Open Questions
 

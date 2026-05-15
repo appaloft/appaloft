@@ -200,7 +200,9 @@ fields for `deployments.create`.
 Allowed target backend progression:
 
 - v1 active: single-server Docker/Compose through local shell or generic SSH.
-- future: Docker Swarm backend after Swarm target/readiness/registry/log/health/cleanup specs.
+- v1 active: Docker Swarm cluster backend through the registered `orchestrator-cluster` /
+  `docker-swarm` target capability, with Swarm-specific render/apply/log/health/cleanup details
+  kept in adapters.
 - future: Kubernetes backend after cluster target/readiness/placement/secret/route/log/health/cleanup specs.
 
 Target-specific render/apply artifacts such as Docker shell commands, Swarm stack definitions,
@@ -305,11 +307,11 @@ The accepted deployment state should include:
 - when applicable, the explicit `supersedesDeploymentId` for the previous same-resource
   runtime-owning deployment that may be cleaned up after terminal success.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current implementation already routes API and CLI through the shared command.
 
-Migration gaps:
+Governed follow-ups:
 
 - current use case awaits runtime backend execution before returning;
 - logical resource-runtime scoped admission coordination from ADR-028 is implemented for the
@@ -331,9 +333,9 @@ Migration gaps:
 - runtime Docker build/run/Compose execution uses typed command specs with adapter renderers for
   local and generic SSH runtime adapters. Legacy workspace command text remains a shell-script leaf
   until runtime profile command fields are remodeled as typed command steps.
-- runtime target execution selection remains single-server, but local-shell and generic-SSH are now
-  selected through a target kind/provider/capability registry; admission-time unsupported-target
-  checks are still pending before Swarm or Kubernetes are added.
+- runtime target execution selection now uses the target kind/provider/capability registry for
+  local-shell, generic-SSH, and Docker Swarm backends; admission-time unsupported-target checks
+  reject unregistered or future backends such as Kubernetes before acceptance.
 - repository config file support now has a profile-only parser/schema, YAML discovery, CLI
   `--config`, profile-only `appaloft init`, targeted rejection coverage for identity, secret, and
   unsupported fields, and ids-only `deployments.create` admission. Existing-resource profile drift

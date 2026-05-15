@@ -45,6 +45,11 @@ import { sanitizeFailureMessage } from "./safe-diagnostic-message";
 
 type DiagnosticSummaryCore = Omit<ResourceDiagnosticSummary, "copy">;
 
+type ResourceDiagnosticObservationWindow = {
+  from: string;
+  to: string;
+};
+
 function compareCreatedAtDesc(left: DeploymentSummary, right: DeploymentSummary): number {
   const createdCompare = right.createdAt.localeCompare(left.createdAt);
 
@@ -66,6 +71,42 @@ function redactionsFromDeployment(deployment: DeploymentSummary | undefined): st
       .map((variable) => variable.value)
       .filter((value) => value.trim().length > 0) ?? []
   );
+}
+
+function observationWindowFromQuery(
+  query: ResourceDiagnosticSummaryQuery,
+): ResourceDiagnosticObservationWindow | undefined {
+  if (!query.observationFrom || !query.observationTo) {
+    return undefined;
+  }
+
+  if (
+    !Number.isFinite(Date.parse(query.observationFrom)) ||
+    !Number.isFinite(Date.parse(query.observationTo))
+  ) {
+    return undefined;
+  }
+
+  return {
+    from: query.observationFrom,
+    to: query.observationTo,
+  };
+}
+
+function timestampInObservationWindow(
+  timestamp: string | undefined,
+  window: ResourceDiagnosticObservationWindow | undefined,
+): boolean {
+  if (!timestamp || !window) {
+    return true;
+  }
+
+  const value = Date.parse(timestamp);
+  if (!Number.isFinite(value)) {
+    return true;
+  }
+
+  return value >= Date.parse(window.from) && value <= Date.parse(window.to);
 }
 
 function redactText(
@@ -334,7 +375,7 @@ export class ResourceDiagnosticSummaryQueryService {
         ...(query.deploymentId ? { requestedDeploymentId: query.deploymentId } : {}),
         ...(deployment ? { deploymentId: deployment.id } : {}),
       },
-      context: this.buildContext(resource, deployment),
+      context: this.buildContext(resource, deployment, observationWindowFromQuery(query)),
       ...(deployment ? { deployment: this.buildDeployment(deployment, redactions) } : {}),
       access,
       proxy,
@@ -456,6 +497,7 @@ export class ResourceDiagnosticSummaryQueryService {
   private buildContext(
     resource: ResourceSummary,
     deployment: DeploymentSummary | undefined,
+    observationWindow: ResourceDiagnosticObservationWindow | undefined,
   ): ResourceDiagnosticContext {
     return {
       projectId: resource.projectId,
@@ -482,6 +524,7 @@ export class ResourceDiagnosticSummaryQueryService {
         : {}),
       services: resource.services,
       ...(resource.networkProfile ? { networkProfile: resource.networkProfile } : {}),
+      ...(observationWindow ? { observationWindow } : {}),
     };
   }
 
@@ -757,7 +800,11 @@ export class ResourceDiagnosticSummaryQueryService {
         toRepositoryContext(context),
         deployment.id,
       );
-      const tail = query.tailLines === 0 ? [] : logs.slice(-query.tailLines);
+      const observationWindow = observationWindowFromQuery(query);
+      const filteredLogs = logs.filter((line) =>
+        timestampInObservationWindow(line.timestamp, observationWindow),
+      );
+      const tail = query.tailLines === 0 ? [] : filteredLogs.slice(-query.tailLines);
       const lines = tail.map((line) => this.deploymentLogLine(line, redactions));
 
       return {
@@ -820,6 +867,7 @@ export class ResourceDiagnosticSummaryQueryService {
       resourceId: deployment.resourceId,
       deploymentId: deployment.id,
       tailLines: query.tailLines,
+      ...(query.observationFrom ? { since: query.observationFrom } : {}),
       follow: false,
     });
     if (runtimeQuery.isErr()) {
@@ -901,7 +949,10 @@ export class ResourceDiagnosticSummaryQueryService {
       });
     }
 
-    const lines = result.value.logs.map((line) => this.runtimeLogLine(line, redactions));
+    const observationWindow = observationWindowFromQuery(query);
+    const lines = result.value.logs
+      .filter((line) => timestampInObservationWindow(line.timestamp, observationWindow))
+      .map((line) => this.runtimeLogLine(line, redactions));
 
     return {
       status: lines.length > 0 ? "available" : "empty",

@@ -9,19 +9,26 @@
     Boxes,
     CheckCircle2,
     CircleDashed,
+    Gauge,
     Globe2,
     KeyRound,
     Network,
+    RefreshCw,
     Save,
     Server,
     ShieldAlert,
     Terminal,
+    Trash2,
     TriangleAlert,
     XCircle,
   } from "@lucide/svelte";
   import type {
     ConfigureDefaultAccessDomainPolicyInput,
     ConfigureServerEdgeProxyInput,
+    DeactivateServerInput,
+    DeleteServerInput,
+    InspectServerCapacityResponse,
+    PruneServerCapacityResponse,
     RenameServerInput,
     ServerDeleteSafety,
     ServerSummary,
@@ -38,13 +45,25 @@
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import { toDefaultAccessPolicyFormState } from "$lib/console/default-access-policy-form";
   import { webDocsHrefs } from "$lib/console/docs-help";
-  import { runtimeUsageQueryOptions } from "$lib/console/runtime-usage-query";
+  import {
+    runtimeMonitoringRollupQueryOptions,
+    runtimeMonitoringSamplesQueryOptions,
+    runtimeMonitoringThresholdsQueryOptions,
+    runtimeUsageQueryOptions,
+  } from "$lib/console/runtime-usage-query";
+  import {
+    formatRuntimeUsageBytes,
+    runtimeMonitoringDeploymentInObservationWindow,
+    runtimeMonitoringObservationHandoffFromSearchParams,
+    runtimeMonitoringObservationHandoffMatchesScope,
+  } from "$lib/console/runtime-usage";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
   import { formatTime } from "$lib/console/utils";
@@ -54,6 +73,7 @@
   type ServerDetailTab =
     | "overview"
     | "monitor"
+    | "capacity"
     | "connectivity"
     | "credentials"
     | "proxy-access"
@@ -63,6 +83,7 @@
   const serverDetailTabs = [
     "overview",
     "monitor",
+    "capacity",
     "connectivity",
     "credentials",
     "proxy-access",
@@ -119,14 +140,32 @@
       staleTime: 5_000,
     }),
   );
+  const serverRuntimeScope = $derived({
+    kind: "server" as const,
+    serverId,
+  });
   const serverRuntimeUsageQuery = createQuery(() =>
-    runtimeUsageQueryOptions(
-      {
-        kind: "server",
-        serverId,
-      },
-      browser && serverId.length > 0,
-    ),
+    runtimeUsageQueryOptions(serverRuntimeScope, browser && serverId.length > 0),
+  );
+  const serverRuntimeMonitoringSamplesQuery = createQuery(() =>
+    runtimeMonitoringSamplesQueryOptions(serverRuntimeScope, browser && serverId.length > 0),
+  );
+  const serverRuntimeMonitoringRollupQuery = createQuery(() =>
+    runtimeMonitoringRollupQueryOptions(serverRuntimeScope, browser && serverId.length > 0),
+  );
+  const serverRuntimeMonitoringThresholdsQuery = createQuery(() =>
+    runtimeMonitoringThresholdsQueryOptions(serverRuntimeScope, browser && serverId.length > 0),
+  );
+  const serverCapacityQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["servers", "capacity", "inspect", serverId],
+      queryFn: () =>
+        orpcClient.servers.capacity.inspect({
+          serverId,
+        }),
+      enabled: browser && serverId.length > 0,
+      staleTime: 5_000,
+    }),
   );
   const projects = $derived(projectsQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
@@ -166,11 +205,66 @@
   const serverRuntimeUsageError = $derived(
     serverRuntimeUsageQuery.error ? readErrorMessage(serverRuntimeUsageQuery.error) : "",
   );
+  const serverRuntimeMonitoringSamples = $derived(
+    serverRuntimeMonitoringSamplesQuery.data ?? null,
+  );
+  const serverRuntimeMonitoringSamplesError = $derived(
+    serverRuntimeMonitoringSamplesQuery.error
+      ? readErrorMessage(serverRuntimeMonitoringSamplesQuery.error)
+      : "",
+  );
+  const serverRuntimeMonitoringRollup = $derived(serverRuntimeMonitoringRollupQuery.data ?? null);
+  const serverRuntimeMonitoringRollupError = $derived(
+    serverRuntimeMonitoringRollupQuery.error
+      ? readErrorMessage(serverRuntimeMonitoringRollupQuery.error)
+      : "",
+  );
+  const serverRuntimeMonitoringThresholds = $derived(
+    serverRuntimeMonitoringThresholdsQuery.data ?? null,
+  );
+  const serverRuntimeMonitoringThresholdsError = $derived(
+    serverRuntimeMonitoringThresholdsQuery.error
+      ? readErrorMessage(serverRuntimeMonitoringThresholdsQuery.error)
+      : "",
+  );
+  const serverCapacity = $derived(serverCapacityQuery.data ?? null);
+  const serverCapacityError = $derived(
+    serverCapacityQuery.error ? readErrorMessage(serverCapacityQuery.error) : "",
+  );
+  const runtimeMonitoringObservationHandoff = $derived(
+    runtimeMonitoringObservationHandoffFromSearchParams(page.url.searchParams),
+  );
+  const serverRuntimeMonitoringObservationHandoff = $derived.by(() => {
+    const handoff = runtimeMonitoringObservationHandoff;
+    const currentServerId = server?.id ?? "";
+    if (!currentServerId) {
+      return null;
+    }
+
+    return runtimeMonitoringObservationHandoffMatchesScope(handoff, {
+      kind: "server",
+      serverId: currentServerId,
+    })
+      ? handoff
+      : null;
+  });
   const serverDeployments = $derived(
     server ? deployments.filter((deployment) => deployment.serverId === server.id) : [],
   );
+  const serverDeploymentsInObservationWindow = $derived(
+    serverRuntimeMonitoringObservationHandoff
+      ? serverDeployments.filter((deployment) =>
+          runtimeMonitoringDeploymentInObservationWindow(
+            deployment,
+            serverRuntimeMonitoringObservationHandoff,
+          ),
+        )
+      : serverDeployments,
+  );
   const relatedDeploymentCount = $derived(
-    serverRollups?.deployments.total ?? serverDeployments.length,
+    serverRuntimeMonitoringObservationHandoff
+      ? serverDeploymentsInObservationWindow.length
+      : (serverRollups?.deployments.total ?? serverDeployments.length),
   );
   const activeTab = $derived(parseServerDetailTab(page.url.searchParams.get("tab")));
   const defaultAccessModes = ["disabled", "provider", "custom-template"] as const;
@@ -184,6 +278,10 @@
   let overridePolicyReadbackSource = $state("");
   let serverFormServerId = $state("");
   let serverName = $state("");
+  let serverDeactivateDialogOpen = $state(false);
+  let serverDeactivateConfirmation = $state("");
+  let serverDeleteDialogOpen = $state(false);
+  let serverDeleteConfirmation = $state("");
   let edgeProxyKind = $state<ConfigureServerEdgeProxyInput["proxyKind"]>("none");
   let settingsFeedback = $state<{
     kind: "success" | "error";
@@ -195,7 +293,40 @@
     title: string;
     detail: string;
   } | null>(null);
+  type ServerCapacityPruneCategory = PruneServerCapacityResponse["categories"][number];
+  const serverCapacityPruneCategories = [
+    "stopped-containers",
+    "preview-workspaces",
+    "source-workspaces",
+    "docker-build-cache",
+    "unused-images",
+  ] as const satisfies ServerCapacityPruneCategory[];
+  let capacityPruneBefore = $state("");
+  let capacityPruneObservationHandoffKey = $state("");
+  let capacityPruneSelectedCategories = $state<Record<ServerCapacityPruneCategory, boolean>>({
+    "stopped-containers": true,
+    "preview-workspaces": true,
+    "source-workspaces": true,
+    "docker-build-cache": false,
+    "unused-images": false,
+  });
+  let capacityPruneResult = $state<PruneServerCapacityResponse | null>(null);
+  let capacityPruneFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
   let overrideFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let serverDeleteFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let serverDeactivateFeedback = $state<{
     kind: "success" | "error";
     title: string;
     detail: string;
@@ -207,6 +338,28 @@
     Boolean(server) &&
       server?.lifecycleStatus === "active" &&
       edgeProxyKind !== (server?.edgeProxy?.kind ?? "none"),
+  );
+  const canOpenServerDeleteDialog = $derived(
+    Boolean(server) && Boolean(serverDeleteSafety?.eligible) && !serverDeleteSafetyQuery.isPending,
+  );
+  const canOpenServerDeactivateDialog = $derived(server?.lifecycleStatus === "active");
+  const canSubmitServerDeactivate = $derived(
+    Boolean(server) &&
+      server?.lifecycleStatus === "active" &&
+      serverDeactivateConfirmation.trim() === server?.id,
+  );
+  const canSubmitServerDelete = $derived(
+    Boolean(server) &&
+      Boolean(serverDeleteSafety?.eligible) &&
+      serverDeleteConfirmation.trim() === server?.id,
+  );
+  const selectedCapacityPruneCategories = $derived(
+    serverCapacityPruneCategories.filter((category) => capacityPruneSelectedCategories[category]),
+  );
+  const canPreviewCapacityPrune = $derived(
+    Boolean(server) &&
+      capacityPruneBefore.trim().length > 0 &&
+      selectedCapacityPruneCategories.length > 0,
   );
 
   const connectivityMutation = createMutation(() => ({
@@ -283,6 +436,77 @@
       };
     },
   }));
+  const deactivateServerMutation = createMutation(() => ({
+    mutationFn: (input: DeactivateServerInput) => orpcClient.servers.deactivate(input),
+    onSuccess: (result) => {
+      serverDeactivateFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.servers.deactivateServerSucceeded),
+        detail: result.id,
+      };
+      serverDeactivateDialogOpen = false;
+      void queryClient.invalidateQueries({ queryKey: ["servers"] });
+      void queryClient.invalidateQueries({ queryKey: ["servers", "show", result.id] });
+      void queryClient.invalidateQueries({ queryKey: ["servers", "delete-check", result.id] });
+    },
+    onError: (error) => {
+      serverDeactivateFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.servers.deactivateServerFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const deleteServerMutation = createMutation(() => ({
+    mutationFn: (input: DeleteServerInput) => orpcClient.servers.delete(input),
+    onSuccess: (result) => {
+      serverDeleteFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.servers.deleteServerSucceeded),
+        detail: result.id,
+      };
+      serverDeleteDialogOpen = false;
+      void queryClient.invalidateQueries({ queryKey: ["servers"] });
+      void queryClient.invalidateQueries({ queryKey: ["servers", "show", result.id] });
+      void queryClient.invalidateQueries({ queryKey: ["servers", "delete-check", result.id] });
+      void goto("/servers");
+    },
+    onError: (error) => {
+      serverDeleteFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.servers.deleteServerFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const pruneServerCapacityMutation = createMutation(() => ({
+    mutationFn: (input: {
+      serverId: string;
+      before: string;
+      categories: ServerCapacityPruneCategory[];
+      dryRun: boolean;
+    }) => orpcClient.servers.capacity.prune(input),
+    onSuccess: (result) => {
+      capacityPruneResult = result;
+      capacityPruneFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.servers.capacityPruneSucceeded),
+        detail: capacityPruneSummary(result),
+      };
+      if (!result.dryRun) {
+        void queryClient.invalidateQueries({
+          queryKey: ["servers", "capacity", "inspect", result.server.id],
+        });
+      }
+    },
+    onError: (error) => {
+      capacityPruneFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.servers.capacityPruneFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
 
   $effect(() => {
     if (!server || serverFormServerId === server.id) {
@@ -294,6 +518,34 @@
     edgeProxyKind = server.edgeProxy?.kind ?? "none";
     settingsFeedback = null;
     edgeProxyFeedback = null;
+    serverDeactivateFeedback = null;
+    serverDeactivateConfirmation = "";
+    serverDeactivateDialogOpen = false;
+    serverDeleteFeedback = null;
+    serverDeleteConfirmation = "";
+    serverDeleteDialogOpen = false;
+    capacityPruneBefore = new Date().toISOString();
+    capacityPruneObservationHandoffKey = "";
+    capacityPruneResult = null;
+    capacityPruneFeedback = null;
+  });
+
+  $effect(() => {
+    const handoff = serverRuntimeMonitoringObservationHandoff;
+    const currentServerId = server?.id ?? "";
+    if (!handoff || !currentServerId) {
+      return;
+    }
+
+    const handoffKey = `${currentServerId}:${handoff.from}:${handoff.to}`;
+    if (capacityPruneObservationHandoffKey === handoffKey) {
+      return;
+    }
+
+    capacityPruneObservationHandoffKey = handoffKey;
+    capacityPruneBefore = handoff.to;
+    capacityPruneResult = null;
+    capacityPruneFeedback = null;
   });
 
   $effect(() => {
@@ -371,6 +623,134 @@
       ...(overrideMode === "custom-template" && overrideTemplateRef.trim()
         ? { templateRef: overrideTemplateRef.trim() }
         : {}),
+    });
+  }
+
+  function openServerDeleteDialog(): void {
+    if (!server || !canOpenServerDeleteDialog) {
+      return;
+    }
+
+    serverDeleteConfirmation = "";
+    serverDeleteFeedback = null;
+    serverDeleteDialogOpen = true;
+  }
+
+  function openServerDeactivateDialog(): void {
+    if (!server || !canOpenServerDeactivateDialog) {
+      return;
+    }
+
+    serverDeactivateConfirmation = "";
+    serverDeactivateFeedback = null;
+    serverDeactivateDialogOpen = true;
+  }
+
+  function submitServerDeactivate(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!server || !canSubmitServerDeactivate || deactivateServerMutation.isPending) {
+      return;
+    }
+
+    serverDeactivateFeedback = null;
+    deactivateServerMutation.mutate({
+      serverId: server.id,
+    });
+  }
+
+  function submitServerDelete(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!server || !canSubmitServerDelete || deleteServerMutation.isPending) {
+      return;
+    }
+
+    serverDeleteFeedback = null;
+    deleteServerMutation.mutate({
+      serverId: server.id,
+      confirmation: {
+        serverId: serverDeleteConfirmation.trim(),
+      },
+    });
+  }
+
+  function setCapacityPruneCategory(category: ServerCapacityPruneCategory, event: Event): void {
+    const checked =
+      event.currentTarget instanceof HTMLInputElement ? event.currentTarget.checked : false;
+    capacityPruneSelectedCategories = {
+      ...capacityPruneSelectedCategories,
+      [category]: checked,
+    };
+  }
+
+  function runCapacityPrune(dryRun: boolean): void {
+    if (!server || !canPreviewCapacityPrune || pruneServerCapacityMutation.isPending) {
+      return;
+    }
+
+    if (
+      !dryRun &&
+      !window.confirm($t(i18nKeys.console.servers.capacityConfirmApply, { serverId: server.id }))
+    ) {
+      return;
+    }
+
+    capacityPruneFeedback = null;
+    pruneServerCapacityMutation.mutate({
+      serverId: server.id,
+      before: capacityPruneBefore.trim(),
+      categories: selectedCapacityPruneCategories,
+      dryRun,
+    });
+  }
+
+  function refreshCapacity(): void {
+    void queryClient.invalidateQueries({ queryKey: ["servers", "capacity", "inspect", serverId] });
+  }
+
+  function capacityBytes(value: number | null | undefined): string {
+    return formatRuntimeUsageBytes(value ?? undefined) ?? "-";
+  }
+
+  function capacityPruneCategoryLabel(category: ServerCapacityPruneCategory): string {
+    switch (category) {
+      case "docker-build-cache":
+        return $t(i18nKeys.console.servers.capacityCategoryBuildCache);
+      case "preview-workspaces":
+        return $t(i18nKeys.console.servers.capacityCategoryPreviewWorkspaces);
+      case "source-workspaces":
+        return $t(i18nKeys.console.servers.capacityCategorySourceWorkspaces);
+      case "stopped-containers":
+        return $t(i18nKeys.console.servers.capacityCategoryStoppedContainers);
+      case "unused-images":
+        return $t(i18nKeys.console.servers.capacityCategoryUnusedImages);
+    }
+  }
+
+  function capacityPruneActionLabel(
+    action: PruneServerCapacityResponse["candidates"][number]["action"],
+  ): string {
+    switch (action) {
+      case "excluded":
+        return $t(i18nKeys.console.servers.capacityCandidateActionExcluded);
+      case "matched":
+        return $t(i18nKeys.console.servers.capacityCandidateActionMatched);
+      case "pruned":
+        return $t(i18nKeys.console.servers.capacityCandidateActionPruned);
+      case "skipped":
+        return $t(i18nKeys.console.servers.capacityCandidateActionSkipped);
+    }
+  }
+
+  function capacityPruneSummary(result: PruneServerCapacityResponse): string {
+    return $t(i18nKeys.console.servers.capacityPruneSummary, {
+      inspected: result.summary.inspectedCount,
+      matched: result.summary.matchedCount,
+      pruned: result.summary.prunedCount,
+      skipped: result.summary.skippedCount,
+      excluded: result.summary.excludedCount,
+      reclaimed: capacityBytes(result.summary.reclaimedBytes),
     });
   }
 
@@ -511,6 +891,8 @@
 
   function serverTabLabel(tab: ServerDetailTab): string {
     switch (tab) {
+      case "capacity":
+        return $t(i18nKeys.console.servers.capacityTab);
       case "connectivity":
         return $t(i18nKeys.console.servers.connectivityTab);
       case "credentials":
@@ -709,11 +1091,282 @@
 
           <Tabs.Content value="monitor" class="mt-0">
         <RuntimeMonitorPanel
+          scope={serverRuntimeScope}
           usage={serverRuntimeUsage}
           loading={serverRuntimeUsageQuery.isPending}
           error={serverRuntimeUsageError}
+          retainedSamples={serverRuntimeMonitoringSamples}
+          retainedSamplesLoading={serverRuntimeMonitoringSamplesQuery.isPending}
+          retainedSamplesError={serverRuntimeMonitoringSamplesError}
+          rollup={serverRuntimeMonitoringRollup}
+          rollupLoading={serverRuntimeMonitoringRollupQuery.isPending}
+          rollupError={serverRuntimeMonitoringRollupError}
+          thresholds={serverRuntimeMonitoringThresholds}
+          thresholdsLoading={serverRuntimeMonitoringThresholdsQuery.isPending}
+          thresholdsError={serverRuntimeMonitoringThresholdsError}
           eventsHref={serverTabHref("deployments")}
+          capacityHref={serverTabHref("capacity")}
         />
+          </Tabs.Content>
+
+          <Tabs.Content value="capacity" class="mt-0 space-y-5">
+        <section class="console-panel p-4">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0 space-y-1">
+              <div class="flex items-center gap-2">
+                <Gauge class="size-4 text-muted-foreground" />
+                <h2 class="text-sm font-semibold">
+                  {$t(i18nKeys.console.servers.capacityTitle)}
+                </h2>
+                <DocsHelpLink
+                  href={webDocsHrefs.runtimeTargetCapacity}
+                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                />
+              </div>
+              <p class="text-sm text-muted-foreground">
+                {$t(i18nKeys.console.servers.capacityDescription)}
+              </p>
+              {#if serverCapacity}
+                <p class="text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.servers.capacityInspectedAt, {
+                    time: formatTime(serverCapacity.inspectedAt),
+                  })}
+                </p>
+              {/if}
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <Badge variant="secondary">
+                {$t(i18nKeys.console.servers.capacityDryRunBadge)}
+              </Badge>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={serverCapacityQuery.isPending}
+                onclick={refreshCapacity}
+              >
+                <RefreshCw class="size-4" />
+                {$t(i18nKeys.console.servers.capacityRefresh)}
+              </Button>
+            </div>
+          </div>
+
+          {#if serverCapacityQuery.isPending}
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Skeleton class="h-20 w-full" />
+              <Skeleton class="h-20 w-full" />
+              <Skeleton class="h-20 w-full" />
+              <Skeleton class="h-20 w-full" />
+            </div>
+          {:else if serverCapacityError}
+            <div class="mt-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive">
+              <p class="font-medium">{$t(i18nKeys.console.servers.capacityErrorTitle)}</p>
+              <p class="mt-1">{serverCapacityError}</p>
+            </div>
+          {:else if serverCapacity}
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div class="rounded-md border bg-muted/15 px-3 py-2">
+                <p class="text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.servers.capacitySafeReclaimable)}
+                </p>
+                <p class="mt-1 text-lg font-semibold">
+                  {capacityBytes(serverCapacity.safeReclaimableEstimate.total)}
+                </p>
+              </div>
+              <div class="rounded-md border bg-muted/15 px-3 py-2">
+                <p class="text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.servers.capacityStoppedContainers)}
+                </p>
+                <p class="mt-1 text-lg font-semibold">
+                  {capacityBytes(serverCapacity.safeReclaimableEstimate.stoppedContainersSize)}
+                </p>
+              </div>
+              <div class="rounded-md border bg-muted/15 px-3 py-2">
+                <p class="text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.servers.capacityBuildCache)}
+                </p>
+                <p class="mt-1 text-lg font-semibold">
+                  {capacityBytes(serverCapacity.safeReclaimableEstimate.oldBuildCacheSize)}
+                </p>
+              </div>
+              <div class="rounded-md border bg-muted/15 px-3 py-2">
+                <p class="text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.resources.previewEnvironmentsTab)}
+                </p>
+                <p class="mt-1 text-lg font-semibold">
+                  {capacityBytes(serverCapacity.safeReclaimableEstimate.oldPreviewWorkspaceCandidatesSize)}
+                </p>
+              </div>
+            </div>
+
+            {#if serverCapacity.warnings.length > 0}
+              <div class="mt-4 rounded-md border bg-muted/15 p-3">
+                <p class="text-sm font-medium">
+                  {$t(i18nKeys.console.servers.capacityWarningsTitle)}
+                </p>
+                <div class="mt-2 space-y-2">
+                  {#each serverCapacity.warnings as warning, index (index)}
+                    <div class="text-sm text-muted-foreground">
+                      <span class="font-medium text-foreground">{warning.code}</span>
+                      {#if warning.message}
+                        · {warning.message}
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+          {/if}
+        </section>
+
+        <section class="console-panel p-4">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0 space-y-1">
+              <div class="flex items-center gap-2">
+                <Trash2 class="size-4 text-muted-foreground" />
+                <h2 class="text-sm font-semibold">
+                  {$t(i18nKeys.console.servers.capacityPruneTitle)}
+                </h2>
+              </div>
+              <p class="text-sm text-muted-foreground">
+                {$t(i18nKeys.console.servers.capacityPruneDescription)}
+              </p>
+            </div>
+            <Badge variant={capacityPruneResult?.dryRun === false ? "destructive" : "secondary"}>
+              {capacityPruneResult?.dryRun === false
+                ? $t(i18nKeys.console.servers.capacityCandidateActionPruned)
+                : $t(i18nKeys.console.servers.capacityDryRunBadge)}
+            </Badge>
+          </div>
+
+          <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
+            <label class="space-y-1.5 text-sm font-medium" for="server-capacity-prune-before">
+              <span>{$t(i18nKeys.console.servers.capacityPruneBefore)}</span>
+              <Input
+                id="server-capacity-prune-before"
+                bind:value={capacityPruneBefore}
+                autocomplete="off"
+                placeholder="2026-01-01T00:00:00.000Z"
+              />
+            </label>
+
+            <fieldset class="space-y-2 text-sm">
+              <legend class="font-medium">
+                {$t(i18nKeys.console.servers.capacityPruneCategories)}
+              </legend>
+              <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                {#each serverCapacityPruneCategories as category (category)}
+                  <label class="flex items-center gap-2 rounded-md border bg-muted/15 px-3 py-2 text-xs font-medium">
+                    <input
+                      type="checkbox"
+                      checked={capacityPruneSelectedCategories[category]}
+                      onchange={(event) => setCapacityPruneCategory(category, event)}
+                    />
+                    <span>{capacityPruneCategoryLabel(category)}</span>
+                  </label>
+                {/each}
+              </div>
+            </fieldset>
+          </div>
+
+          <div class="mt-4 flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!canPreviewCapacityPrune || pruneServerCapacityMutation.isPending}
+              onclick={() => runCapacityPrune(true)}
+            >
+              <RefreshCw class="size-4" />
+              {$t(i18nKeys.console.servers.capacityPreviewAction)}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!canPreviewCapacityPrune || pruneServerCapacityMutation.isPending}
+              onclick={() => runCapacityPrune(false)}
+            >
+              <Trash2 class="size-4" />
+              {$t(i18nKeys.console.servers.capacityApplyAction)}
+            </Button>
+          </div>
+
+          {#if capacityPruneFeedback}
+            <div
+              class={[
+                "mt-4 rounded-md border px-3 py-2 text-sm",
+                capacityPruneFeedback.kind === "success"
+                  ? "border-primary/25 bg-primary/5"
+                  : "border-destructive/30 bg-destructive/5 text-destructive",
+              ]}
+            >
+              <p class="font-medium">{capacityPruneFeedback.title}</p>
+              <p class="mt-1 break-all text-xs">{capacityPruneFeedback.detail}</p>
+            </div>
+          {/if}
+
+          {#if capacityPruneResult}
+            <div class="mt-4 space-y-3">
+              <div class="grid gap-2 sm:grid-cols-5">
+                <div class="rounded-md border bg-muted/15 px-3 py-2">
+                  <p class="text-xs text-muted-foreground">Inspected</p>
+                  <p class="text-lg font-semibold">{capacityPruneResult.summary.inspectedCount}</p>
+                </div>
+                <div class="rounded-md border bg-muted/15 px-3 py-2">
+                  <p class="text-xs text-muted-foreground">Matched</p>
+                  <p class="text-lg font-semibold">{capacityPruneResult.summary.matchedCount}</p>
+                </div>
+                <div class="rounded-md border bg-muted/15 px-3 py-2">
+                  <p class="text-xs text-muted-foreground">Pruned</p>
+                  <p class="text-lg font-semibold">{capacityPruneResult.summary.prunedCount}</p>
+                </div>
+                <div class="rounded-md border bg-muted/15 px-3 py-2">
+                  <p class="text-xs text-muted-foreground">Skipped</p>
+                  <p class="text-lg font-semibold">{capacityPruneResult.summary.skippedCount}</p>
+                </div>
+                <div class="rounded-md border bg-muted/15 px-3 py-2">
+                  <p class="text-xs text-muted-foreground">Reclaimed</p>
+                  <p class="text-lg font-semibold">
+                    {capacityBytes(capacityPruneResult.summary.reclaimedBytes)}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p class="text-sm font-medium">
+                  {$t(i18nKeys.console.servers.capacityCandidatesTitle)}
+                </p>
+                <div class="mt-2 space-y-2">
+                  {#if capacityPruneResult.candidates.length > 0}
+                    {#each capacityPruneResult.candidates as candidate (candidate.id)}
+                      <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div class="min-w-0">
+                            <p class="break-all font-mono text-xs">{candidate.target}</p>
+                            <p class="mt-1 text-xs text-muted-foreground">
+                              {capacityPruneCategoryLabel(candidate.category)}
+                              {#if candidate.updatedAt}
+                                · {formatTime(candidate.updatedAt)}
+                              {/if}
+                              {#if candidate.size !== null}
+                                · {capacityBytes(candidate.size)}
+                              {/if}
+                            </p>
+                          </div>
+                          <Badge variant={candidate.action === "pruned" ? "default" : "outline"}>
+                            {capacityPruneActionLabel(candidate.action)}
+                          </Badge>
+                        </div>
+                      </div>
+                    {/each}
+                  {:else}
+                    <div class="rounded-md border border-dashed bg-muted/15 px-4 py-4 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.servers.capacityCandidatesEmpty)}
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            </div>
+          {/if}
+        </section>
           </Tabs.Content>
 
           <Tabs.Content value="credentials" class="mt-0">
@@ -1106,8 +1759,44 @@
           </Tabs.Content>
 
           <Tabs.Content value="danger" class="mt-0">
+        <div class="space-y-4">
         <div class="console-panel p-4">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0 space-y-1">
+              <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <XCircle class="size-4" />
+                {$t(i18nKeys.console.servers.deactivateServerTitle)}
+              </p>
+              <p class="text-sm text-muted-foreground">
+                {$t(i18nKeys.console.servers.deactivateServerDescription)}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!canOpenServerDeactivateDialog}
+              onclick={openServerDeactivateDialog}
+              aria-label={server
+                ? $t(i18nKeys.console.servers.deactivateServerActionAria, { name: server.name })
+                : $t(i18nKeys.console.servers.deactivateServerAction)}
+            >
+              <XCircle class="size-4" />
+              {$t(i18nKeys.console.servers.deactivateServerAction)}
+            </Button>
+          </div>
+
+          {#if serverDeactivateFeedback}
+            <div
+              class={`mt-4 rounded-md border p-3 text-sm ${serverDeactivateFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+            >
+              <p class="font-medium">{serverDeactivateFeedback.title}</p>
+              <p class="mt-1 text-muted-foreground">{serverDeactivateFeedback.detail}</p>
+            </div>
+          {/if}
+        </div>
+
+        <div class="console-panel p-4">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="min-w-0 space-y-1">
               <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <ShieldAlert class="size-4" />
@@ -1137,7 +1826,184 @@
               {/if}
             </div>
           </div>
+
+          <div class="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0 text-sm text-muted-foreground">
+              {#if serverDeleteSafety?.eligible}
+                {$t(i18nKeys.console.servers.deleteServerReadyDescription)}
+              {:else}
+                {$t(i18nKeys.console.servers.deleteServerBlockedDescription)}
+              {/if}
+            </div>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!canOpenServerDeleteDialog}
+              onclick={openServerDeleteDialog}
+              aria-label={server
+                ? $t(i18nKeys.console.servers.deleteServerActionAria, { name: server.name })
+                : $t(i18nKeys.console.servers.deleteServerAction)}
+            >
+              <Trash2 class="size-4" />
+              {$t(i18nKeys.console.servers.deleteServerAction)}
+            </Button>
+          </div>
+
+          {#if serverDeleteFeedback}
+            <div
+              class={`mt-4 rounded-md border p-3 text-sm ${serverDeleteFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+            >
+              <p class="font-medium">{serverDeleteFeedback.title}</p>
+              <p class="mt-1 text-muted-foreground">{serverDeleteFeedback.detail}</p>
+            </div>
+          {/if}
         </div>
+        </div>
+
+        <Dialog.Root bind:open={serverDeactivateDialogOpen}>
+          {#if server}
+            <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+              <form id="server-deactivate-form" onsubmit={submitServerDeactivate}>
+                <Dialog.Header>
+                  <Dialog.Title>
+                    {$t(i18nKeys.console.servers.deactivateServerDialogTitle)}
+                  </Dialog.Title>
+                  <Dialog.Description>
+                    {$t(i18nKeys.console.servers.deactivateServerDialogDescription, {
+                      id: server.id,
+                    })}
+                  </Dialog.Description>
+                </Dialog.Header>
+
+                <div class="space-y-4 px-5 py-4">
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>
+                      {$t(i18nKeys.console.servers.deactivateServerConfirmationLabel)}
+                    </span>
+                    <Input
+                      id="server-deactivate-confirmation-input"
+                      bind:value={serverDeactivateConfirmation}
+                      autocomplete="off"
+                      aria-invalid={serverDeactivateConfirmation.length > 0 &&
+                        serverDeactivateConfirmation.trim() !== server.id}
+                      placeholder={server.id}
+                    />
+                  </label>
+
+                  {#if serverDeactivateConfirmation.length > 0 && serverDeactivateConfirmation.trim() !== server.id}
+                    <p class="text-sm text-destructive">
+                      {$t(i18nKeys.console.servers.deactivateServerConfirmMismatch)}
+                    </p>
+                  {/if}
+                </div>
+
+                <Dialog.Footer class="border-t p-5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onclick={() => {
+                      serverDeactivateDialogOpen = false;
+                    }}
+                  >
+                    {$t(i18nKeys.common.actions.close)}
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="destructive"
+                    disabled={!canSubmitServerDeactivate || deactivateServerMutation.isPending}
+                  >
+                    <XCircle class="size-4" />
+                    {deactivateServerMutation.isPending
+                      ? $t(i18nKeys.console.servers.deactivateServerDeactivating)
+                      : $t(i18nKeys.console.servers.deactivateServerAction)}
+                  </Button>
+                </Dialog.Footer>
+              </form>
+            </Dialog.Content>
+          {/if}
+        </Dialog.Root>
+
+        <Dialog.Root bind:open={serverDeleteDialogOpen}>
+          {#if server}
+            <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+              <form id="server-delete-form" onsubmit={submitServerDelete}>
+                <Dialog.Header>
+                  <Dialog.Title>
+                    {$t(i18nKeys.console.servers.deleteServerDialogTitle)}
+                  </Dialog.Title>
+                  <Dialog.Description>
+                    {$t(i18nKeys.console.servers.deleteServerDialogDescription, {
+                      id: server.id,
+                    })}
+                  </Dialog.Description>
+                </Dialog.Header>
+
+                <div class="space-y-4 px-5 py-4">
+                  <div
+                    class={`rounded-md border p-3 text-sm ${serverDeleteSafety?.eligible ? "border-border" : "border-destructive/30 text-destructive"}`}
+                  >
+                    {#if serverDeleteSafetyQuery.isPending}
+                      <p class="font-medium">{$t(i18nKeys.common.status.loading)}</p>
+                    {:else if serverDeleteSafety?.eligible}
+                      <p class="font-medium">
+                        {$t(i18nKeys.console.servers.deleteServerReadyDescription)}
+                      </p>
+                    {:else}
+                      <div class="flex items-start gap-2">
+                        <TriangleAlert class="mt-0.5 size-4" />
+                        <p class="font-medium">
+                          {$t(i18nKeys.console.servers.deleteServerBlockedDescription)}
+                        </p>
+                      </div>
+                    {/if}
+                  </div>
+
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>
+                      {$t(i18nKeys.console.servers.deleteServerConfirmationLabel)}
+                    </span>
+                    <Input
+                      id="server-delete-confirmation-input"
+                      bind:value={serverDeleteConfirmation}
+                      autocomplete="off"
+                      aria-invalid={serverDeleteConfirmation.length > 0 &&
+                        serverDeleteConfirmation.trim() !== server.id}
+                      placeholder={server.id}
+                    />
+                  </label>
+
+                  {#if serverDeleteConfirmation.length > 0 && serverDeleteConfirmation.trim() !== server.id}
+                    <p class="text-sm text-destructive">
+                      {$t(i18nKeys.console.servers.deleteServerConfirmMismatch)}
+                    </p>
+                  {/if}
+                </div>
+
+                <Dialog.Footer class="border-t p-5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onclick={() => {
+                      serverDeleteDialogOpen = false;
+                    }}
+                  >
+                    {$t(i18nKeys.common.actions.close)}
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="destructive"
+                    disabled={!canSubmitServerDelete || deleteServerMutation.isPending}
+                  >
+                    <Trash2 class="size-4" />
+                    {deleteServerMutation.isPending
+                      ? $t(i18nKeys.console.servers.deleteServerDeleting)
+                      : $t(i18nKeys.console.servers.deleteServerAction)}
+                  </Button>
+                </Dialog.Footer>
+              </form>
+            </Dialog.Content>
+          {/if}
+        </Dialog.Root>
           </Tabs.Content>
 
           <Tabs.Content value="connectivity" class="mt-0">
@@ -1227,14 +2093,24 @@
                   <p class="mt-1 text-sm text-muted-foreground">
                     {$t(i18nKeys.console.servers.connectedDeploymentsDescription)}
                   </p>
+                  {#if serverRuntimeMonitoringObservationHandoff}
+                    <p class="mt-2 text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.runtimeUsage.observationWindowHandoff, {
+                        from: formatTime(serverRuntimeMonitoringObservationHandoff.from),
+                        to: formatTime(serverRuntimeMonitoringObservationHandoff.to),
+                        scopeKind: serverRuntimeMonitoringObservationHandoff.scope.kind,
+                        scopeId: server?.id ?? "",
+                      })}
+                    </p>
+                  {/if}
                 </div>
                 <Badge variant="outline">{relatedDeploymentCount}</Badge>
               </div>
 
               <div>
-                {#if serverDeployments.length > 0}
+                {#if serverDeploymentsInObservationWindow.length > 0}
                   <DeploymentTable
-                    deployments={serverDeployments.slice(0, 8)}
+                    deployments={serverDeploymentsInObservationWindow.slice(0, 8)}
                     {projects}
                     showEnvironment={false}
                     showServer={false}
@@ -1248,7 +2124,11 @@
                           {$t(i18nKeys.console.servers.noDeploymentsTitle)}
                         </p>
                         <p class="text-sm text-muted-foreground">
-                          {$t(i18nKeys.console.servers.noDeploymentsBody)}
+                          {$t(
+                            serverRuntimeMonitoringObservationHandoff && serverDeployments.length > 0
+                              ? i18nKeys.console.runtimeUsage.observationWindowEmpty
+                              : i18nKeys.console.servers.noDeploymentsBody,
+                          )}
                         </p>
                       </div>
                     </div>

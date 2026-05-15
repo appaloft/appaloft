@@ -83,44 +83,70 @@ Then:
 | --- | --- | --- | --- | --- |
 | TERM-SESSION-TRANSPORT-001 | integration | Output line | Backend emits bytes | Web/CLI receives output frame in order. |
 | TERM-SESSION-TRANSPORT-002 | integration | User input | Client sends input frame | Backend PTY receives bytes. |
-| TERM-SESSION-TRANSPORT-003 | integration | Resize | Client sends dimensions | Backend PTY resize is invoked when supported. |
-| TERM-SESSION-TRANSPORT-004 | integration | Heartbeat idle | No data for interval | Heartbeat may be sent; session remains open. |
-| TERM-SESSION-TRANSPORT-005 | integration | Client closes | WebSocket closes or CLI exits | Backend PTY/SSH/process is closed. |
-| TERM-SESSION-TRANSPORT-006 | integration | Backend exits | Shell exits normally | Closed frame is emitted; session is removed. |
-| TERM-SESSION-TRANSPORT-007 | integration | Backend fails | PTY/SSH errors after open | Structured error frame is emitted; backend is closed. |
+| TERM-SESSION-TRANSPORT-003 | integration | Resize | Client sends dimensions | WebSocket and CLI attach forward dimensions to the attached terminal session; backend PTY resize is invoked when supported. |
+| TERM-SESSION-TRANSPORT-004 | integration | Reattach output replay | Client reconnects to an active session | Gateway replays only a bounded in-memory tail of recent output to the new attach stream, trims older output by configured byte limit, and keeps lifecycle list/show/audit readback free of terminal content. |
+| TERM-SESSION-TRANSPORT-005 | integration | Heartbeat idle | No data for interval | Heartbeat may be sent; session remains open. |
+| TERM-SESSION-TRANSPORT-006 | integration | Client closes | WebSocket closes or CLI exits | Backend PTY/SSH/process is closed. |
+| TERM-SESSION-TRANSPORT-007 | integration | Backend exits | Shell exits normally | Closed frame is emitted; session is removed. |
+| TERM-SESSION-TRANSPORT-008 | integration | Backend fails | PTY/SSH errors after open | Structured error frame is emitted; backend is closed. |
 | TERM-SESSION-LIFE-001 | integration | List active sessions | One server session and one resource session are active | List returns safe descriptors sorted newest first and no terminal output, command text, private keys, tokens, or environment secrets. |
 | TERM-SESSION-LIFE-002 | integration | Show active session | Session id is active | Show returns the safe descriptor and lifecycle status without attaching to the transport. |
 | TERM-SESSION-LIFE-003 | integration | Close active session | Session id is active | Gateway closes backend resources, removes the session from active readback, and returns `status = closed`. |
 | TERM-SESSION-LIFE-004 | integration | Close missing session | Session id is unknown or already removed | Command returns `terminal_session_not_found` and does not close another session. |
-| TERM-SESSION-LIFE-005 | integration | Expire old sessions | Active sessions exist before and after cutoff | Only sessions older than the cutoff close; response returns safe counts and ids. |
+| TERM-SESSION-LIFE-005 | integration | Expire old sessions | Active sessions exist before and after cutoff, or idle past and active within the configured active-session TTL when no cutoff is supplied | Only sessions older than the explicit cutoff or idle past the configured gateway TTL close; terminal input, resize, and backend output refresh activity; response returns safe counts and ids. |
+| TERM-SESSION-LIFE-006 | integration | Durable audit metadata | Runtime gateway is configured with the audit recorder | Opening and closing a terminal session records `terminal-session-opened` and `terminal-session-closed` audit rows on the server/resource aggregate with safe scope, target, actor, entrypoint, request, provider, timestamp, and close-reason metadata only. |
 
 ## Entrypoint Matrix
 
 | Test ID | Preferred automation | Entrypoint | Case | Expected behavior |
 | --- | --- | --- | --- | --- |
-| TERM-SESSION-ENTRY-001 | e2e-preferred | Web resource page | User opens terminal tab/action | Uses `terminal-sessions.open` with resource scope and attaches returned WebSocket. |
-| TERM-SESSION-ENTRY-002 | e2e-preferred | Web server page | User opens terminal action | Uses `terminal-sessions.open` with server scope and attaches returned WebSocket. |
-| TERM-SESSION-ENTRY-003 | e2e-preferred | Web navigation | User leaves the page | Session closes without rendering normal cancellation as an error. |
-| TERM-SESSION-ENTRY-004 | e2e-preferred | CLI server | `terminal open --server <serverId>` | Opens interactive session and restores local TTY on close. |
-| TERM-SESSION-ENTRY-005 | e2e-preferred | CLI resource | `resource terminal <resourceId>` | Opens latest resource workspace session and restores local TTY on close. |
+| TERM-SESSION-ENTRY-001 | e2e-preferred | Web resource page | User opens terminal tab/action | Uses `terminal-sessions.open` with resource scope and attaches returned WebSocket. Bun.WebView coverage verifies resource terminal open, selected deployment scope, attach URL, and initial resize frame. |
+| TERM-SESSION-ENTRY-002 | e2e-preferred | Web server page | User opens terminal action | Uses `terminal-sessions.open` with server scope and attaches returned WebSocket. Bun.WebView coverage verifies server detail terminal open, server scope, attach URL, and initial resize frame; source guards verify the server list terminal action deep-links to the server terminal tab. |
+| TERM-SESSION-ENTRY-003 | e2e-preferred | Web navigation | User leaves the page | Session closes without rendering normal cancellation as an error. Bun.WebView coverage verifies an attached resource terminal sends a close frame during client-side navigation. |
+| TERM-SESSION-ENTRY-004 | integration | CLI server | `server terminal <serverId> --attach` | Opens interactive session and restores local TTY on close. |
+| TERM-SESSION-ENTRY-005 | integration | CLI resource | `resource terminal <resourceId> --attach` | Opens latest or selected resource workspace session and restores local TTY on close. |
 | TERM-SESSION-ENTRY-006 | e2e-preferred | HTTP/WebSocket | Client disconnects | Abort propagates and backend resources close. |
 | TERM-SESSION-ENTRY-007 | e2e-preferred | CLI lifecycle | `terminal-session list/show/close/expire` | CLI dispatches the shared lifecycle query/command schemas and prints safe JSON. |
 | TERM-SESSION-ENTRY-008 | e2e-preferred | HTTP lifecycle | `GET /api/terminal-sessions`, `GET /api/terminal-sessions/{sessionId}`, `POST /api/terminal-sessions/{sessionId}/close`, and `POST /api/terminal-sessions/expire` | HTTP routes dispatch shared messages and never expose terminal input/output. |
+| TERM-SESSION-ENTRY-009 | source/unit | Web deployment detail | Operator opens terminal from a deployment detail page. | Deployment detail links to the Resource terminal tab with `deploymentId`; Resource terminal passes that selected deployment id to `terminal-sessions.open` while preserving resource ownership. |
+| TERM-SESSION-ENTRY-010 | e2e-preferred | Web close action | Operator clicks the terminal panel close action while attached. | Web sends a terminal transport close frame, closes the socket, and renders normal close as disconnected rather than as a terminal error. |
+| TERM-SESSION-WEB-001 | source/unit + WebView | Web Instance lifecycle | Operator opens Instance management. | Web lists active terminal sessions through `terminal-sessions.list`, can close one active session, can expire old active sessions, and never renders terminal input/output or attaches to a terminal transport from the lifecycle view. |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Focused application use-case tests exist for latest resource workspace resolution, `sourceDir`
-workspace metadata, source-locator fallback rejection, server relative-directory rejection,
-selected deployment context mismatch, unsafe relative directory validation, and no-deployment
-workspace unavailable errors.
+workspace metadata, `source.baseDirectory` normalization for monorepo workspaces, source-locator
+fallback rejection, server relative-directory rejection, selected deployment context mismatch,
+unsafe relative directory validation, and no-deployment workspace unavailable errors.
 
 Active lifecycle list/show/close/expire tests exist under `TERM-SESSION-LIFE-*`,
 `TERM-SESSION-ENTRY-007`, and `TERM-SESSION-ENTRY-008`. HTTP/WebSocket attach has focused adapter
 coverage for routing client input frames to the attached terminal session.
 
-Runtime adapter process-spawn coverage, direct interactive CLI TTY attachment, durable
-closed-session audit/history, and Web E2E tests remain follow-up coverage.
+Runtime adapter process-spawn coverage now includes local Docker container `exec`, generic-SSH
+Docker container `exec`, local Docker Compose service `exec`, and generic-SSH Docker Compose service
+`exec` command construction for retained runtime metadata. CLI server/resource `--attach` has
+focused integration coverage for gateway attachment, raw-mode restoration, and terminal output
+bridging under `TERM-SESSION-ENTRY-004` and `TERM-SESSION-ENTRY-005`. Web source coverage exists in
+`apps/web/src/lib/console/terminal-session-web.test.ts` for `TERM-SESSION-WEB-001` and
+`TERM-SESSION-ENTRY-009`; source guards also verify `TERM-SESSION-ENTRY-002` server list terminal
+deep-link coverage. Bun.WebView coverage now exercises `TERM-SESSION-WEB-001` Instance lifecycle
+list/expire/close without rendering terminal output, `TERM-SESSION-ENTRY-001` resource terminal
+open/attach, `TERM-SESSION-ENTRY-002` server detail terminal open/attach, and
+`TERM-SESSION-ENTRY-003` client-side navigation cleanup, plus `TERM-SESSION-ENTRY-010` explicit
+close action transport cleanup with a mocked attach socket. HTTP
+WebSocket resize routing is covered under
+`TERM-SESSION-TRANSPORT-003`, and CLI attach forwards its initial `--rows`/`--cols` dimensions to
+the attached session. Runtime gateway subprocess resize-hook coverage is recorded under
+`TERM-SESSION-TRANSPORT-003` when the spawn adapter exposes a PTY resize hook. Runtime gateway audit
+coverage records safe open/close metadata under `TERM-SESSION-LIFE-006`. Runtime gateway expiry
+coverage records omitted-cutoff activity-aware active-session TTL behavior under
+`TERM-SESSION-LIFE-005`. Runtime gateway reattach coverage records bounded in-memory output replay
+under `TERM-SESSION-TRANSPORT-004`. Host PTY-specific resize behavior is covered through the
+runtime gateway subprocess resize hook when an adapter exposes one; Bun pipe-backed sessions do not
+claim stronger resize semantics.
 
 ## Open Questions
 
-- Should the first Web E2E test use a fake terminal gateway, local PTY, or generic SSH fixture?
+- Current WebView coverage uses a mocked attach socket so browser affordances can be verified
+  without requiring a host PTY or SSH target.

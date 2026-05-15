@@ -38,6 +38,19 @@ describe("runtime command builder", () => {
         "appaloft.resource-id=res_1",
         "traefik.http.routers.res_1.rule=Host(`demo.test`)",
       ]),
+      mounts: [
+        {
+          type: "volume",
+          source: "appaloft-stv_data",
+          target: "/var/lib/app/data",
+        },
+        {
+          type: "bind",
+          source: "/srv/appaloft/shared/cache",
+          target: "/cache",
+          readOnly: true,
+        },
+      ],
       publishedPorts: [
         docker.publishPort({
           containerPort: 3000,
@@ -52,6 +65,8 @@ describe("runtime command builder", () => {
         "docker run -d --name 'appaloft-dep_1'",
         "--network 'appaloft-edge'",
         "-p 127.0.0.1::3000",
+        "--mount type=volume,source='appaloft-stv_data',target='/var/lib/app/data'",
+        "--mount type=bind,source='/srv/appaloft/shared/cache',target='/cache',readonly",
         "-e 'PORT=3000'",
         "-e 'DATABASE_URL=postgres://secret'",
         "--label 'appaloft.managed=true'",

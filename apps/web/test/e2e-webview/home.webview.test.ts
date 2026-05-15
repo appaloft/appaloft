@@ -33,6 +33,13 @@ const dependencyResourceFixtureKinds: Record<
   },
 };
 
+type RuntimeUsageScopeFixture =
+  | { kind: "server"; serverId: string }
+  | { kind: "project"; projectId: string }
+  | { kind: "environment"; environmentId: string }
+  | { kind: "resource"; resourceId: string }
+  | { kind: "deployment"; deploymentId: string };
+
 const selfHostedAuthE2eGeneratedPassword = "generated-local-admin-password";
 let selfHostedAuthE2eAdminCreated = true;
 let selfHostedAuthE2eSignedIn = true;
@@ -362,6 +369,299 @@ function deploymentEventStreamFixture(deploymentId: string): Response {
   });
 }
 
+function runtimeUsageScopeFixture(value: unknown): RuntimeUsageScopeFixture {
+  if (!isRecord(value)) {
+    return { kind: "resource", resourceId: "res_demo" };
+  }
+
+  switch (value.kind) {
+    case "server":
+      return { kind: "server", serverId: String(value.serverId ?? "srv_demo") };
+    case "project":
+      return { kind: "project", projectId: String(value.projectId ?? "prj_demo") };
+    case "environment":
+      return { kind: "environment", environmentId: String(value.environmentId ?? "env_demo") };
+    case "deployment":
+      return { kind: "deployment", deploymentId: String(value.deploymentId ?? "dep_demo") };
+    default:
+      return { kind: "resource", resourceId: String(value.resourceId ?? "res_demo") };
+  }
+}
+
+function runtimeUsageScopeEvidence(scope: RuntimeUsageScopeFixture) {
+  return {
+    scope,
+    ...(scope.kind === "server" ? { serverId: scope.serverId } : {}),
+    ...(scope.kind === "project" ? { projectId: scope.projectId } : {}),
+    ...(scope.kind === "environment" ? { environmentId: scope.environmentId } : {}),
+    ...(scope.kind === "resource" ? { resourceId: scope.resourceId } : {}),
+    ...(scope.kind === "deployment" ? { deploymentId: scope.deploymentId } : {}),
+  };
+}
+
+function runtimeUsageInspectFixture(scope: RuntimeUsageScopeFixture) {
+  return {
+    schemaVersion: "runtime-usage.inspect/v1",
+    scope,
+    generatedAt: "2026-05-13T01:00:00.000Z",
+    observedAt: "2026-05-13T01:00:00.000Z",
+    freshness: "live",
+    partial: false,
+    totals: {
+      cpu: { containerCpuPercent: 42, loadAverage1m: 1.2, logicalCores: 4 },
+      memory: { usedBytes: 536_870_912, totalBytes: 1_073_741_824 },
+      disk: { usedBytes: 268_435_456, totalBytes: 1_073_741_824 },
+    },
+    byProject: [
+      {
+        scope: { kind: "project", projectId: "prj_demo" },
+        ownership: "attributed",
+        totals: {
+          cpu: { containerCpuPercent: 30 },
+          memory: { usedBytes: 402_653_184, totalBytes: 1_073_741_824 },
+          disk: { usedBytes: 201_326_592, totalBytes: 1_073_741_824 },
+        },
+        warnings: [],
+      },
+    ],
+    byEnvironment: [
+      {
+        scope: { kind: "environment", environmentId: "env_demo" },
+        ownership: "attributed",
+        totals: {
+          cpu: { containerCpuPercent: 28 },
+          memory: { usedBytes: 335_544_320, totalBytes: 1_073_741_824 },
+          disk: { usedBytes: 167_772_160, totalBytes: 1_073_741_824 },
+        },
+        warnings: [],
+      },
+    ],
+    byResource: [
+      {
+        scope: { kind: "resource", resourceId: "res_demo" },
+        ownership: "attributed",
+        totals: {
+          cpu: { containerCpuPercent: 24 },
+          memory: { usedBytes: 268_435_456, totalBytes: 1_073_741_824 },
+          disk: { usedBytes: 134_217_728, totalBytes: 1_073_741_824 },
+        },
+        currentDeploymentId: "dep_demo",
+        currentRuntimeId: "runtime_dep_demo",
+        warnings: [],
+      },
+    ],
+    byDeployment: [
+      {
+        scope: { kind: "deployment", deploymentId: "dep_demo" },
+        ownership: "attributed",
+        totals: {
+          cpu: { containerCpuPercent: 18 },
+          memory: { usedBytes: 134_217_728, totalBytes: 1_073_741_824 },
+          disk: { usedBytes: 67_108_864, totalBytes: 1_073_741_824 },
+        },
+        currentRuntimeId: "runtime_dep_demo",
+        warnings: [],
+      },
+    ],
+    artifacts: [],
+    warnings: [],
+    sourceErrors: [],
+  };
+}
+
+function runtimeMonitoringSamplesFixture(scope: RuntimeUsageScopeFixture) {
+  return {
+    schemaVersion: "runtime-monitoring.samples.list/v1",
+    scope,
+    from: "2026-05-13T00:00:00.000Z",
+    to: "2026-05-13T01:00:00.000Z",
+    generatedAt: "2026-05-13T01:00:00.000Z",
+    freshness: "recent-sample",
+    partial: false,
+    retention: {
+      rawRetentionHours: 24,
+      retainedFrom: "2026-05-13T00:00:00.000Z",
+      retainedTo: "2026-05-13T01:00:00.000Z",
+    },
+    samples: [
+      {
+        sampleId: `rms_${scope.kind}`,
+        observedAt: "2026-05-13T00:45:00.000Z",
+        collectedAt: "2026-05-13T00:45:01.000Z",
+        scopeEvidence: runtimeUsageScopeEvidence(scope),
+        totals: {
+          cpu: { containerCpuPercent: 44, logicalCores: 4 },
+          memory: { usedBytes: 536_870_912, totalBytes: 1_073_741_824 },
+          disk: { usedBytes: 268_435_456, totalBytes: 1_073_741_824 },
+        },
+        freshness: "recent-sample",
+        partial: false,
+        labels: {
+          providerKey: "generic-ssh",
+          runtimeId: "runtime_dep_demo",
+        },
+        warnings: [],
+        sourceErrors: [],
+      },
+    ],
+    warnings: [],
+    sourceErrors: [],
+  };
+}
+
+function runtimeMonitoringRollupFixture(scope: RuntimeUsageScopeFixture) {
+  return {
+    schemaVersion: "runtime-monitoring.rollup/v1",
+    scope,
+    from: "2026-05-13T00:00:00.000Z",
+    to: "2026-05-13T01:00:00.000Z",
+    bucket: "minute",
+    generatedAt: "2026-05-13T01:00:00.000Z",
+    freshness: "recent-sample",
+    partial: false,
+    retention: {
+      rawRetentionHours: 24,
+      retainedFrom: "2026-05-13T00:00:00.000Z",
+      retainedTo: "2026-05-13T01:00:00.000Z",
+    },
+    series: [
+      {
+        signal: "cpu",
+        points: [
+          {
+            from: "2026-05-13T00:44:00.000Z",
+            to: "2026-05-13T00:45:00.000Z",
+            sampleCount: 1,
+            totals: { cpu: { containerCpuPercent: 32 } },
+          },
+          {
+            from: "2026-05-13T00:45:00.000Z",
+            to: "2026-05-13T00:46:00.000Z",
+            sampleCount: 1,
+            totals: { cpu: { containerCpuPercent: 44 } },
+          },
+        ],
+      },
+      {
+        signal: "memory",
+        points: [
+          {
+            from: "2026-05-13T00:45:00.000Z",
+            to: "2026-05-13T00:46:00.000Z",
+            sampleCount: 1,
+            totals: { memory: { usedBytes: 536_870_912, totalBytes: 1_073_741_824 } },
+          },
+        ],
+      },
+      {
+        signal: "disk",
+        points: [
+          {
+            from: "2026-05-13T00:45:00.000Z",
+            to: "2026-05-13T00:46:00.000Z",
+            sampleCount: 1,
+            totals: { disk: { usedBytes: 268_435_456, totalBytes: 1_073_741_824 } },
+          },
+        ],
+      },
+    ],
+    totals: {
+      cpu: { containerCpuPercent: 38 },
+      memory: { usedBytes: 536_870_912, totalBytes: 1_073_741_824 },
+      disk: { usedBytes: 268_435_456, totalBytes: 1_073_741_824 },
+    },
+    topContributors: [
+      {
+        scope: { kind: "resource", resourceId: "res_demo" },
+        totals: {
+          cpu: { containerCpuPercent: 38 },
+          memory: { usedBytes: 536_870_912, totalBytes: 1_073_741_824 },
+          disk: { usedBytes: 268_435_456, totalBytes: 1_073_741_824 },
+        },
+        sampleCount: 2,
+      },
+      {
+        scope: { kind: "deployment", deploymentId: "dep_demo" },
+        totals: {
+          cpu: { containerCpuPercent: 18 },
+          memory: { usedBytes: 134_217_728, totalBytes: 1_073_741_824 },
+          disk: { usedBytes: 67_108_864, totalBytes: 1_073_741_824 },
+        },
+        sampleCount: 1,
+      },
+    ],
+    deploymentMarkers: [
+      {
+        deploymentId: "dep_demo",
+        resourceId: "res_demo",
+        environmentId: "env_demo",
+        observedAt: "2026-05-13T00:45:00.000Z",
+        status: "succeeded",
+        label: "Deployment dep_demo succeeded",
+        correlation: "time",
+      },
+    ],
+    warnings: [],
+    sourceErrors: [],
+  };
+}
+
+function runtimeMonitoringThresholdsFixture(scope: RuntimeUsageScopeFixture) {
+  return {
+    schemaVersion: "runtime-monitoring-thresholds.show/v1",
+    scope,
+    generatedAt: "2026-05-13T01:00:00.000Z",
+    policy: {
+      schemaVersion: "runtime-monitoring-thresholds.policy/v1",
+      policyId: `rmtp_${scope.kind}`,
+      scope,
+      rules: [
+        {
+          ruleId: "rmtr_cpu",
+          signal: "cpu",
+          metric: "containerCpuPercent",
+          warning: 40,
+          critical: 80,
+          comparator: "greater-than-or-equal",
+        },
+        {
+          ruleId: "rmtr_memory",
+          signal: "memory",
+          metric: "usedBytes",
+          warning: 400_000_000,
+          critical: 900_000_000,
+          comparator: "greater-than-or-equal",
+        },
+        {
+          ruleId: "rmtr_disk",
+          signal: "disk",
+          metric: "usedBytes",
+          warning: 200_000_000,
+          critical: 900_000_000,
+          comparator: "greater-than-or-equal",
+        },
+      ],
+      enabled: true,
+      updatedAt: "2026-05-13T00:00:00.000Z",
+    },
+    evaluation: {
+      state: "warning",
+      crossed: [
+        {
+          ruleId: "rmtr_cpu",
+          signal: "cpu",
+          metric: "containerCpuPercent",
+          severity: "warning",
+          observedValue: 44,
+          boundary: 40,
+        },
+      ],
+      nextActions: ["open-runtime-monitoring", "inspect-runtime-usage"],
+      sourceErrors: [],
+    },
+  };
+}
+
 type ServerCredentialFixture =
   | {
       kind: "local-ssh-agent";
@@ -424,6 +724,7 @@ function serverDetailFixture(
     edgeProxyKind?: "none" | "traefik" | "caddy";
     edgeProxyStatus?: "pending" | "starting" | "ready" | "failed" | "disabled";
     credential?: ServerCredentialFixture;
+    lifecycleStatus?: "active" | "inactive";
     name?: string;
   } = {},
 ) {
@@ -438,7 +739,7 @@ function serverDetailFixture(
       port: 22,
       providerKey: "generic-ssh",
       targetKind: "single-server",
-      lifecycleStatus: "active",
+      lifecycleStatus: input.lifecycleStatus ?? "active",
       edgeProxy: {
         kind: input.edgeProxyKind ?? "traefik",
         status: input.edgeProxyStatus ?? "ready",
@@ -593,6 +894,18 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       apiVersion: "v1",
       mode: "self-hosted",
     },
+    "/api/instance-upgrade/check": {
+      schemaVersion: "system.instance-upgrade.check/v1",
+      currentVersion: "0.1.0-test",
+      targetVersion: "0.1.0-test",
+      latestVersion: "0.1.0-test",
+      updateAvailable: false,
+      checkedAt: "2026-01-01T00:00:00.000Z",
+      checkStatus: "current",
+      upgradeCommand: "curl -fsSL https://appaloft.com/install.sh | sudo sh",
+      applySupported: false,
+      applyUnsupportedReason: "Host-side upgrade execution is disabled in the test fixture.",
+    },
     "/api/auth/session": () => ({
       enabled: true,
       provider: "better-auth",
@@ -682,6 +995,138 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         success: true,
       };
     },
+    "/api/rpc/system/doctor": {
+      json: {
+        readiness: {
+          status: "ready",
+          checks: {
+            database: true,
+            migrations: true,
+          },
+          details: {
+            databaseDriver: "pglite",
+          },
+        },
+        providers: [],
+        plugins: [],
+        maintenanceWorkers: [
+          {
+            key: "certificate-retry-scheduler",
+            label: "Certificate retry scheduler",
+            enabled: false,
+            activation: "disabled-by-config",
+            safetyMode: "certificate-retry",
+            intervalSeconds: 60,
+            batchSize: 25,
+            configurationKeys: [
+              "APPALOFT_CERTIFICATE_RETRY_SCHEDULER_ENABLED",
+              "APPALOFT_CERTIFICATE_RETRY_SCHEDULER_INTERVAL_SECONDS",
+              "APPALOFT_CERTIFICATE_RETRY_DEFAULT_DELAY_SECONDS",
+              "APPALOFT_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE",
+            ],
+            operationKeys: ["certificates.issue-or-renew"],
+          },
+          {
+            key: "preview-expiry-cleanup-scheduler",
+            label: "Preview expiry cleanup scheduler",
+            enabled: false,
+            activation: "disabled-by-config",
+            safetyMode: "preview-expiry-cleanup",
+            intervalSeconds: 300,
+            batchSize: 25,
+            configurationKeys: [
+              "APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_ENABLED",
+              "APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_INTERVAL_SECONDS",
+              "APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_BATCH_SIZE",
+            ],
+            operationKeys: ["preview-environments.delete", "deployments.cleanup-preview"],
+          },
+          {
+            key: "preview-cleanup-retry-scheduler",
+            label: "Preview cleanup retry scheduler",
+            enabled: false,
+            activation: "disabled-by-config",
+            safetyMode: "preview-cleanup-retry",
+            intervalSeconds: 300,
+            batchSize: 25,
+            configurationKeys: [
+              "APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_ENABLED",
+              "APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_INTERVAL_SECONDS",
+              "APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_BATCH_SIZE",
+            ],
+            operationKeys: ["deployments.cleanup-preview"],
+          },
+          {
+            key: "scheduled-task-runner",
+            label: "Scheduled task runner",
+            enabled: true,
+            activation: "starts-with-backend-service",
+            safetyMode: "runtime-execution",
+            intervalSeconds: 30,
+            batchSize: 10,
+            configurationKeys: [
+              "APPALOFT_SCHEDULED_TASK_RUNNER_ENABLED",
+              "APPALOFT_SCHEDULED_TASK_RUNNER_INTERVAL_SECONDS",
+              "APPALOFT_SCHEDULED_TASK_RUNNER_BATCH_SIZE",
+            ],
+            operationKeys: ["scheduled-tasks.run-now", "scheduled-task-runs.run-due"],
+          },
+          {
+            key: "scheduled-runtime-prune-runner",
+            label: "Scheduled runtime prune runner",
+            enabled: false,
+            activation: "disabled-by-config",
+            safetyMode: "policy-gated-prune",
+            intervalSeconds: 3600,
+            batchSize: 25,
+            configurationKeys: [
+              "APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_ENABLED",
+              "APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_INTERVAL_SECONDS",
+              "APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_BATCH_SIZE",
+            ],
+            operationKeys: ["servers.capacity.prune"],
+          },
+          {
+            key: "scheduled-history-retention-runner",
+            label: "Scheduled history retention runner",
+            enabled: false,
+            activation: "disabled-by-config",
+            safetyMode: "policy-gated-retention",
+            intervalSeconds: 3600,
+            batchSize: 25,
+            configurationKeys: [
+              "APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED",
+              "APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS",
+              "APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_BATCH_SIZE",
+            ],
+            operationKeys: ["audit-events.prune"],
+          },
+          {
+            key: "runtime-monitoring-collector-runner",
+            label: "Runtime monitoring collector",
+            enabled: false,
+            activation: "disabled-by-config",
+            safetyMode: "read-only-collection",
+            intervalSeconds: 60,
+            batchSize: 25,
+            rawRetentionHours: 24,
+            configurationKeys: [
+              "APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_ENABLED",
+              "APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_INTERVAL_SECONDS",
+              "APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_BATCH_SIZE",
+              "APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS",
+            ],
+            operationKeys: ["runtime-monitoring.collect"],
+          },
+        ],
+      },
+    },
+    "/api/rpc/terminalSessions/list": {
+      json: {
+        schemaVersion: "terminal-sessions.list/v1",
+        items: [],
+      },
+    },
     "/api/rpc/projects/list": {
       json: {
         items: [
@@ -770,6 +1215,14 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         },
       };
     },
+    "/api/rpc/servers/deactivate": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: {
+          id: input?.serverId ?? "srv_demo",
+        },
+      };
+    },
     "/api/rpc/servers/deleteCheck": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
       return {
@@ -787,6 +1240,156 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             },
           ],
           checkedAt: "2026-01-01T00:00:10.000Z",
+        },
+      };
+    },
+    "/api/rpc/servers/capacity/inspect": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "servers.capacity.inspect/v1",
+          server: {
+            id: input?.serverId ?? "srv_demo",
+            name: "edge",
+            host: "127.0.0.1",
+            port: 22,
+            providerKey: "generic-ssh",
+            targetKind: "ssh-docker",
+          },
+          inspectedAt: "2026-05-13T01:00:00.000Z",
+          disk: [
+            {
+              path: "/",
+              mount: "/",
+              size: 100_000_000,
+              used: 70_000_000,
+              available: 30_000_000,
+              usePercent: 70,
+            },
+          ],
+          inodes: [],
+          docker: {
+            imagesSize: 40_000_000,
+            reclaimableImagesSize: 10_000_000,
+            buildCacheSize: 12_000_000,
+            reclaimableBuildCacheSize: 6_000_000,
+            containersSize: 3_000_000,
+            volumesSize: 0,
+          },
+          memory: {
+            total: 8_000_000_000,
+            available: 4_000_000_000,
+            used: 4_000_000_000,
+            usePercent: 50,
+          },
+          cpu: {
+            logicalCores: 4,
+            loadAverage1m: 0.5,
+            loadAverage5m: 0.4,
+            loadAverage15m: 0.3,
+          },
+          appaloftRuntime: {
+            runtimeRoot: {
+              path: "/var/lib/appaloft/runtime",
+              size: 20_000_000,
+              detectable: true,
+            },
+            stateRoot: {
+              path: "/var/lib/appaloft/state",
+              size: 10_000_000,
+              detectable: true,
+            },
+            sourceWorkspace: {
+              path: "/var/lib/appaloft/sources",
+              size: 8_000_000,
+              detectable: true,
+            },
+          },
+          appaloftContainers: [
+            {
+              id: "ctr_old",
+              name: "appaloft-old",
+              running: false,
+              status: "exited",
+              writableBytes: 3_000_000,
+              resourceId: "res_demo",
+              serverId: input?.serverId ?? "srv_demo",
+            },
+          ],
+          appaloftWorkspaces: [
+            {
+              deploymentId: "dep_old",
+              path: "/var/lib/appaloft/runtime/local-deployments/dep_old",
+              bytes: 4_000_000,
+              activeMarker: false,
+              rollbackCandidateMarker: false,
+            },
+          ],
+          safeReclaimableEstimate: {
+            stoppedContainersSize: 3_000_000,
+            danglingImagesSize: 10_000_000,
+            oldBuildCacheSize: 6_000_000,
+            oldPreviewWorkspaceCandidatesSize: 4_000_000,
+            total: 23_000_000,
+          },
+          warnings: [],
+          partial: false,
+        },
+      };
+    },
+    "/api/rpc/servers/capacity/prune": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        before?: string;
+        categories?: string[];
+        dryRun?: boolean;
+        serverId?: string;
+      } | null;
+      return {
+        json: {
+          schemaVersion: "servers.capacity.prune/v1",
+          server: {
+            id: input?.serverId ?? "srv_demo",
+            name: "edge",
+            host: "127.0.0.1",
+            port: 22,
+            providerKey: "generic-ssh",
+            targetKind: "ssh-docker",
+          },
+          before: input?.before ?? "2026-05-13T01:00:00.000Z",
+          categories: input?.categories ?? [
+            "stopped-containers",
+            "preview-workspaces",
+            "source-workspaces",
+          ],
+          dryRun: input?.dryRun ?? true,
+          prunedAt: "2026-05-13T01:05:00.000Z",
+          summary: {
+            inspectedCount: 2,
+            matchedCount: 2,
+            prunedCount: input?.dryRun === false ? 2 : 0,
+            skippedCount: 0,
+            excludedCount: 0,
+            reclaimedBytes: input?.dryRun === false ? 7_000_000 : 0,
+          },
+          candidates: [
+            {
+              id: "candidate_ctr_old",
+              category: "stopped-containers",
+              target: "appaloft-old",
+              updatedAt: "2026-05-12T00:00:00.000Z",
+              size: 3_000_000,
+              action: input?.dryRun === false ? "pruned" : "matched",
+            },
+            {
+              id: "candidate_workspace_old",
+              category: "preview-workspaces",
+              target: "/var/lib/appaloft/runtime/local-deployments/dep_old",
+              updatedAt: "2026-05-12T00:00:00.000Z",
+              size: 4_000_000,
+              action: input?.dryRun === false ? "pruned" : "matched",
+            },
+          ],
+          warnings: [],
         },
       };
     },
@@ -834,6 +1437,52 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       return {
         json: {
           id: input?.scope?.serverId ? "dap_server" : "dap_system",
+        },
+      };
+    },
+    "/api/rpc/runtimeUsage/inspect": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { scope?: unknown } | null;
+      return {
+        json: runtimeUsageInspectFixture(runtimeUsageScopeFixture(input?.scope)),
+      };
+    },
+    "/api/rpc/runtimeMonitoring/samples": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { scope?: unknown } | null;
+      return {
+        json: runtimeMonitoringSamplesFixture(runtimeUsageScopeFixture(input?.scope)),
+      };
+    },
+    "/api/rpc/runtimeMonitoring/rollup": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { scope?: unknown } | null;
+      return {
+        json: runtimeMonitoringRollupFixture(runtimeUsageScopeFixture(input?.scope)),
+      };
+    },
+    "/api/rpc/runtimeMonitoring/thresholdShow": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { scope?: unknown } | null;
+      return {
+        json: runtimeMonitoringThresholdsFixture(runtimeUsageScopeFixture(input?.scope)),
+      };
+    },
+    "/api/rpc/runtimeMonitoring/thresholdConfigure": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        policyId?: string;
+        scope?: unknown;
+        rules?: unknown[];
+        enabled?: boolean;
+      } | null;
+      const scope = runtimeUsageScopeFixture(input?.scope);
+      return {
+        json: {
+          schemaVersion: "runtime-monitoring-thresholds.policy/v1",
+          policy: {
+            schemaVersion: "runtime-monitoring-thresholds.policy/v1",
+            policyId: input?.policyId ?? `rmtp_${scope.kind}`,
+            scope,
+            rules: input?.rules ?? runtimeMonitoringThresholdsFixture(scope).policy.rules,
+            enabled: input?.enabled ?? true,
+            updatedAt: "2026-05-13T01:05:00.000Z",
+          },
         },
       };
     },
@@ -1177,8 +1826,38 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     "/api/rpc/resources/setVariable": {
       json: null,
     },
+    "/api/rpc/resources/importVariables": {
+      json: {
+        resourceId: "res_demo",
+        importedEntries: [],
+        duplicateOverrides: [],
+        existingOverrides: [],
+      },
+    },
     "/api/rpc/resources/unsetVariable": {
       json: null,
+    },
+    "/api/rpc/terminalSessions/open": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        scope?: { kind?: string; resourceId?: string; deploymentId?: string; serverId?: string };
+      } | null;
+      return {
+        json: {
+          sessionId: "term_webview",
+          scope: input?.scope?.kind ?? "resource",
+          serverId: input?.scope?.serverId ?? "srv_demo",
+          ...(input?.scope?.resourceId ? { resourceId: input.scope.resourceId } : {}),
+          ...(input?.scope?.deploymentId ? { deploymentId: input.scope.deploymentId } : {}),
+          transport: {
+            kind: "websocket",
+            path: "/api/terminal-sessions/term_webview/attach",
+          },
+          providerKey: "local-shell",
+          workingDirectory: "/var/lib/appaloft/runtime/local-deployments/dep_demo/source",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          status: "active",
+        },
+      };
     },
     "/api/rpc/resources/archive": {
       json: {
@@ -1731,6 +2410,90 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     "/api/deployments": {
       id: "dep_static",
     },
+    "/api/rpc/resources/diagnosticSummary": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        resourceId?: string;
+        deploymentId?: string;
+      } | null;
+      const resourceId = input?.resourceId ?? "res_static";
+      const deploymentId = input?.deploymentId ?? "dep_static";
+      const copyPayload = JSON.stringify({
+        schemaVersion: "resources.diagnostic-summary.copy/v1",
+        resourceId,
+        deploymentId,
+        sectionErrors: [
+          {
+            code: "default_access_route_unavailable",
+            phase: "access-observation",
+          },
+        ],
+      });
+
+      return {
+        json: {
+          schemaVersion: "resources.diagnostic-summary/v1",
+          generatedAt: "2026-01-01T00:00:10.000Z",
+          focus: {
+            resourceId,
+            deploymentId,
+          },
+          context: {
+            projectId: "prj_static",
+            environmentId: "env_static",
+            resourceName: "docs-site",
+            resourceSlug: "docs-site",
+            resourceKind: "static-site",
+            destinationId: "dst_static",
+            serverId: "srv_static",
+            services: [],
+          },
+          access: {
+            status: "unavailable",
+            reasonCode: "default_access_route_unavailable",
+            phase: "access-observation",
+          },
+          proxy: {
+            status: "not-requested",
+            configurationIncluded: false,
+            routeCount: 0,
+            sectionCount: 0,
+          },
+          deploymentLogs: {
+            status: "not-requested",
+            tailLimit: 20,
+            lineCount: 0,
+            lines: [],
+          },
+          runtimeLogs: {
+            status: "unavailable",
+            tailLimit: 20,
+            lineCount: 0,
+            lines: [],
+          },
+          system: {
+            entrypoint: "web",
+          },
+          sourceErrors: [
+            {
+              source: "access-route",
+              code: "default_access_route_unavailable",
+              category: "runtime_observation",
+              phase: "access-observation",
+              retryable: true,
+              relatedEntityId: resourceId,
+            },
+          ],
+          redaction: {
+            policy: "deployment-environment-secrets",
+            masked: false,
+            maskedValueCount: 0,
+          },
+          copy: {
+            json: copyPayload,
+          },
+        },
+      };
+    },
     "/api/rpc/deployments/show": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
       return {
@@ -2171,6 +2934,54 @@ async function clickLinkByHref(view: Bun.WebView, hrefFragment: string): Promise
   expect(found).toBe(true);
 }
 
+async function selectOptionByText(
+  view: Bun.WebView,
+  triggerSelector: string,
+  optionText: string,
+): Promise<void> {
+  const opened = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const trigger = document.querySelector(${JSON.stringify(triggerSelector)});
+          if (!(trigger instanceof HTMLElement)) {
+            return false;
+          }
+          trigger.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+          trigger.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          trigger.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          trigger.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected select trigger: ${triggerSelector}`,
+  );
+  expect(opened).toBe(true);
+
+  const selected = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const option = Array.from(
+            document.querySelectorAll('[data-slot="select-item"], [role="option"]')
+          ).find((candidate) => candidate.textContent?.includes(${JSON.stringify(optionText)}));
+          if (!(option instanceof HTMLElement)) {
+            return false;
+          }
+          option.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+          option.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          option.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          option.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected select option containing text: ${optionText}`,
+  );
+  expect(selected).toBe(true);
+}
+
 async function setInputValue(view: Bun.WebView, selector: string, value: string): Promise<void> {
   const found = await waitFor(
     () =>
@@ -2256,6 +3067,51 @@ async function clickFormSubmit(view: Bun.WebView, selector: string): Promise<voi
   );
 
   expect(found).toBe(true);
+}
+
+async function installMockTerminalWebSocket(view: Bun.WebView): Promise<void> {
+  await view.evaluate<void>(`(() => {
+    window.__appaloftTerminalSocketUrls = [];
+    window.__appaloftTerminalSocketMessages = [];
+    class MockTerminalWebSocket {
+      static CONNECTING = 0;
+      static OPEN = 1;
+      static CLOSING = 2;
+      static CLOSED = 3;
+      constructor(url) {
+        this.url = String(url);
+        this.readyState = MockTerminalWebSocket.CONNECTING;
+        window.__appaloftTerminalSocketUrls.push(this.url);
+        setTimeout(() => {
+          this.readyState = MockTerminalWebSocket.OPEN;
+          this.onopen?.(new Event("open"));
+          this.onmessage?.({
+            data: JSON.stringify({
+              kind: "ready",
+              sessionId: "term_webview",
+              workingDirectory: "/var/lib/appaloft/runtime/local-deployments/dep_demo/source",
+            }),
+          });
+        }, 0);
+      }
+      send(data) {
+        try {
+          window.__appaloftTerminalSocketMessages.push(JSON.parse(String(data)));
+        } catch {
+          window.__appaloftTerminalSocketMessages.push(String(data));
+        }
+      }
+      close() {
+        this.readyState = MockTerminalWebSocket.CLOSED;
+        this.onclose?.(new Event("close"));
+      }
+    }
+    window.WebSocket = MockTerminalWebSocket;
+  })()`);
+}
+
+async function terminalSocketMessages(view: Bun.WebView): Promise<unknown[]> {
+  return view.evaluate<unknown[]>("window.__appaloftTerminalSocketMessages ?? []");
 }
 
 beforeAll(async () => {
@@ -2446,6 +3302,167 @@ describe("console e2e with Bun.WebView", () => {
     }
   }, 45_000);
 
+  test("[SYSTEM-DIAG-004] renders configured maintenance worker activation from system doctor", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    resetSelfHostedAuthE2eState();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/instance`);
+
+    await expectAnyText(view, ["Scheduled maintenance workers", "定时维护 workers"]);
+    await expectAnyText(view, ["This panel does not start workers", "这个面板不会启动 worker"]);
+    await expectAnyText(view, ["1/7 enabled", "1/7 已启用"]);
+    await expectAnyText(view, ["Scheduled task runner", "Scheduled task runner"]);
+    await expectAnyText(view, ["Scheduled runtime prune runner", "Scheduled runtime prune runner"]);
+    await expectAnyText(view, ["Runtime monitoring collector", "Runtime monitoring collector"]);
+    await expectText(view, "runtime-monitoring.collect");
+    await expectAnyText(view, ["Starts with backend service", "随后端服务启动"]);
+    await expectAnyText(view, ["Policy-gated prune only", "仅按 policy 执行 prune"]);
+    await expectAnyText(view, ["Read-only monitoring collection", "只读 monitoring 采集"]);
+    await expectText(view, "APPALOFT_SCHEDULED_TASK_RUNNER_ENABLED");
+    await expectText(view, "APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_ENABLED");
+
+    await waitForRecordedRequest("/api/rpc/system/doctor");
+    expect(recordedApiRequests.some((request) => request.pathname.includes("prune"))).toBe(false);
+    expect(recordedApiRequests.some((request) => request.pathname.includes("cleanup"))).toBe(false);
+    expect(
+      recordedApiRequests.some((request) => request.pathname === "/api/rpc/scheduledTasks/runNow"),
+    ).toBe(false);
+
+    await clickButtonByAnyText(view, ["Refresh doctor", "刷新 doctor"]);
+    await waitFor(
+      async () =>
+        recordedApiRequests.filter((request) => request.pathname === "/api/rpc/system/doctor")
+          .length,
+      (count) => count >= 2,
+      "Expected refreshing the maintenance worker panel to call system doctor again",
+    );
+  }, 45_000);
+
+  test("[TERM-SESSION-WEB-001] manages active terminal sessions from Instance management", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    resetSelfHostedAuthE2eState();
+
+    const previousListRoute = apiResponses.dashboard["/api/rpc/terminalSessions/list"];
+    const previousCloseRoute = apiResponses.dashboard["/api/rpc/terminalSessions/close"];
+    const previousExpireRoute = apiResponses.dashboard["/api/rpc/terminalSessions/expire"];
+    let terminalSessions = [
+      {
+        sessionId: "term_active",
+        scope: "resource",
+        serverId: "srv_demo",
+        resourceId: "res_demo",
+        deploymentId: "dep_demo",
+        transport: {
+          kind: "websocket",
+          path: "/api/terminal-sessions/term_active/attach",
+        },
+        providerKey: "generic-ssh",
+        workingDirectory: "/var/lib/appaloft/runtime/ssh-deployments/dep_demo/source",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        status: "active",
+        lastOutput: "SECRET_TOKEN=do-not-render",
+      },
+      {
+        sessionId: "term_old",
+        scope: "server",
+        serverId: "srv_demo",
+        transport: {
+          kind: "websocket",
+          path: "/api/terminal-sessions/term_old/attach",
+        },
+        providerKey: "generic-ssh",
+        createdAt: "2025-12-31T22:00:00.000Z",
+        status: "active",
+      },
+    ];
+
+    apiResponses.dashboard["/api/rpc/terminalSessions/list"] = () => ({
+      json: {
+        schemaVersion: "terminal-sessions.list/v1",
+        items: terminalSessions,
+      },
+    });
+    apiResponses.dashboard["/api/rpc/terminalSessions/expire"] = () => {
+      terminalSessions = terminalSessions.filter((session) => session.sessionId !== "term_old");
+      return {
+        json: {
+          expiredCount: 1,
+          sessionIds: ["term_old"],
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/terminalSessions/close"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { sessionId?: string } | null;
+      terminalSessions = terminalSessions.filter(
+        (session) => session.sessionId !== (input?.sessionId ?? "term_active"),
+      );
+      return {
+        json: {
+          sessionId: input?.sessionId ?? "term_active",
+          closed: true,
+          status: "closed",
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/instance`);
+      await view.evaluate("window.confirm = () => true");
+
+      await expectAnyText(view, ["Active terminal sessions", "活跃终端会话"]);
+      await expectText(view, "term_active");
+      await expectText(view, "term_old");
+      await expectText(view, "/var/lib/appaloft/runtime/ssh-deployments/dep_demo/source");
+      expect(await pageText(view)).not.toContain("SECRET_TOKEN=do-not-render");
+
+      await clickButtonByAnyText(view, ["Expire old sessions", "过期旧会话"]);
+      const expireRequest = await waitForRecordedRequest("/api/rpc/terminalSessions/expire");
+      const expireInput = readOrpcJsonPayload(expireRequest.body);
+      expect(expireInput).toEqual({
+        olderThan: expect.any(String),
+        limit: 50,
+      });
+      await expectAnyText(view, ["Old terminal sessions expired", "旧终端会话已过期"]);
+      await waitFor(
+        () => pageText(view),
+        (content) => content.includes("term_active") && !content.includes("term_old"),
+        "Expected old terminal session to disappear after expiry",
+      );
+
+      await clickButtonByAnyText(view, ["Close terminal", "关闭终端"]);
+      const closeRequest = await waitForRecordedRequest("/api/rpc/terminalSessions/close");
+      expect(readOrpcJsonPayload(closeRequest.body)).toEqual({
+        sessionId: "term_active",
+      });
+      await expectAnyText(view, ["Terminal session closed", "终端会话已关闭"]);
+      await waitFor(
+        () => pageText(view),
+        (content) =>
+          content.includes("No active terminal sessions") || content.includes("当前没有可见"),
+        "Expected active terminal sessions to be empty after close",
+      );
+    } finally {
+      apiResponses.dashboard["/api/rpc/terminalSessions/list"] = previousListRoute;
+      if (previousCloseRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/terminalSessions/close"];
+      } else {
+        apiResponses.dashboard["/api/rpc/terminalSessions/close"] = previousCloseRoute;
+      }
+      if (previousExpireRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/terminalSessions/expire"];
+      } else {
+        apiResponses.dashboard["/api/rpc/terminalSessions/expire"] = previousExpireRoute;
+      }
+    }
+  }, 45_000);
+
   test("[PROJ-LIFE-ENTRY-005][PROJ-LIFE-ENTRY-006] manages project settings through named operations", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
@@ -2596,6 +3613,254 @@ describe("console e2e with Bun.WebView", () => {
     });
   }, 15_000);
 
+  test("[RES-DIAG-ENTRY-001] copies resource diagnostic JSON from resource detail", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousDiagnosticRoute = apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"];
+    const copyPayload = JSON.stringify({
+      schemaVersion: "resources.diagnostic-summary.copy/v1",
+      resourceId: "res_demo",
+      deploymentId: "dep_demo",
+      sectionErrors: [
+        {
+          code: "resource_runtime_logs_unavailable",
+          phase: "runtime-log-observation",
+        },
+      ],
+    });
+
+    apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"] = {
+      json: {
+        schemaVersion: "resources.diagnostic-summary/v1",
+        generatedAt: "2026-01-01T00:00:10.000Z",
+        focus: {
+          resourceId: "res_demo",
+          deploymentId: "dep_demo",
+        },
+        context: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceName: "workspace",
+          resourceSlug: "workspace",
+          resourceKind: "application",
+          destinationId: "dst_demo",
+          serverId: "srv_demo",
+          services: [],
+        },
+        access: {
+          status: "failed",
+          proxyRouteStatus: "ready",
+          reasonCode: "default_access_route_unavailable",
+          phase: "access-observation",
+        },
+        proxy: {
+          status: "available",
+          providerKey: "traefik",
+          configurationIncluded: true,
+          routeCount: 1,
+          sectionCount: 0,
+        },
+        deploymentLogs: {
+          status: "not-requested",
+          tailLimit: 20,
+          lineCount: 0,
+          lines: [],
+        },
+        runtimeLogs: {
+          status: "unavailable",
+          tailLimit: 20,
+          lineCount: 0,
+          lines: [],
+        },
+        system: {
+          entrypoint: "web",
+        },
+        sourceErrors: [
+          {
+            source: "runtime-logs",
+            code: "resource_runtime_logs_unavailable",
+            category: "runtime_observation",
+            phase: "runtime-log-observation",
+            retryable: true,
+            relatedEntityId: "res_demo",
+          },
+        ],
+        redaction: {
+          policy: "deployment-environment-secrets",
+          masked: false,
+          maskedValueCount: 0,
+        },
+        copy: {
+          json: copyPayload,
+        },
+      },
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo?section=diagnostics`);
+      await view.evaluate<void>(`(() => {
+        window.__appaloftCopiedText = "";
+        window.appaloftDesktop = {
+          copyText: async (text) => {
+            window.__appaloftCopiedText = text;
+          },
+        };
+      })()`);
+
+      await expectAnyText(view, ["Diagnostics", "诊断"]);
+      await clickButtonByAnyText(view, ["Copy diagnostic JSON", "复制诊断 JSON"]);
+
+      const diagnosticRequest = await waitForRecordedRequest(
+        "/api/rpc/resources/diagnosticSummary",
+      );
+      expect(readOrpcJsonPayload(diagnosticRequest.body)).toEqual({
+        resourceId: "res_demo",
+        deploymentId: "dep_demo",
+        includeDeploymentLogTail: true,
+        includeRuntimeLogTail: true,
+        includeProxyConfiguration: true,
+        tailLines: 20,
+      });
+
+      await waitFor(
+        () => view.evaluate<string>("window.__appaloftCopiedText ?? ''"),
+        (copied) => copied === copyPayload,
+        "Expected diagnostic copy payload to be written through the desktop bridge",
+      );
+      expect(JSON.parse(copyPayload)).toMatchObject({
+        resourceId: "res_demo",
+        deploymentId: "dep_demo",
+      });
+      await expectAnyText(view, ["Copied", "已复制"]);
+    } finally {
+      if (previousDiagnosticRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"];
+      } else {
+        apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"] = previousDiagnosticRoute;
+      }
+    }
+  }, 15_000);
+
+  test("[TERM-SESSION-ENTRY-001] opens and attaches a resource terminal from Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await expectText(view, "workspace");
+    await installMockTerminalWebSocket(view);
+
+    await clickButtonByAnyText(view, ["Terminal", "终端"]);
+    const openRequest = await waitForRecordedRequest("/api/rpc/terminalSessions/open");
+    expect(readOrpcJsonPayload(openRequest.body)).toMatchObject({
+      scope: {
+        kind: "resource",
+        resourceId: "res_demo",
+        deploymentId: "dep_demo",
+      },
+      initialRows: 24,
+      initialCols: 80,
+    });
+
+    await waitFor(
+      () => terminalSocketMessages(view),
+      (messages) =>
+        messages.some(
+          (message) =>
+            isRecord(message) &&
+            message.kind === "resize" &&
+            message.rows === 24 &&
+            message.cols === 80,
+        ),
+      "Expected terminal WebSocket resize frame after attach",
+    );
+    await expectText(view, ".../local-deployments/dep_demo/source");
+  }, 15_000);
+
+  test("[TERM-SESSION-ENTRY-002] opens and attaches a server terminal from Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/servers/srv_demo`);
+    await expectText(view, "edge");
+    await installMockTerminalWebSocket(view);
+
+    await clickButtonByAnyText(view, ["Terminal", "终端"]);
+    const openRequest = await waitForRecordedRequest("/api/rpc/terminalSessions/open");
+    expect(readOrpcJsonPayload(openRequest.body)).toMatchObject({
+      scope: {
+        kind: "server",
+        serverId: "srv_demo",
+      },
+      initialRows: 24,
+      initialCols: 80,
+    });
+
+    await waitFor(
+      () => terminalSocketMessages(view),
+      (messages) =>
+        messages.some(
+          (message) =>
+            isRecord(message) &&
+            message.kind === "resize" &&
+            message.rows === 24 &&
+            message.cols === 80,
+        ),
+      "Expected server terminal WebSocket resize frame after attach",
+    );
+  }, 15_000);
+
+  test("[TERM-SESSION-ENTRY-003] closes an attached Web terminal when navigating away", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await expectText(view, "workspace");
+    await installMockTerminalWebSocket(view);
+
+    await clickButtonByAnyText(view, ["Terminal", "终端"]);
+    await waitFor(
+      () => terminalSocketMessages(view),
+      (messages) => messages.some((message) => isRecord(message) && message.kind === "resize"),
+      "Expected terminal resize frame before navigation cleanup",
+    );
+
+    await clickLinkByHref(view, "/projects");
+    await waitFor(
+      () => terminalSocketMessages(view),
+      (messages) => messages.some((message) => isRecord(message) && message.kind === "close"),
+      "Expected terminal close frame after navigation",
+    );
+  }, 15_000);
+
+  test("[TERM-SESSION-ENTRY-010] closes an attached Web terminal from the panel action", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await expectText(view, "workspace");
+    await installMockTerminalWebSocket(view);
+
+    await clickButtonByAnyText(view, ["Terminal", "终端"]);
+    await waitFor(
+      () => terminalSocketMessages(view),
+      (messages) => messages.some((message) => isRecord(message) && message.kind === "resize"),
+      "Expected terminal resize frame before explicit close",
+    );
+
+    await clickButtonByAnyText(view, ["Close terminal", "关闭终端"]);
+    await waitFor(
+      () => terminalSocketMessages(view),
+      (messages) => messages.some((message) => isRecord(message) && message.kind === "close"),
+      "Expected terminal close frame after explicit close action",
+    );
+  }, 15_000);
+
   test("[SCHED-TASK-ENTRY-001] resource detail exposes scheduled task Web controls", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
@@ -2659,6 +3924,1058 @@ describe("console e2e with Bun.WebView", () => {
       resourceId: "res_demo",
       limit: 100,
     });
+  }, 15_000);
+
+  test("[DEP-RES-WEB-001][DEP-RES-BACKUP-011] manages dependency backup and bindings from Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousDependencyListRoute = apiResponses.dashboard["/api/rpc/dependencyResources/list"];
+    const previousBackupListRoute =
+      apiResponses.dashboard["/api/rpc/dependencyResources/listBackups"];
+    const previousCreateBackupRoute =
+      apiResponses.dashboard["/api/rpc/dependencyResources/createBackup"];
+    const previousRestoreBackupRoute =
+      apiResponses.dashboard["/api/rpc/dependencyResources/restoreBackup"];
+    const previousBindingListRoute =
+      apiResponses.dashboard["/api/rpc/resources/dependencyBindings/list"];
+    const previousBindRoute = apiResponses.dashboard["/api/rpc/resources/dependencyBindings/bind"];
+    const previousRotateRoute =
+      apiResponses.dashboard["/api/rpc/resources/dependencyBindings/rotateSecret"];
+    const previousUnbindRoute =
+      apiResponses.dashboard["/api/rpc/resources/dependencyBindings/unbind"];
+    const dependencyResources: Array<Record<string, unknown>> = [
+      {
+        id: "rsi_pg_web",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Managed DB",
+        slug: "managed-db",
+        kind: "postgres",
+        sourceMode: "appaloft-managed",
+        providerKey: "appaloft-managed-postgres",
+        providerManaged: true,
+        lifecycleStatus: "ready",
+        connection: {
+          host: "managed-db.postgres.internal",
+          port: 5432,
+          databaseName: "managed_db",
+          maskedConnection: "postgres://app:********@managed-db.postgres.internal:5432/managed_db",
+          secretRef: "secret://dependency/postgres/rsi_pg_web",
+        },
+        providerRealization: {
+          status: "ready",
+          attemptId: "dpr_web",
+          attemptedAt: "2026-01-01T00:00:00.000Z",
+          providerResourceHandle: "pg/rsi_pg_web",
+          realizedAt: "2026-01-01T00:00:00.000Z",
+        },
+        bindingReadiness: { status: "ready" },
+        deleteSafety: { safeToDelete: true, blockers: [] },
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+    const dependencyBackups: Array<Record<string, unknown>> = [
+      {
+        id: "drb_web_ready",
+        dependencyResourceId: "rsi_pg_web",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        dependencyKind: "postgres",
+        providerKey: "appaloft-managed-postgres",
+        status: "ready",
+        attemptId: "dba_web_ready",
+        requestedAt: "2026-01-01T00:00:00.000Z",
+        retentionStatus: "retained",
+        providerArtifactHandle: "backup/rsi_pg_web/drb_web_ready",
+        completedAt: "2026-01-01T00:00:01.000Z",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+    let dependencyBindings: Array<Record<string, unknown>> = [];
+
+    apiResponses.dashboard["/api/rpc/dependencyResources/list"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        environmentId?: string;
+        projectId?: string;
+      } | null;
+      return {
+        json: {
+          schemaVersion: "dependency-resources.list/v1",
+          items:
+            input?.projectId === "prj_demo" && input.environmentId === "env_demo"
+              ? dependencyResources
+              : [],
+          generatedAt: "2026-01-01T00:00:01.000Z",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/dependencyResources/listBackups"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { dependencyResourceId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "dependency-resources.backups.list/v1",
+          items: dependencyBackups.filter(
+            (backup) => backup.dependencyResourceId === input?.dependencyResourceId,
+          ),
+          generatedAt: "2026-01-01T00:00:02.000Z",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/dependencyResources/createBackup"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        dependencyResourceId?: string;
+      } | null;
+      dependencyBackups.push({
+        id: "drb_web_created",
+        dependencyResourceId: input?.dependencyResourceId ?? "rsi_pg_web",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        dependencyKind: "postgres",
+        providerKey: "appaloft-managed-postgres",
+        status: "ready",
+        attemptId: "dba_web_created",
+        requestedAt: "2026-01-01T00:10:00.000Z",
+        retentionStatus: "retained",
+        providerArtifactHandle: "backup/rsi_pg_web/drb_web_created",
+        completedAt: "2026-01-01T00:10:01.000Z",
+        createdAt: "2026-01-01T00:10:00.000Z",
+      });
+      return {
+        json: {
+          id: "drb_web_created",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/dependencyResources/restoreBackup"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { backupId?: string } | null;
+      dependencyBackups[0] = {
+        ...dependencyBackups[0],
+        latestRestoreAttempt: {
+          attemptId: "dra_web_restore",
+          status: "completed",
+          requestedAt: "2026-01-01T00:11:00.000Z",
+          completedAt: "2026-01-01T00:11:01.000Z",
+        },
+      };
+      return {
+        json: {
+          id: input?.backupId === "drb_web_ready" ? "dra_web_restore" : "dra_web_created",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/resources/dependencyBindings/list"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { resourceId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "resources.dependency-bindings.list/v1",
+          items: input?.resourceId === "res_demo" ? dependencyBindings : [],
+          generatedAt: "2026-01-01T00:00:03.000Z",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/resources/dependencyBindings/bind"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        dependencyResourceId?: string;
+        resourceId?: string;
+        targetName?: string;
+      } | null;
+      dependencyBindings = [
+        {
+          id: "rbd_web_pg",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: input?.resourceId ?? "res_demo",
+          dependencyResourceId: input?.dependencyResourceId ?? "rsi_pg_web",
+          dependencyResourceName: "Managed DB",
+          dependencyResourceSlug: "managed-db",
+          kind: "postgres",
+          sourceMode: "appaloft-managed",
+          providerKey: "appaloft-managed-postgres",
+          providerManaged: true,
+          lifecycleStatus: "ready",
+          target: {
+            targetName: input?.targetName ?? "DATABASE_URL",
+            scope: "runtime-only",
+            injectionMode: "env",
+            secretRef: "secret://dependency-binding/rbd_web_pg/current",
+          },
+          bindingReadiness: { status: "ready" },
+          snapshotReadiness: { status: "ready" },
+          status: "active",
+          createdAt: "2026-01-01T00:12:00.000Z",
+        },
+      ];
+      return {
+        json: {
+          id: "rbd_web_pg",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/resources/dependencyBindings/rotateSecret"] = () => {
+      dependencyBindings = dependencyBindings.map((binding) => ({
+        ...binding,
+        secretRotation: {
+          secretRef: "secret://dependency-binding/rbd_web_pg/v2",
+          secretVersion: "rbsv_web_2",
+          rotatedAt: "2026-01-01T00:13:00.000Z",
+        },
+      }));
+      return {
+        json: {
+          id: "rbd_web_pg",
+          rotatedAt: "2026-01-01T00:13:00.000Z",
+          secretVersion: "rbsv_web_2",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/resources/dependencyBindings/unbind"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { bindingId?: string } | null;
+      dependencyBindings = dependencyBindings.filter(
+        (binding) => binding.id !== (input?.bindingId ?? "rbd_web_pg"),
+      );
+      return {
+        json: {
+          id: input?.bindingId ?? "rbd_web_pg",
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo?section=dependencies`);
+      await view.evaluate("window.confirm = () => true");
+
+      await expectAnyText(view, ["Dependencies", "依赖资源"]);
+      await expectText(view, "Managed DB");
+      await expectText(
+        view,
+        "postgres://app:********@managed-db.postgres.internal:5432/managed_db",
+      );
+
+      const listRequest = await waitForRecordedRequest("/api/rpc/dependencyResources/list");
+      expect(readOrpcJsonPayload(listRequest.body)).toEqual({
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+      });
+
+      const backupsRequest = await waitForRecordedRequest(
+        "/api/rpc/dependencyResources/listBackups",
+      );
+      expect(readOrpcJsonPayload(backupsRequest.body)).toEqual({
+        dependencyResourceId: "rsi_pg_web",
+      });
+      await expectText(view, "backup/rsi_pg_web/drb_web_ready");
+
+      await setInputValue(view, "#resource-dependency-backup-description", "before release");
+      await clickButtonByAnyText(view, ["Create backup", "创建备份"]);
+      const createBackupRequest = await waitForRecordedRequest(
+        "/api/rpc/dependencyResources/createBackup",
+      );
+      expect(readOrpcJsonPayload(createBackupRequest.body)).toEqual({
+        dependencyResourceId: "rsi_pg_web",
+        description: "before release",
+      });
+      await expectAnyText(view, ["Dependency backup requested", "Dependency backup 已请求"]);
+
+      await setInputValue(view, "#dependency-restore-label-drb_web_ready", "restore before deploy");
+      await view.evaluate<void>(`(() => {
+        for (const selector of [
+          "#resource-dependency-restore-overwrite",
+          "#resource-dependency-restore-runtime"
+        ]) {
+          const input = document.querySelector(selector);
+          if (input instanceof HTMLInputElement) {
+            input.checked = true;
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        }
+      })()`);
+      await clickButtonByAnyText(view, ["Restore in place", "原地 restore"]);
+      const restoreRequest = await waitForRecordedRequest(
+        "/api/rpc/dependencyResources/restoreBackup",
+      );
+      expect(readOrpcJsonPayload(restoreRequest.body)).toEqual({
+        backupId: "drb_web_ready",
+        acknowledgeDataOverwrite: true,
+        acknowledgeRuntimeNotRestarted: true,
+        restoreLabel: "restore before deploy",
+      });
+      await expectAnyText(view, ["Dependency restore requested", "Dependency restore 已请求"]);
+
+      await setInputValue(view, "#resource-dependency-target", "DATABASE_URL");
+      await clickButtonByAnyText(view, ["Bind dependency", "绑定依赖"]);
+      const bindRequest = await waitForRecordedRequest(
+        "/api/rpc/resources/dependencyBindings/bind",
+      );
+      expect(readOrpcJsonPayload(bindRequest.body)).toEqual({
+        resourceId: "res_demo",
+        dependencyResourceId: "rsi_pg_web",
+        targetName: "DATABASE_URL",
+        scope: "runtime-only",
+        injectionMode: "env",
+      });
+      await expectAnyText(view, ["Dependency bound", "依赖已绑定"]);
+
+      await setInputValue(
+        view,
+        "#dependency-binding-secret-ref-rbd_web_pg",
+        "secret://dependency-binding/rbd_web_pg/v2",
+      );
+      await view.evaluate<void>(`(() => {
+        const input = document.querySelector("#dependency-binding-secret-ack-rbd_web_pg");
+        if (input instanceof HTMLInputElement) {
+          input.checked = true;
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      })()`);
+      await clickButtonByAnyText(view, ["Rotate secret", "轮换 secret"]);
+      const rotateRequest = await waitForRecordedRequest(
+        "/api/rpc/resources/dependencyBindings/rotateSecret",
+      );
+      expect(readOrpcJsonPayload(rotateRequest.body)).toEqual({
+        resourceId: "res_demo",
+        bindingId: "rbd_web_pg",
+        secretRef: "secret://dependency-binding/rbd_web_pg/v2",
+        confirmHistoricalSnapshotsRemainUnchanged: true,
+      });
+      await expectAnyText(view, [
+        "Dependency binding secret rotated",
+        "Dependency binding secret 已轮换",
+      ]);
+
+      await clickButtonByAnyText(view, ["Unbind", "Unbind"]);
+      const unbindRequest = await waitForRecordedRequest(
+        "/api/rpc/resources/dependencyBindings/unbind",
+      );
+      expect(readOrpcJsonPayload(unbindRequest.body)).toEqual({
+        resourceId: "res_demo",
+        bindingId: "rbd_web_pg",
+      });
+      await expectAnyText(view, ["Dependency binding removed", "依赖绑定已移除"]);
+
+      expect(recordedApiRequests.some((request) => request.pathname === "/api/deployments")).toBe(
+        false,
+      );
+      expect(JSON.stringify(recordedApiRequests)).not.toContain("super-secret");
+    } finally {
+      if (previousDependencyListRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/dependencyResources/list"];
+      } else {
+        apiResponses.dashboard["/api/rpc/dependencyResources/list"] = previousDependencyListRoute;
+      }
+      if (previousBackupListRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/dependencyResources/listBackups"];
+      } else {
+        apiResponses.dashboard["/api/rpc/dependencyResources/listBackups"] =
+          previousBackupListRoute;
+      }
+      if (previousCreateBackupRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/dependencyResources/createBackup"];
+      } else {
+        apiResponses.dashboard["/api/rpc/dependencyResources/createBackup"] =
+          previousCreateBackupRoute;
+      }
+      if (previousRestoreBackupRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/dependencyResources/restoreBackup"];
+      } else {
+        apiResponses.dashboard["/api/rpc/dependencyResources/restoreBackup"] =
+          previousRestoreBackupRoute;
+      }
+      if (previousBindingListRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/resources/dependencyBindings/list"];
+      } else {
+        apiResponses.dashboard["/api/rpc/resources/dependencyBindings/list"] =
+          previousBindingListRoute;
+      }
+      if (previousBindRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/resources/dependencyBindings/bind"];
+      } else {
+        apiResponses.dashboard["/api/rpc/resources/dependencyBindings/bind"] = previousBindRoute;
+      }
+      if (previousRotateRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/resources/dependencyBindings/rotateSecret"];
+      } else {
+        apiResponses.dashboard["/api/rpc/resources/dependencyBindings/rotateSecret"] =
+          previousRotateRoute;
+      }
+      if (previousUnbindRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/resources/dependencyBindings/unbind"];
+      } else {
+        apiResponses.dashboard["/api/rpc/resources/dependencyBindings/unbind"] =
+          previousUnbindRoute;
+      }
+    }
+  }, 20_000);
+
+  test("[STOR-WEB-001][STOR-WEB-002][STOR-WEB-003] manages resource storage from Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/resources/show"];
+    const previousStorageListRoute = apiResponses.dashboard["/api/rpc/storageVolumes/list"];
+    const previousStorageCreateRoute = apiResponses.dashboard["/api/rpc/storageVolumes/create"];
+    const previousStorageCleanupRoute =
+      apiResponses.dashboard["/api/rpc/storageVolumes/cleanupRuntime"];
+    const previousAttachRoute = apiResponses.dashboard["/api/rpc/resources/attachStorage"];
+    const previousDetachRoute = apiResponses.dashboard["/api/rpc/resources/detachStorage"];
+    const storageVolumes = [
+      {
+        id: "stv_uploads",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "uploads",
+        slug: "uploads",
+        kind: "named-volume",
+        lifecycleStatus: "active",
+        attachmentCount: 1,
+        attachments: [
+          {
+            attachmentId: "att_existing",
+            resourceId: "res_demo",
+            resourceName: "workspace",
+            resourceSlug: "workspace",
+            destinationPath: "/data",
+            mountMode: "read-write",
+            attachedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+    let storageAttachments = [
+      {
+        id: "att_existing",
+        storageVolumeId: "stv_uploads",
+        storageVolumeName: "uploads",
+        storageVolumeKind: "named-volume",
+        destinationPath: "/data",
+        mountMode: "read-write",
+        attachedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+
+    apiResponses.dashboard["/api/rpc/resources/show"] = () => {
+      if (!isRecord(previousShowRoute) || !isRecord(previousShowRoute.json)) {
+        throw new Error("Expected dashboard resources.show fixture object");
+      }
+
+      return {
+        json: {
+          ...previousShowRoute.json,
+          storageAttachments,
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/storageVolumes/list"] = () => ({
+      json: {
+        schemaVersion: "storage-volumes.list/v1",
+        items: storageVolumes,
+        generatedAt: "2026-01-01T00:00:01.000Z",
+      },
+    });
+    apiResponses.dashboard["/api/rpc/storageVolumes/create"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        environmentId?: string;
+        kind?: "named-volume" | "bind-mount";
+        name?: string;
+        projectId?: string;
+      } | null;
+      storageVolumes.push({
+        id: "stv_cache",
+        projectId: input?.projectId ?? "prj_demo",
+        environmentId: input?.environmentId ?? "env_demo",
+        name: input?.name ?? "cache",
+        slug: "cache",
+        kind: input?.kind ?? "named-volume",
+        lifecycleStatus: "active",
+        attachmentCount: 0,
+        attachments: [],
+        createdAt: "2026-01-01T00:01:00.000Z",
+      });
+      return {
+        json: {
+          id: "stv_cache",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/storageVolumes/cleanupRuntime"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        before?: string;
+        dryRun?: boolean;
+        serverId?: string;
+        storageVolumeId?: string;
+      } | null;
+      const dryRun = input?.dryRun ?? true;
+      return {
+        json: {
+          schemaVersion: "storage-volumes.cleanup-runtime/v1",
+          storageVolume: {
+            id: input?.storageVolumeId ?? "stv_uploads",
+            name: "uploads",
+            kind: "named-volume",
+          },
+          server: {
+            id: input?.serverId ?? "srv_demo",
+            name: "edge",
+            host: "127.0.0.1",
+            port: 22,
+            providerKey: "generic-ssh",
+            targetKind: "single-server",
+          },
+          before: input?.before ?? "2026-01-01T00:00:00.000Z",
+          dryRun,
+          cleanedAt: "2026-01-01T00:02:00.000Z",
+          summary: {
+            inspectedCount: 1,
+            matchedCount: 1,
+            cleanedCount: dryRun ? 0 : 1,
+            skippedCount: 0,
+            blockedCount: 0,
+          },
+          candidates: [
+            {
+              id: "stvc_uploads",
+              kind: "named-volume",
+              target: "appaloft_res_demo_uploads",
+              updatedAt: "2025-12-31T00:00:00.000Z",
+              action: dryRun ? "matched" : "cleaned",
+            },
+          ],
+          warnings: [],
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/resources/attachStorage"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        destinationPath?: string;
+        mountMode?: "read-write" | "read-only";
+        storageVolumeId?: string;
+      } | null;
+      storageAttachments = [
+        ...storageAttachments,
+        {
+          id: "att_created",
+          storageVolumeId: input?.storageVolumeId ?? "stv_uploads",
+          storageVolumeName: "uploads",
+          storageVolumeKind: "named-volume",
+          destinationPath: input?.destinationPath ?? "/var/lib/app/uploads",
+          mountMode: input?.mountMode ?? "read-write",
+          attachedAt: "2026-01-01T00:03:00.000Z",
+        },
+      ];
+      return {
+        json: {
+          id: "att_created",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/resources/detachStorage"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { attachmentId?: string } | null;
+      storageAttachments = storageAttachments.filter(
+        (attachment) => attachment.id !== (input?.attachmentId ?? "att_existing"),
+      );
+      return {
+        json: {
+          id: input?.attachmentId ?? "att_existing",
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo?section=storage`);
+      await view.evaluate("window.confirm = () => true");
+
+      await expectAnyText(view, ["Storage volumes", "Storage volumes"]);
+      await expectText(view, "uploads");
+      await expectText(view, "/data");
+
+      const listRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/list");
+      expect(readOrpcJsonPayload(listRequest.body)).toEqual({
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+      });
+
+      await setInputValue(view, "#resource-storage-volume-name", "cache");
+      await clickButtonByAnyText(view, ["Create volume", "创建 volume"]);
+      const createRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/create");
+      expect(readOrpcJsonPayload(createRequest.body)).toEqual({
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "cache",
+        kind: "named-volume",
+      });
+      await expectAnyText(view, ["Storage volume created", "Storage volume 已创建"]);
+
+      await selectOptionByText(view, "#resource-storage-runtime-cleanup-volume-trigger", "uploads");
+      await selectOptionByText(view, "#resource-storage-runtime-cleanup-server-trigger", "edge");
+      await setInputValue(
+        view,
+        "#resource-storage-runtime-cleanup-before",
+        "2026-01-01T00:00:00.000Z",
+      );
+      await clickButtonByAnyText(view, ["Preview cleanup", "预览清理"]);
+      const previewRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/cleanupRuntime");
+      expect(readOrpcJsonPayload(previewRequest.body)).toEqual({
+        storageVolumeId: "stv_uploads",
+        serverId: "srv_demo",
+        before: "2026-01-01T00:00:00.000Z",
+        dryRun: true,
+      });
+      await expectAnyText(view, ["Runtime cleanup preview ready", "Runtime cleanup 预览已就绪"]);
+      await expectText(view, "appaloft_res_demo_uploads");
+
+      await clickButtonByAnyText(view, ["Apply cleanup", "执行清理"]);
+      await waitFor(
+        async () => {
+          const cleanupRequests = recordedApiRequests.filter(
+            (request) => request.pathname === "/api/rpc/storageVolumes/cleanupRuntime",
+          );
+          return cleanupRequests.map((request) => readOrpcJsonPayload(request.body));
+        },
+        (inputs) => inputs.some((input) => isRecord(input) && input.dryRun === false),
+        "Expected destructive storage runtime cleanup to require explicit confirmation and dryRun=false",
+      );
+      await expectAnyText(view, ["Runtime cleanup applied", "Runtime cleanup 已执行"]);
+
+      await selectOptionByText(view, "#resource-storage-attachment-volume-trigger", "uploads");
+      await setInputValue(view, "#resource-storage-destination", "/var/lib/app/uploads");
+      await clickFormSubmit(view, "#resource-storage-attachment-form");
+      const attachRequest = await waitForRecordedRequest("/api/rpc/resources/attachStorage");
+      expect(readOrpcJsonPayload(attachRequest.body)).toEqual({
+        resourceId: "res_demo",
+        storageVolumeId: "stv_uploads",
+        destinationPath: "/var/lib/app/uploads",
+        mountMode: "read-write",
+      });
+      await expectAnyText(view, ["Storage attached", "存储已挂载"]);
+
+      await clickButtonByAnyText(view, ["Detach", "Detach"]);
+      const detachRequest = await waitForRecordedRequest("/api/rpc/resources/detachStorage");
+      expect(readOrpcJsonPayload(detachRequest.body)).toEqual({
+        resourceId: "res_demo",
+        attachmentId: "att_existing",
+      });
+      await expectAnyText(view, ["Storage detached", "存储已 detach"]);
+      expect(recordedApiRequests.some((request) => request.pathname === "/api/deployments")).toBe(
+        false,
+      );
+      expect(recordedApiRequests.some((request) => request.pathname.includes("capacity"))).toBe(
+        false,
+      );
+    } finally {
+      apiResponses.dashboard["/api/rpc/resources/show"] = previousShowRoute;
+      if (previousStorageListRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/storageVolumes/list"];
+      } else {
+        apiResponses.dashboard["/api/rpc/storageVolumes/list"] = previousStorageListRoute;
+      }
+      if (previousStorageCreateRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/storageVolumes/create"];
+      } else {
+        apiResponses.dashboard["/api/rpc/storageVolumes/create"] = previousStorageCreateRoute;
+      }
+      if (previousStorageCleanupRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/storageVolumes/cleanupRuntime"];
+      } else {
+        apiResponses.dashboard["/api/rpc/storageVolumes/cleanupRuntime"] =
+          previousStorageCleanupRoute;
+      }
+      if (previousAttachRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/resources/attachStorage"];
+      } else {
+        apiResponses.dashboard["/api/rpc/resources/attachStorage"] = previousAttachRoute;
+      }
+      if (previousDetachRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/resources/detachStorage"];
+      } else {
+        apiResponses.dashboard["/api/rpc/resources/detachStorage"] = previousDetachRoute;
+      }
+    }
+  }, 20_000);
+
+  test("[PG-PREVIEW-SURFACE-001][PG-PREVIEW-CLEANUP-001] requests preview cleanup from the resource Web tab", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousPreviewListRoute = apiResponses.dashboard["/api/rpc/previewEnvironments/list"];
+    const previousPreviewDeleteRoute =
+      apiResponses.dashboard["/api/rpc/previewEnvironments/delete"];
+    const previewSourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A14";
+    let previewEnvironmentStatus: "active" | "cleanup-requested" = "active";
+
+    apiResponses.dashboard["/api/rpc/previewEnvironments/list"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { resourceId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "preview-environments.list/v1",
+          items:
+            input?.resourceId && input.resourceId !== "res_demo"
+              ? []
+              : [
+                  {
+                    previewEnvironmentId: "prenv_demo_14",
+                    projectId: "prj_demo",
+                    environmentId: "env_demo",
+                    resourceId: "res_demo",
+                    serverId: "srv_demo",
+                    destinationId: "dst_demo",
+                    source: {
+                      provider: "github",
+                      repositoryFullName: "acme/platform",
+                      headRepositoryFullName: "acme/platform",
+                      pullRequestNumber: 14,
+                      baseRef: "main",
+                      headSha: "abc1234",
+                      sourceBindingFingerprint: previewSourceFingerprint,
+                    },
+                    status: previewEnvironmentStatus,
+                    createdAt: "2026-01-01T00:00:00.000Z",
+                    updatedAt: "2026-01-01T00:05:00.000Z",
+                    expiresAt: "2026-01-08T00:00:00.000Z",
+                  },
+                ],
+          generatedAt: "2026-01-01T00:05:01.000Z",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/previewEnvironments/delete"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        previewEnvironmentId?: string;
+        resourceId?: string;
+      } | null;
+      previewEnvironmentStatus = "cleanup-requested";
+      return {
+        json: {
+          status: "cleaned",
+          attemptId: "pcln_webview_resource",
+          previewEnvironmentId: input?.previewEnvironmentId ?? "prenv_demo_14",
+          resourceId: input?.resourceId ?? "res_demo",
+          sourceBindingFingerprint: previewSourceFingerprint,
+          previewEnvironmentStatus,
+          cleanedRuntime: true,
+          removedRoute: true,
+          removedSourceLink: true,
+          removedProviderMetadata: true,
+          updatedFeedback: true,
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo?tab=previews`);
+      await view.evaluate("window.confirm = () => true");
+
+      await expectAnyText(view, ["Derived preview environments", "派生预览环境"]);
+      await expectText(view, "prenv_demo_14");
+      await expectText(view, "acme/platform #14");
+      await expectText(view, previewSourceFingerprint);
+
+      const previewListInputs = await waitFor(
+        async () =>
+          recordedApiRequests
+            .filter((request) => request.pathname === "/api/rpc/previewEnvironments/list")
+            .map((request) => readOrpcJsonPayload(request.body)),
+        (inputs) =>
+          inputs.some(
+            (input) => isRecord(input) && input.resourceId === "res_demo" && input.limit === 50,
+          ),
+        "Expected Resource-scoped preview environment list request",
+      );
+      expect(previewListInputs).toContainEqual({
+        resourceId: "res_demo",
+        limit: 50,
+      });
+
+      await clickButtonByAnyText(view, ["Request cleanup", "请求清理"]);
+      const deleteRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/delete");
+      expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
+        previewEnvironmentId: "prenv_demo_14",
+        resourceId: "res_demo",
+      });
+      await expectAnyText(view, ["Preview cleanup requested", "已请求预览清理"]);
+      await expectText(view, "pcln_webview_resource");
+
+      expect(
+        recordedApiRequests.some(
+          (request) => request.pathname === "/api/rpc/deployments/cleanupPreview",
+        ),
+      ).toBe(false);
+    } finally {
+      if (previousPreviewListRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/previewEnvironments/list"];
+      } else {
+        apiResponses.dashboard["/api/rpc/previewEnvironments/list"] = previousPreviewListRoute;
+      }
+
+      if (previousPreviewDeleteRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/previewEnvironments/delete"];
+      } else {
+        apiResponses.dashboard["/api/rpc/previewEnvironments/delete"] = previousPreviewDeleteRoute;
+      }
+    }
+  }, 20_000);
+
+  test("[PG-PREVIEW-SURFACE-001][PG-PREVIEW-CLEANUP-001] manages preview environments from the global Web view", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousPreviewListRoute = apiResponses.dashboard["/api/rpc/previewEnvironments/list"];
+    const previousPreviewShowRoute = apiResponses.dashboard["/api/rpc/previewEnvironments/show"];
+    const previousPreviewDeleteRoute =
+      apiResponses.dashboard["/api/rpc/previewEnvironments/delete"];
+    const previewSourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A27";
+    let previewEnvironmentStatus: "active" | "cleanup-requested" = "active";
+    const previewEnvironment = () => ({
+      previewEnvironmentId: "prenv_global_27",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      source: {
+        provider: "github",
+        repositoryFullName: "acme/platform",
+        headRepositoryFullName: "acme/platform",
+        pullRequestNumber: 27,
+        baseRef: "main",
+        headSha: "def5678",
+        sourceBindingFingerprint: previewSourceFingerprint,
+      },
+      status: previewEnvironmentStatus,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:05:00.000Z",
+      expiresAt: "2026-01-08T00:00:00.000Z",
+    });
+
+    apiResponses.dashboard["/api/rpc/previewEnvironments/list"] = () => ({
+      json: {
+        schemaVersion: "preview-environments.list/v1",
+        items: [previewEnvironment()],
+        generatedAt: "2026-01-01T00:05:01.000Z",
+      },
+    });
+    apiResponses.dashboard["/api/rpc/previewEnvironments/show"] = () => ({
+      json: {
+        schemaVersion: "preview-environments.show/v1",
+        previewEnvironment: previewEnvironment(),
+        generatedAt: "2026-01-01T00:05:02.000Z",
+      },
+    });
+    apiResponses.dashboard["/api/rpc/previewEnvironments/delete"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        previewEnvironmentId?: string;
+        resourceId?: string;
+      } | null;
+      previewEnvironmentStatus = "cleanup-requested";
+      return {
+        json: {
+          status: "cleaned",
+          attemptId: "pcln_webview_global",
+          previewEnvironmentId: input?.previewEnvironmentId ?? "prenv_global_27",
+          resourceId: input?.resourceId ?? "res_demo",
+          sourceBindingFingerprint: previewSourceFingerprint,
+          previewEnvironmentStatus,
+          cleanedRuntime: true,
+          removedRoute: true,
+          removedSourceLink: true,
+          removedProviderMetadata: true,
+          updatedFeedback: true,
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/preview-environments`);
+      await view.evaluate("window.confirm = () => true");
+
+      await expectAnyText(view, ["Preview environments", "预览环境"]);
+      await expectText(view, "acme/platform");
+      await expectText(view, previewSourceFingerprint);
+
+      const listRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/list");
+      expect(readOrpcJsonPayload(listRequest.body)).toEqual({});
+
+      await clickLinkByHref(view, "prenv_global_27");
+      const showRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/show");
+      expect(readOrpcJsonPayload(showRequest.body)).toEqual({
+        previewEnvironmentId: "prenv_global_27",
+      });
+      await expectText(view, "prenv_global_27");
+      await expectText(view, "def5678");
+
+      await clickButtonByAnyText(view, ["Request cleanup", "请求清理"]);
+      const deleteRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/delete");
+      expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
+        previewEnvironmentId: "prenv_global_27",
+        resourceId: "res_demo",
+      });
+      await expectText(view, "pcln_webview_global");
+    } finally {
+      if (previousPreviewListRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/previewEnvironments/list"];
+      } else {
+        apiResponses.dashboard["/api/rpc/previewEnvironments/list"] = previousPreviewListRoute;
+      }
+      if (previousPreviewShowRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/previewEnvironments/show"];
+      } else {
+        apiResponses.dashboard["/api/rpc/previewEnvironments/show"] = previousPreviewShowRoute;
+      }
+      if (previousPreviewDeleteRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/previewEnvironments/delete"];
+      } else {
+        apiResponses.dashboard["/api/rpc/previewEnvironments/delete"] = previousPreviewDeleteRoute;
+      }
+    }
+  }, 15_000);
+
+  test("[ROUTE-TLS-ENTRY-002][ROUTE-TLS-ENTRY-007] creates and confirms a resource-scoped domain binding from Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousDomainBindingsRoute = apiResponses.dashboard["/api/rpc/domainBindings/list"];
+    const previousCreateRoute = apiResponses.dashboard["/api/rpc/domainBindings/create"];
+    const previousConfirmRoute = apiResponses.dashboard["/api/rpc/domainBindings/confirmOwnership"];
+    let bindingStatus: "absent" | "pending_verification" | "bound" = "absent";
+
+    apiResponses.dashboard["/api/rpc/domainBindings/list"] = () => ({
+      json: {
+        items:
+          bindingStatus === "absent"
+            ? []
+            : [
+                {
+                  id: "dbn_resource_web",
+                  projectId: "prj_demo",
+                  environmentId: "env_demo",
+                  resourceId: "res_demo",
+                  serverId: "srv_demo",
+                  destinationId: "dst_demo",
+                  domainName: "resource-web.example.test",
+                  pathPrefix: "/",
+                  proxyKind: "traefik",
+                  tlsMode: "auto",
+                  certificatePolicy: "auto",
+                  status: bindingStatus,
+                  verificationAttemptCount: bindingStatus === "bound" ? 1 : 0,
+                  createdAt: "2026-01-01T00:00:00.000Z",
+                },
+              ],
+      },
+    });
+    apiResponses.dashboard["/api/rpc/domainBindings/create"] = () => {
+      bindingStatus = "pending_verification";
+      return {
+        json: {
+          id: "dbn_resource_web",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/domainBindings/confirmOwnership"] = () => {
+      bindingStatus = "bound";
+      return {
+        json: {
+          id: "dbn_resource_web",
+          verificationAttemptId: "dva_resource_web",
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo`);
+
+      await clickButtonByAnyText(view, ["Custom domains", "自定义域名"]);
+      await setInputValue(
+        view,
+        "#resource-domain-binding-domain-name",
+        "resource-web.example.test",
+      );
+      await clickFormSubmit(view, "#resource-domain-binding-create-form");
+
+      const createRequest = await waitForRecordedRequest("/api/rpc/domainBindings/create");
+      expect(readOrpcJsonPayload(createRequest.body)).toEqual({
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+        domainName: "resource-web.example.test",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        tlsMode: "auto",
+        certificatePolicy: "auto",
+      });
+
+      await expectText(view, "resource-web.example.test");
+      await clickButtonByAnyText(view, ["Confirm ownership", "确认所有权"]);
+
+      const confirmRequest = await waitForRecordedRequest(
+        "/api/rpc/domainBindings/confirmOwnership",
+      );
+      expect(readOrpcJsonPayload(confirmRequest.body)).toEqual({
+        domainBindingId: "dbn_resource_web",
+      });
+      await expectAnyText(view, ["Bound", "BOUND", "已绑定"]);
+    } finally {
+      if (previousCreateRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/domainBindings/create"];
+      } else {
+        apiResponses.dashboard["/api/rpc/domainBindings/create"] = previousCreateRoute;
+      }
+      if (previousConfirmRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/domainBindings/confirmOwnership"];
+      } else {
+        apiResponses.dashboard["/api/rpc/domainBindings/confirmOwnership"] = previousConfirmRoute;
+      }
+      apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
+    }
   }, 15_000);
 
   test("[RES-PROFILE-ENTRY-012] explains resource detail profile edits are durable and future-only", async () => {
@@ -2733,6 +5050,70 @@ describe("console e2e with Bun.WebView", () => {
 
       const content = await pageText(view);
       expect(content).not.toContain("https://generated.example.test");
+    } finally {
+      apiResponses.dashboard["/api/rpc/resources/show"] = previousShowRoute;
+    }
+  }, 15_000);
+
+  test("[WEB-CLI-API-ACCESS-007] renders latest access failure route metadata on resource detail", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/resources/show"];
+    const showFixture = (previousShowRoute as { json: Record<string, unknown> }).json;
+
+    apiResponses.dashboard["/api/rpc/resources/show"] = {
+      json: {
+        ...showFixture,
+        accessSummary: {
+          proxyRouteStatus: "failed",
+          lastRouteRealizationDeploymentId: "dep_demo",
+          latestAccessFailureDiagnostic: {
+            schemaVersion: "resource-access-failure/v1",
+            requestId: "req_access_web_route_meta",
+            generatedAt: "2026-01-01T00:02:00.000Z",
+            code: "resource_access_upstream_unavailable",
+            category: "infra",
+            phase: "upstream-connection",
+            httpStatus: 502,
+            retriable: true,
+            ownerHint: "resource",
+            nextAction: "inspect-runtime-logs",
+            affected: {
+              hostname: "server-applied.example.test",
+              path: "/health",
+              method: "GET",
+            },
+            route: {
+              host: "server-applied.example.test",
+              pathPrefix: "/",
+              resourceId: "res_demo",
+              deploymentId: "dep_demo",
+              serverId: "srv_demo",
+              destinationId: "dst_demo",
+              providerKey: "traefik",
+              routeId: "server_applied_route:server-applied.example.test:/:dep_demo",
+              diagnosticId: "diag_server_applied_route",
+              routeSource: "server-applied",
+              routeStatus: "not-ready",
+            },
+            causeCode: "connect_econnrefused",
+            correlationId: "cor_access_web_route_meta",
+          },
+        },
+      },
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo`);
+
+      await expectAnyText(view, ["Latest access failure", "最近访问失败"]);
+      await expectText(view, "req_access_web_route_meta");
+      await expectText(view, "server-applied.example.test /health");
+      await expectText(view, "inspect-runtime-logs");
+      await expectText(view, "server-applied");
+      await expectText(view, "server_applied_route:server-applied.example.test:/:dep_demo");
     } finally {
       apiResponses.dashboard["/api/rpc/resources/show"] = previousShowRoute;
     }
@@ -2876,6 +5257,76 @@ describe("console e2e with Bun.WebView", () => {
     });
   }, 15_000);
 
+  test("[RES-PROFILE-CONFIG-013] imports pasted dotenv variables through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousImportRoute = apiResponses.dashboard["/api/rpc/resources/importVariables"];
+    apiResponses.dashboard["/api/rpc/resources/importVariables"] = {
+      json: {
+        resourceId: "res_demo",
+        importedEntries: [
+          {
+            key: "PUBLIC_API_BASE_URL",
+            value: "https://api.example.test",
+            exposure: "runtime",
+            kind: "plain-config",
+            isSecret: false,
+            action: "created",
+            sourceLine: 1,
+          },
+          {
+            key: "DATABASE_URL",
+            value: "****",
+            exposure: "runtime",
+            kind: "secret",
+            isSecret: true,
+            action: "replaced",
+            sourceLine: 2,
+          },
+        ],
+        duplicateOverrides: [],
+        existingOverrides: [
+          {
+            key: "DATABASE_URL",
+            exposure: "runtime",
+            previousScope: "resource",
+            rule: "resource-entry-replaced",
+          },
+        ],
+      },
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo?section=configuration`);
+
+      await expectAnyText(view, ["Import .env variables", "导入 .env 变量"]);
+      await setInputValue(view, "#resource-config-import-secret-keys", "DATABASE_URL, API_TOKEN");
+      await setInputValue(view, "#resource-config-import-plain-keys", "PUBLIC_API_BASE_URL");
+      await setInputValue(
+        view,
+        "#resource-config-import-content",
+        "PUBLIC_API_BASE_URL=https://api.example.test\nDATABASE_URL=postgres://resource",
+      );
+      await clickFormSubmit(view, "#resource-configuration-import-form");
+
+      const importVariablesRequest = await waitForRecordedRequest(
+        "/api/rpc/resources/importVariables",
+      );
+      expect(readOrpcJsonPayload(importVariablesRequest.body)).toEqual({
+        resourceId: "res_demo",
+        content: "PUBLIC_API_BASE_URL=https://api.example.test\nDATABASE_URL=postgres://resource",
+        exposure: "runtime",
+        secretKeys: ["DATABASE_URL", "API_TOKEN"],
+        plainKeys: ["PUBLIC_API_BASE_URL"],
+      });
+      await expectAnyText(view, ["2 entries imported", "已导入 2 个条目"]);
+    } finally {
+      apiResponses.dashboard["/api/rpc/resources/importVariables"] = previousImportRoute;
+    }
+  }, 15_000);
+
   test("[RES-PROFILE-ENTRY-013] submits resource health policy changes through Web", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
@@ -2941,30 +5392,143 @@ describe("console e2e with Bun.WebView", () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
-    await using view = createWebView();
-    await view.navigate(`${previewUrl}/deployments/dep_demo`);
-
-    await expectText(view, "workspace");
-    await expectAnyText(view, ["Overview", "基本信息"]);
-
-    const showRequest = await waitForRecordedRequest("/api/rpc/deployments/show");
-    const showInput = readOrpcJsonPayload(showRequest.body);
-    expect(showInput).toEqual({
+    const previousDiagnosticRoute = apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"];
+    const copyPayload = JSON.stringify({
+      schemaVersion: "resources.diagnostic-summary.copy/v1",
+      resourceId: "res_demo",
       deploymentId: "dep_demo",
-      includeTimeline: true,
-      includeSnapshot: true,
-      includeRelatedContext: true,
-      includeLatestFailure: true,
+      sectionErrors: [
+        {
+          code: "resource_runtime_logs_unavailable",
+          phase: "runtime-log-observation",
+        },
+      ],
     });
 
-    const logsRequest = await waitForRecordedRequest("/api/rpc/deployments/logs");
-    const logsInput = readOrpcJsonPayload(logsRequest.body);
-    expect(logsInput).toEqual({
-      deploymentId: "dep_demo",
-    });
+    apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"] = {
+      json: {
+        schemaVersion: "resources.diagnostic-summary/v1",
+        generatedAt: "2026-01-01T00:00:10.000Z",
+        focus: {
+          resourceId: "res_demo",
+          deploymentId: "dep_demo",
+        },
+        context: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceName: "workspace",
+          resourceSlug: "workspace",
+          resourceKind: "application",
+          destinationId: "dst_demo",
+          serverId: "srv_demo",
+          services: [],
+        },
+        access: {
+          status: "unavailable",
+          reasonCode: "default_access_route_unavailable",
+          phase: "access-observation",
+        },
+        proxy: {
+          status: "not-requested",
+          configurationIncluded: false,
+          routeCount: 0,
+          sectionCount: 0,
+        },
+        deploymentLogs: {
+          status: "not-requested",
+          tailLimit: 20,
+          lineCount: 0,
+          lines: [],
+        },
+        runtimeLogs: {
+          status: "unavailable",
+          tailLimit: 20,
+          lineCount: 0,
+          lines: [],
+        },
+        system: {
+          entrypoint: "web",
+        },
+        sourceErrors: [
+          {
+            source: "runtime-logs",
+            code: "resource_runtime_logs_unavailable",
+            category: "runtime_observation",
+            phase: "runtime-log-observation",
+            retryable: true,
+            relatedEntityId: "res_demo",
+          },
+        ],
+        redaction: {
+          policy: "deployment-environment-secrets",
+          masked: false,
+          maskedValueCount: 0,
+        },
+        copy: {
+          json: copyPayload,
+        },
+      },
+    };
 
-    await view.navigate(`${previewUrl}/deployments/dep_demo?tab=logs`);
-    await expectText(view, "Application is ready for dep_demo");
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/deployments/dep_demo`);
+      await view.evaluate<void>(`(() => {
+        window.__appaloftCopiedText = "";
+        window.appaloftDesktop = {
+          copyText: async (text) => {
+            window.__appaloftCopiedText = text;
+          },
+        };
+      })()`);
+
+      await expectText(view, "workspace");
+      await expectAnyText(view, ["Overview", "基本信息"]);
+
+      const showRequest = await waitForRecordedRequest("/api/rpc/deployments/show");
+      const showInput = readOrpcJsonPayload(showRequest.body);
+      expect(showInput).toEqual({
+        deploymentId: "dep_demo",
+        includeTimeline: true,
+        includeSnapshot: true,
+        includeRelatedContext: true,
+        includeLatestFailure: true,
+      });
+
+      const logsRequest = await waitForRecordedRequest("/api/rpc/deployments/logs");
+      const logsInput = readOrpcJsonPayload(logsRequest.body);
+      expect(logsInput).toEqual({
+        deploymentId: "dep_demo",
+      });
+
+      await clickButtonByAnyText(view, ["Copy diagnostic JSON", "复制诊断 JSON"]);
+      const diagnosticRequest = await waitForRecordedRequest(
+        "/api/rpc/resources/diagnosticSummary",
+      );
+      expect(readOrpcJsonPayload(diagnosticRequest.body)).toEqual({
+        resourceId: "res_demo",
+        deploymentId: "dep_demo",
+        includeDeploymentLogTail: true,
+        includeRuntimeLogTail: true,
+        includeProxyConfiguration: true,
+        tailLines: 20,
+      });
+      await waitFor(
+        () => view.evaluate<string>("window.__appaloftCopiedText ?? ''"),
+        (copied) => copied === copyPayload,
+        "Expected deployment detail diagnostic copy payload to be written through the desktop bridge",
+      );
+      await expectAnyText(view, ["Diagnostic JSON copied", "诊断 JSON 已复制"]);
+
+      await view.navigate(`${previewUrl}/deployments/dep_demo?tab=logs`);
+      await expectText(view, "Application is ready for dep_demo");
+    } finally {
+      if (previousDiagnosticRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"];
+      } else {
+        apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"] = previousDiagnosticRoute;
+      }
+    }
   }, 15_000);
 
   test("[DEF-ACCESS-ENTRY-007] server list reads persisted system default access policy", async () => {
@@ -3008,6 +5572,137 @@ describe("console e2e with Bun.WebView", () => {
       recordedApiRequests.some((request) => request.pathname === "/api/rpc/servers/list"),
     ).toBe(false);
   }, 15_000);
+
+  test("[RT-CAP-INSPECT-001][RT-CAP-PRUNE-001] previews server capacity prune from Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/servers/srv_demo?tab=monitor`);
+
+    await expectAnyText(view, ["Runtime monitor", "运行时监控"]);
+    await expectText(view, "Deployment dep_demo succeeded");
+    await expectAnyText(view, ["Capacity", "容量"]);
+    await waitFor(
+      () =>
+        view.evaluate<boolean>(
+          `(() => {
+            const link = Array.from(document.querySelectorAll("a")).find((candidate) =>
+              (candidate.textContent?.includes("Capacity") || candidate.textContent?.includes("容量")) &&
+              candidate.getAttribute("href")?.includes("runtimeMonitoringFrom=")
+            );
+            if (!link) {
+              return false;
+            }
+            link.click();
+            return true;
+          })()`,
+        ),
+      Boolean,
+      "Expected Monitor capacity handoff link",
+    );
+
+    await expectAnyText(view, ["Runtime capacity", "运行时容量"]);
+    await expectAnyText(view, ["Safe reclaimable", "安全可回收"]);
+    await expectAnyText(view, ["Runtime prune", "Runtime prune"]);
+    await clickButtonByAnyText(view, ["Preview prune", "预览 prune"]);
+    await expectAnyText(view, [
+      "Runtime capacity prune completed",
+      "Runtime capacity prune 已完成",
+    ]);
+    await expectText(view, "appaloft-old");
+
+    const inspectRequest = await waitForRecordedRequest("/api/rpc/servers/capacity/inspect");
+    expect(readOrpcJsonPayload(inspectRequest.body)).toEqual({
+      serverId: "srv_demo",
+    });
+
+    const pruneRequest = await waitForRecordedRequest("/api/rpc/servers/capacity/prune");
+    expect(readOrpcJsonPayload(pruneRequest.body)).toEqual({
+      serverId: "srv_demo",
+      before: "2026-05-13T01:00:00.000Z",
+      categories: ["stopped-containers", "preview-workspaces", "source-workspaces"],
+      dryRun: true,
+    });
+  }, 15_000);
+
+  test("[RT-MON-004][RT-MON-007][RT-MON-008][RT-MON-009] renders Observe monitoring surfaces in WebView", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=monitor`);
+
+    await expectText(view, "workspace");
+    await expectAnyText(view, ["Runtime monitor", "运行时监控"]);
+    await expectAnyText(view, ["Rollup window", "Rollup 窗口"]);
+    await expectText(view, "Deployment dep_demo succeeded");
+    await expectAnyText(view, ["Top contributors", "主要贡献来源"]);
+    await expectAnyText(view, ["Threshold state", "Threshold 状态"]);
+    await expectAnyText(view, ["Warning", "警告"]);
+    await expectAnyText(view, ["Logs", "日志"]);
+    await expectAnyText(view, ["Events", "事件"]);
+    await expectAnyText(view, ["Diagnostics", "诊断"]);
+    await expectAnyText(view, ["Cleanup", "清理"]);
+
+    await clickButtonByAnyText(view, ["Cleanup", "清理"]);
+    await expectAnyText(view, ["Runtime cleanup", "Runtime cleanup"]);
+    await waitFor(
+      () =>
+        view.evaluate<string | null>(
+          'document.querySelector("#resource-storage-runtime-cleanup-before")?.value ?? null',
+        ),
+      (value) => value === "2026-05-13T01:00:00.000Z",
+      "Expected storage cleanup dry-run cutoff to inherit the Monitor observation window",
+    );
+
+    await view.navigate(`${previewUrl}/servers/srv_demo?tab=monitor`);
+    await expectText(view, "edge");
+    await expectAnyText(view, ["Runtime monitor", "运行时监控"]);
+    await expectText(view, "Deployment dep_demo succeeded");
+    await expectAnyText(view, ["Top contributors", "主要贡献来源"]);
+
+    await view.navigate(`${previewUrl}/projects/prj_demo`);
+    await expectText(view, "Demo");
+    await expectAnyText(view, ["Runtime monitor", "运行时监控"]);
+    await expectAnyText(view, ["Project · Demo", "项目 · Demo"]);
+    await expectAnyText(view, ["Environment · production", "环境 · production"]);
+
+    await waitFor(
+      async () =>
+        recordedApiRequests.some((request) => {
+          if (request.pathname !== "/api/rpc/runtimeMonitoring/rollup") {
+            return false;
+          }
+          const input = readOrpcJsonPayload(request.body);
+          return (
+            isRecord(input) &&
+            isRecord(input.scope) &&
+            input.scope.kind === "project" &&
+            input.scope.projectId === "prj_demo"
+          );
+        }),
+      Boolean,
+      "Expected project rollup monitoring request",
+    );
+    await waitFor(
+      async () =>
+        recordedApiRequests.some((request) => {
+          if (request.pathname !== "/api/rpc/runtimeMonitoring/rollup") {
+            return false;
+          }
+          const input = readOrpcJsonPayload(request.body);
+          return (
+            isRecord(input) &&
+            isRecord(input.scope) &&
+            input.scope.kind === "environment" &&
+            input.scope.environmentId === "env_demo"
+          );
+        }),
+      Boolean,
+      "Expected environment rollup monitoring request",
+    );
+  }, 20_000);
 
   test("[DEF-ACCESS-ENTRY-007] server detail reads and refreshes deployment-target default access override", async () => {
     activeScenario = "dashboard";
@@ -3193,6 +5888,121 @@ describe("console e2e with Bun.WebView", () => {
     } finally {
       apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
       apiResponses.dashboard["/api/rpc/servers/rename"] = previousRenameRoute;
+    }
+  }, 15_000);
+
+  test("[SRV-LIFE-ENTRY-012-WEB] deletes an eligible server from server detail", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/servers/show"];
+    const previousDeleteCheckRoute = apiResponses.dashboard["/api/rpc/servers/deleteCheck"];
+    const previousDeleteRoute = apiResponses.dashboard["/api/rpc/servers/delete"];
+
+    apiResponses.dashboard["/api/rpc/servers/show"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: serverDetailFixture(input?.serverId ?? "srv_demo", {
+          lifecycleStatus: "inactive",
+        }),
+      };
+    };
+    apiResponses.dashboard["/api/rpc/servers/deleteCheck"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "servers.delete-check/v1",
+          serverId: input?.serverId ?? "srv_demo",
+          lifecycleStatus: "inactive",
+          eligible: true,
+          blockers: [],
+          checkedAt: "2026-01-01T00:00:10.000Z",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/servers/delete"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: {
+          id: input?.serverId ?? "srv_demo",
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/servers/srv_demo?tab=danger`);
+
+      await expectAnyText(view, ["Delete safety", "删除安全检查"]);
+      await expectAnyText(view, ["Eligible", "可删除"]);
+      await clickButtonByAnyText(view, ["Delete server", "删除服务器"]);
+      await setInputValue(view, "#server-delete-confirmation-input", "srv_demo");
+      await clickFormSubmit(view, "#server-delete-form");
+
+      const deleteRequest = await waitForRecordedRequest("/api/rpc/servers/delete");
+      expect(deleteRequest.method).toBe("POST");
+      expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
+        serverId: "srv_demo",
+        confirmation: {
+          serverId: "srv_demo",
+        },
+      });
+    } finally {
+      apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
+      apiResponses.dashboard["/api/rpc/servers/deleteCheck"] = previousDeleteCheckRoute;
+      if (previousDeleteRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/servers/delete"];
+      } else {
+        apiResponses.dashboard["/api/rpc/servers/delete"] = previousDeleteRoute;
+      }
+    }
+  }, 15_000);
+
+  test("[SRV-LIFE-ENTRY-006-WEB] deactivates a server from server detail", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/servers/show"];
+    const previousDeactivateRoute = apiResponses.dashboard["/api/rpc/servers/deactivate"];
+    let lifecycleStatus: "active" | "inactive" = "active";
+
+    apiResponses.dashboard["/api/rpc/servers/show"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: serverDetailFixture(input?.serverId ?? "srv_demo", {
+          lifecycleStatus,
+        }),
+      };
+    };
+    apiResponses.dashboard["/api/rpc/servers/deactivate"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      lifecycleStatus = "inactive";
+
+      return {
+        json: {
+          id: input?.serverId ?? "srv_demo",
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/servers/srv_demo?tab=danger`);
+
+      await expectAnyText(view, ["Deactivate server", "停用服务器"]);
+      await clickButtonByAnyText(view, ["Deactivate server", "停用服务器"]);
+      await setInputValue(view, "#server-deactivate-confirmation-input", "srv_demo");
+      await clickFormSubmit(view, "#server-deactivate-form");
+
+      const deactivateRequest = await waitForRecordedRequest("/api/rpc/servers/deactivate");
+      expect(deactivateRequest.method).toBe("POST");
+      expect(readOrpcJsonPayload(deactivateRequest.body)).toEqual({
+        serverId: "srv_demo",
+      });
+      await expectAnyText(view, ["Server deactivated", "服务器已停用"]);
+    } finally {
+      apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
+      apiResponses.dashboard["/api/rpc/servers/deactivate"] = previousDeactivateRoute;
     }
   }, 15_000);
 
@@ -3846,6 +6656,14 @@ describe("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(deployState.toString());
+    await view.evaluate<void>(`(() => {
+      window.__appaloftCopiedText = "";
+      window.appaloftDesktop = {
+        copyText: async (text) => {
+          window.__appaloftCopiedText = text;
+        },
+      };
+    })()`);
 
     await expectAnyText(view, ["Static site", "静态站点"]);
     await expectText(view, "--method static");
@@ -3892,6 +6710,36 @@ describe("console e2e with Bun.WebView", () => {
       environmentId: "env_static",
       resourceId: "res_static",
     });
+
+    await clickButtonByAnyText(view, ["Copy diagnostic JSON", "复制诊断 JSON"]);
+
+    const diagnosticRequest = await waitForRecordedRequest("/api/rpc/resources/diagnosticSummary");
+    expect(readOrpcJsonPayload(diagnosticRequest.body)).toEqual({
+      resourceId: "res_static",
+      deploymentId: "dep_static",
+      includeDeploymentLogTail: true,
+      includeRuntimeLogTail: true,
+      includeProxyConfiguration: true,
+      tailLines: 20,
+    });
+
+    const expectedCopyPayload = JSON.stringify({
+      schemaVersion: "resources.diagnostic-summary.copy/v1",
+      resourceId: "res_static",
+      deploymentId: "dep_static",
+      sectionErrors: [
+        {
+          code: "default_access_route_unavailable",
+          phase: "access-observation",
+        },
+      ],
+    });
+    await waitFor(
+      () => view.evaluate<string>("window.__appaloftCopiedText ?? ''"),
+      (copied) => copied === expectedCopyPayload,
+      "Expected Quick Deploy diagnostic copy payload to be written through the desktop bridge",
+    );
+    await expectAnyText(view, ["Diagnostic JSON copied", "诊断 JSON 已复制"]);
 
     await clickButtonByAnyText(view, ["View deployment", "查看部署"]);
     await expectLocation(

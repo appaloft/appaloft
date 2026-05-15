@@ -178,7 +178,7 @@ Then:
 | DEP-CREATE-ASYNC-016 | integration | Public route verification failure preserves previous runtime | A reverse-proxy resource has a previously successful runtime and the replacement candidate starts, but generated or durable public route verification fails because DNS, proxy route readiness, or HTTP verification is not ready | `ok({ id })` | `deployment-failed` for the new attempt | Previous successful runtime and route remain active; failed candidate is removed or isolated; failure details include the observed public route error |
 | DEP-CREATE-ASYNC-017 | integration | Static artifact package failure | Accepted static deployment resolves source, but static package/build step cannot produce the publish directory image artifact | `ok({ id })` | `deployment-failed` | Terminal `failed` with `failurePhase = image-build` or `runtime-artifact-resolution`; no replacement runtime is promoted |
 | DEP-CREATE-ASYNC-018 | integration | Git source resolved commit snapshot | Accepted Git-backed deployment clones or checks out source for a new attempt | `ok({ id })` | Later terminal event according to execution result | Deployment execution metadata and read model expose the exact resolved commit SHA; Web and CLI surfaces display it for the attempt |
-| DEP-CREATE-ASYNC-019 | integration, opt-in SSH | Runtime target capacity exhausted during build | Accepted SSH or Docker-backed deployment starts source materialization or image build, but target cannot create files or layers because disk, inode, or build-cache capacity is exhausted | `ok({ id })` | `deployment-failed` | Terminal `failed` with code `runtime_target_resource_exhausted`, phase `image-build` or `runtime-target-apply`, safe capacity details, and no promotion |
+| DEP-CREATE-ASYNC-019 | integration + adapter classification + CI capacity-prune smoke | Runtime target capacity exhausted during build/apply/observation | Accepted local-shell, generic-SSH, or Docker Swarm deployment starts source materialization, image build, service apply, or verification, but the target cannot create files/layers/services or satisfy bounded CPU/memory capacity | `ok({ id })` | `deployment-failed` | Terminal `failed` with code `runtime_target_resource_exhausted`, phase `image-build`, `runtime-target-apply`, or `runtime-target-observation`, safe capacity details, and no promotion |
 | DEP-CREATE-PKG-001 | unit | SSH local workspace upload respects ignore rules | Accepted generic-SSH deployment must upload a local workspace before Docker build | `ok({ id })` for accepted command; later terminal result depends on runtime execution | `build-requested` when package/build work is required | SSH workspace tar uses the Git tracked-plus-unignored file list when the source is in a Git worktree, so `.gitignore`, `.git/info/exclude`, and global ignore rules keep caches such as `.turbo` out of remote extraction; non-Git folders use conservative cache/dependency excludes; failed uploads clean the attempt-scoped remote workdir |
 
 ## Runtime Backend Smoke Matrix
@@ -189,10 +189,10 @@ Then:
 | DEP-CREATE-SMOKE-002 | e2e-preferred | Local-shell Docker Compose path | Resource source/runtime profile selects `docker-compose`; local-shell backend registered | `ok({ id })` | Runtime target backend resolves `local-shell`; runtime plan snapshot has `buildStrategy = compose-deploy`, `execution.kind = docker-compose-stack`, stable Compose file/workdir metadata, and project-name derivation evidence | Deployment reaches terminal success or records stable compose failure metadata |
 | DEP-CREATE-SMOKE-003 | e2e-preferred | Local-shell prebuilt image path | Resource source/runtime profile selects `prebuilt-image`; image is resolvable locally or by Docker | `ok({ id })` | Runtime target backend resolves `local-shell`; runtime plan snapshot has `buildStrategy = prebuilt-image`, `execution.kind = docker-container`, normalized image reference metadata, and no source build step | Deployment reaches terminal success without building source; incompatible non-image sources fail at runtime-plan resolution with structured details |
 | DEP-CREATE-SMOKE-004 | e2e-preferred | Local-shell workspace-command path | Resource source/runtime profile selects `workspace-commands`; local-shell backend registered | `ok({ id })` | Runtime target backend resolves `local-shell`; runtime plan snapshot has `buildStrategy = workspace-commands`, generated Dockerfile metadata, command/base-image metadata, and `execution.kind = docker-container` | Deployment reaches terminal success in local smoke |
-| DEP-CREATE-SMOKE-005 | contract, opt-in SSH | Generic-SSH Dockerfile path | Resource source/runtime profile selects `dockerfile`; generic-SSH backend registered | `ok({ id })` or opt-in smoke success | Runtime target backend resolves `generic-ssh`; runtime plan snapshot has `buildStrategy = dockerfile`, `execution.kind = docker-container`, and resource-owned Dockerfile path metadata | Contract verifies selection; opt-in smoke verifies remote execution |
-| DEP-CREATE-SMOKE-006 | contract, opt-in SSH | Generic-SSH Docker Compose path | Resource source/runtime profile selects `docker-compose`; generic-SSH backend registered | `ok({ id })` or opt-in smoke success | Runtime target backend resolves `generic-ssh`; runtime plan snapshot has `buildStrategy = compose-deploy`, `execution.kind = docker-compose-stack`, stable Compose file/workdir metadata, and project-name derivation evidence | Contract verifies selection; opt-in smoke verifies remote execution when enabled |
+| DEP-CREATE-SMOKE-005 | contract + GitHub Actions secret-gated SSH | Generic-SSH Dockerfile path | Resource source/runtime profile selects `dockerfile`; generic-SSH backend registered | `ok({ id })` or real SSH smoke success when the GitHub Actions or local explicit gate has credentials | Runtime target backend resolves `generic-ssh`; runtime plan snapshot has `buildStrategy = dockerfile`, `execution.kind = docker-container`, and resource-owned Dockerfile path metadata | Contract verifies selection; secret-gated GitHub Actions and local explicit smoke verify remote execution |
+| DEP-CREATE-SMOKE-006 | contract + GitHub Actions secret-gated SSH | Generic-SSH Docker Compose path | Resource source/runtime profile selects `docker-compose`; generic-SSH backend registered | `ok({ id })` or real SSH smoke success when the GitHub Actions or local explicit gate has credentials | Runtime target backend resolves `generic-ssh`; runtime plan snapshot has `buildStrategy = compose-deploy`, `execution.kind = docker-compose-stack`, stable Compose file/workdir metadata, and project-name derivation evidence | Contract verifies selection; secret-gated GitHub Actions and local explicit smoke verify remote execution |
 | DEP-CREATE-SMOKE-007 | integration | Unsupported runtime target remains structured | Resource/runtime plan is valid but selected target has no required backend capability | `err` before acceptance | Error code is `runtime_target_unsupported`, phase `runtime-target-resolution` | No accepted deployment |
-| DEP-CREATE-SMOKE-008 | integration + opt-in smoke | Docker Swarm cluster path keeps ids-only admission | Resource source/runtime profile resolves to an OCI image artifact and selected target is `orchestrator-cluster` with provider key `docker-swarm` | `ok({ id })` when Swarm backend capabilities are registered, or `runtime_target_unsupported` before acceptance when they are not | Runtime target backend resolves `docker-swarm` without Web/CLI/API Swarm fields; Swarm render/apply/log/health metadata is adapter-owned and sanitized | Fake-runner and PGlite coverage prove selection/readback; `bun run smoke:swarm` proves real apply, route realization, registry auth, redaction, and scoped cleanup when enabled |
+| DEP-CREATE-SMOKE-008 | integration + GitHub Actions/local explicit smoke | Docker Swarm cluster path keeps ids-only admission | Resource source/runtime profile resolves to an OCI image artifact and selected target is `orchestrator-cluster` with provider key `docker-swarm` | `ok({ id })` when Swarm backend capabilities are registered, or `runtime_target_unsupported` before acceptance when they are not | Runtime target backend resolves `docker-swarm` without Web/CLI/API Swarm fields; Swarm render/apply/log/health metadata is adapter-owned and sanitized | Fake-runner and PGlite coverage prove selection/readback; `bun run smoke:swarm` proves real apply, route realization, registry auth, redaction, and scoped cleanup in the GitHub Actions or local explicit gate |
 
 ## Zero-to-SSH Create And Runtime Acceptance Matrix
 
@@ -206,10 +206,10 @@ acceptance harness without changing the command input boundary.
 | ZSSH-CREATE-003 | integration | Serverful/SSR port before admission | A serverful or SSR supported fixture is selected | `ok({ id })` only when the resource network profile has explicit or deterministic `internalPort` | No deployment-owned `port` field is accepted | Missing port blocks in `resource-network-resolution` before acceptance. |
 | ZSSH-CREATE-004 | contract | Shared draft parity | Web, CLI, API, repository config, automation, or future tools prepare a supported fixture | Entry workflow dispatches resource profile commands before create | Runtime/source/network/health draft fields are shared profile vocabulary | Transport-only profile shapes are not introduced. |
 | ZSSH-RUNTIME-001 | integration | Runtime target selected before acceptance | A descriptor has a valid Docker/OCI artifact intent | `ok({ id })` only when backend capabilities exist; otherwise `runtime_target_unsupported` before acceptance | Registry selects local-shell and generic-SSH single-server backends by provider key, target kind, and capabilities | No accepted deployment on unsupported provider/capability combinations. |
-| ZSSH-RUNTIME-002 | integration | Hermetic fake/local/generic-SSH render/apply contract | Default CI has no real SSH target | Harness proves capability selection, typed render/apply command evidence, verification, and logs capability through fake/local/generic-SSH descriptors | Generic-SSH contract does not require a live SSH server | Real SSH execution remains opt-in. |
+| ZSSH-RUNTIME-002 | integration | Fast fake/local/generic-SSH render/apply contract | Local fast checks have no real SSH target | Harness proves capability selection, typed render/apply command evidence, verification, and logs capability through fake/local/generic-SSH descriptors | Generic-SSH contract does not require a live SSH server | Real SSH execution is covered by the secret-gated GitHub Actions smoke gate and remains explicit for local runs. |
 | ZSSH-RUNTIME-003 | integration | Observation contract | A fixture resolves a runtime target plan | Accepted/harnessed path exposes normalized observation expectations | Readiness, health, runtime logs, and access/proxy summaries use provider-neutral shapes | Docker/SSH payloads stay adapter-owned diagnostics. |
-| ZSSH-RUNTIME-004 | opt-in local Docker e2e | Real local Docker gate | `APPALOFT_E2E_FRAMEWORK_DOCKER=true` is set | Representative real Docker slice may run | Docker builds, runs, verifies HTTP, records logs/metadata | Without the env gate, default tests skip real Docker mutation. |
-| ZSSH-RUNTIME-005 | opt-in SSH e2e | Real generic-SSH gate | Explicit SSH target configuration is supplied | Representative SSH slice may run | Generic-SSH builds/runs/verifies remotely | Without SSH config, real SSH execution is a migration gap, not a passing default. |
+| ZSSH-RUNTIME-004 | GitHub Actions + local explicit Docker e2e | Real local Docker gate | `APPALOFT_E2E_FRAMEWORK_DOCKER=true` is set locally, or `.github/workflows/framework-fixture-e2e.yml` runs the local Docker fixture matrix from nightly/release | Real Docker fixture smoke runs | Docker builds, runs, verifies HTTP, records logs/metadata | Local runs skip Docker mutation without the env gate; GitHub nightly/release runs the matrix on hosted runners. |
+| ZSSH-RUNTIME-005 | GitHub Actions secret-gated + local explicit SSH e2e | Real generic-SSH gate | Explicit SSH target configuration is supplied locally, or `.github/workflows/framework-fixture-e2e.yml` has SSH secrets | Real SSH fixture smoke runs after preflight | Generic-SSH builds/runs/verifies remotely | Local runs skip without SSH config; GitHub release dispatch can require SSH evidence and fail closed when secrets are absent. Missing SSH is an external confidence-gate prerequisite, not a catalog support gap. |
 
 ## Event Matrix
 
@@ -260,7 +260,7 @@ And deployment-failed is emitted with retriable = true.
 And retry scheduling creates a new deployment attempt id.
 ```
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current code still executes the backend inside `CreateDeploymentUseCase`, so some existing tests may need transitional expectations until async admission is implemented.
 
@@ -319,11 +319,23 @@ covered by `packages/adapters/runtime/test/zero-to-ssh-supported-catalog-accepta
 harness proves the Phase 5 supported catalog can use ids-only create inputs, runtime target backend
 selection, Docker/OCI artifact intent, and normalized observation expectations without adding
 source/runtime/network/framework/buildpack/provider fields to `deployments.create`. Real local
-Docker and real generic-SSH execution remain opt-in gates.
+Docker and real generic-SSH execution are wired into the shared GitHub Actions framework-fixture
+gate for nightly/release confidence, while local developer runs remain env/secret gated to avoid
+mutating Docker or SSH targets unintentionally.
 
-`DEP-CREATE-ASYNC-019` is not implemented yet. Current generic SSH Docker build failures surface as
-adapter-specific build failures; they are not yet classified into
-`runtime_target_resource_exhausted` with disk, inode, Docker image, or build-cache details.
+`DEP-CREATE-ASYNC-019` has runtime adapter classifier and failed execution field coverage in
+`packages/adapters/runtime/test/runtime-target-failure-classification.test.ts`, Swarm apply/verify
+coverage in `packages/adapters/runtime/test/docker-swarm-execution-backend.test.ts`, and
+post-acceptance process projection coverage in `packages/application/test/create-deployment.test.ts`.
+Generic SSH and local Docker-backed deployment failures that emit safe Docker/BuildKit disk, inode,
+memory, CPU, or build-cache exhaustion signals are classified through the same helper used by local,
+SSH, and Swarm execution backends into `runtime_target_resource_exhausted` and receive safe `phase`,
+`capacityResource`, `capacitySignal`, inspect-command, and dry-run prune-command metadata. The
+application deployment process projection keeps those capacity recovery fields in safe operator
+details while still excluding raw provider output. Intentionally exhausting a real server remains
+unsafe for CI, so real-target proof is split between synthetic capacity-signal classification and
+the `.github/workflows/capacity-prune-e2e.yml` runtime-root prune gate for nightly/release
+confidence.
 
 Static site deployment rows `DEP-CREATE-ADM-026`, `DEP-CREATE-ADM-027`, and
 `DEP-CREATE-ASYNC-017` are covered by `packages/application/test/create-deployment.test.ts` and
@@ -331,7 +343,8 @@ the static artifact planning assertion in `packages/adapters/runtime/test/runtim
 Current code accepts the static runtime plan strategy, resolves static artifact intent, and covers
 adapter-owned static-server Dockerfile generation in
 `packages/adapters/runtime/test/runtime-plan-resolver.test.ts`. Executable static smoke coverage
-now includes the local Docker generated-nginx path and an opt-in generic-SSH Docker path. The local
+now includes the local Docker generated-nginx path and a GitHub Actions secret-gated plus local
+explicit generic-SSH Docker path. The local
 Docker static smoke also verifies ADR-031 routing behavior for directory indexes, extensionless
 app-route fallback, exact assets, and missing asset `404` responses.
 
@@ -345,7 +358,8 @@ Current executable coverage covers Next.js, Vite static, Astro static, Nuxt gene
 explicit SvelteKit static, Remix, FastAPI, Django, Flask, generic Node framework metadata, generic
 Python, generic Java, and custom command fallback in runtime planner tests. Additional
 remaining-family detectors, planner implementations, Web/CLI draft fields, and Docker/SSH smoke
-paths are required before the broader catalog can be marked implemented.
+paths in the GitHub Actions/local explicit gate are required before the broader catalog can be
+marked implemented.
 
 Repository config file deployment rows `DEP-CREATE-ADM-035`, `DEP-CREATE-ENTRY-006`, and
 `DEP-CREATE-ENTRY-007` are target contract rows. Current implementation keeps HTTP ids-only, but

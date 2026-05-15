@@ -403,6 +403,93 @@ describe("OpenTerminalSessionUseCase", () => {
     });
   });
 
+  test("[TERM-SESSION-WORKSPACE-003][TERM-SESSION-WORKSPACE-004] applies source baseDirectory to source workspace metadata once", async () => {
+    const context = createExecutionContext({ entrypoint: "http" });
+    const runtimePlan = deploymentSummary().runtimePlan;
+    const { gateway, useCase } = createUseCase({
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...runtimePlan,
+            source: {
+              kind: "git-public",
+              locator: "https://github.com/example/monorepo",
+              displayName: "monorepo",
+              metadata: {
+                baseDirectory: "/apps/api",
+              },
+            },
+            execution: {
+              kind: "docker-container",
+              workingDirectory: "https://github.com/example/monorepo",
+              metadata: {
+                sourceDir: "/var/lib/appaloft/runtime/local-deployments/dep_new/source",
+              },
+            },
+          },
+        }),
+      ],
+    });
+    const command = OpenTerminalSessionCommand.create({
+      scope: {
+        kind: "resource",
+        resourceId: "res_web",
+      },
+      relativeDirectory: "packages/http",
+    })._unsafeUnwrap();
+
+    const result = await useCase.execute(context, command);
+
+    expect(result.isOk()).toBe(true);
+    expect(gateway.calls[0]?.scope).toMatchObject({
+      kind: "resource",
+      workingDirectory:
+        "/var/lib/appaloft/runtime/local-deployments/dep_new/source/apps/api/packages/http",
+    });
+  });
+
+  test("[TERM-SESSION-WORKSPACE-003] does not duplicate source baseDirectory when sourceDir already includes it", async () => {
+    const context = createExecutionContext({ entrypoint: "http" });
+    const runtimePlan = deploymentSummary().runtimePlan;
+    const { gateway, useCase } = createUseCase({
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...runtimePlan,
+            source: {
+              kind: "git-public",
+              locator: "https://github.com/example/monorepo",
+              displayName: "monorepo",
+              metadata: {
+                baseDirectory: "/apps/api",
+              },
+            },
+            execution: {
+              kind: "docker-container",
+              metadata: {
+                sourceDir: "/var/lib/appaloft/runtime/local-deployments/dep_new/source/apps/api",
+              },
+            },
+          },
+        }),
+      ],
+    });
+    const command = OpenTerminalSessionCommand.create({
+      scope: {
+        kind: "resource",
+        resourceId: "res_web",
+      },
+    })._unsafeUnwrap();
+
+    const result = await useCase.execute(context, command);
+
+    expect(result.isOk()).toBe(true);
+    expect(gateway.calls[0]?.scope).toMatchObject({
+      kind: "resource",
+      workingDirectory: "/var/lib/appaloft/runtime/local-deployments/dep_new/source/apps/api",
+    });
+  });
+
   test("[TERM-SESSION-WORKSPACE-008] reports unavailable workspace instead of opening a session in a git locator", async () => {
     const context = createExecutionContext({ entrypoint: "http" });
     const runtimePlan = deploymentSummary().runtimePlan;

@@ -266,8 +266,10 @@ contract. Harness coverage must select target backends by `targetKind`, `provide
 capabilities before acceptance, then assert render/apply/verify/log observation expectations
 without making Docker, SSH, or provider-specific fields part of `deployments.create`.
 
-Default harness coverage may use fake/local/generic-SSH descriptors and typed command rendering.
-Real local Docker and generic-SSH execution remain opt-in smoke layers governed by the test matrix.
+Fast harness coverage may use fake/local/generic-SSH descriptors and typed command rendering.
+Real local Docker and generic-SSH execution are governed by the test matrix and wired through the
+shared GitHub Actions smoke workflows for nightly/release confidence; local developer runs remain
+explicitly gated because they mutate Docker or SSH targets.
 
 ## Failure Semantics
 
@@ -314,11 +316,16 @@ Current implementation covers single-server Docker/Compose and Docker Swarm:
   can read Swarm-backed deployments through the resolved Swarm manager over SSH when target
   metadata is available, while terminal sessions and proxy configuration remain normalized
   read/query surfaces with backend-specific behavior kept behind adapter boundaries.
+- Local Docker, generic-SSH Docker, and Docker Swarm failed execution paths use the shared
+  `runtime_target_resource_exhausted` classifier for safe Docker image store, BuildKit, Docker
+  Compose filesystem-full, OCI runtime memory, Swarm insufficient CPU/memory, disk, inode, memory,
+  and CPU capacity signals.
 - Generic SSH execution currently materializes deployment-scoped source workspaces and builds
   deployment-scoped Docker images on the target. Preview cleanup stops selected runtime instances
-  and route/link state, but it does not yet prune unused Docker images, BuildKit/build cache, or
-  orphaned materialized source workspaces. Long-lived single-server targets can therefore exhaust
-  disk or inodes even after preview routes are cleaned.
+  and route/link state, while `servers.capacity.prune` owns dry-run-first cleanup of scoped source
+  and preview workspaces plus explicit Docker build-cache and unused-image categories. Real local
+  and generic-SSH prune confidence is wired through GitHub Actions/local explicit gates because
+  these paths mutate runtime targets.
 
 The current runtime command spec work is aligned with this workflow because it keeps rendered shell
 strings at the adapter boundary. The next abstraction step is target-specific render/apply result

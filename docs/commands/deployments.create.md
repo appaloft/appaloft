@@ -57,8 +57,9 @@ substrates.
 
 Docker/OCI is the workload artifact substrate. The selected deployment target and destination
 choose the runtime orchestration backend behind the command. Single-server Docker/Compose is the
-active v1 backend; Docker Swarm and Kubernetes are future backends governed by ADR-023 and must not
-add provider-specific fields to this command.
+active v1 single-server backend, and Docker Swarm is the active v1 cluster backend governed by
+ADR-023. Kubernetes remains a future backend. Runtime backends must not add provider-specific
+fields to this command.
 
 The command's domain language is **deployment attempt admission**. It must not use `Deployment` as the owner name for source binding, runtime profile, health policy, access profile, domain binding, or TLS policy.
 
@@ -225,6 +226,7 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | `infra_error` | `deployment-creation`, `event-publication` | Conditional | Persistence or infrastructure failure before the request can be safely accepted. |
 | `provider_error` | `runtime-plan-resolution` | Conditional | Provider/runtime boundary rejects the plan before acceptance. |
 | `runtime_target_unsupported` | `runtime-target-resolution` | No | The selected target kind/provider key has no registered backend with the required runtime capabilities. |
+| `runtime_target_resource_exhausted` | `image-build`, `runtime-target-apply`, `runtime-target-observation` | Yes after cleanup, prune, or target resize | Accepted deployment failed after safe admission because the selected runtime target could not create files, layers, services, containers, or satisfy bounded CPU/memory capacity. Failed deployment metadata must include safe capacity classification such as `capacityResource`, `capacitySignal`, `capacityInspectCommand` (`appaloft server capacity inspect <serverId>`), and `capacityPruneCommand` (`appaloft server capacity prune <serverId> --dry-run`) when available. |
 | `default_access_route_unavailable` | `default-access-policy-resolution`, `default-access-domain-generation`, `proxy-readiness` | Conditional | A required generated access route cannot be resolved before acceptance. |
 | `proxy_route_realization_failed` | `proxy-route-realization`, `public-route-verification` | Yes | Runtime adapter failed to materialize or verify the resolved route after acceptance; represented as workflow failure. |
 | `unsupported_config_field` | `config-capability-resolution` | No | A repository config file requested a known future capability, such as CPU/memory/replicas/restart policy, that is not backed by accepted resource/runtime-target specs and runtime enforcement. This is an entry-workflow rejection before `deployments.create`. |
@@ -325,9 +327,9 @@ for those command specs, not the command contract itself.
 The zero-to-SSH supported catalog acceptance harness proves that supported framework and
 container-native fixture descriptors can reach this command boundary without widening it. The
 harness may assert preview/create parity, runtime target backend selection, Docker/OCI artifact
-intent, typed command rendering, readiness/health/log/access observation expectations, and opt-in
-Docker/SSH smoke gates, but it must keep `deployments.create` input limited to deployment context
-ids.
+intent, typed command rendering, readiness/health/log/access observation expectations, and GitHub
+Actions Docker/SSH smoke gates with local explicit reproduction scripts, but it must keep
+`deployments.create` input limited to deployment context ids.
 
 User-authored command text can still appear as a shell-script leaf when the resource runtime profile
 requires custom install/build/start commands. That shell-script leaf must remain scoped to the
@@ -371,7 +373,7 @@ backend capabilities after admission context is resolved:
 | Target shape | Command behavior |
 | --- | --- |
 | Single-server Docker/Compose | Active v1 backend. The runtime adapter may execute locally or over SSH through injected ports. |
-| Docker Swarm cluster | Future backend. Requires its own target/profile specs before public use. |
+| Docker Swarm cluster | Active v1 cluster backend. The runtime adapter selects the registered `orchestrator-cluster` / `docker-swarm` backend and keeps Swarm stack/service details inside adapter-owned intent. |
 | Kubernetes cluster | Future backend. Requires its own target/profile specs before public use. |
 
 The command must not accept Kubernetes namespaces, Helm values, manifest fragments, Swarm stack
@@ -458,11 +460,11 @@ must behave as Quick Deploy or another entry workflow that selects or creates a 
 dispatching `deployments.create`. Resource-level new deployment entrypoints are the preferred
 owner-scoped surfaces.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current code already has the command, handler, schema, and use case. The handler delegates to the use case, which is aligned with the command boundary.
 
-Migration gaps:
+Governed follow-ups:
 
 - the use case currently awaits runtime backend execution before returning;
 - current aggregate events are `deployment.planning_started`, `deployment.planned`, `deployment.started`, and `deployment.finished`;
@@ -489,8 +491,9 @@ Migration gaps:
   implementation coverage should be verified across Web, CLI, and API before removing this note.
 - resource source variant normalization is typed for the initial Git and Docker image fields;
   deployment admission rejects legacy raw GitHub tree URLs before runtime adapters can clone them.
-  Provider-backed disambiguation for slash-containing Git refs and typed runtime-profile file paths
-  remain future work.
+  Typed runtime-profile Dockerfile, Compose file, and build target fields are resolved from the
+  Resource profile before deployment admission; provider-backed disambiguation for slash-containing
+  Git refs remains future work.
 - repository config file support now has a profile-only parser/schema, YAML discovery, CLI
   `--config`, profile-only `appaloft init`, and targeted tests proving identity/secret/unsupported
   field rejection plus ids-only `deployments.create`. Existing-resource profile drift handling and
@@ -501,8 +504,9 @@ Migration gaps:
   otherwise be ignored. Durable source link creation/reuse and explicit relink are handled outside
   `deployments.create`.
 - resource listener port is stored as `networkProfile.internalPort`; deployment admission does not read `runtimeProfile.port`.
-- archived-resource admission blocking is specified through `resources.archive`, but remains a
-  future implementation gap until explicit resource lifecycle state lands.
+- archived-resource admission blocking is active through `resources.archive`; deployment admission
+  rejects archived Resources with the shared `resource_archived` lifecycle error before creating a
+  deployment attempt.
 - runtime adapter behavior treats reverse-proxy `internalPort` as a workload-local listener rather
   than a globally unique host port; same-port reverse-proxy resources require resource-scoped
   cleanup/replacement.
@@ -510,21 +514,25 @@ Migration gaps:
   renderers in the runtime adapter. Legacy workspace install/build/start command text remains a
   shell-script leaf until runtime profile command fields are fully remodeled.
 - runtime target execution selection and deployment admission now use a
-  `RuntimeTargetBackendRegistry` for local-shell and generic-SSH single-server backends; admission
-  rejects unresolved backends with pre-acceptance `runtime_target_unsupported` checks before Swarm
-  or Kubernetes backends are added.
+  `RuntimeTargetBackendRegistry` for local-shell, generic-SSH single-server, and Docker Swarm
+  cluster backends; admission rejects unresolved backends with pre-acceptance
+  `runtime_target_unsupported` checks before any unsupported future backend such as Kubernetes can
+  be accepted.
 - dependency binding runtime injection is governed by ADR-040 and
   [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md).
   The current implementation captures safe runtime secret references, reports
   `ready | blocked | not-applicable` injection readiness, and rejects active non-injectable bindings
-  before acceptance. Store-backed resolution of dependency secret references into raw connection
-  values remains a migration gap.
+  before acceptance. Store-backed dependency secret value resolution is governed by ADR-041 and
+  [Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md);
+  local-shell and generic-SSH execution receive resolved dependency values as execution-only
+  redacted runtime environment, and Docker Swarm execution materializes resolved values as
+  deployment-scoped Docker secrets.
 - generated default access routing is governed by ADR-017, but the current runtime adapter path still contains adapter-facing requested deployment route fields that must be replaced by provider-neutral route resolution.
 
 ## Open Questions
 
-- Resource source/runtime/network operation names are resolved as accepted candidates:
+- Resource source/runtime/network operation names are active catalog operations:
   `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
-  Access profile configuration remains a separate future behavior governed by ADR-017 and the
-  routing/domain/TLS specs. Generic aggregate update commands are forbidden by
+  Access profile configuration is active through `resources.configure-access` and remains governed
+  by ADR-017 and the routing/domain/TLS specs. Generic aggregate update commands are forbidden by
   [ADR-026](../decisions/ADR-026-aggregate-mutation-command-boundary.md).
