@@ -89,6 +89,12 @@ export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerR
             .select("source_fingerprint as id")
             .where("resource_id", "=", input.resourceId)
             .execute();
+          const dependencyBindingRows = await executor
+            .selectFrom("resource_dependency_bindings")
+            .select("id")
+            .where("resource_id", "=", input.resourceId)
+            .where("lifecycle_status", "=", "active")
+            .execute();
           const serverAppliedRouteRows = await executor
             .selectFrom("server_applied_route_states")
             .select("route_set_id as id")
@@ -102,6 +108,11 @@ export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerR
             blockerFromRows("runtime-log-retention", "runtime-log-archive", runtimeLogRows),
             blockerFromRows("audit-retention", "audit-log", auditRows),
             blockerFromRows("source-link", "source-link", sourceLinkRows),
+            blockerFromRows(
+              "dependency-binding",
+              "resource-dependency-binding",
+              dependencyBindingRows,
+            ),
             blockerFromRows("server-applied-route", "server-applied-route", serverAppliedRouteRows),
           ].filter((blocker): blocker is ResourceDeletionBlocker => blocker !== null);
 

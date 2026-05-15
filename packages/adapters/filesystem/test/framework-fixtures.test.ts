@@ -151,16 +151,17 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
     fixture: "svelte-spa",
     runtimeFamily: "node",
     framework: "svelte",
-    packageManager: "yarn",
+    packageManager: "npm",
     applicationShape: "static",
-    detectedFiles: ["yarn-lock"],
+    detectedFiles: [],
     fixedVersions: {
-      packageManager: "yarn@4.6.0",
+      packageManager: "npm@10.9.2",
       dependencies: {
         svelte: "5.19.7",
       },
       devDependencies: {
-        "@rollup/plugin-svelte": "7.2.2",
+        "@rollup/plugin-node-resolve": "16.0.3",
+        "rollup-plugin-svelte": "7.2.3",
         rollup: "4.34.8",
       },
     },
@@ -358,13 +359,18 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
     fixture: "koa-server",
     runtimeFamily: "node",
     framework: "koa",
-    packageManager: "yarn",
+    packageManager: "npm",
     applicationShape: "serverful-http",
-    detectedFiles: ["yarn-lock"],
+    detectedFiles: [],
     fixedVersions: {
-      packageManager: "yarn@4.6.0",
+      packageManager: "npm@10.9.2",
       dependencies: {
         koa: "2.16.0",
+      },
+      devDependencies: {
+        "@types/koa": "2.15.0",
+        "@types/node": "22.13.10",
+        typescript: "5.8.2",
       },
     },
   },
@@ -445,8 +451,12 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
     framework: "flask",
     packageManager: "poetry",
     applicationShape: "serverful-http",
-    detectedFiles: ["pyproject-toml", "poetry-lock"],
-    fixedVersions: {},
+    detectedFiles: ["pyproject-toml"],
+    fixedVersions: {
+      filesContain: {
+        "pyproject.toml": ['Flask = "3.1.0"', "poetry-core==1.9.1"],
+      },
+    },
   },
   {
     matrixIds: "WF-PLAN-PY-007,WF-PLAN-PY-008,WF-PLAN-PY-012",
@@ -513,6 +523,20 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
     fixedVersions: {
       filesContain: {
         "build.gradle.kts": ["org.springframework.boot", "3.4.4", "spring-boot-starter-web"],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-013,WF-PLAN-JVM-016,WF-PLAN-JVM-008,WF-PLAN-JVM-014",
+    fixture: "quarkus-maven",
+    runtimeFamily: "java",
+    framework: "quarkus",
+    packageManager: "maven",
+    applicationShape: "serverful-http",
+    detectedFiles: ["pom-xml", "jvm-runnable-jar"],
+    fixedVersions: {
+      filesContain: {
+        "pom.xml": ["io.quarkus", "3.21.0", "quarkus-maven-plugin"],
       },
     },
   },

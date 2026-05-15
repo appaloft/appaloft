@@ -170,8 +170,8 @@ The command must not:
 | --- | --- |
 | CLI | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` derives the preview fingerprint from trusted source/config/preview context, resolves the selected state backend, and dispatches this command. |
 | GitHub Actions | A user-authored `pull_request.closed` workflow may run the same CLI path directly or through a thin wrapper that maps trusted preview inputs to the same CLI command. |
-| API/oRPC | `POST /api/deployments/cleanup-preview` accepts the same command schema for hosted/self-hosted control planes and returns the cleanup result. |
-| Web | Future preview management UI may call the same command after showing the selected preview state and cleanup impact. |
+| API/oRPC | `POST /api/deployments/cleanup-preview` accepts the same command schema for hosted/self-hosted control planes, authorizes Action-server `preview-cleanup` calls with deploy-token scope before command dispatch, and returns the cleanup result. |
+| Web | Product-grade preview Web deletion uses `preview-environments.delete`, which delegates to the preview cleanup service for one preview environment while preserving deployment history. It does not expose raw `sourceFingerprint` cleanup input. |
 
 ## Error Contract
 
@@ -198,14 +198,16 @@ At minimum, Test-First and Code Round coverage must prove:
 - CLI preview cleanup derives the preview fingerprint from trusted preview context and resolves the
   same remote-state lifecycle path as preview deploy.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 `deployments.cleanup-preview` is active in the application operation catalog, CLI surface, and
 HTTP/oRPC surface. The CLI derives the preview-scoped source fingerprint from the same
 source/config/preview context used by preview deploy, resolves remote state when SSH-targeted state
 is selected, and dispatches the command through the application command bus. The HTTP/oRPC surface
-accepts an already-derived source fingerprint so self-hosted server API mode remains the state
-owner.
+accepts an already-derived source fingerprint so hosted and self-hosted server API mode remain the
+state owner; Action-server requests marked with `x-appaloft-action-command: preview-cleanup` must
+present a deploy token authorized for the preview cleanup workflow before the command is
+dispatched.
 
 Current implementation cleans preview runtime state through the injected execution backend, sweeps
 additional stale preview deployments in the same linked project/environment scope when their runtime
@@ -214,7 +216,9 @@ filesystem-backed server-applied preview route desired state both for the linked
 additional matching preview-fingerprint route rows, and unlinks the preview source fingerprint from
 the selected state backend. Resource access read models suppress current-route projection for
 preview environment deployment snapshots after their preview source link is absent, while retaining
-deployment history for audit. HTTP/oRPC and Web preview cleanup entrypoints remain future work.
+deployment history for audit. Product-grade Web deletion is active through
+`preview-environments.delete`; direct Web entry of an arbitrary preview `sourceFingerprint` remains
+intentionally unavailable.
 
 Current implementation now applies logical preview-lifecycle scoped coordination in the shell/runtime
 path. In SSH `ssh-pglite` mode, shell still performs brief backend state-root maintenance for
@@ -222,6 +226,7 @@ mirror prepare/upload, and final upload may retry after `remote_state_revision_c
 non-overlapping PG/PGlite row changes onto a fresher remote snapshot. Overlapping row edits still
 fail with a structured infrastructure merge conflict.
 
-Current implementation does not yet remove all preview-owned inert Docker images, BuildKit/build
-cache, or remote SSH source workspaces. On long-lived single-server targets this can accumulate
-substantial disk and inode usage even when preview routes and source links have been cleaned.
+Current implementation removes ownership-proven generated preview source workspaces under local or
+SSH runtime roots and generated preview images for Docker-container preview deployments. BuildKit
+and Docker build-cache cleanup remains governed by explicit `servers.capacity.prune` category
+opt-in rather than implicit preview cleanup.

@@ -219,4 +219,65 @@ describe("terminal session websocket", () => {
       app.server?.stop(true);
     }
   });
+
+  test("[TERM-SESSION-TRANSPORT-003] routes client resize frames to the attached terminal session", async () => {
+    const terminalSessionGateway = new TestTerminalSessionGateway();
+    const app = createHttpApp({
+      config: resolveConfig({
+        flags: {
+          appVersion: "0.1.0-test",
+          authProvider: "none",
+          webStaticDir: "",
+        },
+      }),
+      commandBus: {} as unknown as CommandBus,
+      queryBus: {} as unknown as QueryBus,
+      logger: {
+        debug() {},
+        error() {},
+        info() {},
+        warn() {},
+      },
+      executionContextFactory: {
+        create(input) {
+          return createExecutionContext(input);
+        },
+      },
+      terminalSessionGateway,
+    });
+
+    app.listen({
+      hostname: "127.0.0.1",
+      port: 0,
+    });
+
+    const port = app.server?.port;
+    if (typeof port !== "number") {
+      throw new Error("HTTP test server did not expose a port");
+    }
+
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/terminal-sessions/term_test/attach`);
+
+    try {
+      await waitForOpen(socket);
+      expect(JSON.parse(await waitForMessage(socket))).toEqual({
+        kind: "ready",
+        sessionId: "term_test",
+      });
+
+      socket.send(JSON.stringify({ kind: "resize", rows: 40, cols: 120 }));
+
+      await waitFor(
+        () =>
+          terminalSessionGateway.session.resizes.some(
+            (resize) => resize.rows === 40 && resize.cols === 120,
+          ),
+        "Resize frame was not routed to terminal session",
+      );
+      expect(terminalSessionGateway.attachedSessionId).toBe("term_test");
+    } finally {
+      socket.close();
+      app.server?.stop(true);
+    }
+  });
 });

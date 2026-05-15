@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   domainError,
   err,
@@ -21,8 +22,6 @@ import {
   IngestPreviewPullRequestEventCommandHandler,
   type PreviewCleanupAttemptRecord,
   type PreviewCleanupAttemptRecorder,
-  type PreviewCleanupRetryCandidate,
-  type PreviewCleanupRetryCandidateReader,
   PreviewCleanupRetryScheduler,
   PreviewDeploymentProcessManager,
   type PreviewEnvironmentCleaner,
@@ -30,6 +29,9 @@ import {
   type PreviewEnvironmentCleanerResult,
   PreviewEnvironmentCleanupService,
   type PreviewEnvironmentRepository,
+  type PreviewExpiredEnvironmentCandidate,
+  type PreviewExpiredEnvironmentCandidateReader,
+  PreviewExpiryCleanupScheduler,
   type PreviewFeedbackRecord,
   type PreviewFeedbackRecorder,
   PreviewFeedbackService,
@@ -43,14 +45,29 @@ import {
   PreviewPolicyEvaluator,
   PreviewPullRequestEventIngestService,
   PreviewScopedConfigResolver,
+  type ProcessAttemptClaimer,
+  type ProcessAttemptClaimInput,
+  type ProcessAttemptClaimResult,
+  type ProcessAttemptCompleter,
+  type ProcessAttemptCompletionInput,
+  type ProcessAttemptCompletionResult,
+  type ProcessAttemptDeliveryCandidateFilter,
+  type ProcessAttemptDeliveryCandidateReader,
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
+  type ProcessAttemptRetryCandidateFilter,
+  type ProcessAttemptRetryCandidateReader,
+  type ProcessAttemptRetryGenerationInput,
+  type ProcessAttemptRetryGenerationResult,
+  type ProcessAttemptRetryGenerator,
   type RepositoryContext,
   type SourceEventDeploymentDispatcher,
   type SourceEventDeploymentDispatchInput,
   type SourceEventDeploymentDispatchResult,
   toRepositoryContext,
 } from "../src";
+
+const repoFile = (path: string) => new URL(`../../../${path}`, import.meta.url);
 
 class SequentialIdGenerator {
   private sequence = 0;
@@ -142,8 +159,21 @@ class InMemoryPreviewCleanupAttemptRecorder implements PreviewCleanupAttemptReco
   }
 }
 
-class InMemoryProcessAttemptRecorder implements ProcessAttemptRecorder {
+class InMemoryProcessAttemptRecorder
+  implements
+    ProcessAttemptRecorder,
+    ProcessAttemptRetryCandidateReader,
+    ProcessAttemptDeliveryCandidateReader,
+    ProcessAttemptRetryGenerator,
+    ProcessAttemptClaimer,
+    ProcessAttemptCompleter
+{
   readonly records: ProcessAttemptRecord[] = [];
+  readonly retryInputs: ProcessAttemptRetryCandidateFilter[] = [];
+  readonly deliveryInputs: ProcessAttemptDeliveryCandidateFilter[] = [];
+  readonly generationInputs: ProcessAttemptRetryGenerationInput[] = [];
+  readonly claimInputs: ProcessAttemptClaimInput[] = [];
+  readonly completionInputs: ProcessAttemptCompletionInput[] = [];
 
   async record(
     _context: RepositoryContext,
@@ -152,19 +182,249 @@ class InMemoryProcessAttemptRecorder implements ProcessAttemptRecorder {
     this.records.push(attempt);
     return ok(attempt);
   }
-}
-
-class InMemoryPreviewCleanupRetryCandidateReader implements PreviewCleanupRetryCandidateReader {
-  readonly inputs: Array<{ now: string; limit: number }> = [];
-
-  constructor(private readonly candidates: PreviewCleanupRetryCandidate[]) {}
 
   async listDueRetries(
     _context: RepositoryContext,
+    filter: ProcessAttemptRetryCandidateFilter,
+  ): Promise<ProcessAttemptRecord[]> {
+    this.retryInputs.push(filter);
+    return this.records
+      .filter(
+        (attempt) =>
+          (!filter.kind || attempt.kind === filter.kind) &&
+          attempt.status === "retry-scheduled" &&
+          attempt.retriable === true &&
+          typeof attempt.nextEligibleAt === "string" &&
+          attempt.nextEligibleAt.localeCompare(filter.now) <= 0,
+      )
+      .sort((left, right) => {
+        const leftEligible = left.nextEligibleAt ?? left.updatedAt;
+        const rightEligible = right.nextEligibleAt ?? right.updatedAt;
+        const eligibleOrder = leftEligible.localeCompare(rightEligible);
+        return eligibleOrder === 0 ? right.updatedAt.localeCompare(left.updatedAt) : eligibleOrder;
+      })
+      .slice(0, filter.limit ?? 50);
+  }
+
+  async listDueDeliveryCandidates(
+    _context: RepositoryContext,
+    filter: ProcessAttemptDeliveryCandidateFilter,
+  ): Promise<ProcessAttemptRecord[]> {
+    this.deliveryInputs.push(filter);
+    return this.records
+      .filter(
+        (attempt) =>
+          (!filter.kind || attempt.kind === filter.kind) &&
+          (!filter.operationKey || attempt.operationKey === filter.operationKey) &&
+          (attempt.status === "pending" || attempt.status === "retry-scheduled") &&
+          (!attempt.nextEligibleAt || attempt.nextEligibleAt.localeCompare(filter.now) <= 0),
+      )
+      .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+      .slice(0, filter.limit ?? 50);
+  }
+
+  async generateDueRetry(
+    _context: RepositoryContext,
+    input: ProcessAttemptRetryGenerationInput,
+  ): Promise<Result<ProcessAttemptRetryGenerationResult>> {
+    this.generationInputs.push(input);
+    const sourceAttempt = this.records.find((attempt) => attempt.id === input.sourceAttemptId);
+    if (!sourceAttempt) {
+      return ok({
+        status: "not-found",
+        sourceAttemptId: input.sourceAttemptId,
+      });
+    }
+    if (sourceAttempt.status !== "retry-scheduled" || sourceAttempt.retriable !== true) {
+      return ok({
+        status: "not-retriable",
+        sourceAttempt,
+      });
+    }
+    if (
+      !sourceAttempt.nextEligibleAt ||
+      sourceAttempt.nextEligibleAt.localeCompare(input.generatedAt) > 0
+    ) {
+      return ok({
+        status: "not-due",
+        sourceAttempt,
+      });
+    }
+    if (sourceAttempt.dedupeKey) {
+      const latestAttempt = this.records
+        .filter((attempt) => attempt.dedupeKey === sourceAttempt.dedupeKey)
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+      if (latestAttempt && latestAttempt.id !== sourceAttempt.id) {
+        return ok({
+          status: "stale-generation",
+          sourceAttempt,
+          latestAttempt,
+        });
+      }
+    }
+
+    const retryAttempt: ProcessAttemptRecord = {
+      id: input.retryAttemptId,
+      kind: sourceAttempt.kind,
+      status: "pending",
+      operationKey: sourceAttempt.operationKey,
+      updatedAt: input.generatedAt,
+      startedAt: input.generatedAt,
+      nextActions: ["no-action"],
+      phase: input.phase,
+      step: input.step,
+      retriable: false,
+      ...(sourceAttempt.dedupeKey
+        ? { dedupeKey: `${sourceAttempt.dedupeKey}:retry:${input.retryAttemptId}` }
+        : {}),
+      ...(sourceAttempt.correlationId ? { correlationId: sourceAttempt.correlationId } : {}),
+      ...(sourceAttempt.requestId ? { requestId: sourceAttempt.requestId } : {}),
+      ...(sourceAttempt.projectId ? { projectId: sourceAttempt.projectId } : {}),
+      ...(sourceAttempt.resourceId ? { resourceId: sourceAttempt.resourceId } : {}),
+      ...(sourceAttempt.deploymentId ? { deploymentId: sourceAttempt.deploymentId } : {}),
+      ...(sourceAttempt.serverId ? { serverId: sourceAttempt.serverId } : {}),
+      ...(sourceAttempt.domainBindingId ? { domainBindingId: sourceAttempt.domainBindingId } : {}),
+      ...(sourceAttempt.certificateId ? { certificateId: sourceAttempt.certificateId } : {}),
+      safeDetails: {
+        ...(sourceAttempt.safeDetails ?? {}),
+        ...(input.safeDetails ?? {}),
+        retryOfWorkId: sourceAttempt.id,
+        generatedAt: input.generatedAt,
+        ...(sourceAttempt.dedupeKey ? { retryOfDedupeKey: sourceAttempt.dedupeKey } : {}),
+      },
+    };
+
+    Object.assign(sourceAttempt, {
+      retriable: false,
+      nextEligibleAt: undefined,
+      nextActions: ["no-action"],
+      safeDetails: {
+        ...(sourceAttempt.safeDetails ?? {}),
+        retryGeneratedAt: input.generatedAt,
+        retryAttemptId: input.retryAttemptId,
+      },
+    });
+    this.records.push(retryAttempt);
+
+    return ok({
+      status: "generated",
+      sourceAttempt,
+      retryAttempt,
+    });
+  }
+
+  async claimDue(
+    _context: RepositoryContext,
+    input: ProcessAttemptClaimInput,
+  ): Promise<Result<ProcessAttemptClaimResult>> {
+    this.claimInputs.push(input);
+    const attempt = this.records.find((record) => record.id === input.attemptId);
+    if (!attempt) {
+      return ok({
+        status: "not-found",
+        attemptId: input.attemptId,
+      });
+    }
+    if (attempt.status === "running") {
+      return ok({
+        status: "already-claimed",
+        attempt,
+      });
+    }
+    if (attempt.status !== "pending" && attempt.status !== "retry-scheduled") {
+      return ok({
+        status: "not-claimable",
+        attempt,
+      });
+    }
+    if (attempt.nextEligibleAt && attempt.nextEligibleAt.localeCompare(input.claimedAt) > 0) {
+      return ok({
+        status: "not-due",
+        attempt,
+      });
+    }
+
+    Object.assign(attempt, {
+      status: "running",
+      phase: "worker-claim",
+      step: "claimed",
+      updatedAt: input.claimedAt,
+      retriable: false,
+      nextEligibleAt: undefined,
+      nextActions: ["no-action"],
+      safeDetails: {
+        ...(attempt.safeDetails ?? {}),
+        ...(input.safeDetails ?? {}),
+        claimedAt: input.claimedAt,
+        claimedBy: input.workerId,
+      },
+    });
+
+    return ok({
+      status: "claimed",
+      attempt,
+    });
+  }
+
+  async complete(
+    _context: RepositoryContext,
+    input: ProcessAttemptCompletionInput,
+  ): Promise<Result<ProcessAttemptCompletionResult>> {
+    this.completionInputs.push(input);
+    const attempt = this.records.find((record) => record.id === input.attemptId);
+    if (!attempt) {
+      return ok({
+        status: "not-found",
+        attemptId: input.attemptId,
+      });
+    }
+    if (attempt.status !== "running") {
+      return ok({
+        status: "not-running",
+        attempt,
+      });
+    }
+
+    Object.assign(attempt, {
+      status: input.status,
+      phase: input.phase,
+      step: input.step,
+      updatedAt: input.completedAt,
+      finishedAt: input.status === "retry-scheduled" ? undefined : input.completedAt,
+      errorCode: input.errorCode,
+      errorCategory: input.errorCategory,
+      retriable: input.retriable ?? input.status === "retry-scheduled",
+      nextEligibleAt: input.status === "retry-scheduled" ? input.nextEligibleAt : undefined,
+      nextActions: input.nextActions,
+      safeDetails: {
+        ...(attempt.safeDetails ?? {}),
+        ...(input.safeDetails ?? {}),
+        completedAt: input.completedAt,
+      },
+    });
+
+    return ok({
+      status: "completed",
+      attempt,
+    });
+  }
+}
+
+class InMemoryPreviewExpiredEnvironmentCandidateReader
+  implements PreviewExpiredEnvironmentCandidateReader
+{
+  readonly inputs: Array<{ now: string; limit: number }> = [];
+
+  constructor(private readonly candidates: PreviewExpiredEnvironmentCandidate[]) {}
+
+  async listExpiredActive(
+    _context: RepositoryContext,
     input: { now: string; limit: number },
-  ): Promise<PreviewCleanupRetryCandidate[]> {
+  ): Promise<PreviewExpiredEnvironmentCandidate[]> {
     this.inputs.push(input);
-    return this.candidates.slice(0, input.limit);
+    return this.candidates
+      .filter((candidate) => Date.parse(candidate.expiresAt) <= Date.parse(input.now))
+      .slice(0, input.limit);
   }
 }
 
@@ -778,6 +1038,40 @@ describe("PreviewPolicyEvaluator", () => {
     expect(JSON.stringify(projected)).not.toContain("preview-runtime");
     expect(JSON.stringify(projected)).not.toContain("database");
     expect(JSON.stringify(projected)).not.toContain("secretRef");
+  });
+});
+
+describe("Product-grade preview source-of-truth sync", () => {
+  test("[PG-PREVIEW-SURFACE-001] Action-only workflow spec does not preserve stale product-grade future-control-plane gaps", () => {
+    const actionWorkflowSpec = readFileSync(
+      repoFile("docs/workflows/github-action-pr-preview-deploy.md"),
+      "utf8",
+    );
+
+    expect(actionWorkflowSpec).toContain("Action-only preview workflows do not own");
+    expect(actionWorkflowSpec).toContain(
+      "product-grade preview control-plane specs and operations",
+    );
+    expect(actionWorkflowSpec).toContain("The current control-plane shape is:");
+    expect(actionWorkflowSpec).not.toContain("The future shape is:");
+    expect(actionWorkflowSpec).not.toContain(
+      "Product-grade preview creation, policy, cleanup, comments, audit, scheduler behavior, and no-workflow GitHub App execution remain future control-plane behavior.",
+    );
+    expect(actionWorkflowSpec).not.toContain(
+      "Product-grade comments, check runs, richer deployment status synchronization, preview policies, and scheduled cleanup remain future GitHub App/control-plane work.",
+    );
+  });
+
+  test("[PG-PREVIEW-EVENT-001] core operations does not preserve stale preview context mapping gaps", () => {
+    const coreOperations = readFileSync(repoFile("docs/CORE_OPERATIONS.md"), "utf8");
+
+    expect(coreOperations).toContain(
+      "resolves repository full name/provider repository id plus base ref",
+    );
+    expect(coreOperations).toContain("through the source-event policy reader");
+    expect(coreOperations).not.toContain(
+      "repository or installation mapping remains future control-plane work",
+    );
   });
 });
 
@@ -2026,30 +2320,53 @@ describe("PreviewEnvironmentCleanupService", () => {
     );
     const cleaner = new CapturingPreviewEnvironmentCleaner();
     const recorder = new InMemoryPreviewCleanupAttemptRecorder();
+    const processAttempts = new InMemoryProcessAttemptRecorder();
     const cleanup = new PreviewEnvironmentCleanupService(
       repository,
       cleaner,
       recorder,
       new FixedClock("2026-05-06T06:05:00.000Z"),
       new SequentialIdGenerator(),
+      processAttempts,
+      processAttempts,
+      processAttempts,
     );
-    const retryCandidateReader = new InMemoryPreviewCleanupRetryCandidateReader([
-      {
-        attemptId: "pcln_previous_retry",
+    processAttempts.records.push({
+      id: "pcln_previous_retry",
+      kind: "system",
+      status: "retry-scheduled",
+      operationKey: "preview-environments.delete",
+      dedupeKey: "preview-cleanup:prenv_1:res_preview_api:srcfp_preview_cleanup_scheduler",
+      correlationId: "req_preview_environment_cleanup_scheduler_test",
+      requestId: "req_preview_environment_cleanup_scheduler_test",
+      phase: "provider-metadata-cleanup",
+      step: "cleanup-failed",
+      resourceId: "res_preview_api",
+      startedAt: "2026-05-06T05:55:00.000Z",
+      updatedAt: "2026-05-06T05:55:00.000Z",
+      errorCode: "provider_error",
+      errorCategory: "provider",
+      retriable: true,
+      nextEligibleAt: "2026-05-06T06:00:00.000Z",
+      nextActions: ["retry", "manual-review"],
+      safeDetails: {
         previewEnvironmentId: "prenv_1",
         resourceId: "res_preview_api",
         sourceBindingFingerprint: "srcfp_preview_cleanup_scheduler",
-        owner: "req_preview_environment_cleanup_scheduler_test",
-        phase: "provider-metadata-cleanup",
-        nextRetryAt: "2026-05-06T06:00:00.000Z",
+        provider: "github",
+        repositoryFullName: "appaloft/demo",
+        pullRequestNumber: 52,
       },
-    ]);
+    });
     const logger = new CapturingLogger();
     const scheduler = new PreviewCleanupRetryScheduler(
-      retryCandidateReader,
       cleanup,
       new FixedClock("2026-05-06T06:06:00.000Z"),
       logger,
+      processAttempts,
+      processAttempts,
+      processAttempts,
+      new SequentialIdGenerator(),
     );
     const context = createExecutionContext({
       requestId: "req_preview_environment_cleanup_scheduler_test",
@@ -2078,14 +2395,73 @@ describe("PreviewEnvironmentCleanupService", () => {
 
     expect(deployed.isOk()).toBe(true);
     expect(result.isOk()).toBe(true);
-    expect(retryCandidateReader.inputs).toEqual([
+    expect(processAttempts.retryInputs).toEqual([
       {
+        kind: "system",
         now: "2026-05-06T06:06:00.000Z",
         limit: 5,
       },
     ]);
+    expect(processAttempts.generationInputs).toEqual([
+      {
+        sourceAttemptId: "pcln_previous_retry",
+        retryAttemptId: "pcln_1",
+        generatedAt: "2026-05-06T06:06:00.000Z",
+        phase: "preview-cleanup-retry",
+        step: "queued",
+        safeDetails: {
+          generatedBy: "preview-cleanup-retry-scheduler",
+        },
+      },
+    ]);
+    expect(processAttempts.deliveryInputs).toEqual([
+      {
+        kind: "system",
+        operationKey: "preview-environments.delete",
+        now: "2026-05-06T06:06:00.000Z",
+        limit: 5,
+      },
+      {
+        kind: "system",
+        operationKey: "deployments.cleanup-preview",
+        now: "2026-05-06T06:06:00.000Z",
+        limit: 5,
+      },
+    ]);
+    expect(processAttempts.claimInputs).toEqual([
+      {
+        attemptId: "pcln_1",
+        workerId: "preview-cleanup-retry-scheduler",
+        claimedAt: "2026-05-06T06:05:00.000Z",
+        safeDetails: {
+          previewEnvironmentId: "prenv_1",
+          resourceId: "res_preview_api",
+          sourceBindingFingerprint: "srcfp_preview_cleanup_scheduler",
+          provider: "github",
+          repositoryFullName: "appaloft/demo",
+          pullRequestNumber: 52,
+        },
+      },
+    ]);
+    expect(processAttempts.completionInputs).toEqual([
+      {
+        attemptId: "pcln_1",
+        status: "succeeded",
+        completedAt: "2026-05-06T06:05:00.000Z",
+        phase: "preview-cleanup",
+        step: "cleanup-completed",
+        nextActions: ["no-action"],
+        safeDetails: expect.objectContaining({
+          previewEnvironmentId: "prenv_1",
+          resourceId: "res_preview_api",
+          sourceBindingFingerprint: "srcfp_preview_cleanup_scheduler",
+          cleanedRuntime: true,
+          removedRoute: true,
+        }),
+      },
+    ]);
     expect(result._unsafeUnwrap()).toEqual({
-      scanned: 1,
+      scanned: 3,
       dispatched: [
         {
           previewEnvironmentId: "prenv_1",
@@ -2106,6 +2482,144 @@ describe("PreviewEnvironmentCleanupService", () => {
         phase: "preview-cleanup",
         attemptedAt: "2026-05-06T06:05:00.000Z",
         owner: "req_preview_environment_cleanup_scheduler_test",
+      }),
+    ]);
+    expect(processAttempts.records).toEqual([
+      expect.objectContaining({
+        id: "pcln_previous_retry",
+        status: "retry-scheduled",
+        retriable: false,
+        safeDetails: expect.objectContaining({
+          retryGeneratedAt: "2026-05-06T06:06:00.000Z",
+          retryAttemptId: "pcln_1",
+        }),
+      }),
+      expect.objectContaining({
+        id: "pcln_1",
+        kind: "system",
+        status: "succeeded",
+        operationKey: "preview-environments.delete",
+        dedupeKey:
+          "preview-cleanup:prenv_1:res_preview_api:srcfp_preview_cleanup_scheduler:retry:pcln_1",
+        phase: "preview-cleanup",
+        step: "cleanup-completed",
+        resourceId: "res_preview_api",
+        updatedAt: "2026-05-06T06:05:00.000Z",
+        finishedAt: "2026-05-06T06:05:00.000Z",
+        nextActions: ["no-action"],
+        safeDetails: expect.objectContaining({
+          previewEnvironmentId: "prenv_1",
+          resourceId: "res_preview_api",
+          retryOfWorkId: "pcln_previous_retry",
+          generatedBy: "preview-cleanup-retry-scheduler",
+          claimedBy: "preview-cleanup-retry-scheduler",
+          completedAt: "2026-05-06T06:05:00.000Z",
+          cleanedRuntime: true,
+          removedProviderMetadata: true,
+        }),
+      }),
+    ]);
+    expect(cleaner.inputs).toHaveLength(1);
+    expect(logger.warnings).toEqual([]);
+  });
+
+  test("[PG-PREVIEW-POLICY-003] dispatches expired active previews through cleanup", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const lifecycle = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      projection,
+      new FixedClock("2026-05-06T05:55:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const cleaner = new CapturingPreviewEnvironmentCleaner();
+    const recorder = new InMemoryPreviewCleanupAttemptRecorder();
+    const cleanup = new PreviewEnvironmentCleanupService(
+      repository,
+      cleaner,
+      recorder,
+      new FixedClock("2026-05-06T06:05:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+    const expiredCandidateReader = new InMemoryPreviewExpiredEnvironmentCandidateReader([
+      {
+        previewEnvironmentId: "prenv_1",
+        resourceId: "res_preview_api",
+        expiresAt: "2026-05-06T06:00:00.000Z",
+      },
+      {
+        previewEnvironmentId: "prenv_future",
+        resourceId: "res_preview_api",
+        expiresAt: "2026-05-06T06:30:00.000Z",
+      },
+    ]);
+    const logger = new CapturingLogger();
+    const scheduler = new PreviewExpiryCleanupScheduler(
+      expiredCandidateReader,
+      cleanup,
+      new FixedClock("2026-05-06T06:06:00.000Z"),
+      logger,
+    );
+    const context = createExecutionContext({
+      requestId: "req_preview_expiry_cleanup_scheduler_test",
+      entrypoint: "system",
+    });
+
+    const deployed = await lifecycle.deployFromPolicyEligibleEvent(context, {
+      sourceEventId: "sevt_preview_expiry_cleanup_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_expiry_cleanup",
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "opened",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "appaloft/demo",
+      pullRequestNumber: 53,
+      headSha: "abc1234",
+      baseRef: "main",
+      verified: true,
+      expiresAt: "2026-05-06T06:00:00.000Z",
+    });
+    const result = await scheduler.run(context, { limit: 5 });
+
+    expect(deployed.isOk()).toBe(true);
+    expect(result.isOk()).toBe(true);
+    expect(expiredCandidateReader.inputs).toEqual([
+      {
+        now: "2026-05-06T06:06:00.000Z",
+        limit: 5,
+      },
+    ]);
+    expect(result._unsafeUnwrap()).toEqual({
+      scanned: 1,
+      dispatched: [
+        {
+          previewEnvironmentId: "prenv_1",
+          resourceId: "res_preview_api",
+          expiresAt: "2026-05-06T06:00:00.000Z",
+          attemptId: "pcln_1",
+          status: "cleaned",
+        },
+      ],
+      failed: [],
+    });
+    expect(repository.previewEnvironment?.toState().status.value).toBe("cleanup-requested");
+    expect(recorder.records).toEqual([
+      expect.objectContaining({
+        attemptId: "pcln_1",
+        previewEnvironmentId: "prenv_1",
+        resourceId: "res_preview_api",
+        status: "succeeded",
+        phase: "preview-cleanup",
+        attemptedAt: "2026-05-06T06:05:00.000Z",
+        owner: "req_preview_expiry_cleanup_scheduler_test",
       }),
     ]);
     expect(cleaner.inputs).toHaveLength(1);

@@ -43,7 +43,8 @@
 
 - [x] Add CLI Redis dependency commands.
 - [x] Add oRPC/HTTP Redis routes.
-- [x] Record Web/public-docs migration gap or complete a Docs/Web round.
+- [x] Record initial Web/public-docs handoff; later Web/docs slices closed public help and safe
+  dependency resource affordance coverage.
 
 ## Verification
 

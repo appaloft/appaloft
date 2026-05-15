@@ -39,7 +39,20 @@ appaloft server proxy repair srv_primary
 
 Terminal sessions are controlled troubleshooting tools, not the normal deployment path.
 
+The CLI keeps terminal opens scriptable by printing the session descriptor by default. Add
+`--attach` to `appaloft server terminal <serverId>` or
+`appaloft resource terminal <resourceId>` when you want the local terminal to connect directly to
+the accepted session.
+
 Use terminal session lifecycle operations to list active sessions, show one session's safe metadata, close one active session, or expire old active sessions. These operations return session ids, scope, target ids, provider key, transport path, timestamps, and status only. They do not expose terminal input, terminal output, raw commands, private keys, access tokens, or environment secret values.
+
+The Web Instance page shows the same active-session lifecycle view. It can close one active session
+or expire sessions older than one hour without attaching to the terminal transport or reading
+terminal output.
+
+Opening and closing a terminal writes safe audit metadata: session id, scope, target ids, actor,
+entrypoint, provider key, timestamps, and close reason. Audit records do not store terminal input,
+terminal output, raw commands, private keys, access tokens, or environment secret values.
 
 <h2 id="server-terminal-safe-copy">Copy output safely</h2>
 

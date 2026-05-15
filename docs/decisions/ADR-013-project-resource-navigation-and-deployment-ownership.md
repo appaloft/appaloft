@@ -207,9 +207,12 @@ The resource-scoped diagnostic summary query now exists and resource detail can 
 JSON payload. Deployment detail and Quick Deploy completion do not yet expose the affordance
 directly.
 
-Operator terminal sessions are specified as accepted candidate behavior, but the resource detail
-terminal affordance, server terminal affordance, terminal command, transport, and runtime adapter
-are not implemented yet.
+Operator terminal sessions are implemented through the separate operator terminal boundary. Resource
+detail exposes a resource terminal tab, server detail exposes a server terminal tab/action,
+deployment detail deep-links to the resource terminal with a selected deployment id, CLI resource
+and server attach commands dispatch the same `terminal-sessions.open` command, and HTTP/WebSocket
+transport coverage lives in the operator terminal session matrix. ADR-013 delegates detailed
+terminal behavior to ADR-022 instead of owning a parallel terminal contract.
 
 ## Open Questions
 

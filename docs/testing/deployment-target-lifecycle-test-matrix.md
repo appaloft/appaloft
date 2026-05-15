@@ -76,12 +76,14 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 | SRV-LIFE-ENTRY-004 | Web | e2e-preferred | Server detail page. | Web server detail reads `servers.show` for identity/status/rollups while keeping repair/terminal actions separate. |
 | SRV-LIFE-ENTRY-005 | CLI | e2e-preferred | Server deactivate command. | `appaloft server deactivate <serverId>` dispatches `DeactivateServerCommand`; no repository bypass. |
 | SRV-LIFE-ENTRY-006 | HTTP/oRPC | e2e-preferred | Server deactivate route. | `POST /api/servers/{serverId}/deactivate` reuses `DeactivateServerCommandInput`, dispatches through `CommandBus`, and returns `{ id }`. |
+| SRV-LIFE-ENTRY-006-WEB | Web | e2e-preferred | Server detail deactivate action. | Web server detail enables deactivate only for active servers, requires exact typed server-id confirmation, dispatches the typed `servers.deactivate` oRPC client, and refreshes lifecycle/delete-safety readback after success. |
 | SRV-LIFE-ENTRY-007 | CLI | e2e-preferred | Server delete-check command. | `appaloft server delete-check <serverId>` dispatches `CheckServerDeleteSafetyQuery`; no repository bypass. |
 | SRV-LIFE-ENTRY-008 | HTTP/oRPC | e2e-preferred | Server delete-check route. | `GET /api/servers/{serverId}/delete-check` reuses `CheckServerDeleteSafetyQueryInput`, dispatches through `QueryBus`, and returns `ServerDeleteSafety`. |
 | SRV-LIFE-ENTRY-009 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.deactivate` and `servers.delete-check`. |
 | SRV-LIFE-ENTRY-010 | CLI | e2e-preferred | Server delete command. | `appaloft server delete <serverId> --confirm <serverId>` dispatches `DeleteServerCommand`; no repository bypass. |
 | SRV-LIFE-ENTRY-011 | HTTP/oRPC | e2e-preferred | Server delete route. | `DELETE /api/servers/{serverId}` reuses `DeleteServerCommandInput`, dispatches through `CommandBus`, and returns `{ id }`. |
 | SRV-LIFE-ENTRY-012 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.delete`. |
+| SRV-LIFE-ENTRY-012-WEB | Web | contract | Server detail destructive delete action. | Web server detail reads `servers.delete-check`, disables delete while ineligible, requires exact typed server-id confirmation, dispatches the typed `servers.delete` oRPC client, and navigates back to the server list after success. |
 | SRV-LIFE-ENTRY-013 | CLI | e2e-preferred | Server rename command. | `appaloft server rename <serverId> --name <name>` dispatches `RenameServerCommand`; no repository bypass. |
 | SRV-LIFE-ENTRY-014 | HTTP/oRPC | e2e-preferred | Server rename route. | `POST /api/servers/{serverId}/rename` reuses `RenameServerCommandInput`, dispatches through `CommandBus`, and returns `{ id }`. |
 | SRV-LIFE-ENTRY-015 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.rename`. |
@@ -128,11 +130,12 @@ The active implementation covers:
 `SRV-LIFE-SHOW-004` is covered as a companion branch in `packages/application/test/show-server.test.ts`.
 `SRV-LIFE-ENTRY-004` is covered in `apps/web/test/e2e-webview/home.webview.test.ts`.
 
-`SRV-LIFE-DEACT-*`, `SRV-LIFE-DELETE-CHECK-*`, and `SRV-LIFE-ENTRY-005` through
-`SRV-LIFE-ENTRY-009` are the required coverage rows for the deactivate/delete-safety Code Round.
+`SRV-LIFE-DEACT-*`, `SRV-LIFE-DELETE-CHECK-*`, `SRV-LIFE-ENTRY-005` through
+`SRV-LIFE-ENTRY-009`, and `SRV-LIFE-ENTRY-006-WEB` are the required coverage rows for the
+deactivate/delete-safety Code Round.
 
-`SRV-LIFE-DELETE-*` and `SRV-LIFE-ENTRY-010` through `SRV-LIFE-ENTRY-012` are the required coverage
-rows for the guarded delete Code Round.
+`SRV-LIFE-DELETE-*`, `SRV-LIFE-ENTRY-010` through `SRV-LIFE-ENTRY-012`, and
+`SRV-LIFE-ENTRY-012-WEB` are the required coverage rows for the guarded delete Code Round.
 
 `SRV-LIFE-RENAME-*` and `SRV-LIFE-ENTRY-013` through `SRV-LIFE-ENTRY-016` are the required coverage
 rows for the server rename Code Round.

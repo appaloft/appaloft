@@ -234,7 +234,7 @@ and limitations, not as a new deployment method or a replacement for explicit fr
   `deployments.create`.
 - Do not introduce provider SDK, Docker SDK, Kubernetes, or framework package types into core.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 - `deployments.plan` is active across application, operation catalog, HTTP/oRPC, CLI, Web, public
   docs/help, and targeted contract coverage.
@@ -242,7 +242,8 @@ and limitations, not as a new deployment method or a replacement for explicit fr
   install/build/start steps.
 - Some access route planning data is available through resource access/proxy read models; the first
   plan preview may report access summary as unavailable rather than recomputing every route branch.
-- Full future MCP/tool descriptors remain a follow-up after the operation catalog entry is active.
+- MCP/tool descriptor promotion remains governed by the operation catalog descriptor pipeline and
+  future tool dispatch boundary.
 
 ## Open Questions
 

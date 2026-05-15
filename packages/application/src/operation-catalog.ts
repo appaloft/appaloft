@@ -144,6 +144,10 @@ import { unsetResourceVariableCommandInputSchema } from "./operations/resources/
 import { configureRetentionDefaultsCommandInputSchema } from "./operations/retention-defaults/configure-retention-defaults.command";
 import { listRetentionDefaultsQueryInputSchema } from "./operations/retention-defaults/list-retention-defaults.query";
 import { showRetentionDefaultQueryInputSchema } from "./operations/retention-defaults/show-retention-default.query";
+import { configureRuntimeMonitoringThresholdsCommandInputSchema } from "./operations/runtime-monitoring/configure-runtime-monitoring-thresholds.command";
+import { listRuntimeMonitoringSamplesQueryInputSchema } from "./operations/runtime-monitoring/list-runtime-monitoring-samples.query";
+import { runtimeMonitoringRollupQueryInputSchema } from "./operations/runtime-monitoring/runtime-monitoring-rollup.query";
+import { showRuntimeMonitoringThresholdsQueryInputSchema } from "./operations/runtime-monitoring/show-runtime-monitoring-thresholds.query";
 import { inspectRuntimeUsageQueryInputSchema } from "./operations/runtime-usage/inspect-runtime-usage.query";
 import { createScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/create-scheduled-task.command";
 import { deleteScheduledTaskCommandInputSchema } from "./operations/scheduled-tasks/delete-scheduled-task.command";
@@ -179,6 +183,7 @@ import { ingestSourceEventCommandInputSchema } from "./operations/source-events/
 import { listSourceEventsQueryInputSchema } from "./operations/source-events/list-source-events.query";
 import { showSourceEventQueryInputSchema } from "./operations/source-events/show-source-event.query";
 import { relinkSourceLinkCommandInputSchema } from "./operations/source-links/relink-source-link.command";
+import { cleanupStorageVolumeRuntimeCommandInputSchema } from "./operations/storage-volumes/cleanup-storage-volume-runtime.command";
 import { createStorageVolumeCommandInputSchema } from "./operations/storage-volumes/create-storage-volume.command";
 import { deleteStorageVolumeCommandInputSchema } from "./operations/storage-volumes/delete-storage-volume.command";
 import { listStorageVolumesQueryInputSchema } from "./operations/storage-volumes/list-storage-volumes.query";
@@ -212,6 +217,7 @@ type OperationDomain =
   | "provider-job-logs"
   | "retention-defaults"
   | "runtime-usage"
+  | "runtime-monitoring"
   | "organizations"
   | "deployments"
   | "operator-work"
@@ -748,6 +754,62 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft runtime-usage inspect <scope>",
       orpc: { method: "GET", path: "/api/runtime-usage/inspect" },
+    },
+  },
+  {
+    key: "runtime-monitoring.samples.list",
+    kind: "query",
+    domain: "runtime-monitoring",
+    messageName: "ListRuntimeMonitoringSamplesQuery",
+    handlerName: "ListRuntimeMonitoringSamplesQueryHandler",
+    serviceName: "RuntimeMonitoringSamplesQueryService",
+    inputSchema: listRuntimeMonitoringSamplesQueryInputSchema,
+    serviceToken: tokens.listRuntimeMonitoringSamplesQueryService,
+    transports: {
+      cli: "appaloft runtime-monitoring samples <scope> --from <iso> --to <iso>",
+      orpc: { method: "GET", path: "/api/runtime-monitoring/samples" },
+    },
+  },
+  {
+    key: "runtime-monitoring.rollup",
+    kind: "query",
+    domain: "runtime-monitoring",
+    messageName: "RuntimeMonitoringRollupQuery",
+    handlerName: "RuntimeMonitoringRollupQueryHandler",
+    serviceName: "RuntimeMonitoringRollupQueryService",
+    inputSchema: runtimeMonitoringRollupQueryInputSchema,
+    serviceToken: tokens.runtimeMonitoringRollupQueryService,
+    transports: {
+      cli: "appaloft runtime-monitoring rollup <scope> --from <iso> --to <iso> --bucket <bucket>",
+      orpc: { method: "GET", path: "/api/runtime-monitoring/rollup" },
+    },
+  },
+  {
+    key: "runtime-monitoring.thresholds.configure",
+    kind: "command",
+    domain: "runtime-monitoring",
+    messageName: "ConfigureRuntimeMonitoringThresholdsCommand",
+    handlerName: "ConfigureRuntimeMonitoringThresholdsCommandHandler",
+    serviceName: "ConfigureRuntimeMonitoringThresholdsUseCase",
+    inputSchema: configureRuntimeMonitoringThresholdsCommandInputSchema,
+    serviceToken: tokens.configureRuntimeMonitoringThresholdsUseCase,
+    transports: {
+      cli: "appaloft runtime-monitoring thresholds configure <scope> --rule <json>",
+      orpc: { method: "POST", path: "/api/runtime-monitoring/thresholds" },
+    },
+  },
+  {
+    key: "runtime-monitoring.thresholds.show",
+    kind: "query",
+    domain: "runtime-monitoring",
+    messageName: "ShowRuntimeMonitoringThresholdsQuery",
+    handlerName: "ShowRuntimeMonitoringThresholdsQueryHandler",
+    serviceName: "ShowRuntimeMonitoringThresholdsQueryService",
+    inputSchema: showRuntimeMonitoringThresholdsQueryInputSchema,
+    serviceToken: tokens.showRuntimeMonitoringThresholdsQueryService,
+    transports: {
+      cli: "appaloft runtime-monitoring thresholds show <scope>",
+      orpc: { method: "GET", path: "/api/runtime-monitoring/thresholds" },
     },
   },
   {
@@ -1835,6 +1897,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft storage volume delete <storageVolumeId>",
       orpc: { method: "DELETE", path: "/api/storage-volumes/{storageVolumeId}" },
+    },
+  },
+  {
+    key: "storage-volumes.cleanup-runtime",
+    kind: "command",
+    domain: "storage-volumes",
+    messageName: "CleanupStorageVolumeRuntimeCommand",
+    handlerName: "CleanupStorageVolumeRuntimeCommandHandler",
+    serviceName: "CleanupStorageVolumeRuntimeUseCase",
+    inputSchema: cleanupStorageVolumeRuntimeCommandInputSchema,
+    serviceToken: tokens.cleanupStorageVolumeRuntimeUseCase,
+    transports: {
+      cli: "appaloft storage volume cleanup-runtime <storageVolumeId> --server <serverId> --before <iso> [--dry-run false]",
+      orpc: { method: "POST", path: "/api/storage-volumes/{storageVolumeId}/runtime-cleanup" },
     },
   },
   {
@@ -2952,6 +3028,7 @@ export const operationCatalog = [
     serviceToken: tokens.doctorQueryService,
     transports: {
       cli: "appaloft doctor",
+      orpc: { method: "GET", path: "/api/system/doctor" },
     },
   },
   {

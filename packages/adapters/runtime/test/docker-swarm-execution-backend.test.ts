@@ -21,6 +21,7 @@ import {
   EnvironmentId,
   EnvironmentSnapshotId,
   ExecutionStrategyKindValue,
+  FilePathText,
   GeneratedAt,
   HealthCheckExpectedStatusCode,
   HealthCheckHostText,
@@ -133,6 +134,29 @@ class FailingVerifySwarmCommandRunner implements DockerSwarmCommandRunner {
   }
 }
 
+class CapacityExhaustedSwarmCommandRunner implements DockerSwarmCommandRunner {
+  readonly calls: DockerSwarmCommandRunnerInput[] = [];
+
+  constructor(
+    private readonly failureStep: string,
+    private readonly stderr: string,
+  ) {}
+
+  async run(
+    input: DockerSwarmCommandRunnerInput,
+  ): Promise<Result<DockerSwarmCommandRunnerResult>> {
+    this.calls.push(input);
+    if (input.step === this.failureStep) {
+      return ok({
+        exitCode: 1,
+        stderr: this.stderr,
+      });
+    }
+
+    return ok({ exitCode: 0 });
+  }
+}
+
 class SecretLeakingVerifySwarmCommandRunner implements DockerSwarmCommandRunner {
   readonly calls: DockerSwarmCommandRunnerInput[] = [];
 
@@ -215,6 +239,8 @@ function runtimeEnvironmentSnapshot(input: { secretKey?: string } = {}): Environ
 
 function runtimePlan(
   input: {
+    compose?: boolean;
+    composeFile?: string;
     healthPath?: string;
     image?: string;
     metadata?: Record<string, string>;
@@ -224,6 +250,9 @@ function runtimePlan(
 ): RuntimePlan {
   const image = ImageReference.rehydrate(input.image ?? "registry.example.com/team/app:sha");
   const port = PortNumber.rehydrate(input.port ?? 3000);
+  const metadata = input.compose
+    ? { swarmTargetService: "web", ...(input.metadata ?? {}) }
+    : input.metadata;
   const accessRoute = AccessRoute.rehydrate({
     proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
     domains: [PublicDomainName.rehydrate("api.example.com")],
@@ -231,6 +260,48 @@ function runtimePlan(
     tlsMode: TlsModeValue.rehydrate(input.tlsMode ?? "auto"),
     targetPort: port,
   });
+  const execution = input.compose
+    ? RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
+        composeFile: FilePathText.rehydrate(input.composeFile ?? "docker-compose.yml"),
+        accessRoutes: [accessRoute],
+        ...(metadata ? { metadata } : {}),
+      })
+    : RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
+        port,
+        image,
+        accessRoutes: [accessRoute],
+        healthCheck: {
+          enabled: true,
+          type: HealthCheckTypeValue.rehydrate("http"),
+          intervalSeconds: HealthCheckIntervalSeconds.rehydrate(10),
+          timeoutSeconds: HealthCheckTimeoutSeconds.rehydrate(5),
+          retries: HealthCheckRetryCount.rehydrate(3),
+          startPeriodSeconds: HealthCheckStartPeriodSeconds.rehydrate(0),
+          http: {
+            method: HealthCheckHttpMethodValue.rehydrate("GET"),
+            scheme: HealthCheckSchemeValue.rehydrate("http"),
+            host: HealthCheckHostText.rehydrate("127.0.0.1"),
+            port,
+            path: HealthCheckPathText.rehydrate(input.healthPath ?? "/healthz"),
+            expectedStatusCode: HealthCheckExpectedStatusCode.rehydrate(200),
+          },
+        },
+      });
+  const runtimeArtifact = input.compose
+    ? RuntimeArtifactSnapshot.rehydrate({
+        kind: RuntimeArtifactKindValue.rehydrate("compose-project"),
+        intent: RuntimeArtifactIntentValue.rehydrate("compose-project"),
+        composeFile: FilePathText.rehydrate(input.composeFile ?? "docker-compose.yml"),
+        ...(metadata ? { metadata } : {}),
+      })
+    : RuntimeArtifactSnapshot.rehydrate({
+        kind: RuntimeArtifactKindValue.rehydrate("image"),
+        intent: RuntimeArtifactIntentValue.rehydrate("prebuilt-image"),
+        image,
+        ...(metadata ? { metadata } : {}),
+      });
 
   return RuntimePlan.rehydrate({
     id: RuntimePlanId.rehydrate("rtp_swarm_backend"),
@@ -239,36 +310,10 @@ function runtimePlan(
       locator: SourceLocator.rehydrate("https://github.com/acme/app.git"),
       displayName: DisplayNameText.rehydrate("Acme App"),
     }),
-    buildStrategy: BuildStrategyKindValue.rehydrate("prebuilt-image"),
-    packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
-    execution: RuntimeExecutionPlan.rehydrate({
-      kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
-      port,
-      image,
-      accessRoutes: [accessRoute],
-      healthCheck: {
-        enabled: true,
-        type: HealthCheckTypeValue.rehydrate("http"),
-        intervalSeconds: HealthCheckIntervalSeconds.rehydrate(10),
-        timeoutSeconds: HealthCheckTimeoutSeconds.rehydrate(5),
-        retries: HealthCheckRetryCount.rehydrate(3),
-        startPeriodSeconds: HealthCheckStartPeriodSeconds.rehydrate(0),
-        http: {
-          method: HealthCheckHttpMethodValue.rehydrate("GET"),
-          scheme: HealthCheckSchemeValue.rehydrate("http"),
-          host: HealthCheckHostText.rehydrate("127.0.0.1"),
-          port,
-          path: HealthCheckPathText.rehydrate(input.healthPath ?? "/healthz"),
-          expectedStatusCode: HealthCheckExpectedStatusCode.rehydrate(200),
-        },
-      },
-    }),
-    runtimeArtifact: RuntimeArtifactSnapshot.rehydrate({
-      kind: RuntimeArtifactKindValue.rehydrate("image"),
-      intent: RuntimeArtifactIntentValue.rehydrate("prebuilt-image"),
-      image,
-      ...(input.metadata ? { metadata: input.metadata } : {}),
-    }),
+    buildStrategy: BuildStrategyKindValue.rehydrate(input.compose ? "compose-deploy" : "prebuilt-image"),
+    packagingMode: PackagingModeValue.rehydrate(input.compose ? "compose-bundle" : "all-in-one-docker"),
+    execution,
+    runtimeArtifact,
     target: DeploymentTargetDescriptor.rehydrate({
       kind: TargetKindValue.rehydrate("orchestrator-cluster"),
       providerKey: ProviderKey.rehydrate("docker-swarm"),
@@ -282,6 +327,8 @@ function runtimePlan(
 
 function runningDeployment(
   input: {
+    compose?: boolean;
+    composeFile?: string;
     deploymentId?: string;
     dependencySecretRef?: string;
     healthPath?: string;
@@ -490,6 +537,15 @@ async function commandOutputWithStdinFileRetry(input: {
   );
 }
 
+async function removeDockerVolumeWithRetry(volumeName: string): Promise<void> {
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    if (commandStatus(["docker", "volume", "rm", volumeName]) === 0) {
+      return;
+    }
+    await Bun.sleep(500);
+  }
+}
+
 async function prepareAuthenticatedRegistryImage(input: {
   baseImage: string;
   password: string;
@@ -654,6 +710,50 @@ describe("DockerSwarmExecutionBackend", () => {
     });
   });
 
+  test("[STOR-REALIZE-003][SWARM-TARGET-APPLY-001] executes fake Swarm Compose stack apply commands with storage mounts", async () => {
+    const runner = new RecordingSwarmCommandRunner();
+    const backend = new DockerSwarmExecutionBackend(runner);
+
+    const result = await backend.execute(
+      createContext(),
+      runningDeployment({
+        compose: true,
+        metadata: {
+          "storage.mounts": JSON.stringify([
+            {
+              attachmentId: "rsa_data",
+              storageVolumeId: "stv_data",
+              storageVolumeKind: "named-volume",
+              destinationPath: "/var/lib/app/data",
+              mountMode: "read-write",
+            },
+          ]),
+        },
+      }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const deployment = result._unsafeUnwrap().deployment.toState();
+
+    expect(deployment.status.value).toBe("succeeded");
+    expect(runner.calls.map((call) => call.step)).toEqual([
+      "deploy-candidate-stack",
+      "verify-candidate-service",
+      "promote-route-target",
+      "cleanup-superseded-services",
+    ]);
+    expect(runner.calls[0]?.command).toContain("docker stack deploy");
+    expect(runner.calls[0]?.command).toContain('"appaloft.managed": "true"');
+    expect(runner.calls[0]?.command).toContain('source: "appaloft-stv_data"');
+    expect(runner.calls[0]?.command).toContain('target: "/var/lib/app/data"');
+    expect(runner.calls[0]?.command).not.toContain("docker volume prune");
+    expect(runner.calls[3]?.command).toContain("docker stack rm \"$stack_name\"");
+    expect(deployment.runtimePlan.execution.metadata).toMatchObject({
+      "swarm.serviceName": "appaloft-res-api-dst-prod-dep-swarm-backend_web",
+      "swarm.applyPlanSchemaVersion": "docker-swarm.apply-plan/v1",
+    });
+  });
+
   test("[DEP-BIND-SECRET-RESOLVE-006] materializes resolved dependency refs as Swarm secrets before service create", async () => {
     const runner = new RecordingSwarmCommandRunner();
     const store = new MemoryDependencyResourceSecretStore();
@@ -785,6 +885,59 @@ describe("DockerSwarmExecutionBackend", () => {
     expect(runner.calls[2]?.command).not.toContain("docker volume");
   });
 
+  test("[DEP-CREATE-ASYNC-019] classifies Swarm apply capacity failures as resource exhaustion", async () => {
+    const runner = new CapacityExhaustedSwarmCommandRunner(
+      "create-candidate-service",
+      "failed to create service: no space left on device",
+    );
+    const backend = new DockerSwarmExecutionBackend(runner);
+
+    const result = await backend.execute(createContext(), runningDeployment());
+
+    expect(result.isOk()).toBe(true);
+    const deployment = result._unsafeUnwrap().deployment.toState();
+
+    expect(deployment.status.value).toBe("failed");
+    expect(deployment.runtimePlan.execution.metadata).toMatchObject({
+      errorCode: "runtime_target_resource_exhausted",
+      phase: "runtime-target-apply",
+      capacityResource: "disk",
+      capacitySignal: "disk-space-exhausted",
+      capacityInspectCommand: "appaloft server capacity inspect dtg_swarm_1",
+      capacityPruneCommand: "appaloft server capacity prune dtg_swarm_1 --dry-run",
+    });
+    expect(runner.calls.map((call) => call.step)).toEqual([
+      "create-candidate-service",
+      "remove-services",
+    ]);
+  });
+
+  test("[DEP-CREATE-ASYNC-019] classifies Swarm verification capacity failures as observation exhaustion", async () => {
+    const runner = new CapacityExhaustedSwarmCommandRunner(
+      "verify-candidate-service",
+      "service task failed: memory cgroup out of memory",
+    );
+    const backend = new DockerSwarmExecutionBackend(runner);
+
+    const result = await backend.execute(createContext(), runningDeployment());
+
+    expect(result.isOk()).toBe(true);
+    const deployment = result._unsafeUnwrap().deployment.toState();
+
+    expect(deployment.status.value).toBe("failed");
+    expect(deployment.runtimePlan.execution.metadata).toMatchObject({
+      errorCode: "runtime_target_resource_exhausted",
+      phase: "runtime-target-observation",
+      capacityResource: "memory",
+      capacitySignal: "memory-exhausted",
+    });
+    expect(runner.calls.map((call) => call.step)).toEqual([
+      "create-candidate-service",
+      "verify-candidate-service",
+      "remove-services",
+    ]);
+  });
+
   test("[SWARM-TARGET-SECRET-001] redacts Swarm command failure output in deployment logs and metadata", async () => {
     const runner = new SecretLeakingVerifySwarmCommandRunner();
     const backend = new DockerSwarmExecutionBackend(runner);
@@ -807,6 +960,127 @@ describe("DockerSwarmExecutionBackend", () => {
     expect(serialized).not.toContain("raw-key");
     expect(serialized).not.toContain("BEGIN PRIVATE KEY");
   });
+
+  realSwarmSmokeTest(
+    "[STOR-REALIZE-003][SWARM-TARGET-ROUTE-001B] runs opt-in real Swarm Compose stack storage smoke",
+    async () => {
+      const swarmState = commandOutput([
+        "docker",
+        "info",
+        "--format",
+        "{{.Swarm.LocalNodeState}} {{.Swarm.ControlAvailable}}",
+      ]);
+      expect(swarmState).toBe("active true");
+
+      const edgeNetworkName =
+        Bun.env.APPALOFT_DOCKER_SWARM_EDGE_NETWORK ?? "appaloft-edge";
+      const edgeProxyPort = Bun.env.APPALOFT_DOCKER_SWARM_EDGE_PROXY_PORT ?? "18080";
+      const edgeNetwork = commandOutput([
+        "docker",
+        "network",
+        "inspect",
+        edgeNetworkName,
+        "--format",
+        "{{.Driver}} {{.Scope}}",
+      ]);
+      expect(edgeNetwork).toBe("overlay swarm");
+
+      const composeDir = mkdtempSync(`${process.cwd()}/.tmp-appaloft-swarm-compose-`);
+      const composeFile = `${composeDir}/docker-compose.yml`;
+      const secretKey = "APPALOFT_SWARM_COMPOSE_DATABASE_URL";
+      const storageVolumeName = "appaloft-stv_swarm_compose";
+      let deploymentCleaned = false;
+      const deployment = runningDeployment({
+        compose: true,
+        composeFile,
+        deploymentId: "dep_swarm_compose",
+        port: 80,
+        secretKey,
+        tlsMode: "disabled",
+        metadata: {
+          "storage.mounts": JSON.stringify([
+            {
+              attachmentId: "rsa_swarm_compose",
+              storageVolumeId: "stv_swarm_compose",
+              storageVolumeKind: "named-volume",
+              destinationPath: "/var/lib/appaloft/data",
+              mountMode: "read-write",
+            },
+          ]),
+        },
+      });
+      const backend = new DockerSwarmExecutionBackend(
+        new DockerSwarmShellCommandRunner({
+          timeoutMs: Number(Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_TIMEOUT_MS ?? "120000"),
+        }),
+        undefined,
+        { edgeNetworkName },
+      );
+
+      try {
+        await Bun.write(
+          composeFile,
+          [
+            "services:",
+            "  web:",
+            `    image: ${Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_IMAGE ?? "nginx:alpine"}`,
+          ].join("\n"),
+        );
+        prepareSmokeEdgeProxy({ edgeNetworkName, publishedPort: edgeProxyPort });
+        commandStatus(["docker", "secret", "rm", secretKey]);
+        commandOutput([
+          "sh",
+          "-c",
+          `printf %s 'postgres://secret-value' | docker secret create ${secretKey} -`,
+        ]);
+
+        const result = await backend.execute(createContext(), deployment);
+        expect(result.isOk()).toBe(true);
+        const state = result._unsafeUnwrap().deployment.toState();
+        if (state.status.value !== "succeeded") {
+          throw new Error(
+            JSON.stringify(
+              {
+                logs: state.logs,
+                metadata: state.runtimePlan.execution.metadata,
+              },
+              null,
+              2,
+            ),
+          );
+        }
+
+        expect(state.status.value).toBe("succeeded");
+        expect(state.runtimePlan.execution.metadata).toMatchObject({
+          "swarm.serviceName": "appaloft-res-api-dst-prod-dep-swarm-compose_web",
+          "swarm.applyPlanSchemaVersion": "docker-swarm.apply-plan/v1",
+        });
+        expect(JSON.stringify(state.runtimePlan.execution.metadata)).not.toContain(
+          "postgres://secret-value",
+        );
+        await waitForSmokeRoute({
+          expectedText: "Welcome to nginx",
+          host: "api.example.com",
+          path: "/",
+          port: edgeProxyPort,
+        });
+        expect(commandOutput(["docker", "volume", "inspect", storageVolumeName, "--format", "{{.Name}}"]))
+          .toBe(storageVolumeName);
+
+        await backend.cancel(createContext(), deployment);
+        deploymentCleaned = true;
+      } finally {
+        if (!deploymentCleaned) {
+          await backend.cancel(createContext(), deployment);
+        }
+        commandStatus(["docker", "secret", "rm", secretKey]);
+        removeSmokeEdgeProxy();
+        await removeDockerVolumeWithRetry(storageVolumeName);
+        rmSync(composeDir, { force: true, recursive: true });
+      }
+    },
+    Number(Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_TIMEOUT_MS ?? "120000"),
+  );
 
   realSwarmSmokeTest(
     "[SWARM-TARGET-ROUTE-001B][SWARM-TARGET-SECRET-001B] runs opt-in real Swarm apply and cleanup",

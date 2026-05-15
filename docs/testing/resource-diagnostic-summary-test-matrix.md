@@ -87,6 +87,7 @@ Then:
 | RES-DIAG-QRY-017 | integration | Access precedence summary | Durable ready, server-applied, and generated routes are all present | `ok` with access and proxy sections available | None | Copy payload preserves separate route URLs and proxy/provider context uses durable, server-applied, latest generated, then planned generated precedence for the selected route. |
 | RES-DIAG-QRY-018 | integration | Non-ready durable access | Durable domain binding exists but is not ready while generated or server-applied fallback route data exists | `ok` with access unavailable | `resource_domain_binding_not_ready` | Access section keeps fallback URLs as context but reports the non-ready durable binding as the blocking selected route. |
 | RES-DIAG-QRY-019 | integration | Failure visibility sanitizer | Access/proxy/log/health-adjacent source failures contain auth headers, cookies, sensitive query values, SSH credential URLs, private key material, provider raw payload hints, or multiline remote command output | `ok` with source errors and section statuses | Owning stable source code remains present | `copy.json` and source error messages preserve safe ids/codes/phases/next actions while redacting unsafe adjacent text. |
+| RES-DIAG-QRY-020 | integration | Monitor observation window | Caller supplies `observationFrom` and `observationTo` with deployment/runtime log tails enabled | `ok` with `context.observationWindow`, deployment log evidence filtered to the window, and runtime log reader called with `since = observationFrom` | None | Copy payload includes the observation window and excludes out-of-window log evidence. |
 
 ## Shared Route/Access Diagnostic Matrix
 
@@ -116,8 +117,9 @@ These rows are governed by
 | RES-DIAG-ENTRY-002 | e2e-preferred | Web Quick Deploy completion | Deployment id returned but access URL missing | Completion surface offers copy diagnostic summary with resource/deployment ids. |
 | RES-DIAG-ENTRY-003 | e2e-preferred | Desktop | Local/desktop backend mode | Summary includes safe backend/local mode fields and excludes private local paths. |
 | RES-DIAG-ENTRY-004 | e2e-preferred | CLI | `resource diagnose --json` | Prints canonical summary JSON from the query result. |
-| RES-DIAG-ENTRY-005 | e2e-preferred | CLI | Human output | Shows section statuses and stable codes without hiding JSON availability. |
+| RES-DIAG-ENTRY-005 | e2e-preferred | CLI | `resource diagnose --summary` | Shows section statuses and stable codes without hiding JSON availability. |
 | RES-DIAG-ENTRY-006 | e2e-preferred | API/oRPC | HTTP query | Reuses input schema and returns `ResourceDiagnosticSummary`. |
+| RES-DIAG-ENTRY-007 | e2e-preferred | Web deployment detail | Deployment has resource/deployment ids | Detail surface offers copy diagnostic summary through the resource-scoped query without inventing a deployment-owned payload shape. |
 
 ## Redaction Matrix
 
@@ -129,7 +131,7 @@ These rows are governed by
 | RES-DIAG-REDACT-004 | integration | System context | Private key path or credential file path | Field omitted or redacted. |
 | RES-DIAG-REDACT-005 | integration | Copy payload | Any source secret | Secret absent from `copy.json`, markdown, and plain text. |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Executable application query-service tests now exist in
 `packages/application/test/resource-diagnostic-summary.test.ts`.
@@ -145,24 +147,42 @@ Current executable coverage includes:
   `resource_runtime_logs_unavailable`;
 - safe source error message sanitization for proxy/log/health-adjacent failures through
   `RES-DIAG-QRY-019` and `ACCESS-DIAG-005`;
+- Monitor observation-window diagnostics through `RES-DIAG-QRY-020`: the query records
+  `context.observationWindow`, filters deployment log evidence, passes `observationFrom` to runtime
+  logs as `since`, and omits out-of-window log evidence from `copy.json`;
 - runtime log tail not requested without calling the runtime log reader;
 - selected deployment/resource context mismatch returning
   `resource_diagnostic_context_mismatch`.
+- `RES-DIAG-ENTRY-001` resource-detail WebView coverage: the diagnostics section dispatches
+  `resources.diagnostic-summary` with resource/deployment ids, requests deployment/runtime log tails
+  and proxy configuration, and writes the returned safe `copy.json` through the desktop clipboard
+  bridge.
+- `RES-DIAG-ENTRY-002` Quick Deploy WebView coverage: after an accepted deployment without a known
+  access URL, the completion surface dispatches `resources.diagnostic-summary` with the accepted
+  resource/deployment ids, requests deployment/runtime log tails and proxy configuration, and writes
+  the returned safe `copy.json` through the desktop clipboard bridge.
+- `RES-DIAG-ENTRY-007` deployment-detail WebView coverage: the deployment detail header dispatches
+  `resources.diagnostic-summary` with deployment-owned resource/deployment ids, requests
+  deployment/runtime log tails and proxy configuration, and writes the returned safe `copy.json`
+  through the desktop clipboard bridge.
+- `RES-DIAG-ENTRY-005` CLI summary coverage: `resource diagnose --summary` dispatches the same
+  query as JSON mode, renders stable ids, section statuses, route context, source errors, and points
+  operators back to canonical JSON.
+- `WEB-CLI-API-ACCESS-007` browser rendering coverage: resource detail renders the latest access
+  failure request id, affected host/path, next action, route source, and safe route id from the
+  shared `resources.show` contract without parsing provider raw config.
 
 Remaining coverage gaps:
 
 - query schema edge cases for invalid ids/include flags/tail bounds;
 - no deployments and empty deployment logs branches;
 - redaction failure as a whole-query error;
-- Web clipboard/e2e coverage for the resource detail affordance and future Quick Deploy
-  completion affordance.
 - edge access failure envelope composition rows `RES-DIAG-QRY-015` and `RES-DIAG-QRY-016`.
-- Full browser clipboard/e2e coverage for `WEB-CLI-API-ACCESS-006` remains deferred to a later Web
-  harness; the current regression baseline covers the typed helper and shared contracts.
+- Browser clipboard/e2e coverage for the resource detail, deployment detail, and Quick Deploy
+  completion diagnostic summary affordances is active.
 - `WEB-CLI-API-ACCESS-007` is covered through the proxy preview contract schema, application query
   service, provider renderer tests, CLI JSON shared-resource command harness, and HTTP/oRPC access
-  regression harness. Full browser route-metadata rendering remains deferred because Web consumes
-  the shared contract and this slice adds no new Web lookup form.
+  regression harness, with browser route-metadata rendering covered on resource detail.
 
 ## Open Questions
 

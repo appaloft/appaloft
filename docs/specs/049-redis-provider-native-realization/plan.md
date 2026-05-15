@@ -77,14 +77,17 @@
   - PGlite persistence tests for Redis realization state and safe read models.
   - Contract/CLI/oRPC tests if schemas, route behavior, or output fields change.
 
-## Risks And Migration Gaps
+## Risks And Governed Follow-Ups
 
-- Durable outbox/process ownership remains a platform migration gap. The first Code Round may use
-  a synchronous hermetic provider adapter if it preserves durable attempt/status semantics.
+- Provider realization/delete attempts are mirrored into operator-visible process state. Automatic
+  provider retry execution is a separate governed worker slice rather than a hidden platform gap.
 - Real provider onboarding and smoke tests may remain release enablement work after the safe
   provider capability contract is implemented.
 - Provider-native Redis credential rotation is explicitly outside this behavior.
-- Web affordances remain a migration gap unless the Code Round includes a Docs/Web slice.
-- This behavior is necessary for the Redis closed-loop exit criterion, but the roadmap should not
-  check that criterion until managed Redis provision, bind, deploy, observe, and backup/restore or
-  delete are verified together.
+- Public docs/help coverage is complete through the dependency resource lifecycle topic.
+  Resource-detail managed-Redis provision, external Redis import, dependency rename/delete, backup
+  create/list/acknowledged restore, and bind/unbind Web affordances are implemented with i18n and
+  tests; scheduled backup policy, backup prune/delete, export/download, and cross-resource restore
+  remain later Web rounds.
+- The Redis closed-loop exit criterion is checked because managed Redis provision, bind, deploy,
+  observe, and backup/restore or delete are verified together.

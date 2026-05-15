@@ -3,6 +3,10 @@ import { z } from "zod";
 import { nonEmptyTrimmedString } from "../shared-schema";
 
 const optionalNonEmptyTrimmedString = (label: string) => nonEmptyTrimmedString(label).optional();
+const optionalIsoTimestamp = (label: string) =>
+  nonEmptyTrimmedString(label)
+    .refine((value) => Number.isFinite(Date.parse(value)), `${label} must be an ISO timestamp`)
+    .optional();
 
 const booleanInput = (defaultValue: boolean) =>
   z
@@ -13,15 +17,29 @@ const booleanInput = (defaultValue: boolean) =>
     ])
     .default(defaultValue);
 
-export const resourceDiagnosticSummaryQueryInputSchema = z.object({
-  resourceId: nonEmptyTrimmedString("Resource id"),
-  deploymentId: optionalNonEmptyTrimmedString("Deployment id"),
-  includeDeploymentLogTail: booleanInput(true),
-  includeRuntimeLogTail: booleanInput(false),
-  includeProxyConfiguration: booleanInput(false),
-  tailLines: z.coerce.number().int().min(0).max(50).default(20),
-  locale: optionalNonEmptyTrimmedString("Locale"),
-});
+export const resourceDiagnosticSummaryQueryInputSchema = z
+  .object({
+    resourceId: nonEmptyTrimmedString("Resource id"),
+    deploymentId: optionalNonEmptyTrimmedString("Deployment id"),
+    observationFrom: optionalIsoTimestamp("Observation from"),
+    observationTo: optionalIsoTimestamp("Observation to"),
+    includeDeploymentLogTail: booleanInput(true),
+    includeRuntimeLogTail: booleanInput(false),
+    includeProxyConfiguration: booleanInput(false),
+    tailLines: z.coerce.number().int().min(0).max(50).default(20),
+    locale: optionalNonEmptyTrimmedString("Locale"),
+  })
+  .superRefine((value, context) => {
+    if (Boolean(value.observationFrom) === Boolean(value.observationTo)) {
+      return;
+    }
+
+    context.addIssue({
+      code: "custom",
+      message: "Observation window requires both observationFrom and observationTo",
+      path: value.observationFrom ? ["observationTo"] : ["observationFrom"],
+    });
+  });
 
 export type ResourceDiagnosticSummaryQueryInput = z.input<
   typeof resourceDiagnosticSummaryQueryInputSchema

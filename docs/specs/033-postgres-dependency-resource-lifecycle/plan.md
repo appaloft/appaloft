@@ -29,7 +29,8 @@
 - Entrypoint impact:
   - Add operation catalog entries.
   - Add CLI and oRPC/HTTP dispatch routes reusing command/query schemas.
-  - Web write/read UI remains deferred.
+  - Later Web/docs slices expose safe dependency-resource affordances without changing these
+    command/query boundaries.
 - Persistence/migration impact:
   - Add `dependency_resources` table with JSON fields only for provider-neutral metadata,
     masked connection summary, connection secret ref, exposure policy, backup relationship, and
@@ -66,11 +67,15 @@
   - oRPC/HTTP route dispatch tests;
   - PG/PGlite persistence/read-model test if schema changes.
 
-## Risks And Migration Gaps
+## Risks And Later Slice Handoffs
 
-- Provider-native Postgres provisioning/deletion remains deferred; managed resources are blocked
-  from unsafe delete by default.
-- Deployment snapshots do not include dependency binding secrets in this slice.
-- Public docs page/help anchor is a Docs Round migration gap unless expanded in this PR.
-- Future bind/unbind must replace placeholder readiness/blocker readers with concrete binding
-  persistence and snapshot materialization rules.
+- Provider-native Postgres provisioning/deletion is governed by
+  [Postgres Provider-Native Realization](../038-postgres-provider-native-realization/spec.md).
+- Deployment snapshot/runtime injection is governed by the dependency binding snapshot-reference,
+  runtime-injection, and secret-resolution specs.
+- Public docs/help coverage is complete through the `dependency.resource-lifecycle` topic, and
+  Resource detail now exposes dependency Resource provision/import/list, rename/delete, backup
+  create/list/acknowledged restore, and bind/unbind affordances through shared operations. Scheduled
+  backup policy, backup prune/delete, export/download, and cross-resource restore remain later Web
+  slices.
+- Bind/unbind readiness and blockers are backed by concrete ResourceBinding persistence/read models.

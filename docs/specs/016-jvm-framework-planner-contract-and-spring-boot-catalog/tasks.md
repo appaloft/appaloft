@@ -14,8 +14,8 @@
 
 ## Test-First
 
-- [x] Add stable JVM matrix ids for Spring Boot Maven with wrapper, Maven without wrapper, Gradle
-  with wrapper, Gradle Kotlin DSL, generic JVM explicit fallback, generic deterministic jar
+- [x] Add stable JVM matrix ids for Spring Boot Maven with wrapper, Maven without wrapper, Quarkus
+  Maven JVM jar mode, Gradle with wrapper, Gradle Kotlin DSL, generic JVM explicit fallback, generic deterministic jar
   fallback, build tool precedence, runnable jar discovery, actuator health, missing build tool,
   ambiguous Maven/Gradle evidence, missing runnable jar, missing production start, and
   internal-port behavior.
@@ -28,8 +28,8 @@
 
 - [x] Consolidate or refine reusable planner contract types/services only where tests reveal a
   catalog contract gap.
-- [x] Add or update JVM/Spring fixture projects for Maven wrapper, Maven no wrapper, Gradle
-  wrapper, Gradle Kotlin DSL, explicit fallback, deterministic generic jar, and blocked JVM
+- [x] Add or update JVM/Spring/Quarkus fixture projects for Maven wrapper, Maven no wrapper,
+  Quarkus Maven, Gradle wrapper, Gradle Kotlin DSL, explicit fallback, deterministic generic jar, and blocked JVM
   evidence.
 - [x] Ensure generated Dockerfile evidence includes JVM build tool, build/package command, start
   command, base image, artifact kind, health metadata, and internal HTTP verification metadata.
@@ -38,8 +38,8 @@
 
 ## Entrypoints And Docs
 
-- [x] Update roadmap and implementation notes to mark Spring Boot tested catalog closure without
-  claiming full real Docker/SSH fixture coverage.
+- [x] Update roadmap and implementation notes to mark Spring Boot/Quarkus tested catalog closure while
+  pointing to the shared GitHub Actions/local explicit Docker/generic-SSH fixture smoke coverage and keeping fast CI contract-oriented.
 - [x] Update `deployments.plan` query/test matrix status for JVM preview parity.
 - [x] Record public docs/help outcome for this behavior.
 

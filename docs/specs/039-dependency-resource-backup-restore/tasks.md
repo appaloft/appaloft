@@ -44,7 +44,8 @@
 - [x] Add operation catalog entries.
 - [x] Add CLI backup create/list/show/restore commands.
 - [x] Add oRPC/HTTP routes.
-- [x] Record Web/public-docs migration gap or complete a Docs/Web round.
+- [x] Complete public docs/help coverage through `dependency.backup-restore`; record Resource
+  detail Web backup create, safe restore-point list, and acknowledged restore controls.
 
 ## Verification
 

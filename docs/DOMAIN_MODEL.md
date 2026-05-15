@@ -306,11 +306,12 @@ Boundary rule:
   delivery claim through application ports and persistence-owned claim/dedupe translation
 - operator-work commands mutate only process attempt state unless a workflow-specific spec governs
   additional business-state mutation
-- workflow-specific durable workers remain opt-in by local spec/test matrix; existing in-memory
-  event consumers do not become durable automatically
-- preview cleanup retry scheduling still uses the preview cleanup attempt store and
-  preview-lifecycle coordination lease until a later local spec moves it to process-attempt atomic
-  claim/completion
+- workflow-specific durable workers remain disabled by default unless their local spec/test matrix
+  explicitly enables a shell runner; existing in-memory event consumers do not become durable
+  automatically, and the certificate retry scheduler is the default-on maintenance exception
+- preview cleanup retry scheduling uses process-attempt retry generation plus atomic
+  claim/completion for worker handoff; preview cleanup attempt rows remain a compatibility
+  cleanup-history read model
 - proxy bootstrap repair execution still runs inline through `servers.bootstrap-proxy` and
   post-register bootstrap remains event-driven until a later local spec moves it to process-attempt
   atomic claim/completion
@@ -497,8 +498,12 @@ Current scope:
   [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md)
 - Phase 7 provider-native Redis realization under
   [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md)
+- provider-native Postgres and Redis realization/delete, backup/restore, runtime secret injection,
+  Web management, and Postgres/Redis closed-loop verification are implemented through the Phase 7
+  specs and dependency resource test matrix
 - full process-attempt atomic claim/completion workers, provider-native credential rotation,
-  runtime cleanup, and final closed-loop verification are future work
+  scheduled backup policy, backup prune/delete, export/download, cross-resource restore, and
+  dependency-resource runtime cleanup remain future governed slices
 
 ### Dependency Resource Backup
 
@@ -549,8 +554,8 @@ Boundary rule:
   instances without exposing Docker-native fields as aggregate invariants
 - deployment execution is routed to a runtime target backend selected from the deployment target,
   destination, provider key, and backend capabilities. Single-server Docker/Compose is the active
-  v1 backend; Docker Swarm and Kubernetes are future orchestration backends behind the same
-  `deployments.create` command.
+  v1 single-server backend, Docker Swarm is the active v1 cluster backend, and Kubernetes remains a
+  future orchestration backend behind the same `deployments.create` command.
 - deployment runtime command steps should be represented as typed specs when they are persisted or
   handed between planning and execution. Shell command text is allowed only as a user-authored
   shell-script leaf or as an adapter-rendered execution/display value.
@@ -721,7 +726,8 @@ Rules:
 - target proxy bootstrap state is a readiness gate, not a standalone proxy aggregate
 - target kind describes placement shape, not vendor-specific execution details
 - runtime target provider capabilities decide whether the target can execute single-server
-  Docker/Compose now or future cluster orchestration such as Docker Swarm or Kubernetes
+  Docker/Compose, active cluster orchestration such as Docker Swarm, or future cluster
+  orchestration such as Kubernetes
 - pure CLI SSH state is target-local Appaloft metadata/state, not user workload data, and must be
   migrated or adopted explicitly when moving the same server to a hosted/self-hosted control plane
 
@@ -742,8 +748,8 @@ Current scope:
   while PostgreSQL/PGlite selected backends persist source link state and server-applied proxy route
   desired/applied state through dedicated application persistence adapters
 - current code uses the canonical target-kind values `single-server` and `orchestrator-cluster`;
-  cluster runtime providers such as Docker Swarm still require backend readiness and execution
-  support before they are deployable
+  Docker Swarm is the active cluster runtime provider, while future cluster providers still require
+  backend readiness and execution support before they are deployable
 
 ### Destination
 
@@ -882,9 +888,9 @@ Rules:
   changes, or rewrite deployment snapshots. Runtime control attempt state is governed by
   [ADR-038: Resource Runtime Control Ownership](./decisions/ADR-038-resource-runtime-control-ownership.md)
   and remains separate from Resource lifecycle status.
-- resource storage attachments belong to the Resource profile. Attach/detach affects future
-  deployment snapshots only and does not apply mounts to current runtime state or rewrite historical
-  deployment snapshots
+- resource storage attachments belong to the Resource profile. Attach/detach affects deployment
+  snapshot materialization only and does not apply mounts to current runtime state or rewrite
+  historical deployment snapshots
 - one Resource may not attach two storage volumes at the same normalized destination path
 
 Current scope:
@@ -902,19 +908,24 @@ Meaning:
 
 Rules:
 - names are unique within a project environment
-- `named-volume` stores provider-neutral identity only; runtime adapters may later map it to
-  Docker/Compose/Swarm provider-native storage
+- `named-volume` stores provider-neutral identity only; runtime adapters map deployment snapshot
+  mount metadata to Docker/Compose/Swarm runtime storage realization during deployment execution
 - `bind-mount` stores a trusted source path as adapter/runtime boundary data after strict path
   validation
 - deletion is blocked while any active Resource attachment references the volume
 - backup relationship metadata is metadata-only in this slice, but it participates in delete safety
 - storage commands do not create deployments, provision provider-native volumes, run backup/restore,
   prune runtime state, or mutate historical deployment snapshots
+- deployment execution, not `storage-volumes.create`, is the default runtime realization point for
+  storage mounts
+- runtime volume cleanup belongs to the `storage-volumes.cleanup-runtime` command governed by
+  [ADR-064: Storage Volume Runtime Realization And Cleanup](./decisions/ADR-064-storage-volume-runtime-realization-and-cleanup.md);
+  it must not be hidden inside `storage-volumes.delete` or `servers.capacity.prune`
 
 Current scope:
-- Phase 7 baseline aggregate planned under
+- Phase 7 baseline aggregate implemented under
   [Storage Volume Lifecycle And Resource Attachment](./specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md)
-- intended to feed provider-neutral storage mount metadata into future deployment snapshots
+- feeds provider-neutral storage mount metadata into deployment snapshots and runtime adapters
 
 ### Release
 
@@ -998,7 +1009,10 @@ Rules:
 
 Current scope:
 - foundational aggregate in `core`
-- provider-backed provisioning orchestration is still future work
+- provider-backed provisioning orchestration is active for Appaloft-managed Postgres and Redis
+  through injected provider capabilities and safe realization state
+- concrete cloud provider package onboarding and provider-specific smoke tests remain release
+  enablement work behind the same provider capability contracts
 
 ### Organization
 
@@ -1017,10 +1031,10 @@ Rules:
 Current scope:
 - foundational aggregate in `core`
 - identity provider integration is still future work
-- deploy-token lifecycle and scoped authorization are accepted candidate behavior under
+- deploy-token lifecycle and scoped authorization are active Phase 8 behavior under
   [ADR-043](./decisions/ADR-043-self-hosted-action-deploy-token-authorization.md) and
   [Self-Hosted Action Deploy Token Auth](./specs/052-self-hosted-action-deploy-token-auth/spec.md)
-- post-bootstrap organization/team operations are accepted candidate behavior under
+- post-bootstrap organization/team operations are active Phase 8 behavior under
   [ADR-045](./decisions/ADR-045-self-hosted-organization-team-operations.md) and
   [Self-Hosted Organization Team Operations](./specs/054-self-hosted-organization-team-operations/spec.md)
 
@@ -1040,8 +1054,9 @@ Rules:
 
 Current scope:
 - foundational aggregate in `core`
-- persistence, installer one-time raw output, rotate/revoke operations, and public token management
-  entrypoints are Phase 8 follow-up Code Round work
+- persistence, installer one-time raw output, rotate/revoke operations, scoped Action
+  authorization, and public CLI/API/Web token management entrypoints are active Phase 8 behavior;
+  concrete future MCP descriptors remain a follow-up gap
 
 ### ProviderConnection / IntegrationConnection / PluginInstallation
 

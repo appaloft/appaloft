@@ -154,8 +154,8 @@ health policy mutation through this command, and rejects unsupported target/orch
 The Web form states that runtime profile edits affect future deployments and do not rewrite
 historical deployment snapshots or restart current runtime.
 
-Archived-resource blocking remains a migration gap until `resources.archive` introduces explicit
-resource lifecycle state.
+Archived-resource blocking is active through `resources.archive`; archived Resources reject runtime
+profile changes with `resource_archived` and no event.
 
 ## Open Questions
 

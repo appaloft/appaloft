@@ -75,6 +75,7 @@ describe("docker container command helpers", () => {
       accessHostname: "14.preview.appaloft.com",
       accessScheme: "http",
       accessHosts: ["14.preview.appaloft.com", "14.preview.appaloft.com"],
+      sourceFingerprint: "source-fingerprint:v1:preview%3Apr%3A14",
     });
 
     expect(labels).toEqual([
@@ -89,6 +90,7 @@ describe("docker container command helpers", () => {
       "appaloft.preview-id=pr-14",
       "appaloft.preview-number=14",
       "appaloft.preview-mode=pull-request",
+      "appaloft.source-fingerprint=source-fingerprint:v1:preview%3Apr%3A14",
       "appaloft.resource-id=res_1",
       "appaloft.resource-name=Web",
       "appaloft.resource-slug=web",

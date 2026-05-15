@@ -22,6 +22,36 @@ on:
         required: false
         default: false
         type: boolean
+      require_framework_fixture_e2e:
+        description: Fail the release if SSH framework fixture E2E secrets are missing.
+        required: false
+        default: false
+        type: boolean
+      require_scheduled_task_e2e:
+        description: Fail the release if SSH scheduled-task E2E secrets are missing.
+        required: false
+        default: false
+        type: boolean
+      require_storage_cleanup_e2e:
+        description: Fail the release if SSH storage-cleanup E2E secrets are missing.
+        required: false
+        default: false
+        type: boolean
+      require_runtime_usage_e2e:
+        description: Fail the release if SSH runtime-usage E2E secrets are missing.
+        required: false
+        default: false
+        type: boolean
+      require_capacity_prune_e2e:
+        description: Fail the release if SSH capacity-prune E2E secrets are missing.
+        required: false
+        default: false
+        type: boolean
+      require_preview_provider_e2e:
+        description: Fail the release if GitHub preview provider E2E secrets are missing.
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - main
@@ -175,11 +205,81 @@ jobs:
       required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_ssh_quick_deploy_e2e }}
     secrets: inherit
 
+  framework-fixture-e2e:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/framework-fixture-e2e.yml
+    with:
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_framework_fixture_e2e }}
+      run_local_docker: true
+      run_ssh: true
+    secrets: inherit
+
+  scheduled-task-e2e:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/scheduled-task-e2e.yml
+    with:
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_scheduled_task_e2e }}
+      run_local_docker: true
+      run_ssh: true
+    secrets: inherit
+
+  storage-cleanup-e2e:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/storage-cleanup-e2e.yml
+    with:
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_storage_cleanup_e2e }}
+      run_local_docker: true
+      run_ssh: true
+    secrets: inherit
+
+  runtime-usage-e2e:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/runtime-usage-e2e.yml
+    with:
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_runtime_usage_e2e }}
+      run_local_docker: true
+      run_ssh: true
+    secrets: inherit
+
+  capacity-prune-e2e:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/capacity-prune-e2e.yml
+    with:
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_capacity_prune_e2e }}
+      run_local: true
+      run_ssh: true
+    secrets: inherit
+
+  preview-provider-e2e:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/preview-provider-e2e.yml
+    with:
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_preview_provider_e2e }}
+    secrets: inherit
+
+  dependency-redis-backup-e2e:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/dependency-redis-backup-e2e.yml
+
   build-release:
     needs:
       - release-please
       - ssh-remote-state-e2e
       - ssh-quick-deploy-e2e
+      - framework-fixture-e2e
+      - scheduled-task-e2e
+      - storage-cleanup-e2e
+      - runtime-usage-e2e
+      - capacity-prune-e2e
+      - preview-provider-e2e
+      - dependency-redis-backup-e2e
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     permissions:
       contents: write

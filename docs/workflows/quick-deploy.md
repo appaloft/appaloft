@@ -67,7 +67,7 @@ fields are accepted. GitHub Actions and CLI can remain execution owners when the
 Deploy uses `controlPlane.mode = none`.
 
 When Quick Deploy collects source/runtime/health values, those values are entry-flow draft fields
-for `resources.create` or the accepted candidate resource profile commands such as
+for `resources.create` or the active resource profile commands:
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`, and
 `resources.configure-health`. They must not be submitted to `deployments.create`, and they must not
 be hidden behind a generic `resources.update` operation.
@@ -377,9 +377,9 @@ asserting UI copy or prompt text as domain behavior.
   per-step progress rendering, generated access display, and diagnostic-copy interaction.
 - CLI tests should cover TTY/non-TTY input collection, explicit command dispatch, and final
   `CreateDeploymentCommandInput`.
-- Docker/SSH/proxy e2e tests may be opt-in when they mutate external runtime targets, but the
-  matrix row must state that the shared workflow test is the default hermetic baseline and the
-  opt-in test proves real runtime reachability.
+- Docker/SSH/proxy e2e tests run as GitHub Actions/local explicit confidence gates when they mutate
+  external runtime targets. The matrix row must state the fast contract baseline plus the
+  GitHub Actions or local explicit gate that proves real runtime reachability.
 - Quick Deploy tests must not buy domains, depend on public DNS propagation, or hide domain/TLS
   behavior inside deployment tests. Durable custom domains are covered by the routing/domain/TLS
   workflow and are invoked only through explicit follow-up commands.
@@ -581,7 +581,7 @@ Command errors from underlying operations must use the global error model and pr
 
 Quick Deploy must not convert command errors into message-only failures. UI/CLI may add user-facing copy, but tests should assert stable domain error codes when a command boundary is involved.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Web QuickDeploy now uses a shared Quick Deploy workflow program for operation sequencing and id-threading. The Web component still owns draft input collection, local validation, and query refresh side effects through its executor.
 
@@ -608,8 +608,9 @@ projection after resource list refresh. Web Quick Deploy displays latest or plan
 routes when the projection is available, while CLI/browser e2e regression coverage remains a
 follow-up under the default access test matrix.
 
-Quick Deploy does not yet expose `resources.diagnostic-summary` after deployment acceptance, so
-users may lack a copyable support/debug payload when access or logs are unavailable.
+Quick Deploy exposes `resources.diagnostic-summary` after deployment acceptance once
+resource/deployment ids are known, so users can copy a support/debug payload when access or logs
+are unavailable.
 
 Current Web and CLI entry fields may still use user-facing "method" wording. Entry workflows must map that wording to `ResourceRuntimeProfile.strategy` before dispatching `resources.create`; `deployments.create` must not receive `deploymentMethod`.
 
@@ -623,21 +624,22 @@ typed on the source binding.
 Repository config file support now has a profile-only JSON/YAML parser, profile-only CLI `init`,
 CLI `--config`, implicit source-root discovery, identity/secret/unsupported-field rejection, and
 targeted executable tests. It is the current headless/non-interactive Quick Deploy profile path for
-GitHub Actions style binary deployments. After ADR-024, current headless local PGlite behavior is a
-migration gap: SSH-targeted CLI/Action deploys must default to SSH-server `ssh-pglite` state,
-perform remote state ensure/lock/migrate/recovery before command dispatch, and resolve durable
-source fingerprint link state. Normal deploys may create the first source link or reuse an existing
-link, but must not retarget it; retargeting belongs to the active CLI command
+GitHub Actions style binary deployments. SSH-targeted CLI/Action deploys use SSH-server
+`ssh-pglite` state, perform remote state ensure/lock/migrate/recovery before command dispatch, and
+resolve durable source fingerprint link state. Normal deploys may create the first source link or
+reuse an existing link, but must not retarget it; retargeting belongs to the active CLI command
 `source-links.relink`. SSH CLI config deploy can persist `access.domains[]` as server-applied route
 desired state before ids-only deployment admission, deployment planning consumes that state, and
 deployment-finished handling records applied/failed route status for route outcomes. Resource
 access, health, and diagnostic summaries expose the latest server-applied route URL/status.
-The opt-in SSH e2e harness covers server-applied route realization through a Traefik-backed target.
+The GitHub Actions secret-gated and local explicit SSH e2e harness covers server-applied route
+realization through a Traefik-backed target.
 Provider-local TLS diagnostics for `tlsMode = auto` routes are visible through proxy configuration
 and resource diagnostics.
 Canonical redirect aliases now flow through config parsing, SSH server-applied route state,
 deployment planning, provider route rendering, and proxy configuration queries. Real external
-HTTP/HTTPS redirect verification remains opt-in SSH e2e follow-up.
+HTTP/HTTPS redirect verification remains GitHub Actions secret-gated and local explicit SSH e2e
+target coverage.
 The main repository includes a reference `.github/actions/deploy-action` wrapper that covers
 release download/checksum verification shape, action input mapping, and SSH secret temp-key
 handling. The public `appaloft/deploy-action` repository is published from that reference export
@@ -656,21 +658,23 @@ Dockerfile path, Docker Compose path, and build target remain follow-up work. St
 directory is accepted by the shared resource schema and static workflow tests. Web QuickDeploy and
 CLI deploy expose static draft inputs that map to `resources.create`.
 
-First-class static site deployment is partially aligned at the shared workflow and command
+First-class static site deployment is aligned at the shared workflow and command
 admission layers. Web and CLI now dispatch
 `resources.create(kind = static-site, runtimeProfile.strategy = static, publishDirectory,
 networkProfile.internalPort = 80)` for static drafts. The deployment runtime generates
 adapter-owned static-server Dockerfiles for local/generic-SSH image builds. Local Docker static
-smoke coverage verifies generated nginx packaging and runtime health, and generic-SSH Docker
-static smoke coverage exists as an opt-in harness.
+smoke coverage verifies generated nginx packaging and runtime health, and generic-SSH Docker static
+smoke coverage is bound to the GitHub Actions secret-gated plus local explicit SSH gate.
 
 Until provider-backed disambiguation exists, callers should supply explicit `gitRef` and
 `baseDirectory` when a GitHub tree URL uses a slash-containing branch or tag name.
 
-## Open Questions
+## Governed Follow-Ups
 
-- Should a future non-durable backend convenience endpoint be allowed for Quick Deploy, or should automation always sequence explicit operations until a durable workflow command exists?
-- Resource source/runtime/network operation names are resolved as accepted candidates:
+- A future non-durable backend convenience endpoint for Quick Deploy remains a governed design
+  question; automation can continue to sequence explicit operations until a durable workflow command
+  exists.
+- Resource source/runtime/network operation names are active:
   `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
-  Access profile configuration remains a separate future behavior governed by ADR-017 and the
+  Access profile configuration remains a separate governed behavior under ADR-017 and the
   routing/domain/TLS specs.

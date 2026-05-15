@@ -13,6 +13,7 @@ import {
   type ProcessAttemptClaimer,
   type ProcessAttemptCompleter,
   type ProcessAttemptRecorder,
+  type RuntimeMonitoringSampleRetentionStore,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { PruneAuditEventsCommand } from "../audit-events/prune-audit-events.command";
@@ -35,6 +36,7 @@ export interface ScheduledHistoryRetentionRunInput {
   scope?: "organization" | "system";
   organizationId?: string;
   categories?: RetentionDefaultCategory[];
+  limit?: number;
 }
 
 export type ScheduledHistoryRetentionDispatchStatus =
@@ -62,10 +64,13 @@ export interface ScheduledHistoryRetentionRunResult {
 }
 
 type PruneCommandFactory = (input: { before: string; dryRun: boolean }) => Result<Command<unknown>>;
+type ScheduledHistoryRetentionCommandConfig = {
+  operationKey: string;
+  create: PruneCommandFactory;
+};
 
-const scheduledHistoryRetentionCommands: Record<
-  RetentionDefaultCategory,
-  { operationKey: string; create: PruneCommandFactory }
+const scheduledHistoryRetentionCommands: Partial<
+  Record<RetentionDefaultCategory, ScheduledHistoryRetentionCommandConfig>
 > = {
   "audit-rows": {
     operationKey: "audit-events.prune",
@@ -90,6 +95,16 @@ const scheduledHistoryRetentionCommands: Record<
   "resource-runtime-log-archives": {
     operationKey: "resources.runtime-log-archives.prune",
     create: (input) => PruneResourceRuntimeLogArchivesCommand.create(input),
+  },
+};
+
+const runtimeMonitoringSamplesPruneOperationKey = "runtime-monitoring.samples.prune";
+
+const scheduledHistoryRetentionDirectStores: Partial<
+  Record<RetentionDefaultCategory, { operationKey: string }>
+> = {
+  "runtime-monitoring-samples": {
+    operationKey: runtimeMonitoringSamplesPruneOperationKey,
   },
 };
 
@@ -128,6 +143,21 @@ function policyMatchesInput(
   return matchesScope && matchesOrganization && matchesCategory;
 }
 
+function validateLimit(input: ScheduledHistoryRetentionRunInput): Result<number | undefined> {
+  if (input.limit === undefined) {
+    return ok(undefined);
+  }
+  if (!Number.isInteger(input.limit) || input.limit < 1) {
+    return err(
+      domainError.validation("Scheduled history retention limit must be a positive integer", {
+        phase: "scheduled-history-retention-policy",
+        limit: input.limit,
+      }),
+    );
+  }
+  return ok(input.limit);
+}
+
 @injectable()
 export class ScheduledHistoryRetentionService {
   constructor(
@@ -145,6 +175,8 @@ export class ScheduledHistoryRetentionService {
     private readonly idGenerator: IdGenerator,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.runtimeMonitoringSampleRetentionStore)
+    private readonly runtimeMonitoringSampleRetentionStore: RuntimeMonitoringSampleRetentionStore,
   ) {}
 
   async run(
@@ -160,6 +192,7 @@ export class ScheduledHistoryRetentionService {
       processAttemptCompleter,
       processAttemptRecorder,
       retentionDefaultRepository,
+      runtimeMonitoringSampleRetentionStore,
     } = this;
 
     return safeTry(async function* () {
@@ -169,7 +202,9 @@ export class ScheduledHistoryRetentionService {
         ...(input.scope ? { scope: input.scope } : {}),
         ...(input.organizationId ? { organizationId: input.organizationId } : {}),
       });
-      const policies = listed.filter((policy) => policyMatchesInput(policy, input));
+      const limit = yield* validateLimit(input);
+      const matchedPolicies = listed.filter((policy) => policyMatchesInput(policy, input));
+      const policies = limit === undefined ? matchedPolicies : matchedPolicies.slice(0, limit);
       const dispatches: ScheduledHistoryRetentionDispatchResult[] = [];
 
       for (const policy of policies) {
@@ -182,7 +217,9 @@ export class ScheduledHistoryRetentionService {
           continue;
         }
 
-        const configured = scheduledHistoryRetentionCommands[policy.category];
+        const configured =
+          scheduledHistoryRetentionCommands[policy.category] ??
+          scheduledHistoryRetentionDirectStores[policy.category];
         if (!configured) {
           dispatches.push({
             category: policy.category,
@@ -234,8 +271,17 @@ export class ScheduledHistoryRetentionService {
           );
         }
 
-        const command = yield* configured.create({ before, dryRun });
-        const pruneResult = await commandBus.execute(context, command);
+        const commandConfigured = scheduledHistoryRetentionCommands[policy.category];
+        const pruneResult =
+          policy.category === "runtime-monitoring-samples"
+            ? await runtimeMonitoringSampleRetentionStore.prune(repositoryContext, {
+                before,
+                dryRun,
+              })
+            : await dispatchPruneCommand(context, commandBus, commandConfigured, {
+                before,
+                dryRun,
+              });
         const completedAt = clock.now();
 
         if (pruneResult.isErr()) {
@@ -320,6 +366,28 @@ async function recordAcceptedAttempt(
   });
 
   return recorded.map(() => undefined);
+}
+
+async function dispatchPruneCommand(
+  context: ExecutionContext,
+  commandBus: Pick<CommandBus, "execute">,
+  configured: ScheduledHistoryRetentionCommandConfig | undefined,
+  input: { before: string; dryRun: boolean },
+): Promise<Result<unknown>> {
+  if (!configured) {
+    return err(
+      domainError.validation("Scheduled history retention command configuration is missing", {
+        phase: "scheduled-history-retention",
+      }),
+    );
+  }
+
+  const command = configured.create(input);
+  if (command.isErr()) {
+    return err(command.error);
+  }
+
+  return commandBus.execute(context, command.value);
 }
 
 function safeCountDetails(value: unknown): Record<string, number> {

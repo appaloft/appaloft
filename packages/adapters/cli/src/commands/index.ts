@@ -20,6 +20,7 @@ import { providerJobLogCommand } from "./provider-job-log.js";
 import { remoteStateCommand } from "./remote-state.js";
 import { resourceCommand } from "./resource.js";
 import { retentionDefaultCommand } from "./retention-default.js";
+import { runtimeMonitoringCommand } from "./runtime-monitoring.js";
 import { runtimeUsageCommand } from "./runtime-usage.js";
 import { scheduledTaskCommand } from "./scheduled-task.js";
 import { serverCommand } from "./server.js";
@@ -61,6 +62,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     providerJobLogCommand,
     retentionDefaultCommand,
     runtimeUsageCommand,
+    runtimeMonitoringCommand,
     remoteStateCommand,
     operatorWorkCommand,
     terminalSessionCommand,

@@ -11,7 +11,7 @@
 - [x] DEP-BIND-ROTATE-004: add failing deployment snapshot immutability test after rotation.
 - [x] DEP-BIND-ROTATE-005: add failing list/show read-model tests for safe latest rotation
   metadata.
-- [x] DEP-BIND-ROTATE-006: add failing operation catalog, CLI, and HTTP/oRPC dispatch tests.
+- [x] DEP-BIND-ROTATE-006: add failing operation catalog, CLI, HTTP/oRPC, and Web surface tests.
 - [x] Add PG/PGlite persistence/read-model tests for safe rotation metadata.
 - [x] Add contract/schema tests if command or binding read-model schemas change.
 
@@ -46,7 +46,7 @@
 
 - [x] Add CLI Resource dependency binding secret rotation command.
 - [x] Add oRPC/HTTP route.
-- [x] Record Web/public-docs migration gap or complete a Docs/Web round.
+- [x] Complete Resource detail Web/public-docs help sync with i18n and acknowledgement coverage.
 
 ## Verification
 

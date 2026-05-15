@@ -15,6 +15,14 @@ type JavaBuildTool = "gradle" | "maven";
 
 function javaBaseImage(inspection?: SourceInspectionSnapshot): string {
   const version = inspection?.runtimeVersion ?? "21";
+  if (javaBuildTool(inspection) === "maven") {
+    return `maven:3.9-eclipse-temurin-${version}`;
+  }
+
+  if (javaBuildTool(inspection) === "gradle") {
+    return `gradle:8.12-jdk${version}`;
+  }
+
   return `eclipse-temurin:${version}-jdk`;
 }
 
@@ -55,18 +63,28 @@ function javaBuildCommand(input: WorkspacePlannerInput): string | undefined {
 
   if (buildTool === "maven") {
     return inspection?.hasDetectedFile("maven-wrapper")
-      ? "./mvnw package -DskipTests"
+      ? "sh ./mvnw package -DskipTests"
       : "mvn package -DskipTests";
   }
 
   if (buildTool === "gradle") {
     const task = isSpringBoot ? "bootJar" : "build";
     return inspection?.hasDetectedFile("gradle-wrapper")
-      ? `./gradlew ${task} -x test`
+      ? `sh ./gradlew ${task} -x test`
       : `gradle ${task} -x test`;
   }
 
   return undefined;
+}
+
+function quarkusJarPath(inspection?: SourceInspectionSnapshot): string | undefined {
+  if (inspection?.framework !== "quarkus") {
+    return undefined;
+  }
+
+  return javaBuildTool(inspection) === "gradle"
+    ? "build/quarkus-app/quarkus-run.jar"
+    : "target/quarkus-app/quarkus-run.jar";
 }
 
 function javaStartCommand(input: WorkspacePlannerInput): string | undefined {
@@ -74,13 +92,21 @@ function javaStartCommand(input: WorkspacePlannerInput): string | undefined {
     return input.requestedDeployment.startCommand;
   }
 
-  return input.source.inspection?.jarPath
+  const detectedQuarkusJarPath = quarkusJarPath(input.source.inspection);
+
+  return detectedQuarkusJarPath
+    ? `java -jar ${detectedQuarkusJarPath}`
+    : input.source.inspection?.jarPath
     ? `java -jar ${input.source.inspection.jarPath}`
     : undefined;
 }
 
-function javaPlannerName(inspection?: SourceInspectionSnapshot): "java" | "spring-boot" {
-  return inspection?.framework === "spring-boot" ? "spring-boot" : "java";
+function javaPlannerName(inspection?: SourceInspectionSnapshot): "java" | "quarkus" | "spring-boot" {
+  if (inspection?.framework === "spring-boot" || inspection?.framework === "quarkus") {
+    return inspection.framework;
+  }
+
+  return "java";
 }
 
 function javaHealthCheckPath(inspection?: SourceInspectionSnapshot): string | undefined {
@@ -90,10 +116,7 @@ function javaHealthCheckPath(inspection?: SourceInspectionSnapshot): string | un
 function javaUnsupportedError(input: WorkspacePlannerInput): Result<never> | null {
   const inspection = input.source.inspection;
 
-  if (
-    (inspection?.framework === "quarkus" || inspection?.framework === "micronaut") &&
-    !input.requestedDeployment.startCommand
-  ) {
+  if (inspection?.framework === "micronaut" && !input.requestedDeployment.startCommand) {
     return err(
       domainError.validation(
         "Detected JVM framework is not supported by an active planner. Configure explicit production commands.",
@@ -184,6 +207,7 @@ export const javaWorkspacePlanner: WorkspaceRuntimePlanner = {
     const runtimeKind = planner;
     const buildTool = javaBuildTool(input.source.inspection);
     const healthCheckPath = javaHealthCheckPath(input.source.inspection);
+    const detectedQuarkusJarPath = quarkusJarPath(input.source.inspection);
 
     return ok({
       planner,
@@ -208,7 +232,11 @@ export const javaWorkspacePlanner: WorkspaceRuntimePlanner = {
           ...(input.source.inspection?.projectName
             ? { projectName: input.source.inspection.projectName }
             : {}),
-          ...(input.source.inspection?.jarPath ? { jarPath: input.source.inspection.jarPath } : {}),
+          ...(detectedQuarkusJarPath
+            ? { jarPath: detectedQuarkusJarPath }
+            : input.source.inspection?.jarPath
+              ? { jarPath: input.source.inspection.jarPath }
+              : {}),
           ...(healthCheckPath ? { healthCheckPath } : {}),
         },
       }),

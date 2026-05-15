@@ -36,9 +36,9 @@
   Kubernetes implementations collect target-specific evidence behind a provider-neutral
   `RuntimeUsageInspector` or equivalent port. Adapter code owns shell/Docker/Kubernetes details and
   returns sanitized DTOs only.
-- Persistence/read-model impact: time-series samples require a retained sample store with bounded
-  retention and scope indexes. The first Code Round can avoid persistence by implementing current
-  `runtime-usage.inspect`; `runtime-usage.rollup` should wait for sample retention specs.
+- Persistence/read-model impact: `runtime-usage.inspect` remains the point-in-time query. Retained
+  time-series samples, bounded rollups, and threshold policy persistence are governed and
+  implemented through the dedicated Runtime Monitoring Observation boundary.
 - Event/CQRS impact: first slice is read-only query behavior. Background collection, threshold
   evaluation, and alerting become durable process/worker behavior and must use process attempts or
   another ADR-054-compatible delivery boundary.
@@ -65,16 +65,19 @@
 - Add retained sample schema, retention rules, and migration.
 - Add disabled-by-default collector worker that records bounded samples through a runtime usage
   reader port.
-- Add `runtime-usage.rollup` and `runtime-usage.samples.list` queries.
+- Add `runtime-monitoring.rollup` and `runtime-monitoring.samples.list` queries.
 - Add charts for resource, deployment, project, and server scopes.
 - Add sample pruning/retention docs; do not reuse runtime artifact prune for sample rows.
 
 ### Slice 3: Threshold Evaluation And Operator Visibility
 
-- Add non-enforcing `runtime-usage-thresholds.configure/show` command/query surfaces.
+- Add non-enforcing `runtime-monitoring.thresholds.configure/show` command/query surfaces.
 - Evaluate warning/critical threshold state from current or recent samples.
-- Surface threshold state in Web, CLI, API, and operator work.
-- Add notification hooks only after public docs and failure/retry behavior are specified.
+- Surface exact-scope threshold state in CLI, API, Web, SDK metadata, and generated MCP/tool
+  handlers. Web writes exact-scope CPU/memory/disk policies and turns inherited readback edits into
+  exact-scope overrides.
+- Keep notification hooks and external alert delivery out of the active threshold slice until a
+  separate ADR/spec defines public docs, retry behavior, dedupe, and failure handling.
 
 ### Slice 4: Runtime Sizing, Quotas, And Enforcement
 
@@ -87,8 +90,9 @@
 ## Roadmap And Compatibility
 
 - Roadmap target: `0.12.0`.
-- Version target: pre-1.0 policy. `0.12.0` should include the read-only attribution slice first;
-  sample retention, thresholds, and runtime sizing remain separate pull-forward decisions.
+- Version target: pre-1.0 policy. `0.12.0` includes the read-only attribution slice first; retained
+  samples and non-enforcing thresholds are covered by the dedicated Runtime Monitoring Observation
+  boundary, while runtime sizing/enforcement remains a separate governed decision.
 - Compatibility impact: additive query surfaces and read models at first. Thresholds add additive
   policy state. Runtime sizing/enforcement may become breaking for repository config and deployment
   behavior and therefore needs an explicit ADR/version gate.
@@ -108,19 +112,20 @@
     output/errors;
   - entrypoint schema parity across CLI and HTTP/oRPC;
   - Web rendering uses typed DTOs and i18n keys;
-  - future collector worker records process-attempt visibility for sample failures;
+  - disabled-by-default collector runner records process-attempt visibility for sample failures;
   - unsupported runtime sizing fields remain rejected until the sizing ADR/spec is accepted.
-- Acceptance/e2e: start with fake adapter and persisted read-model tests; add opt-in Docker/SSH
-  smoke only after destructive behavior is explicitly out of path and fixtures are stable.
+- Acceptance/e2e: keep fake adapter and persisted read-model tests as the fast local baseline.
+  Read-only Docker/SSH runtime-usage smoke runs through GitHub Actions/local explicit gates after
+  destructive behavior is kept out of path and fixtures are stable.
 
-## Risks And Migration Gaps
+## Risks And Governed Follow-Ups
 
 - Container CPU/memory metrics are backend-specific and may be unavailable on some targets; output
   must report partial data rather than normalizing to zero.
 - Disk attribution is harder than server disk totals because Docker build cache and unused images
   often lack strong Appaloft ownership. Conservative unattributed/unknown buckets are required.
-- Time-series retention can grow quickly; sample resolution and retention must be governed before
-  background collection is enabled.
+- Time-series retention can grow quickly; sample resolution and retention are governed by the
+  Runtime Monitoring Observation boundary before background collection is enabled.
 - Runtime usage monitoring overlaps with, but must remain separate from, OpenTelemetry export,
   application APM, billing, quotas, and destructive runtime prune.
 - Web charts should avoid implying exact per-project cost allocation until the attribution model is

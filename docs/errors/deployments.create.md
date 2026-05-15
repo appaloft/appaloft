@@ -217,12 +217,14 @@ registry credentials, private key material, raw secret environment values, or fu
 command output.
 
 Runtime target capacity failures, such as SSH target disk exhaustion, inode exhaustion, Docker
-build-cache exhaustion, or bounded CPU/memory admission failures, must not be collapsed into generic
-domain or validation errors. When the selected target can classify the failure safely, the failed
-deployment state must use `runtime_target_resource_exhausted` with phase `image-build`,
-`runtime-target-apply`, or `runtime-target-observation`. Details may include safe capacity facts
-such as mount/path, available bytes or inodes, and Docker image/build-cache reclaimable bytes; they
-must not include raw command output that may contain secrets.
+build-cache exhaustion, Docker Compose filesystem-full failures, OCI runtime memory allocation
+failures, Docker Swarm service apply/verification exhaustion, or bounded CPU/memory admission
+failures, must not be collapsed into generic domain or validation errors. When the selected target
+can classify the failure safely, the failed deployment state must use
+`runtime_target_resource_exhausted` with phase `image-build`, `runtime-target-apply`, or
+`runtime-target-observation`. Details may include safe capacity facts such as mount/path, available
+bytes or inodes, and Docker image/build-cache reclaimable bytes; they must not include raw command
+output that may contain secrets.
 
 Git source materialization failures may record `remote_git_clone_failed` or
 `remote_git_commit_resolution_failed` on the failed deployment attempt. Safe failure metadata may
@@ -257,13 +259,13 @@ Deployment tests must assert:
 
 The shared neverthrow assertion style is defined in [neverthrow Conventions](./neverthrow-conventions.md).
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current core `DomainError` has `code`, `category`, `message`, `retryable`, and optional `details`.
 
 Current implementation already uses neverthrow `Result` for command construction and `Promise<Result<{ id }, DomainError>>` for the use case.
 
-Migration gaps:
+Governed follow-ups:
 
 - phase/step details are not yet uniformly included;
 - `coordination_timeout`, `coordinationScopeKind`, and related ADR-028 details are not yet
@@ -284,9 +286,12 @@ Migration gaps:
 - `deployments.create` admission now consults the runtime target backend registry before acceptance
   and returns `runtime_target_unsupported` with `runtime-target-resolution` details when no backend
   can satisfy the resolved plan capabilities.
-- generic SSH Docker build capacity failures such as Bun `NoSpaceLeft` currently surface as
-  adapter-specific build failures; they need classification into
-  `runtime_target_resource_exhausted` with safe disk, inode, and build-cache details.
+- generic SSH, local Docker-backed, and Docker Swarm deployment failures with safe Docker
+  image-store, BuildKit, disk, inode, memory, CPU, or build-cache exhaustion signals are classified
+  into `runtime_target_resource_exhausted` with safe failure phase and capacity metadata. Because
+  intentionally exhausting a real target is not safe for default CI, real-target confidence is split
+  between synthetic capacity-signal classification and the GitHub Actions/local explicit
+  capacity-prune gate.
 - repository config file errors are target entry-workflow errors; current implementation does not
   yet populate these phases uniformly and still carries a legacy config-bootstrap shape.
 

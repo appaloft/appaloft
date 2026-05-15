@@ -188,8 +188,11 @@ Resource health is governed by [Resource Health Observation](../workflows/resour
 must not be described as current health.
 
 Resource/server terminal sessions are governed by
-[ADR-022](../decisions/ADR-022-operator-terminal-session-boundary.md) and remain future until
-`terminal-sessions.open`, the terminal transport, CLI command, and Web affordances are implemented.
+[ADR-022](../decisions/ADR-022-operator-terminal-session-boundary.md). The current implementation
+has `terminal-sessions.open`, HTTP/WebSocket terminal transport, CLI server/resource attach
+commands, resource/server Web terminal affordances, deployment-detail deep links, and active-session
+lifecycle readback. Detailed behavior and verification stay in the operator terminal session
+workflow and test matrix.
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -207,7 +210,9 @@ Resource detail exposes the resource-level access URL from domain binding or acc
 The access URL should be visible on the first/default resource tab and must not be duplicated as a
 header primary action.
 
-Resource/server terminal UI is not implemented yet.
+Resource/server terminal UI is implemented through the resource and server detail terminal tabs.
+Deployment detail links to the resource terminal tab when a deployment-specific terminal context is
+needed.
 
 ## Open Questions
 

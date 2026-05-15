@@ -53,7 +53,9 @@ import {
   optionalValue,
   runCommand,
   runQuery,
+  runResourceDiagnosticSummaryQuery,
   runResourceRuntimeLogsQuery,
+  runTerminalCommand,
 } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
@@ -147,6 +149,7 @@ const deploymentOption = Options.text("deployment").pipe(Options.optional);
 const directoryOption = Options.text("directory").pipe(Options.optional);
 const rowsOption = Options.text("rows").pipe(Options.withDefault("24"));
 const colsOption = Options.text("cols").pipe(Options.withDefault("80"));
+const attachTerminalOption = Options.boolean("attach").pipe(Options.withDefault(false));
 const serviceOption = Options.text("service").pipe(Options.optional);
 const routeScopeOption = Options.choice("scope", ["planned", "latest", "deployment-snapshot"]).pipe(
   Options.withDefault("latest"),
@@ -181,6 +184,9 @@ const logArchiveCursorOption = Options.text("cursor").pipe(Options.optional);
 const logArchiveLimitOption = Options.text("limit").pipe(Options.withDefault("50"));
 const logArchiveDryRunOption = Options.boolean("dry-run").pipe(Options.withDefault(true));
 const diagnosticTailOption = Options.text("tail").pipe(Options.withDefault("20"));
+const diagnosticObservationFromOption = Options.text("from").pipe(Options.optional);
+const diagnosticObservationToOption = Options.text("to").pipe(Options.optional);
+const diagnosticSummaryOption = Options.boolean("summary").pipe(Options.withDefault(false));
 const includeDeploymentLogsOption = Options.boolean("deployment-logs").pipe(
   Options.withDefault(true),
 );
@@ -654,9 +660,10 @@ const terminalCommand = EffectCommand.make(
     directory: directoryOption,
     rows: rowsOption,
     cols: colsOption,
+    attach: attachTerminalOption,
   },
-  ({ cols, deployment, directory, resourceId, rows }) =>
-    runCommand(
+  ({ attach, cols, deployment, directory, resourceId, rows }) =>
+    runTerminalCommand(
       OpenTerminalSessionCommand.create({
         scope: {
           kind: "resource",
@@ -667,6 +674,11 @@ const terminalCommand = EffectCommand.make(
         initialRows: Number(rows),
         initialCols: Number(cols),
       }),
+      {
+        attach,
+        initialRows: Number(rows),
+        initialCols: Number(cols),
+      },
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceTerminal));
 
@@ -698,11 +710,25 @@ const diagnoseCommand = EffectCommand.make(
     runtimeLogs: includeRuntimeLogsOption,
     proxyConfiguration: includeProxyConfigurationOption,
     tail: diagnosticTailOption,
+    from: diagnosticObservationFromOption,
+    to: diagnosticObservationToOption,
+    summary: diagnosticSummaryOption,
     json: jsonOption,
   },
-  ({ deployment, deploymentLogs, json, proxyConfiguration, resourceId, runtimeLogs, tail }) => {
+  ({
+    deployment,
+    deploymentLogs,
+    from,
+    json,
+    proxyConfiguration,
+    resourceId,
+    runtimeLogs,
+    summary,
+    tail,
+    to,
+  }) => {
     void json;
-    return runQuery(
+    return runResourceDiagnosticSummaryQuery(
       ResourceDiagnosticSummaryQuery.create({
         resourceId,
         deploymentId: optionalValue(deployment),
@@ -710,7 +736,10 @@ const diagnoseCommand = EffectCommand.make(
         includeRuntimeLogTail: runtimeLogs,
         includeProxyConfiguration: proxyConfiguration,
         tailLines: Number(tail),
+        observationFrom: optionalValue(from),
+        observationTo: optionalValue(to),
       }),
+      { summary },
     );
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDiagnose));

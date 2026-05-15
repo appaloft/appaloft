@@ -67,6 +67,15 @@ import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secret
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 import { renderComposeOwnershipLabelOverrideScript } from "./compose-label-overrides";
+import {
+  runtimeTargetCapacityAwareFailureFields,
+} from "./runtime-target-failure-classification";
+import { createPreviewRuntimeArtifactCleanupPlan } from "./preview-artifact-cleanup";
+import {
+  dockerStorageMountsFromRuntimeMetadata,
+  dockerStorageVolumeRealizationsFromRuntimeMetadata,
+  renderDockerVolumeRealizationScript,
+} from "./storage-runtime-mounts";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -137,14 +146,6 @@ function redactSecrets(input: string, secrets: readonly string[] = []): string {
   return secrets.reduce(
     (text, secret) => (secret.length > 0 ? text.replaceAll(secret, "[redacted]") : text),
     input,
-  );
-}
-
-function isRuntimeTargetCapacityFailure(logs: readonly DeploymentLogEntry[]): boolean {
-  return logs.some((log) =>
-    /\b(no space left on device|enospc|disk quota exceeded|not enough space)\b/i.test(
-      log.message,
-    ),
   );
 }
 
@@ -650,7 +651,12 @@ export class LocalExecutionBackend implements ExecutionBackend {
       metadata?: Record<string, string>;
     },
   ): { deployment: Deployment } {
-    const capacityFailure = isRuntimeTargetCapacityFailure(input.logs);
+    const failureFields = runtimeTargetCapacityAwareFailureFields({
+      logs: input.logs,
+      errorCode: input.errorCode,
+      ...(input.metadata ? { metadata: input.metadata } : {}),
+      serverId: deployment.toState().serverId.value,
+    });
     deployment.applyExecutionResult(
       FinishedAt.rehydrate(new Date().toISOString()),
       ExecutionResult.rehydrate({
@@ -658,22 +664,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
         status: ExecutionStatusValue.rehydrate("failed"),
         logs: input.logs,
         retryable: input.retryable ?? false,
-        errorCode: ErrorCodeText.rehydrate(
-          capacityFailure ? "runtime_target_resource_exhausted" : input.errorCode,
-        ),
-        ...(input.metadata || capacityFailure
-          ? {
-              metadata: {
-                ...(input.metadata ?? {}),
-                ...(capacityFailure
-                  ? {
-                      capacityResource: "disk",
-                      capacityInspectCommand: `appaloft server capacity inspect ${deployment.toState().serverId.value}`,
-                    }
-                  : {}),
-              },
-            }
-          : {}),
+        errorCode: ErrorCodeText.rehydrate(failureFields.errorCode),
+        ...(failureFields.metadata ? { metadata: failureFields.metadata } : {}),
       }),
     );
 
@@ -1857,11 +1849,90 @@ export class LocalExecutionBackend implements ExecutionBackend {
       ...appaloftDockerContainerLabelsForDeployment(state),
       ...(proxyRoutePlanResult.value?.labels ?? []),
     ]);
+    const storageMounts = dockerStorageMountsFromRuntimeMetadata(state.runtimePlan.execution.metadata);
+    if (storageMounts.isErr()) {
+      const message = "Storage mounts could not be rendered for Docker";
+      logs.push(phaseLog("deploy", message, "error"));
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          logs,
+          errorCode: storageMounts.error.code,
+          retryable: storageMounts.error.retryable,
+          metadata: {
+            message: storageMounts.error.message,
+            phase: "storage-runtime-realization",
+          },
+        }).deployment,
+      });
+    }
+    const storageVolumeRealizations = dockerStorageVolumeRealizationsFromRuntimeMetadata(
+      state.runtimePlan.execution.metadata,
+    );
+    if (storageVolumeRealizations.isErr()) {
+      const message = "Storage volume realization could not be rendered for Docker";
+      logs.push(phaseLog("deploy", message, "error"));
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          logs,
+          errorCode: storageVolumeRealizations.error.code,
+          retryable: storageVolumeRealizations.error.retryable,
+          metadata: {
+            message: storageVolumeRealizations.error.message,
+            phase: "storage-runtime-realization",
+          },
+        }).deployment,
+      });
+    }
+    const realizeStorageVolumesCommand = renderDockerVolumeRealizationScript({
+      realizations: storageVolumeRealizations.value,
+      quote: shellQuote,
+    });
+    if (realizeStorageVolumesCommand.length > 0) {
+      logs.push(phaseLog("deploy", "Realize Docker storage volumes with Appaloft ownership labels"));
+      const realizeStorageVolumes = await runShellCommand({
+        command: realizeStorageVolumesCommand,
+        cwd: workdir,
+        env: runtimeExecutionEnv,
+        redactions,
+      });
+      this.pushCommandOutput(logs, {
+        context,
+        deploymentId: state.id.value,
+        phase: "deploy",
+        output: realizeStorageVolumes.stdout,
+        level: "info",
+        stream: "stdout",
+      });
+      this.pushCommandOutput(logs, {
+        context,
+        deploymentId: state.id.value,
+        phase: "deploy",
+        output: realizeStorageVolumes.stderr,
+        level: "warn",
+        stream: "stderr",
+      });
+      if (realizeStorageVolumes.failed) {
+        const message = "Docker storage volumes could not be realized";
+        logs.push(phaseLog("deploy", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "docker_storage_volume_realization_failed",
+            retryable: true,
+            metadata: {
+              message,
+              phase: "storage-runtime-realization",
+            },
+          }).deployment,
+        });
+      }
+    }
     const runCommandSpec = dockerCommandBuilder.runContainer({
       image,
       containerName,
       env: dockerEnvVariables,
       labels,
+      mounts: storageMounts.value,
       ...(proxyRoutePlanResult.value?.networkName
         ? { networkName: proxyRoutePlanResult.value.networkName }
         : {}),
@@ -2277,12 +2348,54 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const composeOwnershipLabels = dockerLabelsFromAssignments(
       appaloftDockerContainerLabelsForDeployment(state),
     );
+    const storageMounts = dockerStorageMountsFromRuntimeMetadata(state.runtimePlan.execution.metadata);
+    if (storageMounts.isErr()) {
+      const message = "Storage mounts could not be rendered for Docker Compose";
+      logs.push(phaseLog("deploy", message, "error"));
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          logs,
+          errorCode: storageMounts.error.code,
+          retryable: storageMounts.error.retryable,
+          metadata: {
+            message: storageMounts.error.message,
+            phase: "storage-runtime-realization",
+            composeFile,
+            composeProjectName: runtimeInstanceNames.composeProjectName,
+            ...preparedSource.metadata,
+          },
+        }).deployment,
+      });
+    }
+    const storageVolumeRealizations = dockerStorageVolumeRealizationsFromRuntimeMetadata(
+      state.runtimePlan.execution.metadata,
+    );
+    if (storageVolumeRealizations.isErr()) {
+      const message = "Storage volume realization could not be rendered for Docker Compose";
+      logs.push(phaseLog("deploy", message, "error"));
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          logs,
+          errorCode: storageVolumeRealizations.error.code,
+          retryable: storageVolumeRealizations.error.retryable,
+          metadata: {
+            message: storageVolumeRealizations.error.message,
+            phase: "storage-runtime-realization",
+            composeFile,
+            composeProjectName: runtimeInstanceNames.composeProjectName,
+            ...preparedSource.metadata,
+          },
+        }).deployment,
+      });
+    }
     logs.push(phaseLog("deploy", "Generate Appaloft compose ownership labels override"));
     const composeOverride = await runShellCommand({
       command: renderComposeOwnershipLabelOverrideScript({
         composeFile,
         overrideFile: composeOwnershipOverrideFile,
         labels: composeOwnershipLabels,
+        mounts: storageMounts.value,
+        volumeRealizations: storageVolumeRealizations.value,
         quote: shellQuote,
       }),
       cwd: workdir,
@@ -2473,6 +2586,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
   ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
     const state = deployment.toState();
     const metadata = state.runtimePlan.execution.metadata ?? {};
+    const runtimeDir = this.runtimeDirectory(state.id.value);
     const runtimeEnv = await resolveDependencyRuntimeEnvironment({
       context,
       deployment,
@@ -2487,6 +2601,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
       state.runtimePlan.execution.workingDirectory ??
       normalizeWorkingDirectory(state.runtimePlan.source.locator);
     const logs: DeploymentLogEntry[] = [];
+    const runtimeInstanceNames = deriveRuntimeInstanceNames({
+      deploymentId: state.id.value,
+      metadata: state.runtimePlan.execution.metadata,
+    });
 
     switch (state.runtimePlan.execution.kind) {
       case "host-process":
@@ -2499,10 +2617,6 @@ export class LocalExecutionBackend implements ExecutionBackend {
         );
         break;
       case "docker-container": {
-        const runtimeInstanceNames = deriveRuntimeInstanceNames({
-          deploymentId: state.id.value,
-          metadata: state.runtimePlan.execution.metadata,
-        });
         const containerName = metadata.containerName ?? runtimeInstanceNames.containerName;
         await runShellCommand({
           command: `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
@@ -2514,10 +2628,6 @@ export class LocalExecutionBackend implements ExecutionBackend {
       }
       case "docker-compose-stack":
         {
-          const runtimeInstanceNames = deriveRuntimeInstanceNames({
-            deploymentId: state.id.value,
-            metadata: state.runtimePlan.execution.metadata,
-          });
           const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
           const composeProjectName =
             metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName;
@@ -2539,6 +2649,41 @@ export class LocalExecutionBackend implements ExecutionBackend {
           );
         }
         break;
+    }
+
+    const artifactCleanup = createPreviewRuntimeArtifactCleanupPlan({
+      deploymentId: state.id.value,
+      buildStrategy: state.runtimePlan.buildStrategy,
+      sourceKind: state.runtimePlan.source.kind,
+      executionKind: state.runtimePlan.execution.kind,
+      imageName: runtimeInstanceNames.imageName,
+      metadata,
+      runtimeDir,
+    });
+    try {
+      if (artifactCleanup.localSourceDir) {
+        rmSync(artifactCleanup.localSourceDir, { recursive: true, force: true });
+        logs.push(
+          phaseLog("deploy", `Removed preview source workspace ${artifactCleanup.localSourceDir}`),
+        );
+      }
+    } catch (error) {
+      return err(
+        domainError.infra("Preview local artifact cleanup failed", {
+          phase: "runtime-cleanup",
+          cleanupStage: "artifact-cleanup",
+          deploymentId: state.id.value,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+    if (artifactCleanup.imageName) {
+      await runShellCommand({
+        command: `docker image rm ${shellQuote(artifactCleanup.imageName)} >/dev/null 2>&1 || true`,
+        cwd: workdir,
+        env,
+      });
+      logs.push(phaseLog("deploy", `Removed preview image ${artifactCleanup.imageName}`));
     }
 
     this.report(context, {

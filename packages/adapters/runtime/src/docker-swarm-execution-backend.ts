@@ -32,6 +32,9 @@ import {
   renderDockerSwarmRuntimeIntent,
   type DockerSwarmRuntimeIdentityInput,
 } from "./docker-swarm-runtime-intent";
+import {
+  runtimeTargetCapacityAwareFailureFields,
+} from "./runtime-target-failure-classification";
 import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
 
 export interface DockerSwarmCommandRunnerInput {
@@ -141,6 +144,33 @@ function executionResult(input: {
   });
 }
 
+function failedExecutionResult(
+  deployment: Deployment,
+  input: {
+    exitCode: number;
+    logs: DeploymentLogEntry[];
+    retryable: boolean;
+    errorCode: string;
+    metadata?: Record<string, string>;
+  },
+): ExecutionResult {
+  const failureFields = runtimeTargetCapacityAwareFailureFields({
+    logs: input.logs,
+    errorCode: input.errorCode,
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+    serverId: deployment.toState().serverId.value,
+  });
+
+  return executionResult({
+    status: "failed",
+    exitCode: input.exitCode,
+    logs: input.logs,
+    retryable: input.retryable,
+    errorCode: failureFields.errorCode,
+    ...(failureFields.metadata ? { metadata: failureFields.metadata } : {}),
+  });
+}
+
 export class DockerSwarmShellCommandRunner implements DockerSwarmCommandRunner {
   private readonly timeoutMs: number;
 
@@ -234,8 +264,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       const message = safeFailureMessage(runtimeEnvResult.error.message, deploymentSecretRedactions(deployment));
       return applyExecutionResult(
         deployment,
-        executionResult({
-          status: "failed",
+        failedExecutionResult(deployment, {
           exitCode: 1,
           logs: [phaseLog("deploy", message, "error")],
           retryable: true,
@@ -258,8 +287,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       const message = safeFailureMessage(intentResult.error.message, redactions);
       return applyExecutionResult(
         deployment,
-        executionResult({
-          status: "failed",
+        failedExecutionResult(deployment, {
           exitCode: 1,
           logs: [phaseLog("deploy", message, "error")],
           retryable: false,
@@ -274,8 +302,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       const message = safeFailureMessage(applyPlanResult.error.message, redactions);
       return applyExecutionResult(
         deployment,
-        executionResult({
-          status: "failed",
+        failedExecutionResult(deployment, {
           exitCode: 1,
           logs: [phaseLog("deploy", message, "error")],
           retryable: false,
@@ -297,12 +324,12 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
 
       if (result.isErr()) {
         const message = safeFailureMessage(result.error.message, redactions);
-        logs.push(phaseLog("deploy", message, "error"));
+        const failurePhase = step.step === "verify-candidate-service" ? "verify" : "deploy";
+        logs.push(phaseLog(failurePhase, message, "error"));
         await this.cleanupFailedCandidate(deployment, logs, redactions);
         return applyExecutionResult(
           deployment,
-          executionResult({
-            status: "failed",
+          failedExecutionResult(deployment, {
             exitCode: 1,
             logs,
             retryable: true,
@@ -317,12 +344,12 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
           result.value.stderr ?? `Docker Swarm command failed at ${step.step}`,
           redactions,
         );
-        logs.push(phaseLog("deploy", message, "error"));
+        const failurePhase = step.step === "verify-candidate-service" ? "verify" : "deploy";
+        logs.push(phaseLog(failurePhase, message, "error"));
         await this.cleanupFailedCandidate(deployment, logs, redactions);
         return applyExecutionResult(
           deployment,
-          executionResult({
-            status: "failed",
+          failedExecutionResult(deployment, {
             exitCode: result.value.exitCode,
             logs,
             retryable: true,

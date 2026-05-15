@@ -263,6 +263,8 @@ export interface ResourceStorageAttachmentsTable {
   id: string;
   resource_id: string;
   storage_volume_id: string;
+  storage_volume_kind: string;
+  source_path: string | null;
   destination_path: string;
   mount_mode: string;
   attached_at: TimestampColumn;
@@ -915,6 +917,50 @@ export interface RetentionDefaultsTable {
   updated_by_actor_kind: string | null;
 }
 
+export interface RuntimeMonitoringSamplesTable {
+  id: string;
+  observed_at: string;
+  collected_at: string;
+  scope_kind: string;
+  scope_id: string;
+  server_id: string | null;
+  project_id: string | null;
+  environment_id: string | null;
+  resource_id: string | null;
+  deployment_id: string | null;
+  totals: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  freshness: string;
+  partial: boolean;
+  labels: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  warnings: ColumnType<
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[]
+  >;
+  source_errors: ColumnType<
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[]
+  >;
+  retained_until: string;
+  created_at: TimestampColumn;
+}
+
+export interface RuntimeMonitoringThresholdPoliciesTable {
+  id: string;
+  scope_kind: string;
+  scope_id: string;
+  rules: ColumnType<
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[]
+  >;
+  enabled: boolean;
+  updated_at: UpdatableTimestampColumn;
+  updated_by_actor_id: string | null;
+  updated_by_actor_kind: string | null;
+}
+
 export interface Database {
   account: BetterAuthAccountsTable;
   projects: ProjectsTable;
@@ -963,6 +1009,8 @@ export interface Database {
   scheduled_task_run_logs: ScheduledTaskRunLogsTable;
   scheduled_runtime_prune_policies: ScheduledRuntimePrunePoliciesTable;
   retention_defaults: RetentionDefaultsTable;
+  runtime_monitoring_samples: RuntimeMonitoringSamplesTable;
+  runtime_monitoring_threshold_policies: RuntimeMonitoringThresholdPoliciesTable;
   deploy_tokens: DeployTokensTable;
   invitation: BetterAuthInvitationsTable;
   member: BetterAuthMembersTable;

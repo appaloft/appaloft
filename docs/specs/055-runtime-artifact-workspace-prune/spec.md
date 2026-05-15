@@ -45,7 +45,9 @@ or Appaloft control-plane state.
 
 - API: `POST /api/servers/{serverId}/capacity/prune`.
 - CLI: `appaloft server capacity prune <serverId> --before <iso> [--category <category>] [--dry-run false]`.
-- Web/UI: future operator maintenance panel may use the same command after preview.
+- Web/UI: Server detail Capacity controls call the same command after a dry-run-first preview.
+  Monitor observation links may prefill the cutoff from the selected observation window. Destructive
+  Web cleanup requires explicit confirmation and sends `dryRun = false`.
 - Config: none.
 - Events/audit: destructive prune with actual deletions records one aggregate-scoped audit row; no
   domain event stream or outbox publication is added in this slice.

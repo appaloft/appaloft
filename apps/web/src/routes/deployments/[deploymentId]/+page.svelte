@@ -14,9 +14,11 @@
     FileText,
     FolderOpen,
     Link2,
+    LoaderCircle,
     RefreshCw,
     Server,
     ShieldCheck,
+    Terminal,
   } from "@lucide/svelte";
   import {
     type DeploymentEventStreamEnvelope,
@@ -38,6 +40,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import { Textarea } from "$lib/components/ui/textarea";
   import * as Tabs from "$lib/components/ui/tabs";
   import {
     deploymentEventProgressEvents,
@@ -56,6 +59,7 @@
     formatTime,
     projectDetailHref,
     resourceDetailHref,
+    resourceTerminalHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
@@ -71,6 +75,13 @@
   type DeploymentDetailTab = "overview" | "logs" | "timeline" | "snapshot";
   type DeploymentLogEntry = DeploymentLogsResponse["logs"][number];
   type DeploymentRecoveryAction = "retry" | "redeploy" | "rollback";
+  type AppaloftDesktopBridge = {
+    copyText?: (text: string) => Promise<void>;
+  };
+  type WindowWithAppaloftDesktopBridge = Window &
+    typeof globalThis & {
+      appaloftDesktop?: AppaloftDesktopBridge;
+    };
 
   const deploymentDetailTabs = ["overview", "logs", "timeline", "snapshot"] as const;
 
@@ -88,10 +99,15 @@
   > | null = null;
   let logsCopyState = $state<"idle" | "copied" | "failed">("idle");
   let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
+  let diagnosticSummaryLoading = $state(false);
+  let diagnosticSummaryCopyState = $state<"idle" | "copied" | "failed">("idle");
+  let diagnosticSummaryError = $state<string | null>(null);
+  let diagnosticSummaryCopyFallback = $state<string | null>(null);
   let deploymentRecoveryActionError = $state("");
   let selectedRollbackCandidateId = $state("");
   let logsCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  let diagnosticSummaryCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
 
   const deploymentId = $derived(page.params.deploymentId ?? "");
   const deploymentDetailQuery = createQuery(() =>
@@ -243,6 +259,17 @@
         ? $t(i18nKeys.console.deployments.accessUrlCopyFailed)
         : $t(i18nKeys.console.deployments.copyAccessUrl),
   );
+  const diagnosticSummaryCopyLabel = $derived.by(() => {
+    if (diagnosticSummaryLoading) {
+      return $t(i18nKeys.console.resources.diagnosticSummaryLoading);
+    }
+
+    if (diagnosticSummaryCopyState === "copied") {
+      return $t(i18nKeys.console.resources.diagnosticSummaryCopied);
+    }
+
+    return $t(i18nKeys.console.resources.diagnosticSummaryCopy);
+  });
   const recoveryActionPending = $derived(
     retryDeploymentMutation.isPending ||
       redeployDeploymentMutation.isPending ||
@@ -586,7 +613,28 @@
     }, 1800);
   }
 
+  function scheduleDiagnosticSummaryCopyReset(): void {
+    if (diagnosticSummaryCopyResetTimeout) {
+      clearTimeout(diagnosticSummaryCopyResetTimeout);
+    }
+
+    diagnosticSummaryCopyResetTimeout = setTimeout(() => {
+      diagnosticSummaryCopyState = "idle";
+      diagnosticSummaryCopyResetTimeout = undefined;
+    }, 2200);
+  }
+
   async function copyTextToClipboard(text: string): Promise<void> {
+    const desktopCopyText = (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.copyText;
+    if (desktopCopyText) {
+      try {
+        await desktopCopyText(text);
+        return;
+      } catch {
+        // Fall back to browser clipboard APIs when an older desktop shell lacks permission.
+      }
+    }
+
     if (navigator.clipboard?.writeText) {
       try {
         await navigator.clipboard.writeText(text);
@@ -602,7 +650,9 @@
     textArea.style.position = "fixed";
     textArea.style.left = "-9999px";
     document.body.append(textArea);
+    textArea.focus({ preventScroll: true });
     textArea.select();
+    textArea.setSelectionRange(0, text.length);
 
     try {
       if (!document.execCommand("copy")) {
@@ -610,6 +660,50 @@
       }
     } finally {
       textArea.remove();
+    }
+  }
+
+  function selectDiagnosticSummaryFallback(event: Event): void {
+    const target = event.currentTarget;
+    if (target instanceof HTMLTextAreaElement) {
+      target.select();
+    }
+  }
+
+  async function handleCopyDeploymentDiagnosticSummary(): Promise<void> {
+    if (!browser || !deployment || diagnosticSummaryLoading) {
+      return;
+    }
+
+    diagnosticSummaryLoading = true;
+    diagnosticSummaryError = null;
+    diagnosticSummaryCopyFallback = null;
+
+    try {
+      const summary = await orpcClient.resources.diagnosticSummary({
+        resourceId: deployment.resourceId,
+        deploymentId: deployment.id,
+        includeDeploymentLogTail: true,
+        includeRuntimeLogTail: true,
+        includeProxyConfiguration: true,
+        tailLines: 20,
+      });
+      const copyJson = summary.copy.json;
+      try {
+        await copyTextToClipboard(copyJson);
+      } catch (copyError) {
+        diagnosticSummaryCopyFallback = copyJson;
+        throw copyError;
+      }
+      diagnosticSummaryCopyState = "copied";
+    } catch (error) {
+      diagnosticSummaryCopyState = "failed";
+      diagnosticSummaryError = readErrorMessage(error);
+    } finally {
+      diagnosticSummaryLoading = false;
+      if (diagnosticSummaryCopyState === "copied") {
+        scheduleDiagnosticSummaryCopyReset();
+      }
     }
   }
 
@@ -765,6 +859,9 @@
     }
     if (accessUrlCopyResetTimeout) {
       clearTimeout(accessUrlCopyResetTimeout);
+    }
+    if (diagnosticSummaryCopyResetTimeout) {
+      clearTimeout(diagnosticSummaryCopyResetTimeout);
     }
   });
 
@@ -939,15 +1036,73 @@
                 <Boxes class="size-4" />
                 {$t(i18nKeys.common.actions.openResource)}
               </Button>
+              <Button
+                href={resourceTerminalHref(
+                  {
+                    id: deployment.resourceId,
+                    projectId: deployment.projectId,
+                    environmentId: deployment.environmentId,
+                  },
+                  deployment.id,
+                )}
+                variant="outline"
+              >
+                <Terminal class="size-4" />
+                {$t(i18nKeys.common.actions.openTerminal)}
+              </Button>
             {/if}
             <Button variant="outline" onclick={handleViewProgress}>
               <Clock3 class="size-4" />
               {$t(i18nKeys.common.actions.viewProgress)}
             </Button>
+            <Button
+              id="deployment-diagnostic-summary-copy"
+              type="button"
+              variant="outline"
+              disabled={diagnosticSummaryLoading}
+              aria-label={diagnosticSummaryCopyLabel}
+              title={diagnosticSummaryCopyLabel}
+              onclick={handleCopyDeploymentDiagnosticSummary}
+            >
+              {#if diagnosticSummaryLoading}
+                <LoaderCircle class="size-4 animate-spin" />
+              {:else if diagnosticSummaryCopyState === "copied"}
+                <Check class="size-4" />
+              {:else}
+                <Copy class="size-4" />
+              {/if}
+              {diagnosticSummaryCopyLabel}
+            </Button>
           </div>
         </div>
 
       </section>
+
+      {#if diagnosticSummaryError || diagnosticSummaryCopyFallback}
+        <section class="console-panel space-y-3 p-4">
+          {#if diagnosticSummaryError}
+            <p class="text-sm text-destructive">{diagnosticSummaryError}</p>
+          {/if}
+          {#if diagnosticSummaryCopyFallback}
+            <div class="space-y-2">
+              <div class="space-y-1">
+                <p class="text-sm font-medium">
+                  {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackTitle)}
+                </p>
+                <p class="text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackDescription)}
+                </p>
+              </div>
+              <Textarea
+                class="min-h-28 font-mono text-xs"
+                readonly
+                value={diagnosticSummaryCopyFallback}
+                onfocus={selectDiagnosticSummaryFallback}
+              />
+            </div>
+          {/if}
+        </section>
+      {/if}
 
       {#if sectionErrors.length > 0}
         <section

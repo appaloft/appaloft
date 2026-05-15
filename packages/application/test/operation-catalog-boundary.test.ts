@@ -106,6 +106,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "storage-volumes.show",
       "storage-volumes.rename",
       "storage-volumes.delete",
+      "storage-volumes.cleanup-runtime",
       "resources.attach-storage",
       "resources.detach-storage",
       "dependency-resources.provision-postgres",
@@ -336,6 +337,134 @@ describe("operation catalog aggregate mutation boundary", () => {
       },
     });
     expect(entry?.inputSchema).toBeDefined();
+  });
+
+  test("[RT-MON-002][RT-MON-003][RT-MON-006] runtime monitoring operations expose governed transports", () => {
+    const samplesEntry = operationCatalog.find(
+      (candidate) => candidate.key === "runtime-monitoring.samples.list",
+    );
+    const rollupEntry = operationCatalog.find(
+      (candidate) => candidate.key === "runtime-monitoring.rollup",
+    );
+    const thresholdConfigureEntry = operationCatalog.find(
+      (candidate) => candidate.key === "runtime-monitoring.thresholds.configure",
+    );
+    const thresholdShowEntry = operationCatalog.find(
+      (candidate) => candidate.key === "runtime-monitoring.thresholds.show",
+    );
+
+    expect(samplesEntry).toMatchObject({
+      kind: "query",
+      domain: "runtime-monitoring",
+      messageName: "ListRuntimeMonitoringSamplesQuery",
+      handlerName: "ListRuntimeMonitoringSamplesQueryHandler",
+      serviceName: "RuntimeMonitoringSamplesQueryService",
+      transports: {
+        cli: "appaloft runtime-monitoring samples <scope> --from <iso> --to <iso>",
+        orpc: { method: "GET", path: "/api/runtime-monitoring/samples" },
+      },
+    });
+    expect(samplesEntry?.inputSchema).toBeDefined();
+
+    expect(rollupEntry).toMatchObject({
+      kind: "query",
+      domain: "runtime-monitoring",
+      messageName: "RuntimeMonitoringRollupQuery",
+      handlerName: "RuntimeMonitoringRollupQueryHandler",
+      serviceName: "RuntimeMonitoringRollupQueryService",
+      transports: {
+        cli: "appaloft runtime-monitoring rollup <scope> --from <iso> --to <iso> --bucket <bucket>",
+        orpc: { method: "GET", path: "/api/runtime-monitoring/rollup" },
+      },
+    });
+    expect(rollupEntry?.inputSchema).toBeDefined();
+
+    expect(thresholdConfigureEntry).toMatchObject({
+      kind: "command",
+      domain: "runtime-monitoring",
+      messageName: "ConfigureRuntimeMonitoringThresholdsCommand",
+      handlerName: "ConfigureRuntimeMonitoringThresholdsCommandHandler",
+      serviceName: "ConfigureRuntimeMonitoringThresholdsUseCase",
+      transports: {
+        cli: "appaloft runtime-monitoring thresholds configure <scope> --rule <json>",
+        orpc: { method: "POST", path: "/api/runtime-monitoring/thresholds" },
+      },
+    });
+    expect(thresholdConfigureEntry?.inputSchema).toBeDefined();
+
+    expect(thresholdShowEntry).toMatchObject({
+      kind: "query",
+      domain: "runtime-monitoring",
+      messageName: "ShowRuntimeMonitoringThresholdsQuery",
+      handlerName: "ShowRuntimeMonitoringThresholdsQueryHandler",
+      serviceName: "ShowRuntimeMonitoringThresholdsQueryService",
+      transports: {
+        cli: "appaloft runtime-monitoring thresholds show <scope>",
+        orpc: { method: "GET", path: "/api/runtime-monitoring/thresholds" },
+      },
+    });
+    expect(thresholdShowEntry?.inputSchema).toBeDefined();
+  });
+
+  test("[RT-MON-005] logs events health and diagnostics stay outside runtime monitoring operations", () => {
+    const independentObservationOperations = [
+      "resources.runtime-logs",
+      "deployments.logs",
+      "deployments.stream-events",
+      "resources.health",
+      "resources.diagnostic-summary",
+      "resources.proxy-configuration.preview",
+    ];
+
+    for (const key of independentObservationOperations) {
+      const entry = operationCatalog.find((candidate) => candidate.key === key);
+      expect(entry, key).toBeDefined();
+      expect(entry?.domain).not.toBe("runtime-monitoring");
+    }
+
+    const runtimeMonitoringEntries = operationCatalog.filter(
+      (entry) => entry.domain === "runtime-monitoring",
+    );
+    expect(
+      runtimeMonitoringEntries.filter((entry) =>
+        /\b(logs?|events?|health|diagnostics?|proxy)\b/i.test(
+          [entry.key, entry.messageName, entry.serviceName, entry.transports.cli].join(" "),
+        ),
+      ),
+    ).toEqual([]);
+  });
+
+  test("[RT-MON-010] runtime monitoring catalog stays below Prometheus and APM scope", () => {
+    const runtimeMonitoringEntries = operationCatalog
+      .filter((entry) => entry.domain === "runtime-monitoring")
+      .map((entry) => entry.key)
+      .sort();
+
+    expect(runtimeMonitoringEntries).toEqual([
+      "runtime-monitoring.rollup",
+      "runtime-monitoring.samples.list",
+      "runtime-monitoring.thresholds.configure",
+      "runtime-monitoring.thresholds.show",
+    ]);
+
+    const forbiddenScopePattern =
+      /\b(prometheus|promql|grafana|apm|trace|tracing|dashboard|custom[-.]?metric|alert[-.]?routing|autoscal|quota|billing)\b/i;
+    const catalogEntries: readonly OperationCatalogEntry[] = operationCatalog;
+    const forbiddenEntries = catalogEntries.filter((entry) =>
+      forbiddenScopePattern.test(
+        [
+          entry.key,
+          entry.domain,
+          entry.messageName,
+          entry.handlerName,
+          entry.serviceName,
+          entry.transports.cli,
+          entry.transports.orpc?.path,
+        ].join(" "),
+      ),
+    );
+
+    expect(forbiddenEntries).toEqual([]);
   });
 
   test("[OP-WORK-CATALOG-001] operator work ledger exposes queries and lifecycle commands", () => {

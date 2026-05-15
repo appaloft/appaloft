@@ -59,7 +59,7 @@ Current status:
   Round activation. Resource runtime controls now have registered stub anchors for runtime
   controls, restart versus redeploy, and blocked start before Code Round activation. Docker Swarm
   runtime targets now have a registered server docs anchor for default-active Swarm execution.
-  Action-only pull request previews and future product-grade previews now have registered
+  Action-only pull request previews and control-plane product-grade previews now have registered
   `deploy/previews` anchors that distinguish workflow-file previews from control-plane previews.
   Dependency runtime injection now has a registered dependency docs anchor for plan/show blocked
   readiness and safe bind-to-deploy behavior.
@@ -140,10 +140,10 @@ Current status:
   `@appaloft/docs-registry` topic metadata and
   `docs/documentation/public-docs-traceability.md`. Source auto-deploy traceability is recorded as
   future Web/CLI/API surface coverage until those operations are active. Phase 7 storage,
-  dependency resource, backup/restore, and recovery-command traceability is recorded for active
-  CLI/HTTP/API operations. Resource runtime control traceability is recorded as future
-  Web/CLI/API/MCP surface coverage until those commands are active. Docker Swarm runtime target
-  traceability is recorded as a target-help anchor with deferred execution UI. Scheduled task
+  dependency resource, backup/restore, recovery-command, and resource runtime control traceability
+  is recorded for active CLI/HTTP/API/Web operations. Future MCP runtime-control descriptors remain
+  deferred until the tool surface exists. Docker Swarm runtime target traceability is recorded as a
+  target-help anchor with deferred execution UI. Scheduled task
   traceability is recorded for active CLI/HTTP/API/Web/future MCP help links. Preview deployment
   traceability is recorded for Action-only CLI/repository-config guidance and future
   Cloud/self-hosted product-grade preview surfaces. Self-hosted Action deploy-token auth

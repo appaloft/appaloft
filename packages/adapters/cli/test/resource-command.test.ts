@@ -1,3 +1,5 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
+
 import { describe, expect, test } from "bun:test";
 import {
   type Command as AppCommand,
@@ -654,6 +656,10 @@ describe("CLI resource commands", () => {
       "--proxy-configuration",
       "--tail",
       "7",
+      "--from",
+      "2026-01-01T00:00:00.000Z",
+      "--to",
+      "2026-01-01T00:01:00.000Z",
     ]);
 
     expect(queries).toHaveLength(1);
@@ -665,7 +671,150 @@ describe("CLI resource commands", () => {
       includeRuntimeLogTail: true,
       includeProxyConfiguration: true,
       tailLines: 7,
+      observationFrom: "2026-01-01T00:00:00.000Z",
+      observationTo: "2026-01-01T00:01:00.000Z",
     });
+  });
+
+  test("[RES-DIAG-ENTRY-005] resource diagnose --summary renders stable human output", async () => {
+    ensureReflectMetadata();
+    const { createExecutionContext, ResourceDiagnosticSummaryQuery } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+
+        if (query instanceof ResourceDiagnosticSummaryQuery) {
+          return ok({
+            schemaVersion: "resources.diagnostic-summary/v1",
+            generatedAt: "2026-01-01T00:00:10.000Z",
+            focus: {
+              resourceId: "res_demo",
+              deploymentId: "dep_demo",
+            },
+            context: {
+              projectId: "prj_demo",
+              environmentId: "env_demo",
+              resourceName: "workspace",
+              resourceSlug: "workspace",
+              resourceKind: "application",
+              destinationId: "dst_demo",
+              serverId: "srv_demo",
+              services: [],
+            },
+            deployment: {
+              id: "dep_demo",
+              status: "succeeded",
+              lifecyclePhase: "succeeded",
+              runtimePlanId: "plan_demo",
+              sourceKind: "git-public",
+              sourceDisplayName: "workspace",
+              serverId: "srv_demo",
+              destinationId: "dst_demo",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              logCount: 2,
+            },
+            access: {
+              status: "failed",
+              generatedUrl: "https://generated.example.test",
+              reasonCode: "default_access_route_unavailable",
+              phase: "access-observation",
+            },
+            proxy: {
+              status: "available",
+              providerKey: "traefik",
+              proxyRouteStatus: "ready",
+              configurationIncluded: true,
+              routeCount: 1,
+              sectionCount: 0,
+            },
+            deploymentLogs: {
+              status: "available",
+              tailLimit: 20,
+              lineCount: 2,
+              lines: [],
+            },
+            runtimeLogs: {
+              status: "unavailable",
+              tailLimit: 20,
+              lineCount: 0,
+              lines: [],
+              reasonCode: "resource_runtime_logs_unavailable",
+              phase: "runtime-log-observation",
+            },
+            system: {
+              entrypoint: "cli",
+              requestId: "req_cli_resource_diagnose_summary_test",
+            },
+            sourceErrors: [
+              {
+                source: "runtime-logs",
+                code: "resource_runtime_logs_unavailable",
+                category: "runtime_observation",
+                phase: "runtime-log-observation",
+                retryable: true,
+                relatedEntityId: "res_demo",
+              },
+            ],
+            redaction: {
+              policy: "deployment-environment-secrets",
+              masked: true,
+              maskedValueCount: 1,
+            },
+            copy: {
+              json: JSON.stringify({
+                resourceId: "res_demo",
+                deploymentId: "dep_demo",
+              }),
+            },
+          } as T);
+        }
+
+        return ok({} as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_resource_diagnose_summary_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const output = await parseCliWithOutput(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "diagnose",
+      "res_demo",
+      "--deployment",
+      "dep_demo",
+      "--summary",
+    ]);
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(ResourceDiagnosticSummaryQuery);
+    expect(output).toContain("Resource diagnostic summary");
+    expect(output).toContain("Resource: workspace (res_demo)");
+    expect(output).toContain("Deployment: dep_demo · succeeded");
+    expect(output).toContain("Access: failed · default_access_route_unavailable");
+    expect(output).toContain("Route: https://generated.example.test");
+    expect(output).toContain("runtime-logs · resource_runtime_logs_unavailable");
+    expect(output).toContain("Canonical JSON: rerun with --json");
+    expect(output).not.toContain('"schemaVersion"');
   });
 
   test("[RES-ACCESS-DIAG-EVIDENCE-001] resource access-failure dispatches request-id lookup query", async () => {

@@ -49,6 +49,5 @@
 
 ## Post-Implementation Sync
 
-- [ ] Update `docs/PRODUCT_ROADMAP.md` only after Postgres and Redis closed loops are actually
-  verified.
+- [x] Update `docs/PRODUCT_ROADMAP.md` after Postgres and Redis closed loops are verified.
 - [x] Reconcile migration notes in dependency workflow and runtime injection specs after Code Round.

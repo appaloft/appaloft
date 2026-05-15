@@ -31,7 +31,13 @@ import { type Kysely } from "kysely";
 
 import { type Database } from "../src";
 
-function previewEnvironmentFixture(input?: { id?: string; headSha?: string }) {
+function previewEnvironmentFixture(input?: {
+  id?: string;
+  headSha?: string;
+  expiresAt?: string;
+  pullRequestNumber?: number;
+  sourceBindingFingerprint?: string;
+}) {
   return PreviewEnvironment.create({
     id: PreviewEnvironmentId.rehydrate(input?.id ?? "prenv_demo_42"),
     projectId: ProjectId.rehydrate("prj_preview"),
@@ -43,13 +49,19 @@ function previewEnvironmentFixture(input?: { id?: string; headSha?: string }) {
     source: {
       repositoryFullName: SourceRepositoryFullName.create("appaloft/demo")._unsafeUnwrap(),
       headRepositoryFullName: SourceRepositoryFullName.create("appaloft/demo")._unsafeUnwrap(),
-      pullRequestNumber: PreviewPullRequestNumber.create(42)._unsafeUnwrap(),
+      pullRequestNumber: PreviewPullRequestNumber.create(
+        input?.pullRequestNumber ?? 42,
+      )._unsafeUnwrap(),
       headSha: GitCommitShaText.create(input?.headSha ?? "abc1234")._unsafeUnwrap(),
       baseRef: GitRefText.create("main")._unsafeUnwrap(),
-      sourceBindingFingerprint: SourceBindingFingerprint.create("srcfp_preview_42")._unsafeUnwrap(),
+      sourceBindingFingerprint: SourceBindingFingerprint.create(
+        input?.sourceBindingFingerprint ?? "srcfp_preview_42",
+      )._unsafeUnwrap(),
     },
     createdAt: CreatedAt.rehydrate("2026-05-06T00:00:00.000Z"),
-    expiresAt: PreviewEnvironmentExpiresAt.create("2026-05-13T00:00:00.000Z")._unsafeUnwrap(),
+    expiresAt: PreviewEnvironmentExpiresAt.create(
+      input?.expiresAt ?? "2026-05-13T00:00:00.000Z",
+    )._unsafeUnwrap(),
   })._unsafeUnwrap();
 }
 
@@ -321,6 +333,83 @@ describe("preview environment persistence", () => {
 
       expect(deleted).toBeNull();
       expect(owner?.id).toBe("res_preview_api");
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
+
+  test("[PG-PREVIEW-POLICY-003] lists expired active preview environments for cleanup", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-preview-environment-expired-"));
+    const {
+      createDatabase,
+      createMigrator,
+      PgPreviewEnvironmentRepository,
+      PgPreviewExpiredEnvironmentCandidateReader,
+    } = await import("../src");
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const context = toRepositoryContext(
+        createExecutionContext({
+          requestId: "req_preview_environment_expired_pglite_test",
+          entrypoint: "system",
+        }),
+      );
+      await seedPreviewOwners(database.db);
+
+      const repository = new PgPreviewEnvironmentRepository(database.db);
+      const expired = previewEnvironmentFixture({
+        id: "prenv_expired",
+        expiresAt: "2026-05-06T00:00:00.000Z",
+        pullRequestNumber: 43,
+        sourceBindingFingerprint: "srcfp_preview_43",
+      });
+      const future = previewEnvironmentFixture({
+        id: "prenv_future",
+        expiresAt: "2026-05-07T00:00:00.000Z",
+        pullRequestNumber: 44,
+        sourceBindingFingerprint: "srcfp_preview_44",
+      });
+      const cleanupRequested = previewEnvironmentFixture({
+        id: "prenv_cleanup_requested",
+        expiresAt: "2026-05-06T00:05:00.000Z",
+        pullRequestNumber: 45,
+        sourceBindingFingerprint: "srcfp_preview_45",
+      });
+      cleanupRequested
+        .requestCleanup({
+          requestedAt: UpdatedAt.rehydrate("2026-05-06T00:10:00.000Z"),
+        })
+        ._unsafeUnwrap();
+
+      for (const previewEnvironment of [future, expired, cleanupRequested]) {
+        await repository.upsert(
+          context,
+          previewEnvironment,
+          UpsertPreviewEnvironmentSpec.fromPreviewEnvironment(previewEnvironment),
+        );
+      }
+
+      const reader = new PgPreviewExpiredEnvironmentCandidateReader(database.db);
+      const candidates = await reader.listExpiredActive(context, {
+        now: "2026-05-06T00:30:00.000Z",
+        limit: 10,
+      });
+
+      expect(candidates).toEqual([
+        {
+          previewEnvironmentId: "prenv_expired",
+          resourceId: "res_preview_api",
+          expiresAt: "2026-05-06T00:00:00.000Z",
+        },
+      ]);
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });

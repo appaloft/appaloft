@@ -1,7 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import {
   cleanupWorkspace,
   createShellE2eWorkspace,
@@ -11,194 +9,43 @@ import {
   runShellCli,
   type ShellE2eWorkspace,
 } from "./support/shell-e2e-fixture";
+import {
+  bootstrapSshContext,
+  type QuickDeploySshContext,
+  remoteCleanup,
+  runSsh,
+  type SshConfig,
+  sshConfig,
+} from "./support/ssh-e2e";
 
 const enabled = process.env.APPALOFT_E2E_SSH_QUICK_DEPLOY === "true";
 const successfulFixtureDir = fixturePath("docker-express-hello");
 const failingFixtureDir = fixturePath("docker-exits-fast");
 const staticFixtureDir = fixturePath("static-site");
 const composeFixtureFile = join(fixturePath("docker-compose-hello"), "docker-compose.yml");
+const prebuiltImage = process.env.APPALOFT_E2E_SSH_PREBUILT_IMAGE ?? "nginx:1.27-alpine";
 
-interface SshConfig {
-  host: string;
-  port: string;
-  privateKeyFile: string;
-  username: string;
-}
-
-interface QuickDeployContext {
-  environmentId: string;
-  projectId: string;
-  serverId: string;
-}
-
-function expandHome(path: string): string {
-  return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(2)) : path;
-}
-
-function sshConfig(): SshConfig {
-  const host = process.env.APPALOFT_E2E_SSH_HOST;
-  const privateKeyFile = expandHome(process.env.APPALOFT_E2E_SSH_PRIVATE_KEY ?? "~/.ssh/appaloft");
-
-  if (!host) {
-    throw new Error("APPALOFT_E2E_SSH_HOST is required when APPALOFT_E2E_SSH_QUICK_DEPLOY=true");
-  }
-
-  if (!existsSync(privateKeyFile)) {
-    throw new Error(`SSH private key file does not exist: ${privateKeyFile}`);
-  }
-
-  return {
-    host,
-    port: process.env.APPALOFT_E2E_SSH_PORT ?? "22",
-    privateKeyFile,
-    username: process.env.APPALOFT_E2E_SSH_USERNAME ?? "root",
-  };
-}
-
-function runSsh(
-  config: SshConfig,
-  command: string,
-): {
-  exitCode: number;
-  stderr: string;
-  stdout: string;
-} {
-  const result = Bun.spawnSync(
-    [
-      "ssh",
-      "-i",
-      config.privateKeyFile,
-      "-p",
-      config.port,
-      "-o",
-      "BatchMode=yes",
-      "-o",
-      "StrictHostKeyChecking=accept-new",
-      `${config.username}@${config.host}`,
-      command,
-    ],
-    {
-      stderr: "pipe",
-      stdout: "pipe",
-    },
-  );
-
-  return {
-    exitCode: result.exitCode,
-    stderr: result.stderr.toString(),
-    stdout: result.stdout.toString(),
-  };
-}
-
-function remoteCleanup(config: SshConfig, deploymentId: string): void {
-  const containerName = `appaloft-${deploymentId}`.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
-  const imageName = `appaloft-image-${deploymentId}`.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
-  const remoteRuntimeRoot = process.env.APPALOFT_REMOTE_RUNTIME_ROOT ?? "/var/lib/appaloft/runtime";
-  const remoteRoot = `${remoteRuntimeRoot.replace(/\/+$/, "")}/ssh-deployments/${deploymentId.toLowerCase().replace(/[^a-z0-9_.-]/g, "-")}`;
-
-  runSsh(
-    config,
-    [
-      `docker compose -p '${containerName}' down --remove-orphans >/dev/null 2>&1 || true`,
-      `docker rm -f '${containerName}' >/dev/null 2>&1 || true`,
-      `docker image rm -f '${imageName}' >/dev/null 2>&1 || true`,
-      `rm -rf '${remoteRoot}'`,
-    ].join(" && "),
-  );
-}
-
-function bootstrapSshContext(input: {
-  config: SshConfig;
-  proxyKind: "none" | "traefik";
-  suffix: string;
-  workspace: ShellE2eWorkspace;
-}): QuickDeployContext {
-  const project = runShellCli(
-    ["project", "create", "--name", `SSH Quick ${input.suffix}`],
-    input.workspace.cliOptions,
-  );
-  expectCliSuccess(project, "create project");
-  const projectId = parseJson<{ id: string }>(project.stdout).id;
-
-  const server = runShellCli(
-    [
-      "server",
-      "register",
-      "--name",
-      `ssh-${input.suffix}`,
-      "--host",
-      input.config.host,
-      "--port",
-      input.config.port,
-      "--provider",
-      "generic-ssh",
-      "--proxy-kind",
-      input.proxyKind,
-    ],
-    input.workspace.cliOptions,
-  );
-  expectCliSuccess(server, "register server");
-  const serverId = parseJson<{ id: string }>(server.stdout).id;
-
-  const credential = runShellCli(
-    [
-      "server",
-      "credential",
-      serverId,
-      "--kind",
-      "ssh-private-key",
-      "--username",
-      input.config.username,
-      "--private-key-file",
-      resolve(input.config.privateKeyFile),
-    ],
-    input.workspace.cliOptions,
-  );
-  expectCliSuccess(credential, "configure server credential");
-
-  const doctor = runShellCli(["server", "doctor", serverId], input.workspace.cliOptions);
-  expectCliSuccess(doctor, "server doctor");
-  const doctorOutput = parseJson<{
-    checks: Array<{ name: string; status: string }>;
-    status: string;
-  }>(doctor.stdout);
-  expect(doctorOutput.status).not.toBe("unreachable");
-  expect(doctorOutput.checks).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ name: "ssh", status: "passed" }),
-      expect.objectContaining({ name: "docker", status: "passed" }),
-    ]),
-  );
-
-  const environment = runShellCli(
-    ["env", "create", "--project", projectId, "--name", "production", "--kind", "production"],
-    input.workspace.cliOptions,
-  );
-  expectCliSuccess(environment, "create environment");
-
-  return {
-    environmentId: parseJson<{ id: string }>(environment.stdout).id,
-    projectId,
-    serverId,
-  };
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 describe("quick deploy SSH workflow e2e", () => {
   if (!enabled) {
-    test.skip("[QUICK-DEPLOY-WF-022] opt-in SSH Docker workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
-    test.skip("[QUICK-DEPLOY-WF-060] opt-in SSH Docker Compose workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
-    test.skip("[QUICK-DEPLOY-WF-034] opt-in SSH failure diagnostics workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
-    test.skip("[QUICK-DEPLOY-WF-040] opt-in SSH static site workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
+    test.skip("[QUICK-DEPLOY-WF-022] local explicit SSH Docker workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
+    test.skip("[QUICK-DEPLOY-WF-060] local explicit SSH Docker Compose workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
+    test.skip("[QUICK-DEPLOY-WF-061] local explicit SSH prebuilt image workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
+    test.skip("[QUICK-DEPLOY-WF-034] local explicit SSH failure diagnostics workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
+    test.skip("[QUICK-DEPLOY-WF-040] local explicit SSH static site workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
     return;
   }
 
   let config: SshConfig;
-  let failedRuntimeContext: QuickDeployContext;
-  let successfulRuntimeContext: QuickDeployContext;
+  let failedRuntimeContext: QuickDeploySshContext;
+  let successfulRuntimeContext: QuickDeploySshContext;
   let workspace: ShellE2eWorkspace;
 
   beforeAll(() => {
-    config = sshConfig();
+    config = sshConfig({ enabledVariable: "APPALOFT_E2E_SSH_QUICK_DEPLOY" });
     const dockerVersion = runSsh(config, "docker version --format '{{.Server.Version}}'");
     expect(dockerVersion.exitCode, dockerVersion.stderr).toBe(0);
 
@@ -325,6 +172,87 @@ describe("quick deploy SSH workflow e2e", () => {
       expect(logs.stdout).toContain("Using SSH docker-compose-stack execution");
       expect(logs.stdout).toContain("SSH compose stack started");
       expect(logs.stdout).toContain("docker-compose.yml");
+    } finally {
+      if (deploymentId) {
+        remoteCleanup(config, deploymentId);
+      }
+    }
+  }, 240000);
+
+  test("[QUICK-DEPLOY-WF-061] quick deploys a prebuilt image to an SSH Docker target", () => {
+    let deploymentId: string | undefined;
+
+    try {
+      const preflightPull = runSsh(config, `docker pull ${shellQuote(prebuiltImage)}`);
+      expect(preflightPull.exitCode, preflightPull.stderr).toBe(0);
+
+      const deployment = runShellCli(
+        [
+          "deploy",
+          `docker://${prebuiltImage}`,
+          "--project",
+          successfulRuntimeContext.projectId,
+          "--server",
+          successfulRuntimeContext.serverId,
+          "--environment",
+          successfulRuntimeContext.environmentId,
+          "--method",
+          "prebuilt-image",
+          "--port",
+          "80",
+          "--health-path",
+          "/",
+          "--app-log-lines",
+          "8",
+        ],
+        workspace.cliOptions,
+      );
+      expectCliSuccess(deployment, "quick deploy SSH prebuilt image");
+      deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
+
+      const logs = runShellCli(["logs", deploymentId], workspace.cliOptions);
+      expectCliSuccess(logs, "SSH prebuilt image logs");
+      expect(logs.stdout).toContain("Using SSH docker-container execution");
+      expect(logs.stdout).toContain("SSH container is reachable internally");
+      expect(logs.stdout).toContain("SSH public route is reachable");
+
+      const deploymentDetail = runShellCli(
+        ["deployments", "show", deploymentId],
+        workspace.cliOptions,
+      );
+      expectCliSuccess(deploymentDetail, "show SSH prebuilt image deployment");
+      expect(
+        parseJson<{
+          deployment: {
+            runtimePlan?: {
+              buildStrategy?: string;
+              execution?: { kind?: string; port?: number };
+              runtimeArtifact?: { kind?: string };
+              target?: { providerKey?: string };
+            };
+          };
+          status: { current: string };
+        }>(deploymentDetail.stdout),
+      ).toMatchObject({
+        deployment: {
+          runtimePlan: {
+            buildStrategy: "prebuilt-image",
+            execution: {
+              kind: "docker-container",
+              port: 80,
+            },
+            runtimeArtifact: {
+              kind: "prebuilt-image",
+            },
+            target: {
+              providerKey: "generic-ssh",
+            },
+          },
+        },
+        status: {
+          current: "succeeded",
+        },
+      });
     } finally {
       if (deploymentId) {
         remoteCleanup(config, deploymentId);

@@ -140,5 +140,6 @@
   Plain SSH install does not create a deploy token by default.
 - Public docs now cover installer bootstrap output, GitHub Secret wiring through `appaloft-token`,
   scope meaning, 401/403 recovery, and CLI plus admin-protected HTTP/oRPC lifecycle endpoints under
-  `self-hosting/action-deploy-token-auth#self-hosting-action-deploy-token-auth`. Web and future MCP
-  token management remain later Phase 8 gaps.
+  `self-hosting/action-deploy-token-auth#self-hosting-action-deploy-token-auth`. Web
+  `/organization` token management is active; concrete future MCP token management remains a later
+  Phase 8 gap.

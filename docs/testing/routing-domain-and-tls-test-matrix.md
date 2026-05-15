@@ -305,7 +305,10 @@ pending DNS observation read-model visibility, matched DNS observation visibilit
 DNS match as manual ownership confirmation, and CLI-visible pending DNS propagation before manual
 ownership confirmation.
 
-Current Web implementation includes both a standalone `/domain-bindings` surface and a resource-scoped `/resources/:resourceId` surface, but resource-scoped browser/e2e coverage is not implemented yet.
+Resource-scoped WebView coverage now exercises `ROUTE-TLS-ENTRY-002` and `ROUTE-TLS-ENTRY-007`
+from `/resources/:resourceId`: the resource detail form dispatches `domain-bindings.create` with
+the preloaded project/environment/resource/server/destination context, then confirms the pending
+binding through `domain-bindings.confirm-ownership`.
 
 Current tests cover ownership confirmation through `domain-bindings.confirm-ownership`, including
 DNS-gated confirmation, explicit manual override, DNS mismatch/lookup-failure rejection,

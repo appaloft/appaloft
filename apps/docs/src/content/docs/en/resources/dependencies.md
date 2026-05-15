@@ -39,7 +39,7 @@ sidebar:
 <h2 id="dependency-resource-lifecycle">Dependency resource lifecycle</h2>
 
 A dependency resource is Appaloft's record for a database or service dependency. Phase 7 supports
-provider-neutral Postgres and Redis records, Appaloft-managed Postgres realization, imported
+provider-neutral Postgres and Redis records, Appaloft-managed Postgres/Redis realization, imported
 external dependencies, safe read models, delete safety checks, and backup/restore.
 
 ```bash title="Create or import dependency resources"
@@ -112,6 +112,12 @@ appaloft dependency backup create dep_db
 appaloft dependency backup list dep_db
 appaloft dependency backup restore bkp_123
 ```
+
+For imported dependencies with an Appaloft-owned connection reference, the shell provider runs
+native Postgres dump/restore or Redis logical backup/restore. Provider-owned or unresolved
+references still produce safe metadata-only restore points until that provider supplies its own
+backup substrate. Raw connection values never appear in backup artifacts, read models, events, or
+errors.
 
 Restore does not mutate ResourceBindings, deployment rollback/redeploy state, workload processes, or
 historical deployment snapshots. Dependency delete must be blocked while retained backups or

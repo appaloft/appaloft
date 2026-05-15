@@ -96,8 +96,72 @@ The first implementation translates safe server-scope capacity diagnostics into
 samples, run prune, stop or restart runtimes, deploy, enforce quota, or evaluate threshold policy.
 Appaloft-managed container labels can provide current resource/deployment attribution and runtime
 ids when those labels are present. Source workspace metadata can provide deployment-id evidence for
-resource rollups, and retained runtime identity metadata can add runtime ids when present. Samples,
-rollups, charts, and threshold policy remain governed follow-up slices.
+resource rollups, and retained runtime identity metadata can add runtime ids when present. The
+internal collector service writes sanitized observations through the `runtime-usage.inspect` query
+boundary into the retained sample store; the disabled-by-default background collector runner writes
+retained samples for active servers and runtime-owning resources/deployments/projects/environments
+when enabled. Server/resource Web Monitor surfaces read retained samples, rollup summaries,
+deployment marker counts, and threshold state when available, with browser-local live samples as
+fallback. Threshold reads prefer exact-scope policy, then the nearest parent policy derivable from
+retained sample scope evidence. Server/resource Web Monitor can also configure exact-scope CPU
+`containerCpuPercent`, memory `usedBytes`, and disk `usedBytes` thresholds while preserving
+existing advanced rules for exact-scope edits. Full Observe charts remain a governed follow-up
+slice.
+
+<h2 id="runtime-monitoring-samples-and-rollups">Runtime monitoring samples and rollups</h2>
+
+`runtime-monitoring.samples.list` and `runtime-monitoring.rollup` expose retained sample and rollup
+read APIs. They return data only when a retained monitoring sample store already contains sanitized
+samples for the requested scope and window. Current Web Monitor surfaces prefer retained samples;
+when none exist, they fall back to browser-local Monitor sparklines from `runtime-usage.inspect`
+polling. They also read `runtime-monitoring.rollup` series, deployment marker counts, and top
+contributor counts to show backend rollup state. Their links to logs, events, and diagnostics carry
+the current monitoring window and stable scope id as query parameters so those governed surfaces can
+preserve operator context without copying logs into monitoring records. Resource runtime logs use
+that handoff as the log `since` boundary, resource/server deployment tables filter to matching
+deployment timestamps, and diagnostic summary copies pass the window as `observationFrom` and
+`observationTo` so copied deployment/runtime log evidence stays scoped. Those
+browser-local points are not stored monitoring samples.
+
+```bash title="Read retained runtime monitoring samples"
+appaloft runtime-monitoring samples resource:res_api --from 2026-01-01T00:00:00.000Z --to 2026-01-01T01:00:00.000Z --signal cpu
+```
+
+```http title="Read a retained runtime monitoring rollup"
+GET /api/runtime-monitoring/rollup?scope.kind=resource&scope.resourceId=res_api&window.from=2026-01-01T00%3A00%3A00.000Z&window.to=2026-01-01T01%3A00%3A00.000Z&bucket=minute
+```
+
+These queries read only bounded, sanitized retained observations. They do not collect fresh metrics,
+run cleanup, stop or restart runtimes, copy log lines into monitoring records, or enforce thresholds.
+
+<h2 id="external-observability-handoff">External observability handoff</h2>
+
+Appaloft runtime monitoring is intentionally smaller than a metrics platform. Use external
+observability systems for Prometheus or PromQL, Grafana dashboards, custom metric ingestion,
+application APM, tracing, alert routing, incident workflows, billing analytics, autoscaling, quota
+enforcement, and long-retention analytics. Appaloft keeps only the deployment-platform maintenance
+view: bounded retained usage samples, shallow rollups, deployment markers, non-enforcing threshold
+state, scoped time-window handoffs to existing logs, health, diagnostics, and safe cleanup
+dry-runs, and target-side filtering where those surfaces already expose a compatible boundary.
+
+<h2 id="runtime-monitoring-thresholds">Runtime monitoring thresholds</h2>
+
+`runtime-monitoring.thresholds.configure` writes exact-scope warning/critical threshold policy.
+`runtime-monitoring.thresholds.show` reads the exact policy first, then can inherit the nearest
+parent policy from retained sample scope evidence. Server/resource Web Monitor surfaces read
+threshold state and provides CPU `containerCpuPercent`, memory `usedBytes`, and disk `usedBytes`
+warning/critical threshold configuration; other advanced metrics remain configurable through
+CLI/API. Saving inherited readback creates an exact-scope override. Thresholds are
+observation-only state; they never throttle, resize, restart, redeploy, prune, reject deployments,
+change billing, or trigger automated repair.
+
+```bash title="Configure a non-enforcing threshold"
+appaloft runtime-monitoring thresholds configure resource:res_api --rule '{"signal":"cpu","metric":"containerCpuPercent","warning":70,"critical":90,"comparator":"greater-than-or-equal"}'
+```
+
+```http title="Read threshold policy and latest state"
+GET /api/runtime-monitoring/thresholds?scope.kind=resource&scope.resourceId=res_api
+```
 
 To preview target-owned cleanup, run prune in dry-run mode:
 
@@ -197,6 +261,10 @@ appaloft resource diagnose res_web \
   --runtime-logs \
   --tail 50
 ```
+
+Add `--summary` when you want section status, stable error codes, and next diagnostic context before
+copying the full JSON. Keep the default JSON output, or pass `--json`, when sharing a structured
+payload with support or an issue tracker.
 
 Diagnostic summary shape:
 

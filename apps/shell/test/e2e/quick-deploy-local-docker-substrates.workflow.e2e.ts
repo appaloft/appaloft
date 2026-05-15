@@ -74,6 +74,8 @@ describe("quick deploy local Docker substrate e2e", () => {
           "127.0.0.1",
           "--provider",
           "local-shell",
+          "--proxy-kind",
+          "none",
         ],
         workspace.cliOptions,
       );

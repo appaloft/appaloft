@@ -46,6 +46,9 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.dependencyResourceLifecycle).toBe(
       "/docs/resources/dependencies/#dependency-resource-lifecycle",
     );
+    expect(webDocsHrefs.dependencyBackupRestore).toBe(
+      "/docs/resources/dependencies/#dependency-backup-restore",
+    );
     expect(webDocsHrefs.dependencyRuntimeInjection).toBe(
       "/docs/resources/dependencies/#dependency-runtime-injection",
     );
@@ -64,6 +67,9 @@ describe("console docs help links", () => {
     );
     expect(webDocsHrefs.serverTerminalSession).toBe(
       "/docs/servers/operations/proxy-and-terminal/#server-terminal-session",
+    );
+    expect(webDocsHrefs.maintenanceWorkerActivation).toBe(
+      "/docs/self-hosting/advanced/#maintenance-worker-activation",
     );
     expect(webDocsHrefs.domainGeneratedAccessRoute).toBe(
       "/docs/access/generated-routes/#access-generated-route",
@@ -85,6 +91,9 @@ describe("console docs help links", () => {
     );
     expect(webDocsHrefs.runtimeUsageInspect).toBe(
       "/docs/observe/diagnostics/#runtime-usage-inspect",
+    );
+    expect(webDocsHrefs.runtimeTargetCapacity).toBe(
+      "/docs/observe/diagnostics/#runtime-target-capacity-inspect",
     );
     expect(webDocsHrefs.sourceAutoDeploySetup).toBe(
       "/docs/deploy/sources/#source-auto-deploy-setup",
@@ -114,6 +123,7 @@ describe("console docs help links", () => {
           "routes/preview-environments/+page.svelte",
           "routes/preview-environments/[previewEnvironmentId]/+page.svelte",
           "routes/preview-policies/+page.svelte",
+          "routes/instance/+page.svelte",
           "routes/projects/[projectId]/+page.svelte",
           "routes/resources/[resourceId]/+page.svelte",
           "routes/projects/[projectId]/environments/[environmentId]/resources/[resourceId]/deployments/new/+page.svelte",
@@ -139,6 +149,9 @@ describe("console docs help links", () => {
       sourceByPath["routes/preview-environments/[previewEnvironmentId]/+page.svelte"],
     ).toContain("productGradePreviews");
     expect(sourceByPath["routes/preview-policies/+page.svelte"]).toContain("productGradePreviews");
+    expect(sourceByPath["routes/instance/+page.svelte"]).toContain("DocsHelpLink");
+    expect(sourceByPath["routes/instance/+page.svelte"]).toContain("serverTerminalSession");
+    expect(sourceByPath["routes/instance/+page.svelte"]).toContain("maintenanceWorkerActivation");
     expect(sourceByPath["routes/projects/[projectId]/+page.svelte"]).toContain(
       "environmentLifecycle",
     );
@@ -159,6 +172,24 @@ describe("console docs help links", () => {
       "diagnosticsSafeSupportPayload",
     );
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "orpcClient.resources.diagnosticSummary",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "orpcClient.resources.importVariables",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "resource-configuration-import-form",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "resource-diagnostic-summary-copy",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "accessFailureRouteSource",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "accessFailureRouteId",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "resourceProfileDrift",
     );
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
@@ -169,6 +200,18 @@ describe("console docs help links", () => {
     );
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "certificateReadiness",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "domainCustomDomainBinding",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "orpcClient.domainBindings.create",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "orpcClient.domainBindings.confirmOwnership",
+    );
+    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+      "resource-domain-binding-create-form",
     );
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "scheduledTaskLifecycle",
@@ -221,6 +264,33 @@ describe("console docs help links", () => {
     );
     expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
       "serverTerminalSession",
+    );
+    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+      "orpcClient.servers.deleteCheck",
+    );
+    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+      "orpcClient.servers.delete",
+    );
+    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+      "orpcClient.servers.deactivate",
+    );
+    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+      "runtimeTargetCapacity",
+    );
+    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+      "orpcClient.servers.capacity.inspect",
+    );
+    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+      "deactivateServerDialogTitle",
+    );
+    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+      "serverDeactivateConfirmation.trim() === server?.id",
+    );
+    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+      "deleteServerDialogTitle",
+    );
+    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+      "serverDeleteConfirmation.trim() === server?.id",
     );
     expect(
       await readFile(

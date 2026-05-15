@@ -14,7 +14,17 @@ export const tokens = {
   defaultAccessDomainPolicySupport: Symbol.for("appaloft.default_access_domain_policy_support"),
   serverConnectivityChecker: Symbol.for("appaloft.server_connectivity_checker"),
   runtimeTargetCapacityInspector: Symbol.for("appaloft.runtime_target_capacity_inspector"),
+  storageRuntimeCleaner: Symbol.for("appaloft.storage_runtime_cleaner"),
   runtimeUsageInspector: Symbol.for("appaloft.runtime_usage_inspector"),
+  runtimeMonitoringSampleWriteStore: Symbol.for("appaloft.runtime_monitoring_sample_write_store"),
+  runtimeMonitoringSampleReadModel: Symbol.for("appaloft.runtime_monitoring_sample_read_model"),
+  runtimeMonitoringMarkerReadModel: Symbol.for("appaloft.runtime_monitoring_marker_read_model"),
+  runtimeMonitoringSampleRetentionStore: Symbol.for(
+    "appaloft.runtime_monitoring_sample_retention_store",
+  ),
+  runtimeMonitoringThresholdPolicyRepository: Symbol.for(
+    "appaloft.runtime_monitoring_threshold_policy_repository",
+  ),
   runtimeTargetCapacityPruner: Symbol.for("appaloft.runtime_target_capacity_pruner"),
   serverEdgeProxyBootstrapper: Symbol.for("appaloft.server_edge_proxy_bootstrapper"),
   deploymentConfigReader: Symbol.for("appaloft.deployment_config_reader"),
@@ -44,6 +54,9 @@ export const tokens = {
   previewEnvironmentCleaner: Symbol.for("appaloft.preview_environment_cleaner"),
   previewCleanupAttemptRecorder: Symbol.for("appaloft.preview_cleanup_attempt_recorder"),
   previewCleanupRetryCandidateReader: Symbol.for("appaloft.preview_cleanup_retry_candidate_reader"),
+  previewExpiredEnvironmentCandidateReader: Symbol.for(
+    "appaloft.preview_expired_environment_candidate_reader",
+  ),
   resourceDependencyBindingRepository: Symbol.for(
     "appaloft.resource_dependency_binding_repository",
   ),
@@ -58,6 +71,7 @@ export const tokens = {
     "appaloft.dependency_resource_delete_safety_reader",
   ),
   storageVolumeRepository: Symbol.for("appaloft.storage_volume_repository"),
+  storageVolumeBackupSafetyReader: Symbol.for("appaloft.storage_volume_backup_safety_reader"),
   resourceDeletionBlockerReader: Symbol.for("appaloft.resource_deletion_blocker_reader"),
   deploymentRepository: Symbol.for("appaloft.deployment_repository"),
   domainBindingRepository: Symbol.for("appaloft.domain_binding_repository"),
@@ -112,6 +126,7 @@ export const tokens = {
   previewLifecycleService: Symbol.for("appaloft.preview_lifecycle_service"),
   previewFeedbackService: Symbol.for("appaloft.preview_feedback_service"),
   previewDeploymentProcessManager: Symbol.for("appaloft.preview_deployment_process_manager"),
+  previewExpiryCleanupScheduler: Symbol.for("appaloft.preview_expiry_cleanup_scheduler"),
   previewPullRequestEventIngestService: Symbol.for(
     "appaloft.preview_pull_request_event_ingest_service",
   ),
@@ -194,6 +209,19 @@ export const tokens = {
   showServerQueryService: Symbol.for("appaloft.show_server_query_service"),
   inspectServerCapacityQueryService: Symbol.for("appaloft.inspect_server_capacity_query_service"),
   runtimeUsageInspectionQueryService: Symbol.for("appaloft.runtime_usage_inspection_query_service"),
+  listRuntimeMonitoringSamplesQueryService: Symbol.for(
+    "appaloft.list_runtime_monitoring_samples_query_service",
+  ),
+  runtimeMonitoringRollupQueryService: Symbol.for(
+    "appaloft.runtime_monitoring_rollup_query_service",
+  ),
+  configureRuntimeMonitoringThresholdsUseCase: Symbol.for(
+    "appaloft.configure_runtime_monitoring_thresholds_use_case",
+  ),
+  showRuntimeMonitoringThresholdsQueryService: Symbol.for(
+    "appaloft.show_runtime_monitoring_thresholds_query_service",
+  ),
+  runtimeMonitoringCollectorService: Symbol.for("appaloft.runtime_monitoring_collector_service"),
   pruneServerCapacityUseCase: Symbol.for("appaloft.prune_server_capacity_use_case"),
   scheduledRuntimePrunePolicyRepository: Symbol.for(
     "appaloft.scheduled_runtime_prune_policy_repository",
@@ -311,6 +339,9 @@ export const tokens = {
   createStorageVolumeUseCase: Symbol.for("appaloft.create_storage_volume_use_case"),
   renameStorageVolumeUseCase: Symbol.for("appaloft.rename_storage_volume_use_case"),
   deleteStorageVolumeUseCase: Symbol.for("appaloft.delete_storage_volume_use_case"),
+  cleanupStorageVolumeRuntimeUseCase: Symbol.for(
+    "appaloft.cleanup_storage_volume_runtime_use_case",
+  ),
   listStorageVolumesQueryService: Symbol.for("appaloft.list_storage_volumes_query_service"),
   showStorageVolumeQueryService: Symbol.for("appaloft.show_storage_volume_query_service"),
   resourceEffectiveConfigQueryService: Symbol.for(
@@ -465,6 +496,7 @@ export const tokens = {
   providersQueryService: Symbol.for("appaloft.providers_query_service"),
   pluginsQueryService: Symbol.for("appaloft.plugins_query_service"),
   doctorQueryService: Symbol.for("appaloft.doctor_query_service"),
+  maintenanceWorkerStatusReader: Symbol.for("appaloft.maintenance_worker_status_reader"),
   dbStatusQueryService: Symbol.for("appaloft.db_status_query_service"),
   dbMigrateUseCase: Symbol.for("appaloft.db_migrate_use_case"),
   instanceUpgrade: Symbol.for("appaloft.instance_upgrade"),

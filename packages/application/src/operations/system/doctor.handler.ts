@@ -3,7 +3,12 @@ import { inject, injectable } from "tsyringe";
 
 import { QueryHandler, type QueryHandlerContract } from "../../cqrs";
 import { type ExecutionContext } from "../../execution-context";
-import { type DiagnosticsStatus, type PluginSummary, type ProviderDescriptor } from "../../ports";
+import {
+  type DiagnosticsStatus,
+  type MaintenanceWorkerStatus,
+  type PluginSummary,
+  type ProviderDescriptor,
+} from "../../ports";
 import { tokens } from "../../tokens";
 import { DoctorQuery } from "./doctor.query";
 import { type DoctorQueryService } from "./doctor.query-service";
@@ -18,6 +23,7 @@ export class DoctorQueryHandler
         readiness: DiagnosticsStatus;
         providers: ProviderDescriptor[];
         plugins: PluginSummary[];
+        maintenanceWorkers: MaintenanceWorkerStatus[];
       }
     >
 {
@@ -34,6 +40,7 @@ export class DoctorQueryHandler
       readiness: DiagnosticsStatus;
       providers: ProviderDescriptor[];
       plugins: PluginSummary[];
+      maintenanceWorkers: MaintenanceWorkerStatus[];
     }>
   > {
     void query;

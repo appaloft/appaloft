@@ -269,12 +269,13 @@ custom bindings can be manually confirmed through `domain-bindings.confirm-owner
 `resources.health` exists. Resource detail and sidebar use unknown only when health is loading or
 unobserved, not as a deployment-status fallback.
 
-Resource/server terminal sessions are specified as accepted candidate behavior through
-`terminal-sessions.open`, but no Web resource tab/action, server action, command, or terminal
-transport exists yet.
+Resource/server terminal sessions are active through `terminal-sessions.open`. Resource detail owns
+the resource terminal tab, server detail owns the server terminal tab/action, deployment detail links
+back to the selected resource terminal, and the terminal transport/lifecycle behavior is governed by
+the operator terminal session workflow and test matrix.
 
-Deployment detail and Quick Deploy completion do not yet expose the action directly, so those
-surfaces still rely on navigation back to resource detail for the consolidated support payload.
+Deployment detail and Quick Deploy completion expose the same copy action once resource/deployment
+ids are known; the consolidated support payload remains owned by `resources.diagnostic-summary`.
 
 ## Open Questions
 

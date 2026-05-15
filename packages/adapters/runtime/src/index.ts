@@ -117,6 +117,7 @@ export {
   type DockerSwarmEnvironmentVariableIntent,
   type DockerSwarmHealthIntent,
   type DockerSwarmImageWorkloadIntent,
+  type DockerSwarmMountIntent,
   type DockerSwarmRouteIntent,
   type DockerSwarmRuntimeIdentityInput,
   type DockerSwarmRuntimeIntent,
@@ -133,10 +134,16 @@ export {
 } from "./docker-swarm-execution-backend";
 export {
   HermeticScheduledTaskRuntimePort,
+  renderDockerContainerScheduledTaskCommand,
+  RuntimeTargetScheduledTaskRuntimePort,
+  type DockerContainerScheduledTaskCommandInput,
   type HermeticScheduledTaskRuntimeOptions,
   type ScheduledTaskCommandRunner,
   type ScheduledTaskCommandRunnerInput,
   type ScheduledTaskCommandRunnerResult,
+  type RuntimeTargetScheduledTaskRuntimeOptions,
+  type ScheduledTaskProcessRunner,
+  type ScheduledTaskProcessRunnerInput,
 } from "./scheduled-task-runtime";
 export {
   parseDockerSizeToBytes,
@@ -148,10 +155,23 @@ export {
   RuntimeTargetCapacityPrunerAdapter,
 } from "./runtime-target-capacity";
 export {
+  parseStorageRuntimeCleanupOutput,
+  renderStorageRuntimeCleanupScript,
+  StorageRuntimeCleanerAdapter,
+} from "./storage-runtime-cleanup";
+export {
   RuntimeUsageCapacityInspectorAdapter,
   translateCapacityInspectionToRuntimeUsage,
   type RuntimeUsageServerResolver,
 } from "./runtime-usage";
+export {
+  classifyRuntimeTargetCapacityFailure,
+  classifyRuntimeTargetCapacityFailureFromText,
+  runtimeTargetCapacityFailureMetadata,
+  type RuntimeTargetCapacityFailureClassification,
+  type RuntimeTargetCapacityFailureLog,
+  type RuntimeTargetCapacityResource,
+} from "./runtime-target-failure-classification";
 export { RuntimeTerminalSessionGateway } from "./terminal-sessions";
 export { SshExecutionBackend } from "./ssh-execution";
 export * from "./runtime-commands";
@@ -466,6 +486,20 @@ function executionMetadataFor(
       : {}),
     ...(requestedDeployment.accessContext?.resourceSlug
       ? { "resource.slug": requestedDeployment.accessContext.resourceSlug }
+      : {}),
+    ...(requestedDeployment.storageMounts && requestedDeployment.storageMounts.length > 0
+      ? {
+          "storage.mounts": JSON.stringify(
+            requestedDeployment.storageMounts.map((mount) => ({
+              attachmentId: mount.attachmentId,
+              storageVolumeId: mount.storageVolumeId,
+              storageVolumeKind: mount.storageVolumeKind,
+              ...(mount.sourcePath ? { sourcePath: mount.sourcePath } : {}),
+              destinationPath: mount.destinationPath,
+              mountMode: mount.mountMode,
+            })),
+          ),
+        }
       : {}),
     ...(requestedDeployment.runtimeMetadata ?? {}),
     ...(requestedDeployment.accessRouteMetadata ?? {}),

@@ -29,9 +29,9 @@ Web Resource detail controls are active.
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
-| `RUNTIME-CTRL-STOP-001` | Running Resource runtime receives stop. | Stop attempt is persisted and adapter receives normalized stop request. | `packages/application/test/resource-runtime-control.test.ts` | Application slice passing; real adapter deferred |
-| `RUNTIME-CTRL-START-001` | Stopped Resource runtime has retained metadata. | Start attempt is persisted and adapter receives normalized start request without deployment creation. | `packages/application/test/resource-runtime-control.test.ts` | Application slice passing; real adapter deferred |
-| `RUNTIME-CTRL-RESTART-001` | Running Resource runtime receives restart. | Restart attempt records stop/start phases and does not create a Deployment attempt. | `packages/application/test/resource-runtime-control.test.ts` | Application slice passing; real adapter deferred |
+| `RUNTIME-CTRL-STOP-001` | Running Resource runtime receives stop. | Stop attempt is persisted and adapter receives normalized stop request. | `packages/application/test/resource-runtime-control.test.ts`; `packages/adapters/runtime/test/resource-runtime-control-target.test.ts` | Passing with application orchestration plus local-shell/generic-SSH Docker adapter mapping |
+| `RUNTIME-CTRL-START-001` | Stopped Resource runtime has retained metadata. | Start attempt is persisted and adapter receives normalized start request without deployment creation. | `packages/application/test/resource-runtime-control.test.ts`; `packages/adapters/runtime/test/resource-runtime-control-target.test.ts` | Passing with application orchestration plus local-shell/generic-SSH Docker adapter mapping |
+| `RUNTIME-CTRL-RESTART-001` | Running Resource runtime receives restart. | Restart attempt records stop/start phases and does not create a Deployment attempt. | `packages/application/test/resource-runtime-control.test.ts`; `packages/adapters/runtime/test/resource-runtime-control-target.test.ts` | Passing with application orchestration plus local-shell/generic-SSH Docker adapter mapping |
 | `RUNTIME-CTRL-BLOCK-001` | Runtime metadata is missing or stale. | Command returns stable blocked reason and suggests redeploy or recovery readiness. | `packages/application/test/resource-runtime-control.test.ts` | Passing |
 | `RUNTIME-CTRL-COORD-001` | Deployment or recovery mutation is active for same resource-runtime scope. | Runtime control is blocked or returns coordination timeout without adapter execution. | `packages/application/test/resource-runtime-control.test.ts` | Passing |
 
@@ -56,7 +56,7 @@ Web Resource detail controls are active.
 | `RUNTIME-CTRL-SURFACE-002` | User compares restart and redeploy. | Public docs and UI copy state that restart does not pick up source/config/profile changes. | `packages/docs-registry/test/help-topics.test.ts`; `apps/web/src/routes/resources/[resourceId]/+page.svelte` | Passing |
 | `RUNTIME-CTRL-DOCS-001` | Public help registry resolves runtime-control anchors. | Registered docs topics resolve `resource-runtime-controls`, `runtime-restart-vs-redeploy`, and `runtime-control-blocked-start` anchors in both locales. | `packages/docs-registry/test/help-topics.test.ts` | Passing |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Runtime logs and resource health observation are active. Deployment retry, redeploy, and rollback
 are active recovery operations. `resources.health` now has a typed optional
@@ -74,4 +74,5 @@ provider-neutral Docker container and Docker Compose command mapping, local shel
 generic SSH execution, and sanitized command failure handling behind an injected executor boundary.
 Shell composition registers the target port, attempt recorder, use case, and command handlers.
 Runtime controls are active in `CORE_OPERATIONS.md`, the operation catalog, CLI, HTTP/oRPC, and Web.
-Future MCP/tool descriptors remain deferred until the tool surface exists.
+Future MCP/tool descriptors are governed by the later tool-surface capability and must be generated
+from these active operation catalog entries when that surface exists.

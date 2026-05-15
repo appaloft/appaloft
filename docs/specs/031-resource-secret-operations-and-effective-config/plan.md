@@ -19,8 +19,9 @@
 - Event/CQRS/read-model impact: command path dispatches through `CommandBus`; effective config
   remains a query path through `QueryBus`. Import publishes existing `resource-variable-set` events
   for imported entries.
-- Entrypoint impact: add operation catalog row, CLI command, oRPC route/client contract, and
-  contract schemas. Web full import UI is a deferred gap; existing read model/schema supports it.
+- Entrypoint impact: add operation catalog row, CLI command, oRPC route/client contract, Web
+  resource-detail paste/import form, and contract schemas. Existing read model/schema supports
+  masked readback.
 - Persistence/migration impact: no migration. Existing resource variable persistence stores the
   resource override layer and existing deployment snapshot materialization consumes it.
 
@@ -46,8 +47,8 @@
   - CLI dispatch test;
   - HTTP/oRPC dispatch test;
   - operation catalog boundary test.
-- Acceptance/e2e: command/query API and CLI dispatch are enough for this baseline; full Web import
-  interaction is deferred.
+- Acceptance/e2e: command/query API, CLI dispatch, and resource-detail Web paste/import interaction
+  cover this baseline.
 - Contract/integration/unit: application tests cover masking, duplicate/override summaries, and
   build/runtime exposure guards.
 
@@ -57,5 +58,5 @@
   metadata only.
 - Risk: duplicate values could be confusing. Mitigation: last pasted occurrence wins and response
   reports duplicate line metadata.
-- Deferred gap: Web paste/import UI. Existing Web resource configuration read model remains masked
-  and can consume the new oRPC command later.
+- Deferred gap: Quick Deploy completion/import affordances remain outside this baseline. Resource
+  detail Web paste/import is active and continues to consume masked read models.

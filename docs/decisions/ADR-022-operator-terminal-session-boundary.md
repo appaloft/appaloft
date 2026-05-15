@@ -198,7 +198,7 @@ the business contract remains the same.
 - [ADR-018: Resource Runtime Log Observation](./ADR-018-resource-runtime-log-observation.md)
 - [ADR-021: Docker/OCI Workload Substrate](./ADR-021-docker-oci-workload-substrate.md)
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 The first implementation adds the `terminal-sessions.open` application command, operation catalog
 entry, runtime terminal gateway, HTTP/oRPC open endpoint, WebSocket attach endpoint, CLI dispatch
@@ -213,12 +213,12 @@ The default remote runtime root is `/var/lib/appaloft/runtime` and can be overri
 
 Current local-shell terminal support uses a Bun subprocess bridge rather than a true local PTY, so
 resize is a no-op for local targets. Generic SSH uses `ssh -tt` for an interactive remote TTY.
-CLI dispatch commands return descriptors, but direct CLI TTY attachment remains a follow-up.
+The runtime gateway records durable `terminal-session-opened` and `terminal-session-closed` audit
+metadata through the configured audit recorder; terminal input/output, raw commands, private keys,
+tokens, and environment secret values are not persisted.
 
 ## Open Questions
 
-- Should terminal session audit metadata be ephemeral only, persisted in a dedicated audit table, or
-  projected into an operator activity read model?
 - Should resource terminals later support `container-exec` and compose service shells, or should v1
   stay limited to host/SSH workspace shells?
 - Should server profiles gain a durable default terminal directory operation before server-scope

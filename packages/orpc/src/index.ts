@@ -25,6 +25,7 @@ import {
   CheckDomainBindingDeleteSafetyQuery,
   CheckServerDeleteSafetyQuery,
   CleanupPreviewCommand,
+  CleanupStorageVolumeRuntimeCommand,
   CloneEnvironmentCommand,
   CloseTerminalSessionCommand,
   type Command,
@@ -41,6 +42,7 @@ import {
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
   ConfigureRetentionDefaultsCommand,
+  ConfigureRuntimeMonitoringThresholdsCommand,
   ConfigureScheduledRuntimePrunePolicyCommand,
   ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
@@ -65,6 +67,7 @@ import {
   checkDomainBindingDeleteSafetyQueryInputSchema,
   checkServerDeleteSafetyQueryInputSchema,
   cleanupPreviewCommandInputSchema,
+  cleanupStorageVolumeRuntimeCommandInputSchema,
   cloneEnvironmentCommandInputSchema,
   closeTerminalSessionCommandInputSchema,
   configureAuditEventLegalHoldCommandInputSchema,
@@ -79,6 +82,7 @@ import {
   configureResourceRuntimeCommandInputSchema,
   configureResourceSourceCommandInputSchema,
   configureRetentionDefaultsCommandInputSchema,
+  configureRuntimeMonitoringThresholdsCommandInputSchema,
   configureScheduledRuntimePrunePolicyCommandInputSchema,
   configureScheduledTaskCommandInputSchema,
   configureServerCredentialCommandInputSchema,
@@ -114,6 +118,7 @@ import {
   DeploymentRecoveryReadinessQuery,
   DetachResourceStorageCommand,
   DiffEnvironmentsQuery,
+  DoctorQuery,
   deactivateServerCommandInputSchema,
   deadLetterOperatorWorkCommandInputSchema,
   deleteCertificateCommandInputSchema,
@@ -189,6 +194,7 @@ import {
   ListResourceRuntimeLogArchivesQuery,
   ListResourcesQuery,
   ListRetentionDefaultsQuery,
+  ListRuntimeMonitoringSamplesQuery,
   ListScheduledRuntimePrunePoliciesQuery,
   ListScheduledTaskRunsQuery,
   ListScheduledTasksQuery,
@@ -219,6 +225,7 @@ import {
   listResourceRuntimeLogArchivesQueryInputSchema,
   listResourcesQueryInputSchema,
   listRetentionDefaultsQueryInputSchema,
+  listRuntimeMonitoringSamplesQueryInputSchema,
   listScheduledRuntimePrunePoliciesQueryInputSchema,
   listScheduledTaskRunsQueryInputSchema,
   listScheduledTasksQueryInputSchema,
@@ -293,6 +300,7 @@ import {
   RotateResourceDependencyBindingSecretCommand,
   RotateSshCredentialCommand,
   RunScheduledTaskNowCommand,
+  RuntimeMonitoringRollupQuery,
   redeployDeploymentCommandInputSchema,
   registerServerCommandInputSchema,
   releaseAuditEventLegalHoldCommandInputSchema,
@@ -322,6 +330,7 @@ import {
   rotateResourceDependencyBindingSecretCommandInputSchema,
   rotateSshCredentialCommandInputSchema,
   runScheduledTaskNowCommandInputSchema,
+  runtimeMonitoringRollupQueryInputSchema,
   ScheduledTaskRunLogsQuery,
   SetEnvironmentVariableCommand,
   SetResourceVariableCommand,
@@ -345,6 +354,7 @@ import {
   ShowResourceQuery,
   ShowResourceRuntimeLogArchiveQuery,
   ShowRetentionDefaultQuery,
+  ShowRuntimeMonitoringThresholdsQuery,
   ShowScheduledRuntimePrunePolicyQuery,
   ShowScheduledTaskQuery,
   ShowScheduledTaskRunQuery,
@@ -383,6 +393,7 @@ import {
   showResourceQueryInputSchema,
   showResourceRuntimeLogArchiveQueryInputSchema,
   showRetentionDefaultQueryInputSchema,
+  showRuntimeMonitoringThresholdsQueryInputSchema,
   showScheduledRuntimePrunePolicyQueryInputSchema,
   showScheduledTaskQueryInputSchema,
   showScheduledTaskRunQueryInputSchema,
@@ -422,6 +433,7 @@ import {
   checkDomainBindingDeleteSafetyResponseSchema,
   checkServerDeleteSafetyResponseSchema,
   cleanupPreviewResponseSchema,
+  cleanupStorageVolumeRuntimeResponseSchema,
   cloneEnvironmentResponseSchema,
   closeTerminalSessionResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
@@ -435,6 +447,7 @@ import {
   configureResourceRuntimeResponseSchema,
   configureResourceSourceResponseSchema,
   configureRetentionDefaultsResponseSchema,
+  configureRuntimeMonitoringThresholdsResponseSchema,
   configureScheduledRuntimePrunePolicyResponseSchema,
   configureServerEdgeProxyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
@@ -467,6 +480,7 @@ import {
   deploymentRecoveryReadinessResponseSchema,
   detachResourceStorageResponseSchema,
   diffEnvironmentResponseSchema,
+  doctorResponseSchema,
   environmentEffectivePrecedenceResponseSchema,
   environmentSummarySchema,
   expireTerminalSessionsResponseSchema,
@@ -549,6 +563,9 @@ import {
   rotateResourceDependencyBindingSecretResponseSchema,
   rotateSshCredentialResponseSchema,
   runScheduledTaskNowResponseSchema,
+  runtimeMonitoringRollupResponseSchema,
+  runtimeMonitoringSamplesResponseSchema,
+  runtimeMonitoringThresholdsResponseSchema,
   scheduledTaskCommandResponseSchema,
   scheduledTaskRunLogsResponseSchema,
   setResourceVariableResponseSchema,
@@ -866,6 +883,22 @@ export const apiRouteDescriptions = {
     "Inspects runtime usage attribution for one scope without pruning, quota enforcement, sample persistence, or state mutation.",
     "diagnostics.runtime-usage",
   ),
+  runtimeMonitoringSamples: routeDescription(
+    "Lists retained runtime monitoring samples for one scope without collecting fresh data or mutating runtime targets.",
+    "diagnostics.runtime-monitoring",
+  ),
+  runtimeMonitoringRollup: routeDescription(
+    "Reads retained runtime monitoring rollups and deployment markers for one scope without causal claims or runtime mutation.",
+    "diagnostics.runtime-monitoring",
+  ),
+  runtimeMonitoringThresholdConfigure: routeDescription(
+    "Configures non-enforcing runtime monitoring threshold policy without runtime mutation.",
+    "diagnostics.runtime-monitoring-thresholds",
+  ),
+  runtimeMonitoringThresholdShow: routeDescription(
+    "Reads non-enforcing runtime monitoring threshold state from retained samples without runtime mutation.",
+    "diagnostics.runtime-monitoring-thresholds",
+  ),
   serverCapacityPrune: routeDescription(
     "Dry-runs or prunes safe Appaloft-managed stopped containers and runtime workspaces without deleting volumes, state roots, or rollback candidates.",
     "diagnostics.runtime-target-capacity",
@@ -1014,8 +1047,12 @@ export const apiRouteDescriptions = {
     "Deletes only unattached storage volumes that are not blocked by backup retention metadata.",
     "storage.volume-lifecycle",
   ),
+  cleanupStorageVolumeRuntime: routeDescription(
+    "Dry-runs or explicitly removes safe Appaloft-owned runtime volume realizations for one storage volume on one server.",
+    "storage.volume-lifecycle",
+  ),
   provisionPostgresDependencyResource: routeDescription(
-    "Creates an Appaloft-managed Postgres dependency resource; when serverId is supplied, realizes Docker-backed database infrastructure on that single-server target.",
+    "Provisions an Appaloft-managed Postgres dependency resource through the configured provider capability. When serverId is supplied, the default shell provider realizes Docker-backed database infrastructure on that single-server target.",
     "dependency.resource-lifecycle",
   ),
   importPostgresDependencyResource: routeDescription(
@@ -1023,7 +1060,7 @@ export const apiRouteDescriptions = {
     "dependency.resource-lifecycle",
   ),
   provisionRedisDependencyResource: routeDescription(
-    "Creates an Appaloft-managed Redis dependency resource; when serverId is supplied, realizes Docker-backed Redis infrastructure on that single-server target.",
+    "Provisions an Appaloft-managed Redis dependency resource through the configured provider capability. When serverId is supplied, the default shell provider realizes Docker-backed Redis infrastructure on that single-server target.",
     "dependency.resource-lifecycle",
   ),
   importRedisDependencyResource: routeDescription(
@@ -2334,6 +2371,58 @@ export const inspectRuntimeUsageProcedure = base
   .output(inspectRuntimeUsageResponseSchema)
   .handler(async ({ input, context }) =>
     executeQuery(context, InspectRuntimeUsageQuery.create(input)),
+  );
+
+export const listRuntimeMonitoringSamplesProcedure = base
+  .route({
+    method: "GET",
+    path: "/runtime-monitoring/samples",
+    description: apiRouteDescriptions.runtimeMonitoringSamples,
+    successStatus: 200,
+  })
+  .input(listRuntimeMonitoringSamplesQueryInputSchema)
+  .output(runtimeMonitoringSamplesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListRuntimeMonitoringSamplesQuery.create(input)),
+  );
+
+export const runtimeMonitoringRollupProcedure = base
+  .route({
+    method: "GET",
+    path: "/runtime-monitoring/rollup",
+    description: apiRouteDescriptions.runtimeMonitoringRollup,
+    successStatus: 200,
+  })
+  .input(runtimeMonitoringRollupQueryInputSchema)
+  .output(runtimeMonitoringRollupResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, RuntimeMonitoringRollupQuery.create(input)),
+  );
+
+export const configureRuntimeMonitoringThresholdsProcedure = base
+  .route({
+    method: "POST",
+    path: "/runtime-monitoring/thresholds",
+    description: apiRouteDescriptions.runtimeMonitoringThresholdConfigure,
+    successStatus: 200,
+  })
+  .input(configureRuntimeMonitoringThresholdsCommandInputSchema)
+  .output(configureRuntimeMonitoringThresholdsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureRuntimeMonitoringThresholdsCommand.create(input)),
+  );
+
+export const showRuntimeMonitoringThresholdsProcedure = base
+  .route({
+    method: "GET",
+    path: "/runtime-monitoring/thresholds",
+    description: apiRouteDescriptions.runtimeMonitoringThresholdShow,
+    successStatus: 200,
+  })
+  .input(showRuntimeMonitoringThresholdsQueryInputSchema)
+  .output(runtimeMonitoringThresholdsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowRuntimeMonitoringThresholdsQuery.create(input)),
   );
 
 export const pruneServerCapacityProcedure = base
@@ -4193,6 +4282,19 @@ export const deleteStorageVolumeProcedure = base
     executeCommand(context, DeleteStorageVolumeCommand.create(input)),
   );
 
+export const cleanupStorageVolumeRuntimeProcedure = base
+  .route({
+    method: "POST",
+    path: "/storage-volumes/{storageVolumeId}/runtime-cleanup",
+    description: apiRouteDescriptions.cleanupStorageVolumeRuntime,
+    successStatus: 200,
+  })
+  .input(cleanupStorageVolumeRuntimeCommandInputSchema)
+  .output(cleanupStorageVolumeRuntimeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CleanupStorageVolumeRuntimeCommand.create(input)),
+  );
+
 export const provisionPostgresDependencyResourceProcedure = base
   .route({
     method: "POST",
@@ -4536,6 +4638,17 @@ export const listPluginsProcedure = base
   .output(listPluginsResponseSchema)
   .handler(async ({ context }) => executeQuery(context, ListPluginsQuery.create()));
 
+export const doctorProcedure = base
+  .route({
+    method: "GET",
+    path: "/system/doctor",
+    description:
+      "Reads local readiness, provider/plugin diagnostics, and configured maintenance worker activation without starting or ticking workers.",
+    successStatus: 200,
+  })
+  .output(doctorResponseSchema)
+  .handler(async ({ context }) => executeQuery(context, DoctorQuery.create()));
+
 export const listGitHubRepositoriesProcedure = base
   .route({
     method: "GET",
@@ -4601,6 +4714,12 @@ export const appaloftOrpcRouter = {
   },
   runtimeUsage: {
     inspect: inspectRuntimeUsageProcedure,
+  },
+  runtimeMonitoring: {
+    samples: listRuntimeMonitoringSamplesProcedure,
+    rollup: runtimeMonitoringRollupProcedure,
+    thresholdConfigure: configureRuntimeMonitoringThresholdsProcedure,
+    thresholdShow: showRuntimeMonitoringThresholdsProcedure,
   },
   retentionDefaults: {
     configure: configureRetentionDefaultsProcedure,
@@ -4685,6 +4804,7 @@ export const appaloftOrpcRouter = {
     show: showStorageVolumeProcedure,
     rename: renameStorageVolumeProcedure,
     delete: deleteStorageVolumeProcedure,
+    cleanupRuntime: cleanupStorageVolumeRuntimeProcedure,
   },
   scheduledTasks: {
     list: listScheduledTasksProcedure,
@@ -4813,6 +4933,9 @@ export const appaloftOrpcRouter = {
   },
   plugins: {
     list: listPluginsProcedure,
+  },
+  system: {
+    doctor: doctorProcedure,
   },
   integrations: {
     github: {
@@ -6529,6 +6652,9 @@ export function mountAppaloftOrpcRoutes(
     "/api/servers/:serverId/capacity",
     "/api/servers/:serverId/capacity/prune",
     "/api/runtime-usage/inspect",
+    "/api/runtime-monitoring/samples",
+    "/api/runtime-monitoring/rollup",
+    "/api/runtime-monitoring/thresholds",
     "/api/servers/:serverId/rename",
     "/api/servers/:serverId/edge-proxy/configuration",
     "/api/servers/:serverId/deactivate",
@@ -6561,6 +6687,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/network-profile",
     "/api/resources/:resourceId/access-profile",
     "/api/resources/:resourceId/runtime-profile",
+    "/api/resources/:resourceId/storage-attachments",
+    "/api/resources/:resourceId/storage-attachments/:attachmentId",
     "/api/resources/:resourceId/diagnostic-summary",
     "/api/resources/:resourceId/proxy-configuration",
     "/api/resources/:resourceId/runtime-logs",
@@ -6576,6 +6704,10 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/dependency-bindings",
     "/api/resources/:resourceId/dependency-bindings/:bindingId",
     "/api/resources/:resourceId/dependency-bindings/:bindingId/secret-rotations",
+    "/api/storage-volumes",
+    "/api/storage-volumes/:storageVolumeId",
+    "/api/storage-volumes/:storageVolumeId/rename",
+    "/api/storage-volumes/:storageVolumeId/runtime-cleanup",
     "/api/scheduled-tasks",
     "/api/scheduled-tasks/:taskId",
     "/api/scheduled-tasks/:taskId/runs",
@@ -6649,6 +6781,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/preview-environments/:previewEnvironmentId",
     "/api/providers",
     "/api/plugins",
+    "/api/system/doctor",
     "/api/integrations/github/repositories",
   ] as const;
 

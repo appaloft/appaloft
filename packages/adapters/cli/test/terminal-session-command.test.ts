@@ -5,15 +5,23 @@ import {
   type Command as AppCommand,
   type Query as AppQuery,
   CloseTerminalSessionCommand,
+  type CloseTerminalSessionResponse,
   type CommandBus,
   createExecutionContext,
   type ExecutionContextFactory,
   ExpireTerminalSessionsCommand,
+  type ExpireTerminalSessionsResponse,
   ListTerminalSessionsQuery,
+  OpenTerminalSessionCommand,
   type QueryBus,
   ShowTerminalSessionQuery,
+  type TerminalSession,
+  type TerminalSessionDescriptor,
+  type TerminalSessionFrame,
+  type TerminalSessionGateway,
+  type TerminalSessionSummary,
 } from "@appaloft/application";
-import { ok } from "@appaloft/core";
+import { domainError, err, ok, type Result } from "@appaloft/core";
 
 function executionContextFactory(requestId: string): ExecutionContextFactory {
   return {
@@ -80,6 +88,111 @@ function terminalSessionSummary() {
     providerKey: "local-shell",
     createdAt: "2026-01-01T00:00:00.000Z",
     status: "active" as const,
+  };
+}
+
+class FakeTerminalSession implements TerminalSession {
+  readonly writes: string[] = [];
+  readonly resizes: Array<{ rows: number; cols: number }> = [];
+  closed = false;
+
+  constructor(private readonly frames: TerminalSessionFrame[]) {}
+
+  async write(data: string): Promise<void> {
+    this.writes.push(data);
+  }
+
+  async resize(input: { rows: number; cols: number }): Promise<void> {
+    this.resizes.push(input);
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {
+    for (const frame of this.frames) {
+      yield frame;
+    }
+  }
+}
+
+class FakeTerminalSessionGateway implements TerminalSessionGateway {
+  readonly session = new FakeTerminalSession([
+    { kind: "ready", sessionId: "term_test" },
+    { kind: "output", stream: "stdout", data: "hello from shell\n" },
+    { kind: "closed", reason: "source-ended", exitCode: 0 },
+  ]);
+  readonly attached: string[] = [];
+
+  async open(): Promise<Result<TerminalSessionDescriptor>> {
+    return err(domainError.terminalSessionNotConfigured("not used"));
+  }
+
+  attach(sessionId: string): Result<TerminalSession> {
+    this.attached.push(sessionId);
+    return ok(this.session);
+  }
+
+  list(): TerminalSessionSummary[] {
+    return [];
+  }
+
+  show(): Result<TerminalSessionSummary> {
+    return err(domainError.terminalSessionNotConfigured("not used"));
+  }
+
+  async close(): Promise<Result<CloseTerminalSessionResponse>> {
+    return err(domainError.terminalSessionNotConfigured("not used"));
+  }
+
+  async expire(): Promise<Result<ExpireTerminalSessionsResponse>> {
+    return err(domainError.terminalSessionNotConfigured("not used"));
+  }
+}
+
+function fakeTerminalIO() {
+  const rawMode: boolean[] = [];
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const listeners: Array<(chunk: string | Uint8Array) => void> = [];
+
+  return {
+    rawMode,
+    stdout,
+    stderr,
+    listeners,
+    io: {
+      stdin: {
+        isTTY: true,
+        setRawMode(enabled: boolean) {
+          rawMode.push(enabled);
+        },
+        resume() {},
+        pause() {},
+        on(_event: "data", listener: (chunk: string | Uint8Array) => void) {
+          listeners.push(listener);
+        },
+        off(_event: "data", listener: (chunk: string | Uint8Array) => void) {
+          const index = listeners.indexOf(listener);
+          if (index >= 0) {
+            listeners.splice(index, 1);
+          }
+        },
+      },
+      stdout: {
+        write(data: string | Uint8Array) {
+          stdout.push(typeof data === "string" ? data : new TextDecoder().decode(data));
+          return true;
+        },
+      },
+      stderr: {
+        write(data: string | Uint8Array) {
+          stderr.push(typeof data === "string" ? data : new TextDecoder().decode(data));
+          return true;
+        },
+      },
+    },
   };
 }
 
@@ -156,5 +269,116 @@ describe("CLI terminal session lifecycle commands", () => {
       olderThan: "2026-01-01T00:00:00.000Z",
       limit: 10,
     });
+  });
+
+  test("[TERM-SESSION-ENTRY-004] attaches server terminal sessions when requested", async () => {
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok(terminalSessionSummary() as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const gateway = new FakeTerminalSessionGateway();
+    const terminal = fakeTerminalIO();
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory: executionContextFactory("req_cli_terminal_attach_test"),
+      terminalSessionGateway: gateway,
+      terminalIO: terminal.io,
+    });
+
+    await program.parseAsync([
+      "node",
+      "appaloft",
+      "server",
+      "terminal",
+      "srv_demo",
+      "--attach",
+      "--rows",
+      "40",
+      "--cols",
+      "120",
+    ]);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(OpenTerminalSessionCommand);
+    expect(commands[0]).toMatchObject({
+      scope: {
+        kind: "server",
+        serverId: "srv_demo",
+      },
+      initialRows: 40,
+      initialCols: 120,
+    });
+    expect(gateway.attached).toEqual(["term_test"]);
+    expect(gateway.session.resizes).toEqual([{ rows: 40, cols: 120 }]);
+    expect(terminal.stdout.join("")).toBe("hello from shell\n");
+    expect(terminal.stderr).toEqual([]);
+    expect(terminal.rawMode).toEqual([true, false]);
+    expect(terminal.listeners).toHaveLength(0);
+  });
+
+  test("[TERM-SESSION-ENTRY-005] attaches resource terminal sessions when requested", async () => {
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok(terminalSessionSummary() as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const gateway = new FakeTerminalSessionGateway();
+    const terminal = fakeTerminalIO();
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory: executionContextFactory("req_cli_resource_terminal_attach_test"),
+      terminalSessionGateway: gateway,
+      terminalIO: terminal.io,
+    });
+
+    await program.parseAsync([
+      "node",
+      "appaloft",
+      "resource",
+      "terminal",
+      "res_web",
+      "--deployment",
+      "dep_new",
+      "--directory",
+      "src",
+      "--attach",
+    ]);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(OpenTerminalSessionCommand);
+    expect(commands[0]).toMatchObject({
+      scope: {
+        kind: "resource",
+        resourceId: "res_web",
+        deploymentId: "dep_new",
+      },
+      relativeDirectory: "src",
+      initialRows: 24,
+      initialCols: 80,
+    });
+    expect(gateway.attached).toEqual(["term_test"]);
+    expect(gateway.session.resizes).toEqual([{ rows: 24, cols: 80 }]);
+    expect(terminal.stdout.join("")).toBe("hello from shell\n");
+    expect(terminal.rawMode).toEqual([true, false]);
+    expect(terminal.listeners).toHaveLength(0);
   });
 });

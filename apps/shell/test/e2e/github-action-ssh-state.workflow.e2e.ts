@@ -277,7 +277,7 @@ function verifyRemoteHttpRoute(config: SshConfig, domain: string): void {
 
 describe("GitHub Action SSH remote-state workflow e2e", () => {
   if (!enabled) {
-    test.skip("[CONFIG-FILE-STATE-013] opt-in SSH remote-state workflow requires APPALOFT_E2E_SSH_REMOTE_STATE=true", () => {});
+    test.skip("[CONFIG-FILE-STATE-013] local explicit SSH remote-state workflow requires APPALOFT_E2E_SSH_REMOTE_STATE=true", () => {});
     return;
   }
 

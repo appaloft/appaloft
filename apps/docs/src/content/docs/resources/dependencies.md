@@ -40,8 +40,8 @@ sidebar:
 <h2 id="dependency-resource-lifecycle">依赖资源生命周期</h2>
 
 Dependency resource 是 Appaloft 管理的数据库或服务依赖记录。Phase 7 支持 provider-neutral
-Postgres 和 Redis 记录、Appaloft-managed Postgres realization、外部依赖导入、安全 read model、
-删除安全检查，以及备份恢复。
+Postgres 和 Redis 记录、Appaloft-managed Postgres/Redis realization、外部依赖导入、安全 read
+model、删除安全检查，以及备份恢复。
 
 ```bash title="创建或导入依赖资源"
 appaloft dependency postgres provision --project prj_prod --environment env_prod --name app-db
@@ -108,6 +108,11 @@ appaloft dependency backup create dep_db
 appaloft dependency backup list dep_db
 appaloft dependency backup restore bkp_123
 ```
+
+对于带有 Appaloft-owned connection reference 的 imported dependency，shell provider 会执行 native
+Postgres dump/restore 或 Redis logical backup/restore。Provider-owned 或无法解析的 reference 仍会生成
+安全的 metadata-only restore point，直到对应 provider 提供自己的 backup substrate。原始连接值不会出现在
+backup artifact、read model、event 或 error 里。
 
 恢复不会修改 ResourceBindings、deployment rollback/redeploy 状态、运行时进程或历史 deployment snapshot。
 如果有保留中的 backup 或 in-flight restore，dependency delete 必须被阻塞。

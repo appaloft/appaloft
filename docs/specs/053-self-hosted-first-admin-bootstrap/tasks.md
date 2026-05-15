@@ -30,8 +30,8 @@
 - [x] Add self-hosted product auth error spec.
 - [x] Add self-hosted product auth test matrix rows.
 - [x] Add command/query specs for `auth.bootstrap-first-admin` and `auth.bootstrap-status`.
-- [x] Add application command/query messages, handlers, and operation-catalog entries with no public
-  bootstrap transport declarations yet.
+- [x] Add application command/query messages, handlers, operation-catalog entries, and public
+  bootstrap CLI/HTTP-oRPC transport declarations.
 
 ## Implementation
 

@@ -90,7 +90,7 @@ The command must:
 | --- | --- |
 | CLI | `appaloft server capacity prune <serverId> --before <iso> [--category <category>] [--dry-run false]` dispatches this command. |
 | API/oRPC | `POST /api/servers/{serverId}/capacity/prune` uses the same command schema. |
-| Web | Future operator maintenance UI may call the same command after showing a dry-run preview. |
+| Web | Server detail Capacity calls the same command after showing a dry-run-first prune surface. The Monitor handoff may prefill `before` from the observation window, but Web still dispatches an explicit dry-run preview before any destructive action. |
 
 ## Error Contract
 
@@ -116,9 +116,9 @@ At minimum, Code Round coverage must prove:
 - unsupported target providers return `runtime_target_unsupported` before runtime mutation;
 - CLI and HTTP/oRPC dispatch use the shared command schema.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
-The first implementation covers local-shell and generic-SSH target adapters for stopped
-Appaloft-managed containers, materialized workspace candidates, explicit Docker build-cache prune,
-and explicit unused-image prune. Docker volume prune, scheduled prune automation,
+The implementation covers local-shell and generic-SSH target adapters for stopped Appaloft-managed
+containers, materialized workspace candidates, explicit Docker build-cache prune, explicit
+unused-image prune, CLI, HTTP/oRPC, and server Web dry-run-first dispatch. Docker volume prune,
 event-stream/outbox publication, and broad retention automation remain future governed slices.

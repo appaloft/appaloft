@@ -10,6 +10,11 @@ import {
   type RuntimePlanState,
   type Result,
 } from "@appaloft/core";
+import {
+  type DockerStorageVolumeRealization,
+  dockerStorageMountsFromRuntimeMetadata,
+  dockerStorageVolumeRealizationsFromRuntimeMetadata,
+} from "./storage-runtime-mounts";
 
 type RuntimePlanLike = {
   toState(): RuntimePlanState;
@@ -95,6 +100,13 @@ export interface DockerSwarmHealthIntent {
   };
 }
 
+export interface DockerSwarmMountIntent {
+  type: "volume" | "bind";
+  source: string;
+  target: string;
+  readOnly: boolean;
+}
+
 export interface DockerSwarmRuntimeIntent {
   schemaVersion: "docker-swarm.runtime-intent/v1";
   stackName: string;
@@ -102,6 +114,8 @@ export interface DockerSwarmRuntimeIntent {
   targetServiceName: string;
   workload: DockerSwarmWorkloadIntent;
   environment: DockerSwarmEnvironmentVariableIntent[];
+  mounts: DockerSwarmMountIntent[];
+  volumeRealizations: DockerStorageVolumeRealization[];
   health?: DockerSwarmHealthIntent;
   routes: DockerSwarmRouteIntent[];
   labels: Record<string, string>;
@@ -123,6 +137,7 @@ export interface DockerSwarmCleanupPlan {
 
 export type DockerSwarmApplyPlanStepName =
   | "create-candidate-service"
+  | "deploy-candidate-stack"
   | "verify-candidate-service"
   | "promote-route-target"
   | "cleanup-superseded-services";
@@ -234,6 +249,149 @@ function dockerEnvironmentDisplayFlags(
       variable.secret
         ? `--secret ${shellQuote(`source=${dockerSecretSource(variable)},target=${variable.name}`)}`
         : `--env ${shellQuote(`${variable.name}=********`)}`,
+    )
+    .join(" ");
+}
+
+function yamlQuoted(value: string): string {
+  return JSON.stringify(value);
+}
+
+function dockerComposeOverrideContent(input: {
+  intent: DockerSwarmRuntimeIntent;
+  primaryNetwork: string;
+}): string {
+  const plainEnvironment = input.intent.environment.filter((variable) => !variable.secret);
+  const secretEnvironment = input.intent.environment.filter((variable) => variable.secret);
+  const volumeMounts = input.intent.mounts.filter((mount) => mount.type === "volume");
+  const uniqueVolumeNames = [...new Set(volumeMounts.map((mount) => mount.source))].sort();
+  const labelsByVolumeName = new Map(
+    input.intent.volumeRealizations.map((realization) => [
+      realization.volumeName,
+      realization.labels,
+    ]),
+  );
+  const uniqueSecretSources = [
+    ...new Set(secretEnvironment.map((variable) => dockerSecretSource(variable))),
+  ].sort();
+  const serviceLines = [
+    "services:",
+    `  ${yamlQuoted(input.intent.targetServiceName)}:`,
+    "    deploy:",
+    "      labels:",
+    ...Object.entries(input.intent.labels)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => `        ${yamlQuoted(key)}: ${yamlQuoted(value)}`),
+    ...(plainEnvironment.length > 0
+      ? [
+          "    environment:",
+          ...plainEnvironment.map(
+            (variable) => `      ${yamlQuoted(variable.name)}: ${yamlQuoted(variable.value ?? "")}`,
+          ),
+        ]
+      : []),
+    ...(uniqueSecretSources.length > 0
+      ? [
+          "    secrets:",
+          ...secretEnvironment.map((variable) => {
+            const source = dockerSecretSource(variable);
+            return [
+              `      - source: ${yamlQuoted(source)}`,
+              `        target: ${yamlQuoted(variable.name)}`,
+            ];
+          }).flat(),
+        ]
+      : []),
+    ...(input.intent.mounts.length > 0
+      ? [
+          "    volumes:",
+          ...input.intent.mounts
+            .map((mount) => [
+              `      - type: ${yamlQuoted(mount.type)}`,
+              `        source: ${yamlQuoted(mount.source)}`,
+              `        target: ${yamlQuoted(mount.target)}`,
+              ...(mount.readOnly ? ["        read_only: true"] : []),
+            ])
+            .flat(),
+        ]
+      : []),
+    "    networks:",
+    `      - ${yamlQuoted(input.primaryNetwork)}`,
+  ];
+  const networkLines = [
+    "networks:",
+    `  ${yamlQuoted(input.primaryNetwork)}:`,
+    "    external: true",
+  ];
+  const volumeLines =
+    uniqueVolumeNames.length > 0
+      ? [
+          "volumes:",
+          ...uniqueVolumeNames.flatMap((volumeName) => {
+            const labels = labelsByVolumeName.get(volumeName);
+            return [
+              `  ${yamlQuoted(volumeName)}:`,
+              `    name: ${yamlQuoted(volumeName)}`,
+              ...(labels
+                ? [
+                    "    labels:",
+                    ...Object.entries(labels)
+                      .sort(([left], [right]) => left.localeCompare(right))
+                      .map(([key, value]) => `      ${yamlQuoted(key)}: ${yamlQuoted(value)}`),
+                  ]
+                : []),
+            ];
+          }),
+        ]
+      : [];
+  const secretLines =
+    uniqueSecretSources.length > 0
+      ? [
+          "secrets:",
+          ...uniqueSecretSources.flatMap((secretName) => [
+            `  ${yamlQuoted(secretName)}:`,
+            "    external: true",
+          ]),
+        ]
+      : [];
+
+  return [
+    ...serviceLines,
+    ...networkLines,
+    ...volumeLines,
+    ...secretLines,
+  ].join("\n");
+}
+
+function stackDeployCommand(input: {
+  composeFile: string;
+  intent: DockerSwarmRuntimeIntent;
+  primaryNetwork: string;
+}): string {
+  const overrideContent = dockerComposeOverrideContent(input);
+  return [
+    "override_file=$(mktemp -t appaloft-swarm-compose-override.XXXXXX.yml)",
+    `printf %s ${shellQuote(overrideContent)} > "$override_file"`,
+    `docker stack deploy -c ${shellQuote(input.composeFile)} -c "$override_file" ${shellQuote(input.intent.stackName)}`,
+    'status="$?"',
+    'rm -f "$override_file"',
+    'exit "$status"',
+  ].join("; ");
+}
+
+function dockerMountFlags(mounts: readonly DockerSwarmMountIntent[]): string {
+  return mounts
+    .map((mount) =>
+      `--mount ${shellQuote(
+        [
+          `type=${mount.type}`,
+          `source=${mount.source}`,
+          `target=${mount.target}`,
+          mount.readOnly ? "readonly" : "",
+        ]
+          .filter((part) => part.length > 0)
+          .join(","),
+      )}`,
     )
     .join(" ");
 }
@@ -572,6 +730,20 @@ export function renderDockerSwarmRuntimeIntent(
   const targetServiceName =
     workload.kind === "compose" ? workload.targetServiceName : renderTargetServiceName("web");
   const health = renderHealth(execution.healthCheck, execution);
+  const mounts = dockerStorageMountsFromRuntimeMetadata({
+    ...(runtimePlan.runtimeArtifact?.toState().metadata ?? {}),
+    ...(execution.metadata ?? {}),
+  });
+  if (mounts.isErr()) {
+    return err(mounts.error);
+  }
+  const volumeRealizations = dockerStorageVolumeRealizationsFromRuntimeMetadata({
+    ...(runtimePlan.runtimeArtifact?.toState().metadata ?? {}),
+    ...(execution.metadata ?? {}),
+  });
+  if (volumeRealizations.isErr()) {
+    return err(volumeRealizations.error);
+  }
 
   return ok({
     schemaVersion: "docker-swarm.runtime-intent/v1",
@@ -584,6 +756,13 @@ export function renderDockerSwarmRuntimeIntent(
       input.identity,
       input.dependencyBindingReferences,
     ),
+    mounts: mounts.value.map((mount) => ({
+      type: mount.type,
+      source: mount.source,
+      target: mount.target,
+      readOnly: mount.readOnly ?? false,
+    })),
+    volumeRealizations: volumeRealizations.value,
     ...(health ? { health } : {}),
     routes: renderRoutes({ execution, networkName }),
     labels: runtimeIdentityLabels(input.identity),
@@ -598,7 +777,7 @@ export function renderDockerSwarmCleanupPlan(
   const filters = dockerServiceLabelFilters(scopeLabels);
   const command = [
     `service_ids=$(docker service ls -q ${filters})`,
-    'if [ -n "$service_ids" ]; then docker service rm $service_ids; fi',
+    'for service_id in $service_ids; do stack_name=$(docker service inspect "$service_id" --format \'{{ index .Spec.Labels "com.docker.stack.namespace" }}\'); if [ -n "$stack_name" ] && [ "$stack_name" != "<no value>" ]; then docker stack rm "$stack_name"; else docker service rm "$service_id"; fi; done',
   ].join("; ");
 
   return {
@@ -618,42 +797,55 @@ export function renderDockerSwarmCleanupPlan(
 export function renderDockerSwarmApplyPlan(
   intent: DockerSwarmRuntimeIntent,
 ): Result<DockerSwarmApplyPlan> {
-  if (intent.workload.kind !== "image") {
-    return err(
-      runtimeTargetUnsupported({
-        missingCapability: "image-apply-plan",
-        message: "Docker Swarm apply planning currently requires an OCI image workload",
-      }),
-    );
-  }
-
   const networkNames = [...new Set(intent.routes.map((route) => route.networkName))];
   const primaryNetwork = networkNames[0] ?? defaultEdgeNetworkName;
   const labels = routeLabels({
     serviceName: intent.serviceName,
-    ...(intent.workload.port ? { targetPort: intent.workload.port } : {}),
+    ...(intent.workload.kind === "image" && intent.workload.port
+      ? { targetPort: intent.workload.port }
+      : {}),
     routes: intent.routes,
   });
-  const createCommand = commandParts([
-    "docker service create",
-    `--name ${shellQuote(intent.serviceName)}`,
-    dockerLabelFlags(intent.labels),
-    `--network ${shellQuote(primaryNetwork)}`,
-    intent.workload.registryAuth ? "--with-registry-auth" : "",
-    dockerEnvironmentFlags(intent.environment),
-    dockerHealthFlags(intent.health),
-    shellQuote(intent.workload.image),
-  ]);
-  const createDisplayCommand = commandParts([
-    "docker service create",
-    `--name ${shellQuote(intent.serviceName)}`,
-    dockerLabelFlags(intent.labels),
-    `--network ${shellQuote(primaryNetwork)}`,
-    intent.workload.registryAuth ? "--with-registry-auth" : "",
-    dockerEnvironmentDisplayFlags(intent.environment),
-    dockerHealthFlags(intent.health),
-    shellQuote(intent.workload.image),
-  ]);
+  const createStep =
+    intent.workload.kind === "image"
+      ? {
+          step: "create-candidate-service" as const,
+          command: commandParts([
+            "docker service create",
+            `--name ${shellQuote(intent.serviceName)}`,
+            dockerLabelFlags(intent.labels),
+            `--network ${shellQuote(primaryNetwork)}`,
+            intent.workload.registryAuth ? "--with-registry-auth" : "",
+            dockerEnvironmentFlags(intent.environment),
+            dockerMountFlags(intent.mounts),
+            dockerHealthFlags(intent.health),
+            shellQuote(intent.workload.image),
+          ]),
+          displayCommand: commandParts([
+            "docker service create",
+            `--name ${shellQuote(intent.serviceName)}`,
+            dockerLabelFlags(intent.labels),
+            `--network ${shellQuote(primaryNetwork)}`,
+            intent.workload.registryAuth ? "--with-registry-auth" : "",
+            dockerEnvironmentDisplayFlags(intent.environment),
+            dockerMountFlags(intent.mounts),
+            dockerHealthFlags(intent.health),
+            shellQuote(intent.workload.image),
+          ]),
+        }
+      : {
+          step: "deploy-candidate-stack" as const,
+          command: stackDeployCommand({
+            composeFile: intent.workload.composeFile,
+            intent,
+            primaryNetwork,
+          }),
+          displayCommand: stackDeployCommand({
+            composeFile: intent.workload.composeFile,
+            intent,
+            primaryNetwork,
+          }),
+        };
 
   const verifyCommand = commandParts([
     "docker service ps",
@@ -676,7 +868,7 @@ export function renderDockerSwarmApplyPlan(
     }),
     "| while read -r service_id; do",
     `current_deployment=$(docker service inspect "$service_id" --format ${shellQuote("{{ index .Spec.Labels \"appaloft.deployment-id\" }}")});`,
-    `if [ "$current_deployment" != ${shellQuote(intent.labels["appaloft.deployment-id"] ?? "")} ]; then docker service rm "$service_id"; fi;`,
+    `if [ "$current_deployment" != ${shellQuote(intent.labels["appaloft.deployment-id"] ?? "")} ]; then stack_name=$(docker service inspect "$service_id" --format ${shellQuote("{{ index .Spec.Labels \"com.docker.stack.namespace\" }}")}); if [ -n "$stack_name" ] && [ "$stack_name" != "<no value>" ]; then docker stack rm "$stack_name"; else docker service rm "$service_id"; fi; fi;`,
     "done",
   ]);
 
@@ -686,11 +878,7 @@ export function renderDockerSwarmApplyPlan(
     preservesPreviousService: true,
     routeLabels: labels,
     steps: [
-      {
-        step: "create-candidate-service",
-        command: createCommand,
-        displayCommand: createDisplayCommand,
-      },
+      createStep,
       {
         step: "verify-candidate-service",
         command: verifyCommand,

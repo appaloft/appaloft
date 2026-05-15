@@ -29,13 +29,18 @@ or runtime directories for ordinary persistent storage.
 3. A StorageVolume needs id, project/environment ownership, name/slug, kind, optional description,
    optional bind source path for bind mounts, backup relationship metadata, lifecycle status, and
    attachment summaries. A Resource attachment needs attachment id, storage volume id, resource id,
-   destination path, mounted read/write mode, and attached timestamp.
+   storage volume kind/source snapshot, destination path, mounted read/write mode, and attached
+   timestamp.
 4. The first slice supports `named-volume` and `bind-mount`. Both are structurally validated and
    recorded provider-neutrally; no provider-native volume provisioning or runtime mount execution is
    performed in the storage commands.
-5. Downstream runtime planning may consume attachments only as immutable mount metadata when a
-   future deployment snapshot is materialized. The storage commands do not pollute runtime catalog,
-   effect execution, deployment admission input, or recommendation surfaces.
+5. Deployment admission consumes Resource-owned storage attachments as immutable provider-neutral
+   mount metadata on the requested deployment/runtime plan snapshot. Local and generic-SSH Docker
+   container adapters render that snapshot as Docker `--mount` flags; local and generic-SSH Docker
+   Compose adapters render it into an Appaloft-generated Compose override file; Docker Swarm image
+   service plans render it as `docker service create --mount` flags for named-volume and bind-mount
+   attachments. Storage commands themselves still do not provision volumes, start runtimes, or
+   mutate historical deployment snapshots.
 6. Contradictions are represented as validation/conflict errors: unsafe destination path, missing
    storage volume, missing/archived/deleted resource, duplicate resource destination path, attached
    volume deletion, or backup relationship safety blocker.
@@ -73,7 +78,8 @@ or runtime directories for ordinary persistent storage.
 | STOR-DETACH-001 | Detach storage | Existing attachment | `resources.detach-storage` | Attachment is removed; StorageVolume remains. |
 | STOR-READ-001 | Volume read summaries | Existing volume attachments | `storage-volumes.list/show` | Output includes safe attachment summaries, not runtime/provider secrets. |
 | STOR-READ-002 | Resource read summaries | Resource has storage attachments | `resources.show` | Output includes `storageAttachments` as future-deployment profile data. |
-| STOR-SNAPSHOT-001 | Deployment snapshot metadata | Resource has storage attachments | Future deployment plan/snapshot materialization reads profile | Immutable runtime plan metadata includes provider-neutral mount entries without provisioning provider-native volumes. |
+| STOR-SNAPSHOT-001 | Deployment snapshot metadata | Resource has storage attachments | Deployment plan/snapshot materialization reads the Resource profile | Immutable runtime plan metadata includes provider-neutral mount entries with volume kind/source snapshot and without storage-command provider provisioning. |
+| STOR-RUNTIME-001 | Docker runtime mounts | Runtime plan has `storage.mounts` metadata | Local/generic-SSH Docker container/Compose deployment, Docker Swarm image-service deployment, or Docker Swarm Compose stack deployment starts | Docker run command, generated Compose override, Swarm service create command, or generated Swarm Compose stack override includes deterministic named-volume or bind-mount mounts; unsupported metadata fails before container/stack/service start. |
 
 ## Domain Ownership
 
@@ -93,11 +99,15 @@ or runtime directories for ordinary persistent storage.
   routes using application command/query schemas.
 - CLI: add `appaloft storage volume ...` commands plus
   `appaloft resource storage attach` and `appaloft resource storage detach`.
-- Web/UI: deferred for this slice unless an existing read surface renders `storageAttachments`.
+- Web/UI: Resource detail settings exposes a Storage section that lists available storage volumes
+  for the Resource project/environment, renders current `resources.show` storage attachment
+  summaries, dispatches `storage-volumes.create/rename/delete`, and dispatches
+  `resources.attach-storage` / `resources.detach-storage`. Web storage-volume management must stay
+  provider-neutral and must not imply runtime provisioning or cleanup.
 - Config: no repository config fields in this slice.
 - Events: internal domain events for create/rename/delete/attach/detach; no integration events.
-- Public docs/help: add stable help anchors or mark as Docs Round migration gap if docs site coverage
-  is not expanded in this PR.
+- Public docs/help: add stable help anchors or mark a governed Docs Round follow-up if docs site
+  coverage is not expanded in this PR.
 - Future MCP/tools: one operation per command/query; no compound "manage storage" tool.
 
 ## Output Contracts
@@ -123,12 +133,17 @@ provider tokens, private keys, or hidden runtime state.
 ## Non-Goals
 
 - No BattleSnapshot or context repair behavior.
-- No automatic storage repair, migration, pruning, backup, restore, provider volume provisioning, or
-  Docker Swarm native realization.
+- No automatic storage repair, migration, pruning, backup, restore, or explicit provider volume
+  provisioning.
 - No Postgres/Redis provisioning, dependency bind/unbind, secret rotation, deploy retry, redeploy,
   rollback, runtime restart, or runtime cleanup.
-- No mutation of historical deployment snapshots.
+- No mutation of historical deployment snapshots. New deployments may snapshot current
+  ResourceStorageAttachment entries as provider-neutral mount metadata, and Docker container,
+  Compose, Swarm image-service, and Swarm Compose stack runtime adapters may consume that immutable
+  metadata during deployment execution.
 - No new `deployments.create` input fields.
+- No Web provider-native volume provisioning, volume deletion, backup/restore execution, or runtime
+  cleanup.
 - No active effect, AI recommendation, route repair, or catalog/effect execution behavior.
 
 ## Open Questions
@@ -136,4 +151,4 @@ provider tokens, private keys, or hidden runtime state.
 - Multi-resource shared writable volume semantics are intentionally conservative: first slice may
   allow multiple attachments only when the destination uniqueness is per resource and the volume
   metadata does not mark exclusive future backup/runtime ownership. If implementation cannot prove a
-  safe write-sharing rule, it should fail closed and record a migration gap.
+  safe write-sharing rule, it should fail closed and record a governed follow-up.

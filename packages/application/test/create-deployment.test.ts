@@ -42,6 +42,7 @@ import {
   EnvironmentKindValue,
   EnvironmentName,
   EnvironmentSnapshotId,
+  ErrorCodeText,
   ExecutionResult,
   ExecutionStatusValue,
   ExecutionStrategyKindValue,
@@ -82,6 +83,8 @@ import {
   ResourceName,
   ResourceNetworkProtocolValue,
   ResourceSlug,
+  ResourceStorageAttachmentId,
+  ResourceStorageMountModeValue,
   type Result,
   type RollbackPlan,
   RoutePathPrefix,
@@ -96,6 +99,9 @@ import {
   SourceLocator,
   StartedAt,
   StaticPublishDirectory,
+  StorageDestinationPath,
+  StorageVolumeId,
+  StorageVolumeKindValue,
   TargetKindValue,
   UpdatedAt,
   UpsertDeploymentSpec,
@@ -429,6 +435,41 @@ class FailingStaticPackageExecutionBackend extends HermeticExecutionBackend {
         true,
       ),
     );
+  }
+}
+
+class CapacityExhaustedExecutionBackend extends HermeticExecutionBackend {
+  async execute(
+    _context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ deployment: Deployment }>> {
+    deployment.applyExecutionResult(
+      FinishedAt.rehydrate("2026-01-01T00:03:00.000Z"),
+      ExecutionResult.rehydrate({
+        exitCode: ExitCode.rehydrate(1),
+        status: ExecutionStatusValue.rehydrate("failed"),
+        retryable: true,
+        errorCode: ErrorCodeText.rehydrate("runtime_target_resource_exhausted"),
+        logs: [
+          DeploymentLogEntry.rehydrate({
+            timestamp: OccurredAt.rehydrate("2026-01-01T00:02:00.000Z"),
+            phase: DeploymentPhaseValue.rehydrate("deploy"),
+            level: LogLevelValue.rehydrate("error"),
+            message: MessageText.rehydrate("Docker run failed with safe capacity signal"),
+          }),
+        ],
+        metadata: {
+          phase: "runtime-target-apply",
+          step: "docker-run",
+          capacityResource: "disk",
+          capacitySignal: "disk-space-exhausted",
+          capacityInspectCommand: "appaloft server capacity inspect srv_demo",
+          capacityPruneCommand: "appaloft server capacity prune srv_demo --dry-run",
+        },
+      }),
+    );
+
+    return ok({ deployment });
   }
 }
 
@@ -1406,6 +1447,51 @@ describe("CreateDeploymentUseCase", () => {
     );
   });
 
+  test("[STOR-SNAPSHOT-001] includes storage attachments in deployment plan input", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const {
+      clock,
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      repositoryContext,
+      resources,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      runtimePlanResolver,
+    });
+    const resource = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_demo")),
+    );
+    if (!resource) {
+      throw new Error("Expected fixture resource");
+    }
+    resource
+      .attachStorage({
+        attachmentId: ResourceStorageAttachmentId.rehydrate("rsa_data"),
+        storageVolumeId: StorageVolumeId.rehydrate("stv_data"),
+        storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
+        destinationPath: StorageDestinationPath.rehydrate("/var/lib/app/data"),
+        mountMode: ResourceStorageMountModeValue.readWrite(),
+        attachedAt: CreatedAt.rehydrate(clock.now()),
+      })
+      ._unsafeUnwrap();
+    await resources.upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.requestedDeployment.storageMounts).toEqual([
+      {
+        attachmentId: "rsa_data",
+        storageVolumeId: "stv_data",
+        storageVolumeKind: "named-volume",
+        destinationPath: "/var/lib/app/data",
+        mountMode: "read-write",
+      },
+    ]);
+  });
+
   test("[PROC-DELIVERY-001] projects deployment execution into operator work with safe details", async () => {
     const processAttemptRecorder = new RecordingProcessAttemptRecorder();
     const { context, createDeploymentInput, createDeploymentUseCase } =
@@ -1530,6 +1616,54 @@ describe("CreateDeploymentUseCase", () => {
     });
     expect(JSON.stringify(processAttemptRecorder.records)).not.toContain(
       "Static artifact package failed",
+    );
+  });
+
+  test("[DEP-CREATE-ASYNC-019][PROC-DELIVERY-004] projects runtime target capacity exhaustion recovery details", async () => {
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
+    const { context, createDeploymentInput, createDeploymentUseCase, deployments } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        executionBackend: new CapacityExhaustedExecutionBackend(),
+        processAttemptRecorder,
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    const deploymentId = result._unsafeUnwrap().id;
+    expect(processAttemptRecorder.records.map((record) => record.status)).toEqual([
+      "running",
+      "failed",
+    ]);
+    expect(processAttemptRecorder.records[1]).toMatchObject({
+      id: deploymentId,
+      kind: "deployment",
+      status: "failed",
+      operationKey: "deployments.create",
+      errorCode: "runtime_target_resource_exhausted",
+      errorCategory: "async-processing",
+      retriable: true,
+      nextActions: ["diagnostic", "manual-review"],
+      safeDetails: expect.objectContaining({
+        deploymentStatus: "failed",
+        failurePhase: "runtime-target-apply",
+        failureStep: "docker-run",
+        capacityResource: "disk",
+        capacitySignal: "disk-space-exhausted",
+        capacityInspectCommand: "appaloft server capacity inspect srv_demo",
+        capacityPruneCommand: "appaloft server capacity prune srv_demo --dry-run",
+      }),
+    });
+    expect(
+      deployments.items.get(deploymentId)?.toState().runtimePlan.toState().execution.toState()
+        .metadata,
+    ).toMatchObject({
+      errorCode: "runtime_target_resource_exhausted",
+      capacityResource: "disk",
+      capacitySignal: "disk-space-exhausted",
+    });
+    expect(JSON.stringify(processAttemptRecorder.records)).not.toContain(
+      "Docker run failed with safe capacity signal",
     );
   });
 

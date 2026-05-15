@@ -85,6 +85,11 @@ function deploymentSourceFingerprint(summary: DeploymentSummary): string | undef
   return metadata["access.sourceFingerprint"] ?? metadata["context.sourceFingerprint"];
 }
 
+function cleanupStageFromError(error: DomainError, fallback: string): string {
+  const cleanupStage = error.details?.cleanupStage;
+  return typeof cleanupStage === "string" ? cleanupStage : fallback;
+}
+
 @injectable()
 export class CleanupPreviewUseCase {
   constructor(
@@ -262,7 +267,7 @@ export class CleanupPreviewUseCase {
               result.mapErr((error) =>
                 withPreviewCleanupDetails(error, {
                   sourceFingerprint: input.sourceFingerprint,
-                  cleanupStage: "runtime-cleanup",
+                  cleanupStage: cleanupStageFromError(error, "runtime-cleanup"),
                   resourceId: candidateState.resourceId.value,
                   deploymentId: candidateState.id.value,
                 }),

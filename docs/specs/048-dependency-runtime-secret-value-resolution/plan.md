@@ -70,7 +70,6 @@ raw values in read surfaces.
 
 ## Deferred
 
-- Provider-native Redis realization.
 - External vault/KMS integrations beyond the first Appaloft-owned store and provider-owned refs.
 - Build-time dependency injection.
 - File/reference injection modes.

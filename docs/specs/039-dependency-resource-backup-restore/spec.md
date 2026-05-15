@@ -3,8 +3,9 @@
 ## Status
 
 - Round: Code Round
-- Artifact state: implemented with Docker-backed managed Postgres/Redis shell capability and
-  hermetic external/fallback capability
+- Artifact state: implemented with Docker-backed managed Postgres/Redis shell capability, hermetic
+  external/fallback capability, safe provider execution context, shell-local artifact materialization,
+  and shell-local realization/delete artifact materialization
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, additive dependency resource lifecycle commands and read
   models
@@ -59,12 +60,12 @@ only through `DependencyResourceSecretStore`.
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| DEP-RES-BACKUP-001 | Accept backup request | Active ready dependency resource has provider backup capability | `dependency-resources.create-backup` is admitted | A `DependencyResourceBackup` attempt is persisted, command returns `ok({ id })`, and `dependency-resource-backup-requested` is emitted without leaking secrets. |
+| DEP-RES-BACKUP-001 | Accept backup request | Active ready dependency resource has provider backup capability | `dependency-resources.create-backup` is admitted | A `DependencyResourceBackup` attempt is persisted, the provider receives only safe execution context (`providerResourceHandle`, masked endpoint, and safe `secretRef`), command returns `ok({ id })`, and `dependency-resource-backup-requested` is emitted without leaking secrets. |
 | DEP-RES-BACKUP-002 | Mark backup ready | Provider backup succeeds with safe artifact metadata | The backup result is applied | Backup status becomes `ready`, restore point metadata is visible in list/show, delete safety is blocked by retention, and `dependency-resource-backup-completed` is emitted. |
 | DEP-RES-BACKUP-003 | Surface backup failure | Provider backup fails after admission | The backup result is applied | Backup status becomes `failed`, sanitized failure code/category/phase are visible, original command remains accepted, and `dependency-resource-backup-failed` is emitted. |
 | DEP-RES-BACKUP-004 | Reject backup for unsupported or not-ready resource | Dependency resource is missing, deleted, pending realization, degraded, unsupported, or lacks required secret reference | `dependency-resources.create-backup` is called | Admission returns structured `not_found`, `dependency_resource_backup_blocked`, or `provider_capability_unsupported`; no backup attempt is persisted when admission fails. |
 | DEP-RES-BACKUP-005 | List/show safe restore points | Backups exist for one dependency resource | `dependency-resources.list-backups` or `dependency-resources.show-backup` runs | Output includes only safe owner, dependency kind, status, attempt ids, artifact handle, retention, size/checksum when safe, and sanitized failure metadata. |
-| DEP-RES-BACKUP-006 | Accept in-place restore | Ready restore point belongs to the target dependency resource and acknowledgements are supplied | `dependency-resources.restore-backup` is admitted | A restore attempt is persisted, command returns `ok({ id })`, and `dependency-resource-restore-requested` is emitted without mutating ResourceBindings, snapshots, or runtime state. |
+| DEP-RES-BACKUP-006 | Accept in-place restore | Ready restore point belongs to the target dependency resource and acknowledgements are supplied | `dependency-resources.restore-backup` is admitted | A restore attempt is persisted, the provider receives the safe artifact handle plus current safe execution context (`providerResourceHandle`, masked endpoint, and safe `secretRef`), command returns `ok({ id })`, and `dependency-resource-restore-requested` is emitted without mutating ResourceBindings, snapshots, or runtime state. |
 | DEP-RES-BACKUP-007 | Mark restore completed | Provider restore succeeds | The restore result is applied | Restore attempt status becomes `completed`, dependency resource safe restore metadata is refreshed, and `dependency-resource-restore-completed` is emitted. |
 | DEP-RES-BACKUP-008 | Surface restore failure | Provider restore fails after admission | The restore result is applied | Restore attempt status becomes `failed`, sanitized failure metadata is visible, original restore command remains accepted, and `dependency-resource-restore-failed` is emitted. |
 | DEP-RES-BACKUP-009 | Block unsafe restore | Restore point is missing, failed, deleted, belongs to another dependency resource, target is deleted/degraded, acknowledgements are missing, or provider capability is absent | `dependency-resources.restore-backup` is called | Admission returns structured blocked/not-found/unsupported error and does not start provider restore. |
@@ -101,14 +102,16 @@ only through `DependencyResourceSecretStore`.
   - `appaloft dependency backup list <dependencyResourceId>`
   - `appaloft dependency backup show <backupId>`
   - `appaloft dependency backup restore <backupId>`
-- Web/UI: `/dependency-resources` lists dependency resources and exposes create backup, select
-  ready restore point, acknowledged restore, and safe delete actions without showing raw dumps or
-  raw connection secrets.
+- Web/UI: Resource detail dependency backup/restore controls can create backup restore points,
+  list safe restore point summaries, configure scheduled backup policy, and start acknowledged
+  in-place restores through the active HTTP/oRPC contracts.
 - Events: add provider-safe lifecycle event specs for backup requested/completed/failed and restore
   requested/completed/failed.
-- Public docs/help: CLI, HTTP descriptions, and the Web page point at the existing dependency
-  resource lifecycle help section.
-- Future MCP/tools: one operation per command/query over the same application schemas.
+- Public docs/help: task-oriented backup/restore coverage is active under
+  `/docs/resources/dependencies/#dependency-backup-restore` and the
+  `dependency.backup-restore` help topic. CLI and HTTP descriptions for backup create/list/show
+  and restore point directly at that stable anchor.
+- MCP/tools: generated descriptors use one operation per command/query over the same application schemas.
 
 ## Output Contracts
 
@@ -148,20 +151,33 @@ operation, phase, attempt id, blocker code, and sanitized provider failure metad
 
 ## Non-Goals
 
-- No scheduled backup policies.
-- No backup prune/delete command in the first slice.
+- No backup prune/delete command in this slice.
 - No cross-resource restore, clone, export, or download.
 - No deployment retry, redeploy, or rollback.
 - No runtime environment injection, workload restart, or runtime cleanup.
 - No provider-native credential rotation.
 - No provider SDK types in `core`, contracts, CLI, Web, events, or read models.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 - Code stores the latest restore attempt inside `DependencyResourceBackup` and persists it as safe
   JSON metadata in the backup repository.
-- Provider backup/restore execution is synchronous through the shell provider port in this slice.
-  Durable outbox/process retry remains a platform migration gap.
-- The first provider implementation supports Appaloft-managed Docker-backed Postgres/Redis and
-  imported external Postgres/Redis metadata/fallback handles. Scheduled policy, pruning, export,
-  and cross-resource restore remain open.
+- Provider backup/restore execution is synchronous through an injected shell provider port in this
+  slice. The shell provider runs native Postgres and Redis backup/restore commands when the
+  dependency resource carries a resolvable Appaloft-owned connection secret, stores the native dump
+  path only as safe local artifact metadata, and otherwise keeps the existing metadata-only artifact
+  path for provider-owned or unresolved references. Restore validates the backup artifact, provider
+  key, provider artifact handle, dependency kind, and provider resource handle before replaying
+  native Postgres restore, replaying native Redis logical restore, or materializing restore
+  metadata. The port receives the safe execution context needed by external provider
+  implementations without exposing raw connection values to application read models, events,
+  errors, or transport contracts. Provider attempts are mirrored into operator-visible process
+  state; automatic backup/restore retry execution remains a separate governed worker slice.
+- The shell/test provider implementation supports Appaloft-managed Postgres, Appaloft-managed
+  Redis, imported external Postgres/Redis metadata, native Postgres command execution for imported
+  Postgres resources with Appaloft-owned connection refs, and native Redis logical command
+  execution for imported Redis resources with Appaloft-owned connection refs. Provider-specific
+  Redis snapshot substrates remain governed follow-up work for providers that need snapshot-native
+  restore semantics beyond the shell logical dump/restore path.
+- Scheduled policy is implemented separately as the disabled-by-default scheduled dependency backup
+  runner. Backup pruning, export/download, and cross-resource restore remain governed follow-up work.

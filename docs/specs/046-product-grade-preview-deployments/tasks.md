@@ -68,7 +68,7 @@
 ## Verification
 
 - [x] Run targeted application/integration/persistence tests.
-- [x] Run hermetic GitHub App webhook and feedback adapter tests.
+- [x] Run contract GitHub App webhook and feedback adapter tests.
 - [x] Run preview cleanup retry/process-manager tests.
 - [x] Run `bun run lint`.
 - [x] Run `bun turbo run typecheck`.

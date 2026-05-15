@@ -109,11 +109,13 @@ Resource scope must start in the deployed project directory:
 
 1. Use `scope.deploymentId` when supplied and verify it belongs to `scope.resourceId`.
 2. Otherwise resolve the latest observable deployment/runtime instance for the resource.
-3. Prefer adapter-recorded metadata, in this order for the first slice: `workdir`,
-   `remoteWorkdir`, then `sourceDir`.
+3. Prefer adapter-recorded metadata, in this order: `workdir`, `remoteWorkdir`, then `sourceDir`.
+   `workdir` and `remoteWorkdir` are treated as adapter-resolved final workspaces; `sourceDir`
+   receives the deployment source `baseDirectory` exactly once when present.
 4. Use `runtimePlan.execution.workingDirectory` only if adapter metadata is absent and the value is
-   meaningful for the selected runtime. Source locators such as HTTPS Git URLs and SSH-style Git
-   remotes are not safe working directories.
+   meaningful for the selected runtime. When it represents a source workspace root, the deployment
+   source `baseDirectory` is applied exactly once. Source locators such as HTTPS Git URLs and
+   SSH-style Git remotes are not safe working directories.
 5. Apply `relativeDirectory` below the resolved workspace root after validation.
 6. Reject with `terminal_session_workspace_unavailable` if no safe workspace can be resolved.
 
@@ -175,8 +177,8 @@ It must not:
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
 | Web resource detail | Resource terminal tab/action dispatches `terminal-sessions.open` with resource scope and attaches to returned WebSocket. | Implemented |
-| Web server detail/list | Server terminal action dispatches `terminal-sessions.open` with server scope and attaches to returned WebSocket. | Implemented on server detail |
-| CLI | `appaloft server terminal <serverId>` and `appaloft resource terminal <resourceId>` reuse the same command schema and print the descriptor. | Implemented descriptor open; interactive CLI attach future |
+| Web server detail/list | Server terminal action dispatches `terminal-sessions.open` with server scope and attaches to returned WebSocket. | Implemented: server detail opens and attaches; server list deep-links to the terminal tab |
+| CLI | `appaloft server terminal <serverId>` and `appaloft resource terminal <resourceId>` reuse the same command schema and print the descriptor by default; `--attach` connects the local TTY to the accepted terminal session. | Implemented descriptor open and explicit interactive attach |
 | HTTP/oRPC | Command endpoint plus WebSocket attach endpoint. | Implemented |
 | Automation / MCP | Future tool can request a session only when an interactive transport is available. | Future |
 
@@ -190,19 +192,30 @@ Companion lifecycle operations:
 These companion operations must not expose terminal input/output or mutate resource, deployment, or
 deployment-target aggregate state.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Application command/schema/handler/use case, terminal gateway port, runtime adapter, oRPC command
-endpoint, WebSocket attach transport, CLI descriptor commands, and Web terminal component are
-implemented in the first slice.
+endpoint, WebSocket attach transport, CLI descriptor commands, explicit CLI `--attach`, and Web
+terminal component are implemented.
 
-Current resource workspace resolution uses execution metadata `workdir`, `remoteWorkdir`,
-`sourceDir`, and safe `runtimePlan.execution.workingDirectory` fallbacks. Source `baseDirectory`
-normalization remains a follow-up implementation gap. Docker container shell and compose service
-shell targets remain future scope.
+Resource terminals can open either the latest observable deployment workspace or a selected
+deployment attempt supplied through `scope.deploymentId`; selected deployment ids are verified
+against the resource before workspace resolution. Current resource workspace resolution uses
+execution metadata `workdir`, `remoteWorkdir`, `sourceDir`, and safe
+`runtimePlan.execution.workingDirectory` fallbacks. Source `baseDirectory` normalization is
+implemented for `sourceDir` and safe working-directory fallbacks, with adapter-resolved `workdir`
+and `remoteWorkdir` treated as final directories to avoid duplicate monorepo subpaths. Docker
+container shell targets are implemented for local-shell and generic-SSH targets when the deployment
+has retained or inferrable container identity metadata. Docker Compose service shell targets are
+implemented for local-shell and generic-SSH targets when retained execution metadata can resolve
+`composeFile`, `composeProjectName`, and a target service from runtime metadata, the resource
+network profile, or a single-service resource.
+The runtime gateway records durable `terminal-session-opened` and `terminal-session-closed` audit
+metadata when the audit recorder is configured. Rows are scoped to the server or resource aggregate
+and contain only safe session/scope/target/actor/entrypoint/provider/close-reason metadata.
 
 ## Open Questions
 
-- Should terminal session audit metadata be persisted before the first public Web release?
-- Should resource terminal allow selecting an older deployment attempt, or only latest observable
-  deployment in the first Code Round?
+No open questions remain for the first terminal session slice. Older deployment selection is
+implemented through `scope.deploymentId`; broader product placement questions are tracked in the
+workflow document rather than this command contract.

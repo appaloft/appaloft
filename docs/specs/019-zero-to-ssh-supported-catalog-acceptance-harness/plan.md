@@ -44,8 +44,9 @@ command/surface.
 - Reusable descriptors: consolidate supported fixture descriptors for planner expectation,
   resource profile draft, preview/create parity, runtime target capability, and observation
   expectation.
-- Runtime target fixtures: default to hermetic fake/local/generic-SSH capability selection and
-  typed command rendering. Real Docker/SSH smoke remains opt-in.
+- Runtime target fixtures: fast local checks use hermetic fake/local/generic-SSH capability
+  selection and typed command rendering. Real Docker/SSH smoke is also wired as a GitHub Actions
+  nightly/release confidence layer; local developer runs remain env/secret gated.
 - CQRS/read-model impact: no new command/query. Observation is asserted through existing
   readiness/health/log/access read-model contracts.
 - Entrypoint impact: Web/API/CLI/repository config/future tools share the same resource profile
@@ -58,18 +59,20 @@ command/surface.
 - Version target: `0.7.0` only when all Phase 5 required items and exit criteria are checked.
 - Compatibility impact: additive hardening under pre-`1.0-policy`; no deployment command or route
   input expansion.
-- Release note input: supported catalog entries are now governed by a reusable zero-to-SSH
-  acceptance harness; real Docker/SSH full-catalog execution remains opt-in or migration gap unless
-  explicitly enabled.
+- Release note input: supported catalog entries are governed by a reusable zero-to-SSH acceptance
+  harness; real local Docker execution uses framework fixture and substrate smoke harnesses, and
+  generic-SSH execution uses framework fixture smoke with SSH preflight. GitHub Actions runs the
+  local Docker matrix in nightly/release workflows, while SSH remains secret-gated and can fail
+  closed when release dispatch requires external SSH evidence.
 
 ## Testing Strategy
 
 - Matrix ids:
-  - `ZSSH-CATALOG-001` through `ZSSH-CATALOG-016` for required fixture catalog closure.
+  - `ZSSH-CATALOG-001` through `ZSSH-CATALOG-017` for required fixture catalog closure.
   - `ZSSH-PREVIEW-001` through `ZSSH-PREVIEW-004` for preview readiness and blocked parity.
   - `ZSSH-CREATE-001` through `ZSSH-CREATE-004` for ids-only create and admission parity.
   - `ZSSH-RUNTIME-001` through `ZSSH-RUNTIME-005` for target backend, artifact, observation, and
-    opt-in smoke gating.
+    GitHub Actions/local explicit real-target gating.
 - Hermetic default tests:
   - table-driven fixture descriptors;
   - `deployments.plan/v1` ready/blocked schema contract payloads;
@@ -77,18 +80,30 @@ command/surface.
   - typed Docker build/run command rendering;
   - runtime target backend registry selection for local-shell and generic-SSH;
   - readiness/health/log/access observation expectation shape.
-- Opt-in tests:
-  - representative real local Docker smoke remains gated by
-    `APPALOFT_E2E_FRAMEWORK_DOCKER=true`;
-  - real generic-SSH smoke remains gated by explicit SSH target configuration.
+- Real-target confidence tests:
+  - real local Docker catalog smoke is exposed as `bun run smoke:framework:docker`, which composes
+    Dockerfile/Compose/prebuilt-image substrate smoke and the
+    `APPALOFT_E2E_FRAMEWORK_DOCKER=true` framework fixture smoke. The shared
+    `.github/workflows/framework-fixture-e2e.yml` workflow runs this matrix on GitHub runners for
+    nightly and release gates;
+  - real generic-SSH smoke is gated by explicit SSH target configuration and is exposed as
+    `bun run smoke:framework:ssh`, which runs `bun run smoke:ssh:preflight` before enabling
+    `APPALOFT_E2E_SSH_FRAMEWORK_DOCKER=true`. The same shared GitHub Actions workflow runs it when
+    SSH secrets are present and fails closed when `required=true`;
+  - `bun run smoke:framework` composes the full local Docker catalog gate and the generic-SSH
+    fixture gate for release-readiness environments that have Docker and a configured SSH target.
 
-## Risks And Migration Gaps
+## Risks And Governed Follow-Ups
 
-- Current `deployments.create` still executes runtime work inside the use case as a migration gap
-  against the acceptance-first contract. The harness must assert the stable boundary without
-  pretending async process-manager closure is done.
-- Full real Docker and real SSH coverage for every catalog fixture remains too expensive and
-  environment-sensitive for default CI. The default contract is hermetic; real smoke is opt-in.
+- Current `deployments.create` records durable process-attempt projections and returns accepted
+  success for post-acceptance runtime failures, but it still calls the runtime execution backend
+  from the use case after acceptance. Moving deployment execution to a dedicated durable worker is
+  future async-process hardening and must not be confused with a Zero-to-SSH catalog or real-target
+  confidence gap.
+- Full real Docker and real SSH execution for every catalog fixture is environment-sensitive.
+  GitHub Actions runs the local Docker fixture matrix from nightly and release workflows; generic
+  SSH remains secret-gated and can fail closed on release dispatch. A missing local Docker daemon
+  or SSH target is an external confidence-gate prerequisite, not a catalog support gap.
 - Generic Node/Python/Java support tier naming may need future user-facing copy refinement, but it
   does not block this harness while planner/artifact/create behavior is covered.
 - Public docs/help do not need a new page unless user-facing support text changes; record this as
@@ -104,5 +119,9 @@ command/surface.
   selection for local-shell and generic-SSH, Docker/OCI artifact intent parity, typed command
   rendering for container image paths, and normalized readiness/health/log/access observation
   expectations.
-- Real local Docker and real SSH fixture execution remain opt-in gates, not default CI
-  requirements.
+- Real local Docker and real SSH fixture execution are wired through
+  `.github/workflows/framework-fixture-e2e.yml` for nightly/release confidence; local developer
+  execution remains explicitly env/secret gated. The active fixture descriptor inventory is
+  asserted by `apps/shell/test/e2e/framework-smoke-coverage.test.ts`, and the root package scripts
+  make those full-catalog gates discoverable without memorizing individual e2e file paths or
+  environment variable names.

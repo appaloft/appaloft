@@ -32,6 +32,7 @@ import {
 } from "@appaloft/core";
 import { RuntimeCommandBuilder, renderRuntimeCommandString } from "../src/runtime-commands";
 
+const repoFile = (path: string) => new URL(`../../../../${path}`, import.meta.url);
 const fixturesRoot = join(import.meta.dir, "../../filesystem/test/fixtures/frameworks");
 
 type ProfileStrategy =
@@ -395,7 +396,7 @@ const supportedCatalog: SupportedCatalogDescriptor[] = [
       artifactIntent: "build-image",
       executionKind: "docker-container",
       commandSpecs: {
-        install: "pip install --no-cache-dir uv && uv sync --frozen --no-dev",
+        install: "uv sync --frozen --no-dev",
         start: "uv run python -m uvicorn main:app --host 0.0.0.0 --port 3000",
       },
     },
@@ -421,7 +422,7 @@ const supportedCatalog: SupportedCatalogDescriptor[] = [
       artifactIntent: "build-image",
       executionKind: "docker-container",
       commandSpecs: {
-        install: "pip install --no-cache-dir -r requirements.txt",
+        install: "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt",
         start: "python manage.py runserver 0.0.0.0:3000",
       },
     },
@@ -447,7 +448,7 @@ const supportedCatalog: SupportedCatalogDescriptor[] = [
       artifactIntent: "build-image",
       executionKind: "docker-container",
       commandSpecs: {
-        install: "pip install --no-cache-dir -r requirements.txt",
+        install: "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt",
         start: "python -m flask --app app:app run --host 0.0.0.0 --port 3000",
       },
     },
@@ -498,7 +499,7 @@ const supportedCatalog: SupportedCatalogDescriptor[] = [
       artifactIntent: "build-image",
       executionKind: "docker-container",
       commandSpecs: {
-        install: "pip install --no-cache-dir uv && uv sync --frozen --no-dev",
+        install: "uv sync --frozen --no-dev",
         start: "uv run python -m uvicorn asgi:app --host 0.0.0.0 --port 3000",
       },
     },
@@ -625,7 +626,7 @@ const supportedCatalog: SupportedCatalogDescriptor[] = [
     profileDraft: {
       runtime: {
         strategy: "auto",
-        installCommand: "pip install --no-cache-dir -r requirements.txt",
+        installCommand: "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt",
         startCommand: "python -m waitress --listen=0.0.0.0:4317 service:application",
       },
       network: { internalPort: 4317, upstreamProtocol: "http", exposureMode: "reverse-proxy" },
@@ -641,7 +642,7 @@ const supportedCatalog: SupportedCatalogDescriptor[] = [
       artifactIntent: "build-image",
       executionKind: "docker-container",
       commandSpecs: {
-        install: "pip install --no-cache-dir -r requirements.txt",
+        install: "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt",
         start: "python -m waitress --listen=0.0.0.0:4317 service:application",
       },
     },
@@ -1003,8 +1004,16 @@ describe("Zero-to-SSH supported catalog acceptance harness", () => {
     }
   });
 
-  test("[ZSSH-RUNTIME-004][ZSSH-RUNTIME-005] real Docker and SSH fixture smoke are opt-in gates", () => {
+  test("[ZSSH-RUNTIME-004][ZSSH-RUNTIME-005] local real-target smoke is explicit while CI owns real gates", async () => {
+    const workflow = await Bun.file(
+      repoFile(".github/workflows/framework-fixture-e2e.yml"),
+    ).text();
+
     expect(process.env.APPALOFT_E2E_FRAMEWORK_DOCKER).not.toBe("true");
-    expect(process.env.APPALOFT_E2E_FRAMEWORK_SSH).not.toBe("true");
+    expect(process.env.APPALOFT_E2E_SSH_FRAMEWORK_DOCKER).not.toBe("true");
+    expect(workflow).toContain("framework-docker-fixtures");
+    expect(workflow).toContain("framework-ssh-e2e");
+    expect(workflow).toContain('APPALOFT_E2E_FRAMEWORK_DOCKER: "true"');
+    expect(workflow).toContain('APPALOFT_E2E_SSH_FRAMEWORK_DOCKER: "true"');
   });
 });
