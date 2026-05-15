@@ -180,8 +180,10 @@ import {
   SshPublicKeyText,
   StartedAt,
   StaticPublishDirectory,
+  StorageBindSourcePath,
   StorageDestinationPath,
   StorageVolumeId,
+  StorageVolumeKindValue,
   TargetKindValue,
   TlsModeValue,
   UpdatedAt,
@@ -1713,6 +1715,12 @@ export function rehydrateResourceRow(
     storageAttachments: storageAttachments.map((attachment) => ({
       id: ResourceStorageAttachmentId.rehydrate(attachment.id),
       storageVolumeId: StorageVolumeId.rehydrate(attachment.storage_volume_id),
+      storageVolumeKind: StorageVolumeKindValue.rehydrate(
+        attachment.storage_volume_kind as Parameters<typeof StorageVolumeKindValue.rehydrate>[0],
+      ),
+      ...(attachment.source_path
+        ? { sourcePath: StorageBindSourcePath.rehydrate(attachment.source_path) }
+        : {}),
       destinationPath: StorageDestinationPath.rehydrate(attachment.destination_path),
       mountMode: ResourceStorageMountModeValue.rehydrate(
         attachment.mount_mode as Parameters<typeof ResourceStorageMountModeValue.rehydrate>[0],

@@ -190,7 +190,7 @@ describe("operator-work.cancel", () => {
       workAttempt({
         id: "wrk_scheduled_task_retry",
         status: "retry-scheduled",
-        operationKey: "scheduled-task-runs.run-now",
+        operationKey: "scheduled-tasks.run-now",
         dedupeKey: "scheduled-task-run:str_retry",
         phase: "scheduled-task-run",
         step: "runtime-execution",
@@ -224,7 +224,7 @@ describe("operator-work.cancel", () => {
         id: "wrk_scheduled_task_retry",
         kind: "runtime-maintenance",
         status: "canceled",
-        operationKey: "scheduled-task-runs.run-now",
+        operationKey: "scheduled-tasks.run-now",
         dedupeKey: "scheduled-task-run:str_retry",
         correlationId: "corr_work",
         requestId: "req_work",

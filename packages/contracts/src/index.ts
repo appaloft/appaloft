@@ -952,6 +952,204 @@ export const inspectRuntimeUsageResponseSchema = z.object({
   sourceErrors: z.array(runtimeUsageSourceErrorSchema),
 });
 
+export const runtimeMonitoringSignalSchema = z.enum([
+  "cpu",
+  "memory",
+  "disk",
+  "inode",
+  "docker",
+  "network",
+]);
+
+export const runtimeMonitoringBucketSchema = z.enum(["minute", "five-minute", "hour"]);
+
+export const runtimeMonitoringThresholdMetricSchema = z.enum([
+  "containerCpuPercent",
+  "loadAverage1m",
+  "containerUsedBytes",
+  "usedBytes",
+  "attributedBytes",
+  "used",
+  "imageBytes",
+  "buildCacheBytes",
+  "containerWritableBytes",
+  "rxBytes",
+  "txBytes",
+]);
+
+export const runtimeMonitoringRetentionSummarySchema = z.object({
+  rawRetentionHours: z.number(),
+  retainedFrom: z.string().optional(),
+  retainedTo: z.string().optional(),
+});
+
+export const runtimeMonitoringSafeLabelsSchema = z.object({
+  providerKey: z.string().optional(),
+  artifactKind: runtimeUsageArtifactKindSchema.optional(),
+  runtimeId: z.string().optional(),
+});
+
+export const runtimeMonitoringScopeEvidenceSchema = z.object({
+  scope: runtimeUsageScopeSchema,
+  serverId: z.string().optional(),
+  projectId: z.string().optional(),
+  environmentId: z.string().optional(),
+  resourceId: z.string().optional(),
+  deploymentId: z.string().optional(),
+});
+
+export const runtimeMonitoringWarningSchema = z.object({
+  code: z.enum([
+    "missing-samples",
+    "partial-window",
+    "stale-samples",
+    "missing-metric-source",
+    "outside-retention",
+  ]),
+  message: z.string(),
+  signal: runtimeMonitoringSignalSchema.optional(),
+  scope: runtimeUsageScopeSchema.optional(),
+});
+
+export const runtimeMonitoringSourceErrorSchema = z.object({
+  source: z.enum(["monitoring-store", "collector", "read-model", "unknown"]),
+  code: z.string(),
+  message: z.string(),
+  retriable: z.boolean(),
+});
+
+export const runtimeMonitoringSampleSchema = z.object({
+  sampleId: z.string(),
+  observedAt: z.string(),
+  collectedAt: z.string(),
+  scopeEvidence: runtimeMonitoringScopeEvidenceSchema,
+  totals: runtimeUsageTotalsSchema,
+  freshness: runtimeUsageFreshnessSchema,
+  partial: z.boolean(),
+  labels: runtimeMonitoringSafeLabelsSchema,
+  warnings: z.array(runtimeMonitoringWarningSchema),
+  sourceErrors: z.array(runtimeMonitoringSourceErrorSchema),
+});
+
+export const runtimeMonitoringSamplesResponseSchema = z.object({
+  schemaVersion: z.literal("runtime-monitoring.samples.list/v1"),
+  scope: runtimeUsageScopeSchema,
+  from: z.string(),
+  to: z.string(),
+  generatedAt: z.string(),
+  freshness: runtimeUsageFreshnessSchema,
+  partial: z.boolean(),
+  retention: runtimeMonitoringRetentionSummarySchema,
+  samples: z.array(runtimeMonitoringSampleSchema),
+  warnings: z.array(runtimeMonitoringWarningSchema),
+  sourceErrors: z.array(runtimeMonitoringSourceErrorSchema),
+});
+
+export const runtimeMonitoringSeriesPointSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  sampleCount: z.number(),
+  totals: runtimeUsageTotalsSchema,
+});
+
+export const runtimeMonitoringSeriesSchema = z.object({
+  signal: runtimeMonitoringSignalSchema,
+  points: z.array(runtimeMonitoringSeriesPointSchema),
+});
+
+export const runtimeMonitoringContributorSchema = z.object({
+  scope: runtimeUsageScopeSchema,
+  totals: runtimeUsageTotalsSchema,
+  sampleCount: z.number(),
+});
+
+export const runtimeMonitoringDeploymentMarkerSchema = z.object({
+  deploymentId: z.string(),
+  resourceId: z.string().optional(),
+  environmentId: z.string().optional(),
+  observedAt: z.string(),
+  status: z.string(),
+  label: z.string(),
+  correlation: z.literal("time"),
+});
+
+export const runtimeMonitoringRollupResponseSchema = z.object({
+  schemaVersion: z.literal("runtime-monitoring.rollup/v1"),
+  scope: runtimeUsageScopeSchema,
+  from: z.string(),
+  to: z.string(),
+  bucket: runtimeMonitoringBucketSchema,
+  generatedAt: z.string(),
+  freshness: runtimeUsageFreshnessSchema,
+  partial: z.boolean(),
+  retention: runtimeMonitoringRetentionSummarySchema,
+  series: z.array(runtimeMonitoringSeriesSchema),
+  totals: runtimeUsageTotalsSchema,
+  topContributors: z.array(runtimeMonitoringContributorSchema),
+  deploymentMarkers: z.array(runtimeMonitoringDeploymentMarkerSchema),
+  warnings: z.array(runtimeMonitoringWarningSchema),
+  sourceErrors: z.array(runtimeMonitoringSourceErrorSchema),
+});
+
+export const runtimeMonitoringThresholdRuleSchema = z.object({
+  ruleId: z.string(),
+  signal: runtimeMonitoringSignalSchema,
+  metric: runtimeMonitoringThresholdMetricSchema,
+  warning: z.number().optional(),
+  critical: z.number().optional(),
+  comparator: z.literal("greater-than-or-equal"),
+});
+
+export const runtimeMonitoringThresholdPolicyReadSchema = z.object({
+  schemaVersion: z.literal("runtime-monitoring-thresholds.policy/v1"),
+  policyId: z.string(),
+  scope: runtimeUsageScopeSchema,
+  rules: z.array(runtimeMonitoringThresholdRuleSchema),
+  enabled: z.boolean(),
+  updatedAt: z.string(),
+  updatedByActorId: z.string().optional(),
+  updatedByActorKind: z.enum(["deploy-token", "system", "user"]).optional(),
+});
+
+export const runtimeMonitoringThresholdCrossingSchema = z.object({
+  ruleId: z.string(),
+  signal: runtimeMonitoringSignalSchema,
+  metric: runtimeMonitoringThresholdMetricSchema,
+  severity: z.enum(["warning", "critical"]),
+  observedValue: z.number(),
+  boundary: z.number(),
+});
+
+export const runtimeMonitoringThresholdNextActionSchema = z.enum([
+  "inspect-runtime-usage",
+  "open-runtime-monitoring",
+  "inspect-capacity",
+  "review-runtime-logs",
+  "review-deployment-events",
+  "configure-thresholds",
+]);
+
+export const runtimeMonitoringThresholdEvaluationSchema = z.object({
+  state: z.enum(["ok", "warning", "critical", "stale", "unknown"]),
+  evaluatedAt: z.string().optional(),
+  sourceSampleId: z.string().optional(),
+  crossed: z.array(runtimeMonitoringThresholdCrossingSchema),
+  nextActions: z.array(runtimeMonitoringThresholdNextActionSchema),
+  sourceErrors: z.array(runtimeMonitoringSourceErrorSchema),
+});
+
+export const configureRuntimeMonitoringThresholdsResponseSchema = z.object({
+  policy: runtimeMonitoringThresholdPolicyReadSchema,
+});
+
+export const runtimeMonitoringThresholdsResponseSchema = z.object({
+  schemaVersion: z.literal("runtime-monitoring-thresholds.show/v1"),
+  scope: runtimeUsageScopeSchema,
+  generatedAt: z.string(),
+  policy: runtimeMonitoringThresholdPolicyReadSchema.nullable(),
+  evaluation: runtimeMonitoringThresholdEvaluationSchema,
+});
+
 export const runtimeTargetPruneCategorySchema = z.enum([
   "stopped-containers",
   "preview-workspaces",
@@ -1086,6 +1284,7 @@ export const retentionDefaultCategorySchema = z.enum([
   "process-attempts",
   "provider-job-logs",
   "resource-runtime-log-archives",
+  "runtime-monitoring-samples",
 ]);
 
 export const retentionDefaultReadSchema = z.object({
@@ -2965,6 +3164,71 @@ export const deleteStorageVolumeInputSchema = z.object({
 
 export const deleteStorageVolumeResponseSchema = z.object({
   id: z.string(),
+});
+
+export const cleanupStorageVolumeRuntimeInputSchema = z.object({
+  storageVolumeId: z.string().min(1),
+  serverId: z.string().min(1),
+  before: z.string().datetime({ offset: true }),
+  dryRun: z.boolean().default(true),
+});
+
+export const storageRuntimeCleanupCandidateSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["named-volume", "bind-mount"]),
+  target: z.string(),
+  updatedAt: z.string().nullable(),
+  action: z.enum(["matched", "cleaned", "skipped", "blocked"]),
+  blockedReason: z
+    .enum([
+      "active-attachment",
+      "active-runtime",
+      "retained-snapshot",
+      "rollback-candidate",
+      "backup-restore-in-flight",
+      "backup-retention",
+      "bind-mount-unsupported",
+      "provider-blocked",
+      "cutoff-not-reached",
+      "ownership-unproven",
+      "safety-evidence-missing",
+    ])
+    .optional(),
+});
+
+export const cleanupStorageVolumeRuntimeResponseSchema = z.object({
+  schemaVersion: z.literal("storage-volumes.cleanup-runtime/v1"),
+  storageVolume: z.object({
+    id: z.string(),
+    name: z.string(),
+    kind: z.enum(["named-volume", "bind-mount"]),
+  }),
+  server: z.object({
+    id: z.string(),
+    name: z.string(),
+    host: z.string(),
+    port: z.number(),
+    providerKey: z.string(),
+    targetKind: z.string(),
+  }),
+  before: z.string(),
+  dryRun: z.boolean(),
+  cleanedAt: z.string(),
+  summary: z.object({
+    inspectedCount: z.number(),
+    matchedCount: z.number(),
+    cleanedCount: z.number(),
+    skippedCount: z.number(),
+    blockedCount: z.number(),
+  }),
+  candidates: z.array(storageRuntimeCleanupCandidateSchema),
+  warnings: z.array(
+    z.object({
+      code: z.string(),
+      message: z.string(),
+      target: z.string().optional(),
+    }),
+  ),
 });
 
 export const dependencyResourceResponseSchema = z.object({
@@ -4987,6 +5251,12 @@ export const resourceDiagnosticContextSchema = z.object({
   targetProviderKey: z.string().optional(),
   services: z.array(resourceServiceSummarySchema),
   networkProfile: resourceNetworkProfileSchema.optional(),
+  observationWindow: z
+    .object({
+      from: z.string(),
+      to: z.string(),
+    })
+    .optional(),
 });
 
 export const resourceDiagnosticDeploymentSchema = z.object({
@@ -5166,6 +5436,50 @@ export const listPluginsResponseSchema = z.object({
   items: z.array(pluginSummarySchema),
 });
 
+export const maintenanceWorkerActivationSchema = z.enum([
+  "disabled-by-config",
+  "starts-with-backend-service",
+]);
+
+export const maintenanceWorkerSafetyModeSchema = z.enum([
+  "certificate-retry",
+  "preview-expiry-cleanup",
+  "preview-cleanup-retry",
+  "runtime-execution",
+  "policy-gated-prune",
+  "policy-gated-retention",
+  "read-only-collection",
+]);
+
+export const maintenanceWorkerStatusSchema = z.object({
+  key: z.enum([
+    "certificate-retry-scheduler",
+    "preview-expiry-cleanup-scheduler",
+    "preview-cleanup-retry-scheduler",
+    "scheduled-task-runner",
+    "scheduled-runtime-prune-runner",
+    "scheduled-history-retention-runner",
+    "runtime-monitoring-collector-runner",
+  ]),
+  label: z.string(),
+  enabled: z.boolean(),
+  activation: maintenanceWorkerActivationSchema,
+  safetyMode: maintenanceWorkerSafetyModeSchema,
+  intervalSeconds: z.number().int().positive(),
+  batchSize: z.number().int().positive().optional(),
+  defaultRetryDelaySeconds: z.number().int().positive().optional(),
+  rawRetentionHours: z.number().int().positive().optional(),
+  configurationKeys: z.array(z.string()),
+  operationKeys: z.array(z.string()),
+});
+
+export const doctorResponseSchema = z.object({
+  readiness: readinessResponseSchema,
+  providers: z.array(providerDescriptorSchema),
+  plugins: z.array(pluginSummarySchema),
+  maintenanceWorkers: z.array(maintenanceWorkerStatusSchema),
+});
+
 export const githubRepositorySummarySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -5222,6 +5536,10 @@ export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>;
 export type GitHubRepositorySummary = z.infer<typeof githubRepositorySummarySchema>;
 export type PluginSummary = z.infer<typeof pluginSummarySchema>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
+export type MaintenanceWorkerActivation = z.infer<typeof maintenanceWorkerActivationSchema>;
+export type MaintenanceWorkerSafetyMode = z.infer<typeof maintenanceWorkerSafetyModeSchema>;
+export type MaintenanceWorkerStatus = z.infer<typeof maintenanceWorkerStatusSchema>;
+export type DoctorResponse = z.infer<typeof doctorResponseSchema>;
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 export type CreateProjectInput = z.infer<typeof createProjectInputSchema>;
 export type ShowProjectInput = z.infer<typeof showProjectInputSchema>;
@@ -5264,6 +5582,45 @@ export type RuntimeUsageEvidence = z.infer<typeof runtimeUsageEvidenceSchema>;
 export type RuntimeUsageArtifactKind = z.infer<typeof runtimeUsageArtifactKindSchema>;
 export type RuntimeArtifactUsage = z.infer<typeof runtimeArtifactUsageSchema>;
 export type InspectRuntimeUsageResponse = z.infer<typeof inspectRuntimeUsageResponseSchema>;
+export type RuntimeMonitoringSignal = z.infer<typeof runtimeMonitoringSignalSchema>;
+export type RuntimeMonitoringBucket = z.infer<typeof runtimeMonitoringBucketSchema>;
+export type RuntimeMonitoringThresholdMetric = z.infer<
+  typeof runtimeMonitoringThresholdMetricSchema
+>;
+export type RuntimeMonitoringRetentionSummary = z.infer<
+  typeof runtimeMonitoringRetentionSummarySchema
+>;
+export type RuntimeMonitoringSafeLabels = z.infer<typeof runtimeMonitoringSafeLabelsSchema>;
+export type RuntimeMonitoringScopeEvidence = z.infer<typeof runtimeMonitoringScopeEvidenceSchema>;
+export type RuntimeMonitoringWarning = z.infer<typeof runtimeMonitoringWarningSchema>;
+export type RuntimeMonitoringSourceError = z.infer<typeof runtimeMonitoringSourceErrorSchema>;
+export type RuntimeMonitoringSample = z.infer<typeof runtimeMonitoringSampleSchema>;
+export type RuntimeMonitoringSamplesResponse = z.infer<
+  typeof runtimeMonitoringSamplesResponseSchema
+>;
+export type RuntimeMonitoringSeriesPoint = z.infer<typeof runtimeMonitoringSeriesPointSchema>;
+export type RuntimeMonitoringSeries = z.infer<typeof runtimeMonitoringSeriesSchema>;
+export type RuntimeMonitoringContributor = z.infer<typeof runtimeMonitoringContributorSchema>;
+export type RuntimeMonitoringDeploymentMarker = z.infer<
+  typeof runtimeMonitoringDeploymentMarkerSchema
+>;
+export type RuntimeMonitoringRollupResponse = z.infer<typeof runtimeMonitoringRollupResponseSchema>;
+export type RuntimeMonitoringThresholdRule = z.infer<typeof runtimeMonitoringThresholdRuleSchema>;
+export type RuntimeMonitoringThresholdPolicyRead = z.infer<
+  typeof runtimeMonitoringThresholdPolicyReadSchema
+>;
+export type RuntimeMonitoringThresholdCrossing = z.infer<
+  typeof runtimeMonitoringThresholdCrossingSchema
+>;
+export type RuntimeMonitoringThresholdEvaluation = z.infer<
+  typeof runtimeMonitoringThresholdEvaluationSchema
+>;
+export type ConfigureRuntimeMonitoringThresholdsResponse = z.infer<
+  typeof configureRuntimeMonitoringThresholdsResponseSchema
+>;
+export type RuntimeMonitoringThresholdsResponse = z.infer<
+  typeof runtimeMonitoringThresholdsResponseSchema
+>;
 export type PruneServerCapacityResponse = z.infer<typeof pruneServerCapacityResponseSchema>;
 export type ScheduledRuntimePrunePolicyScope = z.infer<
   typeof scheduledRuntimePrunePolicyScopeSchema
@@ -5464,6 +5821,12 @@ export type RenameStorageVolumeInput = z.infer<typeof renameStorageVolumeInputSc
 export type RenameStorageVolumeResponse = z.infer<typeof renameStorageVolumeResponseSchema>;
 export type DeleteStorageVolumeInput = z.infer<typeof deleteStorageVolumeInputSchema>;
 export type DeleteStorageVolumeResponse = z.infer<typeof deleteStorageVolumeResponseSchema>;
+export type CleanupStorageVolumeRuntimeInput = z.infer<
+  typeof cleanupStorageVolumeRuntimeInputSchema
+>;
+export type CleanupStorageVolumeRuntimeResponse = z.infer<
+  typeof cleanupStorageVolumeRuntimeResponseSchema
+>;
 export type DependencyResourceResponse = z.infer<typeof dependencyResourceResponseSchema>;
 export type ListDependencyResourcesResponse = z.infer<typeof listDependencyResourcesResponseSchema>;
 export type ShowDependencyResourceResponse = z.infer<typeof showDependencyResourceResponseSchema>;
