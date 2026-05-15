@@ -2,8 +2,8 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: accepted-candidate for a `0.9.x` Code Round
+- Round: Code Round baseline implemented; Sync Round active for remaining transport and adoption gaps
+- Artifact state: active self-hosted server config deploy baseline with remaining package/storage/source-profile gaps
 
 ## Business Outcome
 
@@ -12,11 +12,12 @@ user-authored GitHub Actions workflow while the server, not the GitHub runner, o
 repository config application, source materialization, deployment admission, audit, and console
 links.
 
-The current self-hosted Action slice is a trigger for an existing resource profile. It sends a
-source fingerprint to the server and the server resolves existing source-link context. This spec
-defines the next slice: the Action may submit a trusted source package reference plus the selected
-repository config file so the self-hosted server can run the config deploy workflow through API
-state, without installing the CLI, opening SSH, or mutating SSH-server PGlite from the runner.
+The first self-hosted Action slice was a trigger for an existing resource profile. It sent a source
+fingerprint to the server and the server resolved existing source-link context. This spec now
+governs the active server config deploy baseline: the Action submits a trusted source package
+reference plus the selected repository config file so the self-hosted server can run the config
+deploy workflow through API state, without installing the CLI, opening SSH, or mutating SSH-server
+PGlite from the runner.
 
 ## Source Of Truth
 
@@ -80,10 +81,11 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
   [action-source-link-deployment.create](../../commands/action-source-link-deployment.create.md)
   and
   [action-server-config-deployment-target.resolve](../../commands/action-server-config-deployment-target.resolve.md).
-- CLI: no new CLI command in this Spec Round. Pure SSH CLI mode remains the default and continues
-  to own the local/SSH config workflow.
-- GitHub Action: future wrapper inputs may select server config deploy and source package behavior;
-  defaults remain pure SSH `none` or existing self-hosted source-link trigger when selected.
+- CLI: no new CLI command for this workflow. Pure SSH CLI mode remains the default and continues to
+  own the local/SSH config workflow.
+- GitHub Action: wrapper inputs can explicitly select `server-config-deploy` when the self-hosted
+  server advertises source package and server-side config bootstrap support; defaults remain pure
+  SSH `none` or existing self-hosted source-link trigger when selected.
 - Web/UI: Web may link to the accepted deployment detail and source package diagnostics; Web mode
   selection remains separate.
 - Config: committed config may carry non-secret profile, `ci-env:` secret references,
@@ -107,23 +109,22 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
 
 ## Open Questions
 
-- Should the first Code Round upload a tar archive directly to Appaloft, provide a short-lived
-  GitHub archive URL, or use a server-side GitHub integration to fetch the source by revision?
-- What is the maximum source package size for the first self-hosted slice?
-- Should package storage be immediate-local PGlite/Postgres metadata plus filesystem blobs, or a
-  pluggable artifact store from the start?
-- Which source package diagnostics must be visible in Web before this can be documented as
-  supported?
+- Which additional package transports should graduate after the current `server-github-fetch`
+  slice: inline archive, remote archive URL, or a pluggable artifact store?
+- What maximum source package size should archive/blob transports enforce before storage or
+  unpacking?
+- Should archive/blob storage be immediate-local PGlite/Postgres metadata plus filesystem blobs, or
+  a pluggable artifact store from the start?
+- Which source package diagnostics must be visible in Web before archive/blob transports are
+  documented as supported?
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 - Existing implementation supports the first self-hosted Action API trigger:
   `/api/version`, `POST /api/action/deployments/from-source-link`, and
   `POST /api/deployments/cleanup-preview`.
 - Existing server trigger mode does not install or invoke the CLI and does not mutate SSH-server
   PGlite from the runner.
-- Existing server trigger mode does not read/apply repository config, upload source packages,
-  apply runner-side resource profile inputs, or perform product-grade preview orchestration.
 - The first Action Server Config Deploy code slices validate package metadata, read
   `server-github-fetch` config files from GitHub raw content, accept the narrow
   `controlPlane.deploymentContext`, reject broad committed identity/secrets,
@@ -135,9 +136,11 @@ state, without installing the CLI, opening SSH, or mutating SSH-server PGlite fr
   Action-supplied preview `environmentVariables` and `previewRoute` for pull request previews, and
   dispatch ids-only deployment admission. Pull request previews do not reuse committed production
   `access.domains[]`; when a preview route is supplied, it is the only route intent applied for
-  that request. Inline archive transport, remote archive URL transport, source package
-  storage, diagnostics, cleanup, source profile application, non-`ci-env:` secret resolvers, and
-  product-grade preview orchestration remain migration gaps.
+  that request. Inline archive transport, remote archive URL transport, durable source package blob
+  storage, archive diagnostics, archive cleanup, source profile bootstrap, broader control-plane
+  adoption, and non-`ci-env:` secret resolvers remain governed follow-ups for this Action endpoint.
+  Product-grade preview orchestration is active in the separate control-plane workflow and must not
+  be folded into this server trigger surface.
 - The next auth hardening slice must make Action mutation endpoints require an installer-generated
   deploy token or future OIDC exchange, return clear 401/403 errors, and fail before source-link,
   resource, route, or deployment mutation. This is now positioned by

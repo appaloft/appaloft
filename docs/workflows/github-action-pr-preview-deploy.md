@@ -28,8 +28,9 @@ The workflow must keep these boundaries:
 - PR close cleanup is a separate explicit close-event workflow over `deployments.cleanup-preview`;
   it is not implied by preview deploy success and it is not retried automatically in pure Action
   mode.
-- Product-grade preview creation, policy, cleanup, comments, audit, scheduler behavior, and
-  no-workflow GitHub App execution remain future control-plane behavior.
+- Action-only preview workflows do not own product-grade preview creation, policy, cleanup,
+  comments, audit, scheduler behavior, or no-workflow GitHub App execution. Those capabilities are
+  governed by the product-grade preview control-plane specs and operations.
 
 ## Global References
 
@@ -361,8 +362,8 @@ contract.
 
 Action-only preview workflows may also own GitHub deployment/environment metadata cleanup when the
 repository uses workflow `environment:` records and grants `deployments: write` to the close-event
-job. Product-grade comments, check runs, richer deployment status synchronization, preview
-policies, and scheduled cleanup remain future GitHub App/control-plane work.
+job. Product-grade comments, deployment-status feedback, preview policies, and scheduled cleanup
+belong to the control-plane preview workflow rather than this Action-only contract.
 
 ## Cleanup And Expiration
 
@@ -391,7 +392,7 @@ source-link cleanup.
 
 ## Product-Grade Preview Path
 
-Product-grade GitHub preview environments require a control plane. The future shape is:
+Product-grade GitHub preview environments require a control plane. The current control-plane shape is:
 
 ```text
 GitHub App installation
@@ -403,22 +404,27 @@ GitHub App installation
   -> control plane cleans up on PR close and by scheduled expiry
 ```
 
-That product line may support:
+The active product-grade preview baseline supports:
 
 - no workflow file required when GitHub App execution is selected;
 - PR comments and check runs from the Appaloft GitHub App;
 - preview policy list/show/update;
 - preview environment list/show/delete;
 - scoped preview environment variables and secrets;
-- durable audit and billing/cost visibility;
+- durable audit and operator-work visibility;
 - cleanup retries and scheduled expiration;
+
+Future public enablement work adds:
+
+- full GitHub App installation-token onboarding and broader provider smoke coverage beyond the
+  active secret-gated PR-comment feedback smoke;
 - managed custom domains, DNS observation, and certificate lifecycle when the control plane owns
   those integrations.
 
 The same repository config and operation contracts still apply. Product-grade preview orchestration
 must not add source/runtime/domain fields to `deployments.create`.
 
-The governing Spec Round for this future product line is
+The governing product-grade preview artifact is
 [Product-Grade Preview Deployments](../specs/046-product-grade-preview-deployments/spec.md), with
 coverage tracked in the
 [Product-Grade Preview Deployments Test Matrix](../testing/product-grade-preview-deployments-test-matrix.md).
@@ -447,19 +453,20 @@ Errors must include sanitized preview id, repository identity, pull request numb
 mode, and route phase when useful. They must not include SSH keys, tokens, raw secret values,
 database URLs, or resolved application secret values.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current implementation supports the underlying CLI config deploy path, SSH-server PGlite state,
 preview-scoped source fingerprints, non-interactive preview environment selection,
 `--preview-domain-template` server-applied route intent, explicit preview config paths, and the
 implicit-root-domain skip rule needed for Action-style execution. CLI/action profile flags must
 remain in sync with config profile fields so Action previews can be expressed without generating a
-temporary config file. The main repository now includes a reference `.github/actions/deploy-action`
+temporary config file. The main repository includes a reference `.github/actions/deploy-action`
 composite wrapper that maps trusted PR preview inputs to the CLI, handles SSH private-key temp-file
 custody, maps `command: preview-cleanup` to `appaloft preview cleanup`, and includes
-Marketplace-facing examples. A deterministic export script now mirrors the reference wrapper assets
-into a standalone repository layout, but the public `appaloft/deploy-action` repository is not yet
-created.
+Marketplace-facing examples. A deterministic export script mirrors the reference wrapper assets into
+the public `appaloft/deploy-action` repository layout; that public repository is published from the
+same reference export and validates wrapper layout, dry-run preview mapping, and an explicitly
+requested exact-version install smoke in its public CI.
 
 The main Appaloft repository now includes `.github/workflows/deploy-docs-preview.yml` as a
 repository-authored docs preview workflow over the same CLI path. It classifies PRs whose changed
@@ -480,7 +487,7 @@ does not apply runner-side preview route/profile inputs such as `preview-domain-
 `preview-tls-mode`, `require-preview-url`, `runtime-name`, `environment-variables`, or
 `secret-variables`; those remain CLI/SSH Action-only behavior until server-side policy owns them.
 
-Missing pieces before the public Action preview path is fully stable:
+Remaining public wrapper hardening follow-ups:
 
 - promoting the public `appaloft/deploy-action` stable tag after server-mode behavior is exported;
 - public wrapper CI coverage for fixture or real-release install;
@@ -490,12 +497,10 @@ The public docs now distinguish Action-only preview deploy from product-grade Gi
 under `/docs/deploy/previews/#deployment-pr-preview-action-workflow` and
 `/docs/deploy/previews/#product-grade-preview-deployments`.
 
-Missing pieces for product-grade previews:
-
-- GitHub App/webhook ingestion;
-- preview environment policy commands and read models;
-- scheduler-owned close-event handling, retries, and audit around preview cleanup;
-- scheduler/agent cleanup retries;
-- Cloud/self-hosted source links, locks, audit, and managed domain mapping.
-
-The product-grade preview Spec Round is positioned, but Code Round implementation remains open.
+The active product-grade preview baseline includes GitHub App webhook ingestion, preview policy
+commands/read models, preview environment list/show/delete, Resource-detail and global preview Web
+surfaces, close/expiry/delete cleanup retry state, scheduler-runner wiring, and safe feedback
+recording for comments/checks. Remaining product-grade preview work is public enablement and
+hardening: GitHub App installation-token onboarding, broader provider smoke coverage beyond the
+secret-gated PR-comment feedback smoke, managed-domain mapping, DNS observation, and certificate
+lifecycle when the control plane owns those integrations.

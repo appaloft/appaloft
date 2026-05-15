@@ -67,9 +67,10 @@
 - Acceptance/e2e: add a self-hosted PGlite server smoke only after source package storage and
   cleanup are bounded.
 
-## Risks And Migration Gaps
+## Risks And Governed Follow-Ups
 
-- The package transport choice can create security and storage risks. Fail closed until size,
+- The package transport choice can create security and storage risks. The active server-github-fetch
+  slice avoids direct package upload; future package transport must fail closed until size,
   checksum, path, and cleanup rules exist.
 - Server-side GitHub fetch may require GitHub integration auth that differs from Action-provided
   source archives. That choice should not leak provider SDK concepts into core/application.

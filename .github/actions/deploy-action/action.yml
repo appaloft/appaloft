@@ -167,7 +167,7 @@ inputs:
     required: false
     default: "false"
   server-config-deploy:
-    description: Experimental self-hosted server config deploy mode. Requires server-side source package and config bootstrap support.
+    description: Active self-hosted server config deploy mode. Requires a compatible server that advertises source package and server-side config bootstrap support.
     required: false
     default: "false"
   project-id:

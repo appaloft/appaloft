@@ -83,4 +83,4 @@
 
 - [x] Reconcile spec, plan, tasks, durable workflow docs, test matrices, public docs, and code for
   the implemented `server-github-fetch` server config deploy slice.
-- [x] Record remaining migration gaps explicitly instead of weakening the normative contract.
+- [x] Record governed follow-ups explicitly instead of weakening the normative contract.

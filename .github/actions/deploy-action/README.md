@@ -270,7 +270,7 @@ them to bootstrap a missing source link before later runs omit ids. When ids are
 resolves project, environment, resource, and target from existing source-link state. It does not
 install or invoke the Appaloft CLI, open SSH, or read or write SSH-server PGlite state.
 
-`server-config-deploy: true` selects the next self-hosted server config workflow. In that mode the
+`server-config-deploy: true` selects the active self-hosted server config workflow. In that mode the
 action feature-gates server support through `/api/version` before source package handoff and then
 calls `POST /api/action/deployments/from-config-package`. A server that does not advertise source
 package and server-side config bootstrap support fails before package upload or state mutation. This
@@ -422,7 +422,7 @@ source-link state, or the Appaloft server, not from committed config.
 | `control-plane-url` | empty | Self-hosted Appaloft server endpoint for server API mode. When empty, `controlPlane.url` from config may supply the endpoint. |
 | `appaloft-token` | empty | Optional bearer token for server API mode. |
 | `use-oidc` | `false` | Reserved for future GitHub OIDC exchange. |
-| `server-config-deploy` | `false` | Experimental self-hosted mode that calls `POST /api/action/deployments/from-config-package` after the server advertises source package and server-side config bootstrap support. |
+| `server-config-deploy` | `false` | Active self-hosted server config deploy mode that calls `POST /api/action/deployments/from-config-package` after the server advertises source package and server-side config bootstrap support. |
 | `project-id` | config or empty | Optional trusted project id for server API mode. Defaults to `controlPlane.deploymentContext.projectId` when present. |
 | `environment-id` | config or empty | Optional trusted environment id for server API mode. Defaults to `controlPlane.deploymentContext.environmentId` when present. Required only when any explicit deployment id is supplied. |
 | `resource-id` | config or empty | Optional trusted resource id for server API mode. Defaults to `controlPlane.deploymentContext.resourceId` when present. Required only when any explicit deployment id is supplied. |

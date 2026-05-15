@@ -1266,4 +1266,27 @@ describe("deploy-action wrapper reference", () => {
     expect(readme).toContain("Cleanup is idempotent");
     expect(readme).toContain("Product-grade previews");
   });
+
+  test("[CONFIG-FILE-ENTRY-019] roadmap and workflow no longer describe the public wrapper as missing", () => {
+    const roadmap = readFileSync(resolve(import.meta.dir, "../../docs/PRODUCT_ROADMAP.md"), "utf8");
+    const workflow = readFileSync(
+      resolve(import.meta.dir, "../../docs/workflows/github-action-pr-preview-deploy.md"),
+      "utf8",
+    );
+
+    expect(roadmap).toContain(
+      "[x] Action PR preview: deploy/update from a user-authored GitHub Actions workflow",
+    );
+    expect(roadmap).toContain(
+      "[x] Git source binding, Action PR previews, and product-grade preview deployments.",
+    );
+    expect(roadmap).not.toContain(
+      "[ ] Action PR preview: deploy/update from a user-authored GitHub Actions workflow",
+    );
+    expect(roadmap).not.toContain(
+      "[ ] Git source binding, webhooks, auto-deploy, Action PR previews, and product-grade preview",
+    );
+    expect(workflow).toContain("public repository is published");
+    expect(workflow).not.toContain("public `appaloft/deploy-action` repository is not yet created");
+  });
 });

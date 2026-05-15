@@ -65,7 +65,7 @@ This matrix inherits:
 | --- | --- | --- | --- | --- | --- |
 | DEPLOYMENTS-CLEANUP-PREVIEW-CLI-001 | integration | CLI preview cleanup derives preview fingerprint and remote state | `appaloft preview cleanup [path-or-source] --config appaloft.preview.yml --preview pull-request --preview-id 14` with SSH target inputs | CLI dispatches `CleanupPreviewCommand` with preview-scoped fingerprint and runs the same SSH-state prepare/release flow as config deploy | None |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 `DEPLOYMENTS-CLEANUP-PREVIEW-001` through `DEPLOYMENTS-CLEANUP-PREVIEW-004` have application
 coverage in `packages/application/test/cleanup-preview.test.ts`.
@@ -84,9 +84,12 @@ coverage in `packages/application/test/cleanup-preview.test.ts`.
 `apps/shell/test/remote-pglite-state-sync.test.ts`; a cleanup-specific overlapping fixture is still
 follow-up work.
 
-`DEPLOYMENTS-CLEANUP-PREVIEW-007` is not implemented yet. Current cleanup coverage proves runtime,
-route, and source-link cleanup, but not ownership-scoped Docker image/build-cache/source-workspace
-pruning.
+`DEPLOYMENTS-CLEANUP-PREVIEW-007` is implemented for ownership-scoped generated source-workspace,
+stopped container, and generated-image cleanup through the runtime cleanup boundary. Current
+coverage proves that preview cleanup preserves `artifact-cleanup` failure classification, removes
+only generated preview workspaces under Appaloft-owned runtime roots, skips local user workspaces
+and prebuilt images, and never invokes Docker volume deletion. Build-cache pruning remains governed
+by `servers.capacity.prune` opt-in categories rather than preview cleanup.
 
 Source-link unlink and server-applied route desired-state delete-by-target and
 delete-by-source-fingerprint coverage also live in
