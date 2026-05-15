@@ -14,12 +14,14 @@
 Operators can bind a Postgres dependency resource to a Resource after the dependency resource is
 provisioned or imported. The binding gives users a safe, inspectable control-plane relationship
 between the application Resource and the database dependency without exposing raw connection
-secrets, mutating historical deployment snapshots, injecting runtime environment variables, or
-creating/deleting provider-native databases.
+secrets, mutating historical deployment snapshots, or creating/deleting provider-native databases.
+Later Phase 7 slices extended the first binding baseline with safe deployment snapshot references,
+runtime injection readiness, store-backed secret value resolution, Redis binding, and public
+bind-to-deploy documentation.
 
-This first slice establishes the provider-neutral binding metadata that later secret rotation,
-backup/restore, deployment snapshot binding, runtime cleanup/prune, and Redis bind/unbind can
-reuse.
+This first slice established the provider-neutral binding metadata that later secret rotation,
+backup/restore, deployment snapshot binding, runtime injection, runtime cleanup/prune, and Redis
+bind/unbind reuse.
 
 ## Discover Findings
 
@@ -52,7 +54,7 @@ reuse.
 | ResourceBinding | Explicit Resource-to-DependencyResource contract. | Dependency Resources / Workload Delivery | dependency binding |
 | BindingTarget | Safe Resource-side exposure metadata such as env var name or profile label. | Dependency Resources | variable policy |
 | BindingReadinessSummary | Safe read-model statement of whether a binding is usable for future snapshot/runtime work. | Dependency Resources | readiness |
-| SnapshotReadinessSummary | Safe read-model statement that deployment snapshot materialization is deferred in this slice. | Release Orchestration | snapshot readiness |
+| SnapshotReadinessSummary | Safe read-model statement of whether the binding can be copied into a deployment snapshot and runtime injection snapshot. | Release Orchestration / Runtime Topology | snapshot readiness |
 
 ## Scenarios And Acceptance Criteria
 
@@ -68,7 +70,7 @@ reuse.
 | DEP-BIND-PG-DELETE-001 | Block Dependency Resource delete by active binding | Active binding references a Dependency Resource | `dependency-resources.delete` runs | Command returns `dependency_resource_delete_blocked` with a `resource-binding` blocker and no mutation. |
 | DEP-BIND-PG-DELETE-002 | Imported external unbind/delete behavior | Imported external Postgres was bound then unbound | Binding is removed and Dependency Resource delete runs | Appaloft removes only control-plane records; no provider/external database deletion is implied. |
 | DEP-BIND-PG-ENTRY-001 | Public operation catalog | Specs define binding operations | operation catalog/CLI/oRPC are inspected | Each operation has an explicit command/query key and no generic update operation. |
-| DEP-BIND-PG-SNAPSHOT-001 | Snapshot boundary is deferred | Resource has an active dependency binding | deployment snapshot creation or read-model summary is inspected | Raw secrets are not written to snapshots; binding snapshot materialization is reported as deferred. |
+| DEP-BIND-PG-SNAPSHOT-001 | Snapshot boundary is safe | Resource has an active dependency binding | deployment snapshot creation or read-model summary is inspected | Raw secrets are not written to snapshots; later snapshot/reference slices capture safe binding references and runtime injection readiness. |
 
 ## Domain Ownership
 
@@ -82,20 +84,24 @@ reuse.
     dependency binding state inside the Resource aggregate.
 - Upstream/downstream contexts:
   - Workspace provides project/environment ownership.
-  - Release Orchestration may later snapshot safe binding references without raw secrets.
-  - Runtime/provider adapters may later inject environment variables or realize provider-native
-    databases under separate specs.
+  - Release Orchestration snapshots safe binding references without raw secrets through the
+    dependency binding snapshot-reference slice.
+  - Runtime target adapters consume safe dependency runtime injection snapshots through ADR-040 and
+    ADR-041; provider-native database realization remains governed by the Postgres/Redis provider
+    realization specs.
 
 ## Public Surfaces
 
 - API/oRPC: add Resource-scoped bind/unbind/list/show routes using application command/query
   schemas.
 - CLI: add Resource dependency binding subcommands.
-- Web/UI: deferred; Resource detail may later show read-only safe summaries with i18n/test coverage.
+- Web/UI: Resource detail exposes ready dependency selection, runtime env target binding, active
+  binding list, and unbind through shared Resource-scoped commands with i18n and tests. Broader
+  dependency administration remains a later Web slice.
 - Config: no repository config fields in this slice.
 - Events: internal domain events for bind/unbind; no integration events.
-- Public docs/help: record Phase 7 docs migration gap unless a Docs Round expands public docs in
-  this PR.
+- Public docs/help: dependency bind-to-deploy behavior is covered by the later public docs/help
+  slice.
 - Future MCP/tools: one operation per command/query.
 
 ## Output Contracts
@@ -110,7 +116,8 @@ summaries:
   pointer when present;
 - masked connection summary from the Dependency Resource read model;
 - binding readiness summary;
-- snapshot readiness summary, with deferred reason in this slice;
+- snapshot readiness summary and runtime injection readiness from later snapshot/runtime injection
+  slices;
 - created/removed timestamps.
 
 Outputs must not include raw passwords, tokens, auth headers, cookies, SSH credentials, provider
@@ -120,13 +127,15 @@ tokens, private keys, sensitive query parameters, raw connection URLs, or raw en
 
 - No secret rotation.
 - No backup/restore.
-- No Redis.
-- No provider-native database realization.
-- No runtime env injection, redeploy, retry, rollback, or cleanup/prune.
+- No provider-native database realization in this baseline slice.
+- No runtime env injection in the original baseline slice; later runtime-injection slices govern
+  safe env delivery and blocked-readiness admission.
+- No redeploy, retry, rollback, or cleanup/prune.
 - No mutation of historical deployment snapshots.
-- No Web UI beyond a later read-only safe summary.
+- No standalone Web UI owned by this baseline artifact beyond the later Resource detail/docs
+  surfaces.
 
 ## Open Questions
 
-- Whether Resource delete/archive should surface dependency binding blockers in this slice is
-  implementation-dependent. If not implemented now, it remains a documented Phase 7 gap.
+- Whether future provider-native credential rotation should be coordinated with binding secret
+  rotation or remain provider-specific.

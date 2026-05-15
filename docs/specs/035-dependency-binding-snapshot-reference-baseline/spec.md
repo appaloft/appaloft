@@ -14,18 +14,20 @@ Operators who bind a Postgres or imported Redis dependency resource to a Resourc
 later deployment attempt recognized the binding and recorded safe dependency binding references in
 the immutable deployment snapshot.
 
-The snapshot reference baseline must help users inspect "this deployment knew about this dependency
-binding" without exposing raw connection secrets, materialized environment values, or implying that
-runtime environment injection is implemented.
+The snapshot reference baseline helps users inspect "this deployment knew about this dependency
+binding" without exposing raw connection secrets or materialized environment values. Later ADR-040
+and ADR-041 runtime-injection slices use the same safe references for readiness and secret-handle
+delivery.
 
 This first slice established provider-neutral binding snapshot references that later runtime env
-injection, secret rotation, backup/restore, and provider-native database realization can reuse.
+injection, secret rotation, backup/restore, and provider-native database realization reuse.
 
 ## Discover Findings
 
 1. `ResourceBinding` is already the canonical write-side association between a Resource and a
-   Dependency Resource. It stores provider-neutral safe metadata and explicitly keeps runtime env
-   injection and deployment snapshot materialization out of the first binding slice.
+   Dependency Resource. It stores provider-neutral safe metadata; this snapshot-reference slice and
+   later runtime-injection slices extend the first binding baseline without rewriting that
+   aggregate boundary.
 2. ADR-012 and ADR-014 already define the deployment snapshot boundary: `deployments.create`
    consumes Resource-owned profile state and persists immutable attempt context. This slice fits
    that boundary by copying safe binding references into the deployment attempt snapshot.
@@ -69,11 +71,12 @@ injection, secret rotation, backup/restore, and provider-native database realiza
 - Aggregate/resource owner:
   - `ResourceBinding` owns current binding lifecycle and target metadata.
   - `Deployment` owns the immutable copied binding references for one attempt.
-  - Runtime adapters do not own binding admission or secret materialization in this slice.
+  - Runtime adapters do not own binding admission in this slice; later runtime-injection slices own
+    safe secret delivery through runtime target ports.
 - Upstream/downstream contexts:
   - Dependency Resources supplies active safe binding summaries.
   - Release Orchestration snapshots safe references during deployment admission.
-  - Runtime/provider adapters later consume explicit runtime injection specs, not this slice.
+  - Runtime/provider adapters consume explicit runtime injection specs, not this slice alone.
 
 ## Public Surfaces
 
@@ -85,7 +88,8 @@ injection, secret rotation, backup/restore, and provider-native database realiza
   required in this slice.
 - Config: no repository config fields.
 - Events: no new domain or integration events.
-- Public docs/help: record Phase 7 docs migration gap unless a Docs Round expands public pages.
+- Public docs/help: later public docs/help slices describe safe bind-to-deploy behavior and blocked
+  runtime injection readiness.
 - Future MCP/tools: future tools should reuse `deployments.plan` and `deployments.show` schemas.
 
 ## Output Contracts
@@ -112,13 +116,15 @@ They must not expose:
 
 ## Non-Goals
 
-- No runtime env injection.
-- No raw secret materialization.
+- No runtime env injection in the original snapshot-reference slice; ADR-040/041 govern safe
+  runtime injection and store-backed secret resolution.
+- No raw secret materialization in deployment snapshots, read models, logs, events, errors, or
+  public contracts.
 - No secret rotation.
 - No backup/restore.
-- No runtime delivery of Redis bindings; safe imported Redis references are covered by
-  [Redis Dependency Resource Lifecycle](../037-redis-dependency-resource-lifecycle/spec.md).
-- No provider-native database realization.
+- Runtime delivery of imported Redis bindings is governed by ADR-040/041 and the Redis
+  provider-native realization slices.
+- No provider-native database realization in this snapshot-reference slice.
 - No deployment retry/redeploy/rollback.
 - No runtime cleanup/prune.
 - No Web write UI.

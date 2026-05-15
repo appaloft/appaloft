@@ -45,7 +45,10 @@
 - [x] Reuse CLI Redis provision/delete/bind commands.
 - [x] Reuse oRPC/HTTP Redis provision/delete/bind routes.
 - [x] Keep operation catalog entries aligned with schema reuse.
-- [x] Update public docs/help anchors or record explicit Web/public-docs migration gaps.
+- [x] Update public docs/help anchors and record Resource-detail Web provision, import,
+      rename/delete, backup create/list/acknowledged restore, bind/unbind coverage plus remaining
+      scheduled backup policy, backup prune/delete, export/download, and cross-resource restore Web
+      follow-up.
 
 ## Verification
 

@@ -11,6 +11,7 @@ import {
   ResourceStorageMountModeValue,
   StorageDestinationPath,
   StorageVolumeId,
+  StorageVolumeKindValue,
   UpdatedAt,
 } from "../src";
 
@@ -32,6 +33,7 @@ describe("Resource storage attachments", () => {
     const result = resource.attachStorage({
       attachmentId: ResourceStorageAttachmentId.rehydrate("rsa_demo"),
       storageVolumeId: StorageVolumeId.rehydrate("stv_demo"),
+      storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
       destinationPath: StorageDestinationPath.create("/data")._unsafeUnwrap(),
       mountMode: ResourceStorageMountModeValue.rehydrate("read-write"),
       attachedAt: CreatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
@@ -49,6 +51,7 @@ describe("Resource storage attachments", () => {
       .attachStorage({
         attachmentId: ResourceStorageAttachmentId.rehydrate("rsa_one"),
         storageVolumeId: StorageVolumeId.rehydrate("stv_one"),
+        storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
         destinationPath,
         mountMode: ResourceStorageMountModeValue.rehydrate("read-write"),
         attachedAt: CreatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
@@ -58,6 +61,7 @@ describe("Resource storage attachments", () => {
     const duplicate = resource.attachStorage({
       attachmentId: ResourceStorageAttachmentId.rehydrate("rsa_two"),
       storageVolumeId: StorageVolumeId.rehydrate("stv_two"),
+      storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
       destinationPath,
       mountMode: ResourceStorageMountModeValue.rehydrate("read-only"),
       attachedAt: CreatedAt.rehydrate("2026-01-01T00:02:00.000Z"),
@@ -81,6 +85,7 @@ describe("Resource storage attachments", () => {
       .attachStorage({
         attachmentId,
         storageVolumeId: StorageVolumeId.rehydrate("stv_demo"),
+        storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
         destinationPath: StorageDestinationPath.create("/data")._unsafeUnwrap(),
         mountMode: ResourceStorageMountModeValue.rehydrate("read-write"),
         attachedAt: CreatedAt.rehydrate("2026-01-01T00:01:00.000Z"),

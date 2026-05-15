@@ -17,6 +17,7 @@ relatedOperations:
   - storage-volumes.show
   - storage-volumes.rename
   - storage-volumes.delete
+  - storage-volumes.cleanup-runtime
   - resources.attach-storage
   - resources.detach-storage
 sidebar:
@@ -63,8 +64,29 @@ delete provider runtime volumes, remove backup data, or rewrite historical deplo
 If delete is blocked, inspect the attachment summary in `storage-volumes.show`, then explicitly
 detach the affected Resource.
 
+Runtime volume cleanup is a separate dry-run-first operation, `storage-volumes.cleanup-runtime`.
+Start with:
+
+```bash title="Preview runtime cleanup"
+appaloft storage volume cleanup-runtime vol_uploads --server srv_primary --before 2026-01-01T00:00:00.000Z
+```
+
+Destructive cleanup requires `--dry-run false`. The current implementation inspects only the
+selected Appaloft-owned Docker named volume on a local-shell or generic-SSH server, and preserves
+candidates with active runtime, attachment, snapshot, rollback candidate, backup retention, or
+in-flight backup/restore safety evidence. It does not delete bind-mount source paths,
+provider-native storage handles, backup data, or broad Docker prune targets, and it must not be
+triggered implicitly by `storage-volumes.delete` or folded into `servers.capacity.prune`. Docker
+Swarm Compose stack storage mount realization happens during deployment execution: Appaloft renders
+a stack override for Compose workloads with explicit target service metadata, deploys a candidate
+stack, verifies it, then cleans superseded Appaloft stacks/services.
+
 <h2 id="storage-volume-surfaces">Entrypoint differences</h2>
 
 The CLI fits create, inspect, rename, delete, attach, and detach workflows. The HTTP API uses the
-same command/query schemas. Web write controls are deferred; Resource detail can show safe storage
-attachment summaries.
+same command/query schemas. Web Resource detail includes a Storage section that lists available
+storage volumes for the current project/environment, shows safe attachment summaries, creates,
+renames, and deletes provider-neutral storage volume records, and can attach or detach storage from
+the Resource profile. Web can also run dry-run-first runtime cleanup for one storage volume on one
+server: it previews candidates and blockers first, then sends destructive cleanup only after
+confirmation. Web still does not provider-provision storage volumes or run broad Docker prune.

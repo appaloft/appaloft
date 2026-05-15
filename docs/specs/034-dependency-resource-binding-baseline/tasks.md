@@ -40,7 +40,8 @@
 
 - [x] Add CLI Resource dependency binding commands.
 - [x] Add oRPC/HTTP procedures/routes.
-- [x] Record Web/public-docs migration gap.
+- [x] Record initial Web/public-docs handoff; later Web/docs slices closed Resource-detail and
+  public bind-to-deploy documentation coverage.
 
 ## Verification
 

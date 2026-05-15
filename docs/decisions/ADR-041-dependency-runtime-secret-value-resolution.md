@@ -41,13 +41,14 @@ intent and diagnostics.
 ## Context
 
 ADR-040 made bound dependencies injectable and added safe runtime secret references to deployment
-snapshots. That closes admission/readiness for safe handles, but it does not resolve
-`appaloft://...` or `appaloft+pg://...` references into actual connection values for the workload.
-Imported dependencies currently derive a safe connection secret reference from the dependency
-resource id, while binding secret rotation persists binding-scoped values in a separate table. The
-Postgres and Redis closed-loop release criteria remain open until a workload can receive the actual
-database/Redis connection value without the operator editing server files or passing secrets to
-`deployments.create`.
+snapshots. ADR-041 closes the remaining boundary for resolving `appaloft://...` or
+`appaloft+pg://...` references into actual connection values for workload execution without adding
+dependency fields to `deployments.create`. Imported dependencies and provider-native realization
+store safe connection secret references through the dependency resource secret store, while binding
+secret rotation persists binding-scoped values for historical snapshot resolution. Postgres and
+Redis closed-loop verification is now covered by the dependency resource test matrix and proves that
+workloads can receive the actual database/Redis connection value without the operator editing server
+files or passing secrets to `deployments.create`.
 
 ## Consequences
 

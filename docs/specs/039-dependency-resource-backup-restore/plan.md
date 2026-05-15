@@ -34,7 +34,10 @@
 - Entrypoints:
   - Added operation catalog entries during Code Round.
   - Added CLI and oRPC/HTTP dispatch using command/query schemas.
-  - Kept Web/public docs as an explicit migration gap.
+  - Added Resource-detail Web backup create, safe restore-point list, and acknowledged in-place
+    restore controls.
+  - Added task-oriented public docs/help coverage for backup/restore under
+    `dependency.backup-restore`.
 
 ## Roadmap And Compatibility
 
@@ -57,12 +60,21 @@
   - CLI/oRPC/HTTP route dispatch tests for all four operations.
   - Operation catalog boundary tests for explicit commands/queries and no generic backup mutation.
 
-## Risks And Migration Gaps
+## Risks And Governed Follow-Ups
 
-- Durable outbox/inbox and background worker retry are global migration gaps. The first Code Round
-  uses synchronous hermetic provider execution while preserving attempt state and events.
+- Durable outbox/inbox and background worker retry are governed separately. The active Code Round
+  uses shell-local provider backup/restore artifact materialization while preserving attempt state
+  and events, and consumes process-attempt pending/claim/completion handoff when a process journal
+  is available. Shell backup/restore now executes native Postgres dump/restore commands and native
+  Redis logical dump/restore commands when an imported dependency resource has a resolvable
+  Appaloft-owned connection ref; unresolved and provider-owned references stay on the safe
+  metadata-only path. Provider-specific Redis snapshot substrates remain governed follow-up work
+  for providers that need snapshot-native restore semantics beyond the shell logical path.
 - Restore is destructive provider work. The command must require explicit acknowledgements and must
   not restart workloads or imply app-level consistency.
 - Backup/restore support depends on provider capabilities for each dependency kind. Unsupported
   providers must fail admission with stable structured errors.
-- Web/public documentation affordances remain a migration gap for a later Docs/Web round.
+- Web backup/restore write affordances are active on Resource detail for backup create, safe
+  restore-point list, and acknowledged in-place restore. Scheduled backup policy, backup
+  prune/delete, export/download, cross-resource restore, and automatic retry execution are separate
+  governed extensions.

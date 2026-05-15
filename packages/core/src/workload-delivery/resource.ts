@@ -83,7 +83,13 @@ import {
   type ResourceSourceBindingState,
   type SourceBindingFingerprint,
 } from "./source-binding";
-import { type ResourceStorageMountModeValue, type StorageDestinationPath } from "./storage-volume";
+import {
+  type ResourceStorageMountModeValue,
+  type StorageBindSourcePath,
+  type StorageDestinationPath,
+  type StorageVolumeKind,
+  type StorageVolumeKindValue,
+} from "./storage-volume";
 
 export interface ResourceServiceState {
   name: ResourceServiceName;
@@ -162,6 +168,15 @@ export interface ResourceDeploymentAccessContext {
   pathPrefix?: string;
 }
 
+export interface ResourceDeploymentStorageMount {
+  attachmentId: string;
+  storageVolumeId: string;
+  storageVolumeKind: StorageVolumeKind;
+  sourcePath?: string;
+  destinationPath: string;
+  mountMode: "read-write" | "read-only";
+}
+
 export interface ResourceDeploymentProfile {
   method: RuntimePlanStrategy;
   installCommand?: string;
@@ -178,6 +193,7 @@ export interface ResourceDeploymentProfile {
   upstreamProtocol?: ResourceNetworkProtocol;
   accessContext?: ResourceDeploymentAccessContext;
   runtimeMetadata?: Record<string, string>;
+  storageMounts?: ResourceDeploymentStorageMount[];
 }
 
 export interface ResourceDeploymentSourceDescriptor {
@@ -427,6 +443,8 @@ export interface ResourceAccessProfileState {
 export interface ResourceStorageAttachmentState {
   id: ResourceStorageAttachmentId;
   storageVolumeId: StorageVolumeId;
+  storageVolumeKind: StorageVolumeKindValue;
+  sourcePath?: StorageBindSourcePath;
   destinationPath: StorageDestinationPath;
   mountMode: ResourceStorageMountModeValue;
   attachedAt: CreatedAt;
@@ -1064,6 +1082,8 @@ export class Resource extends AggregateRoot<ResourceState> {
   attachStorage(input: {
     attachmentId: ResourceStorageAttachmentId;
     storageVolumeId: StorageVolumeId;
+    storageVolumeKind: StorageVolumeKindValue;
+    sourcePath?: StorageBindSourcePath;
     destinationPath: StorageDestinationPath;
     mountMode: ResourceStorageMountModeValue;
     attachedAt: CreatedAt;
@@ -1087,11 +1107,34 @@ export class Resource extends AggregateRoot<ResourceState> {
       );
     }
 
+    if (input.storageVolumeKind.isBindMount() && !input.sourcePath) {
+      return err(
+        domainError.validation("Bind mount storage attachments require sourcePath", {
+          phase: "resource-storage-attachment",
+          resourceId: this.state.id.value,
+          storageVolumeId: input.storageVolumeId.value,
+          field: "sourcePath",
+        }),
+      );
+    }
+    if (!input.storageVolumeKind.isBindMount() && input.sourcePath) {
+      return err(
+        domainError.validation("Named storage attachments must not include sourcePath", {
+          phase: "resource-storage-attachment",
+          resourceId: this.state.id.value,
+          storageVolumeId: input.storageVolumeId.value,
+          field: "sourcePath",
+        }),
+      );
+    }
+
     this.state.storageAttachments = [
       ...this.state.storageAttachments,
       {
         id: input.attachmentId,
         storageVolumeId: input.storageVolumeId,
+        storageVolumeKind: input.storageVolumeKind,
+        ...(input.sourcePath ? { sourcePath: input.sourcePath } : {}),
         destinationPath: input.destinationPath,
         mountMode: input.mountMode,
         attachedAt: input.attachedAt,
@@ -1104,6 +1147,8 @@ export class Resource extends AggregateRoot<ResourceState> {
       environmentId: this.state.environmentId.value,
       attachmentId: input.attachmentId.value,
       storageVolumeId: input.storageVolumeId.value,
+      storageVolumeKind: input.storageVolumeKind.value,
+      ...(input.sourcePath ? { sourcePath: input.sourcePath.value } : {}),
       destinationPath: input.destinationPath.value,
       mountMode: input.mountMode.value,
       attachedAt: input.attachedAt.value,
@@ -1334,6 +1379,18 @@ export class Resource extends AggregateRoot<ResourceState> {
         : {}),
       ...(runtimeProfile?.healthCheck
         ? { healthCheck: deploymentHealthCheckFromPolicy(runtimeProfile.healthCheck) }
+        : {}),
+      ...(this.state.storageAttachments.length > 0
+        ? {
+            storageMounts: this.state.storageAttachments.map((attachment) => ({
+              attachmentId: attachment.id.value,
+              storageVolumeId: attachment.storageVolumeId.value,
+              storageVolumeKind: attachment.storageVolumeKind.value,
+              ...(attachment.sourcePath ? { sourcePath: attachment.sourcePath.value } : {}),
+              destinationPath: attachment.destinationPath.value,
+              mountMode: attachment.mountMode.value,
+            })),
+          }
         : {}),
     });
   }

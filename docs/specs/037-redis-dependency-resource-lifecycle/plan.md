@@ -38,8 +38,8 @@
   - Add oRPC/HTTP provision/import routes.
   - Reuse existing dependency list/show/rename/delete entrypoints.
 - Runtime/provider impact:
-  - Do not call provider-native Redis APIs.
-  - Do not inject runtime env or mutate deployments.
+  - The original baseline does not call provider-native Redis APIs, inject runtime env, or mutate
+    deployments; later provider-native realization and runtime-injection specs govern those paths.
 
 ## Roadmap And Compatibility
 
@@ -69,9 +69,14 @@
 - Contract/integration/unit:
   - Core unit tests, application integration tests, PG/PGlite tests, contracts, CLI and oRPC tests.
 
-## Risks And Migration Gaps
+## Risks And Later Slice Handoffs
 
-- Runtime env injection remains deferred; Redis records are safe control-plane resources only.
-- Provider-native Redis creation/deletion remains deferred.
-- Redis binding semantics may need additional target defaults and readiness checks later.
-- Backup/restore remains metadata-only until a future backup lifecycle slice.
+- Runtime env injection is governed by
+  [Dependency Binding Runtime Injection](../047-dependency-binding-runtime-injection/spec.md) and
+  [Dependency Runtime Secret Value Resolution](../048-dependency-runtime-secret-value-resolution/spec.md).
+- Provider-native Redis creation/deletion is governed by
+  [Redis Provider-Native Realization](../049-redis-provider-native-realization/spec.md).
+- Redis binding target defaults and provider-specific credential/TLS delivery remain future
+  provider/runtime slices.
+- Backup/restore is governed by
+  [Dependency Resource Backup And Restore](../039-dependency-resource-backup-restore/spec.md).

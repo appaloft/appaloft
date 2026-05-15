@@ -27,14 +27,19 @@
   - Read-your-own-write is expected inside one command/query process after persistence.
 - Entrypoint impact:
   - CLI and oRPC/HTTP dispatch through CommandBus/QueryBus using shared application schemas.
-  - Web remains read-only/deferred unless existing Resource detail consumes the new field.
+  - Web Resource detail settings exposes storage attachment readback plus attach/detach controls
+    and storage volume create/rename/delete management over the same oRPC client methods. It does
+    not expose provider-native upfront volume provisioning. Runtime cleanup is exposed by the later
+    `docs/specs/070-storage-volume-runtime-realization-and-cleanup/` slice as a separate
+    dry-run-first operation.
 - Persistence/migration impact:
   - Add storage volume durable state and attachment durable state in `packages/persistence/pg`.
   - PGlite and PostgreSQL use the same Kysely migrations.
 - Deployment snapshot impact:
-  - Future deployment snapshot materialization may carry immutable mount metadata derived from
-    resource storage attachments.
-  - This slice should avoid provider-native provisioning and avoid adding deployment command fields.
+  - Deployment snapshot materialization carries immutable mount metadata derived from Resource
+    storage attachments.
+  - Storage lifecycle commands avoid provider-native upfront provisioning and avoid adding
+    deployment command fields.
 
 ## Roadmap And Compatibility
 
@@ -64,11 +69,18 @@
 - Acceptance/e2e:
   - Not required beyond focused CLI/HTTP dispatch in this slice.
 - Public docs:
-  - Docs registry coverage must either link stable anchors or record explicit migration gaps.
+  - Docs registry coverage links stable anchors or records governed not-applicable/follow-up
+    decisions.
 
-## Risks And Migration Gaps
+## Risks And Governed Follow-Ups
 
-- Web write affordances are deferred unless the Code Round includes i18n and Web tests.
-- Backup/restore is metadata-only; actual backup execution remains Phase 7 future work.
-- Provider-native Docker/Compose/Swarm realization is deferred; mount metadata is provider-neutral.
-- Runtime cleanup/prune remains out of scope.
+- Web storage-volume create/rename/delete management and the Resource detail attachment surface are
+  implemented with i18n and source-level Web tests.
+- Storage-volume backup/restore remains a separate governed extension. Dependency-resource
+  backup/restore is handled by `docs/specs/039-dependency-resource-backup-restore/`.
+- Docker, Docker Compose, Docker Swarm image-service, and Docker Swarm Compose stack runtime
+  realization now consume provider-neutral mount metadata during deployment execution through
+  `docs/specs/070-storage-volume-runtime-realization-and-cleanup/`.
+- Runtime cleanup/prune is handled by the explicit dry-run-first
+  `storage-volumes.cleanup-runtime` operation from the same 070 slice, not by
+  `storage-volumes.delete`.

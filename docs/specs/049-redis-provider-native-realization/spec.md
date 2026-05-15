@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Code Round
-- Artifact state: application realization, Docker-backed single-server shell capability, bind
-  admission, provider cleanup, runtime secret materialization, and verification coverage
-  implemented
+- Round: Code Round / Post-Implementation Sync
+- Artifact state: implemented with application realization, bind admission, provider cleanup,
+  Docker-backed single-server shell capability, persistence, contract, runtime injection, runtime
+  secret materialization, and closed-loop verification
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, semantic upgrade to managed Redis lifecycle
 - Decision state: no-ADR-needed; this reuses ADR-025, ADR-026, ADR-036, ADR-040, and ADR-041
@@ -92,14 +92,15 @@ single-server target when the command supplies `serverId`.
   Docker-backed single-server target; keep `appaloft resource dependency bind` and
   `appaloft dependency delete`.
 - Web/UI: `/dependency-resources` can create Docker-backed managed Redis on a selected
-  single-server target and expose safe backup/restore/delete actions through existing HTTP/oRPC
-  contracts.
+  single-server target and expose dependency rename/delete, backup create/list/acknowledged
+  restore, scheduled backup policy, and Resource dependency bind/unbind affordances through
+  existing HTTP/oRPC contracts.
 - Config: no repository config fields.
 - Events: reuse provider-safe dependency realization lifecycle events. Consumers resolve kind from
   the dependency resource id/read model unless a Code Round explicitly extends the event payload.
-- Public docs/help: the Web page and CLI/API descriptions continue to point at the stable
-  dependency resource lifecycle help anchor.
-- Future MCP/tools: reuse the existing one-operation-per-command catalog entries.
+- Public docs/help: covered by the `dependency.resource-lifecycle` public docs topic and stable
+  help anchor.
+- MCP/tools: generated descriptors reuse the existing one-operation-per-command catalog entries.
 
 ## Output Contracts
 
@@ -139,7 +140,7 @@ attempt id, and sanitized provider error classification.
 ## Non-Goals
 
 - No provider-native Redis credential rotation.
-- No scheduled backup policy, backup prune/delete, dump export, or cross-resource restore.
+- No backup prune/delete, dump export, or cross-resource restore.
 - No build-time dependency injection.
 - No dependency-specific fields on `deployments.create`.
 - No runtime cleanup/prune.
@@ -148,9 +149,8 @@ attempt id, and sanitized provider error classification.
 
 ## Open Questions
 
-- Whether the first Code Round uses the same generic managed provider port as Postgres or a
-  Redis-specific sibling port is an implementation choice, but the application boundary must remain
-  provider-SDK-free.
 - The shell provider keeps a hermetic fallback when no `serverId` is supplied so existing local
-  development flows remain stable. Durable outbox/process ownership remains a platform migration
-  gap.
+  development flows remain stable. It materializes safe local Redis realization/delete artifacts
+  under the configured Appaloft data directory. External provider onboarding and real
+  infrastructure smoke tests remain release enablement gates, but they must preserve the same safe
+  capability contract, delete safety, secret handling, and read-model redaction rules.

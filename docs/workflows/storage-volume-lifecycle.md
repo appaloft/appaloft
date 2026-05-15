@@ -3,7 +3,7 @@
 ## Normative Contract
 
 Storage Volume Lifecycle is the provider-neutral workflow for managing durable storage and attaching
-it to Resources for future deployments.
+it to Resources for deployment snapshot materialization.
 
 It is not provider-native Docker volume provisioning, not backup/restore, not runtime cleanup, and
 not a deployment command. Every mutation must dispatch one explicit operation:
@@ -29,8 +29,10 @@ read surface.
 - [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
+- [ADR-064: Storage Volume Runtime Realization And Cleanup](../decisions/ADR-064-storage-volume-runtime-realization-and-cleanup.md)
 - [Storage Volume Test Matrix](../testing/storage-volume-test-matrix.md)
 - [Storage Volume Lifecycle And Resource Attachment](../specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md)
+- [Storage Volume Runtime Realization And Cleanup](../specs/070-storage-volume-runtime-realization-and-cleanup/spec.md)
 - [Resource Profile Lifecycle](./resource-profile-lifecycle.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -94,13 +96,32 @@ backups, prune runtime state, or remove provider-native volumes.
 
 ## Deployment Relationship
 
-Storage attachments affect future deployment planning only. When a future deployment snapshot is
-materialized, it may include immutable provider-neutral mount metadata derived from current
-Resource storage attachments.
+Storage attachments affect deployment planning only. When a deployment snapshot is materialized, it
+may include immutable provider-neutral mount metadata derived from current Resource storage
+attachments.
 
 `deployments.create` must not accept storage volume, bind mount, or destination path fields. Entry
 workflows that want storage must first dispatch storage/resource attachment operations, then create
 a deployment from ids-only context.
+
+## Runtime Realization And Cleanup
+
+Storage runtime realization is deployment-driven by default. `storage-volumes.create` records
+provider-neutral control-plane state only. When a deployment snapshot includes storage mount
+metadata, the selected runtime target adapter may realize the concrete Docker/Compose/Swarm
+image-service or Swarm Compose stack mount as part of deployment execution. Swarm Compose stack
+realization requires explicit target service metadata and uses a generated Appaloft override during
+`docker stack deploy`; it does not change `storage-volumes.create` semantics.
+
+Runtime volume cleanup is governed by ADR-064 and the `storage-volumes.cleanup-runtime` command.
+Cleanup must be dry-run-first, storage-volume plus server scoped, and must preserve active
+attachments, active runtimes, retained deployment snapshots, rollback candidates, backup/restore
+blockers, Appaloft state roots, and bind mount source paths. Cleanup safety reads storage backup
+retention and in-flight backup/restore evidence through an application safety reader; the default
+shell implementation reports no such work until storage backup/restore exists. The first runtime
+implementation covers local-shell and generic-SSH Docker named-volume inspection/cleanup. It must
+not run through `servers.capacity.prune`, and it must not be implied by
+`storage-volumes.delete`.
 
 ## Entrypoints
 
@@ -108,14 +129,23 @@ a deployment from ids-only context.
 | --- | --- |
 | CLI | Separate `appaloft storage volume ...` and `appaloft resource storage attach/detach` commands. No generic `storage update`. |
 | oRPC / HTTP | Routes reuse command/query schemas and dispatch through bus. |
-| Web | May read `resources.show.storageAttachments`; write UI is deferred unless implemented with i18n and tests. |
-| Automation / MCP | Future tools map one-to-one to operation keys. |
+| Web | Resource detail Storage section reads `resources.show.storageAttachments`, lists project/environment storage volumes through `storage-volumes.list`, dispatches `storage-volumes.create/rename/delete`, dispatches `resources.attach-storage` / `resources.detach-storage`, and exposes `storage-volumes.cleanup-runtime` as a dry-run-first server-scoped control with destructive confirmation. |
+| Automation / MCP | Generated tool descriptors map one-to-one to operation keys. |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 This Code Round adds the provider-neutral storage volume lifecycle and Resource storage attachment
-baseline. Provider-native volume realization, backup/restore, Docker Swarm realization, and runtime
-cleanup are future work.
+baseline. Web Resource detail can create/rename/delete provider-neutral storage volume records,
+attach/detach storage volumes to/from the Resource profile, and observe delete blockers through
+shared command errors. Provider-native upfront provisioning through `storage-volumes.create` is
+intentionally not part of v1; deployment execution is the default runtime realization point.
+Resource detail Web also exposes the explicit runtime cleanup command as dry-run-first maintenance
+control for one StorageVolume on one server. Storage backup/restore, provider-native storage
+handles, and bind-mount path cleanup are later governed provider/storage extensions, not implicit
+`storage-volumes.create` behavior. GitHub Actions/local explicit Swarm and storage-cleanup gates
+cover generated overrides, named-volume creation, route reachability, dry-run-first cleanup, and
+scoped destructive cleanup without making those target-mutating proofs part of default local checks.
+Storage backup/restore cleanup blockers are wired as a safety seam for those later operations.
 
 ## Open Questions
 

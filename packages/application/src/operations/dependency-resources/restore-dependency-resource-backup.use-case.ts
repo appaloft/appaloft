@@ -27,11 +27,21 @@ import {
   type DependencyResourceSecretStore,
   type EventBus,
   type IdGenerator,
+  type ProcessAttemptClaimer,
+  type ProcessAttemptCompleter,
   type ProcessAttemptRecorder,
 } from "../../ports";
-import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
+import {
+  EmptyProcessAttemptClaimer,
+  EmptyProcessAttemptCompleter,
+  NoopProcessAttemptRecorder,
+} from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
+import {
+  dependencyResourceProviderConnectionContext,
+  dependencyResourceProviderResourceHandle,
+} from "./dependency-resource-provider-context";
 import { type RestoreDependencyResourceBackupCommandInput } from "./restore-dependency-resource-backup.command";
 
 const appaloftOwnedDependencySecretRefPrefix = "appaloft://dependency-resources/";
@@ -61,6 +71,10 @@ export class RestoreDependencyResourceBackupUseCase {
     private readonly logger: AppLogger,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.processAttemptClaimer)
+    private readonly processAttemptClaimer: ProcessAttemptClaimer = new EmptyProcessAttemptClaimer(),
+    @inject(tokens.processAttemptCompleter)
+    private readonly processAttemptCompleter: ProcessAttemptCompleter = new EmptyProcessAttemptCompleter(),
   ) {}
 
   async execute(
@@ -78,6 +92,8 @@ export class RestoreDependencyResourceBackupUseCase {
       idGenerator,
       logger,
       processAttemptRecorder,
+      processAttemptClaimer,
+      processAttemptCompleter,
     } = this;
 
     return safeTry(async function* () {
@@ -162,27 +178,40 @@ export class RestoreDependencyResourceBackupUseCase {
         backup,
         UpsertDependencyResourceBackupSpec.fromDependencyResourceBackup(backup),
       );
-      await recordRestoreProcessAttempt({
+      const claimResult = await claimRestoreProcessAttempt({
         recorder: processAttemptRecorder,
+        claimer: processAttemptClaimer,
+        completer: processAttemptCompleter,
         repositoryContext,
         context,
         backup,
         restoreAttemptId: restoreAttemptId.value,
+        claimedAt: requestedAt.value,
       });
+      if (claimResult.isErr()) {
+        return err(claimResult.error);
+      }
+      if (!claimResult.value.claimed) {
+        await recordRestoreProcessAttempt({
+          recorder: processAttemptRecorder,
+          repositoryContext,
+          context,
+          backup,
+          restoreAttemptId: restoreAttemptId.value,
+        });
+      }
       await publishDomainEventsAndReturn(context, eventBus, logger, backup, undefined);
 
+      const providerResourceHandle = dependencyResourceProviderResourceHandle(dependencyState);
+      const providerConnection = dependencyResourceProviderConnectionContext(dependencyState);
       const providerResult = await dependencyResourceBackupProvider.restoreBackup(context, {
         backupId: backupId.value,
         dependencyResourceId: backupState.dependencyResourceId.value,
         dependencyKind,
         providerKey: backupState.providerKey.value,
         providerArtifactHandle: providerArtifactHandle.value,
-        ...(dependencyState.providerRealization?.providerResourceHandle
-          ? {
-              providerResourceHandle:
-                dependencyState.providerRealization.providerResourceHandle.value,
-            }
-          : {}),
+        ...(providerResourceHandle ? { providerResourceHandle } : {}),
+        ...(providerConnection ? { connection: providerConnection } : {}),
         ...(connectionSecretValue?.isOk()
           ? { connectionSecretValue: connectionSecretValue.value.secretValue }
           : {}),
@@ -210,17 +239,173 @@ export class RestoreDependencyResourceBackupUseCase {
         backup,
         UpsertDependencyResourceBackupSpec.fromDependencyResourceBackup(backup),
       );
-      await recordRestoreProcessAttempt({
-        recorder: processAttemptRecorder,
-        repositoryContext,
-        context,
-        backup,
-        restoreAttemptId: restoreAttemptId.value,
-      });
+      if (claimResult.value.claimed) {
+        const completed = await completeRestoreProcessAttempt({
+          completer: processAttemptCompleter,
+          repositoryContext,
+          backup,
+          restoreAttemptId: restoreAttemptId.value,
+        });
+        if (completed.isErr()) {
+          return err(completed.error);
+        }
+      } else {
+        await recordRestoreProcessAttempt({
+          recorder: processAttemptRecorder,
+          repositoryContext,
+          context,
+          backup,
+          restoreAttemptId: restoreAttemptId.value,
+        });
+      }
       await publishDomainEventsAndReturn(context, eventBus, logger, backup, undefined);
       return ok({ id: restoreAttemptId.value });
     });
   }
+}
+
+function processAttemptRecorderUsesAtomicClaim(input: {
+  claimer: ProcessAttemptClaimer;
+  completer: ProcessAttemptCompleter;
+}): boolean {
+  return (
+    !(input.claimer instanceof EmptyProcessAttemptClaimer) &&
+    !(input.completer instanceof EmptyProcessAttemptCompleter)
+  );
+}
+
+async function claimRestoreProcessAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  claimer: ProcessAttemptClaimer;
+  completer: ProcessAttemptCompleter;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  context: ExecutionContext;
+  backup: DependencyResourceBackup;
+  restoreAttemptId: string;
+  claimedAt: string;
+}): Promise<Result<{ claimed: boolean }>> {
+  if (
+    !processAttemptRecorderUsesAtomicClaim({
+      claimer: input.claimer,
+      completer: input.completer,
+    })
+  ) {
+    return ok({ claimed: false });
+  }
+
+  const state = input.backup.toState();
+  const restore = state.latestRestoreAttempt;
+  if (!restore || restore.attemptId.value !== input.restoreAttemptId) {
+    return ok({ claimed: false });
+  }
+
+  const recorded = await input.recorder.record(input.repositoryContext, {
+    id: restore.attemptId.value,
+    kind: "system",
+    status: "pending",
+    operationKey: "dependency-resources.restore-backup",
+    dedupeKey: `dependency-resource-restore:${state.dependencyResourceId.value}:${state.id.value}:${restore.attemptId.value}`,
+    correlationId: input.context.requestId,
+    requestId: input.context.requestId,
+    phase: "dependency-resource-restore",
+    step: restore.status.value,
+    projectId: state.projectId.value,
+    startedAt: restore.requestedAt.value,
+    updatedAt: restore.requestedAt.value,
+    nextActions: ["no-action"],
+    safeDetails: {
+      backupId: state.id.value,
+      dependencyResourceId: state.dependencyResourceId.value,
+      dependencyKind: state.dependencyKind.value,
+      providerKey: state.providerKey.value,
+      restoreAttemptId: restore.attemptId.value,
+    },
+  });
+  if (recorded.isErr()) {
+    return err(recorded.error);
+  }
+
+  const claimed = await input.claimer.claimDue(input.repositoryContext, {
+    attemptId: restore.attemptId.value,
+    workerId: "dependency-resource-restore-inline-provider",
+    claimedAt: input.claimedAt,
+    safeDetails: {
+      backupId: state.id.value,
+      dependencyResourceId: state.dependencyResourceId.value,
+      dependencyKind: state.dependencyKind.value,
+      providerKey: state.providerKey.value,
+      restoreAttemptId: restore.attemptId.value,
+    },
+  });
+  if (claimed.isErr()) {
+    return err(claimed.error);
+  }
+  if (claimed.value.status !== "claimed") {
+    return err(
+      domainError.conflict("Dependency resource restore process attempt could not be claimed", {
+        phase: "dependency-resource-restore",
+        backupId: state.id.value,
+        processAttemptId: restore.attemptId.value,
+        claimStatus: claimed.value.status,
+      }),
+    );
+  }
+
+  return ok({ claimed: true });
+}
+
+async function completeRestoreProcessAttempt(input: {
+  completer: ProcessAttemptCompleter;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  backup: DependencyResourceBackup;
+  restoreAttemptId: string;
+}): Promise<Result<void>> {
+  const state = input.backup.toState();
+  const restore = state.latestRestoreAttempt;
+  if (!restore || restore.attemptId.value !== input.restoreAttemptId) {
+    return ok(undefined);
+  }
+
+  const completedAt =
+    restore.completedAt?.value ?? restore.failedAt?.value ?? restore.requestedAt.value;
+  const status = restore.status.value === "completed" ? "succeeded" : "failed";
+  const completed = await input.completer.complete(input.repositoryContext, {
+    attemptId: restore.attemptId.value,
+    status,
+    completedAt,
+    phase: "dependency-resource-restore",
+    step: restore.status.value,
+    ...(restore.failureCode
+      ? {
+          errorCode: restore.failureCode.value,
+          errorCategory: "async-processing",
+          retriable: true,
+        }
+      : {}),
+    nextActions: status === "failed" ? ["diagnostic", "manual-review"] : ["no-action"],
+    safeDetails: {
+      backupId: state.id.value,
+      dependencyResourceId: state.dependencyResourceId.value,
+      dependencyKind: state.dependencyKind.value,
+      providerKey: state.providerKey.value,
+      restoreAttemptId: restore.attemptId.value,
+    },
+  });
+  if (completed.isErr()) {
+    return err(completed.error);
+  }
+  if (completed.value.status !== "completed") {
+    return err(
+      domainError.conflict("Dependency resource restore process attempt could not be completed", {
+        phase: "dependency-resource-restore",
+        backupId: state.id.value,
+        processAttemptId: restore.attemptId.value,
+        completionStatus: completed.value.status,
+      }),
+    );
+  }
+
+  return ok(undefined);
 }
 
 async function recordRestoreProcessAttempt(input: {

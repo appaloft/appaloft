@@ -8,7 +8,7 @@
 - Handler: `RotateResourceDependencyBindingSecretCommandHandler`
 - Use case: `RotateResourceDependencyBindingSecretUseCase`
 - Owner: `ResourceBinding`
-- Status: accepted candidate; not active until Code Round adds catalog, transport, and tests
+- Status: active
 
 ## Purpose
 
@@ -64,7 +64,8 @@ materialized environment values.
 - CLI: `appaloft resource dependency rotate-secret <resourceId> <bindingId>`
 - HTTP: `POST /api/resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations`
 - oRPC: route reuses `RotateResourceDependencyBindingSecretCommandInput`
-- Web: deferred
+- Web: Resource detail Settings dependency binding controls dispatch the same command and require
+  the historical-snapshot acknowledgement before submit.
 - Future MCP/tools: one tool maps to this command
 
 ## Explicit Non-Effects

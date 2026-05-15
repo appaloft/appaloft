@@ -5,7 +5,7 @@
 - Round: Code Round / Post-Implementation Sync
 - Artifact state: implemented and aligned
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
-- Compatibility impact: `pre-1.0-policy`, additive public CLI/API/oRPC capability
+- Compatibility impact: `pre-1.0-policy`, additive public CLI/API/oRPC/Web capability
 - Decision state: no-ADR-needed
 
 ## Business Outcome
@@ -14,10 +14,10 @@ Operators can rotate the secret reference used by one active Resource dependency
 unbinding the dependency, deleting the Dependency Resource, editing server files, or rewriting
 historical deployment snapshots.
 
-This slice closes the next explicit dependency-binding gap after provider-neutral Postgres
+This slice closes the next explicit dependency-binding gap after provider-neutral dependency
 bind/unbind and safe deployment snapshot references. It establishes binding-scoped credential
-versioning for future deployments while keeping provider-native database credential rotation,
-runtime environment injection, Redis, and backup/restore out of scope.
+versioning for future deployments while keeping provider-native database credential rotation and
+backup/restore out of scope.
 
 ## Discover Findings
 
@@ -55,7 +55,7 @@ runtime environment injection, Redis, and backup/restore out of scope.
 | DEP-BIND-ROTATE-003 | Reject unsafe secret input/output | Input tries to expose raw secret material through target name, read model, error, event, log, or snapshot output | Rotation command runs or read models are inspected | Raw passwords, tokens, auth headers, cookies, SSH credentials, provider tokens, private keys, sensitive query parameters, and materialized env values are absent. |
 | DEP-BIND-ROTATE-004 | Preserve immutable deployment snapshots | A deployment captured the previous binding reference | Binding secret is rotated and `deployments.show` reads the historical deployment | Historical deployment detail still reports the old safe snapshot reference and never rewrites it to the new secret ref. |
 | DEP-BIND-ROTATE-005 | Report latest binding secret metadata safely | Binding has been rotated | `resources.list-dependency-bindings` or `resources.show-dependency-binding` reads it | Output shows safe current rotation metadata and never returns raw secret material or previous plaintext. |
-| DEP-BIND-ROTATE-006 | Entry surfaces dispatch one explicit command | Operation catalog, CLI, and HTTP/oRPC expose rotation | Public entrypoint is inspected | Entrypoints dispatch `RotateResourceDependencyBindingSecretCommand`, reuse the command schema, and expose no generic update command. |
+| DEP-BIND-ROTATE-006 | Entry surfaces dispatch one explicit command | Operation catalog, CLI, HTTP/oRPC, and Web expose rotation | Public entrypoint is inspected | Entrypoints dispatch `RotateResourceDependencyBindingSecretCommand`, reuse the command schema, require explicit historical-snapshot acknowledgement on write surfaces, and expose no generic update command. |
 
 ## Domain Ownership
 
@@ -77,11 +77,12 @@ runtime environment injection, Redis, and backup/restore out of scope.
   application command schema.
 - CLI:
   `appaloft resource dependency rotate-secret <resourceId> <bindingId>`.
-- Web/UI: deferred to a later Web/Docs Round with i18n and tests.
+- Web/UI: Resource detail Settings dependency binding controls accept exactly one of a safe
+  `secretRef` or secret-bearing input, require the historical-snapshot acknowledgement, dispatch the
+  same command through the typed oRPC client, and use i18n text.
 - Config: no repository config fields.
 - Events: `resource-dependency-binding-secret-rotated` domain event after durable persistence.
-- Public docs/help: migration gap; CLI/API help exposes the operation, while task-oriented public
-  docs are deferred to a later Docs Round.
+- Public docs/help: covered by the dependency-resource lifecycle anchor and Web help registry.
 - Future MCP/tools: one operation for the explicit command, not a compound dependency update tool.
 
 ## Output Contracts
@@ -106,7 +107,6 @@ secret material, or materialized environment values.
 ## Non-Goals
 
 - No provider-native database password rotation.
-- No Redis binding rotation.
 - No runtime environment injection.
 - No runtime restart, redeploy, retry, rollback, or health proof.
 - No backup/restore.

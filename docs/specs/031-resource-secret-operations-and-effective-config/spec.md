@@ -73,4 +73,6 @@ webhook, or provider-native secret model.
 
 ## Open Questions
 
-- Full Web paste/import UI is deferred until a follow-up Web-focused Phase 7 slice.
+- Resource detail Web paste/import UI is active and dispatches the shared
+  `resources.import-variables` command; future Quick Deploy import affordances remain outside this
+  baseline.
