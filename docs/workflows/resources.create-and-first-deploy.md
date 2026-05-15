@@ -178,7 +178,7 @@ resources.create
 
 Compatibility use of `deployments.create.resource` must remain documented in migration notes until callers are migrated.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current deployment bootstrap can create resources during `deployments.create` admission.
 
@@ -206,17 +206,19 @@ state on the SSH target by default, while hosted/control-plane mode can map the 
 managed routing/domain/TLS commands. See
 [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md).
 
-Provider-backed disambiguation for slash-containing Git refs and typed runtime-profile fields for
-Dockerfile/Compose paths remain future work. Static publish directory is typed for the static
-strategy path.
+Provider-backed disambiguation for slash-containing Git refs is a separate governed
+source-resolution extension. Dockerfile path, Docker Compose file path, static publish directory,
+Docker build target, and workspace command fields are typed runtime-profile fields for the relevant
+strategies.
 
-First-class static site deployment is partially implemented: `resources.create` can persist a
-static-site source/runtime/network profile, `deployments.create` remains ids-only and resolves a
-static artifact intent, and the shared Quick Deploy workflow rows are covered by executable tests.
-Local/generic-SSH runtime backends now generate adapter-owned static-server Dockerfiles for image
-builds. Web QuickDeploy and CLI deploy now collect static draft fields and dispatch them through
-`resources.create`. Local Docker static smoke coverage now verifies generated nginx packaging and
-runtime health, and generic-SSH Docker static smoke coverage exists as an opt-in harness.
+First-class static site deployment is implemented for the shared Quick Deploy and first-deploy
+workflow: `resources.create` persists a static-site source/runtime/network profile,
+`deployments.create` remains ids-only and resolves a static artifact intent, and the shared Quick
+Deploy workflow rows are covered by executable tests. Local/generic-SSH runtime backends generate
+adapter-owned static-server Dockerfiles for image builds. Web QuickDeploy and CLI deploy collect
+static draft fields and dispatch them through `resources.create`. Local Docker static smoke coverage
+verifies generated nginx packaging and runtime health, and generic-SSH Docker static smoke coverage
+is bound to the GitHub Actions secret-gated plus local explicit SSH gate.
 
 Generated default access route display and route snapshot persistence are governed by
 [ADR-017](../decisions/ADR-017-default-access-domain-and-proxy-routing.md) and now surface through
@@ -227,9 +229,9 @@ Current Web project detail still needs a fuller ADR-013 alignment pass: resource
 the primary page body, project-level deployment actions should become secondary rollups or Quick
 Deploy entrypoints, and resource detail should own deployment history/actions.
 
-## Open Questions
+## Governed Follow-Ups
 
-- Resource source/runtime/network operation names are resolved as accepted candidates:
+- Resource source/runtime/network operation names are active:
   `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
-  Access profile configuration remains a separate future behavior governed by ADR-017 and the
+  Access profile configuration remains a separate governed behavior under ADR-017 and the
   routing/domain/TLS specs.

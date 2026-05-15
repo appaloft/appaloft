@@ -29,7 +29,8 @@
 
 - [x] Wire CLI help to `diagnostics.runtime-target-capacity`.
 - [x] Add oRPC route `POST /api/servers/{serverId}/capacity/prune`.
-- [x] Keep Web as future surface.
+- [x] Add Server detail Web Capacity controls with dry-run-first preview, explicit destructive
+  confirmation, and Monitor observation-window handoff.
 
 ## Verification
 
@@ -38,6 +39,7 @@
 - [x] Run lint for touched packages.
 - [x] Re-run focused application, persistence, runtime adapter, CLI, oRPC, docs-registry tests and
   touched package typecheck/lint after audit output wiring.
+- [x] Run focused Web source/WebView coverage for `RT-CAP-WEB-001`.
 
 ## Post-Implementation Sync
 

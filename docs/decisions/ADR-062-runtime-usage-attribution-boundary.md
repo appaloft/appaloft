@@ -135,7 +135,8 @@ implementation.
   application tests, a server-scope capacity-backed runtime adapter translator, and shell
   dependency registration. It is wired in the operation catalog, `CORE_OPERATIONS.md`, CLI,
   HTTP/oRPC, contracts, public diagnostics docs, and generated SDK operation metadata for the
-  read-only query. Web readback and future MCP/tool descriptors remain pending.
+  read-only query. Web readback, generated MCP/tool descriptors, and the read-only
+  `runtime_usage_inspect` MCP handler/server are implemented through the same query schema.
 - Project, environment, resource, and deployment scopes now resolve through read models to candidate
   current deployments and server capacity context. The query returns partial attribution instead of
   guessing totals when ownership evidence is incomplete.

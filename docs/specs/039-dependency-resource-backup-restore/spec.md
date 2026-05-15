@@ -3,9 +3,9 @@
 ## Status
 
 - Round: Code Round
-- Artifact state: implemented with Docker-backed managed Postgres/Redis shell capability and
-  hermetic external/fallback capability, safe provider execution context, and shell-local artifact
-  materialization
+- Artifact state: implemented with Docker-backed managed Postgres/Redis shell capability, hermetic
+  external/fallback capability, safe provider execution context, shell-local artifact materialization,
+  and shell-local realization/delete artifact materialization
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, additive dependency resource lifecycle commands and read
   models

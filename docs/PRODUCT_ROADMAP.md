@@ -201,9 +201,9 @@ Still blocking 1.0.0:
   complete.
 - [ ] Generated access, proxy preview, server-applied domains, and durable domain routes still need
   broader API/Web/CLI regression coverage.
-- [x] Dependency resources now cover Postgres/Redis provision/import/list/show/rename/delete,
-  resource binding, backup/restore, and opt-in scheduled backup policy surfaces. Remaining work is
-  prune/export automation, storage-volume parity, and broader provider catalog coverage.
+- [x] Dependency resources and bindings have Postgres/Redis provision/import, binding, backup/restore,
+  runtime injection, deletion-safety command coverage, and opt-in scheduled backup policy surfaces.
+  Remaining work is prune/export automation and broader provider catalog coverage.
 - [ ] Framework coverage is narrower than the target product catalog.
 - [x] Docker Swarm support is specified and implemented as the first cluster runtime target backend.
 - [ ] Durable outbox/inbox, job state, process attempts, dead-letter/retry state, remote-state
@@ -485,9 +485,10 @@ Already done:
   JavaScript/TypeScript/Python fixture catalog resource profiles resolve to Docker/OCI image plans,
   generated Dockerfiles, docker-container execution metadata, internal HTTP verification steps, and
   typed Docker build/run commands without adding framework-specific deployment input.
-- [x] Representative opt-in real local Docker fixture smoke proves at least one static/frontend
-  pair, one Node/server pair, and one Python/server pair can build, run, verify, and expose runtime
-  metadata from the same resource profile vocabulary before ids-only deployment admission.
+- [x] Representative GitHub Actions/local explicit real local Docker fixture smoke proves at least
+  one static/frontend pair, one Node/server pair, and one Python/server pair can build, run, verify,
+  and expose runtime metadata from the same resource profile vocabulary before ids-only deployment
+  admission.
 
 Required:
 - [x] Finish CLI migration to the shared Quick Deploy workflow program.
@@ -507,7 +508,8 @@ Required:
   package scripts.
 - [x] Harden Python support for FastAPI, Django, Flask, generic ASGI/WSGI apps, `uv`, Poetry, pip,
   and explicit start-command fallback.
-- [x] Add Spring Boot as the first named JVM web framework.
+- [x] Add Spring Boot as the first named JVM web framework and Quarkus Maven JVM jar mode as the
+  next deterministic JVM planner slice.
 - [x] Add framework-family matrix rows for detection, base image policy, install/build/start/package
   commands, artifact outputs, internal port behavior, unsupported evidence, and Web/CLI draft
   parity.
@@ -523,10 +525,13 @@ Required:
 Exit criteria:
 - [x] The zero-to-SSH loop works for at least: Next.js, Vite static SPA, Astro static, Nuxt
   generate, SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python, generic
-  Java, Dockerfile, Docker Compose, prebuilt image, and explicit custom commands.
-- [x] Opt-in real Docker framework fixture smoke covers a representative local slice:
-  Vite or Next static export plus Angular, React, or SvelteKit static, Next SSR or Remix plus a
-  Node HTTP framework, and FastAPI plus Django or Flask when dependency installation is available.
+  Java, Quarkus Maven, Dockerfile, Docker Compose, prebuilt image, and explicit custom commands.
+- [x] GitHub Actions/local explicit real Docker framework fixture smoke covers the active local slice:
+  Next static export, Vite, React, Vue, Svelte, Solid, Angular, Astro, Nuxt generate, and SvelteKit
+  static; Next SSR, Next standalone, Remix, Express, Fastify, NestJS, Hono, Koa, and generic Node;
+  and FastAPI, generic ASGI, generic WSGI, Poetry Flask, Django, Flask, explicit custom Python,
+  generic Java jar, Spring Boot Maven wrapper/no-wrapper, Quarkus Maven JVM jar mode, Spring Boot
+  Gradle, and explicit-start JVM when dependency installation is available.
 - [x] Unsupported frameworks fail with structured `validation_error` in `runtime-plan-resolution`
   unless explicit custom commands make a Docker/OCI image plan possible.
 - [x] Web and CLI can collect the same draft fields for source base directory, publish directory,
@@ -536,12 +541,12 @@ Exit criteria:
   Angular static SPA, Express/Fastify/NestJS/Hono/Koa, and generic package scripts to stable
   matrix ids, headless Docker/OCI fixture readiness tests, and `deployments.plan/v1` contract
   coverage.
-- [x] JVM/Spring Boot tested catalog closure binds Spring Boot Maven with wrapper, Spring Boot
+- [x] JVM/Spring Boot/Quarkus tested catalog closure binds Spring Boot Maven with wrapper, Spring Boot
   Maven without wrapper, Spring Boot Gradle with wrapper, Spring Boot Gradle Kotlin DSL, generic
-  JVM explicit-command fallback, generic deterministic jar fallback, unsupported JVM frameworks,
-  ambiguous build-tool evidence, missing build tool, missing runnable jar, actuator health
-  defaults, and internal-port behavior to stable matrix ids, headless Docker/OCI fixture readiness
-  tests, and `deployments.plan/v1` contract coverage.
+  JVM explicit-command fallback, generic deterministic jar fallback, Quarkus Maven JVM jar mode,
+  unsupported JVM frameworks, ambiguous build-tool evidence, missing build tool, missing runnable
+  jar, actuator health defaults, and internal-port behavior to stable matrix ids, headless
+  Docker/OCI fixture readiness tests, and `deployments.plan/v1` contract coverage.
 
 Phase 5 release-gate verification notes from 2026-04-30:
 - `0.7.0` is published as GitHub Release `v0.7.0`; the local package manifest, Release Please
@@ -554,10 +559,12 @@ Phase 5 release-gate verification notes from 2026-04-30:
   future MCP/tool surfaces. It does not persist deployment records, publish deployment events,
   execute runtime work, or add profile/framework/buildpack fields to ids-only
   `deployments.create`.
-- Default release-gate confidence is hermetic: supported catalog acceptance, deployment plan
-  preview schema, framework fixture readiness, shared draft parity, unsupported/ambiguous planner
-  evidence, and public docs/help anchor checks. Real Docker and real SSH fixture smoke remain
-  opt-in gates.
+- Release-gate confidence is layered: fast hermetic checks cover supported catalog acceptance,
+  deployment plan preview schema, framework fixture readiness, shared draft parity,
+  unsupported/ambiguous planner evidence, and public docs/help anchor checks, while nightly and
+  release workflows also call the shared real local Docker and generic-SSH fixture smoke gates.
+  The real local Docker matrix runs on GitHub runners by default; generic-SSH evidence is
+  secret-gated and can fail closed on release dispatch when maintainers require it.
 - Public docs/help coverage is anchored at `/docs/deploy/lifecycle/#deployment-plan-preview` and
   the resource profile docs. Users can see which catalog entries are supported, preview detected
   plan evidence before execution, and inspect blocked reasons, fixes, logs, health, access, and
@@ -788,9 +795,93 @@ Current verification notes:
   This still does not satisfy the full `0.9.0` release rule while Postgres/Redis provisioning,
   dependency binding, backup/restore, recovery, auto-deploy, preview, and cluster runtime items
   remain open.
+- 2026-05-14 Phase 7 storage runtime slice extended Resource attachment snapshots with volume
+  kind/source metadata and taught local/generic-SSH Docker container execution to render
+  `storage.mounts` as deterministic Docker `--mount` flags.
+- 2026-05-14 Phase 7 storage Compose realization slice taught local/generic-SSH Docker Compose
+  execution to consume the same `storage.mounts` metadata through the generated Appaloft Compose
+  override file.
+- 2026-05-14 Phase 7 storage Swarm image-service realization slice taught Docker Swarm image
+  service apply plans to consume `storage.mounts` as deterministic `docker service create --mount`
+  flags. Web Resource detail can now create/rename/delete provider-neutral storage volume records
+  and attach/detach them from Resource profiles.
+- 2026-05-15 Phase 7 storage runtime cleanup slice implemented the dry-run-first
+  `storage-volumes.cleanup-runtime` command for local-shell and generic-SSH Docker named-volume
+  inspection/cleanup through CLI and HTTP/oRPC, separate from both `storage-volumes.delete` and
+  `servers.capacity.prune`.
+- 2026-05-15 Phase 7 storage runtime cleanup safety-evidence slice connected retained deployment
+  snapshot and rollback-candidate read-model evidence into `storage-volumes.cleanup-runtime`, so
+  destructive cleanup now blocks when selected Docker named-volume data is still referenced by
+  retained deployment snapshots or rollback candidates on the same server. Backup/restore,
+  provider-native storage handles, and bind-mount path cleanup remain open.
+- 2026-05-15 Phase 7 storage runtime cleanup backup-safety slice added a storage backup safety
+  reader seam and `backup-restore-in-flight` runtime blocker so future storage backup/restore work
+  can prevent destructive Docker named-volume cleanup through the same command. Storage
+  backup/restore operations themselves, provider-native storage handles, and bind-mount path
+  cleanup remain open.
+- 2026-05-15 Phase 7 storage runtime cleanup Web slice added Resource detail controls for
+  dry-run-first scoped runtime cleanup through `storage-volumes.cleanup-runtime`, including
+  server-scoped preview, bounded result diagnostics, and destructive confirmation before
+  `dryRun = false`.
+- 2026-05-15 Phase 7 Swarm Compose storage realization slice implemented bounded Docker Swarm
+  Compose candidate stack deploy planning with generated Appaloft overrides for storage mounts,
+  runtime env/secret references, identity labels, and edge network attachment. Superseded
+  Appaloft-labeled stacks/services are cleaned during deployment execution.
+- 2026-05-15 Phase 7 Swarm Compose storage smoke slice added an environment-gated real Docker
+  Swarm smoke for Compose stack deployment with generated storage mount override, Traefik route
+  verification, Appaloft named-volume creation proof, scoped stack cleanup, and volume cleanup.
+  The smoke remains skipped by default and runs through `APPALOFT_DOCKER_SWARM_SMOKE=1` /
+  `bun run smoke:swarm`.
+- 2026-05-15 Phase 7 storage runtime ownership-evidence slice made deployment execution label
+  Docker named-volume realizations with Appaloft ownership metadata for Docker run and
+  Compose/Swarm stack paths. Runtime cleanup now requires matching ownership labels and reports
+  `ownership-unproven` for unlabeled or mismatched named volumes, while target-mutating proof stays
+  in GitHub Actions/local explicit smoke gates rather than default local checks.
+- 2026-05-14 Phase 7 dependency backup/restore provider-context slice extended the provider port
+  inputs with safe execution context (`providerResourceHandle`, masked endpoint, and safe
+  `secretRef`) for create-backup and restore-backup and aligned shell/test support for
+  Appaloft-managed Redis backups with the managed Redis closed-loop contract. The shell provider
+  now writes safe local backup/restore artifact metadata under the configured data directory and
+  validates backup artifacts during restore. A later 2026-05-15 native Postgres backup slice taught
+  the shell provider to resolve Appaloft-owned Postgres connection refs and run bounded
+  provider-native `pg_dump`/`pg_restore` commands while keeping raw connection values out of
+  artifacts, read models, events, errors, and transport contracts. A follow-up Redis slice added
+  shell-native logical Redis backup/restore for resolvable Appaloft-owned Redis connection refs;
+  provider-specific Redis snapshot substrates remain governed follow-up work for providers that
+  need snapshot-native restore semantics beyond the shell logical path.
+- 2026-05-15 Phase 7 dependency-resource Web affordance slice added Resource detail Settings
+  controls for managed Postgres/Redis provision, project/environment dependency list, ready
+  dependency bind as runtime-only env targets, active binding list, unbind, and public help links
+  through the typed oRPC client with i18n coverage. Import, backup/restore, scheduled backup
+  policy, backup prune/delete, and cross-resource restore remained future Web work at that point.
+- 2026-05-15 Phase 7 dependency-resource Web administration slice added Resource detail
+  rename/delete controls for dependency resource records through the typed oRPC client. Delete stays
+  disabled when dependency delete-safety blockers are present, and the remaining Web administration
+  gap was import, backup/restore, scheduled backup policy, backup prune/delete, and cross-resource
+  restore at that point.
+- 2026-05-15 Phase 7 dependency-resource backup/restore Web slice added Resource detail controls
+  for backup create, safe restore-point list, and acknowledged in-place restore through the typed
+  oRPC client. Restore requires explicit overwrite and no-runtime-restart acknowledgements, and the
+  remaining Web administration gap was import, scheduled backup policy, backup prune/delete,
+  export/download, and cross-resource restore at that point.
+- 2026-05-15 Phase 7 dependency-resource import Web slice added Resource detail controls for
+  importing external Postgres/Redis dependency resources through the typed oRPC client and safe
+  connection boundary. The remaining Web administration gap is scheduled backup policy, backup
+  prune/delete, export/download, and cross-resource restore.
+- 2026-05-15 Phase 7 dependency binding secret rotation Web slice added Resource detail controls
+  for rotating active binding secret references through the typed oRPC client. The form requires
+  exactly one safe secret input and the historical-snapshot acknowledgement before submit; provider
+  native credential rotation, runtime restart/redeploy, scheduled backup policy, backup
+  prune/delete, export/download, and cross-resource restore remain separate work.
+- 2026-05-15 runtime monitoring Project detail rollup slice added project-scope and selected
+  environment-scope rollup-only readback through the typed oRPC client. Server/resource Monitor tabs
+  still own retained samples, links, and exact-scope CPU/memory/disk threshold configuration.
+  WebView Observe verification, sample-evidence-based threshold inheritance, and MCP/tool handler
+  dispatch are active; cross-window log/event filtering and richer observability navigation remain
+  governed follow-up slices.
 - 2026-05-04 Phase 7 Postgres dependency resource lifecycle baseline implemented
   provider-neutral provision/import/list/show/rename/delete over `ResourceInstance`, with masked
-  connection read models, future binding readiness, backup relationship metadata placeholders,
+  connection read models, later binding readiness, backup relationship metadata placeholders,
   delete-safety blockers, CLI/oRPC/HTTP dispatch, and PG/PGlite persistence. This still does not
   satisfy the full `0.9.0` release rule while Redis, dependency binding, secret rotation,
   backup/restore, provider-native database realization, recovery, auto-deploy, preview, and cluster
@@ -835,8 +926,8 @@ Current verification notes:
 - 2026-05-06 Phase 7 Redis dependency binding safe snapshot reference Code Round allowed ready
   imported Redis dependency resources to bind to Resources and appear in safe deployment snapshot
   references with kind `redis`. Managed Redis binding, provider-native Redis infrastructure, and
-  store-backed runtime secret value resolution remain open, so the Redis closed loop exit criterion
-  remains open.
+  store-backed runtime secret value resolution were still open at that point, so the Redis closed
+  loop exit criterion was not closed by this slice.
 - 2026-05-06 Phase 7 dependency binding runtime injection Spec Round added ADR-040 plus
   `docs/specs/047-dependency-binding-runtime-injection` to govern how active ready Postgres and
   imported Redis bindings become runtime environment inputs through `deployments.plan`,
@@ -846,33 +937,34 @@ Current verification notes:
   `ready | blocked | not-applicable`, rejected active non-injectable bindings before deployment
   acceptance with `dependency_runtime_injection_blocked`, and routed safe dependency secret handles
   through single-server and Swarm adapters. Store-backed resolution of Appaloft secret references
-  into raw dependency connection values and public docs remain open, so Postgres/Redis closed loop
-  exit criteria remain open.
+  into raw dependency connection values and public docs were still open at that point, so
+  Postgres/Redis closed-loop exit criteria were not yet closed by this slice.
 - 2026-05-06 Phase 7 dependency runtime secret value resolution Spec Round added
   [ADR-041](./decisions/ADR-041-dependency-runtime-secret-value-resolution.md) plus
   [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md)
   to govern imported Postgres/Redis connection value storage, managed Postgres reference
   validation, deployment blocked readiness for unresolved refs, single-server runtime env
-  resolution, and Docker Swarm secret materialization. It does not implement the Code Round yet, so
-  Postgres/Redis closed-loop exit criteria remain open.
+  resolution, and Docker Swarm secret materialization. It did not implement the Code Round yet, so
+  Postgres/Redis closed-loop exit criteria were not yet closed by this slice.
 - 2026-05-06 Phase 7 dependency secret value storage Code Round slice added a
   `DependencyResourceSecretStore` application port, PG/PGlite-backed `dependency_resource_secrets`
   storage/resolution, shell DI wiring, and import use-case integration so imported Postgres and
   Redis connection URLs are stored behind safe `appaloft://dependency-resources/.../connection`
   refs. Deployment unresolved-ref blocking, managed Postgres reference validation, and runtime
-  target value materialization remain open, so Postgres/Redis closed-loop exit criteria remain
-  open.
+  target value materialization were still open at that point, so Postgres/Redis closed-loop exit
+  criteria were not yet closed by this slice.
 - 2026-05-06 Phase 7 managed Postgres secret reference validation Code Round slice now validates
   Appaloft-owned provider realization refs through the dependency resource secret store before
   marking binding readiness ready; unresolved refs keep provider realization ready but binding
   readiness blocked with safe reason metadata. Deployment plan/create unresolved-ref blocking and
-  runtime target value materialization remain open, so Postgres/Redis closed-loop exit criteria
-  remain open.
+  runtime target value materialization were still open at that point, so Postgres/Redis closed-loop
+  exit criteria were not yet closed by this slice.
 - 2026-05-06 Phase 7 dependency runtime unresolved-ref blocking Code Round slice now validates
   captured Appaloft-owned dependency runtime refs during `deployments.plan` and
   `deployments.create`, reports `dependency_runtime_secret_unresolved` safely in plan output, and
   rejects create before deployment acceptance when resolution fails. Runtime target value
-  materialization remains open, so Postgres/Redis closed-loop exit criteria remain open.
+  materialization was still open at that point, so Postgres/Redis closed-loop exit criteria were not
+  yet closed by this slice.
 - 2026-05-06 Phase 7 single-server dependency runtime secret materialization Code Round slice now
   resolves Appaloft-owned dependency refs into execution-only environment values for local-shell
   and generic-SSH runtimes, includes dependency target env vars in Docker container launch specs,
@@ -882,13 +974,13 @@ Current verification notes:
 - 2026-05-06 Phase 7 Docker Swarm dependency runtime secret materialization Code Round slice now
   resolves Appaloft-owned dependency refs into deployment-scoped Docker secrets before Swarm
   service update and keeps sanitized service intent on Docker secret handles. Historical
-  rotated-ref execution coverage remains open, so Postgres/Redis closed-loop exit criteria remain
-  open.
+  rotated-ref execution coverage was still open at that point, so Postgres/Redis closed-loop exit
+  criteria were not yet closed by this slice.
 - 2026-05-06 Phase 7 historical rotated dependency ref resolution Code Round slice now resolves
   retained `appaloft+pg://resource-binding/...` binding secret refs through the runtime resolver,
   keeps old deployment snapshots on their captured refs, and verifies new deployments can use a
-  rotated ref only after it is resolvable. Final Postgres/Redis closed-loop exit verification
-  remains open.
+  rotated ref only after it is resolvable. Final Postgres/Redis closed-loop exit verification was
+  completed by later managed Redis and managed Postgres closed-loop verification slices.
 - 2026-05-06 Phase 7 Redis provider-native realization Spec Round added
   [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md) to
   position `dependency-resources.provision-redis`, `resources.bind-dependency`, and
@@ -896,33 +988,39 @@ Current verification notes:
   resolvability, and provider cleanup. It does not implement the Code Round yet, so the Redis
   closed-loop exit criterion remains open.
 - 2026-05-06 Phase 7 Redis provider-native realization Code Round implemented application-level
-  managed Redis realization through a hermetic provider capability, including acceptance-first
+  managed Redis realization through an injected provider capability, including acceptance-first
   provision, safe realization success/failure read models, realized-ready binding admission,
   unsupported-provider rejection, and provider cleanup during delete. Persistence/contract/runtime
-  materialization coverage and final Redis closed-loop verification remain open.
+  materialization coverage and final Redis closed-loop verification were completed by later managed
+  Redis materialization, delete-safety, entrypoint, and closed-loop verification slices.
 - 2026-05-06 Phase 7 managed Redis runtime materialization coverage slice removed the old
   deployment-snapshot source-mode block for realized managed Redis, added deployment snapshot,
   single-server runtime resolver, Docker Swarm secret-handle, PGlite read-model, and contract tests
   for managed Redis safe realization metadata and `REDIS_URL` delivery. Final Redis observe and
-  backup/restore-or-delete closed-loop verification remains open.
+  backup/restore-or-delete closed-loop verification was completed by later Redis safety and
+  closed-loop verification slices.
 - 2026-05-06 Phase 7 managed Redis delete safety coverage slice verified realized managed Redis
   delete is blocked by active binding, backup retention, and retained deployment snapshot/reference
-  blockers before provider cleanup runs. Final Redis observe and closed-loop verification remains
-  open.
+  blockers before provider cleanup runs. Final Redis observe and closed-loop verification was
+  completed by later Redis closed-loop verification slices.
 - 2026-05-06 Phase 7 managed Redis entrypoint contract coverage slice verified provider-native
   Redis realization reuses the existing operation catalog entries, CLI commands, and HTTP/oRPC
   routes for provision, bind, and delete without leaking provider SDK shapes or raw secret fields.
-  Final Redis observe and closed-loop verification remains open.
+  Final Redis observe and closed-loop verification was completed by later Redis closed-loop
+  verification slices.
 - 2026-05-06 Phase 7 managed Redis bind blocker coverage slice verified pending, failed, deleted,
   and unresolved Appaloft-owned connection-ref managed Redis resources cannot create
-  `REDIS_URL` bindings. Final Redis observe and closed-loop verification remains open.
+  `REDIS_URL` bindings. Final Redis observe and closed-loop verification was completed by later
+  Redis closed-loop verification slices.
 - 2026-05-06 Phase 7 managed Redis secret-value storage slice stores provider-returned raw Redis
   connection values through `DependencyResourceSecretStore` before marking binding readiness ready.
-  Final Redis observe and closed-loop verification remains open.
+  Final Redis observe and closed-loop verification was completed by the later Redis closed-loop
+  verification slice.
 - 2026-05-06 Phase 7 managed Redis closed-loop verification slice proved provision -> bind ->
   deploy -> observe logs/status -> backup/restore for a store-backed Appaloft-owned Redis
   connection ref without exposing raw Redis material. The Redis closed-loop exit criterion is now
-  closed; the Postgres closed-loop exit criterion remains open.
+  closed; the Postgres closed-loop exit criterion was still open until the following Postgres
+  closed-loop verification slice.
 - 2026-05-06 Phase 7 managed Postgres closed-loop verification slice proved provision -> bind ->
   deploy -> observe logs/status -> backup/restore for managed Postgres without exposing raw
   Postgres material. The Postgres closed-loop exit criterion is now closed.
@@ -933,7 +1031,7 @@ Current verification notes:
   remains blocked by provider-native database realization, backup/restore, recovery, auto-deploy,
   preview, and cluster runtime items.
 - 2026-05-05 Phase 7 Postgres provider-native realization Code Round implemented durable
-  realization state, hermetic managed Postgres provider capability, safe provider handles and
+  realization state, injected managed Postgres provider capability, safe provider handles and
   masked endpoint read models, bind readiness admission for managed Postgres, and managed provider
   cleanup before delete tombstone. Backup/restore remains a separate required slice, so the full
   `0.9.0` release rule remains blocked by backup/restore, recovery, auto-deploy, preview, and
@@ -946,11 +1044,13 @@ Current verification notes:
   Round yet, so the full `0.9.0` release rule remains blocked by backup/restore Code Round,
   recovery, auto-deploy, preview, and cluster runtime items.
 - 2026-05-05 Phase 7 dependency resource backup/restore Code Round implemented
-  `DependencyResourceBackup` state, hermetic backup/restore provider capability, safe backup
+  `DependencyResourceBackup` state, injected backup/restore provider capability, safe backup
   list/show read models, CLI and oRPC/HTTP entrypoints, lifecycle events, restore acknowledgements,
-  and delete-safety blockers for retained backups. Web affordances and provider-native Redis remain
-  separate gaps, so the full `0.9.0` release rule remains blocked by recovery, auto-deploy, preview,
-  and cluster runtime items.
+  and delete-safety blockers for retained backups. Later Resource-detail Web slices added managed
+  Postgres/Redis provision, dependency rename/delete, ready binding, active binding list, unbind,
+  backup create/list/acknowledged restore, and help affordances; import administration and
+  provider-native Redis were separate follow-up slices, so the full `0.9.0` release rule remained
+  blocked by recovery, auto-deploy, preview, and cluster runtime items at that point.
 - 2026-05-05 Phase 7 deployment retry/redeploy Spec Round created
   [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md) to activate
   `deployments.retry` and `deployments.redeploy` under ADR-016/ADR-034. It narrows the next Code
@@ -1148,105 +1248,179 @@ Current verification notes:
 - 2026-05-05 Phase 7 scheduled task resource Spec Round added ADR-039 and
   `docs/specs/044-scheduled-task-resource-shape` to position Resource-owned scheduled task
   definitions, run attempts, task-run logs, scheduler admission, and deployment-boundary separation.
-  The roadmap row remains open until operation catalog entries, persistence, scheduler/runtime
-  execution, entrypoints, and public docs are implemented.
+  Operation catalog entries, persistence, scheduler/runtime execution, entrypoints, and public docs
+  were still open at that point and are implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task core-domain slice added Resource-owned scheduled task
   definition value objects and state for schedule, timezone, command intent, timeout, retry, and
   lifecycle status, plus `forbid` concurrency validation. Run attempts, persistence,
-  scheduler/runtime execution, entrypoints, and public docs remain open.
+  scheduler/runtime execution, entrypoints, and public docs were still open at that point and are
+  implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task run-attempt core slice added Resource/task-owned run attempt
   state with manual/scheduled trigger kind, accepted/running/succeeded/failed/skipped transitions,
   safe exit/failure details, and no Deployment id. Application run admission, persistence,
-  scheduler/runtime execution, entrypoints, and public docs remain open.
+  scheduler/runtime execution, entrypoints, and public docs were still open at that point and are
+  implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task application-contract slice added inactive command/query
   schemas, messages, result DTOs, and read-model ports for scheduled task definitions, run-now,
   run history, and run logs while keeping operation catalog entries inactive. Application handlers,
-  use cases, persistence, scheduler/runtime execution, entrypoints, and public docs remain open.
+  use cases, persistence, scheduler/runtime execution, entrypoints, and public docs were still open
+  at that point and are implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task run-now admission slice added the inactive application
   handler/use case and repository ports to accept manual task runs as accepted run attempts without
-  synchronous execution, including disabled-task and archived-Resource admission blockers.
-  Remaining handlers/use cases, persistence, scheduler/runtime execution, entrypoints, and public
-  docs remain open.
+  synchronous execution, including disabled-task and archived-Resource admission blockers. Remaining
+  handlers/use cases, persistence, scheduler/runtime execution, entrypoints, and public docs were
+  still open at that point and are implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task create admission slice added the inactive application
   handler/use case and definition repository upsert contract to validate and store Resource-owned
   task definitions, including archived-Resource and unsafe-command blockers. Update/delete/list/show
-  handlers, persistence/read models, scheduler/runtime execution, entrypoints, and public docs
-  remain open.
+  handlers, persistence/read models, scheduler/runtime execution, entrypoints, and public docs were
+  still open at that point and are implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task read-query slice added inactive task list/show, run list/show,
   and run-log query handlers/services over scheduled-task read-model ports with stable envelopes.
   Update/delete handlers, persistence/read models, scheduler/runtime execution, entrypoints, and
-  public docs remain open.
+  public docs were still open at that point and are implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task configure admission slice added the inactive application
   handler/use case plus core VO-based definition patching to validate and store Resource-owned task
-  configures, including archived-Resource and unsafe-command blockers. Delete handler, persistence/read
-  models, scheduler/runtime execution, entrypoints, and public docs remain open.
+  configures, including archived-Resource and unsafe-command blockers. Delete handler,
+  persistence/read models, scheduler/runtime execution, entrypoints, and public docs were still open
+  at that point and are implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task delete admission slice added the inactive application
   handler/use case and explicit definition delete mutation spec to remove Resource-owned task
   definitions after ownership checks. Persistence/read models, scheduler/runtime execution,
-  entrypoints, and public docs remain open.
+  entrypoints, and public docs were still open at that point and are implemented by later
+  scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task definition persistence slice added Postgres/PGlite storage and
   read models for Resource-owned task definitions, including find/upsert/delete repository specs and
   project/environment/Resource/status read filters. Run-attempt/log persistence,
-  scheduler/runtime execution, entrypoints, and public docs remain open.
+  scheduler/runtime execution, entrypoints, and public docs were still open at that point and are
+  implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task run-attempt persistence slice added Postgres/PGlite storage
   and read models for accepted/running/terminal task runs, plus latest-run summaries on task
-  readbacks. Run-log persistence, scheduler/runtime execution, entrypoints, and public docs remain
-  open.
+  readbacks. Run-log persistence, scheduler/runtime execution, entrypoints, and public docs were
+  still open at that point and are implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task run-log persistence slice added Postgres/PGlite storage and
   a run-scoped read model for scheduled task output with secret-looking message masking. Scheduler
-  dispatch, runtime execution, entrypoints, and public docs remain open.
+  dispatch, runtime execution, entrypoints, and public docs were still open at that point and are
+  implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task scheduler admission slice added an inactive application
   scheduler process manager, due-candidate reader port, and shared run admission service so due
   scheduled tasks record `scheduled` trigger run attempts through the same checks as run-now.
-  Due-candidate persistence, shell runner, runtime execution, entrypoints, and public docs remain
-  open.
+  Due-candidate persistence, shell runner, runtime execution, entrypoints, and public docs were
+  still open at that point and are implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task runtime adapter slice added an inactive application
   scheduled-task runtime port and hermetic runtime adapter for one-off task command execution
   results, run-scoped stdout/stderr logs, exit codes, timestamps, and secret-looking output masking.
   Accepted-run worker wiring, due-candidate persistence, shell runner, entrypoints, and public docs
-  remain open.
+  were still open at that point and are implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task accepted-run worker slice added inactive application worker
   orchestration, run-attempt lookup, run-log recording, and Postgres/PGlite recorder support so
   accepted runs can transition through running to terminal state after runtime execution. Automatic
-  shell/background runner wiring, due-candidate persistence, entrypoints, and public docs remain
-  open.
+  shell/background runner wiring, due-candidate persistence, entrypoints, and public docs were still
+  open at that point and are implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task due-candidate read-model slice added Postgres/PGlite
   scheduler candidate scanning for enabled tasks, timezone-aware current-minute schedule matching,
   and same-minute duplicate scheduled-run suppression. Automatic shell/background runner wiring,
-  entrypoints, and public docs remain open.
+  entrypoints, and public docs were still open at that point and are implemented by later
+  scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task shell composition slice registered the inactive scheduled-task
   repositories, read models, due-candidate reader, run-log recorder, runtime port, command/query
   handlers, use cases, scheduler, and accepted-run worker in the shell DI root. Automatic
-  shell/background runner wiring, entrypoints, and public docs remain open.
-- 2026-05-05 Phase 7 scheduled task shell runner slice added opt-in scheduled task runner config
+  shell/background runner wiring, entrypoints, and public docs were still open at that point and are
+  implemented by later scheduled-task slices.
+- 2026-05-05 Phase 7 scheduled task shell runner slice added explicitly enabled scheduled task
+  runner config
   and long-running shell process wiring so enabled runners scan due tasks, admit scheduled runs,
   and drain admitted runs through the worker. Operation catalog entries, entrypoints, public docs,
-  and broader secret masking coverage remain open.
+  and broader secret masking coverage were still open at that point and are implemented by later
+  scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task operation entrypoint slice activated
   `scheduled-tasks.*` and `scheduled-task-runs.*` in `CORE_OPERATIONS.md`, the operation catalog,
   and HTTP/oRPC routes with `SCHED-TASK-CATALOG-001`/`SCHED-TASK-ENTRY-001` coverage. CLI commands,
   Web controls, public docs/help, generated MCP descriptor verification, and broader secret masking
-  coverage remain open.
+  coverage were still open at that point and are implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task CLI entrypoint slice added the `appaloft scheduled-task`
   command group for create/list/show/configure/delete/run and run-history list/show/logs. CLI,
   HTTP/oRPC, operation catalog, and generated MCP descriptor paths are active; Web controls, public
-  docs/help, and broader secret masking coverage remain open.
+  docs/help, and broader secret masking coverage were still open at that point and are implemented
+  by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task public docs/help slice added
   `/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle`, registered
   `scheduled-task.resource-lifecycle`, and wired CLI/HTTP descriptions to the stable scheduled-task
-  anchor. Web controls and broader secret masking coverage remain open.
+  anchor. Web controls and broader secret masking coverage were still open at that point and are
+  implemented by later scheduled-task slices.
 - 2026-05-05 Phase 7 scheduled task secret redaction slice added shared scheduled-task secret
   detection/redaction for command intent, failure summaries, runtime output, runtime errors,
   persisted read models, and generated tool descriptors. Web controls remained open for the next
   scheduled-task entrypoint slice.
 - 2026-05-05 Phase 7 scheduled task Web controls slice added Resource detail controls for
   scheduled-task list/create, run-now, enable/disable, delete, recent run history, run-scoped logs,
-  and the stable scheduled-task public help anchor. Phase 7 remains open for Docker Swarm,
-  preview/cluster runtime, and any remaining roadmap exit criteria.
+  and the stable scheduled-task public help anchor. Provider-native scheduled jobs are tracked as a
+  future provider-extension slice rather than a blocker for the current Appaloft-owned runtime
+  baseline.
 - 2026-05-05 Phase 7 scheduled task roadmap sync marked the scheduled-task Code Round implemented
   after active operation catalog, HTTP/oRPC, CLI, Web, generated MCP descriptor, public docs/help,
   persistence, scheduler, worker, runtime, run history, logs, and secret-redaction coverage landed.
-  The scheduled-task runner remains opt-in for long-running shell processes.
+  The scheduled-task runner is disabled by default and starts only when shell processes explicitly
+  enable it.
+- 2026-05-14 Phase 7 scheduled task local Docker runtime slice extended the real scheduled-task
+  runtime port from generic-SSH Docker containers to local-shell Docker containers as well, keeping
+  task output run-scoped and leaving Docker Compose, Swarm, provider-native scheduled jobs, and
+  richer workload context injection as the remaining runtime gaps at that point.
+- 2026-05-14 Phase 7 scheduled task Docker Compose runtime slice extended the same real runtime
+  port to local-shell and generic-SSH Docker Compose deployments. Compose task runs now render
+  `docker compose run --rm --no-deps` against retained compose file/project/target-service metadata
+  and keep stdout/stderr run-scoped. Docker Swarm and system-owned workload context injection were
+  completed by later scheduled-task runtime slices; provider-native scheduled jobs remain a governed
+  provider-extension follow-up.
+- 2026-05-14 Phase 7 scheduled task Docker Swarm runtime slice extended the real runtime port to
+  Swarm OCI-image services. Swarm task runs create a temporary Appaloft-labeled replicated-job
+  service on the retained Swarm network, stream `docker service logs` into the scheduled task run,
+  and remove the temporary service after success, failure, or timeout. System-owned workload context
+  injection was completed by a later scheduled-task runtime slice; provider-native scheduled jobs
+  remain a governed provider-extension follow-up.
+- 2026-05-15 Phase 7 scheduled task real-runtime confidence sync wired the local Docker and
+  generic-SSH scheduled-task smoke proofs into `.github/workflows/scheduled-task-e2e.yml` for
+  nightly/release gates. Local developer runs remain explicit through
+  `bun run smoke:scheduled-task:docker`, `bun run smoke:scheduled-task:ssh`, and
+  `bun run smoke:scheduled-task`; release dispatch can require SSH evidence and fail closed when
+  target secrets are absent.
+- 2026-05-14 Phase 7 scheduled task runtime context slice injects stable system-owned
+  `APPALOFT_*` variables into hermetic, Docker container, Docker Compose, and Docker Swarm task
+  processes. The injected context covers run/task/resource identity and runtime-owning deployment
+  identity, and reserved system values override user-supplied same-name variables. Provider-native
+  scheduled jobs remain future provider-extension work.
+- 2026-05-14 Phase 7 terminal container exec slice taught resource terminal sessions on
+  `local-shell` targets to use retained Docker `containerName` metadata and open the terminal
+  through `docker exec` instead of the host workspace. Generic SSH Docker exec is wired in the
+  runtime gateway; later slices closed focused SSH adapter coverage, Compose service shells,
+  explicit interactive CLI TTY attach, deployment-detail deep links, WebView attach coverage,
+  resize-frame forwarding, and safe audit metadata. Local true PTY resize and provider-native
+  terminals remain governed runtime/provider follow-ups.
+- 2026-05-14 Phase 7 terminal runtime exec coverage slice closed the focused runtime adapter
+  coverage gap for generic-SSH Docker `exec` and added Docker Compose service `exec` command
+  construction for both local-shell and generic-SSH targets when retained runtime metadata resolves
+  the Compose file/project and service. Later terminal slices closed direct interactive CLI TTY
+  attach, deployment-detail deep links, and WebView terminal attach coverage; local true PTY resize
+  remains a governed runtime backend follow-up.
+- 2026-05-14 Phase 7 terminal CLI attach slice added explicit `--attach` handling for
+  `server terminal` and `resource terminal`, bridging local stdin/stdout/stderr to the accepted
+  gateway session, forwarding initial rows/cols to the session, and restoring raw-mode state on
+  close. Descriptor-only output remains the default for scriptable workflows. Later terminal slices
+  closed deployment-detail deep links and WebView attach coverage; local true PTY resize and
+  provider-native terminals remain governed follow-ups.
+- 2026-05-15 Phase 7 terminal deployment deep-link slice added Web deployment-detail links to the
+  Resource terminal tab with the selected `deploymentId`, and Resource terminal now passes that
+  deployment id to the existing resource-owned `terminal-sessions.open` command. WebView terminal
+  attach coverage, close-frame cleanup, resize-frame forwarding, and audit metadata are active;
+  local true PTY resize and provider-native terminals remain governed follow-ups.
+- 2026-05-15 Phase 7 terminal resize-frame sync covered HTTP WebSocket resize routing and CLI
+  attach initial-size forwarding under `TERM-SESSION-TRANSPORT-003`. Local true PTY resize remains a
+  runtime backend follow-up because the Bun pipe-backed runtime session still has no PTY resize
+  primitive.
+- 2026-05-15 Phase 7 terminal audit metadata slice wired the runtime gateway to the configured
+  audit recorder so terminal opens and closes write durable safe audit rows under
+  `TERM-SESSION-LIFE-006`. Terminal input/output, raw commands, private keys, access tokens, and
+  environment secret values are not retained.
 - 2026-05-05 Phase 7 Docker Swarm admission coverage slice bound `SWARM-TARGET-ADM-001` to
   command schema, public contract schema, HTTP route, repository config parser, and CLI
   config-dispatch tests. Swarm deployment fields remain rejected before deployment creation; Swarm
@@ -1394,50 +1568,50 @@ Current verification notes:
   `docs/specs/046-product-grade-preview-deployments` and
   `docs/testing/product-grade-preview-deployments-test-matrix.md` covering preview policy,
   environment identity, scoped preview config, ids-only deployment dispatch, feedback,
-  cleanup retries, quotas, and public-surface requirements. Code Round remains open.
+  cleanup retries, quotas, and public-surface requirements. Subsequent incremental Code Rounds closed the active baseline; remaining work is public enablement and provider hardening.
 - 2026-05-06 Phase 7 product-grade preview policy evaluator slice added initial normalized
   GitHub pull-request policy evaluation for verified same-repository events, unverified events,
   default fork blocking, secret-backed fork blocking, and opt-in fork previews without secrets.
   Preview environment state, deployment dispatch, read models, GitHub App ingestion, feedback,
-  cleanup retry, and entrypoints remain open.
+  cleanup retry, and entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 product-grade preview environment domain slice added foundational core
   `PreviewEnvironment` state for scoped project/environment/resource/target placement, safe source
   fingerprint and pull-request context, expiry checks, and cleanup-request transition. Persistence,
   read models, deployment dispatch, GitHub App ingestion, feedback, cleanup retry, and entrypoints
-  remain open.
+  remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 product-grade preview environment persistence slice added Postgres/PGlite
   preview environment storage, lookup by id/source scope, safe list/show read models, lifecycle
   status readback, and scoped delete while retaining owner Resource state. Deployment dispatch,
-  GitHub App ingestion, feedback, cleanup retry, and entrypoints remain open.
+  GitHub App ingestion, feedback, cleanup retry, and entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 product-grade preview lifecycle application slice added initial
   `PreviewLifecycleService` coverage for eligible pull-request policy results creating/updating
   preview environments and dispatching one ids-only deployment request. GitHub App ingestion,
-  blocked-event read models, feedback, cleanup retry, and entrypoints remain open.
+  blocked-event read models, feedback, cleanup retry, and entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview policy operation-contract slice added inactive
   `preview-policies.configure` and `preview-policies.show` command/query schemas, handlers,
   repository/read-model ports, operation catalog entries, and tests. Durable policy persistence,
   active transports, GitHub App ingestion, feedback, cleanup retry, and preview environment
-  entrypoints remain open.
+  entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview policy persistence slice added Postgres/PGlite storage and shell
   wiring for inactive `preview-policies.configure` / `preview-policies.show` operation contracts.
   Safe read models now return configured or default project/Resource policy summaries without
   exposing idempotency keys, provider payloads, or secret material. Active transports, GitHub App
-  ingestion, feedback, cleanup retry, and preview environment entrypoints remain open.
+  ingestion, feedback, cleanup retry, and preview environment entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview blocked-policy projection slice added application and Postgres/PGlite
   projection of blocked preview policy decisions by source event id. Fork policy blocks now expose
   safe reason/readback details and requested secret scope counts without dispatching deployments or
   storing secret names/provider tokens. GitHub App ingestion, feedback, cleanup retry, and active
-  preview environment entrypoints remain open.
+  preview environment entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview policy quota/TTL slice added active preview quota settings,
   `preview_quota_exceeded` blocking, preview TTL-derived environment expiry, and Postgres/PGlite
   readback for safe quota/expiry policy decision details. Scheduler cleanup for expired previews,
-  GitHub App ingestion, feedback, cleanup retry, and active preview environment entrypoints remain
-  open.
+  GitHub App ingestion, feedback, cleanup retry, and active preview environment entrypoints
+  remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview GitHub pull-request event slice added an integration-boundary
   verifier/normalizer for signed `pull_request` webhooks. It emits only safe preview lifecycle
-  facts, rejects invalid signatures, unsupported actions, and unsafe payloads, and keeps actual
-  GitHub App route wiring, dedupe/idempotency, feedback, cleanup retry, and active preview
-  environment entrypoints open.
+  facts, rejects invalid signatures, unsupported actions, and unsafe payloads. Actual GitHub App
+  route wiring, dedupe/idempotency, feedback, cleanup retry, and active preview environment
+  entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview duplicate-event slice added source-event-id dedupe to the preview
   lifecycle service. Duplicate deliveries now return the stored preview policy decision without
   mutating preview environment state or dispatching another ids-only deployment request. Feedback
@@ -1446,138 +1620,144 @@ Current verification notes:
   `resources.effective-config` that defaults to copying no production secrets or durable routes,
   resolves only explicit preview variables/secret references, and keeps raw or masked secret values
   out of preview resolution output. Full lifecycle process-manager wiring, GitHub App routes,
-  feedback, cleanup retry, and active preview environment entrypoints remain open.
+  feedback, cleanup retry, and active preview environment entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview deployment-dispatch slice bound preview dispatch to the existing
   `deployments.create` admission adapter and added explicit `PG-PREVIEW-DEPLOY-001` coverage that
   only ids cross the deployment boundary. Pull-request/source/route/preview details remain
   read-model or process context. GitHub App routes, feedback, cleanup retry, and active preview
-  environment entrypoints remain open.
+  environment entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview pull-request ingestion slice added an application service that routes
   safe normalized GitHub pull-request preview facts into preview lifecycle using selected
   control-plane context. This initial slice left closed-event cleanup ignored until cleanup process
   state existed. GitHub App HTTP routes, feedback, cleanup retry, and active preview environment
-  entrypoints remained open at that point.
+  entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview deployment process-manager slice composed policy evaluation,
   preview environment state, ids-only deployment dispatch, and PR-comment feedback. Accepted
   preview deployments now publish idempotent source-event-keyed `github-pr-comment` feedback, and
   retryable feedback failures preserve the accepted deployment result while recording safe feedback
   state. GitHub check/deployment-status writers, GitHub App HTTP routes, cleanup adapters, and
-  active preview environment entrypoints remain open.
+  active preview environment entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview feedback application slice added initial feedback writer/recorder
   ports and a service for idempotent PR comment/check/status updates. Existing provider feedback
   ids are reused for update-in-place, and retryable provider failures are recorded as safe feedback
   state without turning the accepted deployment path into `err`. Durable feedback persistence,
-  GitHub App HTTP routes, cleanup retry, and active preview environment entrypoints remain open.
+  GitHub App HTTP routes, cleanup retry, and active preview environment entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview feedback persistence slice added Postgres/PGlite storage and shell
   wiring for idempotent provider feedback state keyed by feedback key. The record keeps provider
   feedback ids, channel/status, safe error codes, retryable state, and update timestamps without
   persisting feedback body text, provider payloads, tokens, or secret-shaped values. GitHub
   feedback writer adapters, GitHub App HTTP routes, cleanup retry, and active preview environment
-  entrypoints remain open.
+  entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview GitHub PR comment feedback slice added a hermetic GitHub integration
   writer for product-grade preview PR comments. It creates comments, updates existing comments by
   provider feedback id, classifies retryable provider failures safely, and omits response bodies,
   tokens, and feedback body text from returned errors. Check/deployment-status writers, shell
-  wiring, GitHub App HTTP routes, cleanup retry, and active preview environment entrypoints remain
-  open.
+  wiring, GitHub App HTTP routes, cleanup retry, and active preview environment entrypoints
+  remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview GitHub check-run feedback slice added a hermetic GitHub integration
   writer for product-grade preview check runs plus composite GitHub feedback routing for comments
   and checks. It resolves pull-request head SHA safely, creates check runs, updates existing check
   runs by provider feedback id, and keeps deployment-status feedback unsupported until the feedback
   input carries the required provider deployment identity. GitHub App HTTP routes, cleanup adapters,
-  and active preview environment entrypoints remain open.
+  and active preview environment entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview feedback shell-wiring slice registered a request-scoped GitHub
   preview feedback writer in the shell composition. It obtains the GitHub token through the
   existing integration auth port per publish call, returns a safe validation error when GitHub is
   not connected, and delegates supported PR comment/check feedback to the GitHub integration
   writer. Deployment-status feedback, GitHub App HTTP routes, cleanup retry, and active preview
-  environment entrypoints remain open.
+  environment entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview cleanup application slice added a service that marks durable preview
   environment cleanup requested without deleting preview history, then delegates runtime, route,
   source-link, provider metadata, and feedback cleanup to a safe source-scope port. Concrete
   cleanup adapters, cleanup retry state, GitHub App HTTP routes, and active preview environment
-  entrypoints remain open.
+  entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview cleanup retry slice added application attempt state for cleanup
   retries. Each cleanup run gets a fresh `pcln_*` attempt id, retryable provider/adapter failures
   record safe owner, phase, error code, and next retry time, and responses omit provider error text.
   Durable cleanup attempt persistence, scheduler dispatch, concrete cleanup adapters, GitHub App
-  HTTP routes, and active preview environment entrypoints remain open.
+  HTTP routes, and active preview environment entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview cleanup attempt persistence slice added Postgres/PGlite storage and
   shell wiring for durable cleanup retry records keyed by `pcln_*` attempt id. Stored state keeps
   preview environment id, Resource id, source fingerprint, owner, status, phase, retry timing, and
   safe error code without provider error text, tokens, or secret-shaped values. Scheduler dispatch,
   concrete cleanup adapters, GitHub App HTTP routes, and active preview environment entrypoints
-  remain open.
+  remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview cleanup retry scheduler slice added an application scheduler and
   durable due-candidate reader for `preview_cleanup_attempts`. The reader returns latest due
   `retry-scheduled` attempts only, and the scheduler dispatches them through the cleanup service so
   retries create fresh `pcln_*` attempt ids. Concrete cleanup adapters, GitHub App HTTP routes, and
-  active preview environment entrypoints remain open.
+  active preview environment entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview cleanup retry runner slice added a disabled-by-default shell runner
   and config block for `previewCleanupRetryScheduler`. The runner is only resolved when explicitly
   enabled so normal boot does not require the future concrete cleanup adapter. Concrete cleanup
-  adapters, GitHub App HTTP routes, and active preview environment entrypoints remain open.
+  adapters, GitHub App HTTP routes, and active preview environment entrypoints remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview cleanup retry runner coverage slice added shell runner tests for
   disabled startup, system actor context, batch-size forwarding, and the in-process non-overlap
   guard that skips interval ticks while a scheduler run is active.
 - 2026-05-06 Phase 7 preview environment surface-contract slice added inactive
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete`
   application contracts plus operation catalog entries. List/show read from the safe preview
-  environment read model, delete uses cleanup-service input, and CLI/API/Web/future MCP transports
-  remain inactive until the product-grade control-plane route is wired.
+  environment read model, delete uses cleanup-service input, and the transports were introduced as
+  inactive contracts at that point. Later slices wired the active CLI/API/Web/future MCP surfaces
+  through the product-grade control-plane route.
 - 2026-05-06 Phase 7 preview GitHub pull-request HTTP route slice wired signed
   `pull_request` deliveries on `/api/integrations/github/source-events` to
   `IngestPreviewPullRequestEventCommand` through `CommandBus`, using trusted Appaloft preview
   context headers for project/environment/Resource/server/destination/source-fingerprint selection.
-  Follow-up repository and installation mapping was still required before active GitHub App worker
-  transports.
+  Follow-up repository and installation mapping was still required at that point before active
+  GitHub App worker transports; later slices closed that baseline with safe repository-context
+  mapping and worker-token feedback transport.
 - 2026-05-06 Phase 7 preview closed-event cleanup slice routed GitHub `pull_request.closed`
   ingestion through source-scope preview environment lookup into the preview cleanup service.
   Existing previews now preserve history while requesting runtime/route/source-link/provider/
   feedback cleanup, and missing previews return an idempotent ignored result. Active GitHub App
-  preview worker transports remained open.
+  preview worker transports remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview cleanup feedback slice added latest-feedback lookup by preview
   environment/channel, cleanup-side PR-comment updates through the existing idempotent feedback
   writer path, skipped cleanup feedback when no prior feedback exists, and safe retryable failure
   propagation into cleanup retry handling. Active GitHub App preview worker transports remained
-  open.
+  open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview deployment-status publication slice made the preview deployment
   process manager publish idempotent `github-deployment-status` feedback after accepted ids-only
   deployment dispatch. The GitHub feedback writer now creates a transient GitHub preview deployment
   from the pull-request head SHA when automatic feedback has no provider deployment id yet, records
   that deployment id for later append-only status updates, and keeps retryable provider failures in
   safe feedback state without rewriting the accepted deployment result. Active GitHub App preview
-  worker transports remained open.
+  worker transports remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview cleanup scheduler lease slice wrapped enabled shell
   `previewCleanupRetryScheduler` ticks in the existing durable mutation coordinator under the
   `preview-lifecycle` coordination scope. Multiple shell processes now share a bounded lease for
   cleanup retry scans while the in-process non-overlap guard remains as local protection.
-  Active GitHub App preview worker transports remained open.
+  Active GitHub App preview worker transports were closed by later slices.
 - 2026-05-06 Phase 7 preview terminal metadata cleanup slice made cleanup-side feedback mark the
   latest GitHub deployment-status feedback `inactive` when a provider deployment record exists.
   The shell cleaner now reports that inactive status append as provider metadata removal while
   retaining retryable provider failures in safe cleanup retry state. Active GitHub App preview
-  worker transports remained open.
+  worker transports remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview GitHub repository-context mapping slice made the signed
   `pull_request` HTTP route resolve preview context from the source-event policy reader when trusted
   Appaloft headers are absent. The route maps GitHub repository full name/provider repository id and
   base ref to project/environment/Resource/server/destination/source-fingerprint context, carries
   GitHub installation id only as safe verification detail, and still rejects ambiguous or missing
-  policy matches before command dispatch. Active GitHub App preview worker transports remain open.
+  policy matches before command dispatch. Active GitHub App preview worker transports remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview GitHub safe-metadata propagation slice ensured the
   `IngestPreviewPullRequestEventCommandHandler` preserves safe provider repository id and
   installation id facts when handing signed GitHub preview events to the application ingest service.
-  Active GitHub App preview worker transports remain open.
+  Active GitHub App preview worker transports remained open at that point and were closed by later slices.
 - 2026-05-06 Phase 7 preview worker feedback transport slice added an explicit
   `APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN` runtime configuration path for webhook and cleanup
   scheduler contexts where no request-scoped GitHub OAuth token exists. The shell feedback writer
   still prefers request-scoped GitHub auth when present, falls back to the worker token for system
   contexts, and returns safe `preview-feedback` validation errors when neither token source exists.
-  Full GitHub App installation-token onboarding and provider smoke tests remain future public
-  enablement work rather than a Phase 7 Code Round blocker.
+  Full GitHub App installation-token onboarding and broader hosted provider smoke coverage remain
+  future public enablement work rather than a Phase 7 Code Round blocker.
+- 2026-05-15 Phase 7 preview provider smoke gate added a secret-gated live GitHub PR-comment
+  feedback probe. `bun run smoke:preview-provider:github` updates a marker comment on a configured
+  pull request, `.github/workflows/preview-provider-e2e.yml` runs the same gate for nightly/release,
+  and manual releases can require it with `require_preview_provider_e2e=true`.
 - 2026-05-05 Phase 7 preview deployment Docs Round added bilingual
   `/docs/deploy/previews/` content and registered public help topics for Action-only PR previews
-  and future product-grade previews. The public `appaloft/deploy-action` wrapper repository,
+  and control-plane product-grade previews. The public `appaloft/deploy-action` wrapper repository,
   Marketplace README, and public wrapper CI are now published.
 - 2026-05-05 Phase 7 deploy-action wrapper cleanup/README slice added `command:
   preview-cleanup` to the reference composite action, a Marketplace-facing README with deploy, PR
@@ -1590,8 +1770,8 @@ Current verification notes:
   reference and shell scripts keep executable bits.
 - 2026-05-06 Phase 7 deploy-action public CI export slice added the wrapper repository CI workflow
   to the exported layout. The workflow validates shell syntax, dry-run PR preview mapping and
-  outputs, and an opt-in exact-version install smoke controlled by the public repository's
-  `APPALOFT_INSTALL_SMOKE_VERSION` variable.
+  outputs, and a GitHub Actions variable-gated exact-version install smoke controlled by the public
+  repository's `APPALOFT_INSTALL_SMOKE_VERSION` variable.
 - 2026-05-06 Phase 7 deploy-action public repository publication slice merged
   `appaloft/deploy-action#1`, making the public `main` branch match the deterministic reference
   export plus the repository license. Public wrapper CI `validate` passed before merge, and
@@ -1631,7 +1811,7 @@ Required:
 - [x] Add push webhook and generic signed deploy webhook.
 - [x] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
   GitHub Actions workflow. Public docs now distinguish Action-only workflow-file previews from
-  future product-grade control-plane previews; the public `appaloft/deploy-action` repository is
+  control-plane product-grade previews; the public `appaloft/deploy-action` repository is
   published from the deterministic reference export with Marketplace README examples, preview
   cleanup mapping, and public wrapper CI.
 - [x] Add existing-resource profile-drift handling.
@@ -1643,8 +1823,9 @@ Required:
   Web/API/CLI/future MCP surfaces, public docs, an initial signed GitHub pull-request HTTP route,
   close-event cleanup routing, cleanup-side feedback update, and automatic deployment-status
   feedback publication, plus repository-context mapping from signed GitHub events and
-  request-or-worker-token GitHub feedback transport, are implemented. Full GitHub App installation
-  onboarding and provider smoke tests remain outside this Phase 7 Code Round.
+  request-or-worker-token GitHub feedback transport, are implemented. A secret-gated live GitHub
+  PR-comment feedback provider smoke gate is active. Full GitHub App installation onboarding and
+  broader hosted provider smoke coverage remain outside this Phase 7 Code Round.
 - [x] Add scheduled task/cron resource shape with run history and logs after workload service
   semantics are specified. ADR-039/spec matrix now position ownership and target operations.
 - [x] Complete the Docker Swarm Spec Round as the first cluster runtime target:
@@ -1873,9 +2054,9 @@ Target: `0.11.0`.
 
 Release rule:
 - [x] Select `0.11.0` only when all required Phase 9 items, earlier phase items, and exit criteria
-  are checked, except for the accepted deferred SSH smoke evidence gap recorded in this phase. If
-  any other Phase 9 item remains unchecked, release a `0.10.x` patch or an explicitly requested
-  prerelease instead.
+  are checked and required real-execution confidence is represented by explicit local scripts or
+  GitHub Actions gates. If any Phase 9 item remains unchecked, release a `0.10.x` patch or an
+  explicitly requested prerelease instead.
 - [x] Do not select `1.0.0-rc` directly for Phase 9 work. The `0.12.0` runtime usage attribution
   line starts only after Phase 9 has shipped or has been explicitly retargeted as complete, and the
   release-candidate line starts only after `0.12.0` is complete or explicitly deferred.
@@ -1900,12 +2081,14 @@ Required:
   maintenance recording, atomic claim/completion, command-bus dispatch of `servers.capacity.prune`,
   retry-scheduled failure visibility, and safe operator-work details. Scheduled history retention is
   the third worker binding with retention-default category attempt recording, atomic
-  claim/completion, command-bus dispatch of existing history prune commands, retry-scheduled failure
-  visibility, disabled-by-default shell runner wiring, and safe operator-work details. Preview
-  cleanup is the fourth operator-visible binding with successful and retry-scheduled cleanup
+  claim/completion, command-bus dispatch of existing history prune commands or governed direct
+  retention stores, retry-scheduled failure visibility, disabled-by-default shell runner wiring,
+  and safe operator-work details. Preview
+  cleanup is the fourth process-attempt worker binding with successful and retry-scheduled cleanup
   outcomes mirrored into the process attempt journal for `operator-work.*` visibility and repair;
-  its retry scheduler still uses the preview cleanup attempt store and preview-lifecycle lease
-  rather than process-attempt atomic claim/completion. Certificate issuance is the fifth
+  its retry scheduler now generates retry attempts from the process attempt journal and executes
+  cleanup through atomic process-attempt claim/completion while preview cleanup attempt rows remain
+  compatibility cleanup history. Certificate issuance is the fifth
   operator-visible binding with request, provider issuance, success, and retry-scheduled provider
   failure outcomes mirrored into the process attempt journal; its retry scheduler still uses
   certificate aggregate attempt state rather than process-attempt atomic claim/completion.
@@ -1954,8 +2137,8 @@ Required:
   `deployments.redeploy`. Deployment rollback execution is the seventeenth operator-visible binding
   with running, success, and failure outcomes mirrored into the process attempt journal for
   `deployments.rollback`, including source deployment lineage, rollback candidate lineage, runtime
-  plan, and target backend metadata. Remaining long-running workflow workers are future opt-in
-  slices under ADR-054 rather than Phase 9 release blockers.
+  plan, and target backend metadata. Remaining long-running workflow workers require governed
+  explicitly-enabled worker slices under ADR-054 rather than Phase 9 release blockers.
 - [x] Add retry execution, dedupe enforcement, and failure visibility for long-running workflows.
   Scheduled-task retry generation and handoff are implemented with process-attempt dedupe
   authority and safe failure visibility. Scheduled runtime prune records retry-scheduled failure
@@ -1989,7 +2172,7 @@ Required:
   records retriable process-attempt failure visibility for post-acceptance rollback execution
   failures while rollback execution itself still runs inline through `deployments.rollback` rather
   than a process-attempt worker. Broader automatic workflow retry execution remains governed future
-  work and must opt in through local specs before provider/runtime work is executed by a worker.
+  work and requires explicit local specs before provider/runtime work is executed by a worker.
 - [x] Add operator queries for deployment attempts.
 - [x] Add operator queries for proxy bootstrap attempts.
 - [x] Add operator queries for certificate attempts.
@@ -2091,17 +2274,14 @@ Required:
   workspace commands, static, Dockerfile, prebuilt-image, and Compose methods; `bun run
   smoke:swarm` passed 11 tests including the opt-in real Swarm apply/cleanup path after temporary
   Swarm initialization; and `bun run smoke:install-auth` passed the opt-in self-hosted PGlite
-  install/auth/deploy-token smoke after `bun.lock` was synced. The required opt-in SSH evidence is
-  now exposed through aggregate `bun run smoke:ssh`, its `smoke:ssh:remote-state` and
-  `smoke:ssh:quick-deploy` parts, `bun run smoke:ssh:evidence` for redacted
-  `dist/release/ssh-smoke-evidence.json` capture after both SSH suites pass, per-workflow redacted
-  evidence capture for the reusable release/nightly workflows. Maintainers accepted deferring real
-  SSH smoke evidence for `0.11.0` because this local release-preparation environment has no SSH
-  target server; the release workflow keeps manual `require_ssh_remote_state_e2e` and
-  `require_ssh_quick_deploy_e2e` inputs for environments that have SSH secrets, but `v0.11.x`
-  publish runs no longer require those SSH workflows automatically. This accepted gap must be named
-  in the `0.11.0` release notes, and real SSH evidence remains required before the gap can be
-  removed in a later release.
+  install/auth/deploy-token smoke after `bun.lock` was synced. Required SSH evidence is now exposed
+  through GitHub Actions secret-gated/local explicit `bun run smoke:ssh`, its
+  `smoke:ssh:remote-state` and `smoke:ssh:quick-deploy` parts, `bun run smoke:ssh:evidence` for
+  redacted `dist/release/ssh-smoke-evidence.json` capture after both SSH suites pass, per-workflow
+  redacted evidence capture for the reusable release/nightly workflows. Local release preparation
+  can skip real SSH execution when no target server exists; the release workflow keeps manual
+  `require_ssh_remote_state_e2e` and `require_ssh_quick_deploy_e2e` inputs so a
+  release-readiness run that needs SSH confidence fails closed when target secrets are absent.
 
 Exit criteria:
 - [x] Operators can see and repair stuck work through Appaloft operations.
@@ -2132,17 +2312,15 @@ Exit criteria:
   coverage, OpenAPI `x-appaloft-*` metadata, generated TypeScript SDK facade, SDK import boundary,
   SDK auth/error/stream helpers, running-server SDK smoke, generated MCP descriptors, CLI/oRPC/Web
   docs-help links, and SDK release packaging.
-- [x] Phase 9 release readiness passes the local, PGlite, PostgreSQL, Docker, and opt-in SSH smoke
-  suites required for a `0.11.0` minor release, except for the accepted deferred SSH smoke evidence
-  gap.
+- [x] Phase 9 release readiness passes the local, PGlite, PostgreSQL, Docker, and GitHub Actions
+  secret-gated/local explicit SSH smoke gates required for a `0.11.0` minor release.
   Local, PGlite, PostgreSQL, Docker-backed local, Swarm, and install-auth evidence was recorded on
-  2026-05-12. Opt-in SSH smoke is wired through aggregate `smoke:ssh`,
+  2026-05-12. SSH smoke is wired through aggregate `smoke:ssh`,
   `smoke:ssh:remote-state`, `smoke:ssh:quick-deploy`, `smoke:ssh:evidence`, and per-workflow
-  evidence scripts; Release publish runs can still require both SSH reusable workflows when the
-  manual `require_ssh_*` inputs are set, and those workflows upload redacted evidence artifacts
-  after success. Real SSH smoke evidence is accepted as deferred for `0.11.0` because this local
-  release-preparation environment has no SSH target server, so no
-  `dist/release/ssh-smoke-evidence.json` evidence file has been captured for `0.11.0`.
+  evidence scripts; Release publish runs can require the SSH reusable workflows when the manual
+  `require_ssh_*` inputs are set, and those workflows upload redacted evidence artifacts after
+  success. Missing SSH target secrets fail the required reusable workflows instead of converting the
+  release-readiness path into a known-gap note.
 
 ## Phase 10: Runtime Usage Attribution And Monitoring
 
@@ -2184,9 +2362,9 @@ Required:
 - [x] Add Web readback after query DTOs and i18n keys exist.
 - [x] Preserve existing rejection for unsupported CPU/memory/replicas/runtime sizing config fields.
 
-Deferred unless explicitly pulled into `0.12.0`:
-- [ ] Bounded runtime usage sample retention and rollup queries for charts.
-- [ ] Non-enforcing usage thresholds, warning/critical state, and operator visibility.
+Pulled-forward runtime monitoring observation baseline:
+- [x] Bounded runtime usage sample retention and rollup queries for charts.
+- [x] Non-enforcing usage thresholds, warning/critical state, and operator visibility.
 - [ ] Runtime sizing, quotas, or enforcement.
 
 Post-`0.12.0` monitoring boundary:
@@ -2194,10 +2372,12 @@ Post-`0.12.0` monitoring boundary:
   bounded samples, rollups, charts, deployment markers, log/event/diagnostic linkage, and
   non-enforcing thresholds without turning Appaloft into Prometheus, APM, custom metric ingestion,
   dashboard building, alert routing, billing analytics, quota, cleanup, or runtime enforcement.
-- [ ] Select whether bounded samples, rollups, charts, and threshold visibility are GA-blocking for
-  `1.0.0-rc` or remain post-GA. If pulled into RC, complete the
+- [x] Bounded samples, rollups, charts, and threshold visibility are selected as an active
+  pre-RC baseline rather than a post-GA placeholder. The
   [Runtime Monitoring Observation Boundary](./specs/069-runtime-monitoring-observation-boundary/spec.md)
-  Spec/Test-First/Code/Docs rounds before freezing RC scope.
+  Spec/Test-First/Code/Docs rounds are implemented with CLI, HTTP/oRPC, Web, SDK metadata,
+  generated MCP/tool descriptors, disabled-by-default collector wiring, and GitHub Actions/local
+  explicit real-target smoke gates.
 
 ## Phase 11: 1.0.0 Release Candidate
 
@@ -2336,13 +2516,19 @@ work below before GA.
 - [x] Deployment attempt: stream events.
 - [ ] Deployment attempt: retry/redeploy, cancel, rollback candidate/readiness, archive/prune.
 - [x] Runtime artifact/instance: internal snapshot and resource/deployment diagnostic context.
-- [ ] Runtime artifact/instance: capacity diagnostics, cleanup/prune, preview artifact cleanup, and
+- [x] Runtime artifact/instance: capacity diagnostics, cleanup/prune, preview artifact cleanup, and
   rollback-candidate retention.
 - [x] Runtime usage: read-only current attribution for server, project, environment, resource, and
   deployment scopes. Governed by
   [Runtime Usage Attribution And Monitoring](./specs/068-runtime-usage-attribution-and-monitoring/spec.md).
-- [ ] Runtime monitoring: bounded samples, rollup charts, deployment markers, log/event/diagnostic
-  linkage, and non-enforcing threshold visibility. Governed by
+- [x] Runtime monitoring: bounded sample read/write storage, internal collector process
+  visibility, disabled-by-default active-server/resource/deployment/project/environment collector
+  runner, sample/rollup reads, deployment markers, log/event/diagnostic links, non-enforcing
+  threshold readback, exact-scope CPU/memory/disk threshold configuration, server/resource Monitor sparklines,
+  Project detail project/environment rollup-only readback, WebView Observe verification,
+  sample-evidence-based threshold inheritance, and MCP/tool handler dispatch are implemented.
+  Cross-window log/event filtering and richer observability navigation remain governed follow-up
+  slices. Governed by
   [Runtime Monitoring Observation Boundary](./specs/069-runtime-monitoring-observation-boundary/spec.md).
 - [x] Default access policy: static/shell configuration selects provider; generated routes are
   visible through `ResourceAccessSummary`.
@@ -2369,14 +2555,16 @@ work below before GA.
 - [x] Environment/resource secrets: environment set/unset variable baseline.
 - [ ] Environment/resource secrets: secret reference create/list/show/update/delete, masking,
   build/runtime scope.
-- [ ] Storage volume: create/list/show/update/delete, attach/detach, backup relationship.
-- [x] Dependency resource instance: provision/import/list/show/rename/delete for Postgres and
-  Redis.
-- [ ] Resource binding: bind/unbind/list/show/rotate, immutable deployment snapshot.
+- [x] Storage volume: create/list/show/rename/delete, attach/detach, backup relationship metadata,
+  deployment-driven runtime realization, and dry-run-first runtime cleanup.
+- [x] Dependency resource instance: provision/import/list/show/rename/delete for Postgres and Redis.
+- [x] Resource binding: bind/unbind/list/show/rotate, immutable deployment snapshot, and runtime
+  injection materialization.
 - [ ] Webhook/auto-deploy: create/list/show/update/delete, delivery attempts, replay, secret
   rotation.
-- [ ] Action PR preview: deploy/update from a user-authored GitHub Actions workflow with generated
-  or user-owned wildcard preview access.
+- [x] Action PR preview: deploy/update from a user-authored GitHub Actions workflow with generated
+  or user-owned wildcard preview access through the published `appaloft/deploy-action` wrapper,
+  preview cleanup mapping, Marketplace examples, and public wrapper CI.
 - [x] Self-hosted Action server API trigger: user-authored GitHub Actions workflow can call an
   existing self-hosted Appaloft server with trusted project/environment/resource/server ids to
   create a deployment without installing CLI, opening SSH, or mutating SSH-server PGlite state.
@@ -2400,7 +2588,8 @@ work below before GA.
   close, scoped env, GitHub App status/comments, and cleanup retries.
   Spec, operation catalog, CLI, HTTP/oRPC, Web, future MCP descriptors, public docs/help, safe
   GitHub pull-request ingestion, feedback, cleanup retry, and persistence coverage are implemented.
-  Full GitHub App installation-token onboarding, provider smoke tests, and managed-domain public
+  A secret-gated live GitHub PR-comment feedback provider smoke gate is active. Full GitHub App
+  installation-token onboarding, broader hosted provider smoke coverage, and managed-domain public
   enablement remain future hardening/public enablement work.
 - [x] Scheduled task: create/list/show/update/delete, run now, run history/logs. Spec Round
   positioned by ADR-039 and `docs/specs/044-scheduled-task-resource-shape`.
@@ -2411,10 +2600,14 @@ work below before GA.
 - [x] Terminal session: active list/show/attach/close/expire and redacted metadata.
   WebSocket attach, active lifecycle list/show/close/expire, CLI and HTTP/oRPC lifecycle surfaces,
   operation catalog entries, docs/help, and safe metadata redaction coverage are implemented.
-- [ ] Terminal session: durable audit/history and interactive attach hardening.
-  Durable closed-session audit/history, direct CLI TTY attachment, local true PTY resize, container
-  exec, compose service shells, and Web E2E coverage stay open under the audit/event and terminal
-  workflow gaps.
+- [x] Terminal session: interactive attach hardening.
+  Web E2E coverage for resource/server attach, close-frame cleanup, resize-frame forwarding, and
+  active-session lifecycle is implemented with mocked attach sockets. Durable open/close audit
+  metadata is implemented through audit-event rows, without retaining terminal input/output.
+  Deployment detail deep-links to the selected resource terminal deployment, and CLI
+  server/resource `--attach` covers direct TTY bridging while preserving descriptor-only output as
+  the default. Local true PTY resize and provider-native terminals remain governed runtime/provider
+  follow-ups rather than Web affordance gaps.
 - [x] Outbox/inbox/job/process state: list/show/retry/cancel/dead-letter/prune, attempt ownership.
   ADR-054 positions durable process delivery as the accepted baseline. Scheduled-task runs now have
   first worker execution, atomic claims, completion, and retry-generation handoff. Scheduled
@@ -2423,7 +2616,8 @@ work below before GA.
   Scheduled history retention now has command-bus dispatch through durable process attempts, and
   the current accepted long-running workflow set has operator-visible process-attempt projection
   plus `operator-work.*` list/show/retry/cancel/dead-letter/prune coverage. Remaining automatic
-  provider/runtime retry workers are future opt-in slices, not a separate Phase 9 release blocker.
+  provider/runtime retry workers require governed explicitly-enabled worker slices and are not a
+  separate Phase 9 release blocker.
 - [x] Remote SSH PGlite state: partial config workflow.
 - [x] Remote SSH PGlite state: show locks/migrations/backups/recovery diagnostics.
   Operator-work aggregation and SSH diagnostics producer/read-model coverage expose safe lock,
@@ -2485,11 +2679,19 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
   exist.
 - [x] React/Vue/Svelte/Solid SPA: detect framework-specific outputs and route static output through
   static-server artifacts where Vite evidence is not sufficient.
-- [x] Static/Node/Python fixture smoke: current supported JavaScript/TypeScript/Python catalog
-  resource profiles produce Docker/OCI image artifact plans and headless execution evidence.
-- [x] Static/Node/Python real fixture smoke: representative opt-in local Docker slice builds, runs,
-  verifies internal HTTP, and records runtime metadata/logs from the same resource profile
-  vocabulary.
+- [x] Static/Node/Python/JVM fixture smoke: current supported JavaScript/TypeScript/Python/JVM
+  catalog resource profiles produce Docker/OCI image artifact plans and headless execution evidence.
+- [x] Static/Node/Python/JVM real fixture smoke: shared GitHub Actions/local explicit Docker and
+  generic-SSH fixture slices build, run, verify internal HTTP, and record runtime metadata/logs from
+  the same resource profile vocabulary when explicit external targets are configured.
+- [x] Spring Boot real fixture smoke: generated Dockerfiles use Maven/Gradle build images and the
+  Maven wrapper/no-wrapper plus Gradle Groovy/Kotlin DSL fixtures have GitHub Actions/local explicit
+  Docker/generic-SSH smoke descriptors.
+- [x] Generic Java deterministic jar real fixture smoke: `generic-java-jar` is a runnable jar fixture
+  and owns the `ZSSH-CATALOG-012` local Docker/generic-SSH smoke descriptor.
+- [x] Quarkus Maven JVM jar real fixture smoke: generated Dockerfiles use a Maven build image and
+  start `target/quarkus-app/quarkus-run.jar` through the `ZSSH-CATALOG-017` local
+  Docker/generic-SSH smoke descriptor.
 - [x] Nuxt/SvelteKit/Astro/Remix: Nuxt generate static, SvelteKit adapter-static/static, Astro
   static, and Remix server planner exist.
 - [ ] Nuxt/SvelteKit/Astro/Remix: add SSR/server modes where Docker/OCI start command is
@@ -2500,11 +2702,13 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
 - [x] Python: FastAPI, Django, Flask, generic Python, `uv`, Poetry, and pip baseline exist.
 - [x] Python: harden ASGI/WSGI app discovery, module/app target selection, package-tool command
   rendering, explicit fallback, and headless Docker/OCI fixture readiness.
-- [ ] Python: harden collectstatic/static handling and broaden real Docker/SSH smoke beyond the
-  representative slice.
+- [x] Python: broaden real Docker/SSH smoke beyond the representative slice through the shared
+  framework smoke descriptor set. Deeper Django collectstatic/static handling remains separate
+  planner hardening.
 - [x] Java/JVM: generic Maven/Gradle planner exists.
 - [x] Java/JVM: add Spring Boot first.
-- [ ] Java/JVM: add Quarkus/Micronaut if demand justifies it.
+- [x] Java/JVM: add Quarkus Maven JVM jar mode.
+- [ ] Java/JVM: add Micronaut if demand justifies it.
 - [ ] Ruby: add Rails and generic Rack/Sinatra planners or explicit fallback errors.
 - [ ] PHP: add Composer app planner with PHP-FPM or app-server policy.
 - [ ] Go: add generic Go build plus common HTTP framework detection as metadata/defaults.
@@ -2526,13 +2730,9 @@ External baseline research points to this practical minimum:
 - [x] Generated domains and custom domains as separate concepts.
 - [ ] Full HTTPS/ACME, force HTTPS, and redirect lifecycle closure.
 - [ ] Environment variables, build-time arguments, build secrets, and secret masking.
-- [ ] Persistent storage and databases with service binding, backup/restore, and deletion behavior.
-  Docker-backed Appaloft-managed Postgres/Redis for `local-shell` and `generic-ssh`
-  single-server targets now covers provision, safe secret storage, bind-ready runtime injection,
-  backup/restore, provider cleanup, and Web console lifecycle controls; storage-volume parity,
-  scheduled backup policy, and broader database/provider catalog coverage remain open.
-- [ ] Git source binding, webhooks, auto-deploy, Action PR previews, and product-grade preview
-  deployments.
+- [x] Persistent storage and databases with service binding, backup/restore, and deletion behavior.
+- [x] Git source binding, Action PR previews, and product-grade preview deployments.
+- [ ] Webhook/auto-deploy delivery attempts, replay, secret rotation, and day-two management.
 - [ ] Deployment history, standalone event stream, health checks, rollbacks, and resource limits.
 - [ ] Framework auto-detection broad enough for modern frontend frameworks and common backend
   frameworks.
@@ -2552,13 +2752,15 @@ Recommended next Spec Rounds before broad Code Rounds:
 - [x] Framework support tier matrix: promote Web/CLI/repository config draft-field parity and
   equivalent Quick Deploy smoke/acceptance rows for the current JavaScript/TypeScript/Python slice.
 - [x] Framework support tier matrix: add fixture-by-fixture Docker/OCI smoke rows and executable
-  headless coverage for the current supported JavaScript/TypeScript/Python catalog.
-- [x] Framework support tier matrix: add and run the first representative opt-in real local Docker
-  fixture smoke slice for static/frontend, Node/server, and Python/server fixtures.
+  headless coverage for the current supported JavaScript/TypeScript/Python/JVM catalog.
+- [x] Framework support tier matrix: add and run the first representative GitHub Actions/local
+  explicit real local Docker fixture smoke slice for static/frontend, Node/server, and Python/server
+  fixtures.
 - [x] Framework support tier matrix: promote JavaScript/TypeScript catalog closure rows and
   `deployments.plan/v1` catalog preview contract rows for tested headless Docker/OCI readiness.
-- [ ] Framework support tier matrix: broaden fixture-by-fixture real Docker/SSH deployment smoke
-  rows for the full JavaScript/TypeScript/Python catalog.
+- [x] Framework support tier matrix: broaden fixture-by-fixture real Docker/SSH deployment smoke
+  rows for the active JavaScript/TypeScript/Python/JVM catalog through shared GitHub Actions/local
+  explicit smoke descriptors.
 - [ ] Deployment observation and recovery: harden `deployments.stream-events` reconnect/gap/CLI
   coverage, then rebuild retry/redeploy, rollback candidate/readiness, and ADR-016 recovery
   decisions.
@@ -2567,7 +2769,6 @@ Recommended next Spec Rounds before broad Code Rounds:
 - [x] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,
   backup/restore, delete, and opt-in scheduled backup policy configuration. Docker-backed
   Appaloft-managed Postgres/Redis for single-server targets is implemented in the shell provider and
-  Web console; remaining work is backup prune/export, storage-volume parity, and broader provider
-  catalog coverage.
+  Web console; remaining work is backup prune/export and broader provider catalog coverage.
 - [ ] Operator state closure: outbox/inbox/jobs, remote SSH state diagnostics, runtime target
   capacity diagnostics, audit/event retention, and prune/recovery commands.

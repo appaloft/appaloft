@@ -65,9 +65,18 @@ function testConfig(
       intervalSeconds: 300,
       batchSize: 25,
     },
+    previewExpiryCleanupScheduler: {
+      enabled: false,
+      intervalSeconds: 300,
+      batchSize: 25,
+    },
     dockerSwarmExecution: {
       enabled: false,
       commandTimeoutMs: 60000,
+    },
+    terminalSessions: {
+      activeTtlSeconds: 3600,
+      outputRetentionBytes: 65536,
     },
     scheduledTaskRunner: {
       enabled: false,
@@ -87,6 +96,13 @@ function testConfig(
     scheduledHistoryRetentionRunner: {
       enabled: false,
       intervalSeconds: 3600,
+      batchSize: 25,
+    },
+    runtimeMonitoringCollectorRunner: {
+      enabled: false,
+      intervalSeconds: 60,
+      batchSize: 25,
+      rawRetentionHours: 24,
     },
     enabledSystemPlugins: [],
   };

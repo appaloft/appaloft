@@ -48,8 +48,8 @@ catalog entries, and code must distinguish:
 - `runtime-monitoring.samples.list`: bounded raw sample windows for charts and diagnostics;
 - `runtime-monitoring.rollup`: bounded time-window rollups for server, project, environment,
   resource, and deployment scopes;
-- `runtime-monitoring-thresholds.configure`: non-enforcing threshold policy;
-- `runtime-monitoring-thresholds.show`: threshold policy and latest evaluation readback.
+- `runtime-monitoring.thresholds.configure`: non-enforcing threshold policy;
+- `runtime-monitoring.thresholds.show`: threshold policy and latest evaluation readback.
 
 Runtime monitoring samples are retained read-side observation records. They are not domain events,
 audit rows, billing facts, deployment snapshots, or quota ledgers. Sample writes may be performed by
@@ -122,10 +122,14 @@ handoff points, but they must not leak provider SDK types or external metric lan
   detail pages, with project/environment pages showing rollups only.
 - Resource logs and deployment logs remain separate query surfaces, but monitoring UI may correlate
   them with charts and event markers.
-- CLI, HTTP/oRPC, Web, generated SDK, and future MCP/tool descriptors must share operation catalog
-  schemas when each slice is implemented.
-- Code Round cannot begin until query/command specs, testing matrix rows, public docs/help anchors,
-  retention policy, and persistence/read-model ownership are accepted.
+- CLI, HTTP/oRPC, Web, generated SDK, and MCP/tool descriptors must share operation catalog schemas
+  when each slice is implemented.
+- Code Round for retained sample and rollup reads can begin after Test-First because local query
+  specs, testing matrix rows, retention bounds, and persistence/read-model ownership are accepted
+  for `runtime-monitoring.samples.list` and `runtime-monitoring.rollup`.
+- Threshold policy writes remain exact-scope. Threshold readback may inherit the nearest parent
+  policy only from retained sample scope evidence when no exact policy exists; organization/system
+  defaults remain a future governed policy slice.
 
 ## Governed Specs
 
@@ -133,24 +137,38 @@ handoff points, but they must not leak provider SDK types or external metric lan
 - [Runtime Usage Attribution And Monitoring](../specs/068-runtime-usage-attribution-and-monitoring/spec.md)
 - [runtime-usage.inspect Query Spec](../queries/runtime-usage.inspect.md)
 - [Runtime Usage Attribution Test Matrix](../testing/runtime-usage-attribution-test-matrix.md)
+- [Runtime Monitoring Observation Test Matrix](../testing/runtime-monitoring-observation-test-matrix.md)
 - [Business Operation Map](../BUSINESS_OPERATION_MAP.md)
 - [Product Roadmap](../PRODUCT_ROADMAP.md)
 - [Adapter Command/Query Boundary](../architecture/adapter-command-query-boundary.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 - [Error Model](../errors/model.md)
 
-## Migration Gaps
+## Current Implementation Notes And Remaining Gaps
 
-- `runtime-usage.inspect` is implemented for current attribution, but retained samples, time-window
-  rollups, persistent chart history, and thresholds are not implemented.
-- A short-term Web live monitor now reuses `runtime-usage.inspect` polling to keep browser-local
-  rolling samples and render CPU, memory, and disk sparklines on server/resource Monitor tabs. These
-  browser-local samples are not retained monitoring samples and do not satisfy the future
-  `runtime-monitoring.samples.list` or `runtime-monitoring.rollup` operations.
+- `runtime-usage.inspect` is implemented for current attribution. Retained samples, time-window
+  rollups, collector process visibility, and a disabled-by-default active-server/resource/
+  deployment/project/environment collector runner are implemented.
+- Local query specs now accept `runtime-monitoring.samples.list` and `runtime-monitoring.rollup`.
+  Application, persistence, collector, scheduled retention dispatch, CLI, HTTP/oRPC, server/resource
+  Web Monitor readback, SDK metadata, public docs, and generated MCP/tool descriptors now exist for
+  retained monitoring reads.
+- Exact-scope `runtime-monitoring.thresholds.configure` and
+  `runtime-monitoring.thresholds.show` are implemented through application, PG/PGlite, CLI,
+  HTTP/oRPC, server/resource Web Monitor threshold state readback and exact-scope CPU/memory/disk
+  threshold configuration, sample-evidence-based parent policy inheritance, SDK metadata, and
+  generated MCP/tool descriptor/handler dispatch.
+- A short-term Web Monitor now reads retained `runtime-monitoring.samples.list` data when available
+  and falls back to `runtime-usage.inspect` browser-local rolling samples for CPU, memory, and disk
+  sparklines. It also reads `runtime-monitoring.rollup` for latest deployment markers and top
+  contributors. Browser-local samples are not persisted monitoring samples.
 - Resource runtime logs, deployment logs, deployment events, health, access, and diagnostics already
-  exist as separate observation surfaces. The Web monitor links to logs/events/diagnostics, but a
-  durable backend rollup/read-model composition is still pending.
-- Public docs mention runtime usage inspect and capacity diagnostics, but do not yet describe the
-  future monitoring surface because the slice is not implemented.
-- Future MCP/tool descriptors for runtime monitoring remain pending until operation catalog entries
-  are added in Code Round.
+  exist as separate observation surfaces. The Web Monitor links to logs/events/diagnostics and
+  retained rollup/deployment-marker read models are implemented; full cross-surface time-window
+  filtering across logs, events, diagnostics, and monitoring charts remains a later Web Code Round.
+- Public docs mention runtime usage inspect, capacity diagnostics, retained sample/rollup read APIs,
+  exact-scope threshold policy CLI/API entrypoints, server/resource Web Monitor readback and
+  CPU/memory/disk threshold configuration, sample-evidence-based threshold inheritance,
+  project/environment rollup-only readback, external observability handoff, and the
+  disabled-by-default collector runner without claiming organization/system threshold defaults,
+  alert routing, Prometheus-compatible storage, or long-retention analytics exist yet.

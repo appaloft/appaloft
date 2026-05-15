@@ -432,14 +432,14 @@ Next Test-First Round should add or cover these rows:
 - `QUICK-DEPLOY-ENTRY-011` for deploy-action parity with CLI config workflow.
 - `QUICK-DEPLOY-ENTRY-012` for control-plane mode parity across entrypoints.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 The main repository already publishes release artifacts with CLI platform archives, the static
 Docker self-host installer, checksums, release manifest, release notes, and release asset upload.
 
-The main repository already has an opt-in SSH e2e harness that simulates GitHub Actions process
-boundaries by running two separate CLI processes against the same SSH-server state. That proves the
-underlying CLI behavior.
+The main repository already has a GitHub Actions secret-gated and local explicit SSH e2e harness
+that simulates GitHub Actions process boundaries by running two separate CLI processes against the
+same SSH-server state. That proves the underlying CLI behavior.
 
 The main repository now also contains a reference composite action under
 `.github/actions/deploy-action`. It includes:
@@ -466,10 +466,10 @@ The main repository now also contains a reference composite action under
   repository. The wrapper test suite verifies the exported repository layout matches the reference
   action.
 - `.github/workflows/ci.yml` under the exported wrapper layout validates shell script syntax,
-  dry-run PR preview argument/output mapping, and an opt-in exact-version install smoke controlled
-  by the public repository's `APPALOFT_INSTALL_SMOKE_VERSION` variable.
+  dry-run PR preview argument/output mapping, and a GitHub Actions variable-gated exact-version
+  install smoke controlled by the public repository's `APPALOFT_INSTALL_SMOKE_VERSION` variable.
 
-Missing pieces before public release:
+Remaining public wrapper release follow-ups:
 
 - create the `appaloft/deploy-action` repository;
 - run the export script into the public wrapper repository and enable the exported public wrapper

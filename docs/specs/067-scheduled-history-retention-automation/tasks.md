@@ -37,7 +37,8 @@
 - [x] Keep public surfaces at `retention-defaults.*`, manual prune commands, and `operator-work.*`
   unless a governed public scheduled-retention entrypoint enters scope.
 - [x] Link public docs/help to existing retention defaults, manual prune, and operator work anchors.
-- [x] Keep Web as future operator maintenance surface unless a governed UI slice is in scope.
+- [x] Keep Web maintenance write controls out of this worker slice; expose configured worker status
+  only through governed diagnostics/status surfaces.
 
 ## Verification
 
@@ -50,4 +51,4 @@
 ## Post-Implementation Sync
 
 - [x] Reconcile ADR-061, feature artifacts, roadmap, operation map, test matrix, docs/help, code,
-  tests, and remaining migration gaps.
+  tests, and governed follow-ups.

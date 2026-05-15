@@ -3,7 +3,10 @@
 ## Status
 
 - Round: Code Round / Post-Implementation Sync
-- Artifact state: implemented with retained migration gaps
+- Artifact state: active baseline; policy command/query surfaces, persistence-backed discovery,
+  disabled-by-default runner wiring, durable process visibility, audit reuse, repository config
+  materialization, and maintenance-worker status readback are implemented. Web policy editing is an
+  optional future affordance, not a blocker for the scheduled prune execution boundary.
 
 ## Business Outcome
 
@@ -50,8 +53,9 @@ the same safety, dry-run, audit, and operator-work visibility guarantees as manu
   HTTP/oRPC adapters expose those surfaces through command/query bus dispatch and shared schemas.
 - Operator visibility: `operator-work.list/show/retry/cancel/dead-letter/mark-recovered/prune`
   cover accepted scheduled prune process attempts.
-- Web/UI: future policy configuration and maintenance panels may use the same policy and operator
-  work surfaces.
+- Web/UI: Instance diagnostics expose configured maintenance-worker status, including whether the
+  scheduled runtime prune runner is enabled. A future Web policy editor may use the same policy and
+  operator-work surfaces, but policy editing is already available through CLI and HTTP/oRPC.
 - Config: runtime prune policy configuration through the application command surface is required
   before destructive scheduled prune can be enabled. Repository config may also carry a
   `retention.runtimePrune` profile. During deployment config bootstrap, Appaloft materializes that
@@ -72,7 +76,7 @@ the same safety, dry-run, audit, and operator-work visibility guarantees as manu
   domain event stream retention.
 - A generic retention scheduler for every Appaloft retention boundary in the first slice.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 - Manual `servers.capacity.prune` is implemented with dry-run default, destructive opt-in, adapter
   safety exclusions, Docker build-cache/unused-image category opt-in, CLI/oRPC entrypoints, and

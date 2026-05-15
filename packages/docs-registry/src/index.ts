@@ -249,7 +249,9 @@ export const publicDocsHelpTopics = {
       "docs/testing/deployment-target-lifecycle-test-matrix.md",
       "docs/workflows/server-bootstrap-and-proxy.md",
     ],
-    webSurfaces: ["apps/web server list/detail and registration surfaces"],
+    webSurfaces: [
+      "apps/web server list/detail and registration surfaces, including server detail rename, edge proxy configuration, typed deactivate, delete safety, and typed delete confirmation",
+    ],
   },
   "server.docker-swarm-target": {
     id: "server.docker-swarm-target",
@@ -572,9 +574,14 @@ export const publicDocsHelpTopics = {
       "zh-CN": "complete",
       "en-US": "complete",
     },
-    surfaces: ["cli", "mcp"],
+    surfaces: ["cli", "http-api", "web", "mcp"],
     relatedOperation: "deployments.cleanup-preview",
     aliases: ["preview cleanup", "pull request preview", "temporary deployment", "预览清理"],
+    specReferences: [
+      "docs/commands/deployments.cleanup-preview.md",
+      "docs/testing/deployments.cleanup-preview-test-matrix.md",
+      "docs/workflows/github-action-pr-preview-deploy.md",
+    ],
   },
   "deployment.pr-preview-action": {
     id: "deployment.pr-preview-action",
@@ -642,7 +649,9 @@ export const publicDocsHelpTopics = {
       "docs/decisions/ADR-025-control-plane-modes-and-action-execution.md",
       "docs/decisions/ADR-037-source-event-auto-deploy-ownership.md",
     ],
-    webSurfaces: ["Future Cloud/self-hosted preview policy and preview environment surfaces"],
+    webSurfaces: [
+      "Web preview policy readback/configuration, preview environment list/detail/delete surfaces, and Bun.WebView Resource detail Previews cleanup verification.",
+    ],
   },
   "resource.source-profile": {
     id: "resource.source-profile",
@@ -877,15 +886,20 @@ export const publicDocsHelpTopics = {
       "docs/workflows/resource-profile-lifecycle.md",
       "docs/testing/storage-volume-test-matrix.md",
       "docs/specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md",
+      "docs/specs/070-storage-volume-runtime-realization-and-cleanup/spec.md",
+      "docs/decisions/ADR-064-storage-volume-runtime-realization-and-cleanup.md",
       "docs/commands/storage-volumes.create.md",
       "docs/commands/storage-volumes.rename.md",
       "docs/commands/storage-volumes.delete.md",
+      "docs/commands/storage-volumes.cleanup-runtime.md",
       "docs/commands/resources.attach-storage.md",
       "docs/commands/resources.detach-storage.md",
       "docs/queries/storage-volumes.list.md",
       "docs/queries/storage-volumes.show.md",
     ],
-    webSurfaces: ["Web write UI deferred; resources.show can read storage attachment summary."],
+    webSurfaces: [
+      "Web Resource detail can list/create/rename/delete provider-neutral storage volume records, attach/detach Resource storage attachments, and run dry-run-first scoped runtime cleanup; Bun.WebView route coverage exercises list/create/attach/detach and dry-run-first cleanup, CLI/API/Web cleanup preserves backup/restore safety evidence, and Docker Swarm Compose stack realization is deployment-driven through generated Appaloft overrides.",
+    ],
   },
   "dependency.resource-lifecycle": {
     id: "dependency.resource-lifecycle",
@@ -901,7 +915,7 @@ export const publicDocsHelpTopics = {
       "zh-CN": "complete",
       "en-US": "complete",
     },
-    surfaces: ["cli", "http-api", "mcp"],
+    surfaces: ["cli", "http-api", "web", "mcp"],
     relatedOperation: "dependency-resources.list",
     aliases: [
       "dependency resource",
@@ -946,7 +960,53 @@ export const publicDocsHelpTopics = {
       "docs/queries/resources.show-dependency-binding.md",
     ],
     webSurfaces: [
-      "Web dependency-resource write UI deferred; Resource detail can read binding summaries and dependency runtime injection readiness.",
+      "Web Resource detail dependency controls can create managed Postgres/Redis resources, import external Postgres/Redis resources through the safe connection boundary, rename/delete dependency records with safety blockers, bind ready dependencies, list active bindings, rotate binding secrets with historical-snapshot acknowledgement, and unbind runtime injection targets.",
+    ],
+  },
+  "dependency.backup-restore": {
+    id: "dependency.backup-restore",
+    title: "Dependency backup and restore",
+    description:
+      "How dependency resource backup restore points, in-place restore acknowledgements, provider-safe artifacts, and delete safety work.",
+    page: {
+      "zh-CN": "resources/dependencies",
+      "en-US": "en/resources/dependencies",
+    },
+    anchor: "dependency-backup-restore",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "web", "mcp"],
+    relatedOperation: "dependency-resources.create-backup",
+    aliases: [
+      "dependency backup",
+      "dependency restore",
+      "database backup",
+      "restore point",
+      "in-place restore",
+      "backup retention",
+      "依赖备份",
+      "数据库恢复",
+      "恢复点",
+    ],
+    specReferences: [
+      "docs/specs/039-dependency-resource-backup-restore/spec.md",
+      "docs/decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md",
+      "docs/testing/dependency-resource-test-matrix.md",
+      "docs/commands/dependency-resources.create-backup.md",
+      "docs/commands/dependency-resources.restore-backup.md",
+      "docs/queries/dependency-resources.list-backups.md",
+      "docs/queries/dependency-resources.show-backup.md",
+      "docs/events/dependency-resource-backup-requested.md",
+      "docs/events/dependency-resource-backup-completed.md",
+      "docs/events/dependency-resource-backup-failed.md",
+      "docs/events/dependency-resource-restore-requested.md",
+      "docs/events/dependency-resource-restore-completed.md",
+      "docs/events/dependency-resource-restore-failed.md",
+    ],
+    webSurfaces: [
+      "Web Resource detail dependency backup/restore controls can create backup restore points, list safe restore point summaries, and start acknowledged in-place restores through the active HTTP/oRPC contracts.",
     ],
   },
   "dependency.runtime-injection": {
@@ -1002,7 +1062,7 @@ export const publicDocsHelpTopics = {
       "zh-CN": "complete",
       "en-US": "complete",
     },
-    surfaces: ["cli", "http-api", "mcp"],
+    surfaces: ["cli", "http-api", "web", "mcp"],
     relatedOperation: "scheduled-tasks.create",
     aliases: [
       "scheduled task",
@@ -1020,7 +1080,9 @@ export const publicDocsHelpTopics = {
       "docs/testing/scheduled-task-resource-test-matrix.md",
       "docs/architecture/async-lifecycle-and-acceptance.md",
     ],
-    webSurfaces: ["Web controls deferred; CLI, HTTP/API, and future MCP help links are active."],
+    webSurfaces: [
+      "Resource detail scheduled-task controls expose create, configure, delete, run-now, history, logs, and docs help links.",
+    ],
   },
   "server.ssh-credential": {
     id: "server.ssh-credential",
@@ -1168,6 +1230,11 @@ export const publicDocsHelpTopics = {
       "docs/testing/operator-terminal-session-test-matrix.md",
     ],
     aliases: ["terminal", "shell", "ssh session", "terminal session lifecycle", "终端"],
+    webSurfaces: [
+      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource-scoped terminal open and attach",
+      "apps/web/src/routes/servers/[serverId]/+page.svelte: server-scoped terminal open and attach",
+      "apps/web/src/routes/instance/+page.svelte: active terminal session lifecycle list, close, and expire with Bun.WebView route coverage",
+    ],
   },
   "environment.concept": {
     id: "environment.concept",
@@ -1327,6 +1394,14 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "repository-config", "mcp"],
     relatedOperation: "domain-bindings.create",
     aliases: ["custom domain", "domain binding", "hostname", "自定义域名"],
+    specReferences: [
+      "docs/testing/routing-domain-and-tls-test-matrix.md",
+      "docs/commands/domain-bindings.create.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/domain-bindings/+page.svelte: standalone domain binding create form",
+      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource-scoped domain binding create form",
+    ],
   },
   "domain.ownership-check": {
     id: "domain.ownership-check",
@@ -1344,6 +1419,14 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "domain-bindings.confirm-ownership",
     aliases: ["ownership", "dns verification", "domain verify", "所有权"],
+    specReferences: [
+      "docs/testing/routing-domain-and-tls-test-matrix.md",
+      "docs/commands/domain-bindings.confirm-ownership.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/domain-bindings/+page.svelte: standalone ownership confirmation action",
+      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource-scoped ownership confirmation action",
+    ],
   },
   "certificate.readiness": {
     id: "certificate.readiness",
@@ -1505,6 +1588,16 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "resources.diagnostic-summary",
     aliases: ["diagnostic", "support payload", "logs", "secret masking", "诊断"],
+    specReferences: [
+      "docs/workflows/resource-diagnostic-summary.md",
+      "docs/queries/resources.diagnostic-summary.md",
+      "docs/testing/resource-diagnostic-summary-test-matrix.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource detail diagnostic copy action",
+      "apps/web/src/routes/deployments/[deploymentId]/+page.svelte: deployment detail diagnostic copy action",
+      "apps/web/src/lib/components/console/QuickDeploySheet.svelte: Quick Deploy completion diagnostic copy action",
+    ],
   },
   "diagnostics.access-failure-request-id": {
     id: "diagnostics.access-failure-request-id",
@@ -1582,6 +1675,72 @@ export const publicDocsHelpTopics = {
       "docs/decisions/ADR-062-runtime-usage-attribution-boundary.md",
       "docs/queries/runtime-usage.inspect.md",
       "docs/testing/runtime-usage-attribution-test-matrix.md",
+    ],
+  },
+  "diagnostics.runtime-monitoring": {
+    id: "diagnostics.runtime-monitoring",
+    title: "Runtime monitoring samples and rollups",
+    description:
+      "How to read retained runtime monitoring samples, rollups, and deployment markers without collecting fresh data or mutating runtime targets.",
+    page: {
+      "zh-CN": "observe/diagnostics",
+      "en-US": "en/observe/diagnostics",
+    },
+    anchor: "runtime-monitoring-samples-and-rollups",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "web", "mcp"],
+    relatedOperation: "runtime-monitoring.rollup",
+    aliases: [
+      "runtime monitoring",
+      "monitoring samples",
+      "runtime rollup",
+      "deployment markers",
+      "运行时监控",
+      "监控采样",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-063-runtime-monitoring-observation-boundary.md",
+      "docs/queries/runtime-monitoring.samples.list.md",
+      "docs/queries/runtime-monitoring.rollup.md",
+      "docs/testing/runtime-monitoring-observation-test-matrix.md",
+    ],
+    webSurfaces: [
+      "Server/resource Monitor tabs show retained samples and rollups; Project detail shows project and selected-environment rollup-only readback.",
+    ],
+  },
+  "diagnostics.runtime-monitoring-thresholds": {
+    id: "diagnostics.runtime-monitoring-thresholds",
+    title: "Runtime monitoring thresholds",
+    description:
+      "How exact-scope runtime monitoring thresholds produce non-enforcing warning and critical readback.",
+    page: {
+      "zh-CN": "observe/diagnostics",
+      "en-US": "en/observe/diagnostics",
+    },
+    anchor: "runtime-monitoring-thresholds",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "web", "mcp"],
+    relatedOperation: "runtime-monitoring.thresholds.show",
+    aliases: [
+      "runtime thresholds",
+      "monitoring thresholds",
+      "CPU threshold",
+      "memory threshold",
+      "disk threshold",
+      "threshold policy",
+      "监控阈值",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-063-runtime-monitoring-observation-boundary.md",
+      "docs/commands/runtime-monitoring-thresholds.configure.md",
+      "docs/queries/runtime-monitoring-thresholds.show.md",
+      "docs/testing/runtime-monitoring-observation-test-matrix.md",
     ],
   },
   "diagnostics.scheduled-runtime-prune-policy": {
@@ -1818,6 +1977,39 @@ export const publicDocsHelpTopics = {
     surfaces: ["cli", "http-api", "mcp"],
     relatedOperation: "system.doctor",
     aliases: ["doctor", "database", "control plane", "控制面"],
+  },
+  "advanced.maintenance-workers": {
+    id: "advanced.maintenance-workers",
+    title: "Maintenance worker activation",
+    description:
+      "How to read configured maintenance worker activation, the certificate retry exception, and which scheduled workers are disabled by default without starting or ticking them.",
+    page: {
+      "zh-CN": "self-hosting/advanced",
+      "en-US": "en/self-hosting/advanced",
+    },
+    anchor: "maintenance-worker-activation",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "system.doctor",
+    specReferences: [
+      "docs/testing/system-diagnostics-test-matrix.md",
+      "apps/docs/src/content/docs/en/reference/configuration.md",
+      "apps/docs/src/content/docs/reference/configuration.md",
+    ],
+    aliases: [
+      "maintenance worker",
+      "scheduled worker",
+      "disabled by default",
+      "system doctor workers",
+      "维护 worker",
+      "定时 worker",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/instance/+page.svelte: read-only maintenance worker activation status with Bun.WebView route coverage",
+    ],
   },
   "self-hosting.upgrades": {
     id: "self-hosting.upgrades",
@@ -2321,6 +2513,26 @@ export const publicDocsOperationCoverage = [
     topicId: "diagnostics.runtime-usage",
   },
   {
+    operationKey: "runtime-monitoring.samples.list",
+    status: "documented",
+    topicId: "diagnostics.runtime-monitoring",
+  },
+  {
+    operationKey: "runtime-monitoring.rollup",
+    status: "documented",
+    topicId: "diagnostics.runtime-monitoring",
+  },
+  {
+    operationKey: "runtime-monitoring.thresholds.configure",
+    status: "documented",
+    topicId: "diagnostics.runtime-monitoring-thresholds",
+  },
+  {
+    operationKey: "runtime-monitoring.thresholds.show",
+    status: "documented",
+    topicId: "diagnostics.runtime-monitoring-thresholds",
+  },
+  {
     operationKey: "servers.capacity.prune",
     status: "documented",
     topicId: "diagnostics.runtime-target-capacity",
@@ -2589,6 +2801,11 @@ export const publicDocsOperationCoverage = [
     topicId: "storage.volume-lifecycle",
   },
   {
+    operationKey: "storage-volumes.cleanup-runtime",
+    status: "documented",
+    topicId: "storage.volume-lifecycle",
+  },
+  {
     operationKey: "scheduled-tasks.create",
     status: "documented",
     topicId: "scheduled-task.resource-lifecycle",
@@ -2776,22 +2993,37 @@ export const publicDocsOperationCoverage = [
   {
     operationKey: "dependency-resources.create-backup",
     status: "documented",
-    topicId: "dependency.resource-lifecycle",
+    topicId: "dependency.backup-restore",
   },
   {
     operationKey: "dependency-resources.list-backups",
     status: "documented",
-    topicId: "dependency.resource-lifecycle",
+    topicId: "dependency.backup-restore",
   },
   {
     operationKey: "dependency-resources.show-backup",
     status: "documented",
-    topicId: "dependency.resource-lifecycle",
+    topicId: "dependency.backup-restore",
   },
   {
     operationKey: "dependency-resources.restore-backup",
     status: "documented",
-    topicId: "dependency.resource-lifecycle",
+    topicId: "dependency.backup-restore",
+  },
+  {
+    operationKey: "dependency-resources.backup-policies.configure",
+    status: "documented",
+    topicId: "dependency.backup-restore",
+  },
+  {
+    operationKey: "dependency-resources.backup-policies.list",
+    status: "documented",
+    topicId: "dependency.backup-restore",
+  },
+  {
+    operationKey: "dependency-resources.backup-policies.show",
+    status: "documented",
+    topicId: "dependency.backup-restore",
   },
   { operationKey: "environments.create", status: "documented", topicId: "environment.concept" },
   { operationKey: "environments.list", status: "documented", topicId: "environment.concept" },
@@ -3087,7 +3319,7 @@ export const publicDocsOperationCoverage = [
     status: "documented",
     topicId: "deployment.source",
   },
-  { operationKey: "system.doctor", status: "documented", topicId: "advanced.control-plane" },
+  { operationKey: "system.doctor", status: "documented", topicId: "advanced.maintenance-workers" },
   {
     operationKey: "system.instance-upgrade.check",
     status: "documented",

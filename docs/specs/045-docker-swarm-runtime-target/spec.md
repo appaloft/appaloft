@@ -124,16 +124,19 @@ No new public operation key is accepted in this Spec Round.
 - OCI image runtime intent now also renders an adapter-owned apply plan that creates a
   deployment-specific candidate service, keeps workload traffic on Swarm networks without public
   host-port publication, orders verification before route promotion and superseded-service cleanup,
-  and keeps secret environment values as safe Docker secret references. The opt-in fake backend
-  executes that plan in candidate-create, verify, route-promotion, cleanup order and records
-  sanitized runtime identity on success.
+  and keeps secret environment values as safe Docker secret references. Compose runtime intent
+  renders a deployment-specific candidate stack through a generated Appaloft override when target
+  service metadata is explicit; the override carries identity labels, runtime env/secret
+  references, storage mounts, and edge-network attachment. The opt-in fake backend executes those
+  plans in candidate-create/deploy, verify, route-promotion, cleanup order and records sanitized
+  runtime identity on success.
 - The runtime adapter package also renders a label-scoped Swarm cleanup plan for services owned by
   the same Appaloft resource, deployment, target, destination, and runtime-target identity. The plan
   is wired only through the explicit fake-runner Swarm backend, not through default real execution.
 - An explicit `DockerSwarmExecutionBackend` now exists for fake-runner acceptance coverage and
-  default shell composition. It can execute the adapter-owned image apply plan and label-scoped
-  cleanup plan through an injected command runner and records sanitized Swarm runtime metadata on
-  successful deployment completion.
+  default shell composition. It can execute the adapter-owned image or Compose stack apply plan and
+  label-scoped cleanup plan through an injected command runner and records sanitized Swarm runtime
+  metadata on successful deployment completion.
 - Fake-runner failed verification now records deployment failure metadata, skips superseded-service
   cleanup, and runs the deployment-scoped cleanup plan for the failed candidate service without
   broad prune or volume commands.
@@ -175,8 +178,8 @@ No new public operation key is accepted in this Spec Round.
   payloads, and registry secret values are not part of that readback contract.
 - The runtime adapter test suite now includes an environment-gated real Docker Swarm smoke harness
   for apply, post-verification route-label promotion, real Traefik edge-proxy route realization,
-  secret redaction, registry-authenticated image pull, and scoped cleanup. It is skipped by default
-  and requires
+  secret redaction, registry-authenticated image pull, scoped cleanup, and Compose stack storage
+  mount realization through a generated Appaloft override. It is skipped by default and requires
   `APPALOFT_DOCKER_SWARM_SMOKE=1`, an active local Swarm manager, and an overlay network named by
   `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` or `appaloft-edge` before it mutates Docker state.
   `bun run smoke:swarm` is the first-class repository command for that opt-in smoke. The 2026-05-06

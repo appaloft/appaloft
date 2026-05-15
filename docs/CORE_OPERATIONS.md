@@ -48,7 +48,7 @@ to an explicit application operation.
 
 ## Business Capability Model
 
-The current Appaloft core is organized into eight implemented capability groups:
+The current Appaloft core is organized into nine implemented capability groups:
 - Projects
 - Deployment Targets
 - Environments
@@ -57,12 +57,13 @@ The current Appaloft core is organized into eight implemented capability groups:
 - Routing / Domain Bindings
 - Operator Work
 - System operations
+- Identity Governance / Self-Hosted Auth
 
 Each group below lists the currently implemented business operations.
-Identity governance and self-hosted auth are Phase 8 accepted-candidate capability groups; their
-operations must not be treated as active until they are added to this document and
+Identity governance and self-hosted auth operations listed here are active only when they are also
+present in
 [`operation-catalog.ts`](/Users/nichenqin/projects/appaloft/packages/application/src/operation-catalog.ts)
-in the same Code Round.
+with matching command/query messages and transport declarations.
 
 ## Projects
 
@@ -157,6 +158,8 @@ Implemented operations:
 | Configure scheduled runtime prune policy | Command | `scheduled-runtime-prune-policies.configure` | `ConfigureScheduledRuntimePrunePolicyCommand` | `ConfigureScheduledRuntimePrunePolicyCommandInput` | `appaloft server capacity policy configure --scope <scope> --retention-days <days>` | `POST /api/servers/capacity/policies` |
 | List scheduled runtime prune policies | Query | `scheduled-runtime-prune-policies.list` | `ListScheduledRuntimePrunePoliciesQuery` | `ListScheduledRuntimePrunePoliciesQueryInput` | `appaloft server capacity policy list` | `GET /api/servers/capacity/policies` |
 | Show scheduled runtime prune policy | Query | `scheduled-runtime-prune-policies.show` | `ShowScheduledRuntimePrunePolicyQuery` | `ShowScheduledRuntimePrunePolicyQueryInput` | `appaloft server capacity policy show <policyId>` | `GET /api/servers/capacity/policies/{policyId}` |
+| List runtime monitoring samples | Query | `runtime-monitoring.samples.list` | `ListRuntimeMonitoringSamplesQuery` | `ListRuntimeMonitoringSamplesQueryInput` | `appaloft runtime-monitoring samples <scope> --from <iso> --to <iso>` | `GET /api/runtime-monitoring/samples` |
+| Read runtime monitoring rollup | Query | `runtime-monitoring.rollup` | `RuntimeMonitoringRollupQuery` | `RuntimeMonitoringRollupQueryInput` | `appaloft runtime-monitoring rollup <scope> --from <iso> --to <iso> --bucket <bucket>` | `GET /api/runtime-monitoring/rollup` |
 - server registration may carry edge proxy intent/provider selection; when omitted, the deployment
   target records the configured default edge proxy intent and an asynchronous lifecycle path
   attempts proxy bootstrap
@@ -188,21 +191,26 @@ Implemented operations:
   resource rollups, and runtime ids when the labels are present. Source workspace metadata can
   provide deployment-id evidence that is enriched from deployment read models before scope rollups
   are returned; retained runtime identity metadata can add runtime ids when present. The query must
-  not prune, repair, stop/start/restart workloads, deploy, enforce quota, persist samples, or mutate
-  Appaloft records. Retained samples and rollup read models remain governed follow-up slices.
+  remain the point-in-time current attribution boundary.
+- `runtime-monitoring.samples.list` and `runtime-monitoring.rollup` are active read queries for the
+  first retained monitoring slice. They read persisted monitoring samples and deployment marker read
+  models only; they must not collect new samples, connect to targets, mutate runtime state, enforce
+  thresholds, or copy runtime/deployment log lines into monitoring records.
 
-Future runtime monitoring operations:
+Runtime monitoring operations:
 
 | Capability | Kind | Operation Key | Current state |
 | --- | --- | --- | --- |
-| List runtime monitoring samples | Query | `runtime-monitoring.samples.list` | Future Spec/Test-First/Code Round after retained sample store and retention policy are accepted. |
-| Read runtime monitoring rollups | Query | `runtime-monitoring.rollup` | Future Spec/Test-First/Code Round after rollup query contract and chart DTOs are accepted. |
-| Configure runtime monitoring thresholds | Command | `runtime-monitoring-thresholds.configure` | Future Spec/Test-First/Code Round; thresholds are non-enforcing observation policy only. |
-| Show runtime monitoring thresholds | Query | `runtime-monitoring-thresholds.show` | Future Spec/Test-First/Code Round; readback only, no runtime enforcement. |
+| List runtime monitoring samples | Query | `runtime-monitoring.samples.list` | Application, PG/PGlite read model and sample write/prune stores, internal collector service with process visibility through the runtime-usage query boundary, disabled-by-default active-server/resource/deployment/project/environment collector runner, scheduled history retention dispatch, CLI, HTTP/oRPC, server/resource Web Monitor readback, SDK operation metadata, generated MCP/tool descriptor, MCP/tool handler dispatch through the shared query boundary, MCP-facing tool server registration, WebView Observe surface verification, operation docs metadata, and public diagnostics docs implemented. |
+| Read runtime monitoring rollups | Query | `runtime-monitoring.rollup` | Application rollup service, PG deployment marker read model, PG/PGlite sample write/prune stores, internal collector service with process visibility through the runtime-usage query boundary, disabled-by-default active-server/resource/deployment/project/environment collector runner, scheduled history retention dispatch, CLI, HTTP/oRPC, server/resource Web Monitor rollup summary/marker readback, Project detail project/selected-environment rollup-only readback, SDK operation metadata, generated MCP/tool descriptor, MCP/tool handler dispatch through the shared query boundary, MCP-facing tool server registration, WebView Observe surface verification, operation docs metadata, and public diagnostics docs implemented. |
+| Configure runtime monitoring thresholds | Command | `runtime-monitoring.thresholds.configure` | Application command/use case, PG/PGlite exact-scope policy persistence, CLI, HTTP/oRPC, server/resource Web Monitor exact-scope CPU/memory/disk threshold configuration, SDK metadata, and generated MCP/tool descriptor/handler dispatch implemented. Writes stay exact-scope; Web creates an exact-scope override when saving inherited readback. Thresholds are non-enforcing observation policy only. |
+| Show runtime monitoring thresholds | Query | `runtime-monitoring.thresholds.show` | Application query service, PG/PGlite policy readback/evaluation, sample-evidence-based parent policy inheritance, CLI, HTTP/oRPC, server/resource Web Monitor readback, SDK metadata, and generated MCP/tool descriptor/handler dispatch implemented. Readback only, no runtime enforcement. |
 
 - Runtime monitoring is governed by
   [ADR-063: Runtime Monitoring Observation Boundary](./decisions/ADR-063-runtime-monitoring-observation-boundary.md)
-  and [Runtime Monitoring Observation Boundary](./specs/069-runtime-monitoring-observation-boundary/spec.md).
+  [Runtime Monitoring Observation Boundary](./specs/069-runtime-monitoring-observation-boundary/spec.md),
+  and
+  [Runtime Monitoring Observation Test Matrix](./testing/runtime-monitoring-observation-test-matrix.md).
   It may add bounded samples, rollups, charts, deployment markers, log/event/diagnostic links, and
   non-enforcing threshold state. It must not become Prometheus-compatible storage, arbitrary metric
   ingestion, APM/tracing, dashboard building, alert routing, billing analytics, quota, runtime
@@ -213,7 +221,9 @@ Future runtime monitoring operations:
   Docker build-cache and unused-image pruning require explicit category opt-in and use filtered
   Docker prune commands. It must preserve active runtimes, rollback candidates, Docker volumes,
   Appaloft state roots, remote state, backups, migration journals, audit/events, deployment
-  snapshots, logs, routes, resource state, server state, dependencies, and storage volumes.
+  snapshots, logs, routes, resource state, server state, dependencies, and storage volumes. Server
+  Web capacity controls call the same query/command boundary and keep destructive prune behind an
+  explicit operator action after a dry-run preview.
 - `scheduled-runtime-prune-policies.configure/list/show` are the application command/query surface
   for scheduled runtime prune policy records. They persist and read only safe retention policy
   fields used by the scheduler; CLI and HTTP/oRPC adapters dispatch through command and query buses
@@ -348,6 +358,7 @@ Phase 7 storage operations:
 | Show storage volume | Query | `storage-volumes.show` | `ShowStorageVolumeQuery` | `ShowStorageVolumeQueryInput` | `appaloft storage volume show <storageVolumeId>` | `GET /api/storage-volumes/{storageVolumeId}` |
 | Rename storage volume | Command | `storage-volumes.rename` | `RenameStorageVolumeCommand` | `RenameStorageVolumeCommandInput` | `appaloft storage volume rename <storageVolumeId> --name <name>` | `POST /api/storage-volumes/{storageVolumeId}/rename` |
 | Delete storage volume | Command | `storage-volumes.delete` | `DeleteStorageVolumeCommand` | `DeleteStorageVolumeCommandInput` | `appaloft storage volume delete <storageVolumeId>` | `DELETE /api/storage-volumes/{storageVolumeId}` |
+| Cleanup storage volume runtime | Command | `storage-volumes.cleanup-runtime` | `CleanupStorageVolumeRuntimeCommand` | `CleanupStorageVolumeRuntimeCommandInput` | `appaloft storage volume cleanup-runtime <storageVolumeId> --server <serverId> --before <iso>` | `POST /api/storage-volumes/{storageVolumeId}/runtime-cleanup` |
 | Attach storage to resource | Command | `resources.attach-storage` | `AttachResourceStorageCommand` | `AttachResourceStorageCommandInput` | `appaloft resource storage attach <resourceId> <storageVolumeId> --destination-path <path>` | `POST /api/resources/{resourceId}/storage-attachments` |
 | Detach storage from resource | Command | `resources.detach-storage` | `DetachResourceStorageCommand` | `DetachResourceStorageCommandInput` | `appaloft resource storage detach <resourceId> <attachmentId>` | `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` |
 
@@ -397,7 +408,7 @@ Current boundary:
 - provider-backed dependency resources remain `ResourceInstance`; they are not the same aggregate
   as project resources
 - Postgres dependency resources are `ResourceInstance` records. Appaloft-managed Postgres records
-  now carry provider-native realization state through the shell provider capability, imported
+  now carry provider-native realization state through an injected shell provider capability, imported
   external Postgres delete removes only Appaloft's record, and list/show output masks connection
   secrets. When provision receives `serverId`, the shell provider creates a Docker-backed Postgres
   container and named volume on that `local-shell` or `generic-ssh` single-server target, stores the
@@ -445,22 +456,27 @@ Current boundary:
   credentials, inject runtime environment variables, schedule redeploy, or rewrite historical
   deployment snapshots.
 - Redis dependency resources are `ResourceInstance` records. Appaloft-managed Redis now carries
-  provider-native realization state through the shell provider capability, imported external Redis
+  provider-native realization state through an injected shell provider capability, imported external Redis
   delete removes only Appaloft's record, list/show output masks Redis connection secrets, and ready
   imported or realized managed Redis records can be bound as safe dependency references. Runtime
-  materialization coverage for managed Redis is implemented for the single-server and Swarm
-  dependency-secret paths described above.
+  materialization coverage for managed Redis is active through single-server and Docker Swarm
+  dependency secret delivery paths with closed-loop application/read-model verification.
 - Dependency resource backup/restore is governed by
   [ADR-036](./decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md) and
   [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md).
   The active operations create safe restore points and restore them in place through provider
   capabilities without exposing raw dumps, restarting workloads, redeploying Resources, or rewriting
   deployment snapshots. Docker-backed managed Postgres/Redis use the safe provider resource handle
-  to resolve the owning single-server target for backup/restore. Backup and restore provider
-  attempts are also projected into
-  `operator-work.*` through durable process-attempt rows with safe dependency/provider metadata;
-  provider execution still runs inline through the command use cases rather than process-attempt
-  atomic claim/completion.
+  to resolve the owning single-server target for backup/restore. Shell execution runs native
+  Postgres dump/restore commands and native Redis logical backup/restore commands when an imported
+  dependency resource has a resolvable Appaloft-owned connection ref, while unresolved and
+  provider-owned references use safe metadata-only provider artifacts. Provider-specific Redis
+  snapshot substrates remain governed follow-up work for providers that need snapshot-native restore
+  semantics beyond the shell logical path. Backup and restore provider attempts are also projected
+  into `operator-work.*` through durable process-attempt rows with safe dependency/provider
+  metadata. Provider execution still runs inline through the command use cases, but uses
+  process-attempt pending/claim/completion handoff when a process journal is available; automatic
+  background retry execution remains a governed worker slice.
 - Dependency resource scheduled backup policy is governed by
   [Dependency Resource Scheduled Backup Policy](./specs/070-dependency-resource-scheduled-backup-policy/spec.md).
   Policies are opt-in records per dependency resource with retention metadata, interval hours,
@@ -596,11 +612,11 @@ Current boundary:
   command replaces the durable workload endpoint profile for future deployment admission and route
   planning without binding domains, applying proxy routes, restarting runtime, or mutating
   deployment snapshots.
-- Web resource detail source/runtime/network/access/health/configuration editors are owner-scoped
+- Web resource detail source/runtime/network/access/health/configuration/storage editors are owner-scoped
   projections of the named resource commands and queries. They must make the durable future-only
   profile boundary visible to operators and must not introduce Web-only configuration state, imply
   an immediate runtime restart, create a deployment, mutate historical deployment snapshots, bind
-  domains, issue certificates, or apply proxy routes.
+  domains, issue certificates, apply proxy routes, or provision/delete provider-native volumes.
 - Resource Profile Drift Visibility is part of the `resources.show` diagnostic surface and
   repository config deploy preflight. It compares current Resource profile, normalized entry
   workflow profile, and latest deployment snapshot profile; reports sectioned drift for source,
@@ -613,9 +629,39 @@ Current boundary:
   precedence is resolved.
 - storage volume lifecycle is implemented for Phase 7 through
   `storage-volumes.create/list/show/rename/delete` and `resources.attach-storage/detach-storage`.
-  Storage attachments are Resource profile state for future deployment snapshot materialization;
-  storage commands must not create deployments, mutate historical snapshots, apply live runtime
-  mounts, provision provider-native volumes, or perform backup/restore.
+  Storage attachments are Resource profile state and new deployments snapshot them into
+  provider-neutral runtime plan mount metadata. Local and generic-SSH Docker container deployment
+  execution consumes that immutable metadata as Docker `--mount` flags and pre-creates Docker
+  named volumes with Appaloft ownership labels at deployment time; Docker Compose deployment
+  execution consumes it through the generated Appaloft Compose override file with matching top-level
+  volume labels. Docker Swarm image-service deployment execution consumes it through
+  `docker service create --mount` flags. Storage commands must not create deployments, mutate
+  historical snapshots, apply live runtime mounts, explicitly provision provider-native volumes, or
+  perform backup/restore.
+  Web Resource detail exposes attachment readback plus attach/detach controls for those same
+  Resource profile commands, storage-volume create/rename/delete management, and dry-run-first
+  runtime cleanup through the shared storage command contracts.
+- storage runtime realization and cleanup are governed by
+  [ADR-064: Storage Volume Runtime Realization And Cleanup](./decisions/ADR-064-storage-volume-runtime-realization-and-cleanup.md)
+  and [Storage Volume Runtime Realization And Cleanup](./specs/070-storage-volume-runtime-realization-and-cleanup/spec.md).
+  Deployment execution is the default realization point for Docker/Compose/Swarm image-service and
+  Swarm Compose stack mounts; `storage-volumes.create` does not pre-provision provider-native
+  storage.
+  `storage-volumes.cleanup-runtime` is dry-run-first, storage-volume plus server scoped, and
+  separate from both `storage-volumes.delete` and `servers.capacity.prune`. The first runtime
+  cleanup implementation covers local-shell and generic-SSH Docker named volumes through CLI,
+  HTTP/oRPC, and Resource detail Web controls, and requires matching Appaloft ownership labels
+  before a named volume can match or be removed; bind-mount source paths, provider-native storage
+  handles, and storage backup/restore operations remain later governed slices outside the current
+  provider-neutral create boundary. GitHub Actions/local explicit Swarm and storage-cleanup gates
+  prove generated overrides, named-volume creation, route reachability, dry-run-first cleanup, and
+  scoped destructive cleanup without making target-mutating proofs part of default local checks.
+  Swarm Compose stack deployment now uses generated Appaloft overrides and superseded stack/service
+  cleanup during deployment execution. Retained deployment snapshot, rollback-candidate,
+  backup-retention, and in-flight backup/restore safety evidence already block destructive cleanup
+  for the selected
+  StorageVolume on the selected server; the shell default reports no in-flight storage
+  backup/restore work until that operation family exists.
 
 - `.env` import is an operation-local parser for pasted content. It rejects malformed or unsafe
   variable keys, classifies secret-like keys as runtime secrets by default, rejects build-time
@@ -671,7 +717,7 @@ Current boundary:
 - PostgreSQL/PGlite source-link storage is implemented for hosted/self-hosted and embedded state
   backends through the dedicated `packages/persistence/pg` adapter. That same durable state feeds
   `resources.delete` source-link blocker checks. HTTP/oRPC relink is exposed for hosted/self-hosted
-  control planes; Web review UX remains future work.
+  control planes, and Web Resource detail exposes a Resource-scoped relink form.
 
 ## Source Events
 
@@ -961,8 +1007,8 @@ Current boundary:
   `POST /api/deployments/cleanup-preview` in self-hosted server API mode. The command is idempotent
   when preview state is already absent.
   Product-grade preview environments with GitHub App webhooks, comments/checks, policy, cleanup
-  retries, audit, and managed domain lifecycle still require Appaloft Cloud or a self-hosted
-  control plane. That future product line must still reuse repository config and explicit
+  retries, audit, and managed domain lifecycle require Appaloft Cloud or a self-hosted
+  control plane. That control-plane product line must still reuse repository config and explicit
   operations rather than adding preview fields to `deployments.create`. The governing Spec Round is
   [Product-Grade Preview Deployments](./specs/046-product-grade-preview-deployments/spec.md).
   `preview-policies.configure` and `preview-policies.show` now expose CLI and HTTP/oRPC routes
@@ -971,15 +1017,17 @@ Current boundary:
   settings.
   `preview-environments.list`, `preview-environments.show`, and `preview-environments.delete` now
   expose CLI and HTTP/oRPC routes over safe Resource-derived preview environment read models and
-  cleanup-service input. Future MCP tool contracts are generated from the operation catalog for
+  cleanup-service input. MCP/tool contracts are generated from the operation catalog for
   these preview operations. Web exposes `/preview-policies` controls for policy
   readback/configuration, Resource detail exposes previews as temporary derived runtime
   environments under the parent Resource, and `/preview-environments` remains a secondary
   all-project rollup rather than a peer Resource collection. The GitHub source-event HTTP route now
-  accepts verified `pull_request` deliveries for the first product-grade preview slice when trusted
-  Appaloft project/environment/resource/server/destination/source-fingerprint context headers are
-  supplied; repository or installation mapping remains future control-plane work. Managed domain
-  lifecycle and scheduler leases remain future control-plane work.
+  accepts verified `pull_request` deliveries for the first product-grade preview slice. It uses
+  trusted Appaloft project/environment/resource/server/destination/source-fingerprint context
+  headers when supplied, or resolves repository full name/provider repository id plus base ref
+  through the source-event policy reader when headers are absent. Cleanup retry scheduler leases are
+  active for the current preview lifecycle baseline, while managed domain lifecycle remains future
+  public enablement work.
   Compatibility preview Resources that live in preview-kind Environments are omitted from default
   `resources.list` results and may be deleted through explicit operator confirmation without
   treating retained preview deployment/audit rows as product Resource blockers.
@@ -1092,11 +1140,11 @@ Docker self-host installer bootstrap is a narrow optional install-time entrypoin
 printing the token to trusted install output. Plain SSH install does not need or create a machine
 deploy token; admins can create one later from the console or CLI.
 
-Accepted candidate operations for Phase 8:
+Active Phase 8 identity operations:
 - first-admin bootstrap and admin authorization policy
 - organization/team membership management
 
-Accepted-candidate first-admin operations are governed by
+First-admin operations are governed by
 [ADR-044: Self-Hosted First Admin Bootstrap](./decisions/ADR-044-self-hosted-first-admin-bootstrap.md)
 and [Self-Hosted First Admin Bootstrap](./specs/053-self-hosted-first-admin-bootstrap/spec.md):
 
@@ -1109,7 +1157,7 @@ These operations must use Appaloft-owned application ports so `@appaloft/auth-be
 local email/password user creation and initial organization ownership without leaking Better Auth
 types into core or application.
 
-Accepted-candidate organization/team operations are governed by
+Organization/team operations are governed by
 [ADR-045: Self-Hosted Organization Team Operations](./decisions/ADR-045-self-hosted-organization-team-operations.md)
 and
 [Self-Hosted Organization Team Operations](./specs/054-self-hosted-organization-team-operations/spec.md):
@@ -1138,7 +1186,7 @@ Current boundary:
 - `POST /api/action/deployments/from-source-link`,
   `POST /api/action/deployments/from-config-package`, and self-hosted Action
   `POST /api/deployments/cleanup-preview` must require bearer deploy-token authorization before
-  mutation when ADR-043 enters Code Round
+  mutation
 - deploy tokens must never be accepted from repository config, query strings, source packages, or
   `deployments.create` input
 - raw token values are one-time output only; list/show/readiness/log surfaces expose safe metadata
@@ -1154,9 +1202,12 @@ Business meaning:
   have not yet opted into durable process delivery
 - it helps operators decide which diagnostic or manual review path to use
 - durable process delivery is governed by ADR-054 as the outbox/inbox-equivalent baseline for
-  accepted long-running work; scheduled-task runs, scheduled runtime prune, and scheduled history
-  retention are selected worker bindings, and other workflow-specific workers must opt in through
-  local specs before retry execution can run provider or runtime work
+  accepted long-running work; scheduled-task runs, scheduled runtime prune, scheduled history
+  retention, and runtime monitoring collection are selected durable worker bindings. Dependency
+  resource backup/restore consumes process-attempt claim/completion when journal ports are
+  available. Scheduled-task runs, scheduled runtime prune, scheduled history retention, and runtime
+  monitoring collection are selected durable worker bindings. Other workflow-specific workers must
+  opt in through local specs before retry execution can run provider or runtime work.
 
 Implemented operations:
 
@@ -1224,15 +1275,20 @@ Current boundary:
   scheduled-task runs record process attempts, claim/complete due attempts, and can generate and
   drain due retry attempts; scheduled runtime prune records policy-tick attempts and dispatches
   `servers.capacity.prune` through the command bus; scheduled history retention records
-  retention-default category attempts and dispatches existing manual history prune commands through
-  the command bus. Preview cleanup, certificate issuance, certificate import, proxy bootstrap,
+  retention-default category attempts and runs existing manual history prune commands through the
+  command bus or governed direct retention stores such as runtime monitoring sample pruning;
+  runtime monitoring collection records runtime-maintenance attempts, claims/completes due
+  attempts, and writes retained samples through the runtime-usage query boundary without mutating
+  runtime targets.
+  Preview cleanup, certificate issuance, certificate import, proxy bootstrap,
   resource runtime control, source-event auto-deploy, dependency resource backup/restore,
   provider-native dependency resource realization/delete, deployment create execution,
   domain-binding verification retry, domain-binding create verification, deployment retry
   execution, and deployment rollback execution also project selected outcomes into the process
-  attempt journal for operator visibility, but they do not yet consume process-attempt atomic
-  claim/completion as durable workers. Other long-running workflows must still opt in through local
-  specs before automatic retry execution can run provider or runtime work.
+  attempt journal for operator visibility. Dependency resource backup/restore consumes
+  process-attempt atomic claim/completion when journal ports are available, while the other listed
+  inline provider/runtime workflows still require governed local specs and explicit worker
+  enablement before automatic retry execution can run provider or runtime work.
 - `audit-events.list` and `audit-events.show` are read-only aggregate-scoped history views over
   retained audit rows; they do not provide global audit export, delete retention, replay events,
   retry work, or mutate runtime/state roots
@@ -1268,9 +1324,9 @@ Current boundary:
   destructive by default. CLI and HTTP/oRPC entrypoints dispatch through the shared command/query
   schemas.
 - scheduled history retention is an implemented internal worker boundary governed by ADR-061. It
-  consumes `retention-defaults.*`, computes cutoffs, records durable process attempts, and dispatches
-  existing manual prune commands through the command bus. It has no first-slice public command and
-  must preserve every category-specific guard.
+  consumes `retention-defaults.*`, computes cutoffs, records durable process attempts, and runs
+  governed category retention through existing manual prune commands or direct retention stores. It
+  has no first-slice public command and must preserve every category-specific guard.
 - `domain-events.prune` is a narrow retained domain event stream retention mutation. It is governed
   by ADR-059 and targets the `domain_event_stream_records` retained observation store plus prune
   watermark state. It dry-runs by default and must stay separate from audit rows,
@@ -1306,11 +1362,21 @@ Terminal session lifecycle boundary:
 - `terminal-sessions.close` and `terminal-sessions.expire` release gateway-owned PTY, SSH,
   subprocess, and transport resources; they do not mutate resource, deployment, or target
   aggregates
+- `terminal-sessions.expire` uses an explicit `olderThan` cutoff when supplied; otherwise the
+  runtime gateway applies the configured activity-aware active-session TTL, defaulting to 3600
+  seconds; terminal input, resize frames, and backend output refresh activity
+- active attach transports may replay a bounded in-memory output tail after reconnect, defaulting
+  to 65536 bytes and configurable through `APPALOFT_TERMINAL_SESSION_OUTPUT_RETENTION_BYTES`; this
+  is transport-only and never appears in list/show, lifecycle command responses, audit rows, or
+  durable read models
+- Web Instance management lists active terminal sessions and dispatches close/old-session-expire
+  through the same lifecycle operations without attaching to terminal transports or reading output
 - terminal lifecycle operations must not persist or return terminal input/output, raw shell command
   strings, SSH private keys, access tokens, environment secret values, provider SDK objects, or raw
   provider payloads
-- durable audit/history of opened and closed terminal sessions is governed by the separate Phase 9
-  audit/event read-surface work
+- opened and closed terminal sessions are retained as durable audit rows with safe metadata only
+  when audit persistence is configured; they remain inspectable through the audit-event read surface
+  without retaining terminal input/output
 - next actions are guidance such as diagnostic/manual review/no-action, not hidden mutation
   affordances
 - work item detail must not expose raw logs, private keys, raw environment values, certificate
@@ -1482,7 +1548,7 @@ Implemented operations:
 | List providers | Query | `system.providers.list` | `ListProvidersQuery` | none | `appaloft providers list` | `GET /api/providers` |
 | List plugins | Query | `system.plugins.list` | `ListPluginsQuery` | none | `appaloft plugins list` | `GET /api/plugins` |
 | List GitHub repositories | Query | `system.github-repositories.list` | `ListGitHubRepositoriesQuery` | `ListGitHubRepositoriesQueryInput` | none yet | `GET /api/integrations/github/repositories` |
-| Doctor diagnostics | Query | `system.doctor` | `DoctorQuery` | none | `appaloft doctor` | none |
+| Doctor diagnostics | Query | `system.doctor` | `DoctorQuery` | none | `appaloft doctor` | `GET /api/system/doctor` |
 | Check instance upgrade | Query | `system.instance-upgrade.check` | `CheckInstanceUpgradeQuery` | `CheckInstanceUpgradeQueryInput` | `appaloft upgrade check` | `GET /api/instance-upgrade/check` |
 | Apply instance upgrade | Command | `system.instance-upgrade.apply` | `ApplyInstanceUpgradeCommand` | `ApplyInstanceUpgradeCommandInput` | `appaloft upgrade apply --confirm` | `POST /api/instance-upgrade/apply` |
 | Database status | Query | `system.db-status` | `DbStatusQuery` | none | `appaloft db status` | none |
@@ -1500,6 +1566,17 @@ Current boundary:
 - provider and plugin list operations must not expose provider SDK types, raw SDK payloads, plugin
   implementation internals, access tokens, private keys, secret references, certificate material, or
   unredacted command output
+- `system.doctor` is a read-only local diagnostic query. It returns readiness, provider/plugin
+  summaries, and configured maintenance worker status from shell configuration through CLI,
+  HTTP/oRPC, and the Web Instance page. Worker status includes safe activation configuration keys so
+  operators can see which explicit worker enablement settings make a disabled-by-default worker
+  active. The worker status output is observability only; it does not start workers, stop workers,
+  tick schedulers, run prune commands, collect runtime samples, execute scheduled tasks, cleanup
+  expired previews, or make disabled-by-default workers active.
+- Certificate retry is the only default-on maintenance scheduler because it drains already accepted
+  managed certificate attempts in retry-scheduled state. Runtime execution, runtime prune, history
+  retention, monitoring collection, and preview cleanup workers remain disabled by default and must
+  be enabled through explicit `APPALOFT_*_ENABLED` configuration.
 - planned providers and incompatible plugins may remain visible, but disabled capability details and
   configuration diagnostics must make the inactive state explicit
 - embedded self-hosted PGlite applies migrations automatically during shell startup
