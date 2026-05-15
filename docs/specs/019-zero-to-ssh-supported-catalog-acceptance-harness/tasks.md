@@ -33,6 +33,7 @@
 - [x] `ZSSH-CATALOG-014`: Docker Compose container-native fixture passes the harness.
 - [x] `ZSSH-CATALOG-015`: prebuilt image container-native fixture passes the harness.
 - [x] `ZSSH-CATALOG-016`: explicit custom commands fixture passes the harness.
+- [x] `ZSSH-CATALOG-017`: Quarkus Maven JVM jar mode supported fixture passes the harness.
 - [x] `ZSSH-PREVIEW-001`: every supported fixture has `deployments.plan/v1` ready contract.
 - [x] `ZSSH-PREVIEW-002`: unsupported/missing/ambiguous controls reuse 018 blocked preview shape.
 - [x] `ZSSH-PREVIEW-003`: static shapes default to static-server `internalPort = 80`.
@@ -47,8 +48,10 @@
 - [x] `ZSSH-RUNTIME-001`: runtime target backend selection happens before acceptance.
 - [x] `ZSSH-RUNTIME-002`: fake/local/generic-SSH render/apply contract has no real SSH dependency.
 - [x] `ZSSH-RUNTIME-003`: readiness/health/log/access observation contract is normalized.
-- [x] `ZSSH-RUNTIME-004`: local Docker smoke remains opt-in and clearly gated.
-- [x] `ZSSH-RUNTIME-005`: real generic-SSH smoke remains opt-in and clearly gated.
+- [x] `ZSSH-RUNTIME-004`: local Docker smoke is wired through GitHub Actions and remains explicit
+  for local developer runs.
+- [x] `ZSSH-RUNTIME-005`: real generic-SSH smoke is wired through the secret-gated GitHub Actions
+  path and can fail closed on release dispatch.
 
 ## Implementation
 
@@ -57,8 +60,8 @@
   not sufficient.
 - [x] Add/refine provider-neutral contract fields only if tests reveal a real gap.
 - [x] Bind supported catalog fixtures to existing planners; do not add new planner families.
-- [x] Keep runtime execution fake/hermetic by default; preserve existing opt-in Docker/SSH smoke
-  gates.
+- [x] Keep fast runtime execution contract-oriented by default; preserve GitHub Actions/local
+  explicit Docker/SSH smoke gates.
 
 ## Entrypoints And Docs
 
@@ -79,4 +82,5 @@
 - [x] Reconcile feature artifact, roadmap, operation map, workflow docs, runtime substrate plan,
   deployments.plan/deployments.create docs, testing matrices, public docs/help gaps, and executable
   test bindings.
-- [x] Record remaining migration gaps explicitly.
+- [x] Record remaining GitHub Actions/local explicit confidence gates and unrelated governed
+  follow-ups explicitly.

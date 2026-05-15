@@ -149,8 +149,10 @@ deployments.create accepted
   -> deployment-succeeded or deployment-failed
 ```
 
-The first implementation may still execute synchronously inside the use case as a migration gap,
-but it must keep logs, events, state names, and tests aligned with the acceptance-first contract.
+Current deployment execution may still complete work inside the accepted command path for some
+backends, but long-running work is represented through deployment lifecycle state, runtime target
+plans, safe logs/events, and operator-visible process attempts. Follow-up durable worker slices
+must preserve the same acceptance-first contract rather than changing public command inputs.
 
 ## Rollout And Rollback Candidate Rules
 
@@ -251,7 +253,7 @@ Public rollback, redeploy, cancel, manual health check, stateful volume rollback
 retention policy editing, Docker Swarm, Kubernetes, and non-Docker runtime adapters remain
 follow-up behaviors.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current runtime adapters contain Docker/Compose behavior for local and SSH execution, logs, health
 checks, edge proxy plans, and diagnostics.
@@ -299,32 +301,38 @@ runtime, network, and health profile fields; full browser-level entry parity for
 fixture remains a follow-up hardening gap.
 
 The fixture deploy smoke slice is headless for CI portability. The current supported
-JavaScript/TypeScript/Python fixture catalog now proves that the shared resource
+JavaScript/TypeScript/Python/JVM fixture catalog now proves that the shared resource
 source/runtime/network profile can flow through source inspection into Docker/OCI image artifact
 intent, generated Dockerfile evidence, docker-container execution metadata, internal HTTP
 verification steps, and typed Docker build/run-command rendering. This is equivalent smoke rather
 than real Docker execution because the fixture contract avoids dependency installation and framework
-CLI execution by default. Full real Docker/SSH smoke for every JavaScript/TypeScript/Python catalog
-fixture remains a migration gap.
+CLI execution by default. Real local Docker and generic-SSH smoke are GitHub Actions/local explicit
+confidence gates over the shared fixture descriptors; an unavailable Docker daemon or SSH target is
+an external prerequisite, not a catalog support gap.
 
-The first real fixture deployment smoke target is a representative opt-in local Docker slice, not
-the full catalog: Vite or Next static export plus Angular SPA, React SPA, or SvelteKit static; Next
-SSR or Remix plus one Node HTTP framework; and FastAPI plus Django or Flask when dependency
-installation is available. If FastAPI cannot execute because the Docker package index cannot
-resolve required dependencies, the local slice may temporarily use Django plus Flask only when the
-FastAPI dependency failure remains recorded as a migration gap. The harness must start from the
-same resource source/runtime/network profile vocabulary as Quick Deploy, dispatch ids-only
-`deployments.create` or an equivalent shell workflow, then prove actual image build, container run,
-internal HTTP verification, runtime metadata/logs, and typed command rendering. Generic-SSH should
-reuse the same fixture descriptors when a real SSH target is configured; until then, real SSH
-fixture execution remains a migration gap rather than a passed condition.
+The real fixture deployment smoke target is a GitHub Actions/local explicit Docker slice tied to
+the same catalog descriptors as the headless harness. The harness must start from the same resource
+source/runtime/network profile vocabulary as Quick Deploy, dispatch ids-only `deployments.create`
+or an equivalent shell workflow, then prove actual image build, container run, internal HTTP
+verification, runtime metadata/logs, and typed command rendering. Generic-SSH reuses the same
+fixture descriptors when a real SSH target is configured. Without the required SSH target
+configuration, that smoke is an explicit external confidence-gate prerequisite, not a catalog
+support gap and not a default passed condition.
 
-Current opt-in local Docker coverage for this slice passes with Vite SPA, React SPA, Next SSR,
-Hono, Django, and Flask. FastAPI is still a migration gap in the current local Docker environment
-because pip could not resolve the required transitive `pydantic` dependency for the fixture image.
-Angular SPA and SvelteKit static remain fixture-hardening gaps for real Docker execution after
-failing during dependency/build execution before container start. The headless planner/catalog
-coverage for those fixtures remains intact.
+Current GitHub Actions/local explicit Docker coverage for this slice runs the shared framework
+fixture descriptor set from `apps/shell/test/e2e/support/framework-docker-smoke-fixtures.ts`,
+including static SPA, SSR/server, Node, Python, Spring Boot Maven/Gradle, deterministic generic Java
+jar, and explicit custom-command fixtures. Dockerfile, Docker Compose, and prebuilt-image substrates
+are covered by the local Docker substrate smoke. The same framework fixture descriptor set has a
+GitHub Actions secret-gated plus local explicit generic-SSH workflow in
+`apps/shell/test/e2e/quick-deploy-framework-fixtures-ssh.workflow.e2e.ts`.
+`apps/shell/test/e2e/framework-smoke-coverage.test.ts` asserts the coverage inventory for every
+Phase 5 supported catalog entry. FastAPI real-smoke coverage uses the same planner output with
+explicit smoke-only install/start overrides because the historical `uv.lock` fixture is malformed.
+Generic Java real-smoke coverage uses the deterministic runnable `generic-java-jar` fixture.
+Prebuilt-image generic-SSH execution is covered by the `APPALOFT_E2E_SSH_QUICK_DEPLOY=true`
+substrate smoke in `apps/shell/test/e2e/quick-deploy-ssh.workflow.e2e.ts`. The headless
+planner/catalog coverage for those fixtures remains intact.
 
 JavaScript/TypeScript tested catalog closure now has stable fixture-specific rows for Next.js
 SSR/standalone/static export, Remix, Nuxt generate, SvelteKit static and ambiguous mode, Astro
@@ -344,11 +352,11 @@ output, Dockerfile generation intent, internal HTTP verification, and headless D
 readiness. `deployments.plan/v1` contract coverage proves ready and blocked Python planner output
 uses the same preview shape and remediation language as the JavaScript/TypeScript closure.
 
-JVM/Spring Boot tested catalog closure now has stable rows for Spring Boot Maven with wrapper,
+JVM/Spring Boot/Quarkus tested catalog closure now has stable rows for Spring Boot Maven with wrapper,
 Spring Boot Maven without wrapper, Spring Boot Gradle with wrapper, Spring Boot Gradle Kotlin DSL,
 generic JVM explicit start-command fallback, generic deterministic jar fallback, unsupported JVM
-framework evidence, ambiguous Maven/Gradle build-tool evidence, missing JVM build tool, missing
-runnable jar, actuator health defaults, and internal-port behavior. Runtime fixture tests bind
+framework evidence, Quarkus Maven JVM jar mode, ambiguous Maven/Gradle build-tool evidence, missing
+JVM build tool, missing runnable jar, actuator health defaults, and internal-port behavior. Runtime fixture tests bind
 these rows to source inspection, planner/base-image policy, command specs, artifact output,
 Dockerfile generation intent, internal HTTP verification, and headless Docker/OCI execution
 readiness. `deployments.plan/v1` contract coverage proves ready and blocked JVM planner output uses
@@ -378,11 +386,14 @@ typed publish-directory validation at resource creation and deployment admission
 planning, post-acceptance failure mapping for static package errors, and adapter-owned static-server
 Dockerfile generation for local/generic-SSH image builds. Local Docker static smoke coverage now
 exercises generated nginx packaging and runtime verification, and generic-SSH Docker static smoke
-coverage exists as an opt-in e2e harness for real SSH targets.
+coverage exists as a GitHub Actions secret-gated plus local explicit e2e harness for real SSH
+targets.
 
-Runtime target abstraction is not implemented yet. Current execution routing still selects local
-and generic-SSH behavior through provider-key checks rather than a registered backend descriptor and
-capability lookup. Swarm and Kubernetes must not be added before that boundary exists.
+Runtime target abstraction is implemented for the active single-server and Swarm backends:
+local-shell, generic-SSH, and Docker Swarm execution resolve through registered backend descriptors,
+capability checks, and adapter-owned render/apply/observe contracts without adding backend-specific
+fields to `deployments.create`. Kubernetes remains a future runtime target and must use the same
+descriptor/capability boundary rather than extending deployment admission input.
 
 ## Open Questions
 

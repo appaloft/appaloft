@@ -59,6 +59,15 @@ export interface DockerPublishedPortSpec {
   mode: DockerPortPublishMode;
 }
 
+export type DockerRunMountType = "volume" | "bind";
+
+export interface DockerRunMountSpec {
+  type: DockerRunMountType;
+  source: DisplayNameText | FilePathText;
+  target: FilePathText;
+  readOnly: boolean;
+}
+
 export interface DockerBuildImageCommandSpec {
   kind: "docker-build-image";
   image: ImageReference;
@@ -75,6 +84,7 @@ export interface DockerRunContainerCommandSpec {
   env: readonly RuntimeCommandEnvironmentVariable[];
   labels: readonly RuntimeCommandLabel[];
   publishedPorts: readonly DockerPublishedPortSpec[];
+  mounts: readonly DockerRunMountSpec[];
   networkName?: DisplayNameText;
 }
 

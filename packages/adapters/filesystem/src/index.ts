@@ -545,10 +545,17 @@ function findSingleJarUnder(path: string, directoryName: string): string | undef
 
 function deterministicJavaJarPath(input: {
   path: string;
+  framework?: SourceFramework;
   packageManager?: SourcePackageManager;
   projectName?: string;
   version?: string;
 }): string | undefined {
+  if (input.framework === "quarkus") {
+    return input.packageManager === "gradle"
+      ? "build/quarkus-app/quarkus-run.jar"
+      : "target/quarkus-app/quarkus-run.jar";
+  }
+
   const explicitJar =
     findSingleJarUnder(input.path, "target") ?? findSingleJarUnder(input.path, "build/libs");
 
@@ -662,6 +669,7 @@ class JavaProjectProfileDetector implements LocalProjectProfileDetector {
     const framework = detectJavaFramework({ pom, gradle });
     const jarPath = deterministicJavaJarPath({
       path,
+      ...(framework ? { framework } : {}),
       ...(packageManager ? { packageManager } : {}),
       ...(projectName ? { projectName } : {}),
       ...(version ? { version } : {}),

@@ -42,11 +42,15 @@ Every tested framework row must prove:
 
 - Matrix ids: add JS/TS catalog closure ids `WF-PLAN-JS-001` through `WF-PLAN-JS-013` and preview contract ids `DPP-CATALOG-001` through `DPP-CATALOG-002`.
 - Test-first rows: bind fixture catalog tests to the new JS/TS ids before marking the roadmap item complete.
-- Acceptance/e2e: keep representative opt-in local Docker smoke under `WF-PLAN-SMOKE-005`; full fixture-by-fixture real Docker/SSH smoke remains a migration gap.
+- Acceptance/e2e: keep JS/TS local Docker and generic-SSH fixture smoke in
+  `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`; both use the shared framework smoke descriptor list
+  and run as GitHub Actions/local explicit gates because they mutate Docker or SSH targets.
 - Contract/integration/unit: runtime fixture tests prove planner/base image/command/artifact/port shape; contracts tests prove `deployments.plan/v1` can expose the same planner shape.
 
 ## Risks And Migration Gaps
 
 - SvelteKit server, Astro SSR, and Nuxt SSR/server modes are not promoted unless deterministic start evidence exists.
 - Full browser-level Web/CLI parity for every fixture remains broader hardening; current parity is shared draft vocabulary plus preview contract.
-- Full real Docker/SSH smoke for every JS/TS fixture remains a migration gap; headless Docker/OCI readiness is the tested catalog closure for this round.
+- Browser-level Web/CLI parity for every JS/TS fixture remains broader hardening; local Docker and
+  generic-SSH fixture smoke coverage is available through the shared GitHub Actions/local explicit
+  framework smoke gates, while fast local automation stays hermetic.

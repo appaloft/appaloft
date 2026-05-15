@@ -2,6 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
+  type FrameworkDockerSmokeFixture,
+  frameworkDockerSmokeFixtures,
+} from "./support/framework-docker-smoke-fixtures";
+import {
   cleanupLocalDockerDeployment,
   cleanupWorkspace,
   createShellE2eWorkspace,
@@ -16,105 +20,6 @@ const frameworkFixturesRoot = new URL(
   "../../../../packages/adapters/filesystem/test/fixtures/frameworks",
   import.meta.url,
 ).pathname;
-
-interface FrameworkDockerSmokeFixture {
-  fixture: string;
-  matrixIds: string;
-  method: "auto";
-  port: number;
-  healthPath: string;
-  expectedBuildStrategy: "static-artifact" | "workspace-commands";
-  expectedDockerfile: "Dockerfile.appaloft" | "Dockerfile.appaloft-static";
-  expectedGeneratedLog: string;
-  expectedPlanner: string;
-  expectedResourceKind: "application" | "static-site";
-  expectedRuntimeText?: string;
-  install?: string;
-  build?: string;
-  start?: string;
-}
-
-const frameworkDockerSmokeFixtures: FrameworkDockerSmokeFixture[] = [
-  {
-    fixture: "vite-spa",
-    matrixIds: "WF-PLAN-SMOKE-001,WF-PLAN-SMOKE-005,QUICK-DEPLOY-ENTRY-015",
-    method: "auto",
-    port: 80,
-    healthPath: "/",
-    expectedBuildStrategy: "static-artifact",
-    expectedDockerfile: "Dockerfile.appaloft-static",
-    expectedGeneratedLog: "Generated static site Dockerfile",
-    expectedPlanner: "vite-static",
-    expectedResourceKind: "application",
-  },
-  {
-    fixture: "react-spa",
-    matrixIds: "WF-PLAN-SMOKE-001,WF-PLAN-SMOKE-005,QUICK-DEPLOY-ENTRY-015",
-    method: "auto",
-    port: 80,
-    healthPath: "/",
-    expectedBuildStrategy: "static-artifact",
-    expectedDockerfile: "Dockerfile.appaloft-static",
-    expectedGeneratedLog: "Generated static site Dockerfile",
-    expectedPlanner: "react-static",
-    expectedResourceKind: "application",
-  },
-  {
-    fixture: "next-ssr",
-    matrixIds: "WF-PLAN-SMOKE-002,WF-PLAN-SMOKE-005,QUICK-DEPLOY-ENTRY-015",
-    method: "auto",
-    port: 3000,
-    healthPath: "/",
-    expectedBuildStrategy: "workspace-commands",
-    expectedDockerfile: "Dockerfile.appaloft",
-    expectedGeneratedLog: "Generated workspace Dockerfile",
-    expectedPlanner: "nextjs",
-    expectedResourceKind: "application",
-    expectedRuntimeText: "Next SSR fixture ready",
-    install: "corepack enable && rm -f pnpm-lock.yaml && pnpm install",
-    build: "corepack pnpm build",
-    start: "corepack pnpm exec next start -H 0.0.0.0 -p 3000",
-  },
-  {
-    fixture: "hono-server",
-    matrixIds: "WF-PLAN-SMOKE-002,WF-PLAN-SMOKE-005,QUICK-DEPLOY-ENTRY-015",
-    method: "auto",
-    port: 3000,
-    healthPath: "/",
-    expectedBuildStrategy: "workspace-commands",
-    expectedDockerfile: "Dockerfile.appaloft",
-    expectedGeneratedLog: "Generated workspace Dockerfile",
-    expectedPlanner: "node",
-    expectedResourceKind: "application",
-    expectedRuntimeText: "Hono fixture ready",
-  },
-  {
-    fixture: "django-pip",
-    matrixIds: "WF-PLAN-SMOKE-003,WF-PLAN-SMOKE-005,QUICK-DEPLOY-ENTRY-015",
-    method: "auto",
-    port: 3000,
-    healthPath: "/",
-    expectedBuildStrategy: "workspace-commands",
-    expectedDockerfile: "Dockerfile.appaloft",
-    expectedGeneratedLog: "Generated workspace Dockerfile",
-    expectedPlanner: "django",
-    expectedResourceKind: "application",
-    expectedRuntimeText: "Django fixture ready",
-  },
-  {
-    fixture: "flask-pip",
-    matrixIds: "WF-PLAN-SMOKE-003,WF-PLAN-SMOKE-005,QUICK-DEPLOY-ENTRY-015",
-    method: "auto",
-    port: 3000,
-    healthPath: "/",
-    expectedBuildStrategy: "workspace-commands",
-    expectedDockerfile: "Dockerfile.appaloft",
-    expectedGeneratedLog: "Generated workspace Dockerfile",
-    expectedPlanner: "flask",
-    expectedResourceKind: "application",
-    expectedRuntimeText: "Flask fixture ready",
-  },
-];
 
 function deploymentRuntimeUrl(logs: string): string {
   const parsed = parseJson<{ logs?: Array<{ message?: string }> }>(logs);
@@ -175,11 +80,19 @@ function deployArgsFor(input: {
 
 describe("quick deploy framework fixture Docker workflow e2e", () => {
   if (Bun.env.APPALOFT_E2E_FRAMEWORK_DOCKER !== "true") {
-    test.skip("[WF-PLAN-SMOKE-005] opt-in real Docker framework fixture smoke requires APPALOFT_E2E_FRAMEWORK_DOCKER=true", () => {});
+    test.skip("[WF-PLAN-SMOKE-005] local explicit real Docker framework fixture smoke requires APPALOFT_E2E_FRAMEWORK_DOCKER=true", () => {});
     return;
   }
 
   test("[WF-PLAN-SMOKE-005][QUICK-DEPLOY-ENTRY-015] real local Docker builds, runs, and verifies representative framework fixtures", async () => {
+    const fixtureFilter = Bun.env.APPALOFT_E2E_FRAMEWORK_FIXTURE;
+    const fixtures = fixtureFilter
+      ? frameworkDockerSmokeFixtures.filter((fixture) => fixture.fixture === fixtureFilter)
+      : frameworkDockerSmokeFixtures;
+    expect(
+      fixtures.length,
+      `unknown framework fixture filter ${fixtureFilter ?? ""}`,
+    ).toBeGreaterThan(0);
     const dockerVersion = runDocker(["version", "--format", "{{.Server.Version}}"]);
     expect(dockerVersion.exitCode, dockerVersion.stderr).toBe(0);
 
@@ -222,7 +135,7 @@ describe("quick deploy framework fixture Docker workflow e2e", () => {
       expectCliSuccess(environment, "create environment");
       const environmentId = parseJson<{ id: string }>(environment.stdout).id;
 
-      for (const fixture of frameworkDockerSmokeFixtures) {
+      for (const fixture of fixtures) {
         const fixtureDir = join(frameworkFixturesRoot, fixture.fixture);
         expect(existsSync(fixtureDir), fixture.fixture).toBe(true);
 
@@ -361,5 +274,5 @@ describe("quick deploy framework fixture Docker workflow e2e", () => {
       }
       cleanupWorkspace(workspace.workspaceDir);
     }
-  }, 900000);
+  }, 3_600_000);
 });

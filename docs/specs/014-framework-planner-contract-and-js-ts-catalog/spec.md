@@ -49,7 +49,7 @@ Resource profile -> detect -> plan -> deployments.create execution
 - Bounded context: Release orchestration with workload-delivery planning input.
 - Resource owns reusable source, runtime, network, health, and access profile fields.
 - Deployment owns only admitted attempts and immutable snapshots after `deployments.create`.
-- Runtime adapters own filesystem inspection, generated Dockerfile/static-server assets, rendered shell, Docker/Compose/SSH details, and opt-in real smoke execution.
+- Runtime adapters own filesystem inspection, generated Dockerfile/static-server assets, rendered shell, Docker/Compose/SSH details, and GitHub Actions/local explicit real smoke execution.
 - `deployments.plan` is the read-only preview operation for the same `detect -> plan` contract.
 
 ## Public Surfaces
@@ -68,7 +68,9 @@ Resource profile -> detect -> plan -> deployments.create execution
 - Do not add source, runtime, network, framework, package name, base image, buildpack, or provider SDK fields to `deployments.create`.
 - Do not add non-Docker runtime substrate support.
 - Do not execute framework CLIs during admission-time detection.
-- Do not claim every JS/TS fixture has full real Docker/SSH smoke; headless Docker/OCI readiness remains the catalog closure level, with representative opt-in Docker smoke tracked separately.
+- Do not require real Docker/SSH execution in the fast contract suite. JS/TS fixture real-execution confidence is
+  provided by the shared GitHub Actions/local explicit Docker and generic-SSH framework smoke descriptor set governed
+  by the zero-to-SSH catalog acceptance harness.
 
 ## Open Questions
 

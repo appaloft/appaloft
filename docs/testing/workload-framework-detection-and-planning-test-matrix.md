@@ -75,7 +75,7 @@ test expectations in the same change.
 | `vite-spa` | `WF-PLAN-CAT-007` | `vite 5.4.11`, `bun` marker | `node`, `vite`, `bun`, `static` | `vite-static`, static image, publish `/dist` |
 | `react-spa` | `WF-PLAN-CAT-007` | `react 18.3.1`, `react-dom 18.3.1`, `react-scripts 5.0.1`, `npm` marker | `node`, `react`, `npm`, `static` | `react-static`, static image, publish `/build` |
 | `vue-spa` | `WF-PLAN-CAT-007` | `vue 3.5.13`, `@vue/cli-service 5.0.8`, `pnpm` marker | `node`, `vue`, `pnpm`, `static` | `vue-static`, static image, publish `/dist` |
-| `svelte-spa` | `WF-PLAN-CAT-007` | `svelte 5.19.7`, `@rollup/plugin-svelte 7.2.2`, `rollup 4.34.8`, `yarn` marker | `node`, `svelte`, `yarn`, `static` | `svelte-static`, static image, publish `/public` |
+| `svelte-spa` | `WF-PLAN-CAT-007` | `svelte 5.19.7`, `rollup-plugin-svelte 7.2.3`, `@rollup/plugin-node-resolve 16.0.3`, `rollup 4.34.8`, npm package-manager marker | `node`, `svelte`, `npm`, `static` | `svelte-static`, static image, publish `/public` |
 | `solid-spa` | `WF-PLAN-CAT-007` | `solid-js 1.9.5`, `vite 6.1.0`, `vite-plugin-solid 2.11.2`, `bun` marker | `node`, `solid`, `bun`, `static` | `solid-static`, static image, publish `/dist` |
 | `angular-spa` | `WF-PLAN-CAT-007` | `@angular/core 19.2.0`, `@angular/cli 19.2.0`, `@angular-devkit/build-angular 19.2.0`, `npm` marker | `node`, `angular`, `npm`, `static` | `angular-static`, static image, publish `/dist/angular-spa` from `angular.json` |
 | `sveltekit-static` | `WF-PLAN-CAT-005` | `@sveltejs/kit 2.16.1`, `@sveltejs/adapter-static 3.0.8`, `svelte 5.19.7`, `vite 6.1.0`, `pnpm` marker | `node`, `sveltekit`, `pnpm`, `static` from `adapter-static` | `sveltekit-static`, static image, publish `/build` |
@@ -83,23 +83,23 @@ test expectations in the same change.
 | `nuxt-generate` | `WF-PLAN-CAT-004` | `nuxt 3.16.1`, `vue 3.5.13`, `pnpm` marker | `node`, `nuxt`, `pnpm`, `static` from `generate` script | `nuxt-static`, static image, publish `/.output/public` |
 | `astro-static` | `WF-PLAN-CAT-006` | `astro 5.5.5`, `npm` marker | `node`, `astro`, `npm`, `static` | `astro-static`, static image, publish `/dist` |
 | `remix-ssr` | `WF-PLAN-CAT-003` | `@remix-run/node 2.16.3`, `@remix-run/react 2.16.3`, `@remix-run/serve 2.16.3`, `react 18.3.1`, `npm` marker | `node`, `remix`, `npm`, `ssr` | `remix`, workspace image, build/start scripts |
-| `express-server` | `WF-PLAN-CAT-008` | `express 4.21.2`, `npm` marker | `node`, `express`, `npm`, `serverful-http` | generic `node`, workspace image, build/start scripts |
-| `fastify-server` | `WF-PLAN-CAT-008` | `fastify 5.2.1`, `typescript 5.8.2`, `pnpm` marker | `node`, `fastify`, `pnpm`, `serverful-http` | generic `node`, workspace image, build/start scripts |
-| `nestjs-server` | `WF-PLAN-CAT-008` | `@nestjs/common 11.0.11`, `@nestjs/core 11.0.11`, `@nestjs/platform-express 11.0.11`, `reflect-metadata 0.2.2`, `rxjs 7.8.2`, `typescript 5.8.2`, `npm` marker | `node`, `nestjs`, `npm`, `serverful-http` | generic `node`, workspace image, build script plus `start:built` production start script |
+| `express-server` | `WF-PLAN-CAT-008` | `express 4.21.2`, `typescript 5.8.2`, `@types/node 22.13.10`, `@types/express 4.17.21`, `npm` marker | `node`, `express`, `npm`, `serverful-http` | generic `node`, workspace image, build/start scripts |
+| `fastify-server` | `WF-PLAN-CAT-008` | `fastify 5.2.1`, `typescript 5.8.2`, `@types/node 22.13.10`, `pnpm` marker | `node`, `fastify`, `pnpm`, `serverful-http` | generic `node`, workspace image, build/start scripts |
+| `nestjs-server` | `WF-PLAN-CAT-008` | `@nestjs/common 11.0.11`, `@nestjs/core 11.0.11`, `@nestjs/platform-express 11.0.11`, `reflect-metadata 0.2.2`, `rxjs 7.8.2`, `typescript 5.8.2`, `@types/node 22.13.10`, `npm` marker | `node`, `nestjs`, `npm`, `serverful-http` | generic `node`, workspace image, build script plus `start:built` production start script |
 | `hono-server` | `WF-PLAN-CAT-008` | `hono 4.7.5`, `bun` marker | `node`, `hono`, `bun`, `serverful-http` | generic `node`, Bun workspace image, build/start scripts |
-| `koa-server` | `WF-PLAN-CAT-008` | `koa 2.16.0`, `yarn` marker | `node`, `koa`, `yarn`, `serverful-http` | generic `node`, workspace image, build/start scripts |
+| `koa-server` | `WF-PLAN-CAT-008` | `koa 2.16.0`, `typescript 5.8.2`, `@types/node 22.13.10`, `@types/koa 2.15.0`, npm package-manager marker | `node`, `koa`, `npm`, `serverful-http` | generic `node`, workspace image, build/start scripts |
 | `generic-node-server` | `WF-PLAN-CAT-008` | `npm` marker, production package scripts | `node`, no named framework, `npm`, `serverful-http` from non-dev start script evidence | generic `node`, workspace image, build script plus `start:built` production start script |
-| `fastapi-uv` | `WF-PLAN-CAT-009` | `fastapi 0.115.8`, `uvicorn 0.34.0`, `uv` marker | `python`, `fastapi`, `uv`, `serverful-http` | `fastapi`, workspace image, uv install/start defaults |
+| `fastapi-uv` | `WF-PLAN-CAT-009` | `fastapi 0.115.8`, `uvicorn 0.34.0`, `requires-python >=3.12`, real `uv.lock` | `python`, `fastapi`, `uv`, `serverful-http` | `fastapi`, `uv` Python workspace image, frozen uv install/start defaults |
 | `django-pip` | `WF-PLAN-CAT-010` | `Django 5.1.7`, `pip` requirements | `python`, `django`, `pip`, `serverful-http` | `django`, workspace image, pip install/start default |
 | `flask-pip` | `WF-PLAN-CAT-010` | `Flask 3.1.0`, `pip` requirements | `python`, `flask`, `pip`, `serverful-http` | `flask`, workspace image, pip install/start default |
-| `generic-asgi-uv` | `WF-PLAN-PY-004` | `uvicorn 0.34.0`, `uv` marker | `python`, generic ASGI evidence, `uv`, `serverful-http` | `generic-asgi` or generic `python`, workspace image, deterministic ASGI start default |
+| `generic-asgi-uv` | `WF-PLAN-PY-004` | `uvicorn 0.34.0`, `requires-python >=3.12`, real `uv.lock` | `python`, generic ASGI evidence, `uv`, `serverful-http` | `generic-asgi` or generic `python`, `uv` Python workspace image, frozen uv install plus deterministic ASGI start default |
 | `generic-wsgi-pip` | `WF-PLAN-PY-005` | `gunicorn 23.0.0`, pip requirements | `python`, generic WSGI evidence, `pip`, `serverful-http` | `generic-wsgi` or generic `python`, workspace image, deterministic WSGI start default |
-| `python-poetry-web` | `WF-PLAN-PY-006` | Poetry metadata/lock marker plus supported web evidence | `python`, detected framework or ASGI/WSGI evidence, `poetry`, `serverful-http` | workspace image, Poetry install/start commands |
+| `python-poetry-web` | `WF-PLAN-PY-006` | Poetry metadata plus `poetry-core 1.9.1` build backend and supported web evidence | `python`, detected framework or ASGI/WSGI evidence, `poetry`, `serverful-http` | workspace image, PEP 517 `pip install .` dependency install plus Python start command |
 | `python-explicit-start` | `WF-PLAN-PY-007` | Python package evidence plus explicit resource runtime start command | `python`, no unsafe framework selection required, selected package tool, `serverful-http` | generic `python` or custom fallback workspace image using explicit commands |
-| `spring-boot-maven-wrapper` | `WF-PLAN-JVM-001` | Spring Boot `3.4.4`, Maven wrapper marker, `.java-version` 21 | `java`, `spring-boot`, `maven`, `serverful-http`, `maven-wrapper`, Spring Boot dependency/plugin evidence | `spring-boot`, workspace image, `./mvnw package -DskipTests`, deterministic `java -jar` start, Java base image from `.java-version` |
-| `spring-boot-maven` | `WF-PLAN-JVM-002` | Spring Boot `3.4.4`, Maven project without wrapper | `java`, `spring-boot`, `maven`, `serverful-http`, `pom.xml`, Spring Boot dependency/plugin evidence | `spring-boot`, workspace image, `mvn package -DskipTests`, deterministic `java -jar` start |
-| `spring-boot-gradle-wrapper` | `WF-PLAN-JVM-003` | Spring Boot `3.4.4`, Gradle wrapper marker, Groovy DSL | `java`, `spring-boot`, `gradle`, `serverful-http`, `gradle-wrapper`, Spring Boot plugin/dependency evidence | `spring-boot`, workspace image, `./gradlew bootJar -x test`, deterministic `java -jar` start from `build/libs` |
-| `spring-boot-gradle-kts` | `WF-PLAN-JVM-004` | Spring Boot `3.4.4`, Gradle wrapper marker, Kotlin DSL | `java`, `spring-boot`, `gradle`, `serverful-http`, `gradle-wrapper`, `build.gradle.kts`, Spring Boot plugin/dependency evidence | `spring-boot`, workspace image, `./gradlew bootJar -x test`, deterministic `java -jar` start from `build/libs` |
+| `spring-boot-maven-wrapper` | `WF-PLAN-JVM-001` | Spring Boot `3.4.4`, Maven wrapper marker, `.java-version` 21 | `java`, `spring-boot`, `maven`, `serverful-http`, `maven-wrapper`, Spring Boot dependency/plugin evidence | `spring-boot`, workspace image, `sh ./mvnw package -DskipTests`, deterministic `java -jar` start, Maven build image from `.java-version` |
+| `spring-boot-maven` | `WF-PLAN-JVM-002` | Spring Boot `3.4.4`, Maven project without wrapper | `java`, `spring-boot`, `maven`, `serverful-http`, `pom.xml`, Spring Boot dependency/plugin evidence | `spring-boot`, workspace image, `mvn package -DskipTests`, deterministic `java -jar` start, Maven build image |
+| `spring-boot-gradle-wrapper` | `WF-PLAN-JVM-003` | Spring Boot `3.4.4`, Gradle wrapper marker, Groovy DSL | `java`, `spring-boot`, `gradle`, `serverful-http`, `gradle-wrapper`, Spring Boot plugin/dependency evidence | `spring-boot`, workspace image, `sh ./gradlew bootJar -x test`, deterministic `java -jar` start from `build/libs`, Gradle build image |
+| `spring-boot-gradle-kts` | `WF-PLAN-JVM-004` | Spring Boot `3.4.4`, Gradle wrapper marker, Kotlin DSL | `java`, `spring-boot`, `gradle`, `serverful-http`, `gradle-wrapper`, `build.gradle.kts`, Spring Boot plugin/dependency evidence | `spring-boot`, workspace image, `sh ./gradlew bootJar -x test`, deterministic `java -jar` start from `build/libs`, Gradle build image |
 | `jvm-explicit-start` | `WF-PLAN-JVM-005` | JVM project evidence plus explicit resource runtime start command | `java`, selected build tool or generic JVM evidence, `serverful-http` | generic JVM/custom fallback workspace image using explicit commands |
 | `generic-java-jar` | `WF-PLAN-JVM-006` | Generic Java/JVM project with exactly one deterministic runnable jar evidence item | `java`, no named framework, selected build tool or jar evidence, `serverful-http` | generic JVM planner, workspace image, deterministic `java -jar` start |
 
@@ -145,8 +145,8 @@ test expectations in the same change.
 ## JavaScript/TypeScript Tested Catalog Closure Matrix
 
 These rows close the Phase 5 JavaScript/TypeScript tested catalog at the headless Docker/OCI
-readiness layer. They do not claim full fixture-by-fixture real Docker or SSH execution; those
-remain tracked by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`.
+readiness layer. Full fixture-by-fixture local Docker and generic-SSH confidence is tracked by
+`WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006` through the shared smoke descriptor list.
 
 | Test ID | Preferred automation | Case | Expected result |
 | --- | --- | --- | --- |
@@ -167,7 +167,7 @@ remain tracked by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`.
 ## Python Tested Catalog Closure Matrix
 
 These rows close the Phase 5 Python tested catalog at the headless Docker/OCI readiness layer. They
-do not claim full fixture-by-fixture real Docker or SSH execution; those remain tracked by
+also bind into the shared local Docker and generic-SSH confidence gates tracked by
 `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`.
 
 | Test ID | Preferred automation | Case | Expected result |
@@ -177,7 +177,7 @@ do not claim full fixture-by-fixture real Docker or SSH execution; those remain 
 | WF-PLAN-PY-003 | integration | Flask with pip/requirements | `flask-pip` records Flask dependency, app module evidence when present, pip/requirements install command, `flask` planner metadata, workspace image artifact, and resource-owned internal port. |
 | WF-PLAN-PY-004 | integration | Generic deterministic ASGI app | A generic ASGI fixture records Python package tool evidence plus one safe ASGI `module:app` target, selects a generic ASGI/Python planner path, emits Uvicorn start command specs, and avoids framework-specific deployment fields. |
 | WF-PLAN-PY-005 | integration | Generic deterministic WSGI app | A generic WSGI fixture records Python package tool evidence plus one safe WSGI `module:app` target, selects a generic WSGI/Python planner path, emits Gunicorn or equivalent WSGI start command specs, and avoids framework-specific deployment fields. |
-| WF-PLAN-PY-006 | integration | Poetry project | Poetry metadata or `poetry.lock` selects Poetry install/start command rendering without also selecting pip/uv installs unless explicitly owned by the planner. |
+| WF-PLAN-PY-006 | integration | Poetry project | Poetry metadata or `poetry.lock` selects Poetry project handling; build-backend-capable projects install through PEP 517 `pip install .` without bootstrapping the Poetry CLI in runtime images. |
 | WF-PLAN-PY-007 | integration | Explicit start-command fallback | Python source with missing or unsupported framework evidence plans only when explicit resource runtime profile install/build/start commands make a Docker/OCI image plan possible. |
 | WF-PLAN-PY-008 | unit/integration | Python package tool precedence | Explicit tool wins, then `uv.lock`, Poetry metadata/`poetry.lock`, PEP 621 `pyproject.toml`, `requirements.txt`, and generic pip fallback; conflicting evidence is diagnostic unless a selected planner requires one unambiguous tool. |
 | WF-PLAN-PY-009 | integration | Missing ASGI/WSGI app target | FastAPI, Django, Flask, generic ASGI, or generic WSGI evidence without a deterministic app target is blocked with `missing-asgi-app`, `missing-wsgi-app`, or `missing-python-app-target` before deployment execution unless explicit start command is supplied. |
@@ -189,8 +189,8 @@ do not claim full fixture-by-fixture real Docker or SSH execution; those remain 
 ## JVM Tested Catalog Closure Matrix
 
 These rows close the Phase 5 JVM/Spring Boot tested catalog at the headless Docker/OCI readiness
-layer. They do not claim full fixture-by-fixture real Docker or SSH execution; those remain tracked
-by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`.
+layer. They also bind into the shared local Docker and generic-SSH confidence gates tracked by
+`WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`.
 
 | Test ID | Preferred automation | Case | Expected result |
 | --- | --- | --- | --- |
@@ -203,12 +203,13 @@ by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`.
 | WF-PLAN-JVM-007 | unit/integration | JVM build tool precedence | Explicit tool selection wins when supported; otherwise Maven wrapper/Maven and Gradle wrapper/Gradle evidence select their owning tool. Maven/Gradle ambiguity is diagnostic or blocked when no source root/profile selection resolves it. |
 | WF-PLAN-JVM-008 | integration | Runnable jar discovery | Spring Boot and generic JVM planners emit `java -jar` only when jar path selection is deterministic from explicit profile, artifact naming, or exactly one safe jar evidence item. |
 | WF-PLAN-JVM-009 | integration | Spring Boot actuator health evidence | Spring Boot fixtures with actuator dependency may default health to an actuator endpoint; non-actuator Spring Boot fixtures use the generic HTTP default unless resource health policy wins. |
-| WF-PLAN-JVM-010 | integration | Unsupported JVM framework without fallback | Quarkus, Micronaut, or another unsupported JVM framework is blocked with `unsupported-framework` unless explicit fallback commands produce a containerizable image plan. |
+| WF-PLAN-JVM-010 | integration | Unsupported JVM framework without fallback | Micronaut or another unsupported JVM framework is blocked with `unsupported-framework` unless explicit fallback commands produce a containerizable image plan. |
 | WF-PLAN-JVM-011 | integration | Ambiguous Maven/Gradle evidence | Source root with both Maven and Gradle runnable project evidence and no explicit selection is blocked with `ambiguous-jvm-build-tool`. |
 | WF-PLAN-JVM-012 | integration | Missing runnable jar or production start command | JVM evidence without deterministic jar path and without explicit start command is rejected with `missing-runnable-jar` or `missing-production-start-command` in `runtime-plan-resolution`. |
 | WF-PLAN-JVM-013 | integration | Missing JVM build tool evidence | Generic JVM source without Maven, Gradle, jar, or explicit command evidence is rejected with `missing-jvm-build-tool` or `unsupported-framework` in `runtime-plan-resolution`. |
 | WF-PLAN-JVM-014 | integration | Internal port behavior | JVM serverful planners use the resource network profile port and do not add deployment-owned `port` input; missing required port is blocked in `resource-network-resolution` when no deterministic persisted profile value exists. |
 | WF-PLAN-JVM-015 | contract/integration | Preview parity | `deployments.plan/v1` exposes ready and blocked JVM planner output with source evidence, build tool, planner key/support tier, artifact kind, command specs, network, health, warnings, unsupported reasons, and next actions without creating a deployment attempt. |
+| WF-PLAN-JVM-016 | integration | Quarkus Maven JVM jar mode | `quarkus-maven` records Quarkus dependency/plugin evidence, Maven build tool, `quarkus` planner/runtime kind, Maven base image, `mvn package -DskipTests`, deterministic `java -jar target/quarkus-app/quarkus-run.jar` start, workspace image artifact, and resource-owned internal port. |
 
 ## Buildpack Accelerator Contract Matrix
 
@@ -280,18 +281,30 @@ asserts the equivalent Dockerfile/build/run/verification evidence without execut
 
 | Test ID | Preferred automation | Fixture family | Case | Expected result |
 | --- | --- | --- | --- | --- |
-| WF-PLAN-SMOKE-001 | integration, opt-in Docker e2e | Static frontend | Next static export, Vite, React, Vue, Svelte, Solid, Angular, Nuxt generate, Astro static, and SvelteKit static fixtures start from source/runtime/network resource profile fields | Planner selects a static image artifact, generated Dockerfile packages the publish directory into the adapter-owned static server, internal port is 80 unless the resource profile overrides it, and typed Docker build/run commands are renderable from the plan. Representative opt-in real Docker coverage is tracked by `WF-PLAN-SMOKE-005`; full real Docker/SSH coverage for every static catalog fixture remains a migration gap. |
-| WF-PLAN-SMOKE-002 | integration, opt-in Docker e2e | Node HTTP and SSR server | Next SSR/standalone, Remix, Express, Fastify, NestJS, Hono, Koa, and generic Node fixtures start from the same profile vocabulary | Planner selects a workspace-command image artifact with Node/Bun base policy, install/build/start commands, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. Representative opt-in real Docker coverage is tracked by `WF-PLAN-SMOKE-005`; full real Docker/SSH coverage for every Node catalog fixture remains a migration gap. |
-| WF-PLAN-SMOKE-003 | integration, opt-in Docker e2e | Python and JVM HTTP server | FastAPI, Django, Flask, generic Python, Spring Boot, and generic JVM fixtures when present start from the same profile vocabulary | Planner selects a workspace-command image artifact with language-family base policy, package/build-tool install/build/start command, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. Representative opt-in real Docker coverage is tracked by `WF-PLAN-SMOKE-005`; full real Docker/SSH coverage for every Python/JVM catalog fixture remains a migration gap. |
+| WF-PLAN-SMOKE-001 | integration + GitHub Actions Docker/SSH e2e | Static frontend | Next static export, Vite, React, Vue, Svelte, Solid, Angular, Nuxt generate, Astro static, and SvelteKit static fixtures start from source/runtime/network resource profile fields | Planner selects a static image artifact, generated Dockerfile packages the publish directory into the adapter-owned static server, internal port is 80 unless the resource profile overrides it, and typed Docker build/run commands are renderable from the plan. The active static fixture descriptor set is shared by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`; GitHub Actions runs the local Docker matrix and secret-gated SSH matrix from nightly/release. |
+| WF-PLAN-SMOKE-002 | integration + GitHub Actions Docker/SSH e2e | Node HTTP and SSR server | Next SSR/standalone, Remix, Express, Fastify, NestJS, Hono, Koa, and generic Node fixtures start from the same profile vocabulary | Planner selects a workspace-command image artifact with Node/Bun base policy, install/build/start commands, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. The active Node fixture descriptor set is shared by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`; GitHub Actions runs the local Docker matrix and secret-gated SSH matrix from nightly/release. |
+| WF-PLAN-SMOKE-003 | integration + GitHub Actions Docker/SSH e2e | Python and JVM HTTP server | FastAPI, Django, Flask, generic Python, Spring Boot, Quarkus, and generic JVM fixtures when present start from the same profile vocabulary | Planner selects a workspace-command image artifact with language-family base policy, package/build-tool install/build/start command, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. The active Python, Spring Boot Maven/Gradle, Quarkus Maven, and generic JVM fixture descriptor set is shared by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`; GitHub Actions runs the local Docker matrix and secret-gated SSH matrix from nightly/release. |
 | WF-PLAN-SMOKE-004 | integration | Unsupported or ambiguous fixture boundary | Unsupported framework evidence or ambiguous hybrid evidence lacks explicit fallback commands | Planning fails with `validation_error` in phase `runtime-plan-resolution`; explicit fallback commands may instead produce a Docker/OCI image plan without adding deployment command fields. |
-| WF-PLAN-SMOKE-005 | opt-in local Docker e2e | Representative real local Docker fixture slice | Vite or Next static export plus Angular SPA, React SPA, or SvelteKit static; Next SSR or Remix plus one Node HTTP framework; FastAPI plus Django or Flask when dependency installation is available, otherwise Django plus Flask with the FastAPI dependency gap recorded | The same resource source/runtime/network profile draft used by Quick Deploy is persisted before ids-only `deployments.create` or equivalent shell workflow; Docker really builds an image, starts a container, resolves the published internal HTTP verification URL, records runtime metadata/logs, and exposes typed Docker build/run command evidence without framework/base-image/buildpack deployment fields. |
-| WF-PLAN-SMOKE-006 | opt-in SSH e2e or contract with migration gap | Representative generic-SSH fixture slice | The same representative fixture descriptors used by `WF-PLAN-SMOKE-005`, executed through generic-SSH when a real target is configured | The harness selects the generic-SSH backend from the same resource profile and proves remote Docker build/run/verification when enabled. Without a configured SSH target, contract coverage may prove backend selection, but real SSH fixture execution remains an explicit migration gap. |
+| WF-PLAN-SMOKE-005 | GitHub Actions + local explicit Docker e2e | Real local Docker catalog slice | Next static export, Vite, React, Vue, Svelte, Solid, Angular, Astro, Nuxt generate, and SvelteKit static; Next SSR, Next standalone, Remix, Express, Fastify, NestJS, Hono, Koa, and generic Node; FastAPI, generic ASGI, generic WSGI, Poetry Flask, Django, Flask, explicit custom Python, generic Java jar, Spring Boot Maven wrapper/no-wrapper, Quarkus Maven JVM jar mode, Spring Boot Gradle, and explicit-start JVM; Dockerfile, Docker Compose, and prebuilt-image substrates. | The same resource source/runtime/network profile draft used by Quick Deploy is persisted before ids-only `deployments.create` or equivalent shell workflow; Docker really builds an image, starts a container, resolves the published internal HTTP verification URL, records runtime metadata/logs, and exposes typed Docker build/run command evidence without framework/base-image/buildpack deployment fields. `.github/workflows/framework-fixture-e2e.yml` runs this matrix from nightly/release; local developer runs remain explicit. |
+| WF-PLAN-SMOKE-006 | GitHub Actions secret-gated + local explicit SSH e2e | Real generic-SSH fixture slice | The framework fixture descriptors used by `WF-PLAN-SMOKE-005`, executed through generic-SSH when a real target is configured; Dockerfile/Compose/prebuilt-image generic-SSH paths are covered by the SSH substrate smoke. | The harness selects the generic-SSH backend from the same resource profile and proves remote Docker build/run/verification when enabled. Without a configured SSH target, the coverage inventory records which catalog entries have fixture or substrate smoke paths and treats the external target as an explicit confidence-gate prerequisite, not a catalog support gap. Release dispatch can require SSH evidence and fail closed when secrets are absent. |
+
+The full catalog smoke gates are exposed as first-class root scripts:
+`bun run smoke:framework:docker`, `bun run smoke:framework:ssh`, and
+`bun run smoke:framework`. The Docker script composes local Docker substrate smoke plus framework
+fixture smoke; both local Docker catalog slices register a no-proxy target so build/run/health
+coverage does not depend on host ports 80/443 being free. For CI confidence, the
+`.github/workflows/framework-fixture-e2e.yml` workflow runs substrate smoke once, then shards the
+real Docker and generic-SSH fixture smoke by `APPALOFT_E2E_FRAMEWORK_FIXTURE` so one slow language
+ecosystem does not hide the rest of the catalog. The SSH script and workflow jobs run the shared
+SSH preflight before enabling the generic-SSH fixture test, so missing SSH credentials fail closed
+when the gate is required instead of becoming a silent pass.
 
 ## Zero-to-SSH Supported Catalog Acceptance Matrix
 
 These rows govern the Phase 5 supported catalog exit criterion. They sit above family-specific
-planner rows and below opt-in real smoke: default automation is hermetic and table-driven, while
-real Docker and real SSH remain explicit opt-in confidence layers.
+planner rows and below the GitHub Actions/local explicit real-target gates: fast local automation
+is hermetic and table-driven, while real Docker and real SSH are CI/local-explicit confidence
+layers.
 
 | Test ID | Preferred automation | Catalog entry | Expected result |
 | --- | --- | --- | --- |
@@ -307,6 +320,7 @@ real Docker and real SSH remain explicit opt-in confidence layers.
 | ZSSH-CATALOG-010 | integration | Generic Node | Generic Node fixture resolves production package scripts to Docker/OCI image intent without framework-specific deployment fields. |
 | ZSSH-CATALOG-011 | integration | Generic Python | Generic Python or explicit-command fixture resolves only when app target or explicit commands make a Docker/OCI image plan possible. |
 | ZSSH-CATALOG-012 | integration | Generic Java | Generic deterministic jar or explicit-command JVM fixture resolves to Java Docker/OCI image intent with resource-owned internal port. |
+| ZSSH-CATALOG-017 | integration | Quarkus Maven | Quarkus Maven JVM jar fixture resolves to a `quarkus` workspace-command Docker/OCI image intent, Maven build command, deterministic `target/quarkus-app/quarkus-run.jar` start command, resource-owned internal port, and shared local Docker/generic-SSH smoke descriptor coverage. |
 | ZSSH-CATALOG-013 | integration | Dockerfile | Container-native Dockerfile profile wins over framework/buildpack evidence and resolves a build-image artifact intent. |
 | ZSSH-CATALOG-014 | integration | Docker Compose | Container-native Compose profile wins over framework/buildpack evidence and resolves a Compose project intent with target service behavior. |
 | ZSSH-CATALOG-015 | integration | Prebuilt image | Prebuilt image profile resolves image artifact intent, skips source build commands, and keeps network/health profile resource-owned. |
@@ -322,8 +336,8 @@ real Docker and real SSH remain explicit opt-in confidence layers.
 | ZSSH-RUNTIME-001 | integration | Runtime target before acceptance | local-shell and generic-SSH single-server backends are selected from registry capabilities before acceptance; unsupported providers/capabilities reject before acceptance. |
 | ZSSH-RUNTIME-002 | integration | Hermetic fake/generic-SSH contract | Default tests prove render/apply/verify/log capability through fake/local/generic-SSH descriptors without requiring a real SSH server. |
 | ZSSH-RUNTIME-003 | integration | Observation contract | Readiness, health, logs, and access/proxy summaries are normalized observation expectations, not Docker/SSH payloads. |
-| ZSSH-RUNTIME-004 | opt-in local Docker e2e | Real Docker smoke gate | Real local Docker fixture smoke runs only with `APPALOFT_E2E_FRAMEWORK_DOCKER=true`. |
-| ZSSH-RUNTIME-005 | opt-in SSH e2e | Real SSH smoke gate | Real generic-SSH fixture smoke runs only with explicit SSH target configuration; absence of target is a migration gap, not a pass. |
+| ZSSH-RUNTIME-004 | GitHub Actions + local explicit Docker e2e | Real Docker smoke gate | `.github/workflows/framework-fixture-e2e.yml` runs the local Docker fixture matrix from nightly/release; local reproduction runs only with `APPALOFT_E2E_FRAMEWORK_DOCKER=true`. |
+| ZSSH-RUNTIME-005 | GitHub Actions secret-gated + local explicit SSH e2e | Real SSH smoke gate | `.github/workflows/framework-fixture-e2e.yml` runs the generic-SSH fixture matrix when SSH secrets exist; local reproduction requires explicit SSH target configuration. Absence of target is an external confidence-gate prerequisite, not a pass and not a catalog support gap; release dispatch can require SSH evidence and fail closed. |
 
 ## Entry Parity Matrix
 
@@ -336,7 +350,7 @@ real Docker and real SSH remain explicit opt-in confidence layers.
 | WF-PLAN-ENTRY-005 | contract | Shared draft field vocabulary | Web, CLI, and repository config normalize source base directory, publish directory, Dockerfile path, Compose path, build target, install/build/start commands, runtime name, internal port, network exposure, target service, host port, and health fields into the same `resources.create` profile shape before ids-only `deployments.create`. |
 | WF-PLAN-ENTRY-006 | contract | Explicit fallback commands | For supported JavaScript/TypeScript/Python sources whose framework evidence lacks safe production start or static output evidence, entry workflows accept only explicit profile fallback commands or fail with structured `validation_error` before deployment admission; fallback commands are never deployment command fields. |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current executable coverage is spread across deployment, resource, Quick Deploy, runtime planner,
 CLI, Web, and shell e2e tests. This matrix is the source of truth for the broader framework support
@@ -344,9 +358,11 @@ catalog.
 
 Implemented planner code paths currently include Next.js, Vite static, Astro static, Nuxt generate
 static, explicit SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python,
-generic Java, and custom command fallback. Executable matrix coverage exists for the named fixtures
-and focused planner tests listed below; generic Java is now covered by the `generic-java-jar`
-fixture through `WF-PLAN-JVM-006`, `WF-PLAN-JVM-015`, and `ZSSH-CATALOG-012`.
+generic Java, Quarkus Maven, Spring Boot, and custom command fallback. Executable matrix coverage exists for the named fixtures
+and focused planner tests listed below; generic Java deterministic jar behavior and
+GitHub Actions/local explicit real-smoke coverage are covered by the runnable `generic-java-jar` fixture through
+`WF-PLAN-JVM-006`, `WF-PLAN-JVM-015`, and `ZSSH-CATALOG-012`; Quarkus Maven JVM jar mode is
+covered by `WF-PLAN-JVM-016` and `ZSSH-CATALOG-017`.
 
 Executable coverage now includes first-slice `applicationShape` propagation for
 `WF-PLAN-DET-007`, Node manifest package-manager precedence coverage for `WF-PLAN-DET-001`, and
@@ -388,35 +404,56 @@ command rendering without adding framework-specific deployment fields. Python co
 FastAPI with `uv`, Django and Flask with pip/requirements, deterministic generic ASGI/WSGI, Poetry,
 explicit start fallback, missing ASGI app, and ambiguous app-target rejection. JVM coverage includes
 Spring Boot Maven/Gradle, generic deterministic jar, explicit start fallback, unsupported framework,
-ambiguous build-tool, missing build tool, and missing runnable jar rejection. Full real Docker/SSH
-execution for every catalog fixture remains a migration gap until opt-in environment coverage is
-broadened.
+ambiguous build-tool, missing build tool, and missing runnable jar rejection. Real local Docker and
+generic-SSH execution for the supported framework fixture descriptor set are wired through
+`WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006` in `.github/workflows/framework-fixture-e2e.yml`;
+local Docker runs in nightly/release, while generic SSH is secret-gated and can fail closed on
+release dispatch.
 
-`WF-PLAN-SMOKE-005` is the first opt-in real Docker slice and is intentionally narrower than the
-full catalog. It proves a representative static/frontend, Node/server, and Python/server set can
-actually build, run, and verify through the local Docker path. `WF-PLAN-SMOKE-006` keeps SSH on the
-same profile/harness contract; real SSH execution remains a migration gap unless an opt-in target is
-configured.
+`WF-PLAN-SMOKE-005` is the real Docker fixture slice. It records explicit local Docker
+coverage state for every Phase 5 supported catalog entry and proves the active static/frontend,
+Node/server, Python/server, and container-native substrate set can actually build, run, and verify
+through the local Docker path. `WF-PLAN-SMOKE-006` reuses the same fixture descriptors for
+generic-SSH smoke through
+`apps/shell/test/e2e/quick-deploy-framework-fixtures-ssh.workflow.e2e.ts`; full browser/CLI entry
+parity remains an explicit gap. Prebuilt-image generic-SSH execution is covered as a substrate
+smoke by `QUICK-DEPLOY-WF-061`.
 
-`ZSSH-CATALOG-001` through `ZSSH-CATALOG-016`, `ZSSH-PREVIEW-001` through
+`ZSSH-CATALOG-001` through `ZSSH-CATALOG-017`, `ZSSH-PREVIEW-001` through
 `ZSSH-PREVIEW-004`, `ZSSH-CREATE-001` through `ZSSH-CREATE-004`, and `ZSSH-RUNTIME-001` through
 `ZSSH-RUNTIME-005` are covered by
 `packages/adapters/runtime/test/zero-to-ssh-supported-catalog-acceptance.test.ts`. This is the
-default hermetic Phase 5 supported catalog acceptance harness. It binds Next.js, Vite static SPA,
+fast Phase 5 supported catalog acceptance harness. It binds Next.js, Vite static SPA,
 Astro static, Nuxt generate, SvelteKit static, Remix, FastAPI, Django, Flask, generic Node,
-generic Python, generic Java, Dockerfile, Docker Compose, prebuilt image, and explicit custom
+generic Python, generic Java, Quarkus Maven, Dockerfile, Docker Compose, prebuilt image, and explicit custom
 commands to one reusable descriptor contract from profile draft through preview, ids-only create,
 runtime target backend selection, Docker/OCI artifact intent, readiness/health/log/access
-observation expectations, and opt-in Docker/SSH smoke gates.
+observation expectations, and GitHub Actions Docker/SSH smoke gates.
 
-Current `WF-PLAN-SMOKE-005` local Docker coverage runs Vite SPA, React SPA, Next SSR, Hono,
-Django, and Flask through real image build, container run, internal HTTP verification, deployment
-detail runtime metadata, resource detail state, generated Dockerfile assertions, and Docker
-build/run log evidence. FastAPI remains a real-smoke migration gap in the current local Docker
-environment because pip could not resolve the required transitive `pydantic` dependency while
-building the fixture image. Angular SPA and SvelteKit static remain real-smoke fixture-hardening
-gaps because their current catalog fixtures failed before container start during dependency/build
-execution.
+Current `WF-PLAN-SMOKE-005` local Docker coverage runs Next static export, Vite SPA, React SPA,
+Vue SPA, Svelte SPA, Solid SPA, Angular SPA, Astro static, Nuxt generate, SvelteKit static, Next
+SSR, Next standalone, Remix, Express, Fastify, NestJS, Hono, Koa, generic Node, generic ASGI,
+generic WSGI, Poetry Flask, Django, Flask, explicit custom Python, generic Java jar, Spring Boot
+Maven wrapper, Spring Boot Maven no-wrapper, Quarkus Maven JVM jar mode, Spring Boot Gradle Groovy DSL, and Spring Boot Gradle Kotlin DSL through real image build, container run,
+internal HTTP verification,
+deployment detail runtime metadata, resource detail state, generated Dockerfile assertions, and
+Docker build/run log evidence. Dockerfile, Docker Compose, and prebuilt-image substrates are
+covered by `quick-deploy-local-docker-substrates.workflow.e2e.ts`. The same active framework
+fixture descriptor set has a GitHub Actions secret-gated and local explicit generic-SSH workflow in
+`quick-deploy-framework-fixtures-ssh.workflow.e2e.ts`. The GitHub workflow shards both real Docker
+and generic-SSH fixture smoke with `APPALOFT_E2E_FRAMEWORK_FIXTURE`; the local scripts remain useful
+for focused reproduction but do not need to be the default way to run the whole catalog. The coverage
+inventory is asserted by `apps/shell/test/e2e/framework-smoke-coverage.test.ts`, including checks
+that the local explicit Docker and generic-SSH smoke files both consume the shared fixture descriptors,
+keep their explicit environment gates, match the active descriptor inventory exactly, and stay wired
+to the sharded GitHub Actions fixture matrix. FastAPI real-smoke coverage uses the same FastAPI
+planner output and a real `uv.lock` file. Generic Java real-smoke coverage uses the deterministic runnable
+`generic-java-jar` fixture. Maven-based Spring Boot real-smoke coverage uses
+a Maven build image, and Gradle-based Spring Boot real-smoke coverage uses a Gradle build image, so
+generated Dockerfiles contain their own build tools instead of depending on host Maven or Gradle
+binaries. Prebuilt-image generic-SSH execution is covered by the GitHub Actions secret-gated and
+local explicit `QUICK-DEPLOY-WF-061` substrate smoke in
+`quick-deploy-ssh.workflow.e2e.ts`.
 
 Before a framework family can be marked first-class, Code Round must add at least one planner or
 fallback test for its `WF-PLAN-CAT-*` row plus boundary coverage proving base-image policy,

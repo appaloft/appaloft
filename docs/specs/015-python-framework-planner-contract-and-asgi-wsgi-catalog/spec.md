@@ -42,10 +42,10 @@ Resource profile -> detect -> plan -> deployments.create execution
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
 | FPC-PY-SPEC-001 | Stable Python planner output | A supported Python fixture has package tool, framework or ASGI/WSGI evidence, command, network, and health evidence | Planner resolves it | Output includes planner key, support tier inputs, base image policy, install/build/start/package command specs, artifact kind, internal port behavior, health defaults, and safe diagnostics. |
-| FPC-PY-SPEC-002 | FastAPI with `uv` | A FastAPI fixture has PEP 621 dependencies, `uv.lock`, and a deterministic ASGI target | Planner resolves it | Output uses `uv` install/run command specs, `fastapi` planner metadata, Python base image policy, workspace image artifact intent, and resource-owned internal port. |
+| FPC-PY-SPEC-002 | FastAPI with `uv` | A FastAPI fixture has PEP 621 dependencies, a real `uv.lock`, and a deterministic ASGI target | Planner resolves it | Output uses a `uv` Python base image plus frozen `uv` install/run command specs, `fastapi` planner metadata, workspace image artifact intent, and resource-owned internal port. |
 | FPC-PY-SPEC-003 | Django and Flask with pip/requirements | Django or Flask fixtures have requirements evidence and deterministic WSGI/ASGI app targets | Planner resolves them | Output uses pip install command specs, framework planner metadata, deterministic start command, workspace image artifact intent, and resource-owned internal port. |
 | FPC-PY-SPEC-004 | Generic ASGI/WSGI apps | A Python source has deterministic ASGI or WSGI module/app evidence but no named FastAPI/Django/Flask framework | Planner resolves it | Output selects `generic-asgi` or `generic-wsgi` instead of framework-specific behavior and still emits Docker/OCI image intent. |
-| FPC-PY-SPEC-005 | Poetry project | A Python web fixture has Poetry metadata or `poetry.lock` | Planner resolves it | Output records Poetry tool evidence and renders install/start commands through Poetry without installing multiple Python toolchains. |
+| FPC-PY-SPEC-005 | Poetry project | A Python web fixture has Poetry metadata or `poetry.lock` | Planner resolves it | Output records Poetry tool evidence and renders dependency installation through the Poetry build backend without bootstrapping the Poetry CLI in runtime images. |
 | FPC-PY-SPEC-006 | Explicit fallback command | A Python source lacks safe ASGI/WSGI discovery but resource runtime profile supplies explicit install/build/start commands | Planner resolves it | Output uses generic Python/custom command fallback, keeps commands in resource runtime profile, and does not add framework/base-image fields to `deployments.create`. |
 | FPC-PY-SPEC-007 | Unsupported or missing Python evidence | Python evidence has ambiguous app targets, missing ASGI/WSGI app, missing production start, unsupported framework, or missing internal port | Plan preview or deployment planning runs | Appaloft returns structured blocked reasons or `validation_error` without guessing, and points users to resource runtime/network configuration or explicit fallback commands. |
 | FPC-PY-SPEC-008 | Preview parity | Web, CLI, HTTP/oRPC, and future tool surfaces ask for a Python deployment plan | They call `deployments.plan` | They receive the same `deployments.plan/v1` shape and do not reimplement Python planner business logic. |
@@ -56,8 +56,8 @@ Resource profile -> detect -> plan -> deployments.create execution
 - Resource owns reusable source, runtime, network, health, and access profile fields.
 - Deployment owns only admitted attempts and immutable snapshots after `deployments.create`.
 - Runtime adapters own filesystem inspection, Python manifest parsing, ASGI/WSGI module discovery,
-  generated Dockerfile assets, rendered shell, Docker/Compose/SSH details, and opt-in real smoke
-  execution.
+  generated Dockerfile assets, rendered shell, Docker/Compose/SSH details, and GitHub Actions/local
+  explicit real smoke execution.
 - `deployments.plan` is the read-only preview operation for the same `detect -> plan` contract.
 
 ## Public Surfaces
@@ -85,8 +85,9 @@ Resource profile -> detect -> plan -> deployments.create execution
 - Do not add non-Docker runtime substrate support.
 - Do not execute Python package installers, framework CLIs, imports, or application code during
   admission-time detection.
-- Do not claim every Python fixture has full real Docker/SSH smoke; headless Docker/OCI readiness
-  remains the catalog closure layer, with representative opt-in Docker smoke tracked separately.
+- Do not require real Docker/SSH execution in the fast contract suite. Python fixture real-execution confidence is
+  provided by the shared GitHub Actions/local explicit Docker and generic-SSH framework smoke descriptor set governed
+  by the zero-to-SSH catalog acceptance harness.
 
 ## Open Questions
 

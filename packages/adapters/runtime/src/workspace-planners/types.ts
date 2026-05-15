@@ -41,6 +41,7 @@ export type WorkspaceRuntimeKind =
   | "nextjs"
   | "node"
   | "python"
+  | "quarkus"
   | "remix"
   | "spring-boot";
 
