@@ -29,12 +29,14 @@ description: Appaloft release runbook for manually triggered GitHub Actions rele
 - Prerelease npm dist-tag input: `prerelease=true`
 - Explicit version input: `release_as=X.Y.Z`, used only when the roadmap gate allows a target minor
   or explicit hotfix version.
-- SSH release-readiness inputs: `require_ssh_remote_state_e2e=true` and
-  `require_ssh_quick_deploy_e2e=true`, used when the selected roadmap target should require opt-in
-  SSH smoke evidence and matching SSH secrets exist.
-- For `0.11.0`, missing real SSH smoke evidence is an accepted deferred release-note gap when no
-  SSH target server is available. Publish runs for `v0.11.x` do not require both SSH workflows
-  automatically, but the manual inputs should still be used whenever SSH secrets exist.
+- SSH release-readiness inputs: `require_ssh_remote_state_e2e=true`,
+  `require_ssh_quick_deploy_e2e=true`, `require_framework_fixture_e2e=true`,
+  `require_scheduled_task_e2e=true`, `require_storage_cleanup_e2e=true`,
+  `require_runtime_usage_e2e=true`, and `require_capacity_prune_e2e=true`, used when the selected
+  roadmap target should require GitHub Actions SSH smoke evidence. Preview provider release
+  readiness uses `require_preview_provider_e2e=true` to require the live GitHub PR-comment feedback
+  gate. When one of these inputs is set, missing SSH target secrets or GitHub preview provider smoke
+  secrets fail the reusable workflow instead of silently accepting the run.
 - The manual run creates or updates the Release Please PR and adds roadmap release alignment to that
   same PR.
 - When `release_as` is set, the Release workflow must enforce that the release PR title, body,
@@ -76,11 +78,9 @@ Version decision rules:
   version can still ship.
 - If Release Please proposes a version that violates the roadmap gate, stop and report the mismatch
   instead of merging the release PR.
-- For `0.11.0`, stable release is allowed only with the accepted deferred SSH smoke evidence gap
-  recorded in `docs/PRODUCT_ROADMAP.md` and carried into release notes, or with real SSH evidence.
-  When SSH evidence is available, use `bun run smoke:ssh:preflight` locally before
-  `bun run smoke:ssh:evidence`, or set both `require_ssh_remote_state_e2e=true` and
-  `require_ssh_quick_deploy_e2e=true` on the Release workflow run.
+- When real SSH evidence is required, use `bun run smoke:ssh:preflight` locally before
+  `bun run smoke:ssh:evidence`, or set the corresponding `require_*_e2e=true` inputs on the
+  Release workflow run so GitHub Actions becomes the fail-closed confidence layer.
 
 ## Preflight
 
@@ -132,11 +132,11 @@ Create or update a Release Please PR for a roadmap-approved explicit version:
 gh workflow run release.yml -R appaloft/appaloft -f release_as=0.4.0 -f prerelease=false
 ```
 
-Create or update a Release Please PR for a roadmap-approved `0.11.0` release and require SSH
-release-readiness only when SSH target secrets are available:
+Create or update a Release Please PR for a roadmap-approved `0.11.0` release and require the
+fail-closed SSH release-readiness gates:
 
 ```bash
-gh workflow run release.yml -R appaloft/appaloft -f release_as=0.11.0 -f prerelease=false -f require_ssh_remote_state_e2e=true -f require_ssh_quick_deploy_e2e=true
+gh workflow run release.yml -R appaloft/appaloft -f release_as=0.11.0 -f prerelease=false -f require_ssh_remote_state_e2e=true -f require_ssh_quick_deploy_e2e=true -f require_framework_fixture_e2e=true -f require_scheduled_task_e2e=true -f require_storage_cleanup_e2e=true -f require_runtime_usage_e2e=true -f require_capacity_prune_e2e=true -f require_preview_provider_e2e=true
 ```
 
 Publish with prerelease npm tagging only when the user asks for prerelease behavior:
