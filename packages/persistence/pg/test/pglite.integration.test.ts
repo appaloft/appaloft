@@ -1191,7 +1191,7 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
-  test("[RES-PROFILE-DELETE-006] reads audit-retention deletion blockers", async () => {
+  test("[RES-PROFILE-DELETE-006] reads dependency-binding and audit-retention deletion blockers", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-delete-blockers-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
     const context = createRepositoryContext();
@@ -1222,6 +1222,36 @@ describe("pglite persistence integration", () => {
           created_at: "2026-01-01T00:00:00.000Z",
         })
         .execute();
+      await database.db
+        .insertInto("resource_dependency_bindings")
+        .values([
+          {
+            id: "rdb_res_web_active",
+            project_id: "proj_web",
+            environment_id: "env_web",
+            resource_id: "res_web",
+            dependency_resource_id: "rsi_postgres",
+            target_name: "DATABASE_URL",
+            scope: "runtime",
+            injection_mode: "env-reference",
+            lifecycle_status: "active",
+            created_at: "2026-01-01T00:01:00.000Z",
+          },
+          {
+            id: "rdb_res_web_removed",
+            project_id: "proj_web",
+            environment_id: "env_web",
+            resource_id: "res_web",
+            dependency_resource_id: "rsi_redis",
+            target_name: "REDIS_URL",
+            scope: "runtime",
+            injection_mode: "env-reference",
+            lifecycle_status: "removed",
+            created_at: "2026-01-01T00:02:00.000Z",
+            removed_at: "2026-01-01T00:03:00.000Z",
+          },
+        ])
+        .execute();
 
       const reader = new PgResourceDeletionBlockerReader(database.db);
       const result = await reader.findBlockers(context, {
@@ -1229,6 +1259,12 @@ describe("pglite persistence integration", () => {
       });
 
       expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap()).toContainEqual({
+        kind: "dependency-binding",
+        relatedEntityId: "rdb_res_web_active",
+        relatedEntityType: "resource-dependency-binding",
+        count: 1,
+      });
       expect(result._unsafeUnwrap()).toContainEqual({
         kind: "audit-retention",
         relatedEntityId: "audit_res_web",

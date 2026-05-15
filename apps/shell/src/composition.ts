@@ -20,6 +20,7 @@ import {
   type CommandBus,
   type DependencyResourceBackupPolicyRepository,
   type DeployTokenRepository,
+  type EnvironmentReadModel,
   type ExecutionContext,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
@@ -29,11 +30,15 @@ import {
   MarkServerAppliedRouteFailedSpec,
   type MutationCoordinator,
   type PreviewCleanupRetryScheduler,
+  type PreviewExpiryCleanupScheduler,
   type ProcessAttemptDeliveryCandidateReader,
   type ProcessAttemptRetryCandidateReader,
   type ProcessAttemptRetryGenerator,
+  type ProjectReadModel,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
+  type ResourceReadModel,
+  type RuntimeMonitoringCollectorService,
   type ScheduledDependencyBackupService,
   type ScheduledHistoryRetentionService,
   type ScheduledRuntimePrunePolicyReadModel,
@@ -44,6 +49,7 @@ import {
   ServerAppliedRouteStateBySourceFingerprintSpec,
   ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
+  type ServerReadModel,
   type SourceEventVerificationPort,
   SourceLinkBySourceFingerprintSpec,
   type SourceLinkRecord,
@@ -83,12 +89,17 @@ import {
   createDisabledPreviewCleanupRetrySchedulerRunner,
   createPreviewCleanupRetrySchedulerRunner,
 } from "./preview-cleanup-retry-scheduler-runner";
+import {
+  createDisabledPreviewExpiryCleanupSchedulerRunner,
+  createPreviewExpiryCleanupSchedulerRunner,
+} from "./preview-expiry-cleanup-scheduler-runner";
 import { registerApplicationServices } from "./register-application-services";
 import { registerRuntimeDependencies } from "./register-runtime-dependencies";
 import { createReloadableDatabase } from "./reloadable-database";
 import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
 import { SshRemoteStateWorkReadModel } from "./remote-state-work-read-model";
 import { resourceAccessFailureRendererTargetForStartedServer } from "./resource-access-failure-renderer-target";
+import { createRuntimeMonitoringCollectorRunner } from "./runtime-monitoring-collector-runner";
 import { createScheduledDependencyBackupRunner } from "./scheduled-dependency-backup-runner";
 import { createScheduledHistoryRetentionRunner } from "./scheduled-history-retention-runner";
 import { createScheduledRuntimePruneRunner } from "./scheduled-runtime-prune-runner";
@@ -395,7 +406,7 @@ export async function createAppComposition(
       : {}),
     resourceAccessFailureRenderer: () => resourceAccessFailureRendererTarget,
   });
-  registerApplicationServices(childContainer);
+  registerApplicationServices(childContainer, { dataDir: config.dataDir });
   const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
   const commandBus = resolveToken<CommandBus>(childContainer, tokens.commandBus);
   const queryBus = resolveToken<QueryBus>(childContainer, tokens.queryBus);
@@ -497,6 +508,21 @@ export async function createAppComposition(
         logger,
       })
     : createDisabledPreviewCleanupRetrySchedulerRunner();
+  const previewExpiryCleanupSchedulerRunner = config.previewExpiryCleanupScheduler.enabled
+    ? createPreviewExpiryCleanupSchedulerRunner({
+        config: config.previewExpiryCleanupScheduler,
+        scheduler: resolveToken<PreviewExpiryCleanupScheduler>(
+          childContainer,
+          tokens.previewExpiryCleanupScheduler,
+        ),
+        mutationCoordinator: resolveToken<MutationCoordinator>(
+          childContainer,
+          tokens.mutationCoordinator,
+        ),
+        executionContextFactory,
+        logger,
+      })
+    : createDisabledPreviewExpiryCleanupSchedulerRunner();
   const scheduledTaskScheduler = resolveToken<ScheduledTaskScheduler>(
     childContainer,
     tokens.scheduledTaskScheduler,
@@ -528,6 +554,20 @@ export async function createAppComposition(
   const scheduledHistoryRetentionService = resolveToken<ScheduledHistoryRetentionService>(
     childContainer,
     tokens.scheduledHistoryRetentionService,
+  );
+  const runtimeMonitoringCollectorService = resolveToken<RuntimeMonitoringCollectorService>(
+    childContainer,
+    tokens.runtimeMonitoringCollectorService,
+  );
+  const serverReadModel = resolveToken<ServerReadModel>(childContainer, tokens.serverReadModel);
+  const projectReadModel = resolveToken<ProjectReadModel>(childContainer, tokens.projectReadModel);
+  const environmentReadModel = resolveToken<EnvironmentReadModel>(
+    childContainer,
+    tokens.environmentReadModel,
+  );
+  const resourceReadModel = resolveToken<ResourceReadModel>(
+    childContainer,
+    tokens.resourceReadModel,
   );
   const scheduledRuntimePrunePolicyReadModel = resolveToken<ScheduledRuntimePrunePolicyReadModel>(
     childContainer,
@@ -565,6 +605,16 @@ export async function createAppComposition(
   const scheduledHistoryRetentionRunner = createScheduledHistoryRetentionRunner({
     config: config.scheduledHistoryRetentionRunner,
     service: scheduledHistoryRetentionService,
+    executionContextFactory,
+    logger,
+  });
+  const runtimeMonitoringCollectorRunner = createRuntimeMonitoringCollectorRunner({
+    config: config.runtimeMonitoringCollectorRunner,
+    serverReadModel,
+    projectReadModel,
+    environmentReadModel,
+    resourceReadModel,
+    service: runtimeMonitoringCollectorService,
     executionContextFactory,
     logger,
   });
@@ -623,11 +673,13 @@ export async function createAppComposition(
     });
 
     certificateRetrySchedulerRunner.start();
+    previewExpiryCleanupSchedulerRunner.start();
     previewCleanupRetrySchedulerRunner.start();
     scheduledTaskRunner.start();
     scheduledRuntimePruneRunner.start();
     scheduledDependencyBackupRunner.start();
     scheduledHistoryRetentionRunner.start();
+    runtimeMonitoringCollectorRunner.start();
   };
 
   const cliProgram = createCliProgram({
@@ -636,6 +688,7 @@ export async function createAppComposition(
     commandBus,
     queryBus,
     executionContextFactory,
+    terminalSessionGateway,
     deploymentProgressObserver: deploymentProgressReporter,
     ...(sourceLinkStore ? { sourceLinkStore } : {}),
     serverAppliedRouteStore,
@@ -679,11 +732,13 @@ export async function createAppComposition(
     startServer,
     async shutdown(): Promise<void> {
       certificateRetrySchedulerRunner.stop();
+      previewExpiryCleanupSchedulerRunner.stop();
       previewCleanupRetrySchedulerRunner.stop();
       scheduledTaskRunner.stop();
       scheduledRuntimePruneRunner.stop();
       scheduledDependencyBackupRunner.stop();
       scheduledHistoryRetentionRunner.stop();
+      runtimeMonitoringCollectorRunner.stop();
       serverHandle?.stop?.();
       await telemetry.shutdown();
       await database.close();

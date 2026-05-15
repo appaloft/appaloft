@@ -220,6 +220,8 @@ class KyselyResourceMutationVisitor
         id: attachment.id.value,
         resource_id: spec.state.id.value,
         storage_volume_id: attachment.storageVolumeId.value,
+        storage_volume_kind: attachment.storageVolumeKind.value,
+        source_path: attachment.sourcePath?.value ?? null,
         destination_path: attachment.destinationPath.value,
         mount_mode: attachment.mountMode.value,
         attached_at: attachment.attachedAt.value,

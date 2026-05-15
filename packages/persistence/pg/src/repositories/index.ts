@@ -41,6 +41,7 @@ export * from "./resource-repository";
 export * from "./resource-runtime-control-attempts";
 export * from "./resource-runtime-log-archive-store";
 export * from "./retention-default-repository";
+export * from "./runtime-monitoring-read-model";
 export * from "./scheduled-runtime-prune-policy-read-model";
 export * from "./scheduled-task-repository";
 export * from "./server-applied-route-state-repository";

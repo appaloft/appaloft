@@ -7,9 +7,12 @@ import {
   type DeploymentProgressObserver,
   type ExecutionContextFactory,
   type QueryBus,
+  type ResourceDiagnosticSummary,
   type ResourceRuntimeLogLine,
   type ResourceRuntimeLogsResult,
   type StreamDeploymentEventsResult,
+  type TerminalSessionDescriptor,
+  type TerminalSessionGateway,
 } from "@appaloft/application";
 import { createCliLogRenderer } from "@appaloft/cli-logging";
 import { type DomainError, domainError, type Result } from "@appaloft/core";
@@ -45,12 +48,34 @@ export interface CliProgramInput {
   commandBus: CommandBus;
   queryBus: QueryBus;
   executionContextFactory: ExecutionContextFactory;
+  terminalSessionGateway?: TerminalSessionGateway;
+  terminalIO?: CliTerminalIO;
   deploymentProgressObserver?: DeploymentProgressObserver;
   prepareDeploymentStateBackend?: (
     decision: DeploymentStateBackendDecision,
   ) => Promise<Result<RemoteStateSession>>;
   sourceLinkStore?: CliSourceLinkStore;
   serverAppliedRouteStore?: ServerAppliedRouteDesiredStateStore;
+}
+
+export interface CliTerminalReadable {
+  readonly isTTY?: boolean;
+  setRawMode?(enabled: boolean): void;
+  resume?(): void;
+  pause?(): void;
+  on(event: "data", listener: (chunk: string | Uint8Array) => void): unknown;
+  off?(event: "data", listener: (chunk: string | Uint8Array) => void): unknown;
+  removeListener?(event: "data", listener: (chunk: string | Uint8Array) => void): unknown;
+}
+
+export interface CliTerminalWritable {
+  write(data: string | Uint8Array): void | boolean;
+}
+
+export interface CliTerminalIO {
+  stdin: CliTerminalReadable;
+  stdout: CliTerminalWritable;
+  stderr: CliTerminalWritable;
 }
 
 export interface ExecuteCommandOptions {
@@ -83,6 +108,8 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
       options?: ExecuteCommandOptions,
     ) => Promise<Result<T>>;
     readonly executeQuery: <T>(message: AppQuery<T>) => Promise<Result<T>>;
+    readonly terminalSessionGateway?: TerminalSessionGateway;
+    readonly terminalIO: CliTerminalIO;
     readonly prepareDeploymentStateBackend?: (
       decision: DeploymentStateBackendDecision,
     ) => Promise<Result<RemoteStateSession>>;
@@ -140,6 +167,14 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
         }),
         message,
       );
+    },
+    ...(input.terminalSessionGateway
+      ? { terminalSessionGateway: input.terminalSessionGateway }
+      : {}),
+    terminalIO: input.terminalIO ?? {
+      stdin: process.stdin,
+      stdout: process.stdout,
+      stderr: process.stderr,
     },
     ...(input.prepareDeploymentStateBackend
       ? { prepareDeploymentStateBackend: input.prepareDeploymentStateBackend }
@@ -246,6 +281,141 @@ const runLoggedCommand = <T>(
     return output as T;
   });
 
+function chunkToTerminalInput(chunk: string | Uint8Array): string {
+  return typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
+}
+
+function removeDataListener(
+  stdin: CliTerminalReadable,
+  listener: (chunk: string | Uint8Array) => void,
+): void {
+  if (stdin.off) {
+    stdin.off("data", listener);
+    return;
+  }
+
+  stdin.removeListener?.("data", listener);
+}
+
+function terminalSessionErrorFromUnknown(error: unknown): DomainError {
+  if (isDomainError(error)) {
+    return error;
+  }
+
+  return domainError.terminalSessionFailed("CLI terminal session failed", {
+    phase: "cli-terminal-attach",
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
+
+async function pipeTerminalSession(input: {
+  descriptor: TerminalSessionDescriptor;
+  gateway: TerminalSessionGateway;
+  io: CliTerminalIO;
+  initialSize?: {
+    rows: number;
+    cols: number;
+  };
+}): Promise<void> {
+  const attachResult = input.gateway.attach(input.descriptor.sessionId);
+  if (attachResult.isErr()) {
+    throw attachResult.error;
+  }
+
+  const session = attachResult.value;
+  const { stderr, stdin, stdout } = input.io;
+  const supportsRawMode = Boolean(stdin.isTTY && stdin.setRawMode);
+  const writeInput = (chunk: string | Uint8Array) => {
+    void session.write(chunkToTerminalInput(chunk));
+  };
+  let sessionClosed = false;
+
+  try {
+    if (supportsRawMode) {
+      stdin.setRawMode?.(true);
+    }
+    if (input.initialSize) {
+      await session.resize(input.initialSize);
+    }
+    stdin.resume?.();
+    stdin.on("data", writeInput);
+
+    for await (const frame of session) {
+      if (frame.kind === "output") {
+        (frame.stream === "stderr" ? stderr : stdout).write(frame.data);
+        continue;
+      }
+
+      if (frame.kind === "error") {
+        throw frame.error;
+      }
+
+      if (frame.kind === "closed") {
+        sessionClosed = true;
+        if (typeof frame.exitCode === "number" && frame.exitCode !== 0) {
+          process.exitCode = frame.exitCode;
+        }
+        break;
+      }
+    }
+  } finally {
+    removeDataListener(stdin, writeInput);
+    if (supportsRawMode) {
+      stdin.setRawMode?.(false);
+    }
+    stdin.pause?.();
+    if (!sessionClosed) {
+      await session.close();
+    }
+  }
+}
+
+export const runTerminalCommand = (
+  message: Result<AppCommand<TerminalSessionDescriptor>>,
+  options: {
+    attach: boolean;
+    initialRows?: number;
+    initialCols?: number;
+  },
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  options.attach
+    ? Effect.gen(function* () {
+        const cli = yield* CliRuntime;
+        if (!cli.terminalSessionGateway) {
+          return yield* Effect.fail(
+            domainError.terminalSessionNotConfigured(
+              "CLI terminal attach requires terminal session gateway",
+              {
+                phase: "cli-terminal-attach",
+              },
+            ),
+          );
+        }
+
+        const command = yield* resultToEffect(message);
+        const result = yield* Effect.promise(() => cli.executeCommand(command));
+        const descriptor = yield* resultToEffect(result);
+
+        yield* Effect.tryPromise({
+          try: () =>
+            pipeTerminalSession({
+              descriptor,
+              gateway: cli.terminalSessionGateway as TerminalSessionGateway,
+              io: cli.terminalIO,
+              ...(typeof options.initialRows === "number" && typeof options.initialCols === "number"
+                ? {
+                    initialSize: {
+                      rows: options.initialRows,
+                      cols: options.initialCols,
+                    },
+                  }
+                : {}),
+            }),
+          catch: terminalSessionErrorFromUnknown,
+        });
+      })
+    : runCommand(message);
+
 export const runCommand = <T>(
   message: Result<AppCommand<T>>,
 ): Effect.Effect<void, DomainError, CliRuntime> =>
@@ -274,6 +444,80 @@ export const runQuery = <T>(
     const query = yield* resultToEffect(message);
     const result = yield* Effect.promise(() => cli.executeQuery(query));
     const output = yield* resultToEffect(result);
+
+    yield* print(output);
+  });
+
+function diagnosticRouteUrl(summary: ResourceDiagnosticSummary): string | undefined {
+  const selectedRoute = summary.access.selectedRoute;
+  if (selectedRoute) {
+    const { host, pathPrefix, protocol } = selectedRoute.intent;
+    return `${protocol}://${host}${pathPrefix}`;
+  }
+
+  return (
+    summary.access.durableUrl ??
+    summary.access.serverAppliedUrl ??
+    summary.access.generatedUrl ??
+    summary.access.plannedUrl
+  );
+}
+
+function formatDiagnosticSourceError(error: ResourceDiagnosticSummary["sourceErrors"][number]) {
+  return [
+    error.source,
+    error.code,
+    error.phase,
+    error.retryable ? "retryable" : "not-retryable",
+  ].join(" · ");
+}
+
+export function formatResourceDiagnosticSummary(summary: ResourceDiagnosticSummary): string {
+  const deploymentLabel = summary.deployment
+    ? `${summary.deployment.id} · ${summary.deployment.status}`
+    : (summary.focus.deploymentId ?? "none");
+  const accessRoute = diagnosticRouteUrl(summary);
+  const lines = [
+    "Resource diagnostic summary",
+    `Resource: ${summary.context.resourceName} (${summary.focus.resourceId})`,
+    `Deployment: ${deploymentLabel}`,
+    `Access: ${summary.access.status}${summary.access.reasonCode ? ` · ${summary.access.reasonCode}` : ""}`,
+    ...(accessRoute ? [`Route: ${accessRoute}`] : []),
+    `Proxy: ${summary.proxy.status}${summary.proxy.providerKey ? ` · ${summary.proxy.providerKey}` : ""}${summary.proxy.proxyRouteStatus ? ` · ${summary.proxy.proxyRouteStatus}` : ""}`,
+    `Deployment logs: ${summary.deploymentLogs.status} · ${summary.deploymentLogs.lineCount}/${summary.deploymentLogs.tailLimit}`,
+    `Runtime logs: ${summary.runtimeLogs.status} · ${summary.runtimeLogs.lineCount}/${summary.runtimeLogs.tailLimit}`,
+    `Redaction: ${summary.redaction.masked ? "masked" : "not-masked"} · ${summary.redaction.maskedValueCount} value(s)`,
+  ];
+
+  if (summary.sourceErrors.length > 0) {
+    lines.push("Source errors:");
+    for (const sourceError of summary.sourceErrors) {
+      lines.push(`- ${formatDiagnosticSourceError(sourceError)}`);
+    }
+  } else {
+    lines.push("Source errors: none");
+  }
+
+  lines.push("Canonical JSON: rerun with --json");
+  return `${lines.join("\n")}\n`;
+}
+
+export const runResourceDiagnosticSummaryQuery = (
+  message: Result<AppQuery<ResourceDiagnosticSummary>>,
+  options: {
+    summary: boolean;
+  },
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(message);
+    const result = yield* Effect.promise(() => cli.executeQuery(query));
+    const output = yield* resultToEffect(result);
+
+    if (options.summary) {
+      cli.terminalIO.stdout.write(formatResourceDiagnosticSummary(output));
+      return;
+    }
 
     yield* print(output);
   });

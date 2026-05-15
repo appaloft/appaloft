@@ -192,7 +192,7 @@ describe("operator-work.retry", () => {
       failedAttempt({
         id: "wrk_scheduled_task_failed",
         status: "retry-scheduled",
-        operationKey: "scheduled-task-runs.run-now",
+        operationKey: "scheduled-tasks.run-now",
         dedupeKey: "scheduled-task-run:str_failed",
         phase: "scheduled-task-run",
         step: "runtime-execution",
@@ -235,7 +235,7 @@ describe("operator-work.retry", () => {
         id: "wrk_0001",
         kind: "runtime-maintenance",
         status: "pending",
-        operationKey: "scheduled-task-runs.run-now",
+        operationKey: "scheduled-tasks.run-now",
         dedupeKey: "scheduled-task-run:str_failed:retry:wrk_0001",
         correlationId: "corr_work",
         requestId: "req_work",

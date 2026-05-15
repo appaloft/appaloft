@@ -596,7 +596,7 @@ describe("operator work query service", () => {
           id: "task-worker-run-1",
           kind: "runtime-maintenance",
           status: "running",
-          operationKey: "scheduled-task-runs.run-now",
+          operationKey: "scheduled-tasks.run-now",
           phase: "worker-execution",
           step: "running",
           resourceId: "res_web",
@@ -629,7 +629,7 @@ describe("operator work query service", () => {
         id: "task-worker-run-1",
         kind: "runtime-maintenance",
         status: "running",
-        operationKey: "scheduled-task-runs.run-now",
+        operationKey: "scheduled-tasks.run-now",
         phase: "worker-execution",
       }),
     ]);
