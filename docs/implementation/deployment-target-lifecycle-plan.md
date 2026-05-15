@@ -223,8 +223,8 @@ the configured value is still required.
 - normal server list/show read models return the new name and still omit deleted servers;
 - `servers.rename` rejects missing or deleted servers with `not_found`;
 - CLI and HTTP/oRPC dispatch through `RenameServerCommand`;
-- Web server detail exposes the display-name rename action if the existing surface can carry it, or
-  records a named Web action migration gap while remaining read-observable;
+- Web server detail exposes the display-name rename action for active and inactive servers through
+  the shared command/query boundary;
 - contracts and typed clients expose the command shape;
 - public docs coverage maps the operation to the server deployment-target anchor;
 - focused tests cover `SRV-LIFE-RENAME-001`, `SRV-LIFE-RENAME-002`,
@@ -246,8 +246,8 @@ the configured value is still required.
 - normal server list/show read models return the new edge proxy kind/status and still omit deleted
   servers;
 - CLI and HTTP/oRPC dispatch through `ConfigureServerEdgeProxyCommand`;
-- Web server detail exposes the proxy kind selector if the existing surface can carry it, or
-  records a named Web action migration gap while remaining read-observable;
+- Web server detail exposes the proxy kind selector/action for active servers and read-only proxy
+  state for inactive or deleted servers through the shared command/query boundary;
 - contracts and typed clients expose the command shape and result shape;
 - public docs coverage maps the operation to the server proxy readiness anchor;
 - focused tests cover `SRV-LIFE-PROXY-CONFIG-001`, `SRV-LIFE-PROXY-CONFIG-002`,
@@ -265,8 +265,8 @@ the configured value is still required.
 - `servers.delete` calls the shared `ServerDeletionBlockerReader` and returns
   `server_delete_blocked` for active servers or retained blockers;
 - CLI and HTTP/oRPC dispatch through `DeleteServerCommand`;
-- Web server detail continues to display read-only delete-safety status and records the destructive
-  button as a migration gap;
+- Web server detail reads `servers.delete-check` and enables destructive delete only when delete
+  safety is eligible and the operator types the exact server id confirmation;
 - contracts and typed clients expose the command shape;
 - public docs coverage maps the operation to the server deployment-target anchor;
 - focused tests cover `SRV-LIFE-DELETE-001`, `SRV-LIFE-DELETE-002`, `SRV-LIFE-DELETE-003`,
@@ -298,9 +298,11 @@ Run targeted checks before publishing:
 
 `servers.deactivate`, `servers.delete-check`, guarded `servers.delete`, display-name-only
 `servers.rename`, and intent-only `servers.configure-edge-proxy` are the current minimal
-lifecycle/safety slice. Guarded delete uses soft-delete lifecycle state. Reactivation, Web
-deactivate/delete action controls, terminal-session blocker durability, external runtime-task
-blocker durability, and broad credential usage visibility remain future work.
+lifecycle/safety slice. Guarded delete uses soft-delete lifecycle state. Server detail Web exposes
+rename, edge-proxy configuration, typed deactivation, delete-safety readback, and typed delete
+confirmation through the shared command/query boundary. Reactivation, terminal-session blocker
+durability, external runtime-task blocker durability, and broad credential usage visibility remain
+future work.
 
 ## Open Questions
 

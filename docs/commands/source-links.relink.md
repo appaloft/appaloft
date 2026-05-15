@@ -192,7 +192,8 @@ fail with a structured infrastructure merge conflict.
 
 PostgreSQL/PGlite source-link persistence is implemented through the `source_links` migration and
 PG adapter in `packages/persistence/pg`. `resources.delete` reports `source-link` blockers from
-that durable state. API/oRPC and Web relink entrypoints remain future work.
+that durable state. API/oRPC relink is exposed for hosted/self-hosted control planes, and Web
+Resource detail exposes a Resource-scoped relink form that dispatches the same command schema.
 
 The CLI currently accepts an explicit `sourceFingerprint`; deriving the fingerprint from a
 structured `sourceSelector` in the relink command is future entrypoint work.

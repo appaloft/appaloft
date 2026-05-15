@@ -24,7 +24,8 @@
 
 ## Entrypoints And Docs
 
-- [x] Update roadmap and implementation notes to mark JS/TS tested catalog closure without claiming full real Docker/SSH fixture coverage.
+- [x] Update roadmap and implementation notes to mark JS/TS tested catalog closure while pointing to
+  the shared GitHub Actions/local explicit Docker/generic-SSH fixture smoke coverage and keeping fast CI contract-oriented.
 - [x] Update `deployments.plan` query spec status after PR #139.
 - [x] Record public docs/help outcome for this behavior: existing deployment lifecycle and resource source/runtime docs/help anchors cover the preview and profile fix path; no new page required.
 

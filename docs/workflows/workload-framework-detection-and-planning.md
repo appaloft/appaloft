@@ -228,7 +228,7 @@ install, build, package, start, base-image, cache, or diagnostic behavior.
 | Runtime family | Evidence precedence |
 | --- | --- |
 | Node/Bun | Explicit resource runtime profile tool, then `packageManager` from `package.json` when valid, then lockfiles in this order: `bun.lockb`/`bun.lock`, `pnpm-lock.yaml`, `yarn.lock`, `package-lock.json`/`npm-shrinkwrap.json`; conflicting lockfiles are warnings only when an explicit tool resolves the conflict, otherwise ambiguity must be surfaced through diagnostics or `validation_error` when the selected planner requires one tool. |
-| Python | Explicit tool, then `uv.lock`, Poetry metadata/`poetry.lock`, PEP 621 `pyproject.toml`, `requirements.txt`, then generic `pip`. A planner must not install multiple Python toolchains unless the selected planner explicitly owns that behavior. |
+| Python | Explicit tool, then `uv.lock`, Poetry metadata/`poetry.lock`, PEP 621 `pyproject.toml`, `requirements.txt`, then generic `pip`. `uv.lock` selects a `uv` Python base image plus frozen `uv sync` so real Docker smoke does not download `uv` through pip during each build. Poetry projects with a build backend install through PEP 517 `pip install .` so runtime images do not bootstrap the Poetry CLI. Pip-based installs include retry/timeout flags for slow package indexes. A planner must not install multiple Python toolchains unless the selected planner explicitly owns that behavior. |
 | Ruby | `Gemfile.lock` and `Gemfile` select Bundler. Rails/Sinatra/Rack detection cannot bypass Bundler when a Gemfile exists. |
 | PHP | `composer.lock`/`composer.json` select Composer. PHP-FPM, Laravel, and Symfony planners may add server/runtime packaging, but Composer remains the package dependency tool. |
 | Go | `go.mod` selects Go modules. `go.work` may indicate a workspace, but the selected source base directory still owns the deployable module. |
@@ -300,7 +300,8 @@ ResourceSourceBinding + ResourceRuntimeProfile + ResourceNetworkProfile
   -> RuntimePlanResolver
   -> RuntimeArtifactSnapshot(kind = image or compose-project)
   -> docker-container or docker-compose execution plan
-  -> generated Dockerfile/build/run command evidence or an opt-in real Docker run
+  -> generated Dockerfile/build/run command evidence
+  -> GitHub Actions/local explicit real local Docker or generic-SSH smoke gate
 ```
 
 Smoke tests may be headless when the CI environment cannot install dependencies, build images, or
@@ -309,29 +310,42 @@ selected planner, image/Compose artifact intent, generated Dockerfile or Compose
 port, verification steps, and typed Docker command rendering. It must not execute framework CLIs
 during source detection.
 
-Opt-in real fixture smoke is the next confidence layer above headless evidence. It must run only
-when the operator explicitly enables Docker or SSH mutation, and it must start from the same
+GitHub Actions/local explicit real fixture smoke is the next confidence layer above headless
+evidence. It runs only in environments that explicitly provide Docker or SSH mutation access, and it
+must start from the same
 resource source/runtime/network profile draft as Quick Deploy before dispatching ids-only
 deployment admission or an equivalent shell workflow. A passing real smoke must prove actual image
 build, container start, internal HTTP verification, runtime metadata/log visibility, and typed
-Docker command rendering for a representative fixture slice. The first representative local Docker
-slice covers:
+Docker command rendering.
 
-- static/frontend: Vite or Next static export plus one non-Vite static/frontend fixture such as
-  Angular SPA or SvelteKit static;
-- Node/server: Next SSR or Remix plus one Node HTTP framework fixture such as Express, Fastify,
-  NestJS, Hono, or Koa;
-- Python/server: FastAPI plus Django or Flask. If FastAPI cannot be executed in the current Docker
-  environment because dependency installation is unavailable, the first local slice may use Django
-  plus Flask only when the FastAPI failure is recorded as a migration gap with the exact dependency
-  or fixture-build cause.
-
-SSH smoke may reuse the same fixture/profile harness behind a generic-SSH backend, but absence of a
-real SSH target must be recorded as a migration gap rather than skipped as a pass.
+The active local Docker catalog slice is no longer representative-only: the framework descriptor list plus the local Docker substrate smoke cover the supported static/frontend, Node/server, Python/server,
+Spring Boot/JVM, generic JVM, explicit custom, Dockerfile, Docker Compose, and prebuilt-image
+substrate entries named in the test matrix. Generic-SSH smoke reuses the same framework/profile
+descriptors behind the generic-SSH backend. A missing local Docker daemon or SSH target means the
+external confidence gate was not run; it is not recorded as a catalog support gap.
 
 Fixture smoke coverage must be table-driven by fixture descriptors and planner descriptors. Adding
 a new framework should mean adding detection/planner data and a fixture expectation, not adding a
 new public command, framework-specific deployment input field, or transport-only branch.
+
+Current local Docker smoke coverage is tracked by
+`apps/shell/test/e2e/framework-smoke-coverage.test.ts`, the fixture descriptor list in
+`apps/shell/test/e2e/support/framework-docker-smoke-fixtures.ts`, and
+`apps/shell/test/e2e/quick-deploy-local-docker-substrates.workflow.e2e.ts`. The coverage test
+asserts that the active descriptor inventory exactly matches the documented fixture set and that
+Dockerfile/Compose/prebuilt-image substrate catalog entries are bound to substrate smoke, so adding
+or removing a real-smoke fixture or substrate path must update the inventory contract in the same
+change. The framework inventory covers
+Next static export, Vite SPA, React SPA, Vue SPA, Svelte SPA, Solid SPA, Angular SPA, Astro static,
+Nuxt generate, SvelteKit static, Next SSR, Next standalone, Remix, Express, Fastify, NestJS, Hono,
+Koa, generic Node, FastAPI, generic ASGI, generic WSGI, Poetry Flask, Django, Flask, explicit
+custom Python, generic Java jar, Spring Boot Maven wrapper/no-wrapper, Spring Boot Gradle
+Groovy/Kotlin DSL, and generic Java explicit-start. Dockerfile, Docker Compose, and prebuilt-image
+catalog entries are covered by the local Docker substrate smoke.
+`apps/shell/test/e2e/quick-deploy-framework-fixtures-ssh.workflow.e2e.ts` reuses the same framework
+fixture descriptor list for GitHub Actions secret-gated and local explicit generic-SSH smoke.
+Dockerfile, Docker Compose, and prebuilt-image generic-SSH execution are covered by the same
+secret-gated substrate smoke family.
 
 ### Zero-to-SSH Supported Catalog Acceptance Harness
 
@@ -351,11 +365,12 @@ resource source/runtime/network/health profile draft
   -> readiness, health, runtime log, and access/proxy observation expectations
 ```
 
-Default automation must stay hermetic. It may use fake/local/generic-SSH target descriptors,
-runtime target backend registry selection, generated Dockerfile/Compose command rendering, and
-normalized observation expectations. Real local Docker and real SSH fixture smoke are stronger
-confidence layers, but they must be opt-in and must not become required dependencies for the
-default test suite.
+Fast local automation stays contract-oriented. It may use fake/local/generic-SSH target
+descriptors, runtime target backend registry selection, generated Dockerfile/Compose command
+rendering, and normalized observation expectations without mutating Docker or SSH targets. Real
+local Docker and real SSH fixture smoke are GitHub Actions gates with local explicit reproduction
+scripts; they are release/nightly confidence layers rather than required dependencies for every fast
+test invocation.
 
 The required Phase 5 harness catalog is: Next.js, Vite static SPA, Astro static, Nuxt generate,
 SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python, generic Java,
@@ -620,7 +635,7 @@ Static application shapes default to the Appaloft static server on internal port
 HTTP and SSR shapes block with `missing-internal-port` when no persisted or deterministic resource
 network port exists.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current implementation is narrower than the target catalog.
 
@@ -677,24 +692,29 @@ Current typed detection is limited to:
 - JavaScript/TypeScript tested catalog closure has stable rows for Next.js SSR/standalone/static
   export, Remix, Nuxt generate, SvelteKit static/ambiguous mode, Astro static, Vite/React/Vue/
   Svelte/Solid/Angular SPA, Express/Fastify/NestJS/Hono/Koa, generic package scripts, missing
-  evidence, and internal-port behavior. These rows are bound to fixture planner tests and
-  `deployments.plan/v1` preview contract tests. Full real Docker/SSH execution for every fixture is
-  still a migration gap, distinct from the headless Docker/OCI catalog closure.
+  evidence, and internal-port behavior. These rows are bound to fixture planner tests,
+  `deployments.plan/v1` preview contract tests, and the shared GitHub Actions/local explicit
+  Docker/generic-SSH framework smoke descriptors. Browser-level Web/CLI parity for every fixture remains broader
+  hardening, distinct from the headless Docker/OCI catalog closure.
 - Python tested catalog closure has stable rows for FastAPI with `uv`, Django with
   pip/requirements, Flask with pip/requirements, deterministic generic ASGI, deterministic generic
   WSGI, Poetry, explicit start-command fallback, package-tool precedence, missing ASGI/WSGI app
   target, ambiguous app target, missing production start, and internal-port behavior. These rows
   are bound to source-inspection tests, fixture planner tests, headless Docker/OCI smoke assertions,
-  and `deployments.plan/v1` preview contract tests. Full real Docker/SSH execution for every Python
-  fixture and deeper Django collectstatic/static handling remain migration gaps.
-- JVM/Spring Boot tested catalog closure has stable rows for Spring Boot Maven with wrapper, Spring
+  `deployments.plan/v1` preview contract tests, and the shared GitHub Actions/local explicit
+  Docker/generic-SSH framework smoke descriptors. Deeper Django collectstatic/static handling remains broader planner
+  hardening.
+- JVM/Spring Boot/Quarkus tested catalog closure has stable rows for Spring Boot Maven with wrapper, Spring
   Boot Maven without wrapper, Spring Boot Gradle with wrapper, Spring Boot Gradle Kotlin DSL,
-  generic JVM explicit start-command fallback, generic deterministic jar fallback, unsupported JVM
-  framework evidence, ambiguous Maven/Gradle build-tool evidence, missing JVM build tool, missing
-  runnable jar, actuator health defaults, and internal-port behavior. These rows are bound to
-  source-inspection tests, fixture planner tests, headless Docker/OCI smoke assertions, and
-  `deployments.plan/v1` preview contract tests. Full real Docker/SSH execution for every JVM
-  fixture and Quarkus/Micronaut planners remain migration gaps.
+  generic JVM explicit start-command fallback, generic deterministic jar fallback, Quarkus Maven JVM
+  jar mode, unsupported JVM framework evidence, ambiguous Maven/Gradle build-tool evidence, missing
+  JVM build tool, missing runnable jar, actuator health defaults, and internal-port behavior. These rows are bound to
+  source-inspection tests, fixture planner tests, headless Docker/OCI smoke assertions,
+  `deployments.plan/v1` preview contract tests, and the shared GitHub Actions/local explicit
+  Docker/generic-SSH framework smoke descriptors. Maven-based Spring Boot Docker execution uses a Maven build image
+  with shell-safe wrapper invocation, Gradle-based Spring Boot Docker execution uses a Gradle build
+  image, Quarkus Maven JVM jar mode starts `target/quarkus-app/quarkus-run.jar`, and Micronaut
+  planners remain future work.
 - Buildpack accelerator preview guardrails have stable rows for precedence, support tier, builder
   policy, limitations, unsupported/ambiguous/missing evidence, internal-port behavior, and
   `deployments.plan/v1` ready/blocked parity. Executable coverage is currently contract-level with
@@ -706,7 +726,7 @@ Current typed detection is limited to:
   hermetic fake resolver/planner fixtures and must not wire real Docker/buildpack execution in this
   slice.
 
-The following are migration gaps before the mainstream support catalog is complete:
+The following are governed follow-ups before additional support catalog families are promoted:
 
 - add detectors for remaining non-JavaScript catalog families and richer package/project names,
   static output conventions, and framework config files across the support catalog;

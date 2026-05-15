@@ -1,3 +1,5 @@
+export * from "./operations/storage-volumes/cleanup-storage-volume-runtime.handler";
+export * from "./operations/storage-volumes/cleanup-storage-volume-runtime.use-case";
 export * from "./operations/storage-volumes/create-storage-volume.handler";
 export * from "./operations/storage-volumes/create-storage-volume.use-case";
 export * from "./operations/storage-volumes/delete-storage-volume.handler";

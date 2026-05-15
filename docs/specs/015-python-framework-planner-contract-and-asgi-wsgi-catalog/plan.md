@@ -32,6 +32,12 @@ Every tested Python row must prove:
 - planner key and support tier inputs;
 - package tool detection across explicit profile, `uv.lock`, Poetry metadata/`poetry.lock`, PEP
   621 `pyproject.toml`, `requirements.txt`, and generic pip fallback;
+- `uv.lock` rows use a real lockfile and a `uv` Python base image so real Docker smoke does not
+  bootstrap `uv` by downloading the package manager through pip during each build;
+- Poetry metadata rows install through the Poetry build backend with `pip install .` so real Docker
+  smoke does not bootstrap the Poetry CLI in runtime images;
+- pip-based Python rows render retry/timeout flags on dependency installs so GitHub Actions/local explicit real Docker
+  smoke is resilient to slow package index responses without weakening planner semantics;
 - install/build/start/package command specs or explicit absence;
 - ASGI/WSGI module/app discovery rules and explicit fallback behavior;
 - artifact kind and output path, including Dockerfile generation intent;
@@ -54,8 +60,9 @@ Every tested Python row must prove:
   contract ids `DPP-CATALOG-003` through `DPP-CATALOG-004`.
 - Test-first rows: bind fixture catalog tests to the new Python ids before marking the roadmap item
   complete.
-- Acceptance/e2e: keep representative opt-in local Docker smoke under `WF-PLAN-SMOKE-005`; full
-  fixture-by-fixture real Docker/SSH smoke remains a migration gap.
+- Acceptance/e2e: keep Python local Docker and generic-SSH fixture smoke in
+  `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`; both use the shared framework smoke descriptor list
+  and run as GitHub Actions/local explicit gates because they mutate Docker or SSH targets.
 - Contract/integration/unit: runtime fixture tests prove planner/base image/command/artifact/port
   shape; contract tests prove `deployments.plan/v1` can expose the same Python planner shape.
 
@@ -66,5 +73,7 @@ Every tested Python row must prove:
   policy with deterministic ASGI/WSGI target discovery.
 - Full browser-level Web/CLI parity for every Python fixture remains broader hardening; current
   parity is shared draft vocabulary plus preview contract.
-- Full real Docker/SSH smoke for every Python fixture remains a migration gap; headless Docker/OCI
-  readiness is the tested catalog closure for this round.
+- Deeper production command hardening, for example richer Django static collection policy, remains
+  broader planner hardening; local Docker and generic-SSH Python fixture smoke coverage is available
+  through the shared GitHub Actions/local explicit framework smoke gates, while fast local
+  automation stays hermetic.

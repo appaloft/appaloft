@@ -1,4 +1,6 @@
 import { type RuntimeCommandLabel } from "./runtime-commands/types";
+import type { DockerRunMountInput } from "./runtime-commands";
+import type { DockerStorageVolumeRealization } from "./storage-runtime-mounts";
 
 function yamlQuoted(value: string): string {
   return JSON.stringify(value);
@@ -12,13 +14,71 @@ function renderLabelLines(labels: readonly RuntimeCommandLabel[]): string[] {
   });
 }
 
+function renderMountLines(mounts: readonly DockerRunMountInput[]): string[] {
+  if (mounts.length === 0) {
+    return [];
+  }
+
+  return [
+    "    volumes:",
+    ...mounts.flatMap((mount) => [
+      `      - type: ${mount.type}`,
+      `        source: ${yamlQuoted(mount.source)}`,
+      `        target: ${yamlQuoted(mount.target)}`,
+      ...(mount.readOnly ? ["        read_only: true"] : []),
+    ]),
+  ];
+}
+
+function renderTopLevelVolumeLines(input: {
+  mounts: readonly DockerRunMountInput[];
+  volumeRealizations: readonly DockerStorageVolumeRealization[];
+}): string[] {
+  const volumeNames = [
+    ...new Set(input.mounts.filter((mount) => mount.type === "volume").map((mount) => mount.source)),
+  ];
+  if (volumeNames.length === 0) {
+    return [];
+  }
+
+  const labelsByVolumeName = new Map(
+    input.volumeRealizations.map((realization) => [realization.volumeName, realization.labels]),
+  );
+
+  return [
+    "volumes:",
+    ...volumeNames.flatMap((volumeName) => {
+      const labels = labelsByVolumeName.get(volumeName);
+      return [
+        `  ${yamlQuoted(volumeName)}:`,
+        `    name: ${yamlQuoted(volumeName)}`,
+        ...(labels
+          ? [
+              "    labels:",
+              ...Object.entries(labels)
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(([key, value]) => `      ${yamlQuoted(key)}: ${yamlQuoted(value)}`),
+            ]
+          : []),
+      ];
+    }),
+  ];
+}
+
 export function renderComposeOwnershipLabelOverrideScript(input: {
   composeFile: string;
   overrideFile: string;
   labels: readonly RuntimeCommandLabel[];
+  mounts?: readonly DockerRunMountInput[];
+  volumeRealizations?: readonly DockerStorageVolumeRealization[];
   quote: (value: string) => string;
 }): string {
   const labelLines = renderLabelLines(input.labels);
+  const mountLines = renderMountLines(input.mounts ?? []);
+  const topLevelVolumeLines = renderTopLevelVolumeLines({
+    mounts: input.mounts ?? [],
+    volumeRealizations: input.volumeRealizations ?? [],
+  });
   const staticLines = [
     "set -eu",
     `compose_file=${input.quote(input.composeFile)}`,
@@ -43,7 +103,8 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
     "    printf '%s\\n' '    labels:'",
   ];
   const footerLines = [
-    "  done",
+  "  done",
+    ...topLevelVolumeLines.map((line) => `  printf '%s\\n' ${input.quote(line)}`),
     '} > "$tmp_file"',
     'mv "$tmp_file" "$override_file"',
   ];
@@ -51,6 +112,7 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
   return [
     ...staticLines,
     ...labelLines.map((line) => `    printf '%s\\n' ${input.quote(line)}`),
+    ...mountLines.map((line) => `    printf '%s\\n' ${input.quote(line)}`),
     ...footerLines,
   ].join("\n");
 }

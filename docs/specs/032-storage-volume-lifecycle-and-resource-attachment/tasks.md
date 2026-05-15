@@ -8,9 +8,13 @@
 - [x] STOR-DETACH-001: add detach test proving the StorageVolume remains.
 - [x] STOR-VOL-DELETE-001/002/003: add delete safety tests.
 - [x] STOR-READ-001/002: add query/read-model tests for volume and resource attachment summaries.
-- [x] STOR-SNAPSHOT-001: add deployment snapshot metadata test if snapshot materialization is in
-  this Code Round; otherwise record deferred-gap.
+- [x] STOR-SNAPSHOT-001: add deployment snapshot metadata test proving immutable mount metadata is
+  materialized from Resource storage attachments.
 - [x] STOR-ENTRY-001/002/003: add operation catalog, CLI, and oRPC/HTTP dispatch tests.
+- [x] STOR-WEB-001: add Web Resource-detail source coverage for storage volume list,
+  attach/detach controls, client contract shape, and public docs link.
+- [x] STOR-WEB-002: add Web Resource-detail source coverage for storage volume create/rename/delete
+  controls over shared oRPC clients.
 
 ## Source Of Truth
 
@@ -37,13 +41,15 @@
 - [x] Implement contracts and oRPC/HTTP routes.
 - [x] Implement CLI commands.
 - [x] Register application services and runtime dependencies in shell composition.
-- [x] Record deployment snapshot materialization as a deferred gap for this baseline.
+- [x] Record deployment snapshot materialization as active and keep provider-native upfront
+  provisioning out of storage lifecycle commands.
 
 ## Entrypoints And Docs
 
 - [x] CLI: create/list/show/rename/delete/attach/detach dispatch through bus.
 - [x] oRPC/HTTP: routes reuse command/query schemas.
-- [x] Web: classify as deferred or add read-only display with i18n and tests.
+- [x] Web: Resource detail Storage section lists storage volumes, displays attachments, and
+  dispatches attach/detach through shared oRPC clients with i18n and tests.
 - [x] Future MCP/tool manifest: operation catalog entries are AI-native small operations.
 
 ## Verification

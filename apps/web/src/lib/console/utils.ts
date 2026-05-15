@@ -91,6 +91,18 @@ export function resourceDetailHref(
   return `/projects/${encodeURIComponent(resource.projectId)}/environments/${encodeURIComponent(resource.environmentId)}/resources/${encodeURIComponent(resource.id)}`;
 }
 
+export function resourceTerminalHref(
+  resource: Pick<ResourceSummary, "id" | "projectId" | "environmentId">,
+  deploymentId?: string,
+): string {
+  const params = new URLSearchParams({ tab: "terminal" });
+  if (deploymentId) {
+    params.set("deploymentId", deploymentId);
+  }
+
+  return `${resourceDetailHref(resource)}?${params.toString()}`;
+}
+
 export function deploymentDetailHref(
   deployment: Pick<DeploymentSummary, "id" | "projectId" | "environmentId" | "resourceId">,
 ): string {

@@ -85,10 +85,12 @@ using `ResourceDiagnosticSummaryQueryInput`.
 CLI exposes:
 
 ```text
-appaloft resource diagnose <resourceId> [--deployment <deploymentId>] [--json]
+appaloft resource diagnose <resourceId> [--deployment <deploymentId>] [--json] [--summary]
 ```
 
-CLI should print canonical JSON in `--json` mode and a concise section summary in human mode.
+CLI prints canonical JSON by default and in `--json` mode. `--summary` prints a concise human
+section summary with stable ids, section statuses, source errors, and a reminder that canonical JSON
+is available.
 
 Transports must not define parallel diagnostic input/output shapes.
 
@@ -135,8 +137,8 @@ The minimal Code Round deliverable is:
 - Web resource detail copy affordance;
 - tests covering partial failures, redaction, source statuses, and no write side effects.
 
-CLI and Quick Deploy completion are strongly preferred for v1 closure. If deferred, record the
-deferment in this plan and the relevant workflow migration notes.
+CLI and Quick Deploy completion are part of the active v1 closure surface. If a later slice removes
+or narrows them, record the governed follow-up in this plan and the relevant workflow notes.
 
 ## Required Tests
 
@@ -167,7 +169,7 @@ The initial implementation may omit optional markdown/plain-text copy rendering 
 If desktop/client-only fields cannot be returned by the backend, the Web/desktop shell may append a
 separate safe client context section derived from the same structured contract during copy.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 `resources.diagnostic-summary` is implemented in application, operation catalog, contracts,
 oRPC/HTTP, CLI, shell DI, and Web resource detail.
@@ -182,23 +184,19 @@ section/source error, non-ready durable domain bindings as access source errors,
 failure as a source error, runtime log reader failure as a source error, runtime logs not requested
 without reader calls, and deployment/resource context mismatch.
 
-Edge access failure diagnostics are not yet composed into the summary. The future slice should add
-the latest safe `ResourceAccessFailureDiagnostic` as access/proxy evidence and include
+Edge access failure diagnostics are composed into the summary when the latest safe
+`ResourceAccessFailureDiagnostic` read source exists. The summary preserves
 `resource_access_*` source errors without changing the public query operation key.
 
-Web resource detail prefers the native Desktop clipboard bridge when available, then browser
-clipboard APIs, and only exposes the generated diagnostic JSON textarea when every automatic copy
-channel fails.
+Web resource detail, deployment detail, and Quick Deploy completion prefer the native Desktop
+clipboard bridge when available, then browser clipboard APIs, and only expose the generated
+diagnostic JSON textarea when every automatic copy channel fails.
 
-Remaining gaps:
+Governed follow-ups:
 
-- Quick Deploy completion does not yet expose the copy action after accepted deployment.
-- Deployment detail does not yet expose the action directly.
-- CLI human-readable summary mode is not implemented; `appaloft resource diagnose` currently prints
-  JSON through the shared query renderer.
 - Optional `copy.markdown` and `copy.plainText` are not generated.
-- API/oRPC, CLI, and Web copy affordance do not yet have dedicated automated contract/e2e tests
-  beyond typecheck.
+- API/oRPC copy affordances do not yet have dedicated automated contract/e2e tests beyond the CLI
+  summary and resource detail, deployment detail, and Quick Deploy WebView copy coverage.
 
 ## Open Questions
 

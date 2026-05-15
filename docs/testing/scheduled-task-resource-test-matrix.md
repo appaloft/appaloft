@@ -37,8 +37,13 @@ active CLI/API/Web/MCP entrypoints.
 | SCHED-TASK-SCHED-001 | Scheduler | Enabled task is due. | Scheduler dispatches the same run admission path as run-now and records the same run shape. |
 | SCHED-TASK-SCHED-002 | Scheduler/concurrency | Previous run is non-terminal. | Default `forbid` policy prevents concurrent runtime execution and records safe skip/rejection state. |
 | SCHED-TASK-RUNTIME-001 | Runtime adapter | Accepted task run is executed. | Runtime adapter executes one-off task command intent and returns run-scoped stdout/stderr logs, terminal status, timestamps, and exit code without writing deployment/resource runtime logs. |
-| SCHED-TASK-WORKER-001 | Application worker | Accepted run is drained. | Worker transitions accepted run to running, optionally claims a supplied durable process attempt before runtime execution, skips runtime execution when the durable claim is refused, invokes the scheduled-task runtime port, records run-scoped logs, persists terminal run state, and completes the durable process attempt when one was supplied. |
-| SCHED-TASK-RUNNER-001 | Shell runner | Scheduled task runner is enabled. | Long-running shell composition can start an opt-in scheduled task runner that scans due tasks, admits scheduled runs, generates due scheduled-task retry delivery attempts, drains the admitted/generated runs through the worker, and passes due scheduled-task durable process attempts to the same worker with `processAttemptId`/`workerId`. |
+| SCHED-TASK-RUNTIME-002 | Runtime adapter command plan | Docker container or Compose task command is rendered. | Runtime adapter renders a one-off `docker run --rm` task container command or `docker compose run --rm --no-deps` service command, validates environment variable names, preserves the current Resource runtime context, and does not mutate deployment history. |
+| SCHED-TASK-RUNTIME-003 | Runtime adapter target execution | Local-shell, Generic SSH, or Docker Swarm Docker/Compose task target is used. | Runtime adapter resolves the Resource's latest runtime-owning deployment, executes the rendered Docker container, Docker Compose, or Docker Swarm task command locally for `local-shell` and Docker Swarm targets or over SSH for `generic-ssh` targets, and converts stdout/stderr, timeout, exit code, and terminal status into run-scoped output. |
+| SCHED-TASK-RUNTIME-004 | Runtime context injection | Any scheduled task command is executed. | Runtime adapter injects stable system-owned `APPALOFT_*` context variables for run/task/resource and runtime-owning deployment identity, and system-owned values override user-supplied same-name variables. |
+| SCHED-TASK-RUNTIME-005 | GitHub Actions + local explicit real Docker smoke | `APPALOFT_E2E_SCHEDULED_TASK_DOCKER=true` is set locally, or `.github/workflows/scheduled-task-e2e.yml` runs the Docker gate from nightly/release. | The runtime adapter starts a real one-off Docker task container in a running Resource container's network namespace and returns succeeded run-scoped output without mutating deployment history. |
+| SCHED-TASK-RUNTIME-006 | GitHub Actions secret-gated + local explicit real generic-SSH Docker smoke | `APPALOFT_E2E_SSH_SCHEDULED_TASK_DOCKER=true` and SSH target credentials are configured locally, or `.github/workflows/scheduled-task-e2e.yml` has SSH secrets. | The runtime adapter connects through generic SSH, starts a real one-off Docker task container beside the remote Resource container, injects stable `APPALOFT_*` context, and returns succeeded run-scoped output; release dispatch can require SSH evidence and fail closed when secrets are absent. |
+| SCHED-TASK-WORKER-001 | Application worker | Accepted run is drained. | Worker transitions accepted run to running, optionally claims a supplied durable process attempt before runtime execution, skips runtime execution when the durable claim is refused, invokes the scheduled-task runtime port, records run-scoped logs, persists terminal run state, and completes the durable process attempt when one was supplied. Manual run-now process attempts use catalog key `scheduled-tasks.run-now`; scheduler-fired attempts use internal delivery key `scheduled-task-runs.run-due`. |
+| SCHED-TASK-RUNNER-001 | Shell runner | Scheduled task runner is enabled. | Long-running shell composition can start an explicitly enabled scheduled task runner that scans due tasks, admits scheduled runs, generates due scheduled-task retry delivery attempts, drains the admitted/generated runs through the worker, and passes due scheduled-task durable process attempts to the same worker with `processAttemptId`/`workerId`. Delivery reads include both `scheduled-tasks.run-now` and `scheduled-task-runs.run-due`. |
 | SCHED-TASK-LOGS-001 | Query/log adapter | Run emits output. | `scheduled-task-runs.logs` reads run-scoped logs; deployment and resource runtime logs are unchanged. |
 | SCHED-TASK-SECRET-001 | Redaction | Task input references secrets. | Definitions, runs, logs, errors, diagnostics, and tool descriptors expose only safe references and masked values. |
 | SCHED-TASK-ENTRY-001 | CLI/API/Web/MCP | Entrypoints are active. | CLI, HTTP/oRPC, and Web controls dispatch command/query messages through catalog schemas; generated MCP descriptors consume the catalog entries; public docs/help links target stable scheduled-task anchors. |
@@ -68,9 +73,16 @@ coverage in `packages/application/test/scheduled-task-delete.test.ts`.
 `SCHED-TASK-SCHED-001` has application scheduler admission coverage in
 `packages/application/test/scheduled-task-scheduler.test.ts` and Postgres/PGlite due-candidate
 read-model coverage in `packages/persistence/pg/test/scheduled-task-definition.pglite.test.ts`.
-`SCHED-TASK-RUNTIME-001`, runtime-output masking, and runtime-error masking for
+`SCHED-TASK-RUNTIME-001` through `SCHED-TASK-RUNTIME-004`, runtime-output masking, and runtime-error masking for
 `SCHED-TASK-SECRET-001` have adapter coverage in
 `packages/adapters/runtime/test/scheduled-task-runtime.test.ts`.
+`SCHED-TASK-RUNTIME-005` and `SCHED-TASK-RUNTIME-006` have real Docker/SSH smoke bindings in
+`packages/adapters/runtime/test/scheduled-task-runtime.real-docker.test.ts`, exposed through
+`bun run smoke:scheduled-task:docker`, `bun run smoke:scheduled-task:ssh`, and
+`bun run smoke:scheduled-task` for local explicit runs. The reusable
+`.github/workflows/scheduled-task-e2e.yml` workflow runs the same local Docker gate on GitHub
+runners and the same generic-SSH gate when SSH target secrets exist; nightly and release invoke the
+workflow, and release dispatch can require the SSH side with `require_scheduled_task_e2e=true`.
 `SCHED-TASK-WORKER-001` has application worker coverage in
 `packages/application/test/scheduled-task-run-worker.test.ts`, including ADR-054 durable process
 claim/completion binding for `PROC-DELIVERY-002` and `PROC-DELIVERY-004`.
@@ -92,10 +104,13 @@ summary, and run-log output. Generated tool descriptor coverage for `SCHED-TASK-
 
 Application command/query schemas, messages, result DTOs, read-model ports, create, update, delete,
 run-now admission, scheduler admission, accepted-run worker, read-query handlers/services,
-scheduled task persistence/read models, and hermetic runtime adapter support exist. Shell
-composition can resolve the scheduled-task repositories, read models, runtime port, handlers, use
-cases, scheduler, worker, and process attempt candidate/claim/completion ports. The scheduled-task
-runner is configured off by default and can be enabled for long-running shell processes. Operation catalog
-entries, HTTP/oRPC routes, CLI
-commands, Web Resource-detail controls, generated MCP descriptors, and public docs/help anchors are
-active.
+scheduled task persistence/read models, contract-test runtime adapter support, and Appaloft-owned
+local-shell plus generic-SSH Docker container, Docker Compose, and Docker Swarm OCI-image service
+scheduled task runtime execution exist, including stable `APPALOFT_*` runtime context injection.
+Shell composition resolves the real runtime target port
+for scheduled tasks, plus the scheduled-task repositories, read models, handlers, use cases,
+scheduler, worker, and process attempt candidate/claim/completion ports. The scheduled-task runner
+is configured off by default and can be enabled for long-running shell processes. Operation catalog
+entries, HTTP/oRPC routes, CLI commands, Web Resource-detail controls, generated MCP descriptors,
+and public docs/help anchors are active. Provider-native scheduled jobs are future provider-extension
+work, not a gap in the current Appaloft-owned runtime baseline.

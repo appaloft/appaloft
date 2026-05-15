@@ -196,7 +196,7 @@ function scheduledTaskProcessAttempt(
     id: "wrk_scheduled_task_run",
     kind: "runtime-maintenance",
     status: "pending",
-    operationKey: "scheduled-task-runs.run-now",
+    operationKey: "scheduled-tasks.run-now",
     phase: "manual-retry",
     step: "queued",
     resourceId: "res_api",
@@ -308,13 +308,16 @@ describe("ScheduledTaskRunner", () => {
     await sleep(5);
     runner.stop();
 
-    expect(processAttemptDeliveryCandidateReader.calls).toHaveLength(1);
-    const candidateCall = processAttemptDeliveryCandidateReader.calls[0];
-    expect(candidateCall?.filter).toMatchObject({
-      kind: "runtime-maintenance",
-      operationKey: "scheduled-task-runs.run-now",
-      limit: 7,
-    });
+    expect(processAttemptDeliveryCandidateReader.calls).toHaveLength(2);
+    expect(
+      processAttemptDeliveryCandidateReader.calls.map((call) => call.filter.operationKey),
+    ).toEqual(["scheduled-tasks.run-now", "scheduled-task-runs.run-due"]);
+    for (const candidateCall of processAttemptDeliveryCandidateReader.calls) {
+      expect(candidateCall.filter).toMatchObject({
+        kind: "runtime-maintenance",
+        limit: 7,
+      });
+    }
     const schedulerCall = scheduler.calls[0];
     expect(schedulerCall).toBeDefined();
     if (!schedulerCall) {
@@ -336,6 +339,57 @@ describe("ScheduledTaskRunner", () => {
           taskId: "tsk_daily",
           resourceId: "res_api",
           processAttemptId: "wrk_scheduled_task_run",
+          workerId: "scheduled-task-runner",
+        },
+      },
+    ]);
+  });
+
+  test("[SCHED-TASK-RUNNER-001] [PROC-DELIVERY-002] lets durable delivery own scheduler-recorded runs", async () => {
+    const scheduler = new CapturingScheduledTaskScheduler();
+    const processAttemptDeliveryCandidateReader =
+      new CapturingProcessAttemptDeliveryCandidateReader([
+        scheduledTaskProcessAttempt({
+          id: "wrk_scheduled_delivery",
+          operationKey: "scheduled-task-runs.run-due",
+          safeDetails: {
+            runId: "str_scheduled",
+            taskId: "tsk_daily",
+            resourceId: "res_api",
+          },
+        }),
+      ]);
+    const worker = new CapturingScheduledTaskRunWorker();
+    const runner = createScheduledTaskRunner({
+      config: {
+        enabled: true,
+        intervalSeconds: 60,
+        batchSize: 7,
+      },
+      scheduler,
+      worker,
+      processAttemptDeliveryCandidateReader,
+      executionContextFactory: new FixedExecutionContextFactory(),
+      logger: new CapturingLogger(),
+    });
+
+    runner.start();
+    await sleep(5);
+    runner.stop();
+
+    const schedulerCall = scheduler.calls[0];
+    expect(schedulerCall).toBeDefined();
+    if (!schedulerCall) {
+      throw new Error("expected scheduled task scheduler call");
+    }
+    expect(worker.calls).toEqual([
+      {
+        context: schedulerCall.context,
+        input: {
+          runId: "str_scheduled",
+          taskId: "tsk_daily",
+          resourceId: "res_api",
+          processAttemptId: "wrk_scheduled_delivery",
           workerId: "scheduled-task-runner",
         },
       },

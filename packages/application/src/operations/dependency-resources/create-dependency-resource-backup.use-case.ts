@@ -30,12 +30,22 @@ import {
   type DependencyResourceSecretStore,
   type EventBus,
   type IdGenerator,
+  type ProcessAttemptClaimer,
+  type ProcessAttemptCompleter,
   type ProcessAttemptRecorder,
 } from "../../ports";
-import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
+import {
+  EmptyProcessAttemptClaimer,
+  EmptyProcessAttemptCompleter,
+  NoopProcessAttemptRecorder,
+} from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDependencyResourceBackupCommandInput } from "./create-dependency-resource-backup.command";
+import {
+  dependencyResourceProviderConnectionContext,
+  dependencyResourceProviderResourceHandle,
+} from "./dependency-resource-provider-context";
 
 const appaloftOwnedDependencySecretRefPrefix = "appaloft://dependency-resources/";
 
@@ -64,6 +74,10 @@ export class CreateDependencyResourceBackupUseCase {
     private readonly logger: AppLogger,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.processAttemptClaimer)
+    private readonly processAttemptClaimer: ProcessAttemptClaimer = new EmptyProcessAttemptClaimer(),
+    @inject(tokens.processAttemptCompleter)
+    private readonly processAttemptCompleter: ProcessAttemptCompleter = new EmptyProcessAttemptCompleter(),
   ) {}
 
   async execute(
@@ -81,6 +95,8 @@ export class CreateDependencyResourceBackupUseCase {
       idGenerator,
       logger,
       processAttemptRecorder,
+      processAttemptClaimer,
+      processAttemptCompleter,
     } = this;
 
     return safeTry(async function* () {
@@ -165,25 +181,37 @@ export class CreateDependencyResourceBackupUseCase {
         backup,
         UpsertDependencyResourceBackupSpec.fromDependencyResourceBackup(backup),
       );
-      await recordBackupProcessAttempt({
+      const claimResult = await claimBackupProcessAttempt({
         recorder: processAttemptRecorder,
+        claimer: processAttemptClaimer,
+        completer: processAttemptCompleter,
         repositoryContext,
         context,
         backup,
+        claimedAt: requestedAt.value,
       });
+      if (claimResult.isErr()) {
+        return err(claimResult.error);
+      }
+      if (!claimResult.value.claimed) {
+        await recordBackupProcessAttempt({
+          recorder: processAttemptRecorder,
+          repositoryContext,
+          context,
+          backup,
+        });
+      }
       await publishDomainEventsAndReturn(context, eventBus, logger, backup, undefined);
 
+      const providerResourceHandle = dependencyResourceProviderResourceHandle(dependencyState);
+      const providerConnection = dependencyResourceProviderConnectionContext(dependencyState);
       const providerResult = await dependencyResourceBackupProvider.createBackup(context, {
         backupId: backupId.value,
         dependencyResourceId: dependencyResourceId.value,
         dependencyKind,
         providerKey: providerKey.value,
-        ...(dependencyState.providerRealization?.providerResourceHandle
-          ? {
-              providerResourceHandle:
-                dependencyState.providerRealization.providerResourceHandle.value,
-            }
-          : {}),
+        ...(providerResourceHandle ? { providerResourceHandle } : {}),
+        ...(providerConnection ? { connection: providerConnection } : {}),
         ...(connectionSecretValue?.isOk()
           ? { connectionSecretValue: connectionSecretValue.value.secretValue }
           : {}),
@@ -220,16 +248,157 @@ export class CreateDependencyResourceBackupUseCase {
         backup,
         UpsertDependencyResourceBackupSpec.fromDependencyResourceBackup(backup),
       );
-      await recordBackupProcessAttempt({
-        recorder: processAttemptRecorder,
-        repositoryContext,
-        context,
-        backup,
-      });
+      if (claimResult.value.claimed) {
+        const completed = await completeBackupProcessAttempt({
+          completer: processAttemptCompleter,
+          repositoryContext,
+          backup,
+        });
+        if (completed.isErr()) {
+          return err(completed.error);
+        }
+      } else {
+        await recordBackupProcessAttempt({
+          recorder: processAttemptRecorder,
+          repositoryContext,
+          context,
+          backup,
+        });
+      }
       await publishDomainEventsAndReturn(context, eventBus, logger, backup, undefined);
       return ok({ id: backupId.value });
     });
   }
+}
+
+function processAttemptRecorderUsesAtomicClaim(input: {
+  claimer: ProcessAttemptClaimer;
+  completer: ProcessAttemptCompleter;
+}): boolean {
+  return (
+    !(input.claimer instanceof EmptyProcessAttemptClaimer) &&
+    !(input.completer instanceof EmptyProcessAttemptCompleter)
+  );
+}
+
+async function claimBackupProcessAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  claimer: ProcessAttemptClaimer;
+  completer: ProcessAttemptCompleter;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  context: ExecutionContext;
+  backup: DependencyResourceBackup;
+  claimedAt: string;
+}): Promise<Result<{ claimed: boolean }>> {
+  const state = input.backup.toState();
+  if (
+    !processAttemptRecorderUsesAtomicClaim({
+      claimer: input.claimer,
+      completer: input.completer,
+    })
+  ) {
+    return ok({ claimed: false });
+  }
+
+  const recorded = await input.recorder.record(input.repositoryContext, {
+    id: state.attemptId.value,
+    kind: "system",
+    status: "pending",
+    operationKey: "dependency-resources.create-backup",
+    dedupeKey: `dependency-resource-backup:${state.dependencyResourceId.value}:${state.id.value}:${state.attemptId.value}`,
+    correlationId: input.context.requestId,
+    requestId: input.context.requestId,
+    phase: "dependency-resource-backup",
+    step: "pending",
+    projectId: state.projectId.value,
+    startedAt: state.requestedAt.value,
+    updatedAt: state.requestedAt.value,
+    nextActions: ["no-action"],
+    safeDetails: {
+      backupId: state.id.value,
+      dependencyResourceId: state.dependencyResourceId.value,
+      dependencyKind: state.dependencyKind.value,
+      providerKey: state.providerKey.value,
+      retentionStatus: state.retentionStatus.value,
+    },
+  });
+  if (recorded.isErr()) {
+    return err(recorded.error);
+  }
+
+  const claimed = await input.claimer.claimDue(input.repositoryContext, {
+    attemptId: state.attemptId.value,
+    workerId: "dependency-resource-backup-inline-provider",
+    claimedAt: input.claimedAt,
+    safeDetails: {
+      backupId: state.id.value,
+      dependencyResourceId: state.dependencyResourceId.value,
+      dependencyKind: state.dependencyKind.value,
+      providerKey: state.providerKey.value,
+    },
+  });
+  if (claimed.isErr()) {
+    return err(claimed.error);
+  }
+  if (claimed.value.status !== "claimed") {
+    return err(
+      domainError.conflict("Dependency resource backup process attempt could not be claimed", {
+        phase: "dependency-resource-backup",
+        backupId: state.id.value,
+        processAttemptId: state.attemptId.value,
+        claimStatus: claimed.value.status,
+      }),
+    );
+  }
+
+  return ok({ claimed: true });
+}
+
+async function completeBackupProcessAttempt(input: {
+  completer: ProcessAttemptCompleter;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  backup: DependencyResourceBackup;
+}): Promise<Result<void>> {
+  const state = input.backup.toState();
+  const completedAt = state.completedAt?.value ?? state.failedAt?.value ?? state.requestedAt.value;
+  const status = state.status.value === "ready" ? "succeeded" : "failed";
+  const completed = await input.completer.complete(input.repositoryContext, {
+    attemptId: state.attemptId.value,
+    status,
+    completedAt,
+    phase: "dependency-resource-backup",
+    step: state.status.value,
+    ...(state.failureCode
+      ? {
+          errorCode: state.failureCode.value,
+          errorCategory: "async-processing",
+          retriable: true,
+        }
+      : {}),
+    nextActions: status === "failed" ? ["diagnostic", "manual-review"] : ["no-action"],
+    safeDetails: {
+      backupId: state.id.value,
+      dependencyResourceId: state.dependencyResourceId.value,
+      dependencyKind: state.dependencyKind.value,
+      providerKey: state.providerKey.value,
+      retentionStatus: state.retentionStatus.value,
+    },
+  });
+  if (completed.isErr()) {
+    return err(completed.error);
+  }
+  if (completed.value.status !== "completed") {
+    return err(
+      domainError.conflict("Dependency resource backup process attempt could not be completed", {
+        phase: "dependency-resource-backup",
+        backupId: state.id.value,
+        processAttemptId: state.attemptId.value,
+        completionStatus: completed.value.status,
+      }),
+    );
+  }
+
+  return ok(undefined);
 }
 
 async function recordBackupProcessAttempt(input: {

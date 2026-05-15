@@ -20,6 +20,9 @@ the first useful managed-database loop. The default shell composition can now re
 Docker container and named volume on a registered `local-shell` or `generic-ssh` single-server
 target when the command supplies `serverId`. It does not rotate provider credentials, restart
 running workloads, or schedule recurring backups.
+Later Phase 7 slices added dependency runtime injection, backup/restore, scheduled backup policy,
+and the Redis provider-native loop; this artifact remains the Postgres-specific realization/delete
+contract.
 
 ## Discover Findings
 
@@ -39,6 +42,9 @@ running workloads, or schedule recurring backups.
 6. Docker-backed single-server realization uses a safe provider handle to retain the owning server
    id and container name. The shell provider resolves that handle for delete, backup, and restore;
    raw connection URLs are stored only through `DependencyResourceSecretStore`.
+7. Backup/restore execution is now governed by ADR-036 and the dependency backup/restore spec.
+   This Postgres realization slice supplies the lifecycle fields and delete blockers consumed by
+   that closed loop.
 
 ## Ubiquitous Language
 
@@ -87,12 +93,15 @@ running workloads, or schedule recurring backups.
 - CLI: keep `appaloft dependency postgres provision`; add optional `--server <serverId>` for the
   Docker-backed single-server target; keep `appaloft dependency delete`.
 - Web/UI: `/dependency-resources` can create Docker-backed managed Postgres on a selected
-  single-server target and expose safe backup/restore/delete actions through existing HTTP/oRPC
-  contracts.
+  single-server target and expose dependency rename/delete, backup create/list/acknowledged
+  restore, scheduled backup policy, and Resource dependency bind/unbind affordances through
+  existing HTTP/oRPC contracts. Backup prune/delete, export/download, and cross-resource restore
+  remain later Web rounds.
 - Events: add provider-safe lifecycle event specs during Code Round:
   `dependency-resource-realization-requested`, `dependency-resource-realized`,
   `dependency-resource-realization-failed`, and `dependency-resource-provider-delete-requested`.
-- Public docs/help: record a stable public docs anchor or explicit migration gap during Code Round.
+- Public docs/help: covered by the `dependency.resource-lifecycle` public docs topic and stable
+  help anchor.
 
 ## Output Contracts
 
@@ -127,8 +136,9 @@ attempt id, and sanitized provider error code/message.
 ## Non-Goals
 
 - No Redis provider-native lifecycle in this spec.
-- No scheduled backup policy or backup pruning.
+- No backup pruning.
 - No runtime restart or forced redeploy of running workloads.
+- No backup export/download or cross-resource restore.
 - No deployment retry/redeploy/rollback.
 - No provider SDK types in `core`, contracts, CLI, or Web.
 - No mutation of historical deployment snapshots.
@@ -136,5 +146,9 @@ attempt id, and sanitized provider error code/message.
 ## Open Questions
 
 The Code Round still keeps a hermetic fallback when no `serverId` is supplied so existing tests and
-metadata-only development flows remain stable. Durable outbox/process ownership remains a platform
-migration gap.
+metadata-only development flows remain stable. The Code Round uses an injected provider capability
+with the same safe durable status shape that a later background provider worker or concrete cloud
+provider must preserve. The shell provider also materializes safe local realization/delete
+artifacts under the configured Appaloft data directory. Provider realization/delete and
+backup/restore attempts are mirrored into operator-visible process state; automatic provider retry
+execution remains a separate governed worker slice rather than a hidden platform gap.

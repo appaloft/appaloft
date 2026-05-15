@@ -19,14 +19,22 @@ import {
   type PreviewEnvironmentCleaner,
   type PreviewEnvironmentCleanerResult,
   type PreviewEnvironmentRepository,
+  type ProcessAttemptClaimer,
+  type ProcessAttemptCompleter,
   type ProcessAttemptRecorder,
 } from "../../ports";
-import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
+import {
+  EmptyProcessAttemptClaimer,
+  EmptyProcessAttemptCompleter,
+  NoopProcessAttemptRecorder,
+} from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 
 export interface CleanupPreviewEnvironmentInput {
   previewEnvironmentId: string;
   resourceId: string;
+  processAttemptId?: string;
+  workerId?: string;
 }
 
 export type CleanupPreviewEnvironmentStatus =
@@ -94,6 +102,10 @@ export class PreviewEnvironmentCleanupService {
     private readonly idGenerator: IdGenerator,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.processAttemptClaimer)
+    private readonly processAttemptClaimer: ProcessAttemptClaimer = new EmptyProcessAttemptClaimer(),
+    @inject(tokens.processAttemptCompleter)
+    private readonly processAttemptCompleter: ProcessAttemptCompleter = new EmptyProcessAttemptCompleter(),
   ) {}
 
   async cleanup(
@@ -108,7 +120,7 @@ export class PreviewEnvironmentCleanupService {
 
     const repositoryContext = toRepositoryContext(context);
     const attemptedAt = this.clock.now();
-    const attemptId = this.idGenerator.next("pcln");
+    const attemptId = input.processAttemptId ?? this.idGenerator.next("pcln");
     const previewEnvironment = await this.previewEnvironmentRepository.findOne(
       repositoryContext,
       PreviewEnvironmentByIdSpec.create(previewEnvironmentId.value, resourceId.value),
@@ -131,26 +143,49 @@ export class PreviewEnvironmentCleanupService {
     }
 
     const state = previewEnvironment.toState();
-    const cleanerResult = await this.previewEnvironmentCleaner.cleanup(context, {
+    const stateDetails = {
       previewEnvironmentId: state.id.value,
       resourceId: state.resourceId.value,
       sourceBindingFingerprint: state.source.sourceBindingFingerprint.value,
       provider: state.provider.value,
       repositoryFullName: state.source.repositoryFullName.value,
       pullRequestNumber: state.source.pullRequestNumber.value,
+    };
+
+    if (input.processAttemptId) {
+      const claimResult = await this.processAttemptClaimer.claimDue(repositoryContext, {
+        attemptId: input.processAttemptId,
+        workerId: input.workerId ?? "preview-cleanup-retry-scheduler",
+        claimedAt: attemptedAt,
+        safeDetails: stateDetails,
+      });
+      if (claimResult.isErr()) return err(claimResult.error);
+
+      if (claimResult.value.status !== "claimed") {
+        return err(
+          domainError.conflict("Preview cleanup process attempt could not be claimed", {
+            phase: "preview-cleanup-retry",
+            processAttemptId: input.processAttemptId,
+            claimStatus: claimResult.value.status,
+            previewEnvironmentId: state.id.value,
+            resourceId: state.resourceId.value,
+          }),
+        );
+      }
+    }
+
+    const cleanerResult = await this.previewEnvironmentCleaner.cleanup(context, {
+      previewEnvironmentId: stateDetails.previewEnvironmentId,
+      resourceId: stateDetails.resourceId,
+      sourceBindingFingerprint: stateDetails.sourceBindingFingerprint,
+      provider: stateDetails.provider,
+      repositoryFullName: stateDetails.repositoryFullName,
+      pullRequestNumber: stateDetails.pullRequestNumber,
     });
     if (cleanerResult.isErr()) {
       const phase = failurePhase(cleanerResult.error.details);
       const retryable = cleanerResult.error.retryable;
       const retryAt = retryable ? nextRetryAt(attemptedAt) : undefined;
-      const stateDetails = {
-        previewEnvironmentId: state.id.value,
-        resourceId: state.resourceId.value,
-        sourceBindingFingerprint: state.source.sourceBindingFingerprint.value,
-        provider: state.provider.value,
-        repositoryFullName: state.source.repositoryFullName.value,
-        pullRequestNumber: state.source.pullRequestNumber.value,
-      };
       await this.previewCleanupAttemptRecorder.record(repositoryContext, {
         attemptId,
         previewEnvironmentId: stateDetails.previewEnvironmentId,
@@ -165,27 +200,53 @@ export class PreviewEnvironmentCleanupService {
         retryable,
         ...(retryAt ? { nextRetryAt: retryAt } : {}),
       });
-      await this.processAttemptRecorder.record(repositoryContext, {
-        id: attemptId,
-        kind: "system",
-        status: retryable ? "retry-scheduled" : "failed",
-        operationKey: "preview-environments.delete",
-        dedupeKey: cleanupProcessDedupeKey(stateDetails),
-        correlationId: context.requestId,
-        requestId: context.requestId,
-        phase,
-        step: "cleanup-failed",
-        resourceId: stateDetails.resourceId,
-        startedAt: attemptedAt,
-        updatedAt: attemptedAt,
-        ...(retryable ? {} : { finishedAt: attemptedAt }),
-        errorCode: cleanerResult.error.code,
-        errorCategory: cleanerResult.error.category,
-        retriable: retryable,
-        ...(retryAt ? { nextEligibleAt: retryAt } : {}),
-        nextActions: retryable ? ["retry", "manual-review"] : ["manual-review"],
-        safeDetails: stateDetails,
-      });
+      if (input.processAttemptId) {
+        const completed = await this.processAttemptCompleter.complete(repositoryContext, {
+          attemptId: input.processAttemptId,
+          status: retryable ? "retry-scheduled" : "failed",
+          completedAt: attemptedAt,
+          phase,
+          step: "cleanup-failed",
+          errorCode: cleanerResult.error.code,
+          errorCategory: cleanerResult.error.category,
+          retriable: retryable,
+          ...(retryAt ? { nextEligibleAt: retryAt } : {}),
+          nextActions: retryable ? ["retry", "manual-review"] : ["manual-review"],
+          safeDetails: stateDetails,
+        });
+        if (completed.isErr()) return err(completed.error);
+        if (completed.value.status !== "completed") {
+          return err(
+            domainError.conflict("Preview cleanup process attempt could not be completed", {
+              phase: "preview-cleanup-retry",
+              processAttemptId: input.processAttemptId,
+              completionStatus: completed.value.status,
+            }),
+          );
+        }
+      } else {
+        await this.processAttemptRecorder.record(repositoryContext, {
+          id: attemptId,
+          kind: "system",
+          status: retryable ? "retry-scheduled" : "failed",
+          operationKey: "preview-environments.delete",
+          dedupeKey: cleanupProcessDedupeKey(stateDetails),
+          correlationId: context.requestId,
+          requestId: context.requestId,
+          phase,
+          step: "cleanup-failed",
+          resourceId: stateDetails.resourceId,
+          startedAt: attemptedAt,
+          updatedAt: attemptedAt,
+          ...(retryable ? {} : { finishedAt: attemptedAt }),
+          errorCode: cleanerResult.error.code,
+          errorCategory: cleanerResult.error.category,
+          retriable: retryable,
+          ...(retryAt ? { nextEligibleAt: retryAt } : {}),
+          nextActions: retryable ? ["retry", "manual-review"] : ["manual-review"],
+          safeDetails: stateDetails,
+        });
+      }
 
       return ok({
         status: retryable ? "retry-scheduled" : "failed",
@@ -231,23 +292,45 @@ export class PreviewEnvironmentCleanupService {
       attemptedAt,
       updatedAt: attemptedAt,
     });
-    await this.processAttemptRecorder.record(repositoryContext, {
-      id: attemptId,
-      kind: "system",
-      status: "succeeded",
-      operationKey: "preview-environments.delete",
-      dedupeKey: cleanupProcessDedupeKey(cleanupDetails),
-      correlationId: context.requestId,
-      requestId: context.requestId,
-      phase: "preview-cleanup",
-      step: "cleanup-completed",
-      resourceId: cleanupDetails.resourceId,
-      startedAt: attemptedAt,
-      updatedAt: attemptedAt,
-      finishedAt: attemptedAt,
-      nextActions: ["no-action"],
-      safeDetails: cleanupDetails,
-    });
+    if (input.processAttemptId) {
+      const completed = await this.processAttemptCompleter.complete(repositoryContext, {
+        attemptId: input.processAttemptId,
+        status: "succeeded",
+        completedAt: attemptedAt,
+        phase: "preview-cleanup",
+        step: "cleanup-completed",
+        nextActions: ["no-action"],
+        safeDetails: cleanupDetails,
+      });
+      if (completed.isErr()) return err(completed.error);
+      if (completed.value.status !== "completed") {
+        return err(
+          domainError.conflict("Preview cleanup process attempt could not be completed", {
+            phase: "preview-cleanup-retry",
+            processAttemptId: input.processAttemptId,
+            completionStatus: completed.value.status,
+          }),
+        );
+      }
+    } else {
+      await this.processAttemptRecorder.record(repositoryContext, {
+        id: attemptId,
+        kind: "system",
+        status: "succeeded",
+        operationKey: "preview-environments.delete",
+        dedupeKey: cleanupProcessDedupeKey(cleanupDetails),
+        correlationId: context.requestId,
+        requestId: context.requestId,
+        phase: "preview-cleanup",
+        step: "cleanup-completed",
+        resourceId: cleanupDetails.resourceId,
+        startedAt: attemptedAt,
+        updatedAt: attemptedAt,
+        finishedAt: attemptedAt,
+        nextActions: ["no-action"],
+        safeDetails: cleanupDetails,
+      });
+    }
 
     return ok({
       status: cleanupStatus(cleanerResult.value),

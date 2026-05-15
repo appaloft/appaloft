@@ -36,7 +36,8 @@
 
 - [x] Add CLI dependency commands.
 - [x] Add oRPC/HTTP procedures/routes.
-- [x] Record Web/public-docs migration gap.
+- [x] Record initial Web/public-docs handoff; later Web/docs slices closed public help and safe
+  dependency resource affordance coverage.
 
 ## Verification
 

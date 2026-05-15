@@ -45,6 +45,12 @@ appaloft scheduled-task create res_web \
 禁用任务会阻止自动调度。删除任务只移除任务定义和后续触发入口，不会删除 Resource、Deployment、
 runtime 进程或外部依赖。
 
+在 self-hosted runtime 执行里，scheduled tasks 会跑在 Resource 最新拥有 runtime 的 deployment 上；
+前提是该 deployment 使用受支持的 Docker runtime target：local-shell Docker、generic-SSH Docker、
+Docker Compose 或 Docker Swarm image service。Appaloft 会在保留的 runtime 上下文里启动临时 task
+container、Compose run 或 Swarm replicated-job，所以任务命令可以访问相同的内部 runtime network，
+同时不替换正在服务的进程。长驻 scheduled task runner 仍然默认关闭，需要在配置里显式启用。
+
 <h2 id="scheduled-task-run-now">立即运行</h2>
 
 `scheduled-tasks.run-now` 接受一次 manual run attempt。命令返回 run id 后，实际执行和完成状态通过
@@ -56,6 +62,15 @@ appaloft scheduled-task run tsk_daily_migration --resource-id res_web
 
 如果 Resource 已归档、任务已禁用、任务不属于给定 Resource，或默认 `forbid` 并发策略发现已有未结束
 run，Appaloft 会在启动任务命令前拒绝或跳过本次 run。
+
+对于部署在 local-shell、generic-SSH 或 Docker Swarm Docker 目标上的 Resource，Appaloft 会在当前
+runtime 上下文中运行任务。Docker container 部署会启动一个加入 Resource container network
+namespace 的一次性任务容器；Docker Compose 部署会针对保留的目标 service 启动一次性 Compose
+service run；Docker Swarm image-service 部署会在保留的 Swarm 网络上启动带 Appaloft label 的临时
+job service。
+
+任务进程还会收到系统拥有的 `APPALOFT_*` context variables，包括 run id、task id、Resource id
+以及拥有 runtime 的 deployment 身份。如果 manual run 传入同名保留变量，Appaloft 会用系统值覆盖它们。
 
 <h2 id="scheduled-task-run-history">运行历史</h2>
 

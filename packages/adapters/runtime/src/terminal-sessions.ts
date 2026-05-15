@@ -11,8 +11,11 @@ import {
 } from "@appaloft/core";
 import {
   toRepositoryContext,
+  type AuditEventRecorder,
   type AppLogger,
+  type Clock,
   type ExecutionContext,
+  type IdGenerator,
   type ServerRepository,
   type TerminalSession,
   type TerminalSessionDescriptor,
@@ -21,6 +24,7 @@ import {
   type TerminalSessionSummary,
   type TerminalSessionOpenRequest,
 } from "@appaloft/application";
+import { deriveRuntimeInstanceNames } from "./runtime-instance-names";
 
 type TerminalSpawnOptions = {
   cwd?: string;
@@ -31,8 +35,19 @@ type TerminalSpawnOptions = {
 type TerminalSubprocess = Pick<
   Bun.Subprocess<"pipe", "pipe", "pipe">,
   "stdin" | "stdout" | "stderr" | "exited" | "kill"
->;
+> & {
+  resize?: (rows: number, cols: number) => void | Promise<void>;
+};
 type TerminalSpawn = (args: string[], options: TerminalSpawnOptions) => TerminalSubprocess;
+type TerminalSessionFinalization =
+  | {
+      reason: "cancelled" | "source-ended";
+      exitCode?: number;
+    }
+  | {
+      reason: "error";
+      errorCode: string;
+    };
 type WritableTerminalStdin = {
   write(data: string | Uint8Array): void | number | Promise<void | number>;
   flush?: () => void | Promise<void>;
@@ -47,13 +62,19 @@ type SshTerminalTarget = {
 
 class TerminalSessionQueue implements AsyncIterable<TerminalSessionFrame> {
   private readonly events: TerminalSessionFrame[] = [];
+  private readonly retainedOutputFrames: TerminalSessionFrame[] = [];
   private readonly waiters: Array<(result: IteratorResult<TerminalSessionFrame>) => void> = [];
+  private retainedOutputBytes = 0;
   private closed = false;
+
+  constructor(private readonly maxRetainedOutputBytes: number) {}
 
   push(event: TerminalSessionFrame): void {
     if (this.closed) {
       return;
     }
+
+    this.retainOutput(event);
 
     const waiter = this.waiters.shift();
     if (waiter) {
@@ -76,8 +97,14 @@ class TerminalSessionQueue implements AsyncIterable<TerminalSessionFrame> {
   }
 
   [Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {
+    const replay = this.events.length > 0 ? [] : this.retainedOutputFrames.slice();
     return {
       next: () => {
+        const replayEvent = replay.shift();
+        if (replayEvent) {
+          return Promise.resolve({ value: replayEvent, done: false });
+        }
+
         const event = this.events.shift();
         if (event) {
           return Promise.resolve({ value: event, done: false });
@@ -93,6 +120,26 @@ class TerminalSessionQueue implements AsyncIterable<TerminalSessionFrame> {
       },
     };
   }
+
+  private retainOutput(event: TerminalSessionFrame): void {
+    if (event.kind !== "output" || this.maxRetainedOutputBytes <= 0) {
+      return;
+    }
+
+    const retainedBytes = new TextEncoder().encode(event.data).byteLength;
+    this.retainedOutputFrames.push(event);
+    this.retainedOutputBytes += retainedBytes;
+
+    while (
+      this.retainedOutputBytes > this.maxRetainedOutputBytes &&
+      this.retainedOutputFrames.length > 0
+    ) {
+      const removed = this.retainedOutputFrames.shift();
+      if (removed?.kind === "output") {
+        this.retainedOutputBytes -= new TextEncoder().encode(removed.data).byteLength;
+      }
+    }
+  }
 }
 
 class RuntimeTerminalSession implements TerminalSession {
@@ -102,7 +149,8 @@ class RuntimeTerminalSession implements TerminalSession {
     private readonly subprocess: TerminalSubprocess,
     private readonly queue: TerminalSessionQueue,
     private readonly cleanup: () => Promise<void>,
-    private readonly onClosed: () => void,
+    private readonly onFinalized: (finalization: TerminalSessionFinalization) => Promise<void>,
+    private readonly onActivity: () => void,
   ) {}
 
   async write(data: string): Promise<void> {
@@ -113,10 +161,12 @@ class RuntimeTerminalSession implements TerminalSession {
     const stdin = this.subprocess.stdin as unknown as WritableTerminalStdin;
     await stdin.write(data);
     await stdin.flush?.();
+    this.onActivity();
   }
 
-  async resize(_input: { rows: number; cols: number }): Promise<void> {
-    // Bun subprocess pipes do not expose PTY resize. SSH targets receive a TTY via -tt.
+  async resize(input: { rows: number; cols: number }): Promise<void> {
+    this.onActivity();
+    await this.subprocess.resize?.(input.rows, input.cols);
   }
 
   async close(): Promise<void> {
@@ -133,11 +183,12 @@ class RuntimeTerminalSession implements TerminalSession {
       reason: "cancelled",
     });
     this.queue.close();
-    await this.cleanup();
-    this.onClosed();
+    await this.finalize({
+      reason: "cancelled",
+    });
   }
 
-  complete(exitCode: number): void {
+  async complete(exitCode: number): Promise<void> {
     if (this.closed) {
       return;
     }
@@ -149,10 +200,13 @@ class RuntimeTerminalSession implements TerminalSession {
       exitCode,
     });
     this.queue.close();
-    this.onClosed();
+    await this.finalize({
+      reason: "source-ended",
+      exitCode,
+    });
   }
 
-  fail(message: string): void {
+  async fail(message: string): Promise<void> {
     if (this.closed) {
       return;
     }
@@ -163,7 +217,15 @@ class RuntimeTerminalSession implements TerminalSession {
       error: domainError.terminalSessionFailed(message),
     });
     this.queue.close();
-    this.onClosed();
+    await this.finalize({
+      reason: "error",
+      errorCode: "terminal_session_failed",
+    });
+  }
+
+  private async finalize(finalization: TerminalSessionFinalization): Promise<void> {
+    await this.cleanup();
+    await this.onFinalized(finalization);
   }
 
   [Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {
@@ -188,6 +250,201 @@ function remoteCommandWithCwd(cwd?: string): string {
     "exec ${SHELL:-/bin/sh} -i",
   ].join("; ");
   return cwd ? `cd ${shellQuote(cwd)} && ${setup}` : setup;
+}
+
+function runtimeMetadata(request: TerminalSessionOpenRequest): Record<string, string> {
+  return request.scope.kind === "resource"
+    ? (request.scope.deployment.runtimePlan.execution.metadata ?? {})
+    : {};
+}
+
+function metadataValue(metadata: Record<string, string>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = metadata[key]?.trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function containerWorkingDirectory(metadata: Record<string, string>): string | undefined {
+  return metadataValue(metadata, ["terminalWorkdir", "containerWorkdir", "dockerWorkdir"]);
+}
+
+function resourceRuntimeNames(request: TerminalSessionOpenRequest): {
+  containerName: string;
+  composeProjectName: string;
+} | undefined {
+  if (request.scope.kind !== "resource") {
+    return undefined;
+  }
+
+  return deriveRuntimeInstanceNames({
+    deploymentId: request.scope.deployment.id,
+    metadata: request.scope.deployment.runtimePlan.execution.metadata,
+  });
+}
+
+function resourceContainerName(
+  request: TerminalSessionOpenRequest,
+  metadata: Record<string, string>,
+): string | undefined {
+  const configured = metadataValue(metadata, ["containerName", "dockerContainerName"]);
+  if (configured || request.scope.kind !== "resource") {
+    return configured;
+  }
+
+  return request.scope.deployment.runtimePlan.execution.kind === "docker-container"
+    ? resourceRuntimeNames(request)?.containerName
+    : undefined;
+}
+
+function composeFile(
+  request: TerminalSessionOpenRequest,
+  metadata: Record<string, string>,
+): string | undefined {
+  if (request.scope.kind !== "resource") {
+    return undefined;
+  }
+
+  return (
+    metadataValue(metadata, ["composeFile", "compose.file"]) ??
+    request.scope.deployment.runtimePlan.execution.composeFile ??
+    request.scope.deployment.runtimePlan.runtimeArtifact?.composeFile
+  );
+}
+
+function composeProjectName(
+  request: TerminalSessionOpenRequest,
+  metadata: Record<string, string>,
+): string | undefined {
+  if (request.scope.kind !== "resource") {
+    return undefined;
+  }
+
+  return (
+    metadataValue(metadata, ["composeProjectName", "compose.projectName"]) ??
+    resourceRuntimeNames(request)?.composeProjectName
+  );
+}
+
+function composeServiceName(
+  request: TerminalSessionOpenRequest,
+  metadata: Record<string, string>,
+): string | undefined {
+  if (request.scope.kind !== "resource") {
+    return undefined;
+  }
+
+  const configured =
+    metadataValue(metadata, [
+      "composeServiceName",
+      "composeService",
+      "composeTargetService",
+      "targetServiceName",
+      "resource.targetServiceName",
+      "network.targetServiceName",
+    ]) ?? request.scope.resource.networkProfile?.targetServiceName;
+  if (configured) {
+    return configured;
+  }
+
+  return request.scope.resource.services.length === 1
+    ? request.scope.resource.services[0]?.name
+    : undefined;
+}
+
+function composeShellTarget(
+  request: TerminalSessionOpenRequest,
+  metadata: Record<string, string>,
+):
+  | {
+      composeFile: string;
+      projectName: string;
+      serviceName: string;
+      workdir?: string;
+    }
+  | undefined {
+  if (
+    request.scope.kind !== "resource" ||
+    request.scope.deployment.runtimePlan.execution.kind !== "docker-compose-stack"
+  ) {
+    return undefined;
+  }
+
+  const file = composeFile(request, metadata);
+  const projectName = composeProjectName(request, metadata);
+  const serviceName = composeServiceName(request, metadata);
+  if (!file || !projectName || !serviceName) {
+    return undefined;
+  }
+
+  const workdir = containerWorkingDirectory(metadata);
+  return {
+    composeFile: file,
+    projectName,
+    serviceName,
+    ...(workdir ? { workdir } : {}),
+  };
+}
+
+function localDockerExecArgs(containerName: string, workdir?: string): string[] {
+  return [
+    "docker",
+    "exec",
+    "-i",
+    ...(workdir ? ["-w", workdir] : []),
+    containerName,
+    "sh",
+    "-lc",
+    remoteCommandWithCwd(),
+  ];
+}
+
+function localDockerComposeExecArgs(input: {
+  composeFile: string;
+  projectName: string;
+  serviceName: string;
+  workdir?: string;
+}): string[] {
+  return [
+    "docker",
+    "compose",
+    "-p",
+    input.projectName,
+    "-f",
+    input.composeFile,
+    "exec",
+    "-T",
+    ...(input.workdir ? ["--workdir", input.workdir] : []),
+    input.serviceName,
+    "sh",
+    "-lc",
+    remoteCommandWithCwd(),
+  ];
+}
+
+function remoteDockerExecCommand(containerName: string, workdir?: string): string {
+  const workdirArgs = workdir ? ` -w ${shellQuote(workdir)}` : "";
+  return `docker exec -it${workdirArgs} ${shellQuote(containerName)} sh -lc ${shellQuote(
+    remoteCommandWithCwd(),
+  )}`;
+}
+
+function remoteDockerComposeExecCommand(input: {
+  composeFile: string;
+  projectName: string;
+  serviceName: string;
+  workdir?: string;
+}): string {
+  const workdirArgs = input.workdir ? ` --workdir ${shellQuote(input.workdir)}` : "";
+  return `docker compose -p ${shellQuote(input.projectName)} -f ${shellQuote(
+    input.composeFile,
+  )} exec${workdirArgs} ${shellQuote(input.serviceName)} sh -lc ${shellQuote(
+    remoteCommandWithCwd(),
+  )}`;
 }
 
 async function writeSshIdentityFile(privateKey: string): Promise<{
@@ -236,6 +493,7 @@ async function readTerminalOutput(input: {
   stream: ReadableStream<Uint8Array> | null | undefined;
   name: "stdout" | "stderr";
   queue: TerminalSessionQueue;
+  onActivity?: () => void;
 }): Promise<void> {
   if (!input.stream) {
     return;
@@ -251,6 +509,7 @@ async function readTerminalOutput(input: {
         break;
       }
 
+      input.onActivity?.();
       input.queue.push({
         kind: "output",
         stream: input.name,
@@ -260,6 +519,7 @@ async function readTerminalOutput(input: {
 
     const remaining = decoder.decode();
     if (remaining.length > 0) {
+      input.onActivity?.();
       input.queue.push({
         kind: "output",
         stream: input.name,
@@ -277,6 +537,7 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
     {
       session: RuntimeTerminalSession;
       summary: TerminalSessionSummary;
+      lastActivityAt: string;
     }
   >();
 
@@ -286,6 +547,11 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
       logger?: AppLogger;
       allowTerminalSessions: boolean;
       spawnProcess?: TerminalSpawn;
+      auditEventRecorder?: AuditEventRecorder;
+      clock?: Clock;
+      idGenerator?: IdGenerator;
+      activeSessionTtlMs?: number;
+      outputRetentionBytes?: number;
     },
   ) {}
 
@@ -317,7 +583,7 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
     }
 
     const spawnSpec = spawnSpecResult.value;
-    const queue = new TerminalSessionQueue();
+    const queue = new TerminalSessionQueue(this.outputRetentionBytes());
 
     try {
       const subprocess = (this.input.spawnProcess ?? Bun.spawn)(spawnSpec.args, {
@@ -326,15 +592,6 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
         stdout: "pipe",
         stderr: "pipe",
       });
-      const session = new RuntimeTerminalSession(
-        subprocess,
-        queue,
-        spawnSpec.cleanup,
-        () => {
-          this.sessions.delete(request.sessionId);
-        },
-      );
-
       const summary = {
         sessionId: request.sessionId,
         scope: request.scope.kind,
@@ -351,20 +608,38 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
         },
         providerKey,
         ...(workingDirectory ? { workingDirectory } : {}),
-        createdAt: new Date().toISOString(),
+        createdAt: this.now(),
         status: "active" as const,
       };
+      const touchActivity = () => {
+        const entry = this.sessions.get(request.sessionId);
+        if (entry) {
+          entry.lastActivityAt = this.now();
+        }
+      };
+      const session = new RuntimeTerminalSession(
+        subprocess,
+        queue,
+        spawnSpec.cleanup,
+        async (finalization) => {
+          this.sessions.delete(request.sessionId);
+          await this.recordSessionClosedAudit(context, summary, finalization);
+        },
+        touchActivity,
+      );
 
       this.sessions.set(request.sessionId, {
         session,
         summary,
+        lastActivityAt: summary.createdAt,
       });
+      await this.recordSessionOpenedAudit(context, summary);
       queue.push({
         kind: "ready",
         sessionId: request.sessionId,
         ...(workingDirectory ? { workingDirectory } : {}),
       });
-      this.monitorProcess(request.sessionId, session, subprocess, queue, spawnSpec.cleanup);
+      this.monitorProcess(request.sessionId, session, subprocess, queue);
 
       return ok(summary);
     } catch (error) {
@@ -445,9 +720,11 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
     olderThan?: string;
     limit?: number;
   }): Promise<Result<{ expiredCount: number; sessionIds: string[] }>> {
-    const cutoff = input?.olderThan ? Date.parse(input.olderThan) : Date.now();
+    const cutoff = input?.olderThan ? Date.parse(input.olderThan) : this.defaultExpiryCutoffMs();
     const candidates = [...this.sessions.values()]
-      .filter((entry) => Date.parse(entry.summary.createdAt) < cutoff)
+      .filter((entry) =>
+        Date.parse(input?.olderThan ? entry.summary.createdAt : entry.lastActivityAt) < cutoff,
+      )
       .sort((left, right) => left.summary.createdAt.localeCompare(right.summary.createdAt))
       .slice(0, input?.limit ?? 200);
     const sessionIds: string[] = [];
@@ -472,6 +749,23 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
   ): Promise<Result<{ args: string[]; cwd?: string; cleanup: () => Promise<void> }>> {
     switch (providerKey) {
       case "local-shell": {
+        const metadata = runtimeMetadata(request);
+        const composeTarget = composeShellTarget(request, metadata);
+        if (composeTarget) {
+          return ok({
+            args: localDockerComposeExecArgs(composeTarget),
+            cleanup: async () => {},
+          });
+        }
+
+        const containerName = resourceContainerName(request, metadata);
+        if (request.scope.kind === "resource" && containerName) {
+          return ok({
+            args: localDockerExecArgs(containerName, containerWorkingDirectory(metadata)),
+            cleanup: async () => {},
+          });
+        }
+
         const shell = Bun.env.SHELL?.trim() || "/bin/sh";
         const cwd = request.scope.kind === "resource" ? request.scope.workingDirectory : undefined;
         return ok({
@@ -488,16 +782,19 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
         }
 
         const sshTarget = sshTargetResult.value;
+        const metadata = runtimeMetadata(request);
+        const composeTarget = composeShellTarget(request, metadata);
+        const containerName = resourceContainerName(request, metadata);
+        const terminalCommand =
+          request.scope.kind === "resource" && composeTarget
+            ? remoteDockerComposeExecCommand(composeTarget)
+            : request.scope.kind === "resource" && containerName
+              ? remoteDockerExecCommand(containerName, containerWorkingDirectory(metadata))
+              : remoteCommandWithCwd(
+                  request.scope.kind === "resource" ? request.scope.workingDirectory : undefined,
+                );
         return ok({
-          args: [
-            "ssh",
-            ...sshArgs(
-              sshTarget,
-              remoteCommandWithCwd(
-                request.scope.kind === "resource" ? request.scope.workingDirectory : undefined,
-              ),
-            ),
-          ],
+          args: ["ssh", ...sshArgs(sshTarget, terminalCommand)],
           cleanup: sshTarget.cleanup,
         });
       }
@@ -556,27 +853,131 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
     session: RuntimeTerminalSession,
     subprocess: TerminalSubprocess,
     queue: TerminalSessionQueue,
-    cleanup: () => Promise<void>,
   ): void {
     void (async () => {
       try {
         const [exitCode] = await Promise.all([
           subprocess.exited,
-          readTerminalOutput({ stream: subprocess.stdout, name: "stdout", queue }),
-          readTerminalOutput({ stream: subprocess.stderr, name: "stderr", queue }),
+          readTerminalOutput({
+            stream: subprocess.stdout,
+            name: "stdout",
+            queue,
+            onActivity: () => this.touchActivity(sessionId),
+          }),
+          readTerminalOutput({
+            stream: subprocess.stderr,
+            name: "stderr",
+            queue,
+            onActivity: () => this.touchActivity(sessionId),
+          }),
         ]);
 
-        session.complete(exitCode);
+        await session.complete(exitCode);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.input.logger?.error("terminal_session.process_failed", {
           sessionId,
           message,
         });
-        session.fail(message);
-      } finally {
-        await cleanup();
+        await session.fail(message);
       }
     })();
+  }
+
+  private now(): string {
+    return this.input.clock?.now() ?? new Date().toISOString();
+  }
+
+  private defaultExpiryCutoffMs(): number {
+    const activeSessionTtlMs = this.input.activeSessionTtlMs ?? 60 * 60 * 1000;
+    return Date.parse(this.now()) - activeSessionTtlMs;
+  }
+
+  private outputRetentionBytes(): number {
+    return this.input.outputRetentionBytes ?? 64 * 1024;
+  }
+
+  private touchActivity(sessionId: string): void {
+    const entry = this.sessions.get(sessionId);
+    if (entry) {
+      entry.lastActivityAt = this.now();
+    }
+  }
+
+  private nextAuditEventId(): string | undefined {
+    return this.input.idGenerator?.next("aud");
+  }
+
+  private async recordSessionOpenedAudit(
+    context: ExecutionContext,
+    summary: TerminalSessionSummary,
+  ): Promise<void> {
+    await this.recordAuditEvent(context, summary, {
+      eventType: "terminal-session-opened",
+      payload: {
+        operationKey: "terminal-sessions.open",
+        openedAt: summary.createdAt,
+      },
+    });
+  }
+
+  private async recordSessionClosedAudit(
+    context: ExecutionContext,
+    summary: TerminalSessionSummary,
+    finalization: TerminalSessionFinalization,
+  ): Promise<void> {
+    await this.recordAuditEvent(context, summary, {
+      eventType: "terminal-session-closed",
+      payload: {
+        operationKey: "terminal-sessions.close",
+        closedAt: this.now(),
+        closeReason: finalization.reason,
+        ...("exitCode" in finalization ? { exitCode: finalization.exitCode } : {}),
+        ...("errorCode" in finalization ? { errorCode: finalization.errorCode } : {}),
+      },
+    });
+  }
+
+  private async recordAuditEvent(
+    context: ExecutionContext,
+    summary: TerminalSessionSummary,
+    input: {
+      eventType: string;
+      payload: Record<string, string | number | boolean | null | readonly string[]>;
+    },
+  ): Promise<void> {
+    const recorder = this.input.auditEventRecorder;
+    const auditEventId = this.nextAuditEventId();
+    if (!recorder || !auditEventId) {
+      return;
+    }
+
+    const result = await recorder.record(toRepositoryContext(context), {
+      id: auditEventId,
+      aggregateId: summary.resourceId ?? summary.serverId,
+      eventType: input.eventType,
+      payload: {
+        ...input.payload,
+        sessionId: summary.sessionId,
+        scope: summary.scope,
+        serverId: summary.serverId,
+        providerKey: summary.providerKey,
+        entrypoint: context.entrypoint,
+        requestId: context.requestId,
+        ...(context.actor ? { actorKind: context.actor.kind, actorId: context.actor.id } : {}),
+        ...(summary.resourceId ? { resourceId: summary.resourceId } : {}),
+        ...(summary.deploymentId ? { deploymentId: summary.deploymentId } : {}),
+      },
+      createdAt: this.now(),
+    });
+
+    if (result.isErr()) {
+      this.input.logger?.warn("terminal_session.audit_record_failed", {
+        sessionId: summary.sessionId,
+        eventType: input.eventType,
+        errorCode: result.error.code,
+        message: result.error.message,
+      });
+    }
   }
 }

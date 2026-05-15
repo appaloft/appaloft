@@ -269,9 +269,11 @@ The source-link API route dispatches the internal
 from existing server-owned source-link state. If trusted ids are supplied by the Action for deploy,
 the server may bootstrap a missing source link; if ids are omitted and no link exists, deployment
 fails before mutation. Preview cleanup must resolve context from preview source-link state. Config
-bootstrap, source package, and broader preview workflow contracts remain later server-side work.
+bootstrap and source package handling are not part of this source-link trigger route; they are owned
+by the active explicit `server-config-deploy` route below. Broader adoption, Cloud reporting, and
+managed product-grade preview policy remain separate control-plane workflows.
 
-The next accepted-candidate `0.9.x` slice is
+The active self-hosted server-config deploy slice is
 [Action Server Config Deploy](../workflows/action-server-config-deploy.md), coordinated by the
 [Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md) feature artifact.
 That slice keeps the same state-owner boundary but lets the Action hand a bounded source package
@@ -295,8 +297,8 @@ components; labels and errors use i18n keys.
 Strict business commands remain unchanged. `deployments.create` is ids-only and does not accept
 control-plane mode fields.
 
-A future config-aware backend workflow API requires a separate ADR or accepted command/workflow
-contract.
+Additional config-aware backend workflow APIs beyond the active `server-config-deploy` route require
+a separate ADR or accepted command/workflow contract.
 
 ### Future MCP/tools
 
@@ -319,21 +321,29 @@ Errors must include sanitized details such as selected mode, URL origin, client 
 server version, feature flag, or adoption marker state. They must not include tokens, SSH keys,
 database URLs, or raw secret values.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
-Current implementation only has partial state-backend behavior:
+Current implementation has an active self-hosted control-plane baseline:
 
 - `APPALOFT_CONTROL_PLANE_URL` or `APPALOFT_DATABASE_URL` selects `postgres-control-plane` in the
   CLI state backend resolver;
 - remote SSH PGlite sync is skipped for that state backend;
-- no config `controlPlane` parser exists;
-- no Cloud/self-hosted handshake exists;
-- no adoption marker exists;
-- no control-plane API mode exists for deploy-action;
-- no Web selection surface exists.
+- repository config parsing accepts safe `controlPlane.mode` and `controlPlane.url` values while
+  rejecting identity selectors and secret-bearing fields;
+- deploy-action self-hosted modes use `/api/version` as the compatibility handshake;
+- source-link server API deployments are available through
+  `POST /api/action/deployments/from-source-link`;
+- the active self-hosted server-config deploy slice is available through
+  `POST /api/action/deployments/from-config-package` for compatible servers that advertise source
+  package and server-side config bootstrap support.
 
-Until Phase 1 is implemented, documentation and examples should describe Cloud/self-hosted
-control-plane mode as roadmap, not as available behavior.
+Governed follow-ups remain:
+
+- no adoption marker exists;
+- Cloud-assisted Action API mode and OIDC/token exchange remain governed control-plane follow-ups;
+- Additional config-aware backend workflow APIs beyond the active `server-config-deploy` route are
+  governed follow-ups;
+- no Web selection surface exists.
 
 ## Open Questions
 

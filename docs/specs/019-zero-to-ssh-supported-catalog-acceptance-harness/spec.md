@@ -3,7 +3,9 @@
 ## Status
 
 - Round: Post-Implementation Sync
-- Artifact state: implemented; hermetic supported catalog acceptance harness passing
+- Artifact state: implemented; fast supported catalog acceptance harness passing; shared GitHub
+  Actions/local explicit Docker and generic-SSH fixture smoke gates cover the active supported
+  catalog descriptor set
 - Roadmap target: Phase 5 First-Deploy Engine And Framework Breadth (`0.7.0` gate)
 - Compatibility impact: `pre-1.0-policy`; adds acceptance coverage for existing supported catalog
   behavior without adding deployment commands or deployment admission fields
@@ -35,7 +37,7 @@ command or Web-only branch.
 | Supported catalog acceptance harness | Table-driven fixture contract proving a supported catalog entry can move from resource profile draft through preview, ids-only create, runtime target, artifact, and observation stages. | Workload planning / runtime target acceptance | zero-to-SSH harness |
 | Supported fixture descriptor | Reusable test descriptor for one supported fixture's resource source/runtime/network/health profile draft and expected planner/runtime/artifact/observation outcomes. | Test harness | fixture row |
 | Fixture closure | Phase 5 exit state where every required supported catalog item is bound to matrix ids and the acceptance harness. | Roadmap / test matrix | catalog closure |
-| Zero-to-SSH loop | The default single-server path from profile draft to a Docker/OCI-backed runtime target, using hermetic fake/local/generic-SSH target coverage by default and opt-in real Docker/SSH smoke above it. | Runtime target workflow | first deploy loop |
+| Zero-to-SSH loop | The default single-server path from profile draft to a Docker/OCI-backed runtime target, using fast fake/local/generic-SSH target coverage and GitHub Actions/local explicit real Docker/SSH smoke above it. | Runtime target workflow | first deploy loop |
 | Observation contract | Provider-neutral read visibility for readiness, health, logs, and access/proxy summary after the runtime target stage. | Resource/deployment observation | read model observation |
 
 ## Fixture Descriptor Contract

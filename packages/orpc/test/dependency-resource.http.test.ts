@@ -271,7 +271,7 @@ describe("dependency resource HTTP routes", () => {
     expect(commands[0]).toBeInstanceOf(DeleteDependencyResourceCommand);
   });
 
-  test("[DEP-RES-BACKUP-012] dispatches backup and restore routes through HTTP", async () => {
+  test("[DEP-RES-BACKUP-011] dispatches backup and restore routes through HTTP", async () => {
     const { app, commands, queries } = createHarness();
 
     const createResponse = await app.handle(

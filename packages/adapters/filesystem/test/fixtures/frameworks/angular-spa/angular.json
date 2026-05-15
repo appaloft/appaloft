@@ -4,6 +4,7 @@
   "projects": {
     "angular-spa": {
       "projectType": "application",
+      "root": "",
       "sourceRoot": "src",
       "architect": {
         "build": {

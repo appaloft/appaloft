@@ -91,7 +91,7 @@ These rows bind the supported catalog acceptance harness to `deployments.plan/v1
 | ZSSH-PREVIEW-003 | contract/integration | Static default port preview | Static descriptors expose static-server `internalPort = 80`, health probe metadata, and no user port requirement. |
 | ZSSH-PREVIEW-004 | contract/integration | Buildpack remains non-winning | First-class, explicit custom, Dockerfile, Compose, and prebuilt-image descriptors keep their winning support tier and artifact intent when buildpack evidence is also present. |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 `deployments.plan` is active. Executable operation/catalog/API/Web/CLI coverage exists for the
 public surface, while `DPP-CATALOG-001` and `DPP-CATALOG-002` bind the JavaScript/TypeScript planner
@@ -102,8 +102,8 @@ same preview response shape, including Maven/Gradle ambiguity, missing runnable 
 production start, and unsupported JVM framework blocked reason codes. `DPP-CATALOG-BP-001` and
 `DPP-CATALOG-BP-002` govern buildpack accelerator preview parity without claiming real
 `pack`/lifecycle execution. Executable contract tests bind these rows to the shared
-`deployments.plan/v1` schema. Full future MCP/tool descriptors remain a migration gap until
-MCP/tool surfaces are active.
+`deployments.plan/v1` schema. MCP/tool descriptor promotion remains governed by the operation
+catalog descriptor pipeline and future tool dispatch boundary.
 
 `DPP-PLAN-FAIL-001` through `DPP-PLAN-FAIL-006` bind the shared
 runtime-plan-resolution unsupported/override contract to `deployments.plan/v1`. They are intended
@@ -117,6 +117,6 @@ constructs ready preview payloads and blocked controls for the Phase 5 supported
 keeping `deployments.plan` read-only and side-effect free.
 
 `DMBH-RES-DPP-001` is covered by `packages/core/test/resource.test.ts` for Resource-owned
-predicates. Existing preview contract output remains covered by
-`packages/contracts/test/deployment-plan-preview-contract.test.ts`; there is no
-`packages/application/test/deployment-plan-preview.test.ts` file in the current tree.
+predicates. Application query behavior and side-effect assertions are covered by
+`packages/application/test/deployment-plan-preview.test.ts`; preview contract output remains covered
+by `packages/contracts/test/deployment-plan-preview-contract.test.ts`.

@@ -18,7 +18,7 @@ starts.
 
 This work reuses the framework planner contract established by the JavaScript/TypeScript and
 Python catalog closures. The outcome is catalog confidence and a reusable family-planner pattern
-for later Quarkus, Micronaut, Go, Ruby, PHP, .NET, Rust, and Elixir planners, not broader runtime
+for Spring Boot, Quarkus Maven JVM jar mode, generic JVM, and later Micronaut, Go, Ruby, PHP, .NET, Rust, and Elixir planners, not broader runtime
 execution.
 
 The deployment boundary remains:
@@ -45,10 +45,10 @@ Resource profile -> detect -> plan -> deployments.create execution
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
 | FPC-JVM-SPEC-001 | Stable JVM planner output | A supported JVM fixture has runtime, build tool, framework or generic jar evidence, command, network, and health evidence | Planner resolves it | Output includes planner key, support tier inputs, base image policy, build/package/start command specs, artifact kind, internal port behavior, health defaults, and safe diagnostics. |
-| FPC-JVM-SPEC-002 | Spring Boot Maven with wrapper | A Spring Boot Maven fixture has `pom.xml`, `mvnw`, Spring Boot dependency/plugin evidence, `.java-version`, and deterministic jar output | Planner resolves it | Output uses wrapper build/package commands, `spring-boot` planner metadata, Java base image policy, workspace image artifact intent, `java -jar` start command, and resource-owned internal port. |
-| FPC-JVM-SPEC-003 | Spring Boot Maven without wrapper | A Spring Boot Maven fixture has `pom.xml` and Spring Boot evidence but no wrapper | Planner resolves it | Output uses system Maven commands, records missing wrapper as non-fatal evidence, and uses the same Spring Boot artifact/start contract. |
-| FPC-JVM-SPEC-004 | Spring Boot Gradle with wrapper | A Spring Boot Gradle fixture has `build.gradle`, `gradlew`, Spring Boot plugin/dependency evidence, and deterministic `build/libs/*.jar` output | Planner resolves it | Output uses wrapper Gradle commands, `spring-boot` planner metadata, Java base image policy, workspace image artifact intent, and deterministic `java -jar` start command. |
-| FPC-JVM-SPEC-005 | Spring Boot Gradle Kotlin DSL | A Spring Boot Gradle Kotlin DSL fixture has `build.gradle.kts`, Gradle wrapper evidence, and Spring Boot plugin/dependency evidence | Planner resolves it | Output selects Gradle, records Kotlin DSL build file evidence, emits Gradle build/package commands, and uses the same Spring Boot artifact/start contract. |
+| FPC-JVM-SPEC-002 | Spring Boot Maven with wrapper | A Spring Boot Maven fixture has `pom.xml`, `mvnw`, Spring Boot dependency/plugin evidence, `.java-version`, and deterministic jar output | Planner resolves it | Output uses wrapper build/package commands through a shell-safe wrapper invocation, `spring-boot` planner metadata, Maven build image policy, workspace image artifact intent, `java -jar` start command, and resource-owned internal port. |
+| FPC-JVM-SPEC-003 | Spring Boot Maven without wrapper | A Spring Boot Maven fixture has `pom.xml` and Spring Boot evidence but no wrapper | Planner resolves it | Output uses system Maven commands, records missing wrapper as non-fatal evidence, selects a Maven build image so Docker execution has the build tool available, and uses the same Spring Boot artifact/start contract. |
+| FPC-JVM-SPEC-004 | Spring Boot Gradle with wrapper | A Spring Boot Gradle fixture has `build.gradle`, `gradlew`, Spring Boot plugin/dependency evidence, and deterministic `build/libs/*.jar` output | Planner resolves it | Output uses wrapper Gradle commands through a shell-safe wrapper invocation, `spring-boot` planner metadata, Gradle build image policy, workspace image artifact intent, and deterministic `java -jar` start command. |
+| FPC-JVM-SPEC-005 | Spring Boot Gradle Kotlin DSL | A Spring Boot Gradle Kotlin DSL fixture has `build.gradle.kts`, Gradle wrapper evidence, and Spring Boot plugin/dependency evidence | Planner resolves it | Output selects Gradle, records Kotlin DSL build file evidence, emits Gradle build/package commands against the Gradle build image, and uses the same Spring Boot artifact/start contract. |
 | FPC-JVM-SPEC-006 | Generic JVM explicit fallback | A JVM source lacks supported framework evidence but resource runtime profile supplies explicit install/build/start commands | Planner resolves it | Output uses generic JVM/custom command fallback, keeps commands in resource runtime profile, and does not add framework/base-image fields to `deployments.create`. |
 | FPC-JVM-SPEC-007 | Generic deterministic jar fallback | A JVM source has Maven or Gradle evidence plus exactly one deterministic runnable jar path | Planner resolves it | Output selects generic JVM planner behavior, packages a Docker/OCI image, and starts the jar with `java -jar` without pretending the framework is Spring Boot. |
 | FPC-JVM-SPEC-008 | Unsupported or missing JVM evidence | JVM evidence has ambiguous Maven/Gradle roots, missing build tool, missing runnable jar, missing production start, unsupported framework, or missing internal port | Plan preview or deployment planning runs | Appaloft returns structured blocked reasons or `validation_error` without guessing, and points users to resource runtime/network configuration or explicit fallback commands. |
@@ -60,8 +60,8 @@ Resource profile -> detect -> plan -> deployments.create execution
 - Resource owns reusable source, runtime, network, health, and access profile fields.
 - Deployment owns only admitted attempts and immutable snapshots after `deployments.create`.
 - Runtime adapters own filesystem inspection, Maven/Gradle manifest parsing, Spring Boot evidence
-  parsing, generated Dockerfile assets, rendered shell, Docker/Compose/SSH details, and opt-in real
-  smoke execution.
+  parsing, generated Dockerfile assets, rendered shell, Docker/Compose/SSH details, and GitHub
+  Actions/local explicit real smoke execution.
 - `deployments.plan` is the read-only preview operation for the same `detect -> plan` contract.
 
 ## Public Surfaces
@@ -112,10 +112,12 @@ deployment commands, or new recovery write commands.
 - Do not make buildpack-style detection the only Spring Boot support path. Buildpack-style
   detection may become an adapter-owned accelerator only after explicit planner output remains
   deterministic.
-- Do not claim every JVM fixture has full real Docker/SSH smoke; headless Docker/OCI readiness is
-  the catalog closure layer, with representative opt-in Docker smoke tracked separately.
+- Do not require real Docker/SSH execution in the fast contract suite. JVM fixture real-execution confidence is
+  provided by the shared GitHub Actions/local explicit Docker and generic-SSH framework smoke descriptor set governed
+  by the zero-to-SSH catalog acceptance harness.
 
 ## Open Questions
 
-- None for Spring Boot tested catalog closure. Quarkus and Micronaut remain follow-up JVM planner
-  rows that should reuse this contract rather than introduce new deployment inputs.
+- None for Spring Boot, Quarkus Maven JVM jar mode, and generic JVM tested catalog closure.
+  Micronaut remains a follow-up JVM planner row that should reuse this contract rather than
+  introduce new deployment inputs.

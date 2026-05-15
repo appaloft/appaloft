@@ -95,6 +95,7 @@ Then:
 | DEP-SHOW-ENTRY-003 | e2e-preferred | CLI | `appaloft deployments show <deploymentId> --json` | Prints canonical `DeploymentDetail` JSON from the query result. |
 | DEP-SHOW-ENTRY-004 | e2e-preferred | API/oRPC | HTTP query | Reuses the shared query schema and returns `deployments.show/v1`. |
 | DEP-SHOW-ENTRY-005 | e2e-preferred | Quick Deploy completion | Completion links to deployment detail after accepted deploy | Follows the shared deployment-detail query instead of a private completion-only payload. |
+| DEP-SHOW-ENTRY-006 | e2e-preferred | Web deployment detail diagnostic copy | User copies support/debug context from deployment detail | Page calls `resources.diagnostic-summary` with deployment resource/deployment ids; it does not add diagnostic fields to `deployments.show`. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -103,9 +104,10 @@ Executable coverage now exists for the active `deployments.show` slice:
 - application query-service coverage for complete detail, `not_found`, and partial related-context
   availability;
 - API/oRPC coverage for `GET /api/deployments/{deploymentId}`;
-- Web/Bun.WebView coverage for direct deployment-detail entry, resource-history navigation into
-  deployment detail, partial section-error rendering, and Quick Deploy success-path navigation to
-  the shared deployment detail route.
+- Web/Bun.WebView coverage for direct deployment-detail entry, deployment-detail diagnostic copy
+  through `resources.diagnostic-summary`, resource-history navigation into deployment detail,
+  partial section-error rendering, and Quick Deploy success-path navigation to the shared deployment
+  detail route.
 
 `deployments.logs` remains the separate detailed attempt-log boundary and is intentionally verified
 through the deployment detail Web flow rather than folded into the `deployments.show` response.

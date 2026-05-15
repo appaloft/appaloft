@@ -74,6 +74,10 @@ describe("organization auth management console surface", () => {
 
     expect(organizationPageSource).toContain("ManagementShell");
     expect(instancePageSource).toContain("ManagementShell");
+    expect(instancePageSource).toContain("orpcClient.system.doctor");
+    expect(instancePageSource).toContain("maintenanceWorkers");
+    expect(instancePageSource).toContain("workerSafetyLabelKey");
+    expect(instancePageSource).toContain("i18nKeys.console.instance.maintenanceWorkersTitle");
     expect(organizationPageSource).not.toContain("ConsoleShell");
     expect(instancePageSource).not.toContain("ConsoleShell");
     expect(organizationPageSource).toContain("activeSection");

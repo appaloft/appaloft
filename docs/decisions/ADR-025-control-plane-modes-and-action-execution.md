@@ -358,24 +358,28 @@ This decision governs:
 - [Action Server Config Deploy Workflow](../workflows/action-server-config-deploy.md)
 - [Action Server Config Deploy](../specs/050-action-server-config-deploy/spec.md)
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current implementation has a state backend resolver that treats `APPALOFT_CONTROL_PLANE_URL` or
 `APPALOFT_DATABASE_URL` as a `postgres-control-plane` backend and skips SSH remote PGlite sync.
-That remains a partial state-backend implementation for CLI execution.
+That is the scoped CLI state-backend baseline for the current control-plane mode slice.
 
 The config parser accepts `controlPlane.mode` and non-secret `controlPlane.url`, rejects identity and
 secret fields under `controlPlane`, and normalizes safe self-hosted URLs.
 
 The deploy-action wrapper can run pure SSH deployments or the initial self-hosted Action-to-server
-API deploy slice. OIDC/token exchange semantics, Cloud-assisted API mode, and full adoption remain
-roadmap work.
+API deploy slice. It performs a compatibility handshake against `/api/version`, can hand off trusted
+source-link deployments through `POST /api/action/deployments/from-source-link`, and can run the
+active Action Server Config Deploy route through
+`POST /api/action/deployments/from-config-package`.
 
-Action Server Config Deploy is specified as the next `0.9.x` self-hosted server-mode slice, but its
-source package transport/storage and server-side config bootstrap implementation do not exist yet.
+Action Server Config Deploy is active for compatible self-hosted servers. Source package
+transport/storage, server-side config bootstrap, and the advertised `server-github-fetch` capability
+are implemented as the current self-hosted server-mode baseline; durable blob storage and broader
+control-plane adoption remain governed follow-ups.
 
-No Cloud-assisted Action API, self-hosted adoption marker, source-link import, managed config
-domain mapping, or control-plane-owned execution runner is implemented yet.
+OIDC/token exchange semantics, Cloud-assisted API mode, full self-hosted adoption markers, managed
+config domain mapping, and a control-plane-owned execution runner remain roadmap work.
 
 ## Open Questions
 

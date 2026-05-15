@@ -145,25 +145,28 @@ HTTP/oRPC must:
 - reuse the query input schema;
 - return the same structured result to Web, CLI, automation, and future MCP clients.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
-The resource diagnostic summary workflow is active for the resource detail surface. The Web action
-calls `resources.diagnostic-summary` and copies canonical `copy.json`.
+The resource diagnostic summary workflow is active for the resource detail, deployment detail, and
+Quick Deploy completion surfaces. The Web actions call `resources.diagnostic-summary` and copy
+canonical `copy.json`.
 
 The query is implemented in application, contracts, oRPC/HTTP, CLI, operation catalog metadata, and
-Web resource detail.
+Web resource detail, deployment detail, and Quick Deploy completion.
 
-Quick Deploy completion can navigate to deployment detail but does not yet provide a copyable
-diagnostic summary for the accepted resource/deployment. Deployment detail also does not yet expose
-the action directly.
+CLI `resource diagnose` prints canonical JSON by default and supports `--summary` for a concise
+human section summary over the same query result.
 
-Desktop uses the Web resource detail action, but desktop-client-specific safe context is not yet
-appended to the copied payload.
+Deployment detail calls the resource-scoped query with its own `resourceId` and `deploymentId`; it
+does not introduce a separate deployment-owned diagnostic payload shape.
+
+Desktop uses the Web resource detail action. Desktop-client-specific safe context remains a
+governed client-context extension and is not required for the canonical backend `copy.json`.
 
 The 2026-05-01 access-failure baseline composes optional latest edge-failure envelopes from the
 resource access read model into this summary. Short-retention request persistence, automatic
-route/resource lookup from provider metadata, and real proxy error-middleware e2e remain future
-hardening gaps.
+route/resource lookup from provider metadata, and real proxy error-middleware e2e remain governed
+hardening follow-ups.
 
 ## Open Questions
 

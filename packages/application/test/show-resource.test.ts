@@ -37,6 +37,8 @@ import {
   ResourceServiceKindValue,
   ResourceServiceName,
   ResourceSlug,
+  ResourceStorageAttachmentId,
+  ResourceStorageMountModeValue,
   type Result,
   RoutePathPrefix,
   RuntimePlanStrategyValue,
@@ -44,6 +46,9 @@ import {
   SourceEventKindValue,
   SourceKindValue,
   SourceLocator,
+  StorageDestinationPath,
+  StorageVolumeId,
+  StorageVolumeKindValue,
   UpdatedAt,
 } from "@appaloft/core";
 
@@ -522,6 +527,36 @@ describe("ShowResourceQueryService", () => {
       destinationId: "dst_demo",
     });
     expect(detail.lifecycle.status).toBe("active");
+  });
+
+  test("[STOR-READ-002] returns storage attachment summaries from resources.show", async () => {
+    const resource = detailedResource();
+    resource
+      .attachStorage({
+        attachmentId: ResourceStorageAttachmentId.rehydrate("rsa_demo"),
+        storageVolumeId: StorageVolumeId.rehydrate("stv_data"),
+        storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
+        destinationPath: StorageDestinationPath.create("/data")._unsafeUnwrap(),
+        mountMode: ResourceStorageMountModeValue.rehydrate("read-write"),
+        attachedAt: CreatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const result = await createService({
+      resources: [resource],
+    }).execute(createTestContext(), createQuery());
+
+    const detail = unwrap(result);
+    expect(detail.storageAttachments).toEqual([
+      {
+        id: "rsa_demo",
+        storageVolumeId: "stv_data",
+        storageVolumeKind: "named-volume",
+        destinationPath: "/data",
+        mountMode: "read-write",
+        attachedAt: "2026-01-01T00:03:00.000Z",
+      },
+    ]);
   });
 
   test("[RES-PROFILE-DRIFT-001] reports informational resource versus latest snapshot drift", async () => {

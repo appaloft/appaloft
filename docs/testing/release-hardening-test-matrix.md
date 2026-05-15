@@ -11,8 +11,8 @@ release while other Phase 9 roadmap items or exit criteria remain unchecked.
 | RELEASE-HARDENING-003 | Release build publishes source archives, CLI binary archives, desktop artifacts, all-in-one GHCR image, npm packages including `@appaloft/sdk`, release manifest, checksums, release notes, final metadata, and optional Homebrew tap updates through governed jobs. | GitHub Actions release contract | Automated in `scripts/test/release-build-workflow.test.ts` and SDK package checks in `scripts/test/sdk-release-packaging.test.ts`. |
 | RELEASE-HARDENING-004 | Binary bundle and Docker image packaging include PGlite/runtime assets and exclude heavyweight local artifacts from Docker build context. | Packaging script contract | Automated in `scripts/test/binary-bundle.test.ts`. |
 | RELEASE-HARDENING-005 | Deploy-console and deploy-action install-console workflows use the released installer over SSH, keep pure SSH deploy separate, preserve trusted overrides, and keep secrets out of repository config. | Workflow/action wrapper contract | Automated in `scripts/test/deploy-console-workflow.test.ts` and `scripts/test/deploy-action-wrapper.test.ts`. |
-| RELEASE-HARDENING-006 | Local, Docker, Compose, prebuilt image, static, Swarm, install-auth, SSH preflight, aggregate SSH, SSH remote-state, SSH quick-deploy, and redacted SSH evidence-capture smoke commands remain first-class package scripts and release workflow gates for release readiness. | Smoke command contract | Automated in `scripts/test/release-build-workflow.test.ts` by checking package scripts, SSH preflight fail-closed behavior, evidence redaction, and workflow references; real execution remains environment-gated where Docker/SSH is required. |
-| RELEASE-HARDENING-007 | The release alignment gate allows stable `0.11.0` only after Phase 9 release-readiness checklist items are checked or explicitly accepted as release-note gaps. | Roadmap release gate | Automated in `scripts/test/release-build-workflow.test.ts` by invoking `scripts/release/align-roadmap-for-release.ts --target-version 0.11.0 --check` and expecting the current accepted SSH evidence gap not to block roadmap alignment. |
+| RELEASE-HARDENING-006 | Local, Docker, Compose, prebuilt image, static, full framework fixture Docker, full framework fixture SSH, aggregate framework, scheduled-task Docker, scheduled-task SSH, aggregate scheduled-task, storage-cleanup Docker, storage-cleanup SSH, aggregate storage-cleanup, runtime-usage Docker, runtime-usage SSH, aggregate runtime-usage, capacity-prune local, capacity-prune SSH, aggregate capacity-prune, GitHub preview provider smoke, dependency Redis backup smoke, Swarm, install-auth, SSH preflight, aggregate SSH, SSH remote-state, SSH quick-deploy, and redacted SSH evidence-capture smoke commands remain first-class package scripts and release workflow gates for release readiness. | Smoke command contract | Automated in `scripts/test/release-build-workflow.test.ts` by checking package scripts, framework fixture smoke entrypoints, scheduled-task real runtime smoke entrypoints, storage cleanup real runtime smoke entrypoints, runtime usage real target smoke entrypoints, capacity prune real target smoke entrypoints, GitHub preview provider smoke entrypoints, dependency Redis backup smoke entrypoints, SSH preflight fail-closed behavior, evidence redaction, and workflow references including `storage-cleanup-e2e.yml`, `runtime-usage-e2e.yml`, `capacity-prune-e2e.yml`, `preview-provider-e2e.yml`, and `dependency-redis-backup-e2e.yml`; real execution remains environment-gated where Docker/SSH/GitHub provider credentials or service containers are required. |
+| RELEASE-HARDENING-007 | The release alignment gate allows stable `0.11.0` only after Phase 9 release-readiness checklist items are checked and the SSH confidence layer is represented by explicit local or GitHub Actions gates. | Roadmap release gate | Automated in `scripts/test/release-build-workflow.test.ts` by invoking `scripts/release/align-roadmap-for-release.ts --target-version 0.11.0 --check` and expecting the current real-gate release-readiness contract not to block roadmap alignment. |
 
 ## Verification Evidence
 
@@ -60,26 +60,85 @@ release while other Phase 9 roadmap items or exit criteria remain unchecked.
   and the install-auth smoke passed 1 test with 34 assertions in 50.14s against Colima Docker,
   covering the PGlite install, first-admin bootstrap, deploy-token creation, server-mode
   deployment probe, Action deploy-token admission, and console page readiness.
-- 2026-05-12 opt-in SSH workflow rerun: `bun test
+- 2026-05-12 GitHub Actions/local explicit SSH workflow rerun: `bun test
   ./apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` skipped
   `[CONFIG-FILE-STATE-013]` because `APPALOFT_E2E_SSH_REMOTE_STATE=true` was not set. `bun test
   ./apps/shell/test/e2e/quick-deploy-ssh.workflow.e2e.ts` skipped `[QUICK-DEPLOY-WF-022]`,
   `[QUICK-DEPLOY-WF-060]`, `[QUICK-DEPLOY-WF-034]`, and `[QUICK-DEPLOY-WF-040]` because
   `APPALOFT_E2E_SSH_QUICK_DEPLOY=true` was not set. The current environment exposes only
   `SSH_AUTH_SOCK`; it does not provide `APPALOFT_E2E_SSH_HOST`,
-  `APPALOFT_E2E_SSH_PRIVATE_KEY`, or the opt-in flags required for SSH release smoke evidence.
-- 2026-05-12 current-state wiring update: `smoke:ssh` is the aggregate opt-in SSH release-readiness
-  command over `smoke:ssh:remote-state` and `smoke:ssh:quick-deploy`; `ssh-remote-state-e2e` and
-  `ssh-quick-deploy-e2e` are reusable GitHub workflows, nightly invokes both as optional
+  `APPALOFT_E2E_SSH_PRIVATE_KEY`, or the local explicit flags required for SSH release smoke
+  evidence.
+- 2026-05-12 current-state wiring update: `smoke:ssh` is the aggregate local explicit SSH
+  release-readiness command over `smoke:ssh:remote-state` and `smoke:ssh:quick-deploy`;
+  `ssh-remote-state-e2e` and `ssh-quick-deploy-e2e` are reusable GitHub workflows, nightly invokes both as optional
   environment-gated smokes, and release can require both through
-  `require_ssh_remote_state_e2e` and `require_ssh_quick_deploy_e2e`. For `0.11.0`, missing real SSH
-  evidence is an accepted deferred release-note gap because this local release-preparation
-  environment has no SSH target server; `v0.11.x` publish runs no longer require both SSH workflows
-  automatically, but the manual required inputs remain available when SSH secrets exist.
+  `require_ssh_remote_state_e2e` and `require_ssh_quick_deploy_e2e`. Local preparation may skip SSH
+  execution when no target server exists, but a release-readiness run that needs SSH confidence sets
+  the required inputs so missing SSH secrets fail the reusable workflows.
+- 2026-05-15 framework fixture smoke wiring update: `smoke:framework:docker`,
+  `smoke:framework:ssh`, and `smoke:framework` are first-class package scripts over the full
+  supported local Docker catalog gate and generic-SSH framework fixture gate. The Docker script
+  composes Dockerfile/Compose/prebuilt-image substrate smoke with
+  `APPALOFT_E2E_FRAMEWORK_DOCKER=true` fixture smoke; the SSH script runs `smoke:ssh:preflight`
+  before enabling `APPALOFT_E2E_SSH_FRAMEWORK_DOCKER=true`, so an environment without a configured
+  SSH target fails closed instead of silently skipping the full generic-SSH fixture gate.
+- 2026-05-15 framework fixture workflow wiring update: `framework-fixture-e2e.yml` is a reusable
+  GitHub Actions workflow for the same full supported-catalog fixture gates. Nightly invokes it as
+  an optional environment-gated smoke. Release invokes it before `release-build`; local Docker
+  catalog smoke runs on the GitHub Docker runner, and the SSH framework fixture gate can be made
+  required for manual release runs with `require_framework_fixture_e2e=true`.
+- 2026-05-15 scheduled-task runtime smoke wiring update: `smoke:scheduled-task:docker`,
+  `smoke:scheduled-task:ssh`, and `smoke:scheduled-task` are first-class package scripts for
+  local explicit real scheduled-task runtime execution. The Docker script enables
+  `APPALOFT_E2E_SCHEDULED_TASK_DOCKER=true` and proves a real one-off task container can run beside
+  a Resource container. The SSH script runs `smoke:ssh:preflight` before enabling
+  `APPALOFT_E2E_SSH_SCHEDULED_TASK_DOCKER=true`, so generic-SSH scheduled-task execution cannot be
+  claimed without a configured SSH Docker target. `scheduled-task-e2e.yml` is the reusable GitHub
+  Actions gate for the same probes; nightly invokes it as an optional environment-gated smoke, and
+  release can require the SSH scheduled-task gate with `require_scheduled_task_e2e=true`.
+- 2026-05-15 storage cleanup runtime smoke wiring update: `smoke:storage-cleanup:docker`,
+  `smoke:storage-cleanup:ssh`, and `smoke:storage-cleanup` are first-class package scripts for
+  local explicit real storage runtime cleanup. The Docker script enables
+  `APPALOFT_E2E_STORAGE_CLEANUP_DOCKER=true` and proves dry-run-first plus destructive scoped cleanup
+  against a real Appaloft-named Docker volume. The SSH script runs `smoke:ssh:preflight` before
+  enabling `APPALOFT_E2E_SSH_STORAGE_CLEANUP_DOCKER=true`. `storage-cleanup-e2e.yml` is the
+  reusable GitHub Actions gate for the same probes; nightly invokes it as an optional
+  environment-gated smoke, and release can require the SSH storage-cleanup gate with
+  `require_storage_cleanup_e2e=true`.
+- 2026-05-15 runtime usage smoke wiring update: `smoke:runtime-usage:docker`,
+  `smoke:runtime-usage:ssh`, and `smoke:runtime-usage` are first-class package scripts for
+  local explicit real runtime usage attribution. The Docker script enables
+  `APPALOFT_RUNTIME_USAGE_DOCKER_SMOKE=1` and proves read-only capacity-to-usage translation against
+  local runtime metadata. The SSH script runs `smoke:ssh:preflight` before enabling
+  `APPALOFT_RUNTIME_USAGE_SSH_SMOKE=1`. `runtime-usage-e2e.yml` is the reusable GitHub Actions gate
+  for the same probes; nightly invokes it as an optional environment-gated smoke, and release can
+  require the SSH runtime-usage gate with `require_runtime_usage_e2e=true`.
+- 2026-05-15 capacity prune smoke wiring update: `smoke:capacity-prune:local`,
+  `smoke:capacity-prune:ssh`, and `smoke:capacity-prune` are first-class package scripts for
+  local explicit real runtime workspace prune. The local script enables
+  `APPALOFT_E2E_CAPACITY_PRUNE_LOCAL=true` and proves dry-run-first plus destructive scoped cleanup
+  against a temporary Appaloft runtime root. The SSH script runs `smoke:ssh:preflight` before
+  enabling `APPALOFT_E2E_SSH_CAPACITY_PRUNE=true`. `capacity-prune-e2e.yml` is the reusable GitHub
+  Actions gate for the same probes; nightly invokes it as an optional environment-gated smoke, and
+  release can require the SSH capacity-prune gate with `require_capacity_prune_e2e=true`.
+- 2026-05-15 preview provider smoke wiring update: `smoke:preview-provider:github` is a
+  first-class package script for secret-gated live GitHub preview PR-comment feedback. The script
+  enables `APPALOFT_GITHUB_PREVIEW_PROVIDER_SMOKE=true` and requires
+  `APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN`, `APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY`, and
+  `APPALOFT_GITHUB_PREVIEW_SMOKE_PR`. `preview-provider-e2e.yml` is the reusable GitHub Actions
+  gate; nightly invokes it as an optional environment-gated smoke, and release can require the gate
+  with `require_preview_provider_e2e=true`.
+- 2026-05-15 dependency Redis backup smoke wiring update:
+  `smoke:dependency-redis-backup` is a first-class package script for real Redis logical
+  backup/restore. The script enables `APPALOFT_E2E_REDIS_BACKUP_RESTORE=true` and runs
+  `apps/shell/test/e2e/dependency-resource-redis-backup.workflow.e2e.ts`.
+  `dependency-redis-backup-e2e.yml` is the reusable GitHub Actions gate; nightly and release invoke
+  it with a Redis service container and host `redis-cli`.
 - 2026-05-12 fail-closed SSH smoke script check: `smoke:ssh:remote-state` and
   `smoke:ssh:quick-deploy` now pass explicit `./apps/...` file paths to `bun test`, so Bun executes
   the workflow-named e2e files instead of treating them as unmatched filters. With SSH credentials
-  intentionally absent, both scripts fail at the opt-in `APPALOFT_E2E_SSH_HOST` requirement, which
+  intentionally absent, both scripts fail at the explicit `APPALOFT_E2E_SSH_HOST` requirement, which
   proves the scripts do not silently pass without real SSH release-readiness evidence.
 - 2026-05-12 SSH preflight script check: `smoke:ssh:preflight` verifies
   the `ssh` executable, `APPALOFT_E2E_SSH_HOST`, optional `APPALOFT_E2E_SSH_PORT`, optional
@@ -109,23 +168,25 @@ release while other Phase 9 roadmap items or exit criteria remain unchecked.
   command, per-suite suite lists, workflow artifact wiring, evidence verification success, target
   mismatch rejection, leaked configured-value rejection, and verifies failed smoke commands do not
   write an evidence file.
-- 2026-05-12 current-state gate check: `scripts/test/release-build-workflow.test.ts` proves the
+- 2026-05-15 current-state gate check: `scripts/test/release-build-workflow.test.ts` proves the
   release alignment script allows `Release-As: 0.11.0` only after Phase 9 release readiness is
-  checked or explicitly accepted as a release-note gap. The current accepted gap is missing real SSH
-  smoke evidence in local release preparation because no SSH target server is available.
+  checked and the SSH smoke confidence layer is exposed through local explicit scripts plus
+  fail-closed reusable GitHub Actions gates.
 
-## Current Gaps
+## Current Governed Follow-Ups
 
-- Phase 9 release readiness carries an accepted `0.11.0` release-note gap for missing real SSH smoke
-  evidence in this local release-preparation environment. Run `bun run smoke:ssh:evidence` and
-  `bun run smoke:ssh:evidence:verify` in a later environment that has an SSH target server before
-  removing this gap.
 - The local smoke harness now isolates its control-plane HTTP port from the deployed workload port,
   skips best-effort Docker cleanup when Docker is absent, and reports deployment-log failures before
   trying to parse a runtime URL. The workspace-command smoke also now uses the
   `examples/express-hello` Node-compatible build command (`node build.mjs`) instead of a Bun-only
   build command for an npm-owned package.
-- Opt-in SSH workflow smokes remain blocked until a target host, matching private key, and required
-  `APPALOFT_E2E_SSH_*` variables are supplied for the release-readiness environment.
+- SSH workflow smokes require a target host, matching private key, and required
+  `APPALOFT_E2E_SSH_*` variables. Local runs can be skipped when no target exists; GitHub Actions
+  release-readiness runs can set the matching `require_*_e2e=true` input and fail closed if secrets
+  are absent.
+- The GitHub preview provider smoke requires a configured repository, pull request, and token.
+  Local runs can be skipped when no provider smoke target exists; GitHub Actions release-readiness
+  runs can set `require_preview_provider_e2e=true` and fail closed if provider smoke secrets are
+  absent.
 - The public deploy-action repository promotion/mirroring remains tracked outside this private
   repository; the in-repo reference wrapper and exported public layout are contract-tested here.

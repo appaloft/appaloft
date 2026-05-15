@@ -61,12 +61,12 @@
   history prune commands through the command bus, and records retry-scheduled failure visibility.
   It relies on retention-default policy ticks for fresh attempts rather than generic retry
   generation.
-- Preview cleanup is the fourth selected operator-visible process-attempt binding. It mirrors
-  product-grade preview cleanup outcomes into the process attempt journal with stable preview
-  cleanup dedupe keys, safe preview scope details, retry-scheduled failure visibility, and
-  operator-work read/repair visibility. Its retry scheduler still uses the existing
-  `preview_cleanup_attempts` candidate store and preview-lifecycle lease rather than process
-  attempt atomic claim/completion.
+- Preview cleanup is the fourth selected process-attempt worker binding. It mirrors product-grade
+  preview cleanup outcomes into the process attempt journal with stable preview cleanup dedupe keys,
+  safe preview scope details, retry-scheduled failure visibility, and operator-work read/repair
+  visibility. Its retry scheduler generates due process-attempt retries, dispatches cleanup only
+  after atomic process-attempt claim, and records completion through process-attempt completion;
+  `preview_cleanup_attempts` remains compatibility cleanup history.
 - Certificate issuance is the fifth selected operator-visible process-attempt binding. It mirrors
   certificate request, provider issuance, success, and retry-scheduled provider failure state into
   the process attempt journal with certificate/domain-binding ids and safe certificate context. Its
@@ -116,8 +116,8 @@
   backup/restore dedupe keys, safe dependency kind/provider/backup metadata, async-processing
   failure category, retriable provider failure classification, and operator-work read/repair
   visibility. Provider backup/restore execution still runs inline through the command use cases
-  after `DependencyResourceBackup` state is persisted rather than process-attempt atomic
-  claim/completion.
+  after `DependencyResourceBackup` state is persisted, but uses process-attempt atomic
+  claim/completion when a process journal is available.
 - Provider-native dependency resource realization/delete is the twelfth selected operator-visible
   process-attempt binding. It mirrors `dependency-resources.provision-postgres`,
   `dependency-resources.provision-redis`, and provider-managed `dependency-resources.delete`

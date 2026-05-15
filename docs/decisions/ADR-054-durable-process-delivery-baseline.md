@@ -86,8 +86,9 @@ historical and operator-visible until retention prunes them.
   resource backup/restore, and provider-native dependency resource realization/delete
   operator-visible process-attempt projection.
 - Preview cleanup records cleanup outcomes into the process attempt journal for operator-work
-  visibility and repair, but its retry scheduler still uses the existing preview cleanup attempt
-  candidate store and preview-lifecycle lease rather than process-attempt atomic claim/completion.
+  visibility and repair, and its retry scheduler now generates due process-attempt retries before
+  executing cleanup through atomic process-attempt claim/completion. The preview cleanup attempt
+  store remains compatibility cleanup history.
 - Certificate issuance records request, provider issuance, success, and retry-scheduled provider
   failure outcomes into the process attempt journal for operator-work visibility and repair, but
   its retry scheduler still uses certificate aggregate attempt state rather than process-attempt

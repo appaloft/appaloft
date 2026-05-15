@@ -141,8 +141,9 @@ Current covered behavior includes valid Git source changes, ambiguous GitHub tre
 Docker image tag/digest conflict rejection, secret-like source field rejection, and
 `resource-source-configured` publication.
 
-Archived-resource blocking remains a migration gap until `resources.archive` introduces explicit
-resource lifecycle state. Idempotent event-consumer projection remains future read-model work.
+Archived-resource blocking is active through `resources.archive`; archived Resources reject source
+profile changes with `resource_archived` and no event. Idempotent event-consumer projection remains
+future read-model work.
 
 ## Open Questions
 

@@ -40,6 +40,13 @@ export interface ScheduledTaskRunAdmissionInput {
   requestedAt?: string;
 }
 
+const manualRunOperationKey = "scheduled-tasks.run-now";
+const scheduledRunOperationKey = "scheduled-task-runs.run-due";
+
+function processAttemptOperationKey(triggerKind: ScheduledTaskRunTriggerKindValue): string {
+  return triggerKind.value === "scheduled" ? scheduledRunOperationKey : manualRunOperationKey;
+}
+
 function runSummaryFromAttempt(runAttempt: ScheduledTaskRunAttempt): ScheduledTaskRunSummary {
   const state = runAttempt.toState();
   return {
@@ -165,7 +172,7 @@ export class ScheduledTaskRunAdmissionService {
         id: idGenerator.next("wrk"),
         kind: "runtime-maintenance",
         status: "pending",
-        operationKey: "scheduled-task-runs.run-now",
+        operationKey: processAttemptOperationKey(triggerKind),
         dedupeKey: `scheduled-task-run:${runState.id.value}`,
         correlationId: context.requestId,
         requestId: context.requestId,

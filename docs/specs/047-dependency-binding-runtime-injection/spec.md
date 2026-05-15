@@ -4,7 +4,8 @@
 
 - Round: Code Round
 - Artifact state: safe runtime injection snapshot, readiness slice, and public docs/help slice
-  implemented; store-backed secret value resolution remains open
+  implemented; store-backed secret value resolution is governed and implemented by
+  [Dependency Runtime Secret Value Resolution](../048-dependency-runtime-secret-value-resolution/spec.md)
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, deployment admission/readiness behavior changes for
   bound dependencies

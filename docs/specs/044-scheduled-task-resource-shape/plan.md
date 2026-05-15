@@ -16,16 +16,19 @@ Spec-first slice for Resource-owned scheduled tasks, run attempts, history, and 
 3. Add persistence repository/read models for task definitions, run attempts, and run logs.
    `Status: task definition, run-attempt, and run-log persistence/read models are implemented.`
 4. Add runtime target execution/log ports for one-off task runs.
-   `Status: scheduled-task runtime port and hermetic runtime adapter are implemented; accepted-run
-   worker wiring is implemented.`
+   `Status: scheduled-task runtime port, contract-test adapter, Appaloft-owned
+   local-shell/generic-SSH Docker container execution, Docker Compose one-off task execution,
+   Docker Swarm replicated-job execution, run-scoped log capture, secret redaction, accepted-run
+   worker wiring, and GitHub Actions/local explicit real local Docker/generic-SSH Docker smoke
+   gates are implemented.`
 5. Add scheduler process manager that dispatches the same admission path as run-now.
    `Status: scheduler process manager is implemented around a due-candidate reader port and shared
    run admission service; Postgres/PGlite due-candidate read-model support is implemented; shell
-   composition registrations and opt-in runner are implemented.`
+   composition registrations and explicitly enabled runner are implemented.`
 6. Add operation catalog, CLI, HTTP/oRPC, Web, public docs/help, and generated MCP descriptor
    surfaces.
    `Status: operation catalog, CLI commands, HTTP/oRPC routes, and generated MCP descriptors are
-   active. Public docs/help anchors are active. Web controls remain open.`
+   active. Public docs/help anchors and Resource-detail Web controls are active.`
 
 ## Non-Goals
 
@@ -38,5 +41,5 @@ Spec-first slice for Resource-owned scheduled tasks, run attempts, history, and 
 ## Open Implementation Decisions
 
 - Persist skipped fires as run attempts or aggregate counters.
-- Cron parser and timezone validation dependency.
-- First runtime artifact source for task execution.
+- Provider-native scheduled jobs remain a future provider-extension slice outside the current
+  Appaloft-owned runtime baseline.

@@ -11,7 +11,6 @@ import {
   DefaultRuntimePlanResolver,
   DockerSwarmExecutionBackend,
   DockerSwarmShellCommandRunner,
-  HermeticScheduledTaskRuntimePort,
   InMemoryExecutionBackend,
   LocalExecutionBackend,
   RoutingExecutionBackend,
@@ -23,9 +22,11 @@ import {
   RuntimeServerEdgeProxyBootstrapper,
   RuntimeTargetCapacityInspectorAdapter,
   RuntimeTargetCapacityPrunerAdapter,
+  RuntimeTargetScheduledTaskRuntimePort,
   RuntimeTerminalSessionGateway,
   RuntimeUsageCapacityInspectorAdapter,
   SshExecutionBackend,
+  StorageRuntimeCleanerAdapter,
 } from "@appaloft/adapter-runtime";
 import {
   type AppLogger,
@@ -78,6 +79,8 @@ import {
   type SourceLinkRecord,
   type SourceLinkRepository,
   type SourceLinkSelectionSpec,
+  type StorageRuntimeCleaner,
+  type StorageVolumeBackupSafetyReader,
   tokens,
   toRepositoryContext,
 } from "@appaloft/application";
@@ -139,6 +142,7 @@ import {
   PgPreviewCleanupRetryCandidateReader,
   PgPreviewEnvironmentReadModel,
   PgPreviewEnvironmentRepository,
+  PgPreviewExpiredEnvironmentCandidateReader,
   PgPreviewFeedbackRecorder,
   PgPreviewPolicyDecisionProjection,
   PgPreviewPolicyRepository,
@@ -155,6 +159,11 @@ import {
   PgResourceRuntimeControlAttemptRecorder,
   PgResourceRuntimeLogArchiveStore,
   PgRetentionDefaultRepository,
+  PgRuntimeMonitoringMarkerReadModel,
+  PgRuntimeMonitoringSampleReadModel,
+  PgRuntimeMonitoringSampleRetentionStore,
+  PgRuntimeMonitoringSampleWriteStore,
+  PgRuntimeMonitoringThresholdPolicyRepository,
   PgScheduledRuntimePrunePolicyReadModel,
   PgScheduledTaskDefinitionRepository,
   PgScheduledTaskDueCandidateReader,
@@ -195,6 +204,7 @@ import {
   ShellDefaultAccessDomainPolicySupport,
 } from "./default-access-domain-policy-runtime";
 import { ShellDeploymentContextDefaultsPolicy } from "./deployment-context-defaults-policy";
+import { ConfigMaintenanceWorkerStatusReader } from "./maintenance-worker-status-reader";
 import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
 import { SelfHostedInstanceUpgradePort } from "./self-hosted-instance-upgrade";
 import { SshMutationCoordinator } from "./ssh-mutation-coordinator";
@@ -699,6 +709,15 @@ class NoopServerAppliedRouteStateRepository implements ServerAppliedRouteStateRe
   }
 }
 
+class EmptyStorageVolumeBackupSafetyReader implements StorageVolumeBackupSafetyReader {
+  async findSafetyEvidence() {
+    return ok({
+      backupRetentionRequired: false,
+      backupRestoreInFlightCount: 0,
+    });
+  }
+}
+
 class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   private readonly storage = new AsyncLocalStorage<{
     context: ExecutionContext;
@@ -830,6 +849,10 @@ export function registerRuntimeDependencies(
   });
   container.registerInstance(tokens.deploymentProgressReporter, input.deploymentProgressReporter);
   container.registerInstance(
+    tokens.maintenanceWorkerStatusReader,
+    new ConfigMaintenanceWorkerStatusReader(input.config),
+  );
+  container.registerInstance(
     tokens.sourceLinkRepository,
     input.sourceLinkRepository ?? new UnavailableSourceLinkRepository(),
   );
@@ -905,6 +928,31 @@ export function registerRuntimeDependencies(
       }, capacityInspector);
     }),
   });
+  container.register(tokens.runtimeMonitoringSampleReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgRuntimeMonitoringSampleReadModel(input.database.db),
+    ),
+  });
+  container.register(tokens.runtimeMonitoringSampleWriteStore, {
+    useFactory: instanceCachingFactory(
+      () => new PgRuntimeMonitoringSampleWriteStore(input.database.db),
+    ),
+  });
+  container.register(tokens.runtimeMonitoringMarkerReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgRuntimeMonitoringMarkerReadModel(input.database.db),
+    ),
+  });
+  container.register(tokens.runtimeMonitoringSampleRetentionStore, {
+    useFactory: instanceCachingFactory(
+      () => new PgRuntimeMonitoringSampleRetentionStore(input.database.db),
+    ),
+  });
+  container.register(tokens.runtimeMonitoringThresholdPolicyRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgRuntimeMonitoringThresholdPolicyRepository(input.database.db),
+    ),
+  });
   container.register(tokens.runtimeTargetCapacityPruner, {
     useFactory: instanceCachingFactory(
       () =>
@@ -913,6 +961,18 @@ export function registerRuntimeDependencies(
           input.config.remoteRuntimeRoot,
         ),
     ),
+  });
+  container.register(tokens.storageRuntimeCleaner, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new StorageRuntimeCleanerAdapter(
+          join(input.config.dataDir, "runtime"),
+          input.config.remoteRuntimeRoot,
+        ) as StorageRuntimeCleaner,
+    ),
+  });
+  container.register(tokens.storageVolumeBackupSafetyReader, {
+    useFactory: instanceCachingFactory(() => new EmptyStorageVolumeBackupSafetyReader()),
   });
   container.register(tokens.serverEdgeProxyBootstrapper, {
     useFactory: instanceCachingFactory(
@@ -977,6 +1037,11 @@ export function registerRuntimeDependencies(
   container.register(tokens.previewCleanupRetryCandidateReader, {
     useFactory: instanceCachingFactory(
       () => new PgPreviewCleanupRetryCandidateReader(input.database.db),
+    ),
+  });
+  container.register(tokens.previewExpiredEnvironmentCandidateReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgPreviewExpiredEnvironmentCandidateReader(input.database.db),
     ),
   });
   container.register(tokens.scheduledTaskDefinitionRepository, {
@@ -1442,7 +1507,13 @@ export function registerRuntimeDependencies(
     ),
   });
   container.register(tokens.scheduledTaskRuntimePort, {
-    useFactory: instanceCachingFactory(() => new HermeticScheduledTaskRuntimePort()),
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RuntimeTargetScheduledTaskRuntimePort({
+          deploymentReadModel: dependencyContainer.resolve(tokens.deploymentReadModel),
+          serverRepository: dependencyContainer.resolve(tokens.serverRepository),
+        }),
+    ),
   });
   container.register(tokens.resourceRuntimeControlAttemptRecorder, {
     useFactory: instanceCachingFactory(
@@ -1463,6 +1534,11 @@ export function registerRuntimeDependencies(
       (dependencyContainer) =>
         new RuntimeTerminalSessionGateway({
           allowTerminalSessions: input.config.runtimeMode === "self-hosted",
+          auditEventRecorder: dependencyContainer.resolve(tokens.auditEventRecorder),
+          activeSessionTtlMs: input.config.terminalSessions.activeTtlSeconds * 1000,
+          outputRetentionBytes: input.config.terminalSessions.outputRetentionBytes,
+          clock: dependencyContainer.resolve(tokens.clock),
+          idGenerator: dependencyContainer.resolve(tokens.idGenerator),
           logger: dependencyContainer.resolve(tokens.logger),
           serverRepository: dependencyContainer.resolve(tokens.serverRepository),
         }),

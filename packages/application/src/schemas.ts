@@ -147,6 +147,7 @@ export * from "./operations/projects/rename-project.schema";
 export * from "./operations/projects/show-project.schema";
 export * from "./operations/provider-job-logs/provider-job-logs.schema";
 export * from "./operations/resources/archive-resource.schema";
+export * from "./operations/resources/bind-resource-dependency.schema";
 export * from "./operations/resources/configure-resource-access.schema";
 export * from "./operations/resources/configure-resource-auto-deploy.schema";
 export * from "./operations/resources/configure-resource-health.schema";
@@ -156,6 +157,7 @@ export * from "./operations/resources/configure-resource-source.schema";
 export * from "./operations/resources/create-resource.schema";
 export * from "./operations/resources/delete-resource.schema";
 export * from "./operations/resources/import-resource-variables.schema";
+export * from "./operations/resources/list-resource-dependency-bindings.schema";
 export * from "./operations/resources/list-resources.schema";
 export * from "./operations/resources/resource-access-failure-evidence-lookup.schema";
 export * from "./operations/resources/resource-diagnostic-summary.schema";
@@ -165,20 +167,36 @@ export * from "./operations/resources/resource-proxy-configuration-preview.schem
 export * from "./operations/resources/resource-runtime-control.schema";
 export * from "./operations/resources/resource-runtime-log-archives.schema";
 export * from "./operations/resources/resource-runtime-logs.schema";
+export * from "./operations/resources/rotate-resource-dependency-binding-secret.schema";
 export * from "./operations/resources/set-resource-variable.schema";
 export * from "./operations/resources/show-resource.schema";
+export * from "./operations/resources/show-resource-dependency-binding.schema";
+export * from "./operations/resources/unbind-resource-dependency.schema";
 export * from "./operations/resources/unset-resource-variable.schema";
+export * from "./operations/runtime-monitoring/runtime-monitoring.schema";
 export * from "./operations/runtime-usage/inspect-runtime-usage.schema";
 export * from "./operations/scheduled-tasks/scheduled-task.schema";
 export * from "./operations/servers/bootstrap-server-proxy.schema";
 export * from "./operations/servers/check-server-delete-safety.schema";
+export {
+  type ConfigureScheduledRuntimePrunePolicyCommandInput,
+  configureScheduledRuntimePrunePolicyCommandInputSchema,
+} from "./operations/servers/configure-scheduled-runtime-prune-policy.command";
 export * from "./operations/servers/configure-server-credential.schema";
 export * from "./operations/servers/configure-server-edge-proxy.schema";
 export * from "./operations/servers/create-ssh-credential.schema";
 export * from "./operations/servers/deactivate-server.schema";
 export * from "./operations/servers/delete-server.schema";
 export * from "./operations/servers/delete-ssh-credential.schema";
+export {
+  type InspectServerCapacityQueryInput,
+  inspectServerCapacityQueryInputSchema,
+} from "./operations/servers/inspect-server-capacity.schema";
 export * from "./operations/servers/list-ssh-credentials.schema";
+export {
+  type PruneServerCapacityCommandInput,
+  pruneServerCapacityCommandInputSchema,
+} from "./operations/servers/prune-server-capacity.schema";
 export * from "./operations/servers/register-server.schema";
 export * from "./operations/servers/rename-server.schema";
 export * from "./operations/servers/rotate-ssh-credential.schema";

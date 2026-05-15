@@ -92,7 +92,7 @@ Run at least:
 - `bun run typecheck` from `apps/web`;
 - `bun run lint` or a focused Biome check on changed files.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Implemented:
 
@@ -102,23 +102,52 @@ Implemented:
   and `runtimePlan.execution.workingDirectory`;
 - runtime terminal gateway for `local-shell` and `generic-ssh`;
 - HTTP/oRPC open endpoint and WebSocket attach endpoint;
-- Web resource terminal tab and server detail terminal panel using `@xterm/xterm` and
-  `@xterm/addon-fit`;
+- Web resource terminal tab, server detail terminal panel, and server list terminal deep-link using
+  `@xterm/xterm` and `@xterm/addon-fit`;
 - CLI descriptor commands for `appaloft server terminal <serverId>` and
-  `appaloft resource terminal <resourceId>`.
+  `appaloft resource terminal <resourceId>`, with explicit `--attach` local TTY bridging for
+  interactive sessions.
 
-Known gaps:
+Baseline coverage:
 
-- local-shell uses a Bun subprocess bridge instead of a true PTY, so resize is a no-op locally;
-- CLI commands open sessions and print descriptors but do not yet attach the local TTY;
-- `sourceDir` and source `baseDirectory` workspace normalization remain follow-up work;
-- runtime adapter, HTTP/WebSocket, interactive CLI, and Web E2E coverage remain follow-up tests;
-- audit persistence, timeout policy, container exec, compose service shell selection,
-  provider-native terminals, and durable server default terminal directories remain future work.
+- local-shell uses a Bun subprocess bridge; resize is forwarded through the terminal transport and
+  invokes subprocess resize hooks when the spawn adapter exposes them.
+- Bun.WebView resource/server terminal coverage verifies Web open/attach, selected deployment or
+  server scope, initial resize forwarding, client-side navigation cleanup, and explicit close action
+  cleanup with a mocked attach socket; source guards verify the server list terminal entrypoint
+  deep-links to the server terminal tab.
+- Active attach transports replay a bounded in-memory terminal output tail on reconnect without
+  exposing terminal content through lifecycle readback or audit rows.
+- `sourceDir` and source `baseDirectory` workspace normalization are implemented for resource
+  terminal workspace resolution; adapter-resolved `workdir` and `remoteWorkdir` remain final
+  directories to avoid duplicate monorepo subpaths.
+- HTTP/WebSocket attach coverage exists for input and resize routing, and Bun.WebView coverage
+  exists for resource/server open+attach, selected deployment scope, initial resize forwarding, and
+  client-side navigation cleanup plus explicit close action cleanup with a mocked attach socket.
 
-## Open Questions
+Governed follow-ups:
 
-- Which PTY library should be used in Bun for local PTY support, and what fallback is acceptable if
-  the library does not support the current runtime platform?
-- Should the generic-SSH terminal adapter use direct SSH subprocess bridging first, or introduce a
-  reusable SSH session manager shared with runtime logs?
+- optional host PTY adapter selection for platforms that need resize semantics beyond Bun
+  subprocess pipes;
+- provider-native terminals after an isolation boundary is accepted;
+- durable server default terminal directories after a server-profile operation is accepted.
+
+Implemented after the first slice:
+
+- runtime adapter command construction for local-shell and generic-SSH Docker container `exec`;
+- runtime adapter command construction for local-shell and generic-SSH Docker Compose service
+  `exec` when retained execution metadata resolves the Compose file/project and resource service.
+- CLI `--attach` for server and resource terminal commands opens a session through the shared
+  command schema, attaches to the accepted gateway session, bridges local stdin/stdout/stderr, and
+  restores raw-mode state when the terminal closes.
+- Web Instance management lists active terminal sessions through `terminal-sessions.list`, closes
+  one active session through `terminal-sessions.close`, and expires old sessions through
+  `terminal-sessions.expire` without attaching to terminal transports or reading terminal output;
+  Bun.WebView coverage exercises the lifecycle read/expire/close flow.
+- runtime terminal gateway writes durable `terminal-session-opened` and
+  `terminal-session-closed` audit rows through the configured audit recorder, scoped to the server
+  or resource aggregate with safe metadata only.
+
+The first terminal slice intentionally does not bundle a platform PTY dependency. Runtime adapters
+that need host PTY behavior must expose it behind the existing subprocess resize hook, keeping the
+Web, CLI, command, and transport contracts unchanged.

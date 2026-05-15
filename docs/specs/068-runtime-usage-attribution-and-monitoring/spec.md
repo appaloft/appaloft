@@ -2,8 +2,11 @@
 
 ## Status
 
-- Round: Spec Round / accepted boundary planning
-- Artifact state: accepted candidate, not implemented
+- Round: Code Round / Post-Implementation Sync
+- Artifact state: active read workflow with implemented `runtime-usage.inspect`, retained
+  samples/rollups, threshold readback/configuration, Web monitor surfaces, and MCP handler dispatch;
+  full Observe UI, richer charts, alerts, quotas, runtime sizing, cleanup, and enforcement remain
+  separate governed follow-up slices
 - Roadmap target: `0.12.0`
 - Compatibility impact: pre-1.0 policy; additive read surfaces first, later enforcement requires a
   separate accepted ADR
@@ -16,9 +19,9 @@ the target or interpreting raw Docker output.
 
 The first product goal is read-only attribution and monitoring. Appaloft should show safe CPU,
 memory, disk, Docker artifact/cache, source workspace, and optional network signals beside existing
-health, logs, diagnostics, and capacity inspect surfaces. Later slices may add thresholds,
-operator alerts, quotas, and runtime sizing enforcement only after their command/spec/test
-boundaries are accepted.
+health, logs, diagnostics, and capacity inspect surfaces. Non-enforcing threshold
+readback/configuration is active in this baseline; operator alert routing, quotas, and runtime
+sizing enforcement still require separate accepted command/spec/test boundaries.
 
 ## Objective Requirement Baseline
 
@@ -31,9 +34,9 @@ operational questions without requiring target shell access or raw Docker/provid
 | Which project, environment, resource, or deployment is consuming target capacity right now? | Safe scope attribution over current runtime target observations. | Required for the first read-only slice. |
 | Is this target close to disk, inode, memory, CPU, or Docker cache/image pressure? | Current capacity totals, partial-state warnings, and freshness metadata. | Required through reuse of the existing capacity diagnostic base. |
 | Which Appaloft-owned artifacts explain disk usage? | Separate active runtime, rollback candidate, source workspace, Docker image/cache, Appaloft state-root, volume, and unknown buckets. | Required for disk attribution; unknown must stay explicit. |
-| Did a recent deployment likely coincide with a usage change? | Deployment-scoped current attribution now; retained samples and deployment markers later. | Current attribution required; time-series correlation deferred. |
+| Did a recent deployment likely coincide with a usage change? | Deployment-scoped current attribution, retained samples, and deployment markers. | Active through retained sample/rollup readback and deployment marker summaries. |
 | Can an operator decide whether to inspect, clean up, or resize safely? | Read-only summary and next diagnostic context without executing cleanup or enforcement. | Required; mutation and enforcement remain out of scope. |
-| Can Appaloft warn before a target runs out of usable capacity? | Threshold policy, evaluation, and operator visibility. | Deferred unless explicitly pulled into `0.12.0`. |
+| Can Appaloft warn before a target runs out of usable capacity? | Threshold policy, evaluation, and operator visibility. | Active as non-enforcing threshold readback/configuration across CLI, HTTP/oRPC, Web, SDK metadata, and generated MCP/tool handlers. |
 | Can Appaloft enforce CPU/memory/replica limits or project quotas? | Runtime sizing and quota policy with adapter enforcement. | Out of scope for the first slice; separate ADR required. |
 
 The baseline intentionally excludes requirements that are only nice-to-have dashboards, provider
@@ -62,22 +65,22 @@ decision about diagnosis, cleanup, capacity planning, or runtime configuration, 
 | RT-USAGE-004 | Freshness and partial diagnostics are explicit | a target times out, Docker is unavailable, or some metrics are missing | usage is returned | read results include `generatedAt`, `observedAt`, `freshness`, `partial`, warnings, and safe source errors so users do not confuse missing metrics with zero usage. |
 | RT-USAGE-005 | Disk attribution separates classes | a target has active runtimes, rollback candidates, source workspaces, build cache, unused images, state roots, and volumes | disk usage is displayed | output separates Appaloft-managed runtime artifacts, rollback candidates, source workspaces, Docker cache/images, Appaloft state roots, and unowned/unknown storage; Docker volumes are not treated as safely reclaimable. |
 | RT-USAGE-006 | Current deployment context is visible | a resource has retained deployment/runtime identity | current usage is inspected | the result can show which deployment/runtime identity owns attributed current usage when evidence exists, without pretending to provide historical time-series correlation. |
-| RT-USAGE-007 | Time-series collection is opt-in and bounded | monitoring collection is enabled | a scheduler samples targets | samples are retained with bounded resolution/retention, safe labels, and operator-work visibility for collection failures; collection does not execute deploy/prune/repair work. |
-| RT-USAGE-008 | Entrypoints share operation contracts | CLI, HTTP/oRPC, Web, or future MCP reads usage | input is parsed | each surface dispatches an explicit Query through `QueryBus` and reuses the same schema/output contract. |
+| RT-USAGE-007 | Time-series collection is disabled by default, explicitly enabled, and bounded | monitoring collection is explicitly enabled | a scheduler samples targets | samples are retained with bounded resolution/retention, safe labels, and operator-work visibility for collection failures; collection does not execute deploy/prune/repair work. |
+| RT-USAGE-008 | Entrypoints share operation contracts | CLI, HTTP/oRPC, Web, or MCP reads usage | input is parsed | each surface dispatches an explicit Query through `QueryBus` and reuses the same schema/output contract. |
 | RT-USAGE-009 | Thresholds do not enforce limits | a usage threshold is configured | usage crosses the threshold | Appaloft marks warning/critical state and can create operator visibility, but it does not throttle, stop, prune, redeploy, or reject deployments without a separate governed command. |
 | RT-USAGE-010 | Runtime sizing remains separate | a config file declares CPU, memory, replicas, restart policy, or rollout sizing | current deployment config bootstrap evaluates it | Appaloft keeps rejecting unsupported sizing fields until an accepted runtime sizing ADR/spec/runtime enforcement test matrix exists. |
 
 ## Operation Boundary
 
-Proposed read-only operation keys:
+Operation keys:
 
 | Operation | Kind | Role | Code Round state |
 | --- | --- | --- | --- |
-| `runtime-usage.inspect` | Query | Return current safe usage attribution for one server, project, environment, resource, or deployment scope. | Accepted for first Code Round. |
-| `runtime-usage.rollup` | Query | Return bounded time-window usage rollups for a scope from collected samples. | Proposed after sample persistence exists. |
-| `runtime-usage.samples.list` | Query | Return bounded raw sample windows for charts and diagnostics. | Proposed after retention policy exists. |
-| `runtime-usage-thresholds.configure` | Command | Persist non-enforcing warning/critical threshold policy for a scope. | Future Spec Round. |
-| `runtime-usage-thresholds.show` | Query | Read safe threshold policy and latest evaluation state. | Future Spec Round. |
+| `runtime-usage.inspect` | Query | Return current safe usage attribution for one server, project, environment, resource, or deployment scope. | Active. |
+| `runtime-monitoring.samples.list` | Query | Return bounded retained sample windows for charts and diagnostics. | Active through CLI, HTTP/oRPC, server/resource Web Monitor readback, SDK metadata, and generated MCP/tool descriptors. |
+| `runtime-monitoring.rollup` | Query | Return bounded time-window usage rollups for a scope from retained samples. | Active through CLI, HTTP/oRPC, SDK metadata, and generated MCP/tool descriptors. |
+| `runtime-monitoring.thresholds.configure` | Command | Persist non-enforcing warning/critical threshold policy for one exact scope. | Active through CLI, HTTP/oRPC, server/resource Web Monitor CPU/memory/disk configuration, SDK metadata, and generated MCP/tool descriptor/handler dispatch. |
+| `runtime-monitoring.thresholds.show` | Query | Read safe threshold policy and latest evaluation state. | Active through CLI, HTTP/oRPC, server/resource Web Monitor readback, SDK metadata, and generated MCP/tool descriptor/handler dispatch. |
 
 `runtime-usage.inspect` is the first recommended slice. It must be read-only and must not:
 
@@ -148,8 +151,10 @@ Initial measurement groups:
   require a later help-naming decision.
 - HTTP/oRPC: `GET /api/runtime-usage/inspect` dispatches the accepted query with shared schema
   parsing for the first read-only route.
-- Web: resource detail, deployment detail, project detail, and server detail can show compact usage
-  cards and charts after query contracts exist.
+- Web: server/resource Monitor surfaces read retained samples, backend rollup summaries,
+  deployment marker counts, threshold state, and exact-scope CPU/memory/disk threshold
+  configuration when available, with browser-local live samples as fallback. Project/environment
+  surfaces stay rollup-only with deep links.
 - Public docs/help: proposed stable anchors under `diagnostics.runtime-usage` and
   `diagnostics.runtime-target-capacity`.
 - Future MCP/tools: expose the same query schemas and operation catalog entries; no tool-only
@@ -171,11 +176,12 @@ Initial measurement groups:
 [ADR-062: Runtime Usage Attribution Boundary](../../decisions/ADR-062-runtime-usage-attribution-boundary.md)
 accepts `runtime-usage.inspect` as the first read-only query boundary for `0.12.0`.
 
-A separate accepted ADR/spec is still required before any slice that adds persistent sample storage,
-background collection, threshold policy, alert delivery, quota decisions, runtime sizing, or
+ADR-063 and the Runtime Monitoring Observation Boundary spec now govern persistent sample storage,
+background collection, rollup reads, and exact-scope non-enforcing threshold policy. A separate
+accepted ADR/spec is still required before alert delivery, quota decisions, runtime sizing, or
 enforcement.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 - `servers.capacity.inspect` already returns server-level disk, inode, memory, CPU, Docker
   image/build-cache, Appaloft runtime-root/state/source-workspace usage, safe reclaimable
@@ -200,7 +206,13 @@ enforcement.
   context is enriched from deployment read models before scope rollups are assembled.
 - Retained runtime identity metadata from deployment read models now enriches deployment-id-only
   artifacts when `containerName`, `swarm.serviceName`, or `swarm.stackName` is present.
-- Future MCP/tool descriptors remain pending.
+- Generated MCP/tool descriptors and handler dispatch now exist for `runtime-usage.inspect` and
+  retained runtime monitoring samples, rollups, and thresholds.
+- GitHub Actions/local explicit real Docker and SSH usage smoke commands exist as
+  `bun run smoke:runtime-usage:docker`, `bun run smoke:runtime-usage:ssh`, and
+  `bun run smoke:runtime-usage`. They remain read-only and run from
+  `.github/workflows/runtime-usage-e2e.yml` in nightly and release; manual release dispatch can set
+  `require_runtime_usage_e2e=true` when SSH runtime-usage evidence is required.
 - `resources.health`, `resources.runtime-logs`, and `resources.diagnostic-summary` provide
   resource observation, but they are not usage attribution or time-series metrics.
 - Repository config CPU, memory, replicas, restart policy, and rollout sizing remain unsupported

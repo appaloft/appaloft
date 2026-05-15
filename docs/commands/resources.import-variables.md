@@ -142,7 +142,7 @@ The command must:
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Full paste/import UI deferred; existing resource detail can consume the oRPC command later. | Deferred gap |
+| Web | Resource detail configuration section paste/import form dispatches the shared oRPC command. | Active |
 | CLI | `appaloft resource import-variables <resourceId> --content <dotenv> --exposure <...>`. | Active |
 | oRPC / HTTP | `POST /api/resources/{resourceId}/variables/import` using the command schema. | Active |
 | Automation / MCP | Future command/tool over the same operation key. | Future |
@@ -150,8 +150,8 @@ The command must:
 ## Current Implementation Notes And Migration Gaps
 
 Initial implementation uses existing resource aggregate variable storage and existing masked read
-surfaces. It does not add a provider-native secret backend. Full Web paste/import UI is deferred,
-but Web read surfaces continue to receive only masked values.
+surfaces. It does not add a provider-native secret backend. Resource detail Web paste/import is
+active and continues to receive only masked values on read surfaces.
 
 ## Open Questions
 

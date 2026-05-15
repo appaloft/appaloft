@@ -131,9 +131,10 @@ in the default shell runtime registry unless explicitly opted out.
   `SWARM-TARGET-ROUTE-001B`/`SWARM-TARGET-SECRET-001B`. It runs only when
   `APPALOFT_DOCKER_SWARM_SMOKE=1`, requires an active local manager and an overlay network named by
   `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` or `appaloft-edge`, deploys through
-  `DockerSwarmExecutionBackend` with `DockerSwarmShellCommandRunner`, and cleans the scoped service
-  afterward. `bun run smoke:swarm` is the first-class opt-in command for that harness. Default CI
-  keeps this smoke skipped until a real Swarm environment is explicitly available. On 2026-05-06,
+  `DockerSwarmExecutionBackend` with `DockerSwarmShellCommandRunner`, verifies Compose stack
+  storage mount realization through a generated Appaloft override, and cleans the scoped
+  service/stack afterward. `bun run smoke:swarm` is the first-class opt-in command for that harness.
+  Default CI keeps this smoke skipped until a real Swarm environment is explicitly available. On 2026-05-06,
   the harness passed against a temporary local Swarm manager with `appaloft-smoke-edge`, including
   smoke-specific Docker secret setup, real Traefik route realization, authenticated-registry image
   pull, secret-safe deployment metadata, and scoped cleanup.

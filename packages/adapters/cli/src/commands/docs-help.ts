@@ -318,6 +318,30 @@ export const cliCommandDescriptions = {
     "Inspect runtime usage attribution for a scope without cleanup",
     "diagnostics.runtime-usage",
   ),
+  runtimeMonitoring: withDocs(
+    "Runtime monitoring sample and rollup diagnostics",
+    "diagnostics.runtime-monitoring",
+  ),
+  runtimeMonitoringSamples: withDocs(
+    "List retained runtime monitoring samples for a scope",
+    "diagnostics.runtime-monitoring",
+  ),
+  runtimeMonitoringRollup: withDocs(
+    "Read retained runtime monitoring rollups for a scope",
+    "diagnostics.runtime-monitoring",
+  ),
+  runtimeMonitoringThresholds: withDocs(
+    "Runtime monitoring threshold policy operations",
+    "diagnostics.runtime-monitoring",
+  ),
+  runtimeMonitoringThresholdConfigure: withDocs(
+    "Configure non-enforcing runtime monitoring thresholds",
+    "diagnostics.runtime-monitoring",
+  ),
+  runtimeMonitoringThresholdShow: withDocs(
+    "Show non-enforcing runtime monitoring threshold state",
+    "diagnostics.runtime-monitoring",
+  ),
   serverProxy: withDocs("Server edge proxy operations", "server.proxy-readiness"),
   serverProxyRepair: withDocs(
     "Repair provider-owned edge proxy infrastructure",
@@ -454,6 +478,10 @@ export const cliCommandDescriptions = {
   storageVolumeShow: withDocs("Show storage volume detail", "storage.volume-lifecycle"),
   storageVolumeRename: withDocs("Rename a storage volume", "storage.volume-lifecycle"),
   storageVolumeDelete: withDocs("Delete an unattached storage volume", "storage.volume-lifecycle"),
+  storageVolumeCleanupRuntime: withDocs(
+    "Dry-run or explicitly remove safe runtime volume realizations",
+    "storage.volume-lifecycle",
+  ),
   deployToken: withDocs(
     "Self-hosted Action deploy-token management",
     "self-hosting.action-deploy-token-auth",
@@ -566,25 +594,19 @@ export const cliCommandDescriptions = {
     "Delete a dependency resource after safety checks",
     "dependency.resource-lifecycle",
   ),
-  dependencyBackup: withDocs(
-    "Dependency resource backup operations",
-    "dependency.resource-lifecycle",
-  ),
+  dependencyBackup: withDocs("Dependency resource backup operations", "dependency.backup-restore"),
   dependencyBackupCreate: withDocs(
     "Create a backup restore point for a dependency resource",
-    "dependency.resource-lifecycle",
+    "dependency.backup-restore",
   ),
-  dependencyBackupList: withDocs(
-    "List dependency resource backups",
-    "dependency.resource-lifecycle",
-  ),
+  dependencyBackupList: withDocs("List dependency resource backups", "dependency.backup-restore"),
   dependencyBackupShow: withDocs(
     "Show dependency resource backup detail",
-    "dependency.resource-lifecycle",
+    "dependency.backup-restore",
   ),
   dependencyBackupRestore: withDocs(
     "Restore a dependency resource backup in place",
-    "dependency.resource-lifecycle",
+    "dependency.backup-restore",
   ),
   dependencyBackupPolicy: withDocs(
     "Scheduled dependency backup policy operations",
@@ -620,7 +642,7 @@ export const cliCommandDescriptions = {
   ),
   resourceProxyConfig: withDocs("Show resource proxy configuration", "resource.network-profile"),
   resourceDiagnose: withDocs(
-    "Copy resource diagnostic summary context",
+    "Print resource diagnostic summary context as JSON or a concise summary",
     "diagnostics.safe-support-payload",
   ),
   resourceAccessFailure: withDocs(

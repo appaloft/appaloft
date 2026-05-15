@@ -37,8 +37,8 @@
   - Existing list/show query services expose safe rotation metadata.
   - Deployment snapshots remain immutable and continue to copy only safe references at admission.
 - Entrypoint impact:
-  - Add CLI, oRPC, and HTTP routes that dispatch through the command bus and reuse the application
-    schema.
+  - Add CLI, oRPC, HTTP, and Web entrypoints that dispatch through the command bus/typed client and
+    reuse the application schema.
   - Do not expose a generic dependency update operation.
 - Persistence/migration impact:
   - Add nullable safe secret reference/version metadata for existing bindings.
@@ -49,7 +49,7 @@
 
 - Roadmap target: Phase 7 / `0.9.0` beta.
 - Version target: `0.9.0` only after all Phase 7 required items and exit criteria are checked.
-- Compatibility impact: `pre-1.0-policy`, additive public CLI/API/oRPC operation.
+- Compatibility impact: `pre-1.0-policy`, additive public CLI/API/oRPC/Web operation.
 - Release note/migration requirement: mention as a Phase 7 additive capability when implemented.
 
 ## Testing Strategy
@@ -66,10 +66,10 @@
   - Application command admission, persistence, event, and no-provider-runtime side effects.
   - Read-model masking and rotation metadata.
   - Deployment snapshot immutability after rotation.
-  - Operation catalog, CLI, and HTTP/oRPC dispatch.
+  - Operation catalog, CLI, HTTP/oRPC, and Web dispatch/affordance coverage.
 - Acceptance/e2e:
-  - CLI and HTTP/oRPC route dispatch tests are sufficient for this backend-core slice.
-  - Web is deferred until a Docs/Web round.
+  - CLI and HTTP/oRPC route dispatch tests cover transport dispatch.
+  - Web source coverage and `svelte-check` cover the Resource detail acknowledgement affordance.
 - Contract/integration/unit:
   - Core unit, application integration, PG/PGlite persistence, contracts if response schemas add
     fields, CLI and oRPC tests.
@@ -77,6 +77,7 @@
 ## Risks And Migration Gaps
 
 - Provider-native credential rotation remains a separate future provider/database lifecycle slice.
-- Runtime env injection remains deferred; rotation only changes future safe references.
+- Runtime env injection remains a separate deployment-time materialization boundary; rotation only
+  changes future safe references.
 - Existing deployment snapshots must never be rewritten to point at the new secret version.
-- Web affordances and public docs are deferred until the command is implemented.
+- Web affordances and public docs/help are active for the dependency-resource lifecycle surface.

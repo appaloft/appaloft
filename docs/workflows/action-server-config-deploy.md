@@ -232,7 +232,7 @@ Secrets, raw archive URLs with credentials, raw provider payloads, private keys,
 raw secret values must not appear in errors, logs, read models, GitHub summaries, PR comments, or
 console output.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 - The deploy-action wrapper accepts explicit `server-config-deploy: true` for self-hosted mode,
   feature-gates server support through `/api/version`, and fails before package handoff or state
@@ -296,7 +296,8 @@ console output.
 - The active implemented self-hosted server route remains
   `POST /api/action/deployments/from-source-link`, which triggers an existing resource profile from
   source-link context.
-- Inline archive and remote archive URL transport, source package storage, diagnostics, cleanup
-  rules, source profile bootstrap, and non-`ci-env:` secret resolvers are not implemented yet.
-  Committed `access.domains[]` domain bootstrap is currently the managed `DomainBinding`
-  control-plane path; transient Action preview routes use server-applied route state.
+- Inline archive and remote archive URL transport, durable source package blob storage, archive
+  diagnostics, archive cleanup rules, source profile bootstrap, broader control-plane adoption, and
+  non-`ci-env:` secret resolvers remain governed follow-ups. Committed `access.domains[]` domain
+  bootstrap is currently the managed `DomainBinding` control-plane path; transient Action preview
+  routes use server-applied route state.

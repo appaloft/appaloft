@@ -1,4 +1,5 @@
 import {
+  CleanupStorageVolumeRuntimeCommand,
   CreateStorageVolumeCommand,
   DeleteStorageVolumeCommand,
   ListStorageVolumesQuery,
@@ -25,6 +26,9 @@ const backupRetentionOption = Options.boolean("backup-retention-required").pipe(
   Options.withDefault(false),
 );
 const backupReasonOption = Options.text("backup-reason").pipe(Options.optional);
+const serverOption = Options.text("server");
+const beforeOption = Options.text("before");
+const dryRunOption = Options.choice("dry-run", ["true", "false"]).pipe(Options.optional);
 
 const createCommand = EffectCommand.make(
   "create",
@@ -111,6 +115,25 @@ const deleteCommand = EffectCommand.make(
   ({ storageVolumeId }) => runCommand(DeleteStorageVolumeCommand.create({ storageVolumeId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.storageVolumeDelete));
 
+const cleanupRuntimeCommand = EffectCommand.make(
+  "cleanup-runtime",
+  {
+    storageVolumeId: storageVolumeIdArg,
+    serverId: serverOption,
+    before: beforeOption,
+    dryRun: dryRunOption,
+  },
+  ({ before, dryRun, serverId, storageVolumeId }) =>
+    runCommand(
+      CleanupStorageVolumeRuntimeCommand.create({
+        storageVolumeId,
+        serverId,
+        before,
+        dryRun: optionalValue(dryRun) !== "false",
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.storageVolumeCleanupRuntime));
+
 export const storageCommand = EffectCommand.make("storage").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.storage),
   EffectCommand.withSubcommands([
@@ -122,6 +145,7 @@ export const storageCommand = EffectCommand.make("storage").pipe(
         showCommand,
         renameCommand,
         deleteCommand,
+        cleanupRuntimeCommand,
       ]),
     ),
   ]),

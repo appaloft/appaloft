@@ -487,7 +487,10 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
   };
 }
 
-function runtimeLogLine(message: string): ResourceRuntimeLogEvent {
+function runtimeLogLine(
+  message: string,
+  timestamp = "2026-01-01T00:00:06.000Z",
+): ResourceRuntimeLogEvent {
   return {
     kind: "line",
     line: {
@@ -496,7 +499,7 @@ function runtimeLogLine(message: string): ResourceRuntimeLogEvent {
       serviceName: "web",
       runtimeKind: "host-process",
       stream: "stdout",
-      timestamp: "2026-01-01T00:00:06.000Z",
+      timestamp,
       sequence: 1,
       message,
       masked: false,
@@ -591,6 +594,67 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).not.toContain("secret-token");
     expect(summary.system.databaseDriver).toBe("pglite");
     expect(summary.copy.json).not.toContain("databaseLocation");
+  });
+
+  test("[RT-MON-005][RES-DIAG-QRY-020] applies an observation window to diagnostic log evidence", async () => {
+    const context = createTestContext();
+    const { runtimeLogReader, service } = createService({
+      deploymentLogs: [
+        {
+          timestamp: "2025-12-31T23:59:00.000Z",
+          source: "application",
+          phase: "deploy",
+          level: "info",
+          message: "outside deployment window",
+        },
+        {
+          timestamp: "2026-01-01T00:00:03.000Z",
+          source: "application",
+          phase: "deploy",
+          level: "error",
+          message: "inside deployment window secret-token",
+        },
+      ],
+      runtimeLogEvents: [
+        runtimeLogLine("outside runtime window", "2025-12-31T23:59:00.000Z"),
+        runtimeLogLine("inside runtime window secret-token", "2026-01-01T00:00:06.000Z"),
+        {
+          kind: "closed",
+          reason: "source-ended",
+        },
+      ],
+    });
+    const query = ResourceDiagnosticSummaryQuery.create({
+      resourceId: "res_web",
+      includeDeploymentLogTail: true,
+      includeRuntimeLogTail: true,
+      includeProxyConfiguration: false,
+      observationFrom: "2026-01-01T00:00:00.000Z",
+      observationTo: "2026-01-01T00:01:00.000Z",
+      tailLines: 20,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(runtimeLogReader.calls[0]).toMatchObject({
+      since: "2026-01-01T00:00:00.000Z",
+      tailLines: 20,
+    });
+    expect(summary.context.observationWindow).toEqual({
+      from: "2026-01-01T00:00:00.000Z",
+      to: "2026-01-01T00:01:00.000Z",
+    });
+    expect(summary.deploymentLogs.lines.map((line) => line.message)).toEqual([
+      "inside deployment window ********",
+    ]);
+    expect(summary.runtimeLogs.lines.map((line) => line.message)).toEqual([
+      "inside runtime window ********",
+    ]);
+    expect(summary.copy.json).toContain('"observationWindow"');
+    expect(summary.copy.json).not.toContain("outside deployment window");
+    expect(summary.copy.json).not.toContain("outside runtime window");
   });
 
   test("[EDGE-PROXY-ROUTE-005][ACCESS-DIAG-002] includes server-applied route access in diagnostics", async () => {

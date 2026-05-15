@@ -28,6 +28,9 @@ import {
   type ProcessAttemptCompletionResult,
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
+  type RuntimeMonitoringSamplePruneInput,
+  type RuntimeMonitoringSamplePruneStoreResult,
+  type RuntimeMonitoringSampleRetentionStore,
 } from "../src/ports";
 
 class RecordingCommandBus implements Pick<CommandBus, "execute"> {
@@ -134,6 +137,27 @@ class RecordingProcessAttemptCompleter implements ProcessAttemptCompleter {
   }
 }
 
+class RecordingRuntimeMonitoringSampleRetentionStore
+  implements RuntimeMonitoringSampleRetentionStore
+{
+  readonly inputs: RuntimeMonitoringSamplePruneInput[] = [];
+
+  constructor(
+    private readonly result: Result<RuntimeMonitoringSamplePruneStoreResult> = ok({
+      matchedCount: 2,
+      prunedCount: 0,
+    }),
+  ) {}
+
+  async prune(
+    _context: RepositoryContext,
+    input: RuntimeMonitoringSamplePruneInput,
+  ): Promise<Result<RuntimeMonitoringSamplePruneStoreResult>> {
+    this.inputs.push(input);
+    return this.result;
+  }
+}
+
 function retentionDefault(overrides: Partial<RetentionDefaultRecord> = {}): RetentionDefaultRecord {
   return {
     id: "rdf_primary",
@@ -159,11 +183,15 @@ function createService(input: {
   recorder?: MemoryProcessAttemptRecorder;
   claimer?: RecordingProcessAttemptClaimer;
   completer?: RecordingProcessAttemptCompleter;
+  runtimeMonitoringSampleRetentionStore?: RecordingRuntimeMonitoringSampleRetentionStore;
 }) {
   const commandBus = input.commandBus ?? new RecordingCommandBus();
   const recorder = input.recorder ?? new MemoryProcessAttemptRecorder();
   const claimer = input.claimer ?? new RecordingProcessAttemptClaimer();
   const completer = input.completer ?? new RecordingProcessAttemptCompleter();
+  const runtimeMonitoringSampleRetentionStore =
+    input.runtimeMonitoringSampleRetentionStore ??
+    new RecordingRuntimeMonitoringSampleRetentionStore();
   const service = new ScheduledHistoryRetentionService(
     commandBus,
     input.repository,
@@ -172,8 +200,16 @@ function createService(input: {
     completer,
     new TestSequenceIdGenerator(),
     new FixedClock("2026-02-01T00:05:00.000Z"),
+    runtimeMonitoringSampleRetentionStore,
   );
-  return { service, commandBus, recorder, claimer, completer };
+  return {
+    service,
+    commandBus,
+    recorder,
+    claimer,
+    completer,
+    runtimeMonitoringSampleRetentionStore,
+  };
 }
 
 describe("scheduled history retention", () => {
@@ -229,6 +265,50 @@ describe("scheduled history retention", () => {
     });
   });
 
+  test("[SCHED-HISTORY-RETENTION-006] limits scheduled retention policy batches", async () => {
+    const repository = new MemoryRetentionDefaultRepository();
+    await repository.upsert(
+      setupRepositoryContext,
+      retentionDefault({ id: "rdf_audit", category: "audit-rows" }),
+    );
+    await repository.upsert(
+      setupRepositoryContext,
+      retentionDefault({ id: "rdf_domain_events", category: "domain-event-streams" }),
+    );
+    await repository.upsert(
+      setupRepositoryContext,
+      retentionDefault({ id: "rdf_provider_logs", category: "provider-job-logs" }),
+    );
+    const { service, commandBus, recorder } = createService({ repository });
+    const context = createExecutionContext({
+      requestId: "req_scheduled_history_retention_limit",
+      entrypoint: "system",
+    });
+
+    const result = await service.run(context, {
+      scheduledAt: "2026-02-01T00:00:00.000Z",
+      limit: 2,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      inspectedPolicyCount: 2,
+      dispatchedCount: 2,
+      skippedCount: 0,
+      dispatches: [
+        { policyId: "rdf_audit", operationKey: "audit-events.prune" },
+        { policyId: "rdf_domain_events", operationKey: "domain-events.prune" },
+      ],
+    });
+    expect(commandBus.commands).toHaveLength(2);
+    expect(commandBus.commands[0]).toBeInstanceOf(PruneAuditEventsCommand);
+    expect(commandBus.commands[1]).toBeInstanceOf(PruneDomainEventsCommand);
+    expect(recorder.attempts.map((attempt) => attempt.safeDetails?.policyId)).toEqual([
+      "rdf_audit",
+      "rdf_domain_events",
+    ]);
+  });
+
   test("[SCHED-HISTORY-RETENTION-002] destructive scheduled retention is category-policy-gated", async () => {
     const repository = new MemoryRetentionDefaultRepository();
     await repository.upsert(
@@ -259,6 +339,70 @@ describe("scheduled history retention", () => {
       category: "domain-event-streams",
       dryRun: false,
       status: "dispatched",
+    });
+  });
+
+  test("[RT-MON-001][SCHED-HISTORY-RETENTION-001] dispatches runtime monitoring sample retention through the prune store", async () => {
+    const repository = new MemoryRetentionDefaultRepository();
+    await repository.upsert(
+      setupRepositoryContext,
+      retentionDefault({
+        id: "rdf_runtime_samples",
+        category: "runtime-monitoring-samples",
+      }),
+    );
+    const { service, commandBus, recorder, completer, runtimeMonitoringSampleRetentionStore } =
+      createService({ repository });
+    const context = createExecutionContext({
+      requestId: "req_scheduled_history_retention_runtime_samples",
+      entrypoint: "system",
+    });
+
+    const result = await service.run(context, { scheduledAt: "2026-02-01T00:00:00.000Z" });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      inspectedPolicyCount: 1,
+      dispatchedCount: 1,
+      skippedCount: 0,
+      dispatches: [
+        {
+          category: "runtime-monitoring-samples",
+          policyId: "rdf_runtime_samples",
+          processAttemptId: "wrk_0001",
+          operationKey: "runtime-monitoring.samples.prune",
+          before: "2026-01-02T00:00:00.000Z",
+          dryRun: true,
+          status: "dispatched",
+        },
+      ],
+    });
+    expect(commandBus.commands).toHaveLength(0);
+    expect(runtimeMonitoringSampleRetentionStore.inputs).toEqual([
+      {
+        before: "2026-01-02T00:00:00.000Z",
+        dryRun: true,
+      },
+    ]);
+    expect(recorder.attempts[0]).toMatchObject({
+      id: "wrk_0001",
+      operationKey: "runtime-monitoring.samples.prune",
+      status: "pending",
+      safeDetails: {
+        category: "runtime-monitoring-samples",
+        operationKey: "runtime-monitoring.samples.prune",
+      },
+    });
+    expect(completer.completions[0]).toMatchObject({
+      attemptId: "wrk_0001",
+      status: "succeeded",
+      step: "runtime-monitoring.samples.prune",
+      safeDetails: {
+        category: "runtime-monitoring-samples",
+        operationKey: "runtime-monitoring.samples.prune",
+        matchedCount: 2,
+        prunedCount: 0,
+      },
     });
   });
 

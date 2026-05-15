@@ -90,6 +90,7 @@ import {
   type StorageVolumeKind,
   type StorageVolumeMutationSpec,
   type StorageVolumeSelectionSpec,
+  type StorageVolumeState,
   type TargetKind,
   type TlsMode,
   type VariableExposure,
@@ -124,6 +125,44 @@ export interface AppLogger {
 
 export interface EventBus {
   publish(context: ExecutionContext, events: DomainEvent[]): Promise<void>;
+}
+
+export type MaintenanceWorkerKey =
+  | "certificate-retry-scheduler"
+  | "preview-expiry-cleanup-scheduler"
+  | "preview-cleanup-retry-scheduler"
+  | "scheduled-task-runner"
+  | "scheduled-runtime-prune-runner"
+  | "scheduled-history-retention-runner"
+  | "runtime-monitoring-collector-runner";
+
+export type MaintenanceWorkerActivation = "disabled-by-config" | "starts-with-backend-service";
+
+export type MaintenanceWorkerSafetyMode =
+  | "certificate-retry"
+  | "preview-expiry-cleanup"
+  | "preview-cleanup-retry"
+  | "runtime-execution"
+  | "policy-gated-prune"
+  | "policy-gated-retention"
+  | "read-only-collection";
+
+export interface MaintenanceWorkerStatus {
+  key: MaintenanceWorkerKey;
+  label: string;
+  enabled: boolean;
+  activation: MaintenanceWorkerActivation;
+  safetyMode: MaintenanceWorkerSafetyMode;
+  intervalSeconds: number;
+  batchSize?: number;
+  defaultRetryDelaySeconds?: number;
+  rawRetentionHours?: number;
+  configurationKeys: string[];
+  operationKeys: string[];
+}
+
+export interface MaintenanceWorkerStatusReader {
+  list(): MaintenanceWorkerStatus[];
 }
 
 export type CoordinationScopeKind =
@@ -1727,6 +1766,266 @@ export interface RuntimeUsageInspector {
   ): Promise<Result<RuntimeUsageInspection>>;
 }
 
+export type RuntimeMonitoringScope = RuntimeUsageScope;
+export type RuntimeMonitoringSignal = "cpu" | "memory" | "disk" | "inode" | "docker" | "network";
+export type RuntimeMonitoringBucket = "minute" | "five-minute" | "hour";
+
+export interface RuntimeMonitoringWindow {
+  from: string;
+  to: string;
+}
+
+export interface RuntimeMonitoringRetentionSummary {
+  rawRetentionHours: number;
+  retainedFrom?: string;
+  retainedTo?: string;
+}
+
+export interface RuntimeMonitoringSafeLabels {
+  providerKey?: string;
+  artifactKind?: RuntimeUsageArtifactKind;
+  runtimeId?: string;
+}
+
+export interface RuntimeMonitoringScopeEvidence {
+  scope: RuntimeMonitoringScope;
+  serverId?: string;
+  projectId?: string;
+  environmentId?: string;
+  resourceId?: string;
+  deploymentId?: string;
+}
+
+export interface RuntimeMonitoringWarning {
+  code:
+    | "missing-samples"
+    | "partial-window"
+    | "stale-samples"
+    | "missing-metric-source"
+    | "outside-retention";
+  message: string;
+  signal?: RuntimeMonitoringSignal;
+  scope?: RuntimeMonitoringScope;
+}
+
+export interface RuntimeMonitoringSourceError {
+  source: "monitoring-store" | "collector" | "read-model" | "unknown";
+  code: string;
+  message: string;
+  retriable: boolean;
+}
+
+export interface RuntimeMonitoringSample {
+  sampleId: string;
+  observedAt: string;
+  collectedAt: string;
+  scopeEvidence: RuntimeMonitoringScopeEvidence;
+  totals: RuntimeUsageTotals;
+  freshness: RuntimeUsageFreshness;
+  partial: boolean;
+  labels: RuntimeMonitoringSafeLabels;
+  warnings: RuntimeMonitoringWarning[];
+  sourceErrors: RuntimeMonitoringSourceError[];
+}
+
+export interface RuntimeMonitoringSamplesReadInput {
+  scope: RuntimeMonitoringScope;
+  window: RuntimeMonitoringWindow;
+  signals?: RuntimeMonitoringSignal[];
+  limit: number;
+}
+
+export interface RuntimeMonitoringSamplesReadResult {
+  retention: RuntimeMonitoringRetentionSummary;
+  samples: RuntimeMonitoringSample[];
+  warnings: RuntimeMonitoringWarning[];
+  sourceErrors: RuntimeMonitoringSourceError[];
+}
+
+export interface RuntimeMonitoringSamplePruneInput {
+  before: string;
+  scope?: RuntimeMonitoringScope;
+  limit?: number;
+  dryRun: boolean;
+}
+
+export interface RuntimeMonitoringSamplePruneStoreResult {
+  matchedCount: number;
+  prunedCount: number;
+}
+
+export interface RuntimeMonitoringSampleRecord extends RuntimeMonitoringSample {
+  retainedUntil: string;
+}
+
+export interface RuntimeMonitoringSampleWriteStore {
+  record(
+    context: RepositoryContext,
+    sample: RuntimeMonitoringSampleRecord,
+  ): Promise<Result<RuntimeMonitoringSample>>;
+}
+
+export interface RuntimeMonitoringSampleReadModel {
+  listSamples(
+    context: ExecutionContext,
+    input: RuntimeMonitoringSamplesReadInput,
+  ): Promise<Result<RuntimeMonitoringSamplesReadResult>>;
+}
+
+export interface RuntimeMonitoringSamplesWindow {
+  schemaVersion: "runtime-monitoring.samples.list/v1";
+  scope: RuntimeMonitoringScope;
+  from: string;
+  to: string;
+  generatedAt: string;
+  freshness: RuntimeUsageFreshness;
+  partial: boolean;
+  retention: RuntimeMonitoringRetentionSummary;
+  samples: RuntimeMonitoringSample[];
+  warnings: RuntimeMonitoringWarning[];
+  sourceErrors: RuntimeMonitoringSourceError[];
+}
+
+export interface RuntimeMonitoringSeriesPoint {
+  from: string;
+  to: string;
+  sampleCount: number;
+  totals: RuntimeUsageTotals;
+}
+
+export interface RuntimeMonitoringSeries {
+  signal: RuntimeMonitoringSignal;
+  points: RuntimeMonitoringSeriesPoint[];
+}
+
+export interface RuntimeMonitoringContributor {
+  scope: RuntimeMonitoringScope;
+  totals: RuntimeUsageTotals;
+  sampleCount: number;
+}
+
+export interface RuntimeMonitoringDeploymentMarker {
+  deploymentId: string;
+  resourceId?: string;
+  environmentId?: string;
+  observedAt: string;
+  status: string;
+  label: string;
+  correlation: "time";
+}
+
+export interface RuntimeMonitoringMarkerReadModel {
+  listDeploymentMarkers(
+    context: ExecutionContext,
+    input: { scope: RuntimeMonitoringScope; window: RuntimeMonitoringWindow },
+  ): Promise<Result<RuntimeMonitoringDeploymentMarker[]>>;
+}
+
+export interface RuntimeMonitoringRollup {
+  schemaVersion: "runtime-monitoring.rollup/v1";
+  scope: RuntimeMonitoringScope;
+  from: string;
+  to: string;
+  bucket: RuntimeMonitoringBucket;
+  generatedAt: string;
+  freshness: RuntimeUsageFreshness;
+  partial: boolean;
+  retention: RuntimeMonitoringRetentionSummary;
+  series: RuntimeMonitoringSeries[];
+  totals: RuntimeUsageTotals;
+  topContributors: RuntimeMonitoringContributor[];
+  deploymentMarkers: RuntimeMonitoringDeploymentMarker[];
+  warnings: RuntimeMonitoringWarning[];
+  sourceErrors: RuntimeMonitoringSourceError[];
+}
+
+export type RuntimeMonitoringThresholdMetric =
+  | "containerCpuPercent"
+  | "loadAverage1m"
+  | "containerUsedBytes"
+  | "usedBytes"
+  | "attributedBytes"
+  | "used"
+  | "imageBytes"
+  | "buildCacheBytes"
+  | "containerWritableBytes"
+  | "rxBytes"
+  | "txBytes";
+
+export interface RuntimeMonitoringThresholdRule {
+  ruleId: string;
+  signal: RuntimeMonitoringSignal;
+  metric: RuntimeMonitoringThresholdMetric;
+  warning?: number;
+  critical?: number;
+  comparator: "greater-than-or-equal";
+}
+
+export interface RuntimeMonitoringThresholdPolicyRecord {
+  policyId: string;
+  scope: RuntimeMonitoringScope;
+  rules: RuntimeMonitoringThresholdRule[];
+  enabled: boolean;
+  updatedAt: string;
+  updatedByActorId?: string;
+  updatedByActorKind?: "deploy-token" | "system" | "user";
+}
+
+export interface RuntimeMonitoringThresholdPolicyRead {
+  schemaVersion: "runtime-monitoring-thresholds.policy/v1";
+  policyId: string;
+  scope: RuntimeMonitoringScope;
+  rules: RuntimeMonitoringThresholdRule[];
+  enabled: boolean;
+  updatedAt: string;
+  updatedByActorId?: string;
+  updatedByActorKind?: "deploy-token" | "system" | "user";
+}
+
+export interface RuntimeMonitoringThresholdCrossing {
+  ruleId: string;
+  signal: RuntimeMonitoringSignal;
+  metric: RuntimeMonitoringThresholdMetric;
+  severity: "warning" | "critical";
+  observedValue: number;
+  boundary: number;
+}
+
+export interface RuntimeMonitoringThresholdEvaluation {
+  state: "ok" | "warning" | "critical" | "stale" | "unknown";
+  evaluatedAt?: string;
+  sourceSampleId?: string;
+  crossed: RuntimeMonitoringThresholdCrossing[];
+  nextActions: Array<
+    | "inspect-runtime-usage"
+    | "open-runtime-monitoring"
+    | "inspect-capacity"
+    | "review-runtime-logs"
+    | "review-deployment-events"
+    | "configure-thresholds"
+  >;
+  sourceErrors: RuntimeMonitoringSourceError[];
+}
+
+export interface RuntimeMonitoringThresholdsReadback {
+  schemaVersion: "runtime-monitoring-thresholds.show/v1";
+  scope: RuntimeMonitoringScope;
+  generatedAt: string;
+  policy: RuntimeMonitoringThresholdPolicyRead | null;
+  evaluation: RuntimeMonitoringThresholdEvaluation;
+}
+
+export interface RuntimeMonitoringThresholdPolicyRepository {
+  upsert(
+    context: RepositoryContext,
+    record: RuntimeMonitoringThresholdPolicyRecord,
+  ): Promise<Result<RuntimeMonitoringThresholdPolicyRecord>>;
+  findOne(
+    context: RepositoryContext,
+    input: { policyId?: string; scope?: RuntimeMonitoringScope },
+  ): Promise<Result<RuntimeMonitoringThresholdPolicyRecord | null>>;
+}
+
 export type RuntimeTargetCapacityPruneCategory =
   | "stopped-containers"
   | "preview-workspaces"
@@ -1793,6 +2092,104 @@ export interface RuntimeTargetCapacityPruner {
       dryRun: boolean;
     },
   ): Promise<Result<RuntimeTargetCapacityPruneResult>>;
+}
+
+export type StorageRuntimeCleanupCandidateKind = "named-volume" | "bind-mount";
+
+export type StorageRuntimeCleanupCandidateAction = "matched" | "cleaned" | "skipped" | "blocked";
+
+export type StorageRuntimeCleanupBlockedReason =
+  | "active-attachment"
+  | "active-runtime"
+  | "retained-snapshot"
+  | "rollback-candidate"
+  | "backup-restore-in-flight"
+  | "backup-retention"
+  | "bind-mount-unsupported"
+  | "provider-blocked"
+  | "cutoff-not-reached"
+  | "ownership-unproven"
+  | "safety-evidence-missing";
+
+export interface StorageRuntimeCleanupCandidate {
+  id: string;
+  kind: StorageRuntimeCleanupCandidateKind;
+  target: string;
+  updatedAt: string | null;
+  action: StorageRuntimeCleanupCandidateAction;
+  blockedReason?: StorageRuntimeCleanupBlockedReason;
+}
+
+export interface StorageRuntimeCleanupSummary {
+  inspectedCount: number;
+  matchedCount: number;
+  cleanedCount: number;
+  skippedCount: number;
+  blockedCount: number;
+}
+
+export interface StorageRuntimeCleanupWarning {
+  code: string;
+  message: string;
+  target?: string;
+}
+
+export interface StorageRuntimeCleanupSafetyEvidence {
+  activeAttachmentCount: number;
+  backupRetentionRequired: boolean;
+  backupRestoreInFlightCount: number;
+  retainedSnapshotCount: number;
+  rollbackCandidateCount: number;
+}
+
+export interface StorageVolumeBackupSafetyEvidence {
+  backupRetentionRequired: boolean;
+  backupRestoreInFlightCount: number;
+}
+
+export interface StorageVolumeBackupSafetyReader {
+  findSafetyEvidence(
+    context: RepositoryContext,
+    input: {
+      storageVolumeId: string;
+    },
+  ): Promise<Result<StorageVolumeBackupSafetyEvidence>>;
+}
+
+export interface StorageRuntimeCleanupResult {
+  schemaVersion: "storage-volumes.cleanup-runtime/v1";
+  storageVolume: {
+    id: string;
+    name: string;
+    kind: StorageVolumeKind;
+  };
+  server: {
+    id: string;
+    name: string;
+    host: string;
+    port: number;
+    providerKey: string;
+    targetKind: string;
+  };
+  before: string;
+  dryRun: boolean;
+  cleanedAt: string;
+  summary: StorageRuntimeCleanupSummary;
+  candidates: StorageRuntimeCleanupCandidate[];
+  warnings: StorageRuntimeCleanupWarning[];
+}
+
+export interface StorageRuntimeCleaner {
+  cleanup(
+    context: ExecutionContext,
+    input: {
+      server: DeploymentTargetState;
+      storageVolume: StorageVolumeState;
+      before: string;
+      dryRun: boolean;
+      safetyEvidence: StorageRuntimeCleanupSafetyEvidence;
+    },
+  ): Promise<Result<StorageRuntimeCleanupResult>>;
 }
 
 export interface ServerEdgeProxyBootstrapResult {
@@ -3757,6 +4154,10 @@ export interface ResourceDiagnosticContext {
     kind: ResourceServiceKind;
   }>;
   networkProfile?: ResourceSummary["networkProfile"];
+  observationWindow?: {
+    from: string;
+    to: string;
+  };
 }
 
 export interface ResourceDiagnosticDeployment {
@@ -5969,6 +6370,22 @@ export interface PreviewCleanupRetryCandidateReader {
   ): Promise<PreviewCleanupRetryCandidate[]>;
 }
 
+export interface PreviewExpiredEnvironmentCandidate {
+  previewEnvironmentId: string;
+  resourceId: string;
+  expiresAt: string;
+}
+
+export interface PreviewExpiredEnvironmentCandidateReader {
+  listExpiredActive(
+    context: RepositoryContext,
+    input: {
+      now: string;
+      limit: number;
+    },
+  ): Promise<PreviewExpiredEnvironmentCandidate[]>;
+}
+
 export interface SourceEventPolicyCandidate {
   projectId: string;
   environmentId: string;
@@ -6108,6 +6525,13 @@ export interface DeploymentLogRetentionStore {
     context: RepositoryContext,
     input: DeploymentLogPruneInput,
   ): Promise<Result<DeploymentLogPruneStoreResult>>;
+}
+
+export interface RuntimeMonitoringSampleRetentionStore {
+  prune(
+    context: RepositoryContext,
+    input: RuntimeMonitoringSamplePruneInput,
+  ): Promise<Result<RuntimeMonitoringSamplePruneStoreResult>>;
 }
 
 export interface ResourceRuntimeLogArchiveStore {
@@ -6511,6 +6935,7 @@ export interface DependencyResourceBackupProviderInput {
   providerKey: string;
   providerResourceHandle?: string;
   connectionSecretValue?: string;
+  connection?: DependencyResourceProviderConnectionContext;
   attemptId: string;
   requestedAt: string;
 }
@@ -6529,12 +6954,21 @@ export interface DependencyResourceRestoreProviderInput {
   providerArtifactHandle: string;
   providerResourceHandle?: string;
   connectionSecretValue?: string;
+  connection?: DependencyResourceProviderConnectionContext;
   restoreAttemptId: string;
   requestedAt: string;
 }
 
 export interface DependencyResourceRestoreProviderResult {
   completedAt: string;
+}
+
+export interface DependencyResourceProviderConnectionContext {
+  host?: string;
+  port?: number;
+  databaseName?: string;
+  maskedConnection?: string;
+  secretRef?: string;
 }
 
 export interface DependencyResourceBackupProviderPort {
@@ -6643,6 +7077,7 @@ export interface RequestedDeploymentConfig {
   pathPrefix?: string;
   tlsMode?: TlsMode;
   accessRoutes?: RequestedAccessRouteConfig[];
+  storageMounts?: RequestedDeploymentStorageMount[];
 }
 
 export interface RequestedDeploymentHealthCheck {
@@ -6676,6 +7111,15 @@ export interface RequestedDeploymentAccessContext {
   upstreamProtocol: ResourceNetworkProtocol;
   routePurpose: "default-resource-access";
   pathPrefix?: string;
+}
+
+export interface RequestedDeploymentStorageMount {
+  attachmentId: string;
+  storageVolumeId: string;
+  storageVolumeKind: StorageVolumeKind;
+  sourcePath?: string;
+  destinationPath: string;
+  mountMode: "read-write" | "read-only";
 }
 
 export type DefaultAccessRoutePurpose = "default-resource-access" | "preview-access";

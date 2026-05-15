@@ -2,8 +2,9 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: accepted ADR/spec/plan/tasks; Test-First and Code Rounds remain open
+- Round: Code Round implemented
+- Artifact state: implemented for store-backed dependency secret storage, create/plan blocking,
+  local-shell/generic-SSH resolution, Docker Swarm secret materialization, and retained rotated refs
 - Roadmap target: Phase 7 / `0.9.0` beta, Day-Two Production Controls
 - Compatibility impact: `pre-1.0-policy`, durable secret storage and runtime execution behavior
   change for dependency resources and bindings
@@ -87,7 +88,8 @@ OpenAPI descriptions, Web views, CLI table output, lifecycle events, diagnostics
 ## Non-Goals
 
 - No dependency-specific fields on `deployments.create`.
-- No provider-native Redis realization.
+- No provider-native Redis realization in this behavior; managed Redis realization is governed by
+  [Redis Provider-Native Realization](../049-redis-provider-native-realization/spec.md).
 - No provider credential rotation or provider-native database password rotation.
 - No build-time dependency injection.
 - No file/reference injection modes beyond environment-variable delivery.
@@ -95,7 +97,7 @@ OpenAPI descriptions, Web views, CLI table output, lifecycle events, diagnostics
 - No deactivation of historical secret refs still needed by retained deployment snapshots or
   rollback candidates.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current implementation stores imported Postgres and Redis connection URLs through the
 `DependencyResourceSecretStore`, persists them in `dependency_resource_secrets`, and returns only

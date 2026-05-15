@@ -69,6 +69,15 @@ import { normalizeGeneratedDockerBuildAssetPath } from "./generated-docker-build
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 import { renderComposeOwnershipLabelOverrideScript } from "./compose-label-overrides";
+import {
+  runtimeTargetCapacityAwareFailureFields,
+} from "./runtime-target-failure-classification";
+import { createPreviewRuntimeArtifactCleanupPlan } from "./preview-artifact-cleanup";
+import {
+  dockerStorageMountsFromRuntimeMetadata,
+  dockerStorageVolumeRealizationsFromRuntimeMetadata,
+  renderDockerVolumeRealizationScript,
+} from "./storage-runtime-mounts";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -132,14 +141,6 @@ function redactSecrets(input: string, secrets: readonly string[] = []): string {
   return secrets.reduce(
     (text, secret) => (secret.length > 0 ? text.replaceAll(secret, "[redacted]") : text),
     input,
-  );
-}
-
-function isRuntimeTargetCapacityFailure(logs: readonly DeploymentLogEntry[]): boolean {
-  return logs.some((log) =>
-    /\b(no space left on device|enospc|disk quota exceeded|not enough space)\b/i.test(
-      log.message,
-    ),
   );
 }
 
@@ -681,7 +682,12 @@ export class SshExecutionBackend implements ExecutionBackend {
       metadata?: Record<string, string>;
     },
   ): Deployment {
-    const capacityFailure = isRuntimeTargetCapacityFailure(input.logs);
+    const failureFields = runtimeTargetCapacityAwareFailureFields({
+      logs: input.logs,
+      errorCode: input.errorCode,
+      ...(input.metadata ? { metadata: input.metadata } : {}),
+      serverId: deployment.toState().serverId.value,
+    });
     deployment.applyExecutionResult(
       FinishedAt.rehydrate(new Date().toISOString()),
       ExecutionResult.rehydrate({
@@ -689,22 +695,8 @@ export class SshExecutionBackend implements ExecutionBackend {
         status: ExecutionStatusValue.rehydrate("failed"),
         logs: input.logs,
         retryable: input.retryable ?? false,
-        errorCode: ErrorCodeText.rehydrate(
-          capacityFailure ? "runtime_target_resource_exhausted" : input.errorCode,
-        ),
-        ...(input.metadata || capacityFailure
-          ? {
-              metadata: {
-                ...(input.metadata ?? {}),
-                ...(capacityFailure
-                  ? {
-                      capacityResource: "disk",
-                      capacityInspectCommand: `appaloft server capacity inspect ${deployment.toState().serverId.value}`,
-                    }
-                  : {}),
-              },
-            }
-          : {}),
+        errorCode: ErrorCodeText.rehydrate(failureFields.errorCode),
+        ...(failureFields.metadata ? { metadata: failureFields.metadata } : {}),
       }),
     );
     return deployment;
@@ -1933,6 +1925,80 @@ export class SshExecutionBackend implements ExecutionBackend {
         ...appaloftDockerContainerLabelsForDeployment(state),
         ...(proxyRoutePlanResult.value?.labels ?? []),
       ]);
+      const storageMounts = dockerStorageMountsFromRuntimeMetadata(state.runtimePlan.execution.metadata);
+      if (storageMounts.isErr()) {
+        const message = "Storage mounts could not be rendered for SSH Docker";
+        logs.push(phaseLog("deploy", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: storageMounts.error.code,
+            retryable: storageMounts.error.retryable,
+            metadata: {
+              host: target.host,
+              ...prepared.source.metadata,
+              message: storageMounts.error.message,
+              phase: "storage-runtime-realization",
+            },
+          }),
+        });
+      }
+      const storageVolumeRealizations = dockerStorageVolumeRealizationsFromRuntimeMetadata(
+        state.runtimePlan.execution.metadata,
+      );
+      if (storageVolumeRealizations.isErr()) {
+        const message = "Storage volume realization could not be rendered for SSH Docker";
+        logs.push(phaseLog("deploy", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: storageVolumeRealizations.error.code,
+            retryable: storageVolumeRealizations.error.retryable,
+            metadata: {
+              host: target.host,
+              ...prepared.source.metadata,
+              message: storageVolumeRealizations.error.message,
+              phase: "storage-runtime-realization",
+            },
+          }),
+        });
+      }
+      const realizeStorageVolumesCommand = renderDockerVolumeRealizationScript({
+        realizations: storageVolumeRealizations.value,
+        quote: shellQuote,
+      });
+      if (realizeStorageVolumesCommand.length > 0) {
+        logs.push(phaseLog("deploy", "Realize SSH Docker storage volumes with Appaloft ownership labels"));
+        const realizeStorageVolumes = await this.runRemoteCommandStreaming({
+          target,
+          command: realizeStorageVolumesCommand,
+          cwd: runtimeDir,
+          env: runtimeExecutionEnv,
+          redactions: runtimeRedactions,
+          onOutput: this.createStreamingOutputSink(logs, {
+            context,
+            deploymentId: state.id.value,
+            phase: "deploy",
+          }),
+        });
+        if (realizeStorageVolumes.failed) {
+          const message = "SSH Docker storage volumes could not be realized";
+          logs.push(phaseLog("deploy", message, "error"));
+          return ok({
+            deployment: this.applyFailure(deployment, {
+              logs,
+              errorCode: "ssh_docker_storage_volume_realization_failed",
+              retryable: true,
+              metadata: {
+                host: target.host,
+                ...prepared.source.metadata,
+                message,
+                phase: "storage-runtime-realization",
+              },
+            }),
+          });
+        }
+      }
       const usesDirectHostPort =
         state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port";
       const supersededDeploymentIds = supersededDeploymentIdsForCleanup(state);
@@ -1954,6 +2020,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           containerName,
           env: dockerEnvVariables,
           labels,
+          mounts: storageMounts.value,
           ...(proxyRoutePlanResult.value?.networkName
             ? { networkName: proxyRoutePlanResult.value.networkName }
             : {}),
@@ -2518,6 +2585,50 @@ export class SshExecutionBackend implements ExecutionBackend {
       const composeOwnershipLabels = dockerLabelsFromAssignments(
         appaloftDockerContainerLabelsForDeployment(state),
       );
+      const storageMounts = dockerStorageMountsFromRuntimeMetadata(state.runtimePlan.execution.metadata);
+      if (storageMounts.isErr()) {
+        const message = "Storage mounts could not be rendered for SSH Docker Compose";
+        logs.push(phaseLog("deploy", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: storageMounts.error.code,
+            retryable: storageMounts.error.retryable,
+            metadata: {
+              host: target.host,
+              remoteWorkdir,
+              composeFile: remoteComposeFile,
+              composeProjectName: runtimeInstanceNames.composeProjectName,
+              message: storageMounts.error.message,
+              phase: "storage-runtime-realization",
+              ...prepared.source.metadata,
+            },
+          }),
+        });
+      }
+      const storageVolumeRealizations = dockerStorageVolumeRealizationsFromRuntimeMetadata(
+        state.runtimePlan.execution.metadata,
+      );
+      if (storageVolumeRealizations.isErr()) {
+        const message = "Storage volume realization could not be rendered for SSH Docker Compose";
+        logs.push(phaseLog("deploy", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: storageVolumeRealizations.error.code,
+            retryable: storageVolumeRealizations.error.retryable,
+            metadata: {
+              host: target.host,
+              remoteWorkdir,
+              composeFile: remoteComposeFile,
+              composeProjectName: runtimeInstanceNames.composeProjectName,
+              message: storageVolumeRealizations.error.message,
+              phase: "storage-runtime-realization",
+              ...prepared.source.metadata,
+            },
+          }),
+        });
+      }
       logs.push(phaseLog("deploy", "Generate Appaloft compose ownership labels override"));
       const composeOverride = await this.runRemoteCommandStreaming({
         target,
@@ -2525,6 +2636,8 @@ export class SshExecutionBackend implements ExecutionBackend {
           composeFile: remoteComposeFile,
           overrideFile: remoteComposeOwnershipOverrideFile,
           labels: composeOwnershipLabels,
+          mounts: storageMounts.value,
+          volumeRealizations: storageVolumeRealizations.value,
           quote: shellQuote,
         }),
         cwd: runtimeDir,
@@ -2679,6 +2792,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     const containerName = metadata.containerName ?? runtimeInstanceNames.containerName;
     const remoteRoot = this.remoteRuntimeDirectory(state.id.value);
     const remoteWorkdir = metadata.remoteWorkdir ?? remoteSourceWorkdir(remoteRoot, state.runtimePlan.source.metadata);
+    const logs: DeploymentLogEntry[] = [];
 
     try {
       if (state.runtimePlan.execution.kind === "docker-container") {
@@ -2706,12 +2820,55 @@ export class SshExecutionBackend implements ExecutionBackend {
           });
         }
       }
+      const artifactCleanup = createPreviewRuntimeArtifactCleanupPlan({
+        deploymentId: state.id.value,
+        buildStrategy: state.runtimePlan.buildStrategy,
+        sourceKind: state.runtimePlan.source.kind,
+        executionKind: state.runtimePlan.execution.kind,
+        imageName: runtimeInstanceNames.imageName,
+        metadata,
+        remoteRuntimeRoot: remoteRoot,
+        remoteWorkdir,
+      });
+      if (artifactCleanup.remoteWorkdir) {
+        const workspaceCleanup = await this.runRemoteCommand({
+          target,
+          command: `rm -rf ${shellQuote(artifactCleanup.remoteWorkdir)}`,
+          cwd: runtimeDir,
+          env,
+          redactions,
+        });
+        if (workspaceCleanup.failed) {
+          return err(
+            domainError.infra("Preview SSH artifact cleanup failed", {
+              phase: "runtime-cleanup",
+              cleanupStage: "artifact-cleanup",
+              deploymentId: state.id.value,
+              remoteWorkdir: artifactCleanup.remoteWorkdir,
+              errorMessage: workspaceCleanup.reason ?? workspaceCleanup.stderr,
+            }),
+          );
+        }
+        logs.push(
+          phaseLog("deploy", `Removed SSH preview source workspace ${artifactCleanup.remoteWorkdir}`),
+        );
+      }
+      if (artifactCleanup.imageName) {
+        await this.runRemoteCommand({
+          target,
+          command: `docker image rm ${shellQuote(artifactCleanup.imageName)} >/dev/null 2>&1 || true`,
+          cwd: runtimeDir,
+          env,
+          redactions,
+        });
+        logs.push(phaseLog("deploy", `Removed SSH preview image ${artifactCleanup.imageName}`));
+      }
     } finally {
       this.cleanupPrivateKey(target);
     }
 
     const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
-    const logs = [
+    logs.unshift(
       phaseLog(
         "deploy",
         state.runtimePlan.execution.kind === "docker-container"
@@ -2720,7 +2877,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             ? `Stopped SSH compose stack ${composeFile}`
             : "No SSH cancellation cleanup required",
       ),
-    ];
+    );
     this.report(context, {
       deploymentId: state.id.value,
       phase: "deploy",

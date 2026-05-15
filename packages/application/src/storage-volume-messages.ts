@@ -1,3 +1,4 @@
+export * from "./operations/storage-volumes/cleanup-storage-volume-runtime.command";
 export * from "./operations/storage-volumes/create-storage-volume.command";
 export * from "./operations/storage-volumes/delete-storage-volume.command";
 export * from "./operations/storage-volumes/list-storage-volumes.query";

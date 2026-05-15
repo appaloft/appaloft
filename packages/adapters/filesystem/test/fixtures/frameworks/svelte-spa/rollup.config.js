@@ -1,4 +1,5 @@
-import svelte from "@rollup/plugin-svelte";
+import { nodeResolve } from "@rollup/plugin-node-resolve";
+import svelte from "rollup-plugin-svelte";
 
 export default {
   input: "src/main.js",
@@ -7,5 +8,5 @@ export default {
     format: "iife",
     name: "AppaloftFixture",
   },
-  plugins: [svelte()],
+  plugins: [svelte(), nodeResolve({ exportConditions: ["svelte"] })],
 };

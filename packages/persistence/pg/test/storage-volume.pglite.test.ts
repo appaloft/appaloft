@@ -110,6 +110,7 @@ describe("storage volume persistence", () => {
         .attachStorage({
           attachmentId: ResourceStorageAttachmentId.rehydrate("rsa_demo"),
           storageVolumeId: StorageVolumeId.rehydrate("stv_demo"),
+          storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
           destinationPath: StorageDestinationPath.rehydrate("/data"),
           mountMode: ResourceStorageMountModeValue.rehydrate("read-write"),
           attachedAt: createdAt,
@@ -128,6 +129,9 @@ describe("storage volume persistence", () => {
 
       expect(persistedResource?.toState().storageAttachments[0]?.destinationPath.value).toBe(
         "/data",
+      );
+      expect(persistedResource?.toState().storageAttachments[0]?.storageVolumeKind.value).toBe(
+        "named-volume",
       );
       expect(summary).toMatchObject({
         id: "stv_demo",

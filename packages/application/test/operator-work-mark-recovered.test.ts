@@ -188,7 +188,7 @@ describe("operator-work.mark-recovered", () => {
     const store = new MemoryProcessAttempts([
       failedAttempt({
         id: "wrk_scheduled_task_failed",
-        operationKey: "scheduled-task-runs.run-now",
+        operationKey: "scheduled-tasks.run-now",
         dedupeKey: "scheduled-task-run:str_failed",
         phase: "scheduled-task-run",
         step: "runtime-execution",
@@ -222,7 +222,7 @@ describe("operator-work.mark-recovered", () => {
         id: "wrk_scheduled_task_failed",
         kind: "runtime-maintenance",
         status: "succeeded",
-        operationKey: "scheduled-task-runs.run-now",
+        operationKey: "scheduled-tasks.run-now",
         dedupeKey: "scheduled-task-run:str_failed",
         correlationId: "corr_work",
         requestId: "req_work",

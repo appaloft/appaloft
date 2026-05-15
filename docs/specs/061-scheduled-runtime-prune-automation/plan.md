@@ -54,12 +54,12 @@
 - Contract/integration/unit: application policy resolver tests, persistence policy tests if storage
   is introduced, and runtime prune command reuse tests.
 
-## Risks And Migration Gaps
+## Risks And Governed Follow-Ups
 
 - Policy source and persistence are implemented for configured policy records, including
   `deployment-snapshot` scope.
 - Repository/deployment-snapshot config materialization is implemented for `retention.runtimePrune`
   in Appaloft deployment config. It writes the existing scheduled runtime prune policy record shape
   for the selected target and does not widen scheduled prune beyond runtime target capacity cleanup.
-- A first implementation must avoid broad retention automation for audit/events/logs until those
-  boundaries have their own governed scheduler specs.
+- The implemented worker avoids broad retention automation for audit/events/logs; those boundaries
+  are governed by their own scheduler specs.

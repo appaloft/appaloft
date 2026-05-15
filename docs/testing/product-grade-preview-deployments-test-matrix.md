@@ -50,11 +50,12 @@ admission, and durable cleanup retry state.
 | PG-PREVIEW-CONFIG-001 | integration | Scoped preview configuration | Policy defines preview-only variables, secret refs, and route/domain rules | Preview materialization uses only preview-scoped values and safe references; production secrets/routes are not copied by default | `validation_error` or `permission`, phase `preview-config-resolution` |
 | PG-PREVIEW-DEPLOY-001 | application | Deployment dispatch remains ids-only | Preview environment context is resolved | `deployments.create` receives only project/environment/resource/server/destination ids; PR, branch, source, route, and preview details remain read-model/process context | None |
 | PG-PREVIEW-FEEDBACK-001 | integration | Feedback idempotency and retry | Existing PR comment/check/status exists or provider update fails transiently | Feedback is updated in place when possible; retryable provider failures record feedback retry state without rewriting accepted deployment result | `provider_error`, phase `preview-feedback`, retriable by provider classification |
+| PG-PREVIEW-PROVIDER-001 | provider smoke | Live GitHub PR comment feedback gate | `APPALOFT_GITHUB_PREVIEW_PROVIDER_SMOKE=true` and GitHub smoke secrets identify a repository, pull request, and feedback token | The GitHub PR-comment writer creates or updates a marker comment through the live provider API, returns only safe provider feedback metadata, and the reusable Actions gate skips unless secrets exist or a manual run marks it required | `provider_error`, phase `preview-feedback`, retriable by provider classification |
 | PG-PREVIEW-CLEANUP-001 | process | Close/delete cleanup preserves history | PR is closed or `preview-environments.delete` is accepted for an active preview | Runtime, route desired state, source link, provider metadata, and feedback are cleaned or marked already clean; deployment history/audit remain readable | None |
-| PG-PREVIEW-CLEANUP-002 | process | Cleanup retry state | Runtime cleanup, provider metadata deletion, or feedback update fails transiently | Cleanup attempt records safe phase, attempt id, retry owner, next retry time, and sanitized detail; retry creates a new attempt id | `infra_error` or `provider_error`, phase `preview-cleanup-retry` |
+| PG-PREVIEW-CLEANUP-002 | process | Cleanup retry state | Runtime cleanup, provider metadata deletion, or feedback update fails transiently | Cleanup attempt records safe phase, attempt id, retry owner, next retry time, and sanitized detail; process-attempt retry generation creates a pending retry attempt; cleanup executes only after atomic claim and records completion or retry scheduling through process-attempt completion | `infra_error` or `provider_error`, phase `preview-cleanup-retry` |
 | PG-PREVIEW-SURFACE-001 | contract | Normalized surfaces and docs/help | Preview operations are exposed through API/oRPC, CLI, Web, or future MCP/tools | Surfaces use command/query schemas, i18n keys, stable help anchors, masked details, and Appaloft preview terminology rather than provider-native payloads. Web places previews under Resource detail by default and treats all-project preview pages as secondary rollups. | `validation_error`, phase `command-validation` for malformed input |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 `PG-PREVIEW-POLICY-001` and `PG-PREVIEW-POLICY-002` have initial application-service coverage in
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves normalized
@@ -72,7 +73,11 @@ secret scope counts only, no deployment dispatch, and no secret-name or provider
 files. The coverage proves active preview quota blocks new preview events with
 `preview_quota_exceeded`, safe quota details are projected, configured quota/TTL policy settings
 round-trip through persistence, and allowed preview lifecycle events derive/persist preview expiry
-from policy TTL when no explicit expiry is provided.
+from policy TTL when no explicit expiry is provided. It also covers TTL-driven cleanup scanning:
+`PreviewExpiryCleanupScheduler` reads expired active preview environments, dispatches cleanup
+through the existing preview cleanup service, skips future or already cleanup-requested previews,
+and the disabled-by-default shell runner executes under the durable `preview-lifecycle`
+coordination scope.
 `PG-PREVIEW-EVENT-001` has initial integration-boundary coverage in
 `packages/integrations/github/test/github-webhook.test.ts`. The coverage proves signed GitHub
 `pull_request` payloads normalize to safe preview facts, invalid signatures reject before
@@ -89,11 +94,12 @@ context is rejected before command dispatch when no policy reader mapping is ava
 `packages/application/test/product-grade-preview-policy.test.ts` also covers the preview command
 handler preserving safe GitHub provider repository id and installation id facts when handing the
 command to the preview ingest service.
-`PG-PREVIEW-EVENT-002` has initial application coverage in
+`PG-PREVIEW-EVENT-002` has application coverage in
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves duplicate
 source event ids return the existing preview policy decision and do not update preview environment
-state or dispatch another deployment request. Feedback and cleanup idempotency coverage remains
-blocked on those future process-state implementations.
+state or dispatch another deployment request. Feedback idempotency is covered by provider feedback
+key persistence and GitHub writer tests; cleanup idempotency is covered by source-scope lookup,
+durable preview environment state, and cleanup attempt retry tests below.
 `PG-PREVIEW-CONFIG-001` has initial application coverage in
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves preview
 scoped config resolution materializes no production secrets or durable routes by default, resolves
@@ -153,16 +159,20 @@ error text, so `operator-work.*` can see and repair the cleanup work.
 `packages/persistence/pg/test/preview-cleanup-attempt.pglite.test.ts`. The coverage proves durable
 cleanup attempt rows retain attempt id, preview environment id, Resource id, source fingerprint,
 owner, status, safe phase, retry timing, and safe error code without provider error text, tokens, or
-secret-shaped values. The same test proves the due retry reader returns only the latest due
-retry-scheduled attempt for a preview target. Application coverage also proves the retry scheduler
-reads due candidates and dispatches them through the cleanup service, creating a fresh cleanup
-attempt id for the retry. `packages/config/test/index.test.ts` covers the disabled-by-default shell
-runner config and environment overrides for preview cleanup retry scheduling.
+secret-shaped values; those rows remain compatibility cleanup history. Application coverage proves
+the retry scheduler reads due process-attempt retry candidates, generates a pending retry attempt
+with lineage, dispatches cleanup only after atomic process-attempt claim, and completes the process
+attempt as succeeded or retry-scheduled through process-attempt completion.
+`packages/config/test/index.test.ts` covers the disabled-by-default shell runner config and
+environment overrides for preview cleanup retry scheduling.
 `apps/shell/test/preview-cleanup-retry-scheduler-runner.test.ts` covers disabled runner behavior,
 system actor context, batch-size forwarding, and the in-process non-overlap guard that skips
 interval ticks while one scheduler run is active. It also proves enabled runner ticks execute under
 a durable `preview-lifecycle` mutation-coordinator lease keyed to the preview cleanup retry
-scheduler.
+scheduler while per-attempt delivery is guarded by process-attempt atomic claim/completion.
+`apps/shell/test/preview-expiry-cleanup-scheduler-runner.test.ts` covers the parallel
+expiry cleanup runner with disabled defaults, system actor context, batch-size forwarding, and the
+same durable `preview-lifecycle` lease.
 `apps/shell/test/preview-environment-cleaner.test.ts` covers the shell cleaner adapter that maps
 product-grade preview environment cleanup to the existing source-fingerprint
 `deployments.cleanup-preview` primitive and preserves retryable failures with safe preview scope
@@ -194,9 +204,9 @@ environment list/show/delete through `QueryBus` and `CommandBus`.
 configure/show through `CommandBus` and `QueryBus`.
 `packages/orpc/test/preview-environment.http.test.ts` covers the HTTP routes dispatching preview
 environment list/show/delete through `QueryBus` and `CommandBus`.
-`packages/ai/mcp/test/tool-descriptors.test.ts` covers generated future MCP tool descriptors for
-preview policy and preview environment operations using operation-key-derived names and shared
-CLI/API metadata.
+`packages/ai/mcp/test/tool-descriptors.test.ts` covers generated MCP/tool descriptors for preview
+policy and preview environment operations using operation-key-derived names and shared CLI/API
+metadata.
 `apps/web/src/lib/console/preview-policies.test.ts` covers the Web console preview policy
 entrypoint, project/resource scope selection, policy readback through
 `orpcClient.previewPolicies.show`, policy configuration through
@@ -207,7 +217,12 @@ list/detail/delete entrypoints, shared query helper binding to
 `orpcClient.previewEnvironments.list`, direct detail binding to
 `orpcClient.previewEnvironments.show`, cleanup dispatch through
 `orpcClient.previewEnvironments.delete`, navigation registration, product-grade preview help
-anchor, and typed oRPC client contract surface.
+anchor, and typed oRPC client contract surface. `apps/web/test/e2e-webview/home.webview.test.ts`
+now covers the primary Resource detail Previews tab with real WebView navigation, Resource-scoped
+`previewEnvironments.list` input, cleanup confirmation, `previewEnvironments.delete` dispatch, and
+no raw `deployments.cleanup-preview` Web call. It also covers the global preview environment view
+with real WebView navigation, unscoped `previewEnvironments.list`, detail
+`previewEnvironments.show`, and cleanup-backed `previewEnvironments.delete`.
 `PG-PREVIEW-SURFACE-001` now also has Postgres/PGlite persistence coverage in
 `packages/persistence/pg/test/preview-policy.pglite.test.ts` for project/resource-scoped policy
 storage, configured/default safe summaries, idempotency-key retention on the write side, and
@@ -222,10 +237,21 @@ blocking source updates after cleanup is requested.
 `packages/persistence/pg/test/preview-environment.pglite.test.ts`. The coverage proves scoped
 preview environment upsert, lookup by id/source scope, safe list/show read models, cleanup-request
 status readback, scoped delete, and owner Resource retention after delete.
+`PG-PREVIEW-SURFACE-001` also has a source-of-truth sync guard in
+`packages/application/test/product-grade-preview-policy.test.ts` to keep the Action-only workflow
+spec from describing active product-grade preview/control-plane capabilities as future work.
 
-Full GitHub App installation-token onboarding and provider smoke tests remain future public
-enablement work. Existing non-product-grade coverage belongs to Action-only PR previews and
-`deployments.cleanup-preview`.
+`PG-PREVIEW-PROVIDER-001` has secret-gated live provider coverage in
+`packages/integrations/github/test/github-preview-provider-smoke.test.ts`, exposed locally as
+`bun run smoke:preview-provider:github` and in GitHub Actions through
+`.github/workflows/preview-provider-e2e.yml`. The smoke requires
+`APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN`, `APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY`, and
+`APPALOFT_GITHUB_PREVIEW_SMOKE_PR`; nightly skips when they are absent, while a manual release can
+require the gate with `require_preview_provider_e2e=true`.
 
-Future hardening rounds should add provider smoke tests and GitHub App installation-token
-onboarding coverage after that public enablement decision is accepted.
+Full GitHub App installation-token onboarding and broader hosted provider smoke coverage remain
+governed public enablement work. Existing non-product-grade coverage belongs to Action-only PR
+previews and `deployments.cleanup-preview`.
+
+Future hardening rounds should expand provider smoke coverage and add GitHub App
+installation-token onboarding coverage after that public enablement decision is accepted.

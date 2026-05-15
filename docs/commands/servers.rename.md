@@ -156,7 +156,7 @@ All errors use [Deployment Target Lifecycle Error Spec](../errors/servers.lifecy
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Server detail provides a display-name text input/action for active and inactive servers. Deleted servers are not visible from normal detail. | Active when implemented |
+| Web | Server detail provides a display-name text input/action for active and inactive servers and dispatches the typed `servers.rename` oRPC client. Deleted servers are not visible from normal detail. | Active |
 | CLI | `appaloft server rename <serverId> --name <name> [--json]`. | Active |
 | oRPC / HTTP | `POST /api/servers/{serverId}/rename` using the command schema. | Active |
 | Repository config files | Not applicable. Repository config cannot rename deployment targets. | Not applicable |
@@ -171,10 +171,10 @@ Canonical event spec:
 
 ## Current Implementation Notes And Migration Gaps
 
-The intended first active implementation exposes API/oRPC and CLI closure and updates list/show
-read-model visibility. Web server detail may expose the rename action if the existing detail page
-can carry a small display-name form without broad redesign; otherwise the Web action is recorded as
-a migration gap while the detail page continues to show the renamed value after API/CLI changes.
+The active implementation exposes API/oRPC, CLI, and Web closure and updates list/show read-model
+visibility. Web server detail carries the display-name form for active and inactive servers,
+dispatches the same command schema through the typed oRPC client, and refreshes detail/list-visible
+name after success.
 
 ## Open Questions
 

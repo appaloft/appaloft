@@ -58,12 +58,17 @@
   - CLI/oRPC/HTTP route dispatch tests if input/output schemas change.
   - Operation catalog boundary tests for schema reuse and no generic operation.
 
-## Risks And Migration Gaps
+## Risks And Governed Follow-Ups
 
-- Durable process/outbox ownership is still incomplete globally. This Code Round uses a synchronous
-  hermetic provider adapter while preserving the durable attempt/status contract.
+- Durable process/outbox ownership is governed separately. This Code Round uses shell-local
+  provider realization/delete artifact materialization while preserving the durable
+  attempt/status contract external provider packages and later background workers must keep.
 - Backup/restore remains a separate Phase 7 slice; this work only preserves blockers and safe
   metadata needed by that loop.
-- Runtime environment injection remains deferred; binding readiness does not mean a running
-  workload has received a database URL.
-- Web/public documentation affordances remain a migration gap unless completed in the same PR.
+- Runtime environment injection is governed by ADR-040 and the dependency runtime secret value
+  resolution spec; this provider-native slice does not add dependency-specific deployment inputs.
+- Public docs/help coverage is complete through the dependency resource lifecycle topic.
+  Resource-detail managed-Postgres provision, external Postgres import, dependency rename/delete,
+  backup create/list/acknowledged restore, and bind/unbind Web affordances are implemented with
+  i18n and tests; scheduled backup policy, backup prune/delete, export/download, and cross-resource
+  restore remain later Web rounds.

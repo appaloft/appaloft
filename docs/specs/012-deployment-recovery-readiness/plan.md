@@ -132,14 +132,15 @@ Target public docs outcome:
   - `deployment-recovery-rollback-candidates`
 - CLI help, Web recovery panel help, API descriptions, and future MCP/tool descriptions should link
   to those anchors.
-- Locale state can start as a documented migration gap during Code Round but must be explicit.
+- Locale state can start as a documented governed follow-up during Code Round but must be explicit.
 
-## Risks And Migration Gaps
+## Risks And Governed Follow-Ups
 
 - Artifact retention is not yet a complete contract; rollback Code Round must not overclaim.
-- Existing deployment status/event names still include migration seams around canonical terminal
+- Existing deployment status/event names still include compatibility seams around canonical terminal
   events.
-- `deployments.create` still has acceptance-first migration gaps in current implementation.
+- `deployments.create` acceptance-first hardening is governed by the create workflow's current
+  implementation notes and must not be widened from the recovery readiness plan.
 - Stateful data rollback is intentionally out of scope and must be prominent in UI/CLI/docs.
 - Public write commands must not be enabled before readiness, errors, tests, and docs are aligned.
 

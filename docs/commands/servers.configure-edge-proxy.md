@@ -217,7 +217,7 @@ the configure implementation introduces a provider registry admission check in a
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Server detail should expose a select/radio control for active servers using `none`, `traefik`, and `caddy`; inactive/deleted servers show read-only status. | Active when implemented |
+| Web | Server detail exposes a proxy kind selector for active servers using `none`, `traefik`, and `caddy`, dispatches the typed `servers.configure-edge-proxy` oRPC client, and shows inactive/deleted servers as read-only. | Active |
 | CLI | `appaloft server proxy configure <serverId> --kind none\|traefik\|caddy [--json]`. | Active |
 | oRPC / HTTP | `POST /api/servers/{serverId}/edge-proxy/configuration` using the command schema. | Active |
 | Repository config files | Not applicable. Repository config cannot change deployment target identity or server-owned proxy intent. | Not applicable |
@@ -233,10 +233,10 @@ Canonical event spec:
 
 ## Current Implementation Notes And Migration Gaps
 
-The intended first active implementation exposes API/oRPC and CLI closure and updates list/show
-read-model visibility. Web server detail may expose the owner-scoped proxy kind selector if the
-existing detail page can carry it without broad redesign; otherwise the Web action is recorded as a
-migration gap while read-only proxy status remains visible.
+The active implementation exposes API/oRPC, CLI, and Web closure and updates list/show read-model
+visibility. Web server detail carries the owner-scoped proxy kind selector for active servers,
+dispatches the same command schema through the typed oRPC client, and keeps inactive/deleted
+servers read-only for this operation.
 
 The current code still uses `proxyKind` as provider-selection migration data. This command reuses
 that existing value object/enum seam and does not introduce provider-specific SDK types.

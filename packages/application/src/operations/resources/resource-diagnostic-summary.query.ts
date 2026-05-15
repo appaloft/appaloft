@@ -21,6 +21,8 @@ export class ResourceDiagnosticSummaryQuery extends Query<ResourceDiagnosticSumm
     public readonly includeProxyConfiguration: boolean,
     public readonly tailLines: number,
     public readonly deploymentId?: string,
+    public readonly observationFrom?: string,
+    public readonly observationTo?: string,
     public readonly locale?: string,
   ) {
     super();
@@ -38,6 +40,8 @@ export class ResourceDiagnosticSummaryQuery extends Query<ResourceDiagnosticSumm
           parsed.includeProxyConfiguration,
           parsed.tailLines,
           trimToUndefined(parsed.deploymentId),
+          trimToUndefined(parsed.observationFrom),
+          trimToUndefined(parsed.observationTo),
           trimToUndefined(parsed.locale),
         ),
     );

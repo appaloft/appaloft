@@ -102,6 +102,7 @@ describe("ScheduledHistoryRetentionRunner", () => {
       config: {
         enabled: false,
         intervalSeconds: 60,
+        batchSize: 25,
       },
       service,
       executionContextFactory: new FixedExecutionContextFactory(),
@@ -122,6 +123,7 @@ describe("ScheduledHistoryRetentionRunner", () => {
       config: {
         enabled: true,
         intervalSeconds: 60,
+        batchSize: 2,
       },
       service,
       executionContextFactory: new FixedExecutionContextFactory(),
@@ -134,6 +136,9 @@ describe("ScheduledHistoryRetentionRunner", () => {
 
     expect(service.calls).toHaveLength(1);
     expect(service.calls[0]).toMatchObject({
+      input: {
+        limit: 2,
+      },
       context: {
         entrypoint: "system",
         actor: {
@@ -170,6 +175,7 @@ describe("ScheduledHistoryRetentionRunner", () => {
       config: {
         enabled: true,
         intervalSeconds: 60,
+        batchSize: 25,
       },
       service,
       executionContextFactory: new FixedExecutionContextFactory(),

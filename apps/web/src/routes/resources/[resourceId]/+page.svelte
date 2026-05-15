@@ -10,6 +10,8 @@
     Check,
     Clipboard,
     Copy,
+    Database,
+    HardDrive,
     Globe2,
     Link2,
     Play,
@@ -25,7 +27,9 @@
   } from "@lucide/svelte";
   import type {
     ArchiveResourceInput,
+    AttachResourceStorageInput,
     CertificateSummary,
+    CleanupStorageVolumeRuntimeResponse,
     ConfigureResourceAutoDeployInput,
     ConfigureResourceAccessInput,
     ConfigureResourceHealthInput,
@@ -34,7 +38,12 @@
     ConfigureResourceSourceInput,
     ConfirmDomainBindingOwnershipInput,
     CreateDomainBindingInput,
+    CreateStorageVolumeInput,
     DeleteResourceInput,
+    DeleteStorageVolumeInput,
+    DependencyResourceBackupSummary,
+    DependencyResourceSummary,
+    DetachResourceStorageInput,
     DomainBindingSummary,
     ImportCertificateInput,
     ProxyConfigurationView,
@@ -45,6 +54,8 @@
     ResourceHealthOverall,
     ResourceRuntimeLogEvent,
     ResourceRuntimeLogLine,
+    ResourceDependencyBindingSummary,
+    ResourceStorageAttachmentSummary,
     ResourceSummary,
     ScheduledTaskDefinitionSummary,
     ScheduledTaskRunLogEntry,
@@ -53,9 +64,11 @@
     ScheduledTaskRunTriggerKind,
     SourceEventListItem,
     RestartResourceRuntimeInput,
+    RenameStorageVolumeInput,
     SetResourceVariableInput,
     StartResourceRuntimeInput,
     StopResourceRuntimeInput,
+    StorageVolumeSummary,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -87,7 +100,18 @@
     sourceEventRevisionLabel,
     sourceEventVisibleOutcomes,
   } from "$lib/console/source-events";
-  import { runtimeUsageQueryOptions } from "$lib/console/runtime-usage-query";
+  import {
+    runtimeMonitoringRollupQueryOptions,
+    runtimeMonitoringSamplesQueryOptions,
+    runtimeMonitoringThresholdsQueryOptions,
+    runtimeUsageQueryOptions,
+  } from "$lib/console/runtime-usage-query";
+  import {
+    runtimeMonitoringDeploymentInObservationWindow,
+    runtimeMonitoringObservationHandoffFromSearchParams,
+    runtimeMonitoringObservationHandoffMatchesScope,
+    runtimeMonitoringTimestampInObservationWindow,
+  } from "$lib/console/runtime-usage";
   import {
     findEnvironment,
     findProject,
@@ -145,6 +169,36 @@
   type ConfigureScheduledTaskInput = Parameters<typeof orpcClient.scheduledTasks.configure>[0];
   type DeleteScheduledTaskInput = Parameters<typeof orpcClient.scheduledTasks.delete>[0];
   type RunScheduledTaskNowInput = Parameters<typeof orpcClient.scheduledTasks.runNow>[0];
+  type ImportResourceVariablesInput = Parameters<typeof orpcClient.resources.importVariables>[0];
+  type BindResourceDependencyInput = Parameters<typeof orpcClient.resources.dependencyBindings.bind>[0];
+  type UnbindResourceDependencyInput = Parameters<typeof orpcClient.resources.dependencyBindings.unbind>[0];
+  type RotateResourceDependencyBindingSecretInput = Parameters<
+    typeof orpcClient.resources.dependencyBindings.rotateSecret
+  >[0];
+  type CleanupStorageVolumeRuntimeInput = Parameters<
+    typeof orpcClient.storageVolumes.cleanupRuntime
+  >[0];
+  type StorageRuntimeCleanupCandidate = CleanupStorageVolumeRuntimeResponse["candidates"][number];
+  type ProvisionPostgresDependencyResourceInput = Parameters<
+    typeof orpcClient.dependencyResources.provisionPostgres
+  >[0];
+  type ProvisionRedisDependencyResourceInput = Parameters<
+    typeof orpcClient.dependencyResources.provisionRedis
+  >[0];
+  type ImportPostgresDependencyResourceInput = Parameters<
+    typeof orpcClient.dependencyResources.importPostgres
+  >[0];
+  type ImportRedisDependencyResourceInput = Parameters<
+    typeof orpcClient.dependencyResources.importRedis
+  >[0];
+  type RenameDependencyResourceInput = Parameters<typeof orpcClient.dependencyResources.rename>[0];
+  type DeleteDependencyResourceInput = Parameters<typeof orpcClient.dependencyResources.delete>[0];
+  type CreateDependencyResourceBackupInput = Parameters<
+    typeof orpcClient.dependencyResources.createBackup
+  >[0];
+  type RestoreDependencyResourceBackupInput = Parameters<
+    typeof orpcClient.dependencyResources.restoreBackup
+  >[0];
   type RelinkSourceLinkInput = Parameters<typeof orpcClient.sourceLinks.relink>[0];
   type DomainRouteMode = "serve" | "redirect";
   type RedirectStatusText = "301" | "302" | "307" | "308";
@@ -152,6 +206,8 @@
     | "profile"
     | "auto-deploy"
     | "configuration"
+    | "storage"
+    | "dependencies"
     | "domains"
     | "usage"
     | "health"
@@ -173,6 +229,8 @@
     "profile",
     "auto-deploy",
     "configuration",
+    "storage",
+    "dependencies",
     "domains",
     "usage",
     "health",
@@ -190,6 +248,7 @@
     certificatesQuery,
   } = createConsoleQueries(browser);
   const resourceId = $derived(page.params.resourceId ?? "");
+  let dependencyBackupResourceId = $state("");
   const resourceDetailQuery = createQuery(() =>
     queryOptions({
       queryKey: ["resources", "show", resourceId],
@@ -277,14 +336,21 @@
       staleTime: 5_000,
     }),
   );
+  const resourceRuntimeScope = $derived({
+    kind: "resource" as const,
+    resourceId,
+  });
   const resourceRuntimeUsageQuery = createQuery(() =>
-    runtimeUsageQueryOptions(
-      {
-        kind: "resource",
-        resourceId,
-      },
-      browser && resourceId.length > 0,
-    ),
+    runtimeUsageQueryOptions(resourceRuntimeScope, browser && resourceId.length > 0),
+  );
+  const resourceRuntimeMonitoringSamplesQuery = createQuery(() =>
+    runtimeMonitoringSamplesQueryOptions(resourceRuntimeScope, browser && resourceId.length > 0),
+  );
+  const resourceRuntimeMonitoringRollupQuery = createQuery(() =>
+    runtimeMonitoringRollupQueryOptions(resourceRuntimeScope, browser && resourceId.length > 0),
+  );
+  const resourceRuntimeMonitoringThresholdsQuery = createQuery(() =>
+    runtimeMonitoringThresholdsQueryOptions(resourceRuntimeScope, browser && resourceId.length > 0),
   );
 
   const projects = $derived(projectsQuery.data?.items ?? []);
@@ -306,6 +372,64 @@
   const resourceDetail = $derived(resourceDetailQuery.data ?? null);
   const isResourceArchived = $derived(resourceDetail?.lifecycle.status === "archived");
   const resource = $derived(resourceDetail ? resourceSummaryFromDetail(resourceDetail) : null);
+  const resourceProjectId = $derived(resource?.projectId ?? "");
+  const resourceEnvironmentId = $derived(resource?.environmentId ?? "");
+  const storageVolumesQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "storage-volumes",
+        "resource-attach",
+        resourceProjectId,
+        resourceEnvironmentId,
+      ],
+      queryFn: () =>
+        orpcClient.storageVolumes.list({
+          projectId: resourceProjectId,
+          environmentId: resourceEnvironmentId,
+        }),
+      enabled: browser && resourceProjectId.length > 0 && resourceEnvironmentId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+  const dependencyResourcesQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "dependency-resources",
+        "resource-bind",
+        resourceProjectId,
+        resourceEnvironmentId,
+      ],
+      queryFn: () =>
+        orpcClient.dependencyResources.list({
+          projectId: resourceProjectId,
+          environmentId: resourceEnvironmentId,
+        }),
+      enabled: browser && resourceProjectId.length > 0 && resourceEnvironmentId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+  const resourceDependencyBindingsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["resource-dependency-bindings", resourceId],
+      queryFn: () =>
+        orpcClient.resources.dependencyBindings.list({
+          resourceId,
+        }),
+      enabled: browser && resourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+  const dependencyBackupsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["dependency-resource-backups", dependencyBackupResourceId],
+      queryFn: () =>
+        orpcClient.dependencyResources.listBackups({
+          dependencyResourceId: dependencyBackupResourceId,
+        }),
+      enabled: browser && dependencyBackupResourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const project = $derived(resource ? findProject(projects, resource.projectId) : null);
   const environment = $derived(
     resource ? findEnvironment(environments, resource.environmentId) : null,
@@ -317,6 +441,44 @@
   const resourceDeployments = $derived(
     resource ? deployments.filter((deployment) => deployment.resourceId === resource.id) : [],
   );
+  const runtimeMonitoringObservationHandoff = $derived(
+    runtimeMonitoringObservationHandoffFromSearchParams(page.url.searchParams),
+  );
+  const resourceRuntimeMonitoringObservationHandoff = $derived.by(() => {
+    const handoff = runtimeMonitoringObservationHandoff;
+    const currentResourceId = resource?.id ?? "";
+    if (!currentResourceId) {
+      return null;
+    }
+
+    return runtimeMonitoringObservationHandoffMatchesScope(handoff, {
+      kind: "resource",
+      resourceId: currentResourceId,
+    })
+      ? handoff
+      : null;
+  });
+  const resourceDeploymentsInObservationWindow = $derived(
+    resourceRuntimeMonitoringObservationHandoff
+      ? resourceDeployments.filter((deployment) =>
+          runtimeMonitoringDeploymentInObservationWindow(
+            deployment,
+            resourceRuntimeMonitoringObservationHandoff,
+          ),
+        )
+      : resourceDeployments,
+  );
+  const terminalDeploymentId = $derived.by(() => {
+    const requestedDeploymentId = page.url.searchParams.get("deploymentId")?.trim();
+    if (
+      requestedDeploymentId &&
+      resourceDeployments.some((deployment) => deployment.id === requestedDeploymentId)
+    ) {
+      return requestedDeploymentId;
+    }
+
+    return latestDeployment?.id;
+  });
   const resourceDomainBindings = $derived(
     resource ? domainBindings.filter((binding) => binding.resourceId === resource.id) : [],
   );
@@ -331,6 +493,35 @@
   const resourceEffectiveConfig = $derived<ResourceEffectiveConfig | null>(
     resourceEffectiveConfigQuery.data ?? null,
   );
+  const storageVolumes = $derived(storageVolumesQuery.data?.items ?? []);
+  const resourceStorageAttachments = $derived(resourceDetail?.storageAttachments ?? []);
+  const dependencyResources = $derived(dependencyResourcesQuery.data?.items ?? []);
+  const resourceDependencyBindings = $derived(resourceDependencyBindingsQuery.data?.items ?? []);
+  const dependencyBackups = $derived(dependencyBackupsQuery.data?.items ?? []);
+  const bindableDependencyResources = $derived(
+    dependencyResources.filter(
+      (dependency) =>
+        dependency.lifecycleStatus === "ready" &&
+        dependency.bindingReadiness.status === "ready" &&
+        !resourceDependencyBindings.some(
+          (binding) =>
+            binding.status === "active" && binding.dependencyResourceId === dependency.id,
+        ),
+    ),
+  );
+  $effect(() => {
+    if (
+      !dependencyBackupResourceId &&
+      dependencyResources.length === 1 &&
+      dependencyResources[0]?.lifecycleStatus === "ready"
+    ) {
+      dependencyBackupResourceId = dependencyResources[0].id;
+    }
+
+    if (!dependencyBindingResourceId && bindableDependencyResources.length === 1) {
+      dependencyBindingResourceId = bindableDependencyResources[0]?.id ?? "";
+    }
+  });
   const resourceSourceEvents = $derived(resourceSourceEventsQuery.data?.items ?? []);
   const resourcePreviewEnvironments = $derived(
     resourcePreviewEnvironmentsQuery.data?.items ?? [],
@@ -350,6 +541,28 @@
   const resourceRuntimeUsage = $derived(resourceRuntimeUsageQuery.data ?? null);
   const resourceRuntimeUsageError = $derived(
     resourceRuntimeUsageQuery.error ? readErrorMessage(resourceRuntimeUsageQuery.error) : "",
+  );
+  const resourceRuntimeMonitoringSamples = $derived(
+    resourceRuntimeMonitoringSamplesQuery.data ?? null,
+  );
+  const resourceRuntimeMonitoringSamplesError = $derived(
+    resourceRuntimeMonitoringSamplesQuery.error
+      ? readErrorMessage(resourceRuntimeMonitoringSamplesQuery.error)
+      : "",
+  );
+  const resourceRuntimeMonitoringRollup = $derived(resourceRuntimeMonitoringRollupQuery.data ?? null);
+  const resourceRuntimeMonitoringRollupError = $derived(
+    resourceRuntimeMonitoringRollupQuery.error
+      ? readErrorMessage(resourceRuntimeMonitoringRollupQuery.error)
+      : "",
+  );
+  const resourceRuntimeMonitoringThresholds = $derived(
+    resourceRuntimeMonitoringThresholdsQuery.data ?? null,
+  );
+  const resourceRuntimeMonitoringThresholdsError = $derived(
+    resourceRuntimeMonitoringThresholdsQuery.error
+      ? readErrorMessage(resourceRuntimeMonitoringThresholdsQuery.error)
+      : "",
   );
   const autoDeployPolicy = $derived(resourceDetail?.autoDeployPolicy ?? null);
   const profileDiagnostics = $derived(resourceDetail?.diagnostics ?? []);
@@ -525,13 +738,78 @@
   let runtimeLogsFollowing = $state(false);
   let runtimeLogStream = $state<RuntimeLogClientStream | null>(null);
   let runtimeLogRequestGeneration = $state(0);
+  const runtimeLogsInObservationWindow = $derived(
+    resourceRuntimeMonitoringObservationHandoff
+      ? runtimeLogs.filter((line) =>
+          runtimeMonitoringTimestampInObservationWindow(
+            line.timestamp,
+            resourceRuntimeMonitoringObservationHandoff,
+          ),
+        )
+      : runtimeLogs,
+  );
   let configFormResourceId = $state("");
   let configKey = $state("");
   let configValue = $state("");
   let configKind = $state<ResourceVariableKind>("plain-config");
   let configExposure = $state<ResourceVariableExposure>("runtime");
   let configSecret = $state(false);
+  let configImportContent = $state("");
+  let configImportExposure = $state<ResourceVariableExposure>("runtime");
+  let configImportSecretKeys = $state("");
+  let configImportPlainKeys = $state("");
   let configFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let storageAttachmentFormResourceId = $state("");
+  let storageAttachmentVolumeId = $state("");
+  let storageAttachmentDestinationPath = $state("/data");
+  let storageAttachmentMountMode = $state<AttachResourceStorageInput["mountMode"]>("read-write");
+  let storageAttachmentFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let storageVolumeName = $state("");
+  let storageVolumeKind = $state<CreateStorageVolumeInput["kind"]>("named-volume");
+  let storageVolumeDescription = $state("");
+  let storageVolumeSourcePath = $state("");
+  let storageVolumeRenameNames = $state<Record<string, string>>({});
+  let storageVolumeFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let storageRuntimeCleanupVolumeId = $state("");
+  let storageRuntimeCleanupServerId = $state("");
+  let storageRuntimeCleanupBefore = $state("");
+  let storageRuntimeCleanupObservationHandoffKey = $state("");
+  let storageRuntimeCleanupResult = $state<CleanupStorageVolumeRuntimeResponse | null>(null);
+  let storageRuntimeCleanupFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let dependencyProvisionName = $state("");
+  let dependencyProvisionKind = $state<DependencyResourceSummary["kind"]>("postgres");
+  let dependencyProviderKey = $state("");
+  let dependencyImportName = $state("");
+  let dependencyImportKind = $state<DependencyResourceSummary["kind"]>("postgres");
+  let dependencyImportConnectionUrl = $state("");
+  let dependencyImportSecretRef = $state("");
+  let dependencyRenameNames = $state<Record<string, string>>({});
+  let dependencyBackupDescription = $state("");
+  let dependencyRestoreLabels = $state<Record<string, string>>({});
+  let dependencyRestoreAcknowledgeDataOverwrite = $state(false);
+  let dependencyRestoreAcknowledgeRuntimeNotRestarted = $state(false);
+  let dependencyBindingResourceId = $state("");
+  let dependencyBindingTargetName = $state("DATABASE_URL");
+  let dependencyBindingSecretRefs = $state<Record<string, string>>({});
+  let dependencyBindingSecretValues = $state<Record<string, string>>({});
+  let dependencyBindingSecretRotationAcks = $state<Record<string, boolean>>({});
+  let dependencyFeedback = $state<{
     kind: "success" | "error";
     title: string;
     detail: string;
@@ -740,6 +1018,82 @@
     ),
   );
   const canSetResourceVariable = $derived(Boolean(resource && !isResourceArchived && configKey.trim()));
+  const canImportResourceVariables = $derived(
+    Boolean(resource && !isResourceArchived && configImportContent.trim()),
+  );
+  const selectedStorageVolume = $derived(
+    storageVolumes.find((volume) => volume.id === storageAttachmentVolumeId) ?? null,
+  );
+  const selectedStorageRuntimeCleanupVolume = $derived(
+    storageVolumes.find((volume) => volume.id === storageRuntimeCleanupVolumeId) ?? null,
+  );
+  const selectedStorageRuntimeCleanupServer = $derived(
+    findServer(servers, storageRuntimeCleanupServerId),
+  );
+  const canAttachStorage = $derived(
+    Boolean(
+      resource &&
+        !isResourceArchived &&
+        storageAttachmentVolumeId &&
+        storageAttachmentDestinationPath.trim().startsWith("/") &&
+        storageAttachmentDestinationPath.trim() !== "/" &&
+        !storageAttachmentDestinationPath.includes(".."),
+    ),
+  );
+  const canCreateStorageVolume = $derived(
+    Boolean(
+      resource &&
+        resourceProjectId &&
+        resourceEnvironmentId &&
+        storageVolumeName.trim() &&
+        (storageVolumeKind === "named-volume" ||
+          (storageVolumeSourcePath.trim().startsWith("/") &&
+            storageVolumeSourcePath.trim() !== "/" &&
+            !storageVolumeSourcePath.includes(".."))),
+    ),
+  );
+  const canCleanupStorageRuntime = $derived(
+    Boolean(
+      resource &&
+        storageRuntimeCleanupVolumeId &&
+        storageRuntimeCleanupServerId &&
+        storageRuntimeCleanupBefore.trim(),
+    ),
+  );
+  const selectedDependencyResource = $derived(
+    bindableDependencyResources.find((dependency) => dependency.id === dependencyBindingResourceId) ??
+      null,
+  );
+  const selectedDependencyBackupResource = $derived(
+    dependencyResources.find((dependency) => dependency.id === dependencyBackupResourceId) ?? null,
+  );
+  const canProvisionDependencyResource = $derived(
+    Boolean(resource && !isResourceArchived && dependencyProvisionName.trim()),
+  );
+  const canImportDependencyResource = $derived(
+    Boolean(
+      resource &&
+        !isResourceArchived &&
+        dependencyImportName.trim() &&
+        dependencyImportConnectionUrl.trim(),
+    ),
+  );
+  const canBindDependencyResource = $derived(
+    Boolean(
+      resource &&
+        !isResourceArchived &&
+        selectedDependencyResource &&
+        dependencyBindingTargetName.trim(),
+    ),
+  );
+  const canCreateDependencyBackup = $derived(
+    Boolean(
+      resource &&
+        !isResourceArchived &&
+        selectedDependencyBackupResource &&
+        selectedDependencyBackupResource.lifecycleStatus === "ready",
+    ),
+  );
   const createDomainBindingMutation = createMutation(() => ({
     mutationFn: (input: CreateDomainBindingInput) => orpcClient.domainBindings.create(input),
     onSuccess: (result) => {
@@ -1209,6 +1563,29 @@
       };
     },
   }));
+  const importResourceVariablesMutation = createMutation(() => ({
+    mutationFn: (input: ImportResourceVariablesInput) => orpcClient.resources.importVariables(input),
+    onSuccess: (result) => {
+      configFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.configurationImportSucceeded),
+        detail: $t(i18nKeys.console.resources.configurationImportSummary, {
+          count: result.importedEntries.length,
+        }),
+      };
+      configImportContent = "";
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "effective-config", resourceId],
+      });
+    },
+    onError: (error) => {
+      configFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.configurationImportFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
   const unsetResourceVariableMutation = createMutation(() => ({
     mutationFn: (input: { resourceId: string; key: string; exposure: ResourceVariableExposure }) =>
       orpcClient.resources.unsetVariable(input),
@@ -1226,6 +1603,330 @@
       configFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.configurationUnsetFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const attachResourceStorageMutation = createMutation(() => ({
+    mutationFn: (input: AttachResourceStorageInput) => orpcClient.resources.attachStorage(input),
+    onSuccess: (result) => {
+      storageAttachmentFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.storageAttachSucceeded),
+        detail: result.id,
+      };
+      storageAttachmentDestinationPath = "/data";
+      void invalidateStorageAttachmentQueries();
+    },
+    onError: (error) => {
+      storageAttachmentFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.storageAttachFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const detachResourceStorageMutation = createMutation(() => ({
+    mutationFn: (input: DetachResourceStorageInput) => orpcClient.resources.detachStorage(input),
+    onSuccess: (result) => {
+      storageAttachmentFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.storageDetachSucceeded),
+        detail: result.id,
+      };
+      void invalidateStorageAttachmentQueries();
+    },
+    onError: (error) => {
+      storageAttachmentFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.storageDetachFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const createStorageVolumeMutation = createMutation(() => ({
+    mutationFn: (input: CreateStorageVolumeInput) => orpcClient.storageVolumes.create(input),
+    onSuccess: (result) => {
+      storageVolumeFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.storageVolumeCreateSucceeded),
+        detail: result.id,
+      };
+      storageVolumeName = "";
+      storageVolumeDescription = "";
+      storageVolumeSourcePath = "";
+      void invalidateStorageAttachmentQueries();
+    },
+    onError: (error) => {
+      storageVolumeFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.storageVolumeCreateFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const renameStorageVolumeMutation = createMutation(() => ({
+    mutationFn: (input: RenameStorageVolumeInput) => orpcClient.storageVolumes.rename(input),
+    onSuccess: (result) => {
+      storageVolumeFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.storageVolumeRenameSucceeded),
+        detail: result.id,
+      };
+      void invalidateStorageAttachmentQueries();
+    },
+    onError: (error) => {
+      storageVolumeFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.storageVolumeRenameFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const deleteStorageVolumeMutation = createMutation(() => ({
+    mutationFn: (input: DeleteStorageVolumeInput) => orpcClient.storageVolumes.delete(input),
+    onSuccess: (result) => {
+      storageVolumeFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.storageVolumeDeleteSucceeded),
+        detail: result.id,
+      };
+      void invalidateStorageAttachmentQueries();
+    },
+    onError: (error) => {
+      storageVolumeFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.storageVolumeDeleteFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const cleanupStorageRuntimeMutation = createMutation(() => ({
+    mutationFn: (input: CleanupStorageVolumeRuntimeInput) =>
+      orpcClient.storageVolumes.cleanupRuntime(input),
+    onSuccess: (result) => {
+      storageRuntimeCleanupResult = result;
+      storageRuntimeCleanupFeedback = {
+        kind: "success",
+        title: result.dryRun
+          ? $t(i18nKeys.console.resources.storageRuntimeCleanupPreviewSucceeded)
+          : $t(i18nKeys.console.resources.storageRuntimeCleanupSucceeded),
+        detail: storageRuntimeCleanupSummary(result),
+      };
+      void invalidateStorageAttachmentQueries();
+    },
+    onError: (error) => {
+      storageRuntimeCleanupFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.storageRuntimeCleanupFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const provisionDependencyResourceMutation = createMutation(() => ({
+    mutationFn: (
+      input: {
+        kind: DependencyResourceSummary["kind"];
+      } & (ProvisionPostgresDependencyResourceInput | ProvisionRedisDependencyResourceInput),
+    ) => {
+      const { kind, ...payload } = input;
+      return kind === "postgres"
+        ? orpcClient.dependencyResources.provisionPostgres(
+            payload as ProvisionPostgresDependencyResourceInput,
+          )
+        : orpcClient.dependencyResources.provisionRedis(
+            payload as ProvisionRedisDependencyResourceInput,
+          );
+    },
+    onSuccess: (result) => {
+      dependencyFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.dependencyProvisionSucceeded),
+        detail: result.id,
+      };
+      dependencyProvisionName = "";
+      dependencyProviderKey = "";
+      void invalidateDependencyQueries();
+    },
+    onError: (error) => {
+      dependencyFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.dependencyProvisionFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const importDependencyResourceMutation = createMutation(() => ({
+    mutationFn: (
+      input: {
+        kind: DependencyResourceSummary["kind"];
+      } & (ImportPostgresDependencyResourceInput | ImportRedisDependencyResourceInput),
+    ) => {
+      const { kind, ...payload } = input;
+      return kind === "postgres"
+        ? orpcClient.dependencyResources.importPostgres(
+            payload as ImportPostgresDependencyResourceInput,
+          )
+        : orpcClient.dependencyResources.importRedis(payload as ImportRedisDependencyResourceInput);
+    },
+    onSuccess: (result) => {
+      dependencyFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.dependencyImportSucceeded),
+        detail: result.id,
+      };
+      dependencyImportName = "";
+      dependencyImportConnectionUrl = "";
+      dependencyImportSecretRef = "";
+      void invalidateDependencyQueries();
+    },
+    onError: (error) => {
+      dependencyFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.dependencyImportFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const bindResourceDependencyMutation = createMutation(() => ({
+    mutationFn: (input: BindResourceDependencyInput) =>
+      orpcClient.resources.dependencyBindings.bind(input),
+    onSuccess: (result) => {
+      dependencyFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.dependencyBindSucceeded),
+        detail: result.id,
+      };
+      dependencyBindingResourceId = "";
+      dependencyBindingTargetName = "DATABASE_URL";
+      void invalidateDependencyQueries();
+    },
+    onError: (error) => {
+      dependencyFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.dependencyBindFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const renameDependencyResourceMutation = createMutation(() => ({
+    mutationFn: (input: RenameDependencyResourceInput) =>
+      orpcClient.dependencyResources.rename(input),
+    onSuccess: (result) => {
+      dependencyFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.dependencyRenameSucceeded),
+        detail: result.id,
+      };
+      delete dependencyRenameNames[result.id];
+      void invalidateDependencyQueries();
+    },
+    onError: (error) => {
+      dependencyFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.dependencyRenameFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const deleteDependencyResourceMutation = createMutation(() => ({
+    mutationFn: (input: DeleteDependencyResourceInput) => orpcClient.dependencyResources.delete(input),
+    onSuccess: (result) => {
+      dependencyFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.dependencyDeleteSucceeded),
+        detail: result.id,
+      };
+      delete dependencyRenameNames[result.id];
+      void invalidateDependencyQueries();
+    },
+    onError: (error) => {
+      dependencyFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.dependencyDeleteFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const createDependencyBackupMutation = createMutation(() => ({
+    mutationFn: (input: CreateDependencyResourceBackupInput) =>
+      orpcClient.dependencyResources.createBackup(input),
+    onSuccess: (result) => {
+      dependencyFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.dependencyBackupCreateSucceeded),
+        detail: result.id,
+      };
+      dependencyBackupDescription = "";
+      void invalidateDependencyQueries();
+    },
+    onError: (error) => {
+      dependencyFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.dependencyBackupCreateFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const restoreDependencyBackupMutation = createMutation(() => ({
+    mutationFn: (input: RestoreDependencyResourceBackupInput) =>
+      orpcClient.dependencyResources.restoreBackup(input),
+    onSuccess: (result) => {
+      dependencyFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.dependencyBackupRestoreSucceeded),
+        detail: result.id,
+      };
+      dependencyRestoreLabels = {};
+      dependencyRestoreAcknowledgeDataOverwrite = false;
+      dependencyRestoreAcknowledgeRuntimeNotRestarted = false;
+      void invalidateDependencyQueries();
+    },
+    onError: (error) => {
+      dependencyFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.dependencyBackupRestoreFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const rotateResourceDependencyBindingSecretMutation = createMutation(() => ({
+    mutationFn: (input: RotateResourceDependencyBindingSecretInput) =>
+      orpcClient.resources.dependencyBindings.rotateSecret(input),
+    onSuccess: (result) => {
+      dependencyFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.dependencySecretRotateSucceeded),
+        detail: result.secretVersion,
+      };
+      delete dependencyBindingSecretRefs[result.id];
+      delete dependencyBindingSecretValues[result.id];
+      delete dependencyBindingSecretRotationAcks[result.id];
+      void invalidateDependencyQueries();
+    },
+    onError: (error) => {
+      dependencyFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.dependencySecretRotateFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const unbindResourceDependencyMutation = createMutation(() => ({
+    mutationFn: (input: UnbindResourceDependencyInput) =>
+      orpcClient.resources.dependencyBindings.unbind(input),
+    onSuccess: (result) => {
+      dependencyFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.dependencyUnbindSucceeded),
+        detail: result.id,
+      };
+      void invalidateDependencyQueries();
+    },
+    onError: (error) => {
+      dependencyFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.dependencyUnbindFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -1375,7 +2076,7 @@
     void stream?.return?.().catch(() => undefined);
   }
 
-  async function loadRuntimeLogs(currentResourceId: string): Promise<void> {
+  async function loadRuntimeLogs(currentResourceId: string, since?: string): Promise<void> {
     const generation = runtimeLogRequestGeneration + 1;
     runtimeLogRequestGeneration = generation;
     runtimeLogResourceId = currentResourceId;
@@ -1386,6 +2087,7 @@
       const result = await orpcClient.resources.logs({
         resourceId: currentResourceId,
         tailLines: 100,
+        ...(since ? { since } : {}),
         follow: false,
       });
 
@@ -1407,11 +2109,13 @@
     currentResourceId: string,
     generation: number,
     tailLines: number,
+    since?: string,
   ): Promise<void> {
     try {
       const stream = await orpcClient.resources.logsStream({
         resourceId: currentResourceId,
         tailLines,
+        ...(since ? { since } : {}),
         follow: true,
       });
 
@@ -1458,7 +2162,12 @@
     runtimeLogsError = null;
     runtimeLogsFollowing = true;
     const tailLines = runtimeLogs.length > 0 ? 0 : 100;
-    void consumeRuntimeLogStream(resource.id, generation, tailLines);
+    void consumeRuntimeLogStream(
+      resource.id,
+      generation,
+      tailLines,
+      resourceRuntimeMonitoringObservationHandoff?.from,
+    );
   }
 
   function refreshRuntimeLogs(): void {
@@ -1467,7 +2176,7 @@
     }
 
     stopRuntimeLogFollow();
-    void loadRuntimeLogs(resource.id);
+    void loadRuntimeLogs(resource.id, resourceRuntimeMonitoringObservationHandoff?.from);
   }
 
   async function loadProxyConfiguration(currentResourceId: string): Promise<void> {
@@ -1586,6 +2295,12 @@
       const summary = await orpcClient.resources.diagnosticSummary({
         resourceId: resource.id,
         ...(latestDeployment?.id ? { deploymentId: latestDeployment.id } : {}),
+        ...(resourceRuntimeMonitoringObservationHandoff
+          ? {
+              observationFrom: resourceRuntimeMonitoringObservationHandoff.from,
+              observationTo: resourceRuntimeMonitoringObservationHandoff.to,
+            }
+          : {}),
         includeDeploymentLogTail: true,
         includeRuntimeLogTail: true,
         includeProxyConfiguration: true,
@@ -1916,6 +2631,63 @@
   });
 
   $effect(() => {
+    if (!browser || !resource) {
+      return;
+    }
+
+    if (storageAttachmentFormResourceId !== resource.id) {
+      storageAttachmentFormResourceId = resource.id;
+      storageAttachmentVolumeId = "";
+      storageAttachmentDestinationPath = "/data";
+      storageAttachmentMountMode = "read-write";
+      storageAttachmentFeedback = null;
+      storageVolumeName = "";
+      storageVolumeKind = "named-volume";
+      storageVolumeDescription = "";
+      storageVolumeSourcePath = "";
+      storageVolumeFeedback = null;
+      storageVolumeRenameNames = {};
+      storageRuntimeCleanupVolumeId = "";
+      storageRuntimeCleanupServerId = "";
+      storageRuntimeCleanupBefore = new Date().toISOString();
+      storageRuntimeCleanupObservationHandoffKey = "";
+      storageRuntimeCleanupResult = null;
+      storageRuntimeCleanupFeedback = null;
+    }
+
+    if (!storageAttachmentVolumeId && storageVolumes.length > 0) {
+      storageAttachmentVolumeId = storageVolumes[0]?.id ?? "";
+    }
+
+    if (!storageRuntimeCleanupVolumeId && storageVolumes.length > 0) {
+      storageRuntimeCleanupVolumeId = storageVolumes[0]?.id ?? "";
+    }
+
+    if (
+      storageRuntimeCleanupVolumeId &&
+      !storageVolumes.some((volume) => volume.id === storageRuntimeCleanupVolumeId)
+    ) {
+      storageRuntimeCleanupVolumeId = storageVolumes[0]?.id ?? "";
+      storageRuntimeCleanupResult = null;
+    }
+
+    if (!storageRuntimeCleanupServerId) {
+      storageRuntimeCleanupServerId = latestDeployment?.serverId ?? servers[0]?.id ?? "";
+    }
+
+    const observationHandoff = resourceRuntimeMonitoringObservationHandoff;
+    const observationHandoffKey = observationHandoff
+      ? `${resource.id}:${observationHandoff.from}:${observationHandoff.to}`
+      : "";
+    if (observationHandoff && storageRuntimeCleanupObservationHandoffKey !== observationHandoffKey) {
+      storageRuntimeCleanupObservationHandoffKey = observationHandoffKey;
+      storageRuntimeCleanupBefore = observationHandoff.to;
+      storageRuntimeCleanupResult = null;
+      storageRuntimeCleanupFeedback = null;
+    }
+  });
+
+  $effect(() => {
     const currentResourceId = resource?.id ?? "";
 
     if (!browser) {
@@ -1936,6 +2708,7 @@
   $effect(() => {
     const currentResourceId = resource?.id ?? "";
     const currentTab = activeTab;
+    const currentObservationHandoff = resourceRuntimeMonitoringObservationHandoff;
 
     if (!browser) {
       return;
@@ -1956,7 +2729,7 @@
         return;
       }
 
-      void loadRuntimeLogs(currentResourceId);
+      void loadRuntimeLogs(currentResourceId, currentObservationHandoff?.from);
     });
   });
 
@@ -2085,6 +2858,23 @@
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["scheduled-tasks", "resource", resourceId] }),
       queryClient.invalidateQueries({ queryKey: ["scheduled-task-runs", "resource", resourceId] }),
+    ]);
+  }
+
+  async function invalidateStorageAttachmentQueries(): Promise<void> {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["resources"] }),
+      queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] }),
+      queryClient.invalidateQueries({ queryKey: ["storage-volumes"] }),
+    ]);
+  }
+
+  async function invalidateDependencyQueries(): Promise<void> {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["dependency-resources"] }),
+      queryClient.invalidateQueries({ queryKey: ["dependency-resource-backups"] }),
+      queryClient.invalidateQueries({ queryKey: ["resource-dependency-bindings", resourceId] }),
+      queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] }),
     ]);
   }
 
@@ -2463,6 +3253,34 @@
     });
   }
 
+  function parseImportKeyList(value: string): string[] {
+    return value
+      .split(/[\s,]+/)
+      .map((key) => key.trim())
+      .filter(Boolean);
+  }
+
+  function importResourceVariables(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (
+      !resource ||
+      !canImportResourceVariables ||
+      importResourceVariablesMutation.isPending
+    ) {
+      return;
+    }
+
+    configFeedback = null;
+    importResourceVariablesMutation.mutate({
+      resourceId: resource.id,
+      content: configImportContent,
+      exposure: configImportExposure,
+      secretKeys: parseImportKeyList(configImportSecretKeys),
+      plainKeys: parseImportKeyList(configImportPlainKeys),
+    });
+  }
+
   function unsetResourceVariable(entry: ResourceConfigEntry): void {
     if (!resource || isResourceArchived || unsetResourceVariableMutation.isPending) {
       return;
@@ -2473,6 +3291,330 @@
       resourceId: resource.id,
       key: entry.key,
       exposure: entry.exposure,
+    });
+  }
+
+  function attachResourceStorage(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canAttachStorage || attachResourceStorageMutation.isPending) {
+      return;
+    }
+
+    storageAttachmentFeedback = null;
+    attachResourceStorageMutation.mutate({
+      resourceId: resource.id,
+      storageVolumeId: storageAttachmentVolumeId,
+      destinationPath: storageAttachmentDestinationPath.trim(),
+      mountMode: storageAttachmentMountMode,
+    });
+  }
+
+  function createStorageVolume(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canCreateStorageVolume || createStorageVolumeMutation.isPending) {
+      return;
+    }
+
+    storageVolumeFeedback = null;
+    createStorageVolumeMutation.mutate({
+      projectId: resource.projectId,
+      environmentId: resource.environmentId,
+      name: storageVolumeName.trim(),
+      kind: storageVolumeKind,
+      ...(storageVolumeDescription.trim()
+        ? { description: storageVolumeDescription.trim() }
+        : {}),
+      ...(storageVolumeKind === "bind-mount"
+        ? { sourcePath: storageVolumeSourcePath.trim() }
+        : {}),
+    });
+  }
+
+  function updateStorageVolumeRenameName(storageVolumeId: string, event: Event): void {
+    storageVolumeRenameNames = {
+      ...storageVolumeRenameNames,
+      [storageVolumeId]: (event.currentTarget as HTMLInputElement).value,
+    };
+  }
+
+  function renameStorageVolume(volume: StorageVolumeSummary): void {
+    if (renameStorageVolumeMutation.isPending) {
+      return;
+    }
+
+    const name = (storageVolumeRenameNames[volume.id] ?? volume.name).trim();
+    if (!name || name === volume.name) {
+      return;
+    }
+
+    storageVolumeFeedback = null;
+    renameStorageVolumeMutation.mutate({
+      storageVolumeId: volume.id,
+      name,
+    });
+  }
+
+  function deleteStorageVolume(volume: StorageVolumeSummary): void {
+    if (!browser || deleteStorageVolumeMutation.isPending) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        $t(i18nKeys.console.resources.storageVolumeDeleteConfirm, {
+          name: volume.name,
+        }),
+      )
+    ) {
+      return;
+    }
+
+    storageVolumeFeedback = null;
+    deleteStorageVolumeMutation.mutate({ storageVolumeId: volume.id });
+  }
+
+  function cleanupStorageRuntime(dryRun: boolean): void {
+    if (!canCleanupStorageRuntime || cleanupStorageRuntimeMutation.isPending) {
+      return;
+    }
+
+    storageRuntimeCleanupFeedback = null;
+    cleanupStorageRuntimeMutation.mutate({
+      storageVolumeId: storageRuntimeCleanupVolumeId,
+      serverId: storageRuntimeCleanupServerId,
+      before: storageRuntimeCleanupBefore.trim(),
+      dryRun,
+    });
+  }
+
+  function previewStorageRuntimeCleanup(): void {
+    cleanupStorageRuntime(true);
+  }
+
+  function applyStorageRuntimeCleanup(): void {
+    if (!browser || !selectedStorageRuntimeCleanupVolume) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        $t(i18nKeys.console.resources.storageRuntimeCleanupConfirm, {
+          name: selectedStorageRuntimeCleanupVolume.name,
+        }),
+      )
+    ) {
+      return;
+    }
+
+    cleanupStorageRuntime(false);
+  }
+
+  function provisionDependencyResource(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canProvisionDependencyResource || provisionDependencyResourceMutation.isPending) {
+      return;
+    }
+
+    dependencyFeedback = null;
+    provisionDependencyResourceMutation.mutate({
+      kind: dependencyProvisionKind,
+      projectId: resource.projectId,
+      environmentId: resource.environmentId,
+      name: dependencyProvisionName.trim(),
+      ...(dependencyProviderKey.trim() ? { providerKey: dependencyProviderKey.trim() } : {}),
+    });
+  }
+
+  function importDependencyResource(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canImportDependencyResource || importDependencyResourceMutation.isPending) {
+      return;
+    }
+
+    dependencyFeedback = null;
+    importDependencyResourceMutation.mutate({
+      kind: dependencyImportKind,
+      projectId: resource.projectId,
+      environmentId: resource.environmentId,
+      name: dependencyImportName.trim(),
+      connectionUrl: dependencyImportConnectionUrl.trim(),
+      ...(dependencyImportSecretRef.trim() ? { secretRef: dependencyImportSecretRef.trim() } : {}),
+    });
+  }
+
+  function bindDependencyResource(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canBindDependencyResource || bindResourceDependencyMutation.isPending) {
+      return;
+    }
+
+    dependencyFeedback = null;
+    bindResourceDependencyMutation.mutate({
+      resourceId: resource.id,
+      dependencyResourceId: dependencyBindingResourceId,
+      targetName: dependencyBindingTargetName.trim(),
+      scope: "runtime-only",
+      injectionMode: "env",
+    });
+  }
+
+  function canRotateDependencyBindingSecret(bindingId: string): boolean {
+    const hasSecretRef = Boolean((dependencyBindingSecretRefs[bindingId] ?? "").trim());
+    const hasSecretValue = Boolean((dependencyBindingSecretValues[bindingId] ?? "").trim());
+
+    return (
+      Boolean(resource) &&
+      !isResourceArchived &&
+      hasSecretRef !== hasSecretValue &&
+      dependencyBindingSecretRotationAcks[bindingId] === true &&
+      !rotateResourceDependencyBindingSecretMutation.isPending
+    );
+  }
+
+  function rotateDependencyBindingSecret(binding: ResourceDependencyBindingSummary): void {
+    if (!resource || !canRotateDependencyBindingSecret(binding.id)) {
+      return;
+    }
+
+    const secretRef = (dependencyBindingSecretRefs[binding.id] ?? "").trim();
+    const secretValue = (dependencyBindingSecretValues[binding.id] ?? "").trim();
+
+    dependencyFeedback = null;
+    rotateResourceDependencyBindingSecretMutation.mutate({
+      resourceId: resource.id,
+      bindingId: binding.id,
+      confirmHistoricalSnapshotsRemainUnchanged: true,
+      ...(secretRef ? { secretRef } : { secretValue }),
+    });
+  }
+
+  function renameDependencyResource(dependency: DependencyResourceSummary): void {
+    if (!resource || isResourceArchived || renameDependencyResourceMutation.isPending) {
+      return;
+    }
+
+    const name = (dependencyRenameNames[dependency.id] ?? "").trim();
+    if (!name || name === dependency.name) {
+      return;
+    }
+
+    dependencyFeedback = null;
+    renameDependencyResourceMutation.mutate({
+      dependencyResourceId: dependency.id,
+      name,
+    });
+  }
+
+  function deleteDependencyResource(dependency: DependencyResourceSummary): void {
+    if (!browser || !resource || isResourceArchived || deleteDependencyResourceMutation.isPending) {
+      return;
+    }
+
+    if ((dependency.deleteSafety?.blockers.length ?? 0) > 0) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        $t(i18nKeys.console.resources.dependencyDeleteConfirm, {
+          name: dependency.name,
+        }),
+      )
+    ) {
+      return;
+    }
+
+    dependencyFeedback = null;
+    deleteDependencyResourceMutation.mutate({
+      dependencyResourceId: dependency.id,
+    });
+  }
+
+  function createDependencyBackup(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canCreateDependencyBackup || createDependencyBackupMutation.isPending) {
+      return;
+    }
+
+    dependencyFeedback = null;
+    createDependencyBackupMutation.mutate({
+      dependencyResourceId: dependencyBackupResourceId,
+      ...(dependencyBackupDescription.trim()
+        ? { description: dependencyBackupDescription.trim() }
+        : {}),
+    });
+  }
+
+  function restoreDependencyBackup(backup: DependencyResourceBackupSummary): void {
+    if (
+      !resource ||
+      isResourceArchived ||
+      backup.status !== "ready" ||
+      !dependencyRestoreAcknowledgeDataOverwrite ||
+      !dependencyRestoreAcknowledgeRuntimeNotRestarted ||
+      restoreDependencyBackupMutation.isPending
+    ) {
+      return;
+    }
+
+    dependencyFeedback = null;
+    restoreDependencyBackupMutation.mutate({
+      backupId: backup.id,
+      acknowledgeDataOverwrite: true,
+      acknowledgeRuntimeNotRestarted: true,
+      ...(dependencyRestoreLabels[backup.id]?.trim()
+        ? { restoreLabel: dependencyRestoreLabels[backup.id].trim() }
+        : {}),
+    });
+  }
+
+  function unbindDependencyResource(binding: ResourceDependencyBindingSummary): void {
+    if (!browser || !resource || isResourceArchived || unbindResourceDependencyMutation.isPending) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        $t(i18nKeys.console.resources.dependencyUnbindConfirm, {
+          targetName: binding.target.targetName,
+        }),
+      )
+    ) {
+      return;
+    }
+
+    dependencyFeedback = null;
+    unbindResourceDependencyMutation.mutate({
+      resourceId: resource.id,
+      bindingId: binding.id,
+    });
+  }
+
+  function detachResourceStorage(attachment: ResourceStorageAttachmentSummary): void {
+    if (!browser || !resource || isResourceArchived || detachResourceStorageMutation.isPending) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        $t(i18nKeys.console.resources.storageDetachConfirm, {
+          destinationPath: attachment.destinationPath,
+        }),
+      )
+    ) {
+      return;
+    }
+
+    storageAttachmentFeedback = null;
+    detachResourceStorageMutation.mutate({
+      resourceId: resource.id,
+      attachmentId: attachment.id,
     });
   }
 
@@ -2612,9 +3754,13 @@
 
     if (tab === "settings") {
       params.delete("tab");
+      params.delete("deploymentId");
     } else {
       params.set("tab", tab);
       params.delete("section");
+      if (tab !== "terminal") {
+        params.delete("deploymentId");
+      }
     }
 
     const search = params.toString();
@@ -2718,6 +3864,10 @@
         return $t(i18nKeys.console.resources.autoDeployTitle);
       case "configuration":
         return $t(i18nKeys.console.resources.configurationTitle);
+      case "storage":
+        return $t(i18nKeys.console.resources.storageTitle);
+      case "dependencies":
+        return $t(i18nKeys.console.resources.dependenciesTitle);
       case "domains":
         return $t(i18nKeys.console.resources.domainBindingsTitle);
       case "usage":
@@ -2916,6 +4066,58 @@
       case "deployment-strategy":
         return $t(i18nKeys.console.resources.configurationKindDeploymentStrategy);
     }
+  }
+
+  function storageVolumeKindLabel(kind: StorageVolumeSummary["kind"]): string {
+    return kind === "bind-mount"
+      ? $t(i18nKeys.console.resources.storageKindBindMount)
+      : $t(i18nKeys.console.resources.storageKindNamedVolume);
+  }
+
+  function storageMountModeLabel(mode: AttachResourceStorageInput["mountMode"]): string {
+    return mode === "read-only"
+      ? $t(i18nKeys.console.resources.storageMountModeReadOnly)
+      : $t(i18nKeys.console.resources.storageMountModeReadWrite);
+  }
+
+  function storageVolumeOptionLabel(volume: StorageVolumeSummary): string {
+    return `${volume.name} (${storageVolumeKindLabel(volume.kind)})`;
+  }
+
+  function storageRuntimeCleanupSummary(result: CleanupStorageVolumeRuntimeResponse): string {
+    return $t(i18nKeys.console.resources.storageRuntimeCleanupSummary, {
+      inspected: String(result.summary.inspectedCount),
+      matched: String(result.summary.matchedCount),
+      cleaned: String(result.summary.cleanedCount),
+      skipped: String(result.summary.skippedCount),
+      blocked: String(result.summary.blockedCount),
+    });
+  }
+
+  function storageRuntimeCleanupCandidateDetail(candidate: StorageRuntimeCleanupCandidate): string {
+    return candidate.blockedReason
+      ? `${candidate.action} / ${candidate.blockedReason}`
+      : candidate.action;
+  }
+
+  function storageAttachmentVolumeLabel(
+    attachment: ResourceStorageAttachmentSummary,
+  ): string {
+    return attachment.storageVolumeName ?? attachment.storageVolumeId;
+  }
+
+  function dependencyResourceKindLabel(kind: DependencyResourceSummary["kind"]): string {
+    return kind === "postgres"
+      ? $t(i18nKeys.console.resources.dependencyKindPostgres)
+      : $t(i18nKeys.console.resources.dependencyKindRedis);
+  }
+
+  function dependencyResourceOptionLabel(dependency: DependencyResourceSummary): string {
+    return `${dependency.name} (${dependencyResourceKindLabel(dependency.kind)})`;
+  }
+
+  function dependencyBackupLabel(backup: DependencyResourceBackupSummary): string {
+    return `${backup.id} · ${backup.status} · ${backup.requestedAt}`;
   }
 
   function runtimeStrategyLabel(strategy: RuntimePlanStrategy): string {
@@ -3498,6 +4700,16 @@
                 <p class="mt-1 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.resources.deploymentsDescription)}
                 </p>
+                {#if resourceRuntimeMonitoringObservationHandoff}
+                  <p class="mt-2 text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.runtimeUsage.observationWindowHandoff, {
+                      from: formatTime(resourceRuntimeMonitoringObservationHandoff.from),
+                      to: formatTime(resourceRuntimeMonitoringObservationHandoff.to),
+                      scopeKind: resourceRuntimeMonitoringObservationHandoff.scope.kind,
+                      scopeId: resource?.id ?? "",
+                    })}
+                  </p>
+                {/if}
               </div>
               <Button href={resourceDeploymentHref()} disabled={isResourceArchived}>
                 <Plus class="size-4" />
@@ -3506,9 +4718,9 @@
             </div>
 
             <div>
-              {#if resourceDeployments.length > 0}
+              {#if resourceDeploymentsInObservationWindow.length > 0}
                 <DeploymentTable
-                  deployments={resourceDeployments}
+                  deployments={resourceDeploymentsInObservationWindow}
                   {servers}
                   showProject={false}
                   showEnvironment={false}
@@ -3517,7 +4729,11 @@
                 />
               {:else}
                 <div class="border-y bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.resources.noDeployments)}
+                  {$t(
+                    resourceRuntimeMonitoringObservationHandoff && resourceDeployments.length > 0
+                      ? i18nKeys.console.runtimeUsage.observationWindowEmpty
+                      : i18nKeys.console.resources.noDeployments,
+                  )}
                 </div>
               {/if}
             </div>
@@ -4994,7 +6210,7 @@
                               className="size-5"
                             />
                           </div>
-                          <dl class="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+                          <dl class="mt-2 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-5">
                             <div class="min-w-0">
                               <dt class="text-muted-foreground">
                                 {$t(i18nKeys.console.resources.accessFailureRequestId)}
@@ -5017,6 +6233,24 @@
                                 {$t(i18nKeys.console.resources.accessFailureNextAction)}
                               </dt>
                               <dd class="break-all font-medium">{latestAccessFailure.nextAction}</dd>
+                            </div>
+                            <div class="min-w-0">
+                              <dt class="text-muted-foreground">
+                                {$t(i18nKeys.console.resources.accessFailureRouteSource)}
+                              </dt>
+                              <dd class="break-all font-medium">
+                                {latestAccessFailure.route?.routeSource ?? "-"}
+                              </dd>
+                            </div>
+                            <div class="min-w-0">
+                              <dt class="text-muted-foreground">
+                                {$t(i18nKeys.console.resources.accessFailureRouteId)}
+                              </dt>
+                              <dd class="break-all font-medium">
+                                {latestAccessFailure.route?.routeId ??
+                                  latestAccessFailure.route?.diagnosticId ??
+                                  "-"}
+                              </dd>
                             </div>
                           </dl>
                         </div>
@@ -5425,6 +6659,96 @@
                   </div>
                 </form>
 
+                <form
+                  id="resource-configuration-import-form"
+                  class="rounded-md border bg-background p-4"
+                  onsubmit={importResourceVariables}
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 class="text-base font-semibold">
+                        {$t(i18nKeys.console.resources.configurationImportTitle)}
+                      </h3>
+                      <p class="mt-1 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.configurationImportDescription)}
+                      </p>
+                    </div>
+                    <Badge variant="outline">.env</Badge>
+                  </div>
+
+                  <div class="mt-4 grid gap-4 xl:grid-cols-3">
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.common.domain.exposure)}</span>
+                      <Select.Root bind:value={configImportExposure} type="single">
+                        <Select.Trigger class="w-full">
+                          {configExposureLabel(configImportExposure)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="runtime">
+                            {$t(i18nKeys.console.resources.configurationExposureRuntime)}
+                          </Select.Item>
+                          <Select.Item value="build-time">
+                            {$t(i18nKeys.console.resources.configurationExposureBuildTime)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label
+                      class="space-y-1.5 text-sm font-medium"
+                      for="resource-config-import-secret-keys"
+                    >
+                      <span>{$t(i18nKeys.console.resources.configurationImportSecretKeys)}</span>
+                      <Input
+                        id="resource-config-import-secret-keys"
+                        bind:value={configImportSecretKeys}
+                        autocomplete="off"
+                        placeholder="DATABASE_URL, API_TOKEN"
+                      />
+                    </label>
+
+                    <label
+                      class="space-y-1.5 text-sm font-medium"
+                      for="resource-config-import-plain-keys"
+                    >
+                      <span>{$t(i18nKeys.console.resources.configurationImportPlainKeys)}</span>
+                      <Input
+                        id="resource-config-import-plain-keys"
+                        bind:value={configImportPlainKeys}
+                        autocomplete="off"
+                        placeholder="PUBLIC_API_BASE_URL"
+                      />
+                    </label>
+
+                    <label
+                      class="space-y-1.5 text-sm font-medium xl:col-span-3"
+                      for="resource-config-import-content"
+                    >
+                      <span>{$t(i18nKeys.console.resources.configurationImportContent)}</span>
+                      <Textarea
+                        id="resource-config-import-content"
+                        bind:value={configImportContent}
+                        rows={6}
+                        spellcheck={false}
+                        autocomplete="off"
+                        placeholder={"PUBLIC_API_BASE_URL=https://api.example.com\nDATABASE_URL=postgres://user:pass@example/db"}
+                      />
+                    </label>
+                  </div>
+
+                  <div class="mt-4 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!canImportResourceVariables ||
+                        importResourceVariablesMutation.isPending}
+                    >
+                      {importResourceVariablesMutation.isPending
+                        ? $t(i18nKeys.common.actions.saving)
+                        : $t(i18nKeys.console.resources.configurationImportAction)}
+                    </Button>
+                  </div>
+                </form>
+
                 {#if resourceEffectiveConfigQuery.isPending}
                   <div class="space-y-3">
                     <Skeleton class="h-28 w-full" />
@@ -5560,6 +6884,1153 @@
                 {/if}
               </section>
 
+              {:else if activeSettingsSection === "storage"}
+              <section id="resource-overview-storage" class="space-y-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <h2 class="text-lg font-semibold">
+                        {$t(i18nKeys.console.resources.storageTitle)}
+                      </h2>
+                      <DocsHelpLink
+                        href={webDocsHrefs.storageVolumeLifecycle}
+                        ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      />
+                    </div>
+                    <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                      {$t(i18nKeys.console.resources.storageDescription)}
+                    </p>
+                  </div>
+                  <Badge variant="outline">{resourceStorageAttachments.length}</Badge>
+                </div>
+
+                <section class="rounded-md border bg-background p-4">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2">
+                        <HardDrive class="size-4 text-muted-foreground" aria-hidden="true" />
+                        <h3 class="text-base font-semibold">
+                          {$t(i18nKeys.console.resources.storageVolumeManagementTitle)}
+                        </h3>
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.storageVolumeManagementDescription)}
+                      </p>
+                    </div>
+                    <Badge variant="outline">{storageVolumes.length}</Badge>
+                  </div>
+
+                  <form class="mt-4 space-y-4" onsubmit={createStorageVolume}>
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_minmax(0,1fr)]">
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-storage-volume-name">
+                        <span>{$t(i18nKeys.console.resources.storageVolumeName)}</span>
+                        <Input
+                          id="resource-storage-volume-name"
+                          bind:value={storageVolumeName}
+                          autocomplete="off"
+                          placeholder="uploads"
+                        />
+                      </label>
+
+                      <label class="space-y-1.5 text-sm font-medium">
+                        <span>{$t(i18nKeys.console.resources.storageVolumeKind)}</span>
+                        <Select.Root bind:value={storageVolumeKind} type="single">
+                          <Select.Trigger class="w-full">
+                            {storageVolumeKindLabel(storageVolumeKind)}
+                          </Select.Trigger>
+                          <Select.Content>
+                            <Select.Item value="named-volume">
+                              {$t(i18nKeys.console.resources.storageKindNamedVolume)}
+                            </Select.Item>
+                            <Select.Item value="bind-mount">
+                              {$t(i18nKeys.console.resources.storageKindBindMount)}
+                            </Select.Item>
+                          </Select.Content>
+                        </Select.Root>
+                      </label>
+
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-storage-volume-description">
+                        <span>{$t(i18nKeys.console.resources.storageVolumeDescription)}</span>
+                        <Input
+                          id="resource-storage-volume-description"
+                          bind:value={storageVolumeDescription}
+                          autocomplete="off"
+                          placeholder={$t(i18nKeys.console.resources.storageVolumeDescriptionPlaceholder)}
+                        />
+                      </label>
+                    </div>
+
+                    {#if storageVolumeKind === "bind-mount"}
+                      <label class="block space-y-1.5 text-sm font-medium" for="resource-storage-volume-source">
+                        <span>{$t(i18nKeys.console.resources.storageVolumeSourcePath)}</span>
+                        <Input
+                          id="resource-storage-volume-source"
+                          bind:value={storageVolumeSourcePath}
+                          autocomplete="off"
+                          placeholder="/srv/appaloft/storage/uploads"
+                        />
+                      </label>
+                    {/if}
+
+                    <div class="flex justify-end">
+                      <Button
+                        type="submit"
+                        disabled={!canCreateStorageVolume || createStorageVolumeMutation.isPending}
+                      >
+                        <Plus class="mr-2 size-4" aria-hidden="true" />
+                        {createStorageVolumeMutation.isPending
+                          ? $t(i18nKeys.common.actions.saving)
+                          : $t(i18nKeys.console.resources.storageVolumeCreateAction)}
+                      </Button>
+                    </div>
+                  </form>
+
+                  {#if storageVolumeFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        storageVolumeFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{storageVolumeFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{storageVolumeFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 space-y-3">
+                    {#if storageVolumes.length > 0}
+                      {#each storageVolumes as volume (volume.id)}
+                        <article class="rounded-md border bg-muted/15 p-3">
+                          <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                            <div class="min-w-0 space-y-2">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-medium">{volume.name}</p>
+                                <Badge variant="outline">{storageVolumeKindLabel(volume.kind)}</Badge>
+                                <Badge variant="secondary">
+                                  {$t(i18nKeys.console.resources.storageVolumeAttachmentCount, {
+                                    count: String(volume.attachmentCount),
+                                  })}
+                                </Badge>
+                              </div>
+                              {#if volume.sourcePath}
+                                <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
+                                  {volume.sourcePath}
+                                </p>
+                              {/if}
+                            </div>
+
+                            <div class="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto_auto] xl:min-w-[28rem]">
+                              <Input
+                                value={storageVolumeRenameNames[volume.id] ?? volume.name}
+                                aria-label={$t(i18nKeys.console.resources.storageVolumeRenameInput)}
+                                autocomplete="off"
+                                oninput={(event) => updateStorageVolumeRenameName(volume.id, event)}
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={renameStorageVolumeMutation.isPending}
+                                onclick={() => renameStorageVolume(volume)}
+                              >
+                                {$t(i18nKeys.console.resources.storageVolumeRenameAction)}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={deleteStorageVolumeMutation.isPending}
+                                onclick={() => deleteStorageVolume(volume)}
+                              >
+                                <Trash2 class="mr-2 size-4" aria-hidden="true" />
+                                {$t(i18nKeys.console.resources.storageVolumeDeleteAction)}
+                              </Button>
+                            </div>
+                          </div>
+                        </article>
+                      {/each}
+                    {:else if !storageVolumesQuery.isPending && !storageVolumesQuery.error}
+                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.storageVolumesEmpty)}
+                      </div>
+                    {/if}
+                  </div>
+                </section>
+
+                <section class="rounded-md border bg-background p-4">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2">
+                        <Trash2 class="size-4 text-muted-foreground" aria-hidden="true" />
+                        <h3 class="text-base font-semibold">
+                          {$t(i18nKeys.console.resources.storageRuntimeCleanupTitle)}
+                        </h3>
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.storageRuntimeCleanupDescription)}
+                      </p>
+                    </div>
+                    <Badge variant="secondary">
+                      {$t(i18nKeys.console.resources.storageRuntimeCleanupBadge)}
+                    </Badge>
+                  </div>
+
+                  <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(14rem,18rem)]">
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
+                      <Select.Root bind:value={storageRuntimeCleanupVolumeId} type="single">
+                        <Select.Trigger id="resource-storage-runtime-cleanup-volume-trigger" class="w-full">
+                          {selectedStorageRuntimeCleanupVolume
+                            ? storageVolumeOptionLabel(selectedStorageRuntimeCleanupVolume)
+                            : $t(i18nKeys.console.resources.storageVolumeSelect)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          {#each storageVolumes as volume (volume.id)}
+                            <Select.Item value={volume.id}>
+                              {storageVolumeOptionLabel(volume)}
+                            </Select.Item>
+                          {/each}
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.common.domain.server)}</span>
+                      <Select.Root bind:value={storageRuntimeCleanupServerId} type="single">
+                        <Select.Trigger id="resource-storage-runtime-cleanup-server-trigger" class="w-full">
+                          {selectedStorageRuntimeCleanupServer?.name ??
+                            $t(i18nKeys.console.domainBindings.noServerOptions)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          {#each servers as server (server.id)}
+                            <Select.Item value={server.id}>{server.name}</Select.Item>
+                          {/each}
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-storage-runtime-cleanup-before">
+                      <span>{$t(i18nKeys.console.resources.storageRuntimeCleanupBefore)}</span>
+                      <Input
+                        id="resource-storage-runtime-cleanup-before"
+                        bind:value={storageRuntimeCleanupBefore}
+                        autocomplete="off"
+                        placeholder="2026-01-01T00:00:00.000Z"
+                      />
+                    </label>
+                  </div>
+
+                  <div class="mt-4 flex flex-wrap justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!canCleanupStorageRuntime || cleanupStorageRuntimeMutation.isPending}
+                      onclick={previewStorageRuntimeCleanup}
+                    >
+                      <RefreshCw class="mr-2 size-4" aria-hidden="true" />
+                      {cleanupStorageRuntimeMutation.isPending
+                        ? $t(i18nKeys.common.status.loading)
+                        : $t(i18nKeys.console.resources.storageRuntimeCleanupPreviewAction)}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!canCleanupStorageRuntime || cleanupStorageRuntimeMutation.isPending}
+                      onclick={applyStorageRuntimeCleanup}
+                    >
+                      <Trash2 class="mr-2 size-4" aria-hidden="true" />
+                      {$t(i18nKeys.console.resources.storageRuntimeCleanupApplyAction)}
+                    </Button>
+                  </div>
+
+                  {#if storageRuntimeCleanupFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        storageRuntimeCleanupFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{storageRuntimeCleanupFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{storageRuntimeCleanupFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  {#if storageRuntimeCleanupResult}
+                    <div class="mt-4 space-y-3">
+                      <div class="grid gap-2 sm:grid-cols-5">
+                        <div class="rounded-md border bg-muted/15 px-3 py-2">
+                          <p class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.storageRuntimeCleanupInspected)}
+                          </p>
+                          <p class="text-lg font-semibold">
+                            {storageRuntimeCleanupResult.summary.inspectedCount}
+                          </p>
+                        </div>
+                        <div class="rounded-md border bg-muted/15 px-3 py-2">
+                          <p class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.storageRuntimeCleanupMatched)}
+                          </p>
+                          <p class="text-lg font-semibold">
+                            {storageRuntimeCleanupResult.summary.matchedCount}
+                          </p>
+                        </div>
+                        <div class="rounded-md border bg-muted/15 px-3 py-2">
+                          <p class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.storageRuntimeCleanupCleaned)}
+                          </p>
+                          <p class="text-lg font-semibold">
+                            {storageRuntimeCleanupResult.summary.cleanedCount}
+                          </p>
+                        </div>
+                        <div class="rounded-md border bg-muted/15 px-3 py-2">
+                          <p class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.storageRuntimeCleanupSkipped)}
+                          </p>
+                          <p class="text-lg font-semibold">
+                            {storageRuntimeCleanupResult.summary.skippedCount}
+                          </p>
+                        </div>
+                        <div class="rounded-md border bg-muted/15 px-3 py-2">
+                          <p class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.storageRuntimeCleanupBlocked)}
+                          </p>
+                          <p class="text-lg font-semibold">
+                            {storageRuntimeCleanupResult.summary.blockedCount}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p class="text-sm font-medium">
+                          {$t(i18nKeys.console.resources.storageRuntimeCleanupCandidatesTitle)}
+                        </p>
+                        <div class="mt-2 space-y-2">
+                          {#if storageRuntimeCleanupResult.candidates.length > 0}
+                            {#each storageRuntimeCleanupResult.candidates as candidate (candidate.id)}
+                              <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                  <div class="min-w-0">
+                                    <p class="break-all font-mono text-xs">{candidate.target}</p>
+                                    <p class="mt-1 text-xs text-muted-foreground">
+                                      {candidate.updatedAt ? formatTime(candidate.updatedAt) : "-"}
+                                    </p>
+                                  </div>
+                                  <Badge variant={candidate.action === "blocked" ? "secondary" : "outline"}>
+                                    {storageRuntimeCleanupCandidateDetail(candidate)}
+                                  </Badge>
+                                </div>
+                              </div>
+                            {/each}
+                          {:else}
+                            <div class="rounded-md border border-dashed bg-muted/15 px-4 py-4 text-sm text-muted-foreground">
+                              {$t(i18nKeys.console.resources.storageRuntimeCleanupCandidatesEmpty)}
+                            </div>
+                          {/if}
+                        </div>
+                      </div>
+
+                      {#if storageRuntimeCleanupResult.warnings.length > 0}
+                        <div>
+                          <p class="text-sm font-medium">
+                            {$t(i18nKeys.console.resources.storageRuntimeCleanupWarningsTitle)}
+                          </p>
+                          <div class="mt-2 space-y-2">
+                            {#each storageRuntimeCleanupResult.warnings as warning, index (index)}
+                              <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
+                                <p class="font-medium">{warning.code}</p>
+                                <p class="mt-1 text-xs text-muted-foreground">{warning.message}</p>
+                              </div>
+                            {/each}
+                          </div>
+                        </div>
+                      {/if}
+                    </div>
+                  {/if}
+                </section>
+
+                <form
+                  id="resource-storage-attachment-form"
+                  class="rounded-md border bg-background p-4"
+                  onsubmit={attachResourceStorage}
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2">
+                        <HardDrive class="size-4 text-muted-foreground" aria-hidden="true" />
+                        <h3 class="text-base font-semibold">
+                          {$t(i18nKeys.console.resources.storageAttachTitle)}
+                        </h3>
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.storageAttachDescription)}
+                      </p>
+                    </div>
+                    <Badge variant="secondary">
+                      {$t(i18nKeys.console.resources.storageSnapshotBadge)}
+                    </Badge>
+                  </div>
+
+                  <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(10rem,12rem)]">
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
+                      <Select.Root bind:value={storageAttachmentVolumeId} type="single">
+                        <Select.Trigger id="resource-storage-attachment-volume-trigger" class="w-full">
+                          {selectedStorageVolume
+                            ? storageVolumeOptionLabel(selectedStorageVolume)
+                            : $t(i18nKeys.console.resources.storageVolumeSelect)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          {#each storageVolumes as volume (volume.id)}
+                            <Select.Item value={volume.id}>
+                              {storageVolumeOptionLabel(volume)}
+                            </Select.Item>
+                          {/each}
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-storage-destination">
+                      <span>{$t(i18nKeys.console.resources.storageDestinationPath)}</span>
+                      <Input
+                        id="resource-storage-destination"
+                        bind:value={storageAttachmentDestinationPath}
+                        autocomplete="off"
+                        placeholder="/var/lib/app/data"
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.resources.storageMountMode)}</span>
+                      <Select.Root bind:value={storageAttachmentMountMode} type="single">
+                        <Select.Trigger class="w-full">
+                          {storageMountModeLabel(storageAttachmentMountMode)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="read-write">
+                            {$t(i18nKeys.console.resources.storageMountModeReadWrite)}
+                          </Select.Item>
+                          <Select.Item value="read-only">
+                            {$t(i18nKeys.console.resources.storageMountModeReadOnly)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+                  </div>
+
+                  {#if storageVolumesQuery.isPending}
+                    <div class="mt-4 rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.storageVolumesLoading)}
+                    </div>
+                  {:else if storageVolumesQuery.error}
+                    <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                      {readErrorMessage(storageVolumesQuery.error)}
+                    </div>
+                  {:else if storageVolumes.length === 0}
+                    <div class="mt-4 rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.storageVolumesEmpty)}
+                    </div>
+                  {/if}
+
+                  {#if storageAttachmentFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        storageAttachmentFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{storageAttachmentFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{storageAttachmentFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!canAttachStorage || attachResourceStorageMutation.isPending}
+                    >
+                      {attachResourceStorageMutation.isPending
+                        ? $t(i18nKeys.common.actions.saving)
+                        : $t(i18nKeys.console.resources.storageAttachAction)}
+                    </Button>
+                  </div>
+                </form>
+
+                <section class="rounded-md border bg-background p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 class="text-base font-semibold">
+                        {$t(i18nKeys.console.resources.storageAttachmentsTitle)}
+                      </h3>
+                      <p class="mt-1 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.storageAttachmentsDescription)}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onclick={() => void invalidateStorageAttachmentQueries()}
+                    >
+                      <RefreshCw class="mr-2 size-4" aria-hidden="true" />
+                      {$t(i18nKeys.console.resources.storageAttachmentsRefresh)}
+                    </Button>
+                  </div>
+
+                  <div class="mt-4 space-y-3">
+                    {#if resourceStorageAttachments.length > 0}
+                      {#each resourceStorageAttachments as attachment (attachment.id)}
+                        <article class="rounded-md border bg-muted/15 p-3">
+                          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div class="min-w-0 space-y-2">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-medium">
+                                  {storageAttachmentVolumeLabel(attachment)}
+                                </p>
+                                {#if attachment.storageVolumeKind}
+                                  <Badge variant="outline">
+                                    {storageVolumeKindLabel(attachment.storageVolumeKind)}
+                                  </Badge>
+                                {/if}
+                                <Badge variant="secondary">
+                                  {storageMountModeLabel(attachment.mountMode)}
+                                </Badge>
+                              </div>
+                              <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
+                                {attachment.destinationPath}
+                              </p>
+                              <p class="text-xs text-muted-foreground">
+                                {$t(i18nKeys.console.resources.storageAttachedAt)}
+                                {formatTime(attachment.attachedAt)}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={isResourceArchived || detachResourceStorageMutation.isPending}
+                              onclick={() => detachResourceStorage(attachment)}
+                            >
+                              {$t(i18nKeys.console.resources.storageDetachAction)}
+                            </Button>
+                          </div>
+                        </article>
+                      {/each}
+                    {:else}
+                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.storageAttachmentsEmpty)}
+                      </div>
+                    {/if}
+                  </div>
+                </section>
+              </section>
+
+              {:else if activeSettingsSection === "dependencies"}
+              <section id="resource-overview-dependencies" class="space-y-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <h2 class="text-lg font-semibold">
+                        {$t(i18nKeys.console.resources.dependenciesTitle)}
+                      </h2>
+                      <DocsHelpLink
+                        href={webDocsHrefs.dependencyResourceLifecycle}
+                        ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      />
+                    </div>
+                    <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                      {$t(i18nKeys.console.resources.dependenciesDescription)}
+                    </p>
+                  </div>
+                  <Badge variant="outline">{resourceDependencyBindings.length}</Badge>
+                </div>
+
+                <section class="rounded-md border bg-background p-4">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2">
+                        <Database class="size-4 text-muted-foreground" aria-hidden="true" />
+                        <h3 class="text-base font-semibold">
+                          {$t(i18nKeys.console.resources.dependencyResourceManagementTitle)}
+                        </h3>
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependencyResourceManagementDescription)}
+                      </p>
+                    </div>
+                    <Badge variant="outline">{dependencyResources.length}</Badge>
+                  </div>
+
+                  <form class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_minmax(0,1fr)_auto]" onsubmit={provisionDependencyResource}>
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-name">
+                      <span>{$t(i18nKeys.console.resources.dependencyName)}</span>
+                      <Input
+                        id="resource-dependency-name"
+                        bind:value={dependencyProvisionName}
+                        autocomplete="off"
+                        placeholder="primary-db"
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.resources.dependencyKind)}</span>
+                      <Select.Root bind:value={dependencyProvisionKind} type="single">
+                        <Select.Trigger class="w-full">
+                          {dependencyResourceKindLabel(dependencyProvisionKind)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="postgres">
+                            {$t(i18nKeys.console.resources.dependencyKindPostgres)}
+                          </Select.Item>
+                          <Select.Item value="redis">
+                            {$t(i18nKeys.console.resources.dependencyKindRedis)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-provider">
+                      <span>{$t(i18nKeys.console.resources.dependencyProviderKey)}</span>
+                      <Input
+                        id="resource-dependency-provider"
+                        bind:value={dependencyProviderKey}
+                        autocomplete="off"
+                        placeholder="local"
+                      />
+                    </label>
+
+                    <div class="flex items-end">
+                      <Button
+                        type="submit"
+                        disabled={!canProvisionDependencyResource || provisionDependencyResourceMutation.isPending}
+                      >
+                        <Plus class="mr-2 size-4" aria-hidden="true" />
+                        {provisionDependencyResourceMutation.isPending
+                          ? $t(i18nKeys.common.actions.saving)
+                          : $t(i18nKeys.console.resources.dependencyProvisionAction)}
+                      </Button>
+                    </div>
+                  </form>
+
+                  <form class="mt-4 grid gap-4 border-t pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_minmax(0,1.4fr)_minmax(0,1fr)_auto]" onsubmit={importDependencyResource}>
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-import-name">
+                      <span>{$t(i18nKeys.console.resources.dependencyImportName)}</span>
+                      <Input
+                        id="resource-dependency-import-name"
+                        bind:value={dependencyImportName}
+                        autocomplete="off"
+                        placeholder="external-db"
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.resources.dependencyKind)}</span>
+                      <Select.Root bind:value={dependencyImportKind} type="single">
+                        <Select.Trigger class="w-full">
+                          {dependencyResourceKindLabel(dependencyImportKind)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="postgres">
+                            {$t(i18nKeys.console.resources.dependencyKindPostgres)}
+                          </Select.Item>
+                          <Select.Item value="redis">
+                            {$t(i18nKeys.console.resources.dependencyKindRedis)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-import-url">
+                      <span>{$t(i18nKeys.console.resources.dependencyImportConnectionUrl)}</span>
+                      <Input
+                        id="resource-dependency-import-url"
+                        bind:value={dependencyImportConnectionUrl}
+                        autocomplete="off"
+                        placeholder={dependencyImportKind === "postgres"
+                          ? "postgres://..."
+                          : "redis://..."}
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-import-secret-ref">
+                      <span>{$t(i18nKeys.console.resources.dependencyImportSecretRef)}</span>
+                      <Input
+                        id="resource-dependency-import-secret-ref"
+                        bind:value={dependencyImportSecretRef}
+                        autocomplete="off"
+                        placeholder="secret://..."
+                      />
+                    </label>
+
+                    <div class="flex items-end">
+                      <Button
+                        type="submit"
+                        disabled={!canImportDependencyResource || importDependencyResourceMutation.isPending}
+                      >
+                        <Link2 class="mr-2 size-4" aria-hidden="true" />
+                        {importDependencyResourceMutation.isPending
+                          ? $t(i18nKeys.common.actions.saving)
+                          : $t(i18nKeys.console.resources.dependencyImportAction)}
+                      </Button>
+                    </div>
+                  </form>
+
+                  <div class="mt-4 space-y-3">
+                    {#if dependencyResourcesQuery.isPending}
+                      <div class="rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependenciesLoading)}
+                      </div>
+                    {:else if dependencyResourcesQuery.error}
+                      <div class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                        {readErrorMessage(dependencyResourcesQuery.error)}
+                      </div>
+                    {:else if dependencyResources.length === 0}
+                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependenciesEmpty)}
+                      </div>
+                    {:else}
+                      {#each dependencyResources as dependency (dependency.id)}
+                        <article class="rounded-md border bg-muted/15 p-3">
+                          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div class="min-w-0 flex-1 space-y-2">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-medium">{dependency.name}</p>
+                                <Badge variant="outline">
+                                  {dependencyResourceKindLabel(dependency.kind)}
+                                </Badge>
+                                <Badge variant="secondary">{dependency.lifecycleStatus}</Badge>
+                                <Badge variant="outline">{dependency.bindingReadiness.status}</Badge>
+                              </div>
+                              {#if dependency.connection?.maskedConnection}
+                                <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
+                                  {dependency.connection.maskedConnection}
+                                </p>
+                              {/if}
+                              <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+                                <label class="min-w-0 flex-1 space-y-1 text-xs font-medium" for={`dependency-rename-${dependency.id}`}>
+                                  <span>{$t(i18nKeys.console.resources.dependencyRenameInput)}</span>
+                                  <Input
+                                    id={`dependency-rename-${dependency.id}`}
+                                    value={dependencyRenameNames[dependency.id] ?? ""}
+                                    autocomplete="off"
+                                    placeholder={dependency.name}
+                                    oninput={(event) => {
+                                      dependencyRenameNames[dependency.id] = event.currentTarget.value;
+                                    }}
+                                  />
+                                </label>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isResourceArchived ||
+                                    renameDependencyResourceMutation.isPending ||
+                                    !(dependencyRenameNames[dependency.id] ?? "").trim() ||
+                                    (dependencyRenameNames[dependency.id] ?? "").trim() === dependency.name}
+                                  onclick={() => renameDependencyResource(dependency)}
+                                >
+                                  {$t(i18nKeys.console.resources.dependencyRenameAction)}
+                                </Button>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={isResourceArchived ||
+                                deleteDependencyResourceMutation.isPending ||
+                                (dependency.deleteSafety?.blockers.length ?? 0) > 0}
+                              title={(dependency.deleteSafety?.blockers.length ?? 0) > 0
+                                ? $t(i18nKeys.console.resources.dependencyDeleteBlocked)
+                                : undefined}
+                              onclick={() => deleteDependencyResource(dependency)}
+                            >
+                              <Trash2 class="mr-2 size-4" aria-hidden="true" />
+                              {$t(i18nKeys.console.resources.dependencyDeleteAction)}
+                            </Button>
+                          </div>
+                        </article>
+                      {/each}
+                    {/if}
+                  </div>
+                </section>
+
+                <section class="rounded-md border bg-background p-4">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2">
+                        <Archive class="size-4 text-muted-foreground" aria-hidden="true" />
+                        <h3 class="text-base font-semibold">
+                          {$t(i18nKeys.console.resources.dependencyBackupTitle)}
+                        </h3>
+                        <DocsHelpLink
+                          href={webDocsHrefs.dependencyBackupRestore}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependencyBackupDescription)}
+                      </p>
+                    </div>
+                    <Badge variant="outline">{dependencyBackups.length}</Badge>
+                  </div>
+
+                  <form class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onsubmit={createDependencyBackup}>
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.resources.dependencyResource)}</span>
+                      <Select.Root bind:value={dependencyBackupResourceId} type="single">
+                        <Select.Trigger id="resource-dependency-backup-resource-trigger" class="w-full">
+                          {selectedDependencyBackupResource
+                            ? dependencyResourceOptionLabel(selectedDependencyBackupResource)
+                            : $t(i18nKeys.console.resources.dependencySelect)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          {#each dependencyResources as dependency (dependency.id)}
+                            <Select.Item value={dependency.id}>
+                              {dependencyResourceOptionLabel(dependency)}
+                            </Select.Item>
+                          {/each}
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-backup-description">
+                      <span>{$t(i18nKeys.console.resources.dependencyBackupDescriptionInput)}</span>
+                      <Input
+                        id="resource-dependency-backup-description"
+                        bind:value={dependencyBackupDescription}
+                        autocomplete="off"
+                        placeholder="pre deploy"
+                      />
+                    </label>
+
+                    <div class="flex items-end">
+                      <Button
+                        type="submit"
+                        disabled={!canCreateDependencyBackup || createDependencyBackupMutation.isPending}
+                      >
+                        <Database class="mr-2 size-4" aria-hidden="true" />
+                        {createDependencyBackupMutation.isPending
+                          ? $t(i18nKeys.common.actions.saving)
+                          : $t(i18nKeys.console.resources.dependencyBackupCreateAction)}
+                      </Button>
+                    </div>
+                  </form>
+
+                  <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    <label
+                      class="flex items-start gap-3 rounded-md border bg-muted/20 px-3 py-3 text-sm"
+                      for="resource-dependency-restore-overwrite"
+                    >
+                      <input
+                        id="resource-dependency-restore-overwrite"
+                        bind:checked={dependencyRestoreAcknowledgeDataOverwrite}
+                        type="checkbox"
+                        class="mt-0.5 size-4 rounded border-input"
+                      />
+                      <span>{$t(i18nKeys.console.resources.dependencyBackupAcknowledgeOverwrite)}</span>
+                    </label>
+
+                    <label
+                      class="flex items-start gap-3 rounded-md border bg-muted/20 px-3 py-3 text-sm"
+                      for="resource-dependency-restore-runtime"
+                    >
+                      <input
+                        id="resource-dependency-restore-runtime"
+                        bind:checked={dependencyRestoreAcknowledgeRuntimeNotRestarted}
+                        type="checkbox"
+                        class="mt-0.5 size-4 rounded border-input"
+                      />
+                      <span>{$t(i18nKeys.console.resources.dependencyBackupAcknowledgeRuntime)}</span>
+                    </label>
+                  </div>
+
+                  <div class="mt-4 space-y-3">
+                    {#if !dependencyBackupResourceId}
+                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependencyBackupSelectPrompt)}
+                      </div>
+                    {:else if dependencyBackupsQuery.isPending}
+                      <div class="rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependencyBackupsLoading)}
+                      </div>
+                    {:else if dependencyBackupsQuery.error}
+                      <div class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                        {readErrorMessage(dependencyBackupsQuery.error)}
+                      </div>
+                    {:else if dependencyBackups.length === 0}
+                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependencyBackupsEmpty)}
+                      </div>
+                    {:else}
+                      {#each dependencyBackups as backup (backup.id)}
+                        <article class="rounded-md border bg-muted/15 p-3">
+                          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div class="min-w-0 flex-1 space-y-2">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-medium">{dependencyBackupLabel(backup)}</p>
+                                <Badge variant="secondary">{backup.retentionStatus}</Badge>
+                                {#if backup.latestRestoreAttempt}
+                                  <Badge variant="outline">
+                                    {backup.latestRestoreAttempt.status}
+                                  </Badge>
+                                {/if}
+                              </div>
+                              {#if backup.providerArtifactHandle}
+                                <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
+                                  {backup.providerArtifactHandle}
+                                </p>
+                              {/if}
+                              {#if backup.failureCode || backup.failureMessage}
+                                <p class="text-xs text-destructive">
+                                  {backup.failureCode ?? ""} {backup.failureMessage ?? ""}
+                                </p>
+                              {/if}
+                              <label class="block space-y-1 text-xs font-medium" for={`dependency-restore-label-${backup.id}`}>
+                                <span>{$t(i18nKeys.console.resources.dependencyBackupRestoreLabel)}</span>
+                                <Input
+                                  id={`dependency-restore-label-${backup.id}`}
+                                  value={dependencyRestoreLabels[backup.id] ?? ""}
+                                  autocomplete="off"
+                                  placeholder="restore before migration"
+                                  oninput={(event) => {
+                                    dependencyRestoreLabels[backup.id] = event.currentTarget.value;
+                                  }}
+                                />
+                              </label>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={isResourceArchived ||
+                                backup.status !== "ready" ||
+                                !dependencyRestoreAcknowledgeDataOverwrite ||
+                                !dependencyRestoreAcknowledgeRuntimeNotRestarted ||
+                                restoreDependencyBackupMutation.isPending}
+                              onclick={() => restoreDependencyBackup(backup)}
+                            >
+                              <RotateCw class="mr-2 size-4" aria-hidden="true" />
+                              {$t(i18nKeys.console.resources.dependencyBackupRestoreAction)}
+                            </Button>
+                          </div>
+                        </article>
+                      {/each}
+                    {/if}
+                  </div>
+                </section>
+
+                <form
+                  id="resource-dependency-binding-form"
+                  class="rounded-md border bg-background p-4"
+                  onsubmit={bindDependencyResource}
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2">
+                        <Link2 class="size-4 text-muted-foreground" aria-hidden="true" />
+                        <h3 class="text-base font-semibold">
+                          {$t(i18nKeys.console.resources.dependencyBindTitle)}
+                        </h3>
+                        <DocsHelpLink
+                          href={webDocsHrefs.dependencyRuntimeInjection}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependencyBindDescription)}
+                      </p>
+                    </div>
+                    <Badge variant="secondary">
+                      {$t(i18nKeys.console.resources.dependencyRuntimeBadge)}
+                    </Badge>
+                  </div>
+
+                  <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_auto]">
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.resources.dependencyResource)}</span>
+                      <Select.Root bind:value={dependencyBindingResourceId} type="single">
+                        <Select.Trigger id="resource-dependency-binding-resource-trigger" class="w-full">
+                          {selectedDependencyResource
+                            ? dependencyResourceOptionLabel(selectedDependencyResource)
+                            : $t(i18nKeys.console.resources.dependencySelect)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          {#each bindableDependencyResources as dependency (dependency.id)}
+                            <Select.Item value={dependency.id}>
+                              {dependencyResourceOptionLabel(dependency)}
+                            </Select.Item>
+                          {/each}
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-target">
+                      <span>{$t(i18nKeys.console.resources.dependencyTargetName)}</span>
+                      <Input
+                        id="resource-dependency-target"
+                        bind:value={dependencyBindingTargetName}
+                        autocomplete="off"
+                        placeholder="DATABASE_URL"
+                      />
+                    </label>
+
+                    <div class="flex items-end">
+                      <Button
+                        type="submit"
+                        disabled={!canBindDependencyResource || bindResourceDependencyMutation.isPending}
+                      >
+                        {bindResourceDependencyMutation.isPending
+                          ? $t(i18nKeys.common.actions.saving)
+                          : $t(i18nKeys.console.resources.dependencyBindAction)}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {#if dependencyFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        dependencyFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{dependencyFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{dependencyFeedback.detail}</p>
+                    </div>
+                  {/if}
+                </form>
+
+                <section class="rounded-md border bg-background p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 class="text-base font-semibold">
+                        {$t(i18nKeys.console.resources.dependencyBindingsTitle)}
+                      </h3>
+                      <p class="mt-1 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependencyBindingsDescription)}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onclick={() => void invalidateDependencyQueries()}
+                    >
+                      <RefreshCw class="mr-2 size-4" aria-hidden="true" />
+                      {$t(i18nKeys.console.resources.dependencyRefresh)}
+                    </Button>
+                  </div>
+
+                  <div class="mt-4 space-y-3">
+                    {#if resourceDependencyBindingsQuery.isPending}
+                      <div class="rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependenciesLoading)}
+                      </div>
+                    {:else if resourceDependencyBindings.length > 0}
+                      {#each resourceDependencyBindings as binding (binding.id)}
+                        <article class="rounded-md border bg-muted/15 p-3">
+                          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div class="min-w-0 space-y-2">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-medium">
+                                  {binding.dependencyResourceName ?? binding.dependencyResourceId}
+                                </p>
+                                <Badge variant="outline">
+                                  {dependencyResourceKindLabel(binding.kind)}
+                                </Badge>
+                                <Badge variant="secondary">{binding.snapshotReadiness.status}</Badge>
+                                <Badge variant="outline">{binding.status}</Badge>
+                              </div>
+                              <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
+                                {binding.target.targetName} · {binding.target.scope} · {binding.target.injectionMode}
+                              </p>
+                              <div class="grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                                <label class="space-y-1 text-xs font-medium" for={`dependency-binding-secret-ref-${binding.id}`}>
+                                  <span>{$t(i18nKeys.console.resources.dependencySecretRefInput)}</span>
+                                  <Input
+                                    id={`dependency-binding-secret-ref-${binding.id}`}
+                                    value={dependencyBindingSecretRefs[binding.id] ?? ""}
+                                    autocomplete="off"
+                                    placeholder="secret://..."
+                                    oninput={(event) => {
+                                      dependencyBindingSecretRefs[binding.id] = event.currentTarget.value;
+                                    }}
+                                  />
+                                </label>
+                                <label class="space-y-1 text-xs font-medium" for={`dependency-binding-secret-value-${binding.id}`}>
+                                  <span>{$t(i18nKeys.console.resources.dependencySecretValueInput)}</span>
+                                  <Input
+                                    id={`dependency-binding-secret-value-${binding.id}`}
+                                    value={dependencyBindingSecretValues[binding.id] ?? ""}
+                                    type="password"
+                                    autocomplete="new-password"
+                                    oninput={(event) => {
+                                      dependencyBindingSecretValues[binding.id] = event.currentTarget.value;
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                              <label
+                                class="flex items-start gap-3 rounded-md border bg-background px-3 py-2 text-xs"
+                                for={`dependency-binding-secret-ack-${binding.id}`}
+                              >
+                                <input
+                                  id={`dependency-binding-secret-ack-${binding.id}`}
+                                  checked={dependencyBindingSecretRotationAcks[binding.id] === true}
+                                  type="checkbox"
+                                  class="mt-0.5 size-4 rounded border-input"
+                                  onchange={(event) => {
+                                    dependencyBindingSecretRotationAcks[binding.id] =
+                                      event.currentTarget.checked;
+                                  }}
+                                />
+                                <span>
+                                  {$t(i18nKeys.console.resources.dependencySecretRotateAck)}
+                                </span>
+                              </label>
+                            </div>
+                            <div class="flex flex-wrap gap-2 lg:justify-end">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={!canRotateDependencyBindingSecret(binding.id)}
+                                onclick={() => rotateDependencyBindingSecret(binding)}
+                              >
+                                <RotateCw class="mr-2 size-4" aria-hidden="true" />
+                                {$t(i18nKeys.console.resources.dependencySecretRotateAction)}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={isResourceArchived || unbindResourceDependencyMutation.isPending}
+                                onclick={() => unbindDependencyResource(binding)}
+                              >
+                                {$t(i18nKeys.console.resources.dependencyUnbindAction)}
+                              </Button>
+                            </div>
+                          </div>
+                        </article>
+                      {/each}
+                    {:else}
+                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependencyBindingsEmpty)}
+                      </div>
+                    {/if}
+                  </div>
+                </section>
+              </section>
+
               {:else if activeSettingsSection === "domains"}
               <section id="resource-overview-domains" class="space-y-4">
                 <div>
@@ -5577,7 +8048,11 @@
                   </p>
                 </div>
 
-                <form class="rounded-md border bg-background p-4" onsubmit={createResourceDomainBinding}>
+                <form
+                  id="resource-domain-binding-create-form"
+                  class="rounded-md border bg-background p-4"
+                  onsubmit={createResourceDomainBinding}
+                >
                   <div class="flex flex-wrap gap-x-4 gap-y-1 border-b pb-3 text-xs text-muted-foreground">
                     <span>{$t(i18nKeys.common.domain.resource)}: {resource.name}</span>
                     <span>
@@ -5598,6 +8073,7 @@
                         />
                       </span>
                       <Input
+                        id="resource-domain-binding-domain-name"
                         bind:value={domainName}
                         autocomplete="off"
                         placeholder={$t(i18nKeys.console.domainBindings.formDomainPlaceholder)}
@@ -5613,7 +8089,12 @@
                           className="size-5"
                         />
                       </span>
-                      <Input bind:value={pathPrefix} autocomplete="off" placeholder="/" />
+                      <Input
+                        id="resource-domain-binding-path-prefix"
+                        bind:value={pathPrefix}
+                        autocomplete="off"
+                        placeholder="/"
+                      />
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
@@ -6491,8 +8972,19 @@
                     <p class="mt-1 text-sm text-muted-foreground">
                       {$t(i18nKeys.console.resources.diagnosticsDescription)}
                     </p>
+                    {#if resourceRuntimeMonitoringObservationHandoff}
+                      <p class="mt-2 text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.runtimeUsage.observationWindowHandoff, {
+                          from: formatTime(resourceRuntimeMonitoringObservationHandoff.from),
+                          to: formatTime(resourceRuntimeMonitoringObservationHandoff.to),
+                          scopeKind: resourceRuntimeMonitoringObservationHandoff.scope.kind,
+                          scopeId: resource?.id ?? "",
+                        })}
+                      </p>
+                    {/if}
                   </div>
                   <Button
+                    id="resource-diagnostic-summary-copy"
                     variant="outline"
                     onclick={copyResourceDiagnosticSummary}
                     disabled={diagnosticSummaryLoading}
@@ -6590,12 +9082,23 @@
 
         <Tabs.Content value="monitor" class="mt-0">
           <RuntimeMonitorPanel
+            scope={resourceRuntimeScope}
             usage={resourceRuntimeUsage}
             loading={resourceRuntimeUsageQuery.isPending}
             error={resourceRuntimeUsageError}
+            retainedSamples={resourceRuntimeMonitoringSamples}
+            retainedSamplesLoading={resourceRuntimeMonitoringSamplesQuery.isPending}
+            retainedSamplesError={resourceRuntimeMonitoringSamplesError}
+            rollup={resourceRuntimeMonitoringRollup}
+            rollupLoading={resourceRuntimeMonitoringRollupQuery.isPending}
+            rollupError={resourceRuntimeMonitoringRollupError}
+            thresholds={resourceRuntimeMonitoringThresholds}
+            thresholdsLoading={resourceRuntimeMonitoringThresholdsQuery.isPending}
+            thresholdsError={resourceRuntimeMonitoringThresholdsError}
             logsHref={resourceTabHref("logs")}
             eventsHref={resourceTabHref("deployments")}
             diagnosticsHref={resourceSettingsSectionHref("diagnostics")}
+            cleanupHref={resourceSettingsSectionHref("storage")}
           />
         </Tabs.Content>
 
@@ -6685,6 +9188,16 @@
                     <p class="mt-1 text-sm text-muted-foreground">
                       {$t(i18nKeys.console.resources.runtimeLogsDescription)}
                     </p>
+                    {#if resourceRuntimeMonitoringObservationHandoff}
+                      <p class="mt-2 text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.runtimeUsage.observationWindowHandoff, {
+                          from: formatTime(resourceRuntimeMonitoringObservationHandoff.from),
+                          to: formatTime(resourceRuntimeMonitoringObservationHandoff.to),
+                          scopeKind: resourceRuntimeMonitoringObservationHandoff.scope.kind,
+                          scopeId: resource?.id ?? "",
+                        })}
+                      </p>
+                    {/if}
                     {#if runtimeLogsLoading || runtimeLogsFollowing}
                       <p class="mt-2 text-xs text-muted-foreground">
                         {runtimeLogsLoading
@@ -6725,11 +9238,17 @@
               <div class="mt-4 max-h-96 overflow-auto rounded-md border bg-zinc-950 p-3 font-mono text-xs text-zinc-100">
                 {#if runtimeLogsLoading}
                   <p class="text-zinc-400">{$t(i18nKeys.console.resources.runtimeLogsLoading)}</p>
-                {:else if runtimeLogs.length === 0}
-                  <p class="text-zinc-400">{$t(i18nKeys.console.resources.runtimeLogsEmpty)}</p>
+                {:else if runtimeLogsInObservationWindow.length === 0}
+                  <p class="text-zinc-400">
+                    {$t(
+                      resourceRuntimeMonitoringObservationHandoff && runtimeLogs.length > 0
+                        ? i18nKeys.console.runtimeUsage.observationWindowEmpty
+                        : i18nKeys.console.resources.runtimeLogsEmpty,
+                    )}
+                  </p>
                 {:else}
                   <div class="space-y-1">
-                    {#each runtimeLogs as line, index (`${line.sequence ?? index}-${line.timestamp ?? ""}-${line.message}`)}
+                    {#each runtimeLogsInObservationWindow as line, index (`${line.sequence ?? index}-${line.timestamp ?? ""}-${line.message}`)}
                       <div class="grid gap-2 sm:grid-cols-[10rem_1fr]">
                         <span class="truncate text-zinc-500">
                           {line.timestamp ? formatTime(line.timestamp) : line.stream}
@@ -6763,6 +9282,7 @@
               scope={{
                 kind: "resource",
                 resourceId: resource.id,
+                ...(terminalDeploymentId ? { deploymentId: terminalDeploymentId } : {}),
               }}
             />
           </section>

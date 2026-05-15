@@ -131,6 +131,7 @@ generic `resources.update`.
 | RES-PROFILE-ENTRY-014 | Web | Entrypoint | Resource detail configuration override removed. | Dispatches `resources.unset-variable`, invalidates `resources.effective-config`, and does not mutate environment variables, historical deployment snapshots, or current runtime. |
 | RES-PROFILE-ENTRY-015 | CLI | Entrypoint | Resource `.env` import submitted. | Dispatches `ImportResourceVariablesCommand` through `CommandBus`; no CLI-only parser bypasses the application schema. |
 | RES-PROFILE-ENTRY-016 | HTTP/oRPC | Entrypoint | Resource `.env` import route submitted. | Dispatches `ImportResourceVariablesCommand` through `CommandBus` using the command schema. |
+| RES-PROFILE-ENTRY-017 | Web | Entrypoint | Resource detail `.env` import form submitted. | Dispatches `resources.import-variables` through the shared oRPC command schema, supports explicit secret/plain key classification, invalidates `resources.effective-config`, and does not echo raw secret values. |
 | RES-PROFILE-ERROR-001 | Error mapping | Contract | Persistence failure before command success. | Returns `infra_error`, `phase = resource-persistence`. |
 | RES-PROFILE-ERROR-002 | Error mapping | Contract | Event publication/outbox failure before command success. | Returns `infra_error`, `phase = event-publication`. |
 | RES-PROFILE-ERROR-003 | Error mapping | Contract | Event consumer projection failure. | Records `phase = event-consumption` and does not reinterpret command success. |
@@ -203,13 +204,15 @@ Automated coverage now exists for:
 - CLI dispatch for `resources.archive` in `packages/adapters/cli/test/resource-command.test.ts`;
 - CLI dispatch for `resources.delete` in `packages/adapters/cli/test/resource-command.test.ts`;
 - Web detail dispatch for `resources.show` in `apps/web/test/e2e-webview/home.webview.test.ts`;
-- Web source, runtime, network, access, configuration set, archive, and delete submissions in
+- Web source, runtime, network, access, configuration set/import, archive, and delete submissions in
   `apps/web/test/e2e-webview/home.webview.test.ts`.
 - Web durable future-only profile editing guidance for source/runtime/network/access/health/
   configuration profile forms in
   `apps/web/test/e2e-webview/home.webview.test.ts` under `RES-PROFILE-ENTRY-012`.
 - Web health policy submission for `RES-PROFILE-ENTRY-013` and configuration removal for
   `RES-PROFILE-ENTRY-014` in `apps/web/test/e2e-webview/home.webview.test.ts`.
+- Web `.env` import submission for `RES-PROFILE-ENTRY-017` and `RES-PROFILE-CONFIG-013` in
+  `apps/web/test/e2e-webview/home.webview.test.ts`.
 - CLI dispatch coverage for source/runtime/network/access/health/config/archive/delete profile
   commands in `packages/adapters/cli/test/resource-command.test.ts` under `RES-PROFILE-ENTRY-003`,
   `RES-PROFILE-ENTRY-006`, and `RES-PROFILE-ENTRY-010`.

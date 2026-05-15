@@ -71,12 +71,17 @@
   - PG/PGlite deployment persistence/read-model test when schema changes;
   - contract/schema tests for plan/show response shape if contracts change.
 
-## Risks And Migration Gaps
+## Risks And Later Slice Handoffs
 
-- Runtime env injection remains deferred and must not be inferred from snapshot readiness.
-- Secret rotation remains deferred.
-- Backup/restore remains deferred.
-- Redis remains deferred.
+- Runtime env injection is governed by
+  [Dependency Binding Runtime Injection](../047-dependency-binding-runtime-injection/spec.md) and
+  [Dependency Runtime Secret Value Resolution](../048-dependency-runtime-secret-value-resolution/spec.md).
+- Secret rotation is governed by
+  [Dependency Binding Secret Rotation](../036-dependency-binding-secret-rotation/spec.md).
+- Backup/restore is governed by
+  [Dependency Resource Backup And Restore](../039-dependency-resource-backup-restore/spec.md).
+- Redis binding and runtime delivery are governed by the Redis lifecycle/provider-realization and
+  runtime-injection slices.
 - Existing deployments have no dependency binding references and should read as an empty list, not
   as missing/corrupt state.
-- Public docs page/help anchor is a Docs Round migration gap unless expanded in this PR.
+- Public docs/help coverage is active through the later public bind-to-deploy docs slice.

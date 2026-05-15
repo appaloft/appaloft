@@ -552,6 +552,54 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  test("[STOR-SNAPSHOT-001] materializes storage mounts into runtime plan metadata", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_storage_mounts",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/demo",
+        displayName: "workspace",
+      }),
+      server: {
+        id: "srv_demo",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_storage_mounts"),
+      detectedReasoning: ["local folder"],
+      requestedDeployment: {
+        method: "dockerfile",
+        port: 4321,
+        storageMounts: [
+          {
+            attachmentId: "rsa_data",
+            storageVolumeId: "stv_data",
+            storageVolumeKind: "named-volume",
+            destinationPath: "/var/lib/app/data",
+            mountMode: "read-write",
+          },
+        ],
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(JSON.parse(plan.execution.metadata?.["storage.mounts"] ?? "[]")).toEqual([
+      {
+        attachmentId: "rsa_data",
+        storageVolumeId: "stv_data",
+        storageVolumeKind: "named-volume",
+        destinationPath: "/var/lib/app/data",
+        mountMode: "read-write",
+      },
+    ]);
+  });
+
   test("[WF-PLAN-DET-007][WF-PLAN-DET-013][WF-PLAN-CAT-002] packages detected Next.js static export as static artifact", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
@@ -1424,7 +1472,7 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.execution).toEqual(
       expect.objectContaining({
         kind: "docker-container",
-        installCommand: "pip install --no-cache-dir -r requirements.txt",
+        installCommand: "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt",
         startCommand: "python -m app",
         port: 4316,
       }),
@@ -1473,13 +1521,13 @@ describe("DefaultRuntimePlanResolver", () => {
         runtimeKind: "fastapi",
         framework: "fastapi",
         packageManager: "uv",
-        baseImage: "python:3.12-slim",
+        baseImage: "ghcr.io/astral-sh/uv:0.9.26-python3.12-bookworm-slim",
         applicationShape: "serverful-http",
       }),
     );
     expect(plan.execution).toEqual(
       expect.objectContaining({
-        installCommand: "pip install --no-cache-dir uv && uv sync --frozen --no-dev",
+        installCommand: "uv sync --frozen --no-dev",
         startCommand: "uv run python -m uvicorn main:app --host 0.0.0.0 --port 3000",
         port: 3000,
       }),
@@ -1533,9 +1581,8 @@ describe("DefaultRuntimePlanResolver", () => {
     );
     expect(plan.execution).toEqual(
       expect.objectContaining({
-        installCommand:
-          "pip install --no-cache-dir poetry && poetry install --only main --no-root",
-        startCommand: "poetry run python manage.py runserver 0.0.0.0:4319",
+        installCommand: "pip install --no-cache-dir --retries 10 --timeout 120 .",
+        startCommand: "python manage.py runserver 0.0.0.0:4319",
         port: 4319,
       }),
     );
@@ -1587,7 +1634,7 @@ describe("DefaultRuntimePlanResolver", () => {
     );
     expect(plan.execution).toEqual(
       expect.objectContaining({
-        installCommand: "pip install --no-cache-dir -r requirements.txt",
+        installCommand: "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt",
         startCommand: "python -m flask --app app:app run --host 0.0.0.0 --port 4320",
         port: 4320,
       }),

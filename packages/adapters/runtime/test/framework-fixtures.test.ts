@@ -195,11 +195,11 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     runtimeKind: "static",
     applicationShape: "static",
     framework: "svelte",
-    packageManager: "yarn",
+    packageManager: "npm",
     baseImage: "node:22-alpine",
     publishDirectory: "/public",
-    installCommand: "yarn install --frozen-lockfile",
-    buildCommand: "yarn build",
+    installCommand: "npm install",
+    buildCommand: "npm run build",
   },
   {
     matrixIds: "WF-PLAN-CAT-007,WF-PLAN-JS-009,WF-PLAN-JS-013",
@@ -360,11 +360,11 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     runtimeKind: "node",
     applicationShape: "serverful-http",
     framework: "koa",
-    packageManager: "yarn",
+    packageManager: "npm",
     baseImage: "node:22-alpine",
-    installCommand: "yarn install --frozen-lockfile",
-    buildCommand: "yarn build",
-    startCommand: "yarn start",
+    installCommand: "npm install",
+    buildCommand: "npm run build",
+    startCommand: "npm run start",
   },
   {
     matrixIds: "WF-PLAN-CAT-008,WF-PLAN-JS-011,WF-PLAN-JS-013",
@@ -390,8 +390,8 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     applicationShape: "serverful-http",
     framework: "fastapi",
     packageManager: "uv",
-    baseImage: "python:3.12-slim",
-    installCommand: "pip install --no-cache-dir uv && uv sync --frozen --no-dev",
+    baseImage: "ghcr.io/astral-sh/uv:0.9.26-python3.12-bookworm-slim",
+    installCommand: "uv sync --frozen --no-dev",
     startCommand: "uv run python -m uvicorn main:app --host 0.0.0.0 --port 3000",
   },
   {
@@ -405,7 +405,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     framework: "django",
     packageManager: "pip",
     baseImage: "python:3.12-slim",
-    installCommand: "pip install --no-cache-dir -r requirements.txt",
+    installCommand: "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt",
     startCommand: "python manage.py runserver 0.0.0.0:3000",
   },
   {
@@ -419,7 +419,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     framework: "flask",
     packageManager: "pip",
     baseImage: "python:3.12-slim",
-    installCommand: "pip install --no-cache-dir -r requirements.txt",
+    installCommand: "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt",
     startCommand: "python -m flask --app app:app run --host 0.0.0.0 --port 3000",
   },
   {
@@ -431,8 +431,8 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     runtimeKind: "generic-asgi",
     applicationShape: "serverful-http",
     packageManager: "uv",
-    baseImage: "python:3.12-slim",
-    installCommand: "pip install --no-cache-dir uv && uv sync --frozen --no-dev",
+    baseImage: "ghcr.io/astral-sh/uv:0.9.26-python3.12-bookworm-slim",
+    installCommand: "uv sync --frozen --no-dev",
     startCommand: "uv run python -m uvicorn asgi:app --host 0.0.0.0 --port 3000",
   },
   {
@@ -445,7 +445,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     applicationShape: "serverful-http",
     packageManager: "pip",
     baseImage: "python:3.12-slim",
-    installCommand: "pip install --no-cache-dir -r requirements.txt",
+    installCommand: "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt",
     startCommand: "python -m gunicorn wsgi:app --bind 0.0.0.0:3000",
   },
   {
@@ -459,8 +459,8 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     framework: "flask",
     packageManager: "poetry",
     baseImage: "python:3.12-slim",
-    installCommand: "pip install --no-cache-dir poetry && poetry install --only main --no-root",
-    startCommand: "poetry run python -m flask --app app:app run --host 0.0.0.0 --port 3000",
+    installCommand: "pip install --no-cache-dir --retries 10 --timeout 120 .",
+    startCommand: "python -m flask --app app:app run --host 0.0.0.0 --port 3000",
   },
   {
     matrixIds: "WF-PLAN-CAT-013,WF-PLAN-JVM-001,WF-PLAN-JVM-007,WF-PLAN-JVM-008,WF-PLAN-JVM-009,WF-PLAN-JVM-014",
@@ -472,8 +472,8 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     applicationShape: "serverful-http",
     framework: "spring-boot",
     packageManager: "maven",
-    baseImage: "eclipse-temurin:21-jdk",
-    buildCommand: "./mvnw package -DskipTests",
+    baseImage: "maven:3.9-eclipse-temurin-21",
+    buildCommand: "sh ./mvnw package -DskipTests",
     startCommand: "java -jar target/spring-boot-maven-wrapper-0.0.1-SNAPSHOT.jar",
     healthCheckPath: "/actuator/health",
   },
@@ -487,7 +487,7 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     applicationShape: "serverful-http",
     framework: "spring-boot",
     packageManager: "maven",
-    baseImage: "eclipse-temurin:21-jdk",
+    baseImage: "maven:3.9-eclipse-temurin-21",
     buildCommand: "mvn package -DskipTests",
     startCommand: "java -jar target/spring-boot-maven-0.0.1-SNAPSHOT.jar",
   },
@@ -501,8 +501,8 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     applicationShape: "serverful-http",
     framework: "spring-boot",
     packageManager: "gradle",
-    baseImage: "eclipse-temurin:21-jdk",
-    buildCommand: "./gradlew bootJar -x test",
+    baseImage: "gradle:8.12-jdk21",
+    buildCommand: "sh ./gradlew bootJar -x test",
     startCommand: "java -jar build/libs/spring-boot-gradle-wrapper-0.0.1-SNAPSHOT.jar",
   },
   {
@@ -515,9 +515,23 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     applicationShape: "serverful-http",
     framework: "spring-boot",
     packageManager: "gradle",
-    baseImage: "eclipse-temurin:21-jdk",
-    buildCommand: "./gradlew bootJar -x test",
+    baseImage: "gradle:8.12-jdk21",
+    buildCommand: "sh ./gradlew bootJar -x test",
     startCommand: "java -jar build/libs/spring-boot-gradle-kts-0.0.1-SNAPSHOT.jar",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-013,WF-PLAN-JVM-016,WF-PLAN-JVM-008,WF-PLAN-JVM-014",
+    fixture: "quarkus-maven",
+    port: 8080,
+    buildStrategy: "workspace-commands",
+    planner: "quarkus",
+    runtimeKind: "quarkus",
+    applicationShape: "serverful-http",
+    framework: "quarkus",
+    packageManager: "maven",
+    baseImage: "maven:3.9-eclipse-temurin-21",
+    buildCommand: "mvn package -DskipTests",
+    startCommand: "java -jar target/quarkus-app/quarkus-run.jar",
   },
   {
     matrixIds: "WF-PLAN-JVM-006,WF-PLAN-JVM-008,WF-PLAN-JVM-014",
@@ -608,6 +622,7 @@ function smokeMatrixIdFor(fixture: PlannerFixtureExpectation): string {
     fixture.runtimeKind === "generic-asgi" ||
     fixture.runtimeKind === "generic-wsgi" ||
     fixture.runtimeKind === "spring-boot" ||
+    fixture.runtimeKind === "quarkus" ||
     fixture.runtimeKind === "java"
   ) {
     return "WF-PLAN-SMOKE-003";
@@ -971,7 +986,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
       requestedDeployment: {
         method: "auto",
         port: 4317,
-        installCommand: "pip install --no-cache-dir -r requirements.txt",
+        installCommand: "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt",
         startCommand: "python -m waitress --listen=0.0.0.0:4317 service:application",
       },
       generatedAt: "2026-01-01T00:00:00.000Z",
@@ -1141,16 +1156,16 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
     const context = createTestExecutionContext();
     const sourceResult = await new FileSystemSourceDetector().detect(
       context,
-      join(fixturesRoot, "quarkus-unsupported"),
+      join(fixturesRoot, "micronaut-unsupported"),
     );
 
     expect(sourceResult.isOk()).toBe(true);
 
     const result = await new DefaultRuntimePlanResolver().resolve(context, {
-      id: "plan_quarkus_unsupported",
+      id: "plan_micronaut_unsupported",
       source: sourceResult._unsafeUnwrap().source,
-      server: createTarget("srv_quarkus_unsupported"),
-      environmentSnapshot: createEnvironmentSnapshot("snap_quarkus_unsupported"),
+      server: createTarget("srv_micronaut_unsupported"),
+      environmentSnapshot: createEnvironmentSnapshot("snap_micronaut_unsupported"),
       detectedReasoning: ["detected unsupported JVM fixture"],
       requestedDeployment: {
         method: "auto",
@@ -1166,7 +1181,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
       expect.objectContaining({
         phase: "runtime-plan-resolution",
         runtimeFamily: "java",
-        framework: "quarkus",
+        framework: "micronaut",
         reasonCode: "unsupported-framework",
       }),
     );

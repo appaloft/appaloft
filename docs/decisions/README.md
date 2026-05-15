@@ -88,6 +88,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-061: Scheduled History Retention Automation](./ADR-061-scheduled-history-retention-automation.md) | Accepted | Defines scheduled history retention automation as policy-gated command-bus dispatch over existing manual prune commands with durable process visibility and category guard preservation. |
 | [ADR-062: Runtime Usage Attribution Boundary](./ADR-062-runtime-usage-attribution-boundary.md) | Accepted | Defines read-only `runtime-usage.inspect` attribution over server, project, environment, resource, and deployment scopes without cleanup, enforcement, or sample persistence in the first slice. |
 | [ADR-063: Runtime Monitoring Observation Boundary](./ADR-063-runtime-monitoring-observation-boundary.md) | Accepted | Defines bounded runtime monitoring observation with retained samples, rollups, chart/log/event correlation, and non-enforcing thresholds without becoming a Prometheus-class observability platform. |
+| [ADR-064: Storage Volume Runtime Realization And Cleanup](./ADR-064-storage-volume-runtime-realization-and-cleanup.md) | Accepted | Defines deployment-driven storage runtime realization and keeps destructive runtime volume cleanup behind an explicit dry-run-first storage operation instead of generic prune or delete. |
 
 ## Authoring Rules
 

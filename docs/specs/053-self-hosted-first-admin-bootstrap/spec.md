@@ -2,8 +2,9 @@
 
 ## Status
 
-- Round: Spec Round
-- Artifact state: accepted-candidate
+- Round: Post-Implementation Sync
+- Artifact state: active baseline; broader browser-driven self-hosted auth smoke remains a Phase 8
+  follow-up hardening gap
 
 ## Business Outcome
 

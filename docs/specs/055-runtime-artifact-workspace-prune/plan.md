@@ -18,7 +18,8 @@
 - Event/CQRS/read-model impact: command-side mutation through `CommandBus`; successful destructive
   prune with at least one deleted candidate records one retained audit row through an injected
   application port. No query mutation and no domain event/outbox publication is added in this slice.
-- Entrypoint impact: CLI and oRPC use the command schema directly; Web remains future.
+- Entrypoint impact: CLI, HTTP/oRPC, and Server detail Web Capacity controls use the command
+  schema directly. Web keeps the destructive path behind dry-run preview and explicit confirmation.
 - Persistence/migration impact: none.
 
 ## Roadmap And Compatibility
@@ -30,10 +31,11 @@
 
 ## Testing Strategy
 
-- Matrix ids: `RT-CAP-PRUNE-001` through `RT-CAP-PRUNE-007`.
+- Matrix ids: `RT-CAP-PRUNE-001` through `RT-CAP-PRUNE-007` plus `RT-CAP-WEB-001`.
 - Test-first rows: application use case, CLI dispatch, oRPC route, runtime adapter parser/script
   coverage.
-- Acceptance/e2e: focused CLI/oRPC tests prove command bus dispatch and shared schema.
+- Acceptance/e2e: focused CLI/oRPC tests prove command bus dispatch and shared schema; Bun.WebView
+  coverage proves Monitor-to-Capacity handoff, dry-run-first Web dispatch, and inherited cutoff.
 - Contract/integration/unit: application command schema and runtime adapter parse/delete intent
   tests prove safety exclusions.
 

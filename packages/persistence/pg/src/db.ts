@@ -74,6 +74,9 @@ import { auditEventArchivesMigration } from "./migrations/065_audit_event_archiv
 import { domainEventStreamRecordsMigration } from "./migrations/066_domain_event_stream_records";
 import { retentionDefaultsMigration } from "./migrations/067_retention_defaults";
 import { dependencyResourceBackupPoliciesMigration } from "./migrations/068_dependency_resource_backup_policies";
+import { runtimeMonitoringSamplesMigration } from "./migrations/069_runtime_monitoring_samples";
+import { resourceStorageAttachmentSnapshotsMigration } from "./migrations/070_resource_storage_attachment_snapshots";
+import { runtimeMonitoringThresholdPoliciesMigration } from "./migrations/071_runtime_monitoring_threshold_policies";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -238,6 +241,9 @@ class StaticMigrationProvider implements MigrationProvider {
       "066_domain_event_stream_records": domainEventStreamRecordsMigration,
       "067_retention_defaults": retentionDefaultsMigration,
       "068_dependency_resource_backup_policies": dependencyResourceBackupPoliciesMigration,
+      "069_runtime_monitoring_samples": runtimeMonitoringSamplesMigration,
+      "070_resource_storage_attachment_snapshots": resourceStorageAttachmentSnapshotsMigration,
+      "071_runtime_monitoring_threshold_policies": runtimeMonitoringThresholdPoliciesMigration,
     };
   }
 }

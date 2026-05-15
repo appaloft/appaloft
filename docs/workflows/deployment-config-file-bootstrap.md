@@ -769,7 +769,7 @@ PG/PGlite server-applied route persistence is specified in
 and is implemented through the selected PostgreSQL/PGlite backend. `resources.delete` reports
 `server-applied-route` blockers from durable route-state rows.
 
-An opt-in shell e2e harness in
+The GitHub Actions/local explicit shell e2e harness in
 `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` covers the GitHub Actions style
 process boundary for SSH-server `ssh-pglite`: two separate CLI processes with different local
 PGlite directories deploy the same repository/config to the same trusted SSH target and the second
@@ -788,9 +788,10 @@ key. A custom runtime without route-state storage fails at `config-domain-resolu
 silently ignoring the declaration. Deployment planning now reads that desired state back from
 SSH-server state, groups entries by `pathPrefix` and `tlsMode`, and forwards each group to
 provider-neutral edge proxy route input without creating managed `DomainBinding` rows.
-Deployment-finished handling records applied/failed route status back into
-the same server-applied route state. The opt-in SSH e2e harness verifies Traefik-backed
-server-applied route reachability for `CONFIG-FILE-DOMAIN-005`. Broader CLI e2e, HTTP-schema
+Deployment-finished handling records applied/failed route status back into the same
+server-applied route state. The GitHub Actions secret-gated and local explicit SSH e2e harness
+verifies Traefik-backed server-applied route reachability for `CONFIG-FILE-DOMAIN-005`. Broader CLI
+e2e, HTTP-schema
 contract coverage, existing-resource profile drift handling, stored/external secret adapters beyond
 `ci-env:`, Dockerfile/Compose path mapping, operational provisioning of the external SSH e2e
 secrets/target, real HTTP/HTTPS public validation for canonical redirects, provider-owned ACME

@@ -28,7 +28,7 @@
 - [x] Update `docs/CORE_OPERATIONS.md`.
 - [x] Update `docs/PRODUCT_ROADMAP.md`.
 - [x] Add lifecycle event specs during Code Round.
-- [x] Update public docs/help anchor or record explicit migration gap during Code Round.
+- [x] Update public docs/help anchor or record explicit governed follow-up during Code Round.
 
 ## Implementation
 
@@ -44,7 +44,9 @@
 - [x] Reuse or extend CLI Postgres provision/delete commands.
 - [x] Reuse or extend oRPC/HTTP provision/delete routes.
 - [x] Keep operation catalog entries aligned with any schema changes.
-- [x] Record Web/public-docs migration gap or complete a Docs/Web round.
+- [x] Record Resource-detail Web provision, import, rename/delete, backup
+      create/list/acknowledged restore, bind/unbind coverage and remaining scheduled backup policy,
+      backup prune/delete, export/download, and cross-resource restore Web follow-up.
 
 ## Verification
 

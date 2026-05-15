@@ -54,9 +54,23 @@ export interface ScheduledDependencyBackupRunnerConfig {
 export interface ScheduledHistoryRetentionRunnerConfig {
   enabled: boolean;
   intervalSeconds: number;
+  batchSize: number;
+}
+
+export interface RuntimeMonitoringCollectorRunnerConfig {
+  enabled: boolean;
+  intervalSeconds: number;
+  batchSize: number;
+  rawRetentionHours: number;
 }
 
 export interface PreviewCleanupRetrySchedulerConfig {
+  enabled: boolean;
+  intervalSeconds: number;
+  batchSize: number;
+}
+
+export interface PreviewExpiryCleanupSchedulerConfig {
   enabled: boolean;
   intervalSeconds: number;
   batchSize: number;
@@ -66,6 +80,11 @@ export interface DockerSwarmExecutionConfig {
   enabled: boolean;
   commandTimeoutMs: number;
   edgeNetworkName?: string;
+}
+
+export interface TerminalSessionsConfig {
+  activeTtlSeconds: number;
+  outputRetentionBytes: number;
 }
 
 export type ActionDeployTokenWorkflow =
@@ -135,12 +154,15 @@ export interface AppConfig {
   defaultAccessDomain: DefaultAccessDomainConfig;
   certificateProvider: CertificateProviderConfig;
   certificateRetryScheduler: CertificateRetrySchedulerConfig;
+  previewExpiryCleanupScheduler: PreviewExpiryCleanupSchedulerConfig;
   previewCleanupRetryScheduler: PreviewCleanupRetrySchedulerConfig;
   dockerSwarmExecution: DockerSwarmExecutionConfig;
+  terminalSessions: TerminalSessionsConfig;
   scheduledTaskRunner: ScheduledTaskRunnerConfig;
   scheduledRuntimePruneRunner: ScheduledRuntimePruneRunnerConfig;
   scheduledDependencyBackupRunner: ScheduledDependencyBackupRunnerConfig;
   scheduledHistoryRetentionRunner: ScheduledHistoryRetentionRunnerConfig;
+  runtimeMonitoringCollectorRunner: RuntimeMonitoringCollectorRunnerConfig;
   enabledSystemPlugins: string[];
   configFilePath?: string;
 }
@@ -199,10 +221,19 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
     intervalSeconds: 300,
     batchSize: 25,
   },
+  previewExpiryCleanupScheduler: {
+    enabled: false,
+    intervalSeconds: 300,
+    batchSize: 25,
+  },
   dockerSwarmExecution: {
     enabled: true,
     commandTimeoutMs: 60_000,
     edgeNetworkName: defaultDockerSwarmEdgeNetworkName,
+  },
+  terminalSessions: {
+    activeTtlSeconds: 3600,
+    outputRetentionBytes: 65536,
   },
   scheduledTaskRunner: {
     enabled: false,
@@ -222,6 +253,13 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   scheduledHistoryRetentionRunner: {
     enabled: false,
     intervalSeconds: 3600,
+    batchSize: 25,
+  },
+  runtimeMonitoringCollectorRunner: {
+    enabled: false,
+    intervalSeconds: 60,
+    batchSize: 25,
+    rawRetentionHours: 24,
   },
   enabledSystemPlugins: [],
 };
@@ -473,14 +511,24 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     source.flags?.scheduledHistoryRetentionRunner ??
     fileConfig.scheduledHistoryRetentionRunner ??
     defaults.scheduledHistoryRetentionRunner;
+  const runtimeMonitoringCollectorRunner =
+    source.flags?.runtimeMonitoringCollectorRunner ??
+    fileConfig.runtimeMonitoringCollectorRunner ??
+    defaults.runtimeMonitoringCollectorRunner;
   const dockerSwarmExecution =
     source.flags?.dockerSwarmExecution ??
     fileConfig.dockerSwarmExecution ??
     defaults.dockerSwarmExecution;
+  const terminalSessions =
+    source.flags?.terminalSessions ?? fileConfig.terminalSessions ?? defaults.terminalSessions;
   const previewCleanupRetryScheduler =
     source.flags?.previewCleanupRetryScheduler ??
     fileConfig.previewCleanupRetryScheduler ??
     defaults.previewCleanupRetryScheduler;
+  const previewExpiryCleanupScheduler =
+    source.flags?.previewExpiryCleanupScheduler ??
+    fileConfig.previewExpiryCleanupScheduler ??
+    defaults.previewExpiryCleanupScheduler;
   const previewCleanupRetrySchedulerEnabled =
     parseBoolean(env.APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_ENABLED) ??
     previewCleanupRetryScheduler.enabled;
@@ -492,6 +540,17 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(env.APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_BATCH_SIZE) ??
     parsePositiveInteger(previewCleanupRetryScheduler.batchSize) ??
     defaults.previewCleanupRetryScheduler.batchSize;
+  const previewExpiryCleanupSchedulerEnabled =
+    parseBoolean(env.APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_ENABLED) ??
+    previewExpiryCleanupScheduler.enabled;
+  const previewExpiryCleanupSchedulerIntervalSeconds =
+    parsePositiveInteger(env.APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_INTERVAL_SECONDS) ??
+    parsePositiveInteger(previewExpiryCleanupScheduler.intervalSeconds) ??
+    defaults.previewExpiryCleanupScheduler.intervalSeconds;
+  const previewExpiryCleanupSchedulerBatchSize =
+    parsePositiveInteger(env.APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_BATCH_SIZE) ??
+    parsePositiveInteger(previewExpiryCleanupScheduler.batchSize) ??
+    defaults.previewExpiryCleanupScheduler.batchSize;
   const scheduledTaskRunnerEnabled =
     parseBoolean(env.APPALOFT_SCHEDULED_TASK_RUNNER_ENABLED) ?? scheduledTaskRunner.enabled;
   const scheduledTaskRunnerIntervalSeconds =
@@ -531,6 +590,25 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(env.APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS) ??
     parsePositiveInteger(scheduledHistoryRetentionRunner.intervalSeconds) ??
     defaults.scheduledHistoryRetentionRunner.intervalSeconds;
+  const scheduledHistoryRetentionRunnerBatchSize =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_BATCH_SIZE) ??
+    parsePositiveInteger(scheduledHistoryRetentionRunner.batchSize) ??
+    defaults.scheduledHistoryRetentionRunner.batchSize;
+  const runtimeMonitoringCollectorRunnerEnabled =
+    parseBoolean(env.APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_ENABLED) ??
+    runtimeMonitoringCollectorRunner.enabled;
+  const runtimeMonitoringCollectorRunnerIntervalSeconds =
+    parsePositiveInteger(env.APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_INTERVAL_SECONDS) ??
+    parsePositiveInteger(runtimeMonitoringCollectorRunner.intervalSeconds) ??
+    defaults.runtimeMonitoringCollectorRunner.intervalSeconds;
+  const runtimeMonitoringCollectorRunnerBatchSize =
+    parsePositiveInteger(env.APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_BATCH_SIZE) ??
+    parsePositiveInteger(runtimeMonitoringCollectorRunner.batchSize) ??
+    defaults.runtimeMonitoringCollectorRunner.batchSize;
+  const runtimeMonitoringCollectorRunnerRawRetentionHours =
+    parsePositiveInteger(env.APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS) ??
+    parsePositiveInteger(runtimeMonitoringCollectorRunner.rawRetentionHours) ??
+    defaults.runtimeMonitoringCollectorRunner.rawRetentionHours;
   const dockerSwarmExecutionEnabled =
     parseBoolean(env.APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED) ?? dockerSwarmExecution.enabled;
   const dockerSwarmExecutionCommandTimeoutMs =
@@ -541,6 +619,14 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     env.APPALOFT_DOCKER_SWARM_EDGE_NETWORK ??
     dockerSwarmExecution.edgeNetworkName ??
     defaultDockerSwarmEdgeNetworkName;
+  const terminalSessionActiveTtlSeconds =
+    parsePositiveInteger(env.APPALOFT_TERMINAL_SESSION_ACTIVE_TTL_SECONDS) ??
+    parsePositiveInteger(terminalSessions.activeTtlSeconds) ??
+    defaults.terminalSessions.activeTtlSeconds;
+  const terminalSessionOutputRetentionBytes =
+    parsePositiveInteger(env.APPALOFT_TERMINAL_SESSION_OUTPUT_RETENTION_BYTES) ??
+    parsePositiveInteger(terminalSessions.outputRetentionBytes) ??
+    defaults.terminalSessions.outputRetentionBytes;
   const resourceAccessFailureRendererUrl = normalizeHttpUrl(
     source.flags?.resourceAccessFailureRendererUrl ??
       env.APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL ??
@@ -925,10 +1011,19 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       intervalSeconds: previewCleanupRetrySchedulerIntervalSeconds,
       batchSize: previewCleanupRetrySchedulerBatchSize,
     },
+    previewExpiryCleanupScheduler: {
+      enabled: previewExpiryCleanupSchedulerEnabled,
+      intervalSeconds: previewExpiryCleanupSchedulerIntervalSeconds,
+      batchSize: previewExpiryCleanupSchedulerBatchSize,
+    },
     dockerSwarmExecution: {
       enabled: dockerSwarmExecutionEnabled,
       commandTimeoutMs: dockerSwarmExecutionCommandTimeoutMs,
       edgeNetworkName: dockerSwarmExecutionEdgeNetworkName,
+    },
+    terminalSessions: {
+      activeTtlSeconds: terminalSessionActiveTtlSeconds,
+      outputRetentionBytes: terminalSessionOutputRetentionBytes,
     },
     scheduledTaskRunner: {
       enabled: scheduledTaskRunnerEnabled,
@@ -948,6 +1043,13 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     scheduledHistoryRetentionRunner: {
       enabled: scheduledHistoryRetentionRunnerEnabled,
       intervalSeconds: scheduledHistoryRetentionRunnerIntervalSeconds,
+      batchSize: scheduledHistoryRetentionRunnerBatchSize,
+    },
+    runtimeMonitoringCollectorRunner: {
+      enabled: runtimeMonitoringCollectorRunnerEnabled,
+      intervalSeconds: runtimeMonitoringCollectorRunnerIntervalSeconds,
+      batchSize: runtimeMonitoringCollectorRunnerBatchSize,
+      rawRetentionHours: runtimeMonitoringCollectorRunnerRawRetentionHours,
     },
     enabledSystemPlugins,
     ...(source.configFilePath ? { configFilePath: source.configFilePath } : {}),

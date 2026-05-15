@@ -518,6 +518,68 @@ describe("CleanupPreviewUseCase", () => {
     expect(sourceLinkRepository.deletedFingerprints).toEqual([]);
   });
 
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-007] preserves artifact-cleanup failure stage from runtime cleanup", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      destinationId: "dst_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
+    const executionBackend = new CapturingExecutionBackend(
+      err({
+        code: "runtime_target_resource_exhausted",
+        category: "retryable",
+        message: "Preview artifact cleanup could not inspect target",
+        retryable: true,
+        details: {
+          phase: "runtime-cleanup",
+          cleanupStage: "artifact-cleanup",
+        },
+      }),
+    );
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_artifact_failure",
+    });
+    const deployment = createSucceededDeployment();
+    await deployments.insertOne(
+      toRepositoryContext(context),
+      deployment,
+      UpsertDeploymentSpec.fromDeployment(deployment),
+    );
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "runtime_target_resource_exhausted",
+      details: {
+        phase: "preview-cleanup",
+        cleanupStage: "artifact-cleanup",
+        deploymentId: "dep_preview_1",
+      },
+    });
+    expect(routeRepository.deletedTargets).toEqual([]);
+    expect(routeRepository.deletedSourceFingerprints).toEqual([]);
+    expect(sourceLinkRepository.deletedFingerprints).toEqual([]);
+  });
+
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-004][CONFIG-FILE-ENTRY-019] sweeps stale preview runtime and route state for the same preview fingerprint", async () => {
     const sourceLinkRepository = new MemorySourceLinkRepository({
       sourceFingerprint: previewSourceFingerprint,

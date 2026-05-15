@@ -79,6 +79,8 @@ type ResourceDiagnosticSummaryQueryInput = {
   includeDeploymentLogTail?: boolean;
   includeRuntimeLogTail?: boolean;
   includeProxyConfiguration?: boolean;
+  observationFrom?: string;
+  observationTo?: string;
   tailLines?: number;
   locale?: string;
 };
@@ -91,6 +93,8 @@ type ResourceDiagnosticSummaryQueryInput = {
 | `includeDeploymentLogTail` | No | Whether to include a sanitized bounded deployment-attempt log tail. Defaults to true with a small upper bound. |
 | `includeRuntimeLogTail` | No | Whether to attempt a sanitized bounded runtime log tail. Defaults to false when the caller only needs metadata. |
 | `includeProxyConfiguration` | No | Whether to include redacted proxy configuration section summaries. Defaults to false for compact support copies. |
+| `observationFrom` | No | Optional ISO timestamp lower bound for Monitor-window diagnostics. Requires `observationTo`; filters deployment log evidence and is passed to runtime logs as `since`. |
+| `observationTo` | No | Optional ISO timestamp upper bound for Monitor-window diagnostics. Requires `observationFrom`; filters copied diagnostic evidence to the selected observation window. |
 | `tailLines` | No | Maximum lines per included log section. The schema must enforce a low upper bound. |
 | `locale` | No | Optional formatting hint for entrypoints that render copy text. It must not change machine fields. |
 
@@ -123,7 +127,8 @@ Required top-level behavior:
 
 - `focus` always includes `resourceId` and the selected `deploymentId` when one is resolved.
 - `context` includes safe ids for project, environment, server/deployment target, destination, and
-  runtime strategy when available.
+  runtime strategy when available, plus `observationWindow` when a caller pins the summary to a
+  Monitor time window.
 - `deployment` includes attempt status, lifecycle phase, terminal timestamps, request/correlation id
   when available, and last structured error summary when available.
 - `access` includes generated, durable, and server-applied access route status, public URLs when
@@ -137,7 +142,9 @@ Required top-level behavior:
 - `proxy` includes provider key, proxy readiness, configuration view availability, and safe warnings
   or last structured provider error.
 - `deploymentLogs` and `runtimeLogs` report whether logs are available, empty, unavailable, or not
-  requested. Included lines are bounded and redacted.
+  requested. Included lines are bounded and redacted. When `observationFrom`/`observationTo` are
+  provided, deployment log lines outside the window are omitted and runtime log reads use
+  `observationFrom` as the `since` boundary before applying the same upper-bound filter.
 - `system` includes safe installation context such as backend version, runtime mode, persistence
   driver, desktop/local mode when known, and configured provider keys. It must not include secrets,
   private local paths, SSH commands, credentials, raw environment variables, or tokens.
@@ -251,9 +258,9 @@ All errors use [Resource Diagnostic Summary Error Spec](../errors/resources.diag
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail exposes a copy diagnostic summary action. Quick Deploy completion and deployment detail remain follow-up surfaces. | Implemented / partial |
+| Web | Resource detail, deployment detail, and Quick Deploy completion expose copy diagnostic summary actions. | Implemented |
 | Desktop | Desktop Web resource detail exposes the same Web action. Safe desktop-client appendix is not yet added. | Implemented / partial |
-| CLI | `appaloft resource diagnose <resourceId> [--deployment <deploymentId>] [--json]` prints canonical JSON. Human summary rendering remains a follow-up. | Implemented / partial |
+| CLI | `appaloft resource diagnose <resourceId> [--deployment <deploymentId>] [--json] [--summary]` prints canonical JSON by default and a concise human summary with `--summary`. | Implemented |
 | oRPC / HTTP | `GET /api/resources/{resourceId}/diagnostic-summary` using the query schema. | Implemented |
 | Automation / MCP | Future query/tool over the same operation key. | Future |
 
@@ -263,13 +270,14 @@ parallel diagnostic shapes.
 ## Current Implementation Notes And Migration Gaps
 
 `resources.diagnostic-summary` is implemented as an application query slice and exposed through
-oRPC/HTTP, CLI, operation catalog metadata, contracts, and the Web resource detail copy action.
+oRPC/HTTP, CLI, operation catalog metadata, contracts, the Web resource detail copy action, the Web
+deployment detail copy action, and the Quick Deploy completion copy action.
 
 The initial implementation returns canonical `copy.json` and omits optional `copy.markdown` and
 `copy.plainText`.
 
-The Web resource detail action calls the typed query client. Quick Deploy completion and deployment
-detail do not yet expose the action directly.
+The Web resource detail, deployment detail, and Quick Deploy completion actions call the typed query
+client.
 
 Safe backend/system context currently includes request id, entrypoint, locale, readiness status,
 and database driver/mode from diagnostics. It intentionally omits private database locations and

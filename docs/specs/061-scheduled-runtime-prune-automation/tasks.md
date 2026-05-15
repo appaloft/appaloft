@@ -58,7 +58,8 @@
 - [x] Add CLI and HTTP/oRPC policy configure/list/show entrypoints through command/query buses.
 - [x] Add repository config `retention.runtimePrune` readback through deployment config parsing.
 - [x] Link public docs/help to stable runtime capacity or retention anchors.
-- [x] Keep Web as future policy/status surface unless a governed UI slice is in scope.
+- [x] Keep Web write controls out of this worker slice; expose configured maintenance status only
+  through governed diagnostics/status surfaces.
 
 ## Verification
 
@@ -70,4 +71,4 @@
 ## Post-Implementation Sync
 
 - [x] Reconcile ADR-055, feature artifacts, runtime target capacity matrix, roadmap, operation map,
-  docs/help, code, tests, and remaining migration gaps.
+  docs/help, code, tests, and governed follow-ups.

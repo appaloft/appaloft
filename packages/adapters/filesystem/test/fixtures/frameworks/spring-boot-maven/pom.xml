@@ -3,6 +3,9 @@
   <groupId>io.appaloft.fixtures</groupId>
   <artifactId>spring-boot-maven</artifactId>
   <version>0.0.1-SNAPSHOT</version>
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+  </properties>
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>

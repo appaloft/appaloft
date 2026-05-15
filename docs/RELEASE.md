@@ -45,13 +45,65 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
 - `release.yml`: manually creates or updates a Release Please PR on `main`, adds roadmap release
   alignment to that PR, and publishes only when the merged release PR pushes a `chore: release ...`
   commit to `main`. Public docs deployment is no longer tied to product releases.
-- `ssh-remote-state-e2e.yml` and `ssh-quick-deploy-e2e.yml`: opt-in SSH release-readiness smokes
-  used by nightly and release. They require SSH test-target secrets and can be made required for a
-  manual release run with `require_ssh_remote_state_e2e=true` and
-  `require_ssh_quick_deploy_e2e=true`. For `0.11.0`, real SSH smoke evidence is an accepted
-  deferred roadmap gap when no SSH target server is available; publish runs do not require both SSH
-  smokes automatically, but maintainers should set the manual inputs whenever SSH secrets exist.
-  Each reusable workflow uploads a redacted SSH evidence JSON artifact after its suite passes.
+- `ssh-remote-state-e2e.yml` and `ssh-quick-deploy-e2e.yml`: GitHub Actions secret-gated SSH
+  release-readiness smokes used by nightly and release, with local explicit reproduction through
+  the matching e2e environment variables. They require SSH test-target secrets and can be made
+  required for a manual release run with `require_ssh_remote_state_e2e=true` and
+  `require_ssh_quick_deploy_e2e=true`. Local developer runs may skip the real SSH smokes when no
+  target server is available; release-readiness runs that need SSH confidence should set the
+  required inputs so the workflows fail closed when target secrets are absent. Each reusable
+  workflow uploads a redacted SSH evidence JSON artifact after its suite passes.
+- `framework-fixture-e2e.yml`: full supported-catalog real smoke gate used by nightly and release.
+  It runs local Docker substrate smoke once, shards framework fixtures by
+  `APPALOFT_E2E_FRAMEWORK_FIXTURE` on the GitHub Docker runner, and runs the same fixture matrix over
+  generic SSH when SSH target secrets exist. A manual release can require the SSH framework gate with
+  `require_framework_fixture_e2e=true`; without SSH secrets, the workflow fails closed only when
+  required. The package scripts remain available for local reproduction:
+  `bun run smoke:framework:docker`, `bun run smoke:framework:ssh`, and `bun run smoke:framework`.
+- `scheduled-task-e2e.yml`: scheduled-task real runtime smoke gate used by nightly and release. It
+  runs `bun run smoke:scheduled-task:docker` on the GitHub Docker runner and runs
+  `bun run smoke:scheduled-task:ssh` after the shared SSH preflight when SSH target secrets exist. A
+  manual release can require the SSH scheduled-task gate with
+  `require_scheduled_task_e2e=true`; without SSH secrets, the workflow fails closed only when
+  required. The package scripts remain available for local reproduction:
+  `bun run smoke:scheduled-task:docker`, `bun run smoke:scheduled-task:ssh`, and
+  `bun run smoke:scheduled-task`.
+- `storage-cleanup-e2e.yml`: storage runtime cleanup smoke gate used by nightly and release. It
+  runs `bun run smoke:storage-cleanup:docker` on the GitHub Docker runner and runs
+  `bun run smoke:storage-cleanup:ssh` after the shared SSH preflight when SSH target secrets exist.
+  A manual release can require the SSH storage-cleanup gate with
+  `require_storage_cleanup_e2e=true`; without SSH secrets, the workflow fails closed only when
+  required. The package scripts remain available for local reproduction:
+  `bun run smoke:storage-cleanup:docker`, `bun run smoke:storage-cleanup:ssh`, and
+  `bun run smoke:storage-cleanup`. These probes create scoped Appaloft-named Docker volumes and must
+  not run broad Docker prune.
+- `runtime-usage-e2e.yml`: runtime usage attribution smoke gate used by nightly and release. It
+  runs `bun run smoke:runtime-usage:docker` on the GitHub Docker runner and runs
+  `bun run smoke:runtime-usage:ssh` after the shared SSH preflight when SSH target secrets exist. A
+  manual release can require the SSH runtime-usage gate with `require_runtime_usage_e2e=true`;
+  without SSH secrets, the workflow fails closed only when required. The package scripts remain
+  available for local reproduction: `bun run smoke:runtime-usage:docker`,
+  `bun run smoke:runtime-usage:ssh`, and `bun run smoke:runtime-usage`. These probes inspect real
+  runtime targets and remain read-only release-readiness gates.
+- `capacity-prune-e2e.yml`: runtime capacity prune smoke gate used by nightly and release. It runs
+  `bun run smoke:capacity-prune:local` against a temporary local runtime root and runs
+  `bun run smoke:capacity-prune:ssh` after the shared SSH preflight when SSH target secrets exist. A
+  manual release can require the SSH capacity-prune gate with `require_capacity_prune_e2e=true`;
+  without SSH secrets, the workflow fails closed only when required. The package scripts remain
+  available for local reproduction: `bun run smoke:capacity-prune:local`,
+  `bun run smoke:capacity-prune:ssh`, and `bun run smoke:capacity-prune`. These probes create only
+  scoped temporary Appaloft workspace roots and prove dry-run-first destructive prune behavior.
+- `preview-provider-e2e.yml`: GitHub preview provider feedback smoke gate used by nightly and
+  release. It runs `bun run smoke:preview-provider:github` only when
+  `APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN`, `APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY`, and
+  `APPALOFT_GITHUB_PREVIEW_SMOKE_PR` are configured. A manual release can require the gate with
+  `require_preview_provider_e2e=true`; without these secrets, the workflow fails closed only when
+  required. The probe creates or updates a marker comment on the configured pull request and
+  verifies the provider writer returns safe metadata without token/body echo.
+- `dependency-redis-backup-e2e.yml`: Redis dependency backup/restore smoke gate used by nightly and
+  release. It provisions a Redis service in GitHub Actions, installs `redis-cli`, and runs
+  `bun run smoke:dependency-redis-backup` with `APPALOFT_E2E_REDIS_BACKUP_RESTORE=true` to prove the
+  shell native Redis logical backup/restore path against a real Redis server.
 - `deploy-docs.yml`: deploys `apps/docs` as a standalone static site to `https://docs.appaloft.com`
   with Appaloft from the checked-out source and `appaloft.docs.yml`. Pushes to `main` auto-deploy
   when docs content, docs config, or the source-side deployment stack used by docs changes. Manual
@@ -102,7 +154,7 @@ The CLI binary bundle embeds:
 - `NPM_TOKEN`: optional fallback for npm publish. Prefer npm trusted publishing/OIDC. Because the
   source repository is private, npm provenance is not requested.
 - `HOMEBREW_TAP_TOKEN`: token with write access to `appaloft/homebrew-tap`.
-- `APPALOFT_E2E_SSH_HOST`: SSH release-readiness target host used by the opt-in
+- `APPALOFT_E2E_SSH_HOST`: SSH release-readiness target host used by the explicit
   `smoke:ssh:remote-state` and `smoke:ssh:quick-deploy` suites.
 - `APPALOFT_E2E_SSH_PRIVATE_KEY`: SSH private key for the release-readiness target. Workflows write
   this value to a temporary key file and pass only the file path to the tests.
@@ -111,6 +163,13 @@ The CLI binary bundle embeds:
   Blank whitespace-only values are rejected by the preflight.
 - `APPALOFT_E2E_PUBLIC_ROUTE_HOST`: optional host template for SSH remote-state route checks. Use
   `{suffix}` in the value when the target needs per-run hostnames.
+- `APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN`: optional GitHub token for the secret-gated product-grade
+  preview provider feedback smoke. It must be able to create or update issue comments on the smoke
+  pull request.
+- `APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY`: optional `owner/repo` target used by the product-grade
+  preview provider feedback smoke.
+- `APPALOFT_GITHUB_PREVIEW_SMOKE_PR`: optional pull request number used by the product-grade preview
+  provider feedback smoke.
 - `APPALOFT_SSH_PRIVATE_KEY`: SSH private key used by `deploy-docs.yml` to deploy to the same
   server as `appaloft/www` when the docs workflow uses the pure SSH CLI fallback.
 - `APPALOFT_TOKEN`: bearer token used by `deploy-docs.yml` when
@@ -143,7 +202,7 @@ flows.
 1. Merge normal feature and fix PRs into `main`.
 2. Read `docs/PRODUCT_ROADMAP.md`, compare it with the implementation and release state, and choose
    the allowed version.
-3. Before selecting `0.11.0` or any later pre-`1.0.0` target whose roadmap requires SSH
+3. Before selecting any pre-`1.0.0` target whose roadmap requires SSH
    release-readiness, run `bun run smoke:ssh:preflight` to verify the `ssh` executable,
    `APPALOFT_E2E_SSH_HOST`, optional `APPALOFT_E2E_SSH_PORT`, optional
    `APPALOFT_E2E_SSH_USERNAME`, and the private-key path is a regular file with content and private
@@ -156,14 +215,23 @@ flows.
    SSH workflows write
    `dist/release/ssh-remote-state-evidence.json` and
    `dist/release/ssh-quick-deploy-evidence.json` and upload them as workflow artifacts after the
-   corresponding suite passes. For `0.11.0`, `docs/PRODUCT_ROADMAP.md` records an accepted
-   deferred SSH smoke evidence gap when no SSH target server is available; keep that gap in the
-   release notes until real SSH evidence is captured in a later release.
+   corresponding suite passes. If local SSH smoke cannot run because no target server is available,
+   use the GitHub Actions reusable workflows as the release-readiness confidence layer and set the
+   corresponding `require_*_e2e=true` inputs for suites that must block the release.
 4. Open GitHub Actions and run `Release` from `main`. Set `release_as` only when the roadmap gate
    allows an explicit target such as `0.11.0`. For a `0.11.0` release-readiness run with SSH
    secrets available, set both `require_ssh_remote_state_e2e=true` and
-   `require_ssh_quick_deploy_e2e=true`; otherwise the accepted deferred SSH smoke evidence gap in
-   the roadmap must stay in the release notes.
+   `require_ssh_quick_deploy_e2e=true`. Set `require_framework_fixture_e2e=true` when the same SSH
+   target should also prove the full generic-SSH framework fixture gate. Set
+   `require_scheduled_task_e2e=true` when the SSH target should also prove scheduled-task Docker
+   runtime execution. Set `require_storage_cleanup_e2e=true` when the SSH target should also prove
+   dry-run-first scoped storage runtime cleanup over generic SSH Docker. Set
+   `require_runtime_usage_e2e=true` when the SSH target should also prove read-only runtime usage
+   attribution. Set `require_capacity_prune_e2e=true` when the SSH target should also prove
+   dry-run-first scoped runtime workspace prune over generic SSH. Set
+   `require_preview_provider_e2e=true` when the release should prove live GitHub PR-comment preview
+   feedback. When one of those inputs is true, missing SSH target secrets or GitHub preview provider
+   smoke secrets fail the reusable workflow instead of silently accepting the release.
 5. Review the single Release Please PR. It must include the generated version/changelog changes and
    the `docs/PRODUCT_ROADMAP.md` release alignment commit. When `release_as` is set, the workflow
    also enforces that the release PR title, body, version files, and changelog use that exact
