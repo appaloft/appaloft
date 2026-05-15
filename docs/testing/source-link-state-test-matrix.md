@@ -102,10 +102,12 @@ Current implementation has adapter-level source link store and recovery coverage
 Current implementation has config workflow coverage for first-run source link creation and repeated
 config deploy reuse in `packages/adapters/cli/test/deployment-config.test.ts`.
 
-Current implementation has application command and CLI dispatch coverage for `source-links.relink`
-in `packages/application/test/relink-source-link.test.ts` and
-`packages/adapters/cli/test/source-link-command.test.ts`. Shell startup plans the same SSH remote
-PGlite mirror for relink in `apps/shell/test/remote-pglite-state-sync.test.ts`.
+Current implementation has application command, CLI, HTTP/oRPC, and Web dispatch coverage for
+`source-links.relink` in `packages/application/test/relink-source-link.test.ts`,
+`packages/adapters/cli/test/source-link-command.test.ts`,
+`packages/orpc/test/source-link-relink.http.test.ts`, and
+`apps/web/src/lib/console/source-links.test.ts`. Shell startup plans the same SSH remote PGlite
+mirror for relink in `apps/shell/test/remote-pglite-state-sync.test.ts`.
 
 `DMBH-CONTEXT-001` is covered by `packages/core/test/context-ownership.test.ts` for
 Environment/Resource/Destination ownership predicates and by
@@ -126,12 +128,12 @@ backend is PostgreSQL/PGlite.
 file-backed source links into PG/PGlite state and prunes stale file records once PG/PGlite already
 owns the fingerprint.
 
-An opt-in external SSH e2e harness in
+A GitHub Actions secret-gated and local explicit external SSH e2e harness in
 `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` proves source link state across a
 real GitHub Actions style process boundary when run with `APPALOFT_E2E_SSH_REMOTE_STATE=true`
 against a provisioned SSH/Docker target. `.github/workflows/ssh-remote-state-e2e.yml` runs the same
 harness manually, from nightly smoke, and before release artifact publication when
-`APPALOFT_E2E_SSH_HOST` and `APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured. For `v0.11.x`
-publish tags, the release workflow requires this remote-state harness and the quick-deploy SSH
-harness before release artifact publication. Operational secret/target provisioning remains outside
-the repository code.
+`APPALOFT_E2E_SSH_HOST` and `APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured. Release dispatch
+can require it with `require_ssh_remote_state_e2e=true`. For `v0.11.x` publish tags, the release
+workflow requires this remote-state harness and the quick-deploy SSH harness before release
+artifact publication. Operational secret/target provisioning remains outside the repository code.

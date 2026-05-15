@@ -51,7 +51,7 @@
 - Shell tests: disabled-by-default runner configuration and injected policy discovery handoff.
 - Entrypoint tests: not applicable unless a new public entrypoint enters scope.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 - Scheduled runtime target prune already has a separate worker under ADR-055 and should be used as
   a pattern, not merged with this worker.

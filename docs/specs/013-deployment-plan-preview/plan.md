@@ -104,21 +104,22 @@ Docs Round target:
   detected framework/runtime evidence, planner/support tier, artifact kind, commands, internal port,
   health/access plan, warnings, unsupported reasons, and next configuration actions.
 
-## Risks And Migration Gaps
+## Risks And Governed Follow-Ups
 
 - The preview may duplicate parts of runtime planning until `deployments.create` and
   `deployments.plan` share a single application service.
 - Access route planning may be partial in the first Code Round.
-- Current acceptance-first migration gaps in `deployments.create` remain out of scope.
-- Draft-profile preview before resource persistence is deferred to a future Quick Deploy/spec
-  round.
+- Acceptance-first `deployments.create` follow-ups remain governed by the create workflow and are
+  out of scope for the read-only preview query.
+- Draft-profile preview before resource persistence remains a future Quick Deploy/spec round.
 
 ## Post-Implementation Notes
 
 The first active Code Round is complete for application query, operation catalog, HTTP/oRPC, CLI,
 Resource deployment Web affordance, public docs/help, i18n, and targeted entrypoint/docs tests.
-Full fixture-level query behavior tests and side-effect assertions remain a migration gap tracked in
-the implementation plan.
+Fixture-level query behavior, side-effect assertions, shared preview schema contract tests, and
+supported-catalog preview parity are covered by the current application, contract, and
+zero-to-SSH acceptance tests.
 
 ## Code Round Readiness
 

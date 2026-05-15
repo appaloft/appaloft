@@ -65,6 +65,8 @@ import {
   ShowDependencyResourceBackupQueryService,
 } from "../src/use-cases";
 
+const repoFile = (path: string) => new URL(`../../../${path}`, import.meta.url);
+
 function createContext(): ExecutionContext {
   return createExecutionContext({
     requestId: "req_dependency_resource_backup_restore_test",
@@ -822,16 +824,16 @@ describe("dependency resource backup and restore use cases", () => {
 
 describe("dependency resource backup and restore source-of-truth sync", () => {
   test("[DEP-RES-BACKUP-001] [PROC-DELIVERY-002] business map records journal-backed claim/completion", () => {
-    const businessOperationMap = readFileSync("docs/BUSINESS_OPERATION_MAP.md", "utf8");
+    const businessOperationMap = readFileSync(repoFile("docs/BUSINESS_OPERATION_MAP.md"), "utf8");
     const durableProcessSpec = readFileSync(
-      "docs/specs/060-durable-process-delivery-baseline/spec.md",
+      repoFile("docs/specs/060-durable-process-delivery-baseline/spec.md"),
       "utf8",
     );
     const durableProcessMatrix = readFileSync(
-      "docs/testing/durable-process-delivery-test-matrix.md",
+      repoFile("docs/testing/durable-process-delivery-test-matrix.md"),
       "utf8",
     );
-    const coreOperations = readFileSync("docs/CORE_OPERATIONS.md", "utf8");
+    const coreOperations = readFileSync(repoFile("docs/CORE_OPERATIONS.md"), "utf8");
     const normalizedBusinessOperationMap = businessOperationMap.replace(/\s+/g, " ");
     const normalizedDurableProcessSpec = durableProcessSpec.replace(/\s+/g, " ");
     const normalizedDurableProcessMatrix = durableProcessMatrix.replace(/\s+/g, " ");

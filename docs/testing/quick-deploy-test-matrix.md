@@ -135,14 +135,15 @@ Then:
 | QUICK-DEPLOY-WF-050 | e2e-preferred | Repository config environment overlay | CLI or local Web agent | Config has base profile plus selected-environment overlay | Overlay applies only to the environment selected outside the file; final command remains ids-only | None | Config merge -> explicit operations -> `deployments.create` | Config overlay cannot move deployment to another environment by itself | Per command |
 | QUICK-DEPLOY-WF-051 | e2e-preferred | Repository config domain/TLS declaration | CLI, local Web agent, or headless binary | Config contains `access.domains[]` | Workflow accepts provider-neutral domain intent only when it can persist server-applied SSH route desired state or map to managed control-plane domain commands; otherwise fails before mutation | None when the selected mapping is supported, or `validation_error`, phase `config-domain-resolution` | SSH mode: context commands -> route desired state -> `deployments.create` -> proxy realization. Control-plane mode: context commands -> `deployments.create` -> `domain-bindings.create` follow-up | No domain/TLS fields enter `deployments.create`; committed config cannot select domain binding identity context | Per proxy/domain command |
 | QUICK-DEPLOY-WF-052 | e2e-preferred | Headless SSH remote state default | GitHub Actions or CLI non-TTY | Repository config plus trusted SSH target inputs, no Appaloft ids, no `DATABASE_URL` | Workflow uses SSH-server PGlite state, creates or reuses identity there, persists/reuses source link state, and accepts deployment | None | SSH state ensure/state-root-coordinate/migrate -> source link resolution -> Quick Deploy operation order -> persist link if first run -> `deployments.create` | Repeated runs reuse remote project/resource/server/environment state | Per backend coordination and command policy |
-| QUICK-DEPLOY-WF-053 | e2e-preferred, opt-in SSH | Repository config server-applied domain | GitHub Actions or CLI non-TTY | Valid `access.domains[]`, reverse-proxy network profile, proxy-ready SSH target | Deployment succeeds or accepts and server-applied route state is realized/observable through access/proxy read models | None or provider route error | SSH state -> context commands -> `deployments.create` -> edge proxy route realization | Remote state records route desired/applied status; no managed `DomainBinding` is created | Per proxy route retry |
+| QUICK-DEPLOY-WF-053 | GitHub Actions secret-gated + local explicit SSH e2e | Repository config server-applied domain | GitHub Actions or CLI non-TTY | Valid `access.domains[]`, reverse-proxy network profile, proxy-ready SSH target | Deployment succeeds or accepts and server-applied route state is realized/observable through access/proxy read models | None or provider route error | SSH state -> context commands -> `deployments.create` -> edge proxy route realization | Remote state records route desired/applied status; no managed `DomainBinding` is created | Per proxy route retry |
 | QUICK-DEPLOY-WF-054 | integration | Control-plane maps config domain to managed workflow | Hosted/self-hosted control-plane entry | Same config `access.domains[]`, selected control-plane state | Config domain intent maps to managed domain binding workflow or fails with stable unsupported managed-mapping error; it does not write SSH server-applied state | None or stable unsupported error | Context commands -> `deployments.create` -> `domain-bindings.create` follow-up when supported | Managed `DomainBinding` state progresses separately from deployment | Per domain/certificate retry rules |
-| QUICK-DEPLOY-WF-055 | e2e-preferred, opt-in SSH | Repository config canonical redirect | GitHub Actions or CLI non-TTY | Valid `access.domains[]` with a served canonical host and an alias host using `redirectTo` | Deployment succeeds or accepts, canonical host serves the workload, alias host redirects with configured status, and access/proxy diagnostics expose redirect state | None or provider route error | SSH state -> context commands -> route desired state with redirect intent -> `deployments.create` -> edge proxy route realization -> redirect verification | Remote state records desired/applied redirect status; no managed `DomainBinding` or `Certificate` is created | Per proxy route retry |
+| QUICK-DEPLOY-WF-055 | GitHub Actions secret-gated + local explicit SSH e2e | Repository config canonical redirect | GitHub Actions or CLI non-TTY | Valid `access.domains[]` with a served canonical host and an alias host using `redirectTo` | Deployment succeeds or accepts, canonical host serves the workload, alias host redirects with configured status, and access/proxy diagnostics expose redirect state | None or provider route error | SSH state -> context commands -> route desired state with redirect intent -> `deployments.create` -> edge proxy route realization -> redirect verification | Remote state records desired/applied redirect status; no managed `DomainBinding` or `Certificate` is created | Per proxy route retry |
 | QUICK-DEPLOY-WF-056 | integration | Control-plane mode resolved before identity | Web, CLI, local Web agent, or headless binary | Quick Deploy or repository config supplies control-plane mode policy | Workflow resolves execution owner and control-plane/state owner before state backend, source link, identity, env, domain, or deployment mutation; Cloud/self-hosted requires handshake first | `validation_error`, phase `control-plane-resolution`, `control_plane_unsupported`, or `control_plane_handshake_failed` when selected mode is not usable | Mode resolution -> optional handshake -> state/source identity -> Quick Deploy operation order -> `deployments.create` | No project/resource/server/route/deployment mutation occurs before control-plane mode is accepted | Per selected mode policy |
 | QUICK-DEPLOY-WF-057 | e2e-preferred | Local-shell Dockerfile smoke | CLI or local Web agent | Local Docker is available; source/profile selects `dockerfile` | Deployment request is accepted and executed through the same resource-owned profile path | None | Context/resource commands -> ids-only `deployments.create(resourceId)` -> local-shell runtime backend | Runtime plan snapshot uses `dockerfile`; logs show local docker-container execution and successful container health | Per deployment |
 | QUICK-DEPLOY-WF-058 | e2e-preferred | Local-shell Docker Compose smoke | CLI or local Web agent | Local Docker Compose is available; source/profile selects `docker-compose` | Deployment request is accepted and executed through the same resource-owned profile path | None | Context/resource commands -> ids-only `deployments.create(resourceId)` -> local-shell runtime backend | Runtime plan snapshot uses `compose-deploy`; logs show local docker-compose-stack execution and compose metadata | Per deployment |
 | QUICK-DEPLOY-WF-059 | e2e-preferred | Local-shell prebuilt image smoke | CLI or local Web agent | Local Docker is available; image source/profile selects `prebuilt-image` | Deployment request is accepted and executed without source rebuild | None | Context/resource commands -> ids-only `deployments.create(resourceId)` -> local-shell runtime backend | Runtime plan snapshot uses `prebuilt-image`; logs show local docker-container execution and successful container health | Per image/deployment |
-| QUICK-DEPLOY-WF-060 | contract, opt-in SSH | Generic-SSH Docker Compose coverage | CLI, GitHub Actions, or automation | Generic-SSH backend is registered; compose source/profile is available; real remote mutation may be disabled | Contract coverage proves plan/backend selection; opt-in smoke may execute against a real SSH target | None or stable backend/runtime `DomainError` | Resource profile -> ids-only `deployments.create(resourceId)` -> generic-SSH runtime backend | Runtime plan snapshot uses `compose-deploy`; backend selection resolves `generic-ssh`; unsupported paths do not bypass structured errors | Per target/backend |
+| QUICK-DEPLOY-WF-060 | contract + GitHub Actions secret-gated SSH | Generic-SSH Docker Compose coverage | CLI, GitHub Actions, or automation | Generic-SSH backend is registered; compose source/profile is available; real remote mutation may be disabled | Contract coverage proves plan/backend selection; GitHub Actions or local explicit smoke may execute against a real SSH target | None or stable backend/runtime `DomainError` | Resource profile -> ids-only `deployments.create(resourceId)` -> generic-SSH runtime backend | Runtime plan snapshot uses `compose-deploy`; backend selection resolves `generic-ssh`; unsupported paths do not bypass structured errors | Per target/backend |
+| QUICK-DEPLOY-WF-061 | GitHub Actions secret-gated + local explicit SSH e2e | Generic-SSH prebuilt image smoke | CLI, GitHub Actions, or automation | Generic-SSH backend is registered, remote Docker can pull the configured image, and image source/profile selects `prebuilt-image` | Deployment request is accepted and executed without source upload or image build | None or stable backend/runtime `DomainError` | Context/resource commands -> ids-only `deployments.create(resourceId)` -> generic-SSH runtime backend | Runtime plan snapshot uses `prebuilt-image`; backend selection resolves `generic-ssh`; logs show SSH docker-container execution and successful internal/public health | Per target/image |
 
 ## Entry Consistency Matrix
 
@@ -162,7 +163,7 @@ Then:
 | QUICK-DEPLOY-ENTRY-012 | contract | Control-plane mode parity | Web shows read-only mode until selection is implemented, then uses an explicit select/radio backed by the same resolver | CLI and deploy-action expose equivalent trusted mode/URL/token inputs and keep pure SSH `none` as default | HTTP/oRPC keeps `deployments.create` ids-only; future backend workflow API requires separate ADR/operation contract |
 | QUICK-DEPLOY-ENTRY-013 | contract | Framework/runtime draft field parity | Web maps source base directory, publish directory, Dockerfile path, Compose path, build target, install/build/start commands, runtime name, internal port, network, and health drafts to `resources.create` | CLI flags, config seeds, and interactive prompts where present map the same fields to `resources.create` or `resources.configure-runtime` for existing resources | Repository config declares the same profile fields and maps them before ids-only deployment admission |
 | QUICK-DEPLOY-ENTRY-014 | contract | Explicit fallback command parity | Web requires explicit fallback commands or publish/runtime fields when detection cannot produce safe defaults | CLI non-TTY fails before mutation unless config or flags provide fallback commands; CLI TTY may prompt | API/automation remains explicit-resource-profile first; `deployments.create` never accepts fallback command fields |
-| QUICK-DEPLOY-ENTRY-015 | integration, opt-in e2e | Framework fixture Docker/OCI smoke parity | Web or local Web agent must produce the same source/runtime/network profile draft for every currently supported JavaScript/TypeScript/Python fixture before ids-only deployment | CLI and repository config/headless flows must map the same profile vocabulary for those fixtures before ids-only deployment | The shared profile produces an image or Compose runtime plan with Docker/OCI execution evidence; representative opt-in real Docker coverage builds/runs/verifies the `WF-PLAN-SMOKE-005` fixture slice; no entrypoint sends framework, package, base image, or buildpack fields to `deployments.create` |
+| QUICK-DEPLOY-ENTRY-015 | integration + GitHub Actions/local explicit e2e | Framework fixture Docker/OCI smoke parity | Web or local Web agent must produce the same source/runtime/network profile draft for the active supported catalog fixture descriptor set before ids-only deployment | CLI and repository config/headless flows must map the same profile vocabulary for those fixtures before ids-only deployment | The shared profile produces an image or Compose runtime plan with Docker/OCI execution evidence; GitHub Actions and local explicit real Docker/generic-SSH coverage build/run/verify the shared `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006` framework fixture descriptor set; no entrypoint sends framework, package, base image, or buildpack fields to `deployments.create` |
 
 ## Error Assertion Rules
 
@@ -174,7 +175,7 @@ Tests must distinguish:
 
 Assertions at command boundaries must inspect stable error fields instead of translated messages.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current Web QuickDeploy uses the shared workflow program for step order and id-threading. Component tests may still assert Web-specific draft validation, executor behavior, and query refresh side effects in `QuickDeploySheet.svelte`.
 
@@ -207,7 +208,8 @@ Web QuickDeploy and CLI deploy now expose first-class static site draft UI/flags
 `apps/web/test/e2e-webview/home.webview.test.ts`, and CLI entry helper coverage exists under
 `packages/adapters/cli/test/deployment-interaction.test.ts`. Local Docker static smoke coverage
 exists under `apps/shell/test/e2e/quick-deploy-static-docker.workflow.e2e.ts`, and the generic-SSH
-Docker static path is covered by the opt-in SSH e2e harness.
+Docker static path is covered by the GitHub Actions secret-gated and local explicit SSH e2e
+harness.
 
 CLI non-TTY Quick Deploy must not prompt for omitted optional advanced fields once source and
 context flags are supplied. It should use provided flags plus defaults, then dispatch
@@ -218,13 +220,16 @@ Framework detection rows `QUICK-DEPLOY-WF-042` through `QUICK-DEPLOY-WF-044` and
 framework-signal, classification, catalog, base-image, runtime-capability, and boundary coverage is
 owned by `WF-PLAN-*` rows in
 [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md).
-Current implementation has detector/planner coverage for initial JavaScript/TypeScript and Python
-framework slices. `QUICK-DEPLOY-ENTRY-015` is covered by headless fixture smoke for the current
-supported JavaScript/TypeScript/Python fixture catalog and by a representative opt-in real local
-Docker fixture slice governed by `WF-PLAN-SMOKE-005` for Vite SPA, React SPA, Next SSR, Hono,
-Django, and Flask. FastAPI, Angular SPA, SvelteKit static, full browser/CLI e2e parity, and real
-Docker/SSH execution for every catalog fixture are still required before a framework family is
-marked first-class.
+Current implementation has detector/planner coverage for the active JavaScript/TypeScript, Python,
+and JVM supported catalog fixture descriptor set. `QUICK-DEPLOY-ENTRY-015` is covered by headless
+fixture smoke for that set and by GitHub Actions/local explicit real Docker and generic-SSH fixture
+smoke governed by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`. The shared descriptor set includes static
+frontend fixtures, Node HTTP/SSR fixtures, FastAPI/Django/Flask/generic Python and explicit Python
+fallback fixtures, Spring Boot Maven/Gradle and generic JVM fixtures, while
+Dockerfile/Compose/prebuilt-image substrates are covered by the local Docker substrate smoke and
+`QUICK-DEPLOY-WF-061` covers the generic-SSH prebuilt-image substrate. Full browser/Web-agent e2e
+parity remains a separate governed entrypoint follow-up; the framework Docker/SSH smoke catalog
+itself is no longer a fixture-coverage gap.
 
 Repository config file rows `QUICK-DEPLOY-WF-045` through `QUICK-DEPLOY-WF-051` and
 remote-state/domain rows `QUICK-DEPLOY-WF-052` through `QUICK-DEPLOY-WF-054` plus
@@ -244,8 +249,9 @@ Current config schema accepts provider-neutral `access.domains[]`, and SSH CLI c
 persists server-applied route desired state before ids-only deployment admission when route-state
 storage is wired. Deployment planning consumes that desired state and deployment-finished handling
 records applied/failed route status for route outcomes. Resource access, health, and diagnostic
-summaries expose the latest server-applied route URL/status. The opt-in SSH e2e harness covers
-Traefik-backed server-applied route apply/reload/verify for `CONFIG-FILE-DOMAIN-005`.
+summaries expose the latest server-applied route URL/status. The GitHub Actions secret-gated and
+local explicit SSH e2e harness covers Traefik-backed server-applied route apply/reload/verify for
+`CONFIG-FILE-DOMAIN-005`.
 Provider-local TLS diagnostics for `tlsMode = auto` routes are visible through proxy configuration
 and resource diagnostics. Operational provisioning of the external SSH e2e secrets/target,
 control-plane domain mapping, first-run project/resource creation e2e, deploy-action wrapper install
@@ -271,8 +277,9 @@ Web and CLI parity before deep Git URL support is considered complete.
 `packages/contracts/test/quick-deploy-workflow.test.ts` provides numbered executable coverage for
 all `QUICK-DEPLOY-WF-*` and `QUICK-DEPLOY-ENTRY-*` matrix ids at the shared workflow boundary. Those
 tests assert explicit operation sequencing, id threading, failure stop points, and that
-`deployments.create` stays ids-only. The opt-in shell e2e harnesses keep the same matrix ids on real
-Docker/SSH deployment paths where a composed runtime is required.
+`deployments.create` stays ids-only. The GitHub Actions secret-gated and local explicit shell e2e
+harnesses keep the same matrix ids on real Docker/SSH deployment paths where a composed runtime is
+required.
 
 Dedicated browser assertions for Web-only preflight, default-selection UI, per-step progress
 rendering, generated access display, and diagnostic-copy interaction remain follow-up coverage. The
@@ -286,14 +293,16 @@ container, and passing HTTP health verification. Docker availability is a prereq
 environment because Docker/OCI is the v1 deployment substrate.
 
 `apps/shell/test/e2e/quick-deploy-ssh.workflow.e2e.ts` is the workflow-named executable e2e harness
-for the real SSH/Docker path. It remains opt-in through environment variables because it mutates a
-real external SSH target. After ADR-024, the successful SSH path must use SSH-server `ssh-pglite`
+for the real SSH/Docker path. It is a GitHub Actions secret-gated release/nightly gate with local
+explicit environment-variable reproduction because it mutates a real external SSH target. After
+ADR-024, the successful SSH path must use SSH-server `ssh-pglite`
 state by default, while explicit local PGlite remains a separate smoke mode. Its successful path
 must exercise the Traefik-backed generated public route and, when `access.domains[]` is configured,
 the server-applied custom route so proxy image compatibility and Docker label discovery are covered
 by a real deployment.
 
-`apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` is the opt-in harness for
+`apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` is the GitHub Actions secret-gated
+harness for
 `QUICK-DEPLOY-WF-052` and the GitHub Actions style process boundary. It runs two separate CLI
 processes with different runner-local PGlite directories and verifies that the second deploy reuses
 remote SSH state/source link identity instead of creating a duplicate resource.
@@ -301,6 +310,7 @@ remote SSH state/source link identity instead of creating a duplicate resource.
 into nightly smoke plus release gating when `APPALOFT_E2E_SSH_HOST` and
 `APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured. `.github/workflows/ssh-quick-deploy-e2e.yml`
 exposes the real quick-deploy SSH harness through the same nightly/release release-readiness path.
+Release dispatch can require the quick-deploy SSH harness with `require_ssh_quick_deploy_e2e=true`.
 For `v0.11.x` publish tags, the release workflow requires both SSH workflows before release artifact
 publication.
 

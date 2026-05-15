@@ -167,10 +167,12 @@ selection overrides, not required setup.
   route intent.
 - Canonical redirect aliases now flow through parser validation, remote-state persistence,
   deployment route grouping, runtime/provider route inputs, Traefik/Caddy provider rendering, and
-  proxy configuration visibility. Remaining follow-up is an opt-in SSH e2e assertion for
-  `www -> apex` or `apex -> www`, plus public HTTPS validation of resident-provider TLS behavior.
-- An opt-in external SSH e2e harness now covers two isolated GitHub Actions style CLI processes
-  using different runner-local PGlite directories against the same SSH-server `ssh-pglite` state.
+  proxy configuration visibility. Remaining follow-up is GitHub Actions secret-gated and local
+  explicit SSH e2e assertion for `www -> apex` or `apex -> www`, plus public HTTPS validation of
+  resident-provider TLS behavior.
+- A GitHub Actions secret-gated and local explicit external SSH e2e harness now covers two
+  isolated GitHub Actions style CLI processes using different runner-local PGlite directories
+  against the same SSH-server `ssh-pglite` state.
   `.github/workflows/ssh-remote-state-e2e.yml` runs it manually, from nightly smoke, and before
   release artifact publication when the SSH target secrets are configured. Repository code cannot
   provision the external SSH/Docker target or its GitHub secrets; that remains operational setup.

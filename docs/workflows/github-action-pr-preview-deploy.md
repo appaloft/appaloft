@@ -392,6 +392,7 @@ source-link cleanup.
 
 ## Product-Grade Preview Path
 
+Action-only preview workflows do not own product-grade preview control-plane specs and operations.
 Product-grade GitHub preview environments require a control plane. The current control-plane shape is:
 
 ```text

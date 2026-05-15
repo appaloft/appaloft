@@ -334,23 +334,30 @@ Dockerfile, Docker Compose, or workspace command choices. Those drafts belong to
 source/runtime/network profile language and may be persisted by `resources.create` when the resource
 is created for a first-deploy workflow.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
-Current code has a `Resource` aggregate that records `resource-created`, a resource repository, resource read model, and `resources.list`.
+Current code has a `Resource` aggregate that records `resource-created`, a resource repository,
+resource read model, and `resources.list`.
 
-Current deployment bootstrap can create resources internally through deployment context resolution.
+Current deployment bootstrap can create resources internally through deployment context resolution
+only as a compatibility bootstrap path. New entry workflows should create or select a Resource
+first, then call ids-only `deployments.create`.
 
-`resources.create` command/schema/handler/use case, operation catalog entry, API/oRPC route, CLI command, Web Quick Deploy new-resource call path, CLI interactive deploy new-resource call path, source/runtime/network profile persistence, and command-level use-case tests are implemented.
+`resources.create` command/schema/handler/use case, operation catalog entry, API/oRPC route, CLI
+command, Web Quick Deploy new-resource call path, CLI interactive deploy new-resource call path,
+source/runtime/network profile persistence, and command-level use-case tests are implemented.
 
-Focused transport/UI contract tests beyond typecheck are still pending.
+Dedicated resource profile mutation operations are active:
+`resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
+`resources.configure-access`, and `resources.configure-health`. They own post-create profile edits
+through the public operation catalog, CLI, HTTP/oRPC, Web Resource detail controls, and public help
+anchors. `resources.create` remains the creation command and may persist first-deploy profile
+drafts, but it does not become a generic resource update command.
 
-Dedicated source/runtime/network configuration operations are accepted candidate behavior slices named
-`resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
-They remain inactive until implemented and added to the public operation catalog. Reusable
-access-profile operations remain separate future behavior slices.
-
-Dedicated resource create page and Project -> Resource sidebar navigation are governed by ADR-013
-and are not fully implemented yet.
+Project -> Resource navigation and Resource detail editing are governed by ADR-013 and the Resource
+Profile Lifecycle workflow. Resource create affordances remain explicit entry workflows over
+`resources.create`; post-create source/runtime/network/access/health edits dispatch the dedicated
+profile commands.
 
 Current code stores and reads `networkProfile.internalPort` as the only resource listener-port field.
 
@@ -361,18 +368,17 @@ invalid source base directories and Docker image tag/digest conflicts.
 
 Current GitHub tree URL normalization handles common single-segment refs; callers should supply
 explicit `gitRef` and `baseDirectory` for slash-containing branch or tag names until provider-backed
-disambiguation is implemented. Static publish directory is now a typed runtime-profile value for
-the static strategy. Dockerfile path, Docker Compose file path, and build target remain pending
-typed runtime-profile fields.
+disambiguation is implemented. Static publish directory, Dockerfile path, Docker Compose file path,
+and Docker build target are typed runtime-profile fields with core/application validation and
+readback.
 
 Generated default access routes are now exposed through the provider-neutral
 `ResourceAccessSummary` projection for planned and realized resource access. Public default access
-policy editing and dedicated resource access-profile configuration operations remain future behavior
-slices.
+policy editing remains separate from resource-owned access-profile configuration:
+`resources.configure-access` changes one Resource's generated-access preference, while
+`default-access-domain-policies.configure` owns system/server policy records.
 
 ## Open Questions
 
-- Resource source/runtime/network operation names are resolved as accepted candidates:
-  `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
-  Access profile configuration remains a future separate operation governed by ADR-017 and the
-  routing/domain/TLS specs.
+- None for the minimum create/profile boundary. New profile concerns must enter through explicit
+  operations rather than expanding `resources.create` into a generic update surface.

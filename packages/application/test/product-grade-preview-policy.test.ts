@@ -67,6 +67,8 @@ import {
   toRepositoryContext,
 } from "../src";
 
+const repoFile = (path: string) => new URL(`../../../${path}`, import.meta.url);
+
 class SequentialIdGenerator {
   private sequence = 0;
 
@@ -1042,7 +1044,7 @@ describe("PreviewPolicyEvaluator", () => {
 describe("Product-grade preview source-of-truth sync", () => {
   test("[PG-PREVIEW-SURFACE-001] Action-only workflow spec does not preserve stale product-grade future-control-plane gaps", () => {
     const actionWorkflowSpec = readFileSync(
-      "docs/workflows/github-action-pr-preview-deploy.md",
+      repoFile("docs/workflows/github-action-pr-preview-deploy.md"),
       "utf8",
     );
 
@@ -1061,7 +1063,7 @@ describe("Product-grade preview source-of-truth sync", () => {
   });
 
   test("[PG-PREVIEW-EVENT-001] core operations does not preserve stale preview context mapping gaps", () => {
-    const coreOperations = readFileSync("docs/CORE_OPERATIONS.md", "utf8");
+    const coreOperations = readFileSync(repoFile("docs/CORE_OPERATIONS.md"), "utf8");
 
     expect(coreOperations).toContain(
       "resolves repository full name/provider repository id plus base ref",

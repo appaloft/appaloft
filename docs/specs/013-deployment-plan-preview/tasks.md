@@ -41,7 +41,7 @@
 ## Post-Implementation Sync
 
 - [x] Reconcile roadmap, operation map, `CORE_OPERATIONS.md`, operation catalog, query/error/test
-  docs, implementation plan, public docs, i18n/help registry, and migration gaps.
+  docs, implementation plan, public docs, i18n/help registry, and governed follow-ups.
 - [x] Confirm `deployments.create` remains the only general deployment admission command.
 - [x] Confirm no retry/redeploy/rollback/cancel behavior was introduced.
 - [x] Record targeted verification commands and any skipped full-suite checks.

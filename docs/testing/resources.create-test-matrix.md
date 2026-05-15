@@ -135,7 +135,7 @@ Then:
 | --- | --- | --- | --- |
 | RES-CREATE-ENTRY-001 | e2e-preferred | HTTP/oRPC static resource create | `POST /api/resources` reuses the command schema, accepts `kind = static-site`, `runtimeProfile.strategy = static`, `runtimeProfile.publishDirectory`, and HTTP network profile defaults, dispatches `CreateResourceCommand`, and returns a resource id. |
 | RES-CREATE-ENTRY-002 | e2e-preferred | Web/CLI framework-detected resource create | Web and CLI use the same source inspection and planner contract to suggest resource profile defaults, then dispatch `resources.create` through the shared command schema without deployment-owned framework/base-image fields. |
-| RES-CREATE-ENTRY-003 | e2e-preferred | Config-file-backed resource create | CLI/local entry maps repository config profile fields into the existing `resources.create` schema or future resource profile configuration commands such as `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`; HTTP resource create remains explicit schema input and does not read local files. |
+| RES-CREATE-ENTRY-003 | e2e-preferred | Config-file-backed resource create | CLI/local entry maps repository config profile fields into the existing `resources.create` schema for first-create flows or active resource profile configuration commands such as `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network` for existing Resources; HTTP resource create remains explicit schema input and does not read local files. |
 
 ## Event Matrix
 
@@ -143,7 +143,7 @@ Then:
 | --- | --- | --- | --- |
 | RES-CREATE-EVT-001 | integration | `resource-created` | Emitted after durable resource persistence; includes resource/project/environment/kind/slug; duplicate consumption does not create duplicate read-model entries or deployments. |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 Current aggregate event name is `resource-created`.
 
@@ -166,7 +166,8 @@ Static site deployment rows `RES-CREATE-ADM-035`, `RES-CREATE-ADM-036`, and
 `RES-CREATE-WF-007` is covered at the shared Quick Deploy workflow-contract layer. Runtime adapter
 static-server Dockerfile generation is covered by runtime planner tests. Real runtime coverage now
 includes local Docker static smoke under `apps/shell/test/e2e/quick-deploy-static-docker.workflow.e2e.ts`
-and opt-in generic-SSH static smoke under `apps/shell/test/e2e/quick-deploy-ssh.workflow.e2e.ts`.
+and GitHub Actions secret-gated/local explicit generic-SSH static smoke under
+`apps/shell/test/e2e/quick-deploy-ssh.workflow.e2e.ts`.
 
 Framework-detected resource create rows are target contract rows for the broader mainstream
 framework support catalog. Detailed detection/planning coverage is owned by `WF-PLAN-*` rows in
@@ -177,10 +178,12 @@ need planner-specific Web/CLI parity and additional detectors before these rows 
 
 Repository config file rows `RES-CREATE-WF-009`, `RES-CREATE-WF-010`, and `RES-CREATE-ENTRY-003`
 are target contract rows. Current implementation rejects identity-bearing fields, raw secrets, and
-unsupported future sizing fields before resource creation, and CLI profile mapping is covered at
-the entry seed boundary. Full resource command sequencing coverage for first-run create,
-environment variable application, required secret lookup, and existing-resource profile updates
-remains follow-up.
+unsupported future sizing fields before resource creation. CLI profile mapping is covered at the
+entry seed boundary, and existing-resource profile updates route through active
+`resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`
+commands before ids-only deployment admission. Broader sequencing coverage for every repository
+config overlay, environment variable application, and required secret lookup remains governed by
+the deployment-config-file matrix rather than by expanding `resources.create`.
 
 ## Open Questions
 
