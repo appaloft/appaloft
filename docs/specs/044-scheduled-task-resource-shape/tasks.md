@@ -3,7 +3,8 @@
 ## Spec Round
 
 - [x] Add ADR-039 for scheduled task ownership and boundaries.
-- [x] Position scheduled tasks in the business operation map as accepted candidates.
+- [x] Position scheduled tasks in the business operation map and sync them to active baseline after
+      Code Round.
 - [x] Create local spec, plan, and task artifacts.
 - [x] Create the scheduled task resource test matrix.
 - [x] Update roadmap notes without marking implementation complete.
@@ -66,7 +67,7 @@
 - [x] Add scheduler process manager.
 - [x] Add scheduled-task due-candidate persistence/read model.
 - [x] Register scheduled-task shell composition dependencies.
-- [x] Add opt-in scheduled-task shell runner.
+- [x] Add explicitly enabled scheduled-task shell runner.
 - [x] Add runtime adapter one-off task execution/log support.
 - [x] Add accepted-run worker wiring.
 - [x] Add broader scheduled-task secret redaction across definition, run, log, runtime-error, and

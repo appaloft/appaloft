@@ -181,21 +181,21 @@ async function createHarness(input?: {
   );
   const runAttemptRepository = new RecordingScheduledTaskRunAttemptRepository();
   const processAttemptRecorder = new RecordingProcessAttemptRecorder();
+  const admissionService = new ScheduledTaskRunAdmissionService(
+    new StaticScheduledTaskDefinitionRepository(input?.task ?? scheduledTaskFixture()),
+    runAttemptRepository,
+    resourceRepository,
+    new SequenceIdGenerator(),
+    new FixedClock("2026-05-05T00:10:00.000Z"),
+    processAttemptRecorder,
+  );
 
   return {
+    admissionService,
     context,
     processAttemptRecorder,
     runAttemptRepository,
-    useCase: new RunScheduledTaskNowUseCase(
-      new ScheduledTaskRunAdmissionService(
-        new StaticScheduledTaskDefinitionRepository(input?.task ?? scheduledTaskFixture()),
-        runAttemptRepository,
-        resourceRepository,
-        new SequenceIdGenerator(),
-        new FixedClock("2026-05-05T00:10:00.000Z"),
-        processAttemptRecorder,
-      ),
-    ),
+    useCase: new RunScheduledTaskNowUseCase(admissionService),
   };
 }
 
@@ -230,7 +230,7 @@ describe("RunScheduledTaskNowUseCase", () => {
         id: "wrk_0002",
         kind: "runtime-maintenance",
         status: "pending",
-        operationKey: "scheduled-task-runs.run-now",
+        operationKey: "scheduled-tasks.run-now",
         dedupeKey: "scheduled-task-run:str_0001",
         correlationId: "req_scheduled_task_run_now_test",
         requestId: "req_scheduled_task_run_now_test",
@@ -248,6 +248,32 @@ describe("RunScheduledTaskNowUseCase", () => {
         },
       },
     ]);
+  });
+
+  test("[SCHED-TASK-SCHED-001] scheduler-fired admission records the internal run-due delivery key", async () => {
+    const { admissionService, context, processAttemptRecorder } = await createHarness();
+
+    const result = await admissionService.admit(context, {
+      taskId: "tsk_daily_migration",
+      resourceId: "res_api",
+      triggerKind: "scheduled",
+      requestedAt: "2026-05-05T00:15:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().run).toMatchObject({
+      runId: "str_0001",
+      triggerKind: "scheduled",
+      status: "accepted",
+    });
+    expect(processAttemptRecorder.records[0]).toMatchObject({
+      operationKey: "scheduled-task-runs.run-due",
+      phase: "scheduled-task-run-admission",
+      safeDetails: {
+        runId: "str_0001",
+        triggerKind: "scheduled",
+      },
+    });
   });
 
   test("[SCHED-TASK-RUN-002] rejects archived Resources before runtime execution", async () => {

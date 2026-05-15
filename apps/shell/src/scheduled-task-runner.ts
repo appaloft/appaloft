@@ -15,7 +15,7 @@ import {
 } from "@appaloft/application";
 import { type AppConfig } from "@appaloft/config";
 
-const scheduledTaskRunOperationKey = "scheduled-task-runs.run-now";
+const scheduledTaskRunOperationKeys = ["scheduled-tasks.run-now", "scheduled-task-runs.run-due"];
 const scheduledTaskWorkerId = "scheduled-task-runner";
 const scheduledTaskWorkKind = "runtime-maintenance";
 
@@ -107,7 +107,7 @@ export function createScheduledTaskRunner(input: ScheduledTaskRunnerInput): Sche
       );
       const generatedRetryAttempts: ProcessAttemptRecord[] = [];
       for (const retryCandidate of retryCandidates) {
-        if (retryCandidate.operationKey !== scheduledTaskRunOperationKey) {
+        if (!scheduledTaskRunOperationKeys.includes(retryCandidate.operationKey)) {
           continue;
         }
 
@@ -142,23 +142,39 @@ export function createScheduledTaskRunner(input: ScheduledTaskRunnerInput): Sche
         });
       }
 
-      const queriedDeliveryCandidates =
-        await processAttemptDeliveryCandidateReader.listDueDeliveryCandidates(repositoryContext, {
-          kind: scheduledTaskWorkKind,
-          operationKey: scheduledTaskRunOperationKey,
-          now,
-          limit: input.config.batchSize,
-        });
+      const queriedDeliveryCandidates: ProcessAttemptRecord[] = [];
+      for (const operationKey of scheduledTaskRunOperationKeys) {
+        queriedDeliveryCandidates.push(
+          ...(await processAttemptDeliveryCandidateReader.listDueDeliveryCandidates(
+            repositoryContext,
+            {
+              kind: scheduledTaskWorkKind,
+              operationKey,
+              now,
+              limit: input.config.batchSize,
+            },
+          )),
+        );
+      }
       const durableCandidatesById = new Map<string, ProcessAttemptRecord>();
       for (const candidate of [...generatedRetryAttempts, ...queriedDeliveryCandidates]) {
         durableCandidatesById.set(candidate.id, candidate);
       }
       const durableCandidates = [...durableCandidatesById.values()];
+      const durableRunIds = new Set(
+        durableCandidates
+          .map((candidate) => candidateRunId(candidate))
+          .filter((runId): runId is string => typeof runId === "string"),
+      );
 
       let completed = 0;
       let failed = result.value.failed.length;
       let skipped = 0;
       for (const dispatch of result.value.dispatched) {
+        if (durableRunIds.has(dispatch.run.runId)) {
+          continue;
+        }
+
         const workerResult = await input.worker.run(context, {
           runId: dispatch.run.runId,
           taskId: dispatch.taskId,
