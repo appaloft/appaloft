@@ -48,6 +48,15 @@ describe("release build workflow", () => {
     const nightlyWorkflow = await readText(".github/workflows/nightly.yml");
     const remoteStateSshWorkflow = await readText(".github/workflows/ssh-remote-state-e2e.yml");
     const quickDeploySshWorkflow = await readText(".github/workflows/ssh-quick-deploy-e2e.yml");
+    const frameworkFixtureWorkflow = await readText(".github/workflows/framework-fixture-e2e.yml");
+    const scheduledTaskWorkflow = await readText(".github/workflows/scheduled-task-e2e.yml");
+    const storageCleanupWorkflow = await readText(".github/workflows/storage-cleanup-e2e.yml");
+    const runtimeUsageWorkflow = await readText(".github/workflows/runtime-usage-e2e.yml");
+    const capacityPruneWorkflow = await readText(".github/workflows/capacity-prune-e2e.yml");
+    const previewProviderWorkflow = await readText(".github/workflows/preview-provider-e2e.yml");
+    const dependencyRedisBackupWorkflow = await readText(
+      ".github/workflows/dependency-redis-backup-e2e.yml",
+    );
     const releaseWorkflow = await readText(".github/workflows/release.yml");
 
     expect(scripts["smoke:local:commands"]).toContain("scripts/smoke/local-deploy.ts");
@@ -55,6 +64,63 @@ describe("release build workflow", () => {
     expect(scripts["smoke:local:compose"]).toContain("--method=docker-compose");
     expect(scripts["smoke:local:prebuilt"]).toContain("--method=prebuilt-image");
     expect(scripts["smoke:local:static"]).toContain("--method=static");
+    expect(scripts["smoke:framework:docker-fixtures"]).toBe(
+      "APPALOFT_E2E_FRAMEWORK_DOCKER=true bun test --timeout=3600000 ./apps/shell/test/e2e/quick-deploy-framework-fixtures-docker.workflow.e2e.ts",
+    );
+    expect(scripts["smoke:framework:docker-substrates"]).toBe(
+      "bun test --timeout=300000 ./apps/shell/test/e2e/quick-deploy-local-docker-substrates.workflow.e2e.ts",
+    );
+    expect(scripts["smoke:framework:docker"]).toBe(
+      "bun run smoke:framework:docker-substrates && bun run smoke:framework:docker-fixtures",
+    );
+    expect(scripts["smoke:framework:ssh"]).toBe(
+      "bun run smoke:ssh:preflight && APPALOFT_E2E_SSH_FRAMEWORK_DOCKER=true bun test --timeout=1800000 ./apps/shell/test/e2e/quick-deploy-framework-fixtures-ssh.workflow.e2e.ts",
+    );
+    expect(scripts["smoke:framework"]).toBe(
+      "bun run smoke:framework:docker && bun run smoke:framework:ssh",
+    );
+    expect(scripts["smoke:scheduled-task:docker"]).toBe(
+      "APPALOFT_E2E_SCHEDULED_TASK_DOCKER=true bun test --timeout=300000 packages/adapters/runtime/test/scheduled-task-runtime.real-docker.test.ts",
+    );
+    expect(scripts["smoke:scheduled-task:ssh"]).toBe(
+      "bun run smoke:ssh:preflight && APPALOFT_E2E_SSH_SCHEDULED_TASK_DOCKER=true bun test --timeout=300000 packages/adapters/runtime/test/scheduled-task-runtime.real-docker.test.ts",
+    );
+    expect(scripts["smoke:scheduled-task"]).toBe(
+      "bun run smoke:scheduled-task:docker && bun run smoke:scheduled-task:ssh",
+    );
+    expect(scripts["smoke:storage-cleanup:docker"]).toBe(
+      "APPALOFT_E2E_STORAGE_CLEANUP_DOCKER=true bun test --timeout=300000 packages/adapters/runtime/test/storage-runtime-cleanup.test.ts",
+    );
+    expect(scripts["smoke:storage-cleanup:ssh"]).toBe(
+      "bun run smoke:ssh:preflight && APPALOFT_E2E_SSH_STORAGE_CLEANUP_DOCKER=true bun test --timeout=300000 packages/adapters/runtime/test/storage-runtime-cleanup.test.ts",
+    );
+    expect(scripts["smoke:storage-cleanup"]).toBe(
+      "bun run smoke:storage-cleanup:docker && bun run smoke:storage-cleanup:ssh",
+    );
+    expect(scripts["smoke:runtime-usage:docker"]).toBe(
+      "APPALOFT_RUNTIME_USAGE_DOCKER_SMOKE=1 bun test --timeout=300000 packages/adapters/runtime/test/runtime-usage-smoke.test.ts",
+    );
+    expect(scripts["smoke:runtime-usage:ssh"]).toBe(
+      "bun run smoke:ssh:preflight && APPALOFT_RUNTIME_USAGE_SSH_SMOKE=1 bun test --timeout=300000 packages/adapters/runtime/test/runtime-usage-smoke.test.ts",
+    );
+    expect(scripts["smoke:runtime-usage"]).toBe(
+      "bun run smoke:runtime-usage:docker && bun run smoke:runtime-usage:ssh",
+    );
+    expect(scripts["smoke:capacity-prune:local"]).toBe(
+      "APPALOFT_E2E_CAPACITY_PRUNE_LOCAL=true bun test --timeout=300000 packages/adapters/runtime/test/runtime-target-capacity-prune.test.ts",
+    );
+    expect(scripts["smoke:capacity-prune:ssh"]).toBe(
+      "bun run smoke:ssh:preflight && APPALOFT_E2E_SSH_CAPACITY_PRUNE=true bun test --timeout=300000 packages/adapters/runtime/test/runtime-target-capacity-prune.test.ts",
+    );
+    expect(scripts["smoke:capacity-prune"]).toBe(
+      "bun run smoke:capacity-prune:local && bun run smoke:capacity-prune:ssh",
+    );
+    expect(scripts["smoke:preview-provider:github"]).toBe(
+      "APPALOFT_GITHUB_PREVIEW_PROVIDER_SMOKE=true bun test --timeout=300000 packages/integrations/github/test/github-preview-provider-smoke.test.ts",
+    );
+    expect(scripts["smoke:dependency-redis-backup"]).toBe(
+      "APPALOFT_E2E_REDIS_BACKUP_RESTORE=true bun test --timeout=300000 ./apps/shell/test/e2e/dependency-resource-redis-backup.workflow.e2e.ts",
+    );
     expect(scripts["smoke:install-auth"]).toContain("scripts/test/install-full-smoke.test.ts");
     expect(scripts["smoke:swarm"]).toContain("APPALOFT_DOCKER_SWARM_SMOKE=1");
     expect(scripts["smoke:swarm"]).toContain("docker-swarm-execution-backend.test.ts");
@@ -95,9 +161,29 @@ describe("release build workflow", () => {
     expect(releaseWorkflow).toContain("ssh-remote-state-e2e");
     expect(releaseWorkflow).toContain("require_ssh_remote_state_e2e");
     expect(releaseWorkflow).toContain("ssh-quick-deploy-e2e");
+    expect(releaseWorkflow).toContain("framework-fixture-e2e");
+    expect(releaseWorkflow).toContain("scheduled-task-e2e");
+    expect(releaseWorkflow).toContain("storage-cleanup-e2e");
+    expect(releaseWorkflow).toContain("runtime-usage-e2e");
+    expect(releaseWorkflow).toContain("capacity-prune-e2e");
+    expect(releaseWorkflow).toContain("preview-provider-e2e");
+    expect(releaseWorkflow).toContain("dependency-redis-backup-e2e");
     expect(releaseWorkflow).toContain("require_ssh_quick_deploy_e2e");
+    expect(releaseWorkflow).toContain("require_framework_fixture_e2e");
+    expect(releaseWorkflow).toContain("require_scheduled_task_e2e");
+    expect(releaseWorkflow).toContain("require_storage_cleanup_e2e");
+    expect(releaseWorkflow).toContain("require_runtime_usage_e2e");
+    expect(releaseWorkflow).toContain("require_capacity_prune_e2e");
+    expect(releaseWorkflow).toContain("require_preview_provider_e2e");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/ssh-remote-state-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/ssh-quick-deploy-e2e.yml");
+    expect(releaseWorkflow).toContain("uses: ./.github/workflows/framework-fixture-e2e.yml");
+    expect(releaseWorkflow).toContain("uses: ./.github/workflows/scheduled-task-e2e.yml");
+    expect(releaseWorkflow).toContain("uses: ./.github/workflows/storage-cleanup-e2e.yml");
+    expect(releaseWorkflow).toContain("uses: ./.github/workflows/runtime-usage-e2e.yml");
+    expect(releaseWorkflow).toContain("uses: ./.github/workflows/capacity-prune-e2e.yml");
+    expect(releaseWorkflow).toContain("uses: ./.github/workflows/preview-provider-e2e.yml");
+    expect(releaseWorkflow).toContain("uses: ./.github/workflows/dependency-redis-backup-e2e.yml");
     expect(releaseWorkflow).toContain(
       [
         "build-release:",
@@ -105,6 +191,13 @@ describe("release build workflow", () => {
         "      - release-please",
         "      - ssh-remote-state-e2e",
         "      - ssh-quick-deploy-e2e",
+        "      - framework-fixture-e2e",
+        "      - scheduled-task-e2e",
+        "      - storage-cleanup-e2e",
+        "      - runtime-usage-e2e",
+        "      - capacity-prune-e2e",
+        "      - preview-provider-e2e",
+        "      - dependency-redis-backup-e2e",
       ].join("\n"),
     );
     expect(releaseWorkflow).toContain(
@@ -121,6 +214,48 @@ describe("release build workflow", () => {
         "{{ github.event_name == 'workflow_dispatch' && inputs.require_ssh_quick_deploy_e2e }}",
       ].join(""),
     );
+    expect(releaseWorkflow).toContain(
+      [
+        "required: ",
+        "$",
+        "{{ github.event_name == 'workflow_dispatch' && inputs.require_framework_fixture_e2e }}",
+      ].join(""),
+    );
+    expect(releaseWorkflow).toContain(
+      [
+        "required: ",
+        "$",
+        "{{ github.event_name == 'workflow_dispatch' && inputs.require_scheduled_task_e2e }}",
+      ].join(""),
+    );
+    expect(releaseWorkflow).toContain(
+      [
+        "required: ",
+        "$",
+        "{{ github.event_name == 'workflow_dispatch' && inputs.require_storage_cleanup_e2e }}",
+      ].join(""),
+    );
+    expect(releaseWorkflow).toContain(
+      [
+        "required: ",
+        "$",
+        "{{ github.event_name == 'workflow_dispatch' && inputs.require_runtime_usage_e2e }}",
+      ].join(""),
+    );
+    expect(releaseWorkflow).toContain(
+      [
+        "required: ",
+        "$",
+        "{{ github.event_name == 'workflow_dispatch' && inputs.require_capacity_prune_e2e }}",
+      ].join(""),
+    );
+    expect(releaseWorkflow).toContain(
+      [
+        "required: ",
+        "$",
+        "{{ github.event_name == 'workflow_dispatch' && inputs.require_preview_provider_e2e }}",
+      ].join(""),
+    );
     expect(releaseWorkflow).not.toContain(
       "startsWith(needs.release-please.outputs.tag_name, 'v0.11.')",
     );
@@ -128,6 +263,93 @@ describe("release build workflow", () => {
     expect(nightlyWorkflow).toContain("uses: ./.github/workflows/ssh-remote-state-e2e.yml");
     expect(nightlyWorkflow).toContain("ssh-quick-deploy-e2e");
     expect(nightlyWorkflow).toContain("uses: ./.github/workflows/ssh-quick-deploy-e2e.yml");
+    expect(nightlyWorkflow).toContain("framework-fixture-e2e");
+    expect(nightlyWorkflow).toContain("uses: ./.github/workflows/framework-fixture-e2e.yml");
+    expect(nightlyWorkflow).toContain("scheduled-task-e2e");
+    expect(nightlyWorkflow).toContain("uses: ./.github/workflows/scheduled-task-e2e.yml");
+    expect(nightlyWorkflow).toContain("storage-cleanup-e2e");
+    expect(nightlyWorkflow).toContain("uses: ./.github/workflows/storage-cleanup-e2e.yml");
+    expect(nightlyWorkflow).toContain("runtime-usage-e2e");
+    expect(nightlyWorkflow).toContain("uses: ./.github/workflows/runtime-usage-e2e.yml");
+    expect(nightlyWorkflow).toContain("capacity-prune-e2e");
+    expect(nightlyWorkflow).toContain("uses: ./.github/workflows/capacity-prune-e2e.yml");
+    expect(nightlyWorkflow).toContain("preview-provider-e2e");
+    expect(nightlyWorkflow).toContain("uses: ./.github/workflows/preview-provider-e2e.yml");
+    expect(nightlyWorkflow).toContain("dependency-redis-backup-e2e");
+    expect(nightlyWorkflow).toContain("uses: ./.github/workflows/dependency-redis-backup-e2e.yml");
+    expect(frameworkFixtureWorkflow).toContain("name: Framework Fixture E2E");
+    expect(frameworkFixtureWorkflow).toContain("APPALOFT_E2E_FRAMEWORK_DOCKER");
+    expect(frameworkFixtureWorkflow).toContain("APPALOFT_E2E_SSH_FRAMEWORK_DOCKER");
+    expect(frameworkFixtureWorkflow).toContain("framework-docker-substrates");
+    expect(frameworkFixtureWorkflow).toContain("framework-docker-fixtures");
+    expect(frameworkFixtureWorkflow).toContain("APPALOFT_E2E_FRAMEWORK_FIXTURE");
+    expect(frameworkFixtureWorkflow).toContain(
+      "bun test --timeout=1500000 ./apps/shell/test/e2e/quick-deploy-framework-fixtures-docker.workflow.e2e.ts",
+    );
+    expect(frameworkFixtureWorkflow).toContain(
+      "bun run smoke:ssh:preflight && bun test --timeout=1500000 ./apps/shell/test/e2e/quick-deploy-framework-fixtures-ssh.workflow.e2e.ts",
+    );
+    expect(frameworkFixtureWorkflow).toContain("HAS_SSH_FRAMEWORK_SECRETS");
+    expect(frameworkFixtureWorkflow).toContain(
+      "Skipping SSH framework fixture E2E because APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY is not configured.",
+    );
+    expect(frameworkFixtureWorkflow).toContain(
+      "Missing APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY.",
+    );
+    expect(scheduledTaskWorkflow).toContain("name: Scheduled Task E2E");
+    expect(scheduledTaskWorkflow).toContain("bun run smoke:scheduled-task:docker");
+    expect(scheduledTaskWorkflow).toContain("bun run smoke:scheduled-task:ssh");
+    expect(scheduledTaskWorkflow).toContain("HAS_SSH_SCHEDULED_TASK_SECRETS");
+    expect(scheduledTaskWorkflow).toContain(
+      "Skipping SSH scheduled-task E2E because APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY is not configured.",
+    );
+    expect(scheduledTaskWorkflow).toContain(
+      "Missing APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY.",
+    );
+    expect(storageCleanupWorkflow).toContain("name: Storage Cleanup E2E");
+    expect(storageCleanupWorkflow).toContain("bun run smoke:storage-cleanup:docker");
+    expect(storageCleanupWorkflow).toContain("bun run smoke:storage-cleanup:ssh");
+    expect(storageCleanupWorkflow).toContain("HAS_SSH_STORAGE_CLEANUP_SECRETS");
+    expect(storageCleanupWorkflow).toContain(
+      "Skipping SSH storage-cleanup E2E because APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY is not configured.",
+    );
+    expect(storageCleanupWorkflow).toContain(
+      "Missing APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY.",
+    );
+    expect(previewProviderWorkflow).toContain("name: Preview Provider E2E");
+    expect(previewProviderWorkflow).toContain("bun run smoke:preview-provider:github");
+    expect(previewProviderWorkflow).toContain("HAS_GITHUB_PREVIEW_PROVIDER_SECRETS");
+    expect(previewProviderWorkflow).toContain("APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN");
+    expect(previewProviderWorkflow).toContain("APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY");
+    expect(previewProviderWorkflow).toContain("APPALOFT_GITHUB_PREVIEW_SMOKE_PR");
+    expect(previewProviderWorkflow).toContain(
+      "Skipping GitHub preview provider E2E because APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN, APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY, or APPALOFT_GITHUB_PREVIEW_SMOKE_PR is not configured.",
+    );
+    expect(dependencyRedisBackupWorkflow).toContain("name: Dependency Redis Backup E2E");
+    expect(dependencyRedisBackupWorkflow).toContain("image: redis:7-alpine");
+    expect(dependencyRedisBackupWorkflow).toContain("sudo apt-get install -y redis-tools");
+    expect(dependencyRedisBackupWorkflow).toContain("bun run smoke:dependency-redis-backup");
+    expect(dependencyRedisBackupWorkflow).toContain("APPALOFT_E2E_REDIS_URL");
+    expect(runtimeUsageWorkflow).toContain("name: Runtime Usage E2E");
+    expect(runtimeUsageWorkflow).toContain("bun run smoke:runtime-usage:docker");
+    expect(runtimeUsageWorkflow).toContain("bun run smoke:runtime-usage:ssh");
+    expect(runtimeUsageWorkflow).toContain("HAS_SSH_RUNTIME_USAGE_SECRETS");
+    expect(runtimeUsageWorkflow).toContain(
+      "Skipping SSH runtime-usage E2E because APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY is not configured.",
+    );
+    expect(runtimeUsageWorkflow).toContain(
+      "Missing APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY.",
+    );
+    expect(capacityPruneWorkflow).toContain("name: Capacity Prune E2E");
+    expect(capacityPruneWorkflow).toContain("bun run smoke:capacity-prune:local");
+    expect(capacityPruneWorkflow).toContain("bun run smoke:capacity-prune:ssh");
+    expect(capacityPruneWorkflow).toContain("HAS_SSH_CAPACITY_PRUNE_SECRETS");
+    expect(capacityPruneWorkflow).toContain(
+      "Skipping SSH capacity-prune E2E because APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY is not configured.",
+    );
+    expect(capacityPruneWorkflow).toContain(
+      "Missing APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY.",
+    );
     expect(remoteStateSshWorkflow).toContain("APPALOFT_E2E_SSH_REMOTE_STATE");
     expect(remoteStateSshWorkflow).toContain("Check SSH Release Readiness");
     expect(remoteStateSshWorkflow).toContain("bun run smoke:ssh:preflight");
@@ -201,28 +423,93 @@ describe("release build workflow", () => {
     expect(releaseDocs).toContain("APPALOFT_E2E_SSH_USERNAME");
     expect(releaseDocs).toContain("require_ssh_remote_state_e2e=true");
     expect(releaseDocs).toContain("require_ssh_quick_deploy_e2e=true");
+    expect(releaseDocs).toContain("framework-fixture-e2e.yml");
+    expect(releaseDocs).toContain("scheduled-task-e2e.yml");
+    expect(releaseDocs).toContain("storage-cleanup-e2e.yml");
+    expect(releaseDocs).toContain("runtime-usage-e2e.yml");
+    expect(releaseDocs).toContain("capacity-prune-e2e.yml");
+    expect(releaseDocs).toContain("preview-provider-e2e.yml");
+    expect(releaseDocs).toContain("dependency-redis-backup-e2e.yml");
+    expect(releaseDocs).toContain("bun run smoke:dependency-redis-backup");
+    expect(releaseDocs).toContain("bun run smoke:framework:docker");
+    expect(releaseDocs).toContain("bun run smoke:framework:ssh");
+    expect(releaseDocs).toContain("bun run smoke:scheduled-task:docker");
+    expect(releaseDocs).toContain("bun run smoke:scheduled-task:ssh");
+    expect(releaseDocs).toContain("bun run smoke:storage-cleanup:docker");
+    expect(releaseDocs).toContain("bun run smoke:storage-cleanup:ssh");
+    expect(releaseDocs).toContain("bun run smoke:runtime-usage:docker");
+    expect(releaseDocs).toContain("bun run smoke:runtime-usage:ssh");
+    expect(releaseDocs).toContain("bun run smoke:capacity-prune:local");
+    expect(releaseDocs).toContain("bun run smoke:capacity-prune:ssh");
+    expect(releaseDocs).toContain("bun run smoke:preview-provider:github");
+    expect(releaseDocs).toContain("require_framework_fixture_e2e=true");
+    expect(releaseDocs).toContain("require_scheduled_task_e2e=true");
+    expect(releaseDocs).toContain("require_storage_cleanup_e2e=true");
+    expect(releaseDocs).toContain("require_runtime_usage_e2e=true");
+    expect(releaseDocs).toContain("require_capacity_prune_e2e=true");
+    expect(releaseDocs).toContain("require_preview_provider_e2e=true");
+    expect(releaseDocs).toContain("APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN");
+    expect(releaseDocs).toContain("APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY");
+    expect(releaseDocs).toContain("APPALOFT_GITHUB_PREVIEW_SMOKE_PR");
     expect(releaseDocs).toContain(
-      "For `0.11.0`, real SSH smoke evidence is an accepted deferred roadmap gap",
+      "If local SSH smoke cannot run because no target server is available",
     );
-    expect(releaseNotesScript).toContain(
-      "Real SSH release-readiness smoke evidence is deferred for this release",
+    expect(releaseDocs).toContain(
+      "use the GitHub Actions reusable workflows as the release-readiness confidence layer",
     );
-    expect(releaseSkill).toContain(
-      "For `0.11.0`, missing real SSH smoke evidence is an accepted deferred release-note gap",
+    expect(releaseNotesScript).not.toContain(
+      ["Real SSH release-readiness", "smoke evidence is deferred for this release"].join(" "),
     );
+    expect(releaseSkill).toContain("When one of these inputs is set");
+    expect(releaseSkill).toContain("missing SSH target secrets or GitHub preview provider smoke");
+    expect(releaseSkill).toContain("secrets fail the reusable workflow");
+    expect(releaseSkill).toContain("require_scheduled_task_e2e=true");
+    expect(releaseSkill).toContain("require_storage_cleanup_e2e=true");
+    expect(releaseSkill).toContain("require_runtime_usage_e2e=true");
+    expect(releaseSkill).toContain("require_capacity_prune_e2e=true");
+    expect(releaseSkill).toContain("require_preview_provider_e2e=true");
+    expect(releaseHardeningMatrix).toContain("fail-closed reusable GitHub Actions gates");
     expect(releaseHardeningMatrix).toContain(
-      "missing real SSH evidence is an accepted deferred release-note gap",
+      "both scripts fail at the explicit `APPALOFT_E2E_SSH_HOST` requirement",
     );
+    expect(releaseHardeningMatrix).toContain("smoke:scheduled-task:docker");
     expect(releaseHardeningMatrix).toContain(
-      "both scripts fail at the opt-in `APPALOFT_E2E_SSH_HOST` requirement",
+      "local explicit real scheduled-task runtime execution",
     );
+    expect(releaseHardeningMatrix).toContain("APPALOFT_E2E_SSH_SCHEDULED_TASK_DOCKER=true");
+    expect(releaseHardeningMatrix).toContain("scheduled-task-e2e.yml");
+    expect(releaseHardeningMatrix).toContain("require_scheduled_task_e2e=true");
+    expect(releaseHardeningMatrix).toContain("smoke:storage-cleanup:docker");
+    expect(releaseHardeningMatrix).toContain("APPALOFT_E2E_SSH_STORAGE_CLEANUP_DOCKER=true");
+    expect(releaseHardeningMatrix).toContain("storage-cleanup-e2e.yml");
+    expect(releaseHardeningMatrix).toContain("require_storage_cleanup_e2e=true");
+    expect(releaseHardeningMatrix).toContain("smoke:runtime-usage:docker");
+    expect(releaseHardeningMatrix).toContain("APPALOFT_RUNTIME_USAGE_SSH_SMOKE=1");
+    expect(releaseHardeningMatrix).toContain("runtime-usage-e2e.yml");
+    expect(releaseHardeningMatrix).toContain("require_runtime_usage_e2e=true");
+    expect(releaseHardeningMatrix).toContain("smoke:capacity-prune:local");
+    expect(releaseHardeningMatrix).toContain("local explicit real runtime workspace prune");
+    expect(releaseHardeningMatrix).toContain("APPALOFT_E2E_SSH_CAPACITY_PRUNE=true");
+    expect(releaseHardeningMatrix).toContain("capacity-prune-e2e.yml");
+    expect(releaseHardeningMatrix).toContain("require_capacity_prune_e2e=true");
+    expect(releaseHardeningMatrix).toContain("smoke:preview-provider:github");
+    expect(releaseHardeningMatrix).toContain("preview-provider-e2e.yml");
+    expect(releaseHardeningMatrix).toContain("APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN");
+    expect(releaseHardeningMatrix).toContain("APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY");
+    expect(releaseHardeningMatrix).toContain("APPALOFT_GITHUB_PREVIEW_SMOKE_PR");
+    expect(releaseHardeningMatrix).toContain("require_preview_provider_e2e=true");
+    expect(releaseHardeningMatrix).toContain("smoke:dependency-redis-backup");
+    expect(releaseHardeningMatrix).toContain("dependency-redis-backup-e2e.yml");
+    expect(releaseHardeningMatrix).toContain("APPALOFT_E2E_REDIS_BACKUP_RESTORE=true");
     expect(releaseHardeningMatrix).toContain("`smoke:ssh:preflight` verifies");
     expect(releaseHardeningMatrix).toContain("ssh-smoke-evidence.json");
     expect(releaseHardeningMatrix).toContain("`smoke:ssh:evidence:verify`");
     expect(releaseHardeningMatrix).toContain("`APPALOFT_E2E_SSH_USERNAME`");
+    expect(releaseHardeningMatrix).not.toContain("opt-in real scheduled-task runtime execution");
+    expect(releaseHardeningMatrix).not.toContain("opt-in real runtime workspace prune");
   });
 
-  test("[RELEASE-HARDENING-006] SSH smoke scripts fail closed when opt-in credentials are missing", () => {
+  test("[RELEASE-HARDENING-006] SSH smoke scripts fail closed when explicit credentials are missing", () => {
     const sshSmokeEnv = {
       ...Bun.env,
       APPALOFT_E2E_SSH_HOST: "",
@@ -667,7 +954,7 @@ describe("release build workflow", () => {
     }
   });
 
-  test("[RELEASE-HARDENING-006] allows stable 0.11.0 with accepted SSH evidence gap", () => {
+  test("[RELEASE-HARDENING-006] allows stable 0.11.0 with explicit SSH confidence gates", () => {
     const result = Bun.spawnSync(
       [
         "bun",

@@ -1,0 +1,52 @@
+name: Dependency Redis Backup E2E
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: dependency-redis-backup-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  APPALOFT_OTEL_ENABLED: "false"
+
+jobs:
+  dependency-redis-backup-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install redis-cli
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y redis-tools
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Verify Bun version sync
+        run: bun run bun:version:check
+
+      - name: Run Dependency Redis Backup E2E
+        env:
+          APPALOFT_E2E_REDIS_URL: redis://127.0.0.1:6379/0
+        run: bun run smoke:dependency-redis-backup

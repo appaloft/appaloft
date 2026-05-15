@@ -1,0 +1,77 @@
+name: Preview Provider E2E
+
+on:
+  workflow_call:
+    inputs:
+      required:
+        description: Fail when the GitHub preview provider smoke secrets are not configured.
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN:
+        required: false
+      APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY:
+        required: false
+      APPALOFT_GITHUB_PREVIEW_SMOKE_PR:
+        required: false
+  workflow_dispatch:
+    inputs:
+      required:
+        description: Fail when the GitHub preview provider smoke secrets are not configured.
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: preview-provider-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  APPALOFT_OTEL_ENABLED: "false"
+
+jobs:
+  github-preview-feedback-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HAS_GITHUB_PREVIEW_PROVIDER_SECRETS: ${{ secrets.APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN != '' && secrets.APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY != '' && secrets.APPALOFT_GITHUB_PREVIEW_SMOKE_PR != '' }}
+    steps:
+      - name: Require GitHub Preview Provider E2E Secrets
+        if: ${{ env.HAS_GITHUB_PREVIEW_PROVIDER_SECRETS != 'true' && inputs.required == true }}
+        run: |
+          echo "::error::Missing APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN, APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY, or APPALOFT_GITHUB_PREVIEW_SMOKE_PR."
+          echo "::error::Configure repository or organization secrets, or dispatch with required=false."
+          exit 1
+
+      - name: Skip GitHub Preview Provider E2E
+        if: ${{ env.HAS_GITHUB_PREVIEW_PROVIDER_SECRETS != 'true' && inputs.required != true }}
+        run: |
+          echo "Skipping GitHub preview provider E2E because APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN, APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY, or APPALOFT_GITHUB_PREVIEW_SMOKE_PR is not configured."
+
+      - uses: actions/checkout@v4
+        if: ${{ env.HAS_GITHUB_PREVIEW_PROVIDER_SECRETS == 'true' }}
+
+      - uses: oven-sh/setup-bun@v2
+        if: ${{ env.HAS_GITHUB_PREVIEW_PROVIDER_SECRETS == 'true' }}
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install
+        if: ${{ env.HAS_GITHUB_PREVIEW_PROVIDER_SECRETS == 'true' }}
+        run: bun install --frozen-lockfile
+
+      - name: Verify Bun version sync
+        if: ${{ env.HAS_GITHUB_PREVIEW_PROVIDER_SECRETS == 'true' }}
+        run: bun run bun:version:check
+
+      - name: Run GitHub Preview Provider E2E
+        if: ${{ env.HAS_GITHUB_PREVIEW_PROVIDER_SECRETS == 'true' }}
+        env:
+          APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN: ${{ secrets.APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN }}
+          APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY: ${{ secrets.APPALOFT_GITHUB_PREVIEW_SMOKE_REPOSITORY }}
+          APPALOFT_GITHUB_PREVIEW_SMOKE_PR: ${{ secrets.APPALOFT_GITHUB_PREVIEW_SMOKE_PR }}
+        run: bun run smoke:preview-provider:github
