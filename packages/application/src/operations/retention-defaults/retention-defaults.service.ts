@@ -10,7 +10,8 @@ export type RetentionDefaultCategory =
   | "domain-event-streams"
   | "process-attempts"
   | "provider-job-logs"
-  | "resource-runtime-log-archives";
+  | "resource-runtime-log-archives"
+  | "runtime-monitoring-samples";
 
 export interface RetentionDefaultRecord {
   id: string;

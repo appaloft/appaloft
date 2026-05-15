@@ -11,6 +11,7 @@ export const retentionDefaultCategorySchema = z.enum([
   "process-attempts",
   "provider-job-logs",
   "resource-runtime-log-archives",
+  "runtime-monitoring-samples",
 ]);
 
 export const configureRetentionDefaultsCommandInputSchema = z.object({

@@ -101,6 +101,18 @@ describe("resolveConfig", () => {
     expect(configured.autoMigrate).toBe(true);
   });
 
+  test("[SCHED-MAINT-WORKER-003] keeps scheduled maintenance workers disabled by default", () => {
+    const config = resolveConfig({ env: {} });
+
+    expect(config.certificateRetryScheduler.enabled).toBe(true);
+    expect(config.previewCleanupRetryScheduler.enabled).toBe(false);
+    expect(config.previewExpiryCleanupScheduler.enabled).toBe(false);
+    expect(config.scheduledTaskRunner.enabled).toBe(false);
+    expect(config.scheduledRuntimePruneRunner.enabled).toBe(false);
+    expect(config.scheduledHistoryRetentionRunner.enabled).toBe(false);
+    expect(config.runtimeMonitoringCollectorRunner.enabled).toBe(false);
+  });
+
   test("derives pglite storage from explicit data dir", () => {
     const config = resolveConfig({
       env: {
@@ -385,8 +397,20 @@ describe("resolveConfig", () => {
     expect(config.scheduledHistoryRetentionRunner).toEqual({
       enabled: false,
       intervalSeconds: 3600,
+      batchSize: 25,
+    });
+    expect(config.runtimeMonitoringCollectorRunner).toEqual({
+      enabled: false,
+      intervalSeconds: 60,
+      batchSize: 25,
+      rawRetentionHours: 24,
     });
     expect(config.previewCleanupRetryScheduler).toEqual({
+      enabled: false,
+      intervalSeconds: 300,
+      batchSize: 25,
+    });
+    expect(config.previewExpiryCleanupScheduler).toEqual({
       enabled: false,
       intervalSeconds: 300,
       batchSize: 25,
@@ -486,17 +510,51 @@ describe("resolveConfig", () => {
     });
   });
 
+  test("[TERM-SESSION-LIFE-005][TERM-SESSION-TRANSPORT-004] allows configuring terminal session lifecycle through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_TERMINAL_SESSION_ACTIVE_TTL_SECONDS: "900",
+        APPALOFT_TERMINAL_SESSION_OUTPUT_RETENTION_BYTES: "32768",
+      },
+    });
+
+    expect(config.terminalSessions).toEqual({
+      activeTtlSeconds: 900,
+      outputRetentionBytes: 32768,
+    });
+  });
+
   test("[SCHED-HISTORY-RETENTION-006] allows configuring the scheduled history retention runner through environment", () => {
     const config = resolveConfig({
       env: {
         APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED: "true",
         APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS: "180",
+        APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_BATCH_SIZE: "9",
       },
     });
 
     expect(config.scheduledHistoryRetentionRunner).toEqual({
       enabled: true,
       intervalSeconds: 180,
+      batchSize: 9,
+    });
+  });
+
+  test("[RT-MON-001] allows configuring the runtime monitoring collector runner through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_ENABLED: "true",
+        APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_INTERVAL_SECONDS: "90",
+        APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_BATCH_SIZE: "4",
+        APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS: "6",
+      },
+    });
+
+    expect(config.runtimeMonitoringCollectorRunner).toEqual({
+      enabled: true,
+      intervalSeconds: 90,
+      batchSize: 4,
+      rawRetentionHours: 6,
     });
   });
 
@@ -513,6 +571,22 @@ describe("resolveConfig", () => {
       enabled: true,
       intervalSeconds: 20,
       batchSize: 4,
+    });
+  });
+
+  test("allows configuring the preview expiry cleanup scheduler through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_ENABLED: "true",
+        APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_INTERVAL_SECONDS: "30",
+        APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_BATCH_SIZE: "6",
+      },
+    });
+
+    expect(config.previewExpiryCleanupScheduler).toEqual({
+      enabled: true,
+      intervalSeconds: 30,
+      batchSize: 6,
     });
   });
 });
