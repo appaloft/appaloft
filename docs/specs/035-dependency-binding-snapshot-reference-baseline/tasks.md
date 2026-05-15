@@ -49,7 +49,8 @@
 
 - [x] Keep CLI/API/oRPC operation keys unchanged.
 - [x] Update plan/show schemas and tests for additive fields.
-- [x] Record Web/public-docs migration gap.
+- [x] Record initial Web/public-docs handoff; later public docs/help slices closed bind-to-deploy
+  documentation coverage.
 
 ## Verification
 

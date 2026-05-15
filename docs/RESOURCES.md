@@ -8,8 +8,10 @@ Appaloft now uses two related but different resource concepts:
 - `ResourceInstance`: a provisioned or externally attached dependency resource used through
   bindings, such as a managed Postgres instance or object storage bucket.
 
-`ResourceInstance` and `ResourceBinding` are first-class Appaloft concepts even before the full
-provider-backed resource provisioning context is implemented.
+`ResourceInstance` and `ResourceBinding` are first-class Appaloft concepts. Appaloft-managed
+Postgres and Redis provisioning, imported Postgres/Redis metadata, binding, store-backed runtime
+secret resolution, provider-backed delete, and backup/restore are active through the dependency
+resource operation surface.
 
 ## Why This Exists
 
@@ -43,10 +45,12 @@ Implemented in `core`:
 - `ResourceInstance`
 - `ResourceBinding`
 
-Planned but not yet implemented:
-- resource provisioning commands
-- resource restore / backup / upgrade flows
-- release-scoped binding snapshots
+Implemented through application, CLI, HTTP/oRPC, Web, and provider capability boundaries:
+- Appaloft-managed Postgres and Redis provisioning
+- external Postgres and Redis import
+- dependency binding, unbinding, binding-secret rotation, and safe runtime injection
+- dependency resource list/show/rename/delete with binding, backup, snapshot, and provider blockers
+- dependency backup create/list/show and acknowledged in-place restore for Postgres and Redis
 
 ## Modeling Rules
 
@@ -55,16 +59,15 @@ Planned but not yet implemented:
 - active releases must keep binding snapshots immutable
 - provider SDK types must not leak into `core`
 
-## Future Operation Surface
+## Governed Extensions
 
-Expected future commands:
-- `ProvisionResource`
-- `BindResourceToWorkload`
-- `RotateBindingSecrets`
-- `UnbindResource`
-- `RestoreResource`
-- `DeleteResource`
+Separate specs are required before adding:
+- scheduled backup policies and backup pruning/deletion
+- backup export/download flows
+- cross-resource restore
+- provider-native upgrade flows
+- broader provider families beyond the active Postgres and Redis capability contracts
 
-These are not part of the current business surface until they are added to
-[CORE_OPERATIONS.md](/Users/nichenqin/projects/appaloft/docs/CORE_OPERATIONS.md) and the operation
-catalog.
+Current user-facing dependency resource operations are listed in
+[CORE_OPERATIONS.md](/Users/nichenqin/projects/appaloft/docs/CORE_OPERATIONS.md) and must stay
+aligned with the operation catalog, public docs metadata, and the dependency resource test matrix.

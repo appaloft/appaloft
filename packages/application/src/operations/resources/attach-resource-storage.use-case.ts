@@ -102,6 +102,8 @@ export class AttachResourceStorageUseCase {
       yield* resource.attachStorage({
         attachmentId,
         storageVolumeId,
+        storageVolumeKind: storageState.kind,
+        ...(storageState.sourcePath ? { sourcePath: storageState.sourcePath } : {}),
         destinationPath,
         mountMode,
         attachedAt,

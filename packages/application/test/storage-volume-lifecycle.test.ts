@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  ArchivedAt,
   CreatedAt,
   Environment,
   EnvironmentId,
@@ -41,6 +42,7 @@ import {
   DeleteStorageVolumeUseCase,
   DetachResourceStorageUseCase,
   ListStorageVolumesQueryService,
+  RenameStorageVolumeUseCase,
   ShowStorageVolumeQueryService,
 } from "../src/use-cases";
 
@@ -122,6 +124,7 @@ async function createHarness() {
     detachStorage: new DetachResourceStorageUseCase(resources, clock, eventBus, logger),
     eventBus,
     listStorage: new ListStorageVolumesQueryService(storageReadModel, clock),
+    renameStorage: new RenameStorageVolumeUseCase(storageVolumes, clock, eventBus, logger),
     repositoryContext,
     resources,
     showStorage: new ShowStorageVolumeQueryService(storageReadModel, clock),
@@ -180,6 +183,56 @@ describe("Storage volume lifecycle use cases", () => {
     });
   });
 
+  test("[STOR-VOL-RENAME-001] renames active volumes without mutating attachments", async () => {
+    const { attachStorage, context, createStorage, eventBus, renameStorage, showStorage } =
+      await createHarness();
+    const volume = (
+      await createStorage.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Data",
+        kind: "named-volume",
+      })
+    )._unsafeUnwrap();
+    const attachment = (
+      await attachStorage.execute(context, {
+        resourceId: "res_web",
+        storageVolumeId: volume.id,
+        destinationPath: "/data",
+        mountMode: "read-write",
+      })
+    )._unsafeUnwrap();
+
+    const result = await renameStorage.execute(context, {
+      storageVolumeId: volume.id,
+      name: "Renamed Data",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const show = await showStorage.execute(
+      context,
+      ShowStorageVolumeQuery.create({ storageVolumeId: volume.id })._unsafeUnwrap(),
+    );
+    expect(show._unsafeUnwrap().storageVolume).toMatchObject({
+      id: volume.id,
+      name: "Renamed Data",
+      slug: "renamed-data",
+      attachments: [
+        expect.objectContaining({
+          attachmentId: attachment.id,
+          resourceId: "res_web",
+          destinationPath: "/data",
+        }),
+      ],
+    });
+    expect(eventBus.events).toContainEqual(
+      expect.objectContaining({
+        type: "storage-volume-renamed",
+        aggregateId: volume.id,
+      }),
+    );
+  });
+
   test("[STOR-ATTACH-002] rejects duplicate resource destination paths", async () => {
     const { attachStorage, context, createStorage } = await createHarness();
     const volumeOne = (
@@ -223,6 +276,79 @@ describe("Storage volume lifecycle use cases", () => {
         destinationPath: "/data",
       },
     });
+  });
+
+  test("[STOR-ATTACH-003] rejects archived resource attachment", async () => {
+    const { attachStorage, context, createStorage, repositoryContext, resources } =
+      await createHarness();
+    const volume = (
+      await createStorage.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Data",
+        kind: "named-volume",
+      })
+    )._unsafeUnwrap();
+    const resource = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    resource
+      ?.archive({ archivedAt: ArchivedAt.rehydrate("2026-01-01T00:05:00.000Z") })
+      ._unsafeUnwrap();
+    if (resource) {
+      await resources.upsert(
+        repositoryContext,
+        resource,
+        UpsertResourceSpec.fromResource(resource),
+      );
+    }
+
+    const result = await attachStorage.execute(context, {
+      resourceId: "res_web",
+      storageVolumeId: volume.id,
+      destinationPath: "/data",
+      mountMode: "read-write",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_archived",
+    });
+  });
+
+  test("[STOR-ATTACH-004] rejects unsafe destination paths before mutation", async () => {
+    const { attachStorage, context, createStorage, repositoryContext, resources } =
+      await createHarness();
+    const volume = (
+      await createStorage.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Data",
+        kind: "named-volume",
+      })
+    )._unsafeUnwrap();
+
+    const result = await attachStorage.execute(context, {
+      resourceId: "res_web",
+      storageVolumeId: volume.id,
+      destinationPath: "/var/lib/../secret",
+      mountMode: "read-write",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "resource-storage-attachment",
+        field: "destinationPath",
+      },
+    });
+    const resource = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    expect(resource?.toState().storageAttachments).toHaveLength(0);
   });
 
   test("[STOR-DETACH-001] detaches storage without deleting the volume", async () => {
@@ -284,6 +410,61 @@ describe("Storage volume lifecycle use cases", () => {
       code: "conflict",
       details: {
         phase: "storage-volume-delete-safety",
+      },
+    });
+  });
+
+  test("[STOR-VOL-DELETE-001] deletes unattached volumes from normal reads", async () => {
+    const { context, createStorage, deleteStorage, listStorage, showStorage } =
+      await createHarness();
+    const volume = (
+      await createStorage.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Temporary",
+        kind: "named-volume",
+      })
+    )._unsafeUnwrap();
+
+    const result = await deleteStorage.execute(context, { storageVolumeId: volume.id });
+
+    expect(result.isOk()).toBe(true);
+    const show = await showStorage.execute(
+      context,
+      ShowStorageVolumeQuery.create({ storageVolumeId: volume.id })._unsafeUnwrap(),
+    );
+    const list = await listStorage.execute(
+      context,
+      ListStorageVolumesQuery.create({ projectId: "prj_demo" })._unsafeUnwrap(),
+    );
+    expect(show.isErr()).toBe(true);
+    expect(show._unsafeUnwrapErr()).toMatchObject({ code: "not_found" });
+    expect(list._unsafeUnwrap().items.map((item) => item.id)).not.toContain(volume.id);
+  });
+
+  test("[STOR-VOL-DELETE-003] blocks volume deletion while backup retention is required", async () => {
+    const { context, createStorage, deleteStorage } = await createHarness();
+    const volume = (
+      await createStorage.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Retained",
+        kind: "named-volume",
+        backupRelationship: {
+          retentionRequired: true,
+          reason: "compliance",
+        },
+      })
+    )._unsafeUnwrap();
+
+    const result = await deleteStorage.execute(context, { storageVolumeId: volume.id });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "conflict",
+      details: {
+        phase: "storage-volume-delete-safety",
+        deletionBlockers: "backup-relationship",
       },
     });
   });

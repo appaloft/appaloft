@@ -32,7 +32,8 @@
 - Entrypoint impact:
   - Add operation catalog entries.
   - Add CLI and oRPC/HTTP dispatch routes reusing command/query schemas.
-  - Web read/write UI remains deferred.
+  - Later Web/docs slices expose safe Resource-detail affordances and public bind-to-deploy help
+    without changing these command/query boundaries.
 - Persistence/migration impact:
   - Add a `resource_dependency_bindings` table with no raw secret columns.
   - Store only references, target metadata, lifecycle status, and timestamps.
@@ -67,13 +68,16 @@
   - oRPC/HTTP route dispatch tests;
   - PG/PGlite persistence/read-model/delete-safety tests.
 
-## Risks And Migration Gaps
+## Risks And Later Slice Handoffs
 
-- Deployment snapshots do not include dependency bindings or secrets in this slice; read models
-  report snapshot materialization as deferred.
-- Runtime env injection remains deferred.
-- Secret rotation remains deferred.
-- Backup/restore remains deferred.
-- Resource delete/archive binding blockers may remain a deferred gap if not implemented in the
-  first binding slice.
-- Public docs page/help anchor is a Docs Round migration gap unless expanded in this PR.
+- Deployment snapshot references are governed by
+  [Dependency Binding Deployment Snapshot Reference Baseline](../035-dependency-binding-snapshot-reference-baseline/spec.md).
+- Runtime environment injection is governed by
+  [Dependency Binding Runtime Injection](../047-dependency-binding-runtime-injection/spec.md) and
+  [Dependency Runtime Secret Value Resolution](../048-dependency-runtime-secret-value-resolution/spec.md).
+- Secret rotation is governed by
+  [Dependency Binding Secret Rotation](../036-dependency-binding-secret-rotation/spec.md).
+- Backup/restore is governed by
+  [Dependency Resource Backup And Restore](../039-dependency-resource-backup-restore/spec.md).
+- Provider-native Postgres/Redis realization is governed by the provider-native realization specs.
+- Public Resource-detail and docs affordances are active through later Web/docs slices.

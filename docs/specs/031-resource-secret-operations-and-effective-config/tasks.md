@@ -12,6 +12,7 @@
 - [x] `RES-PROFILE-CONFIG-017`: add effective-config override summary test.
 - [x] `RES-PROFILE-ENTRY-015`: add CLI import command dispatch test.
 - [x] `RES-PROFILE-ENTRY-016`: add HTTP/oRPC import command dispatch test.
+- [x] `RES-PROFILE-CONFIG-013`: add resource-detail WebView paste/import dispatch test.
 
 ## Source Of Truth
 
@@ -33,6 +34,7 @@
 - [x] Extend `ResourceEffectiveConfigView` with safe override summaries.
 - [x] Update contract schemas/types and oRPC route/client contract.
 - [x] Add CLI command for pasted `.env` import.
+- [x] Add resource-detail Web paste/import form over the shared oRPC command.
 
 ## Verification
 
