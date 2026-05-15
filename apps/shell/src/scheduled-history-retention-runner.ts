@@ -12,6 +12,7 @@ export interface ScheduledHistoryRetentionRunner {
 export interface ScheduledHistoryRetentionRunnerConfig {
   enabled: boolean;
   intervalSeconds: number;
+  batchSize: number;
 }
 
 export interface ScheduledHistoryRetentionRunnerInput {
@@ -42,7 +43,7 @@ export function createScheduledHistoryRetentionRunner(
           label: "Scheduled history retention runner",
         },
       });
-      const result = await input.service.run(context);
+      const result = await input.service.run(context, { limit: input.config.batchSize });
 
       if (result.isErr()) {
         input.logger.error("scheduled_history_retention_runner.run_failed", {
@@ -79,6 +80,7 @@ export function createScheduledHistoryRetentionRunner(
       }, input.config.intervalSeconds * 1000);
       input.logger.info("scheduled_history_retention_runner.started", {
         intervalSeconds: input.config.intervalSeconds,
+        batchSize: input.config.batchSize,
       });
     },
     stop(): void {

@@ -94,7 +94,68 @@ artifacts、warnings 和 sourceErrors。这个查询不会保存 sample，不会
 runtime，不会部署，也不会执行 quota 或 threshold enforcement。Appaloft-managed container labels
 存在时可以提供当前 resource/deployment 归因和 runtime id。source workspace metadata 可以提供用于
 resource rollup 的 deployment-id 证据；retained runtime identity metadata 存在时可以补充 runtime
-id。samples、rollups、charts 和 threshold policy 属于后续受治理的切片。
+id。内部 collector service 已能通过 `runtime-usage.inspect` 查询边界把脱敏 observation 写入
+retained sample store；默认关闭的 background collector runner 启用后会按 active servers 和已有
+runtime-owning resources/deployments/projects/environments 写入 retained samples。server/resource
+Web Monitor 会在有 retained samples 时读取这些样本，也会读取 rollup summary、deployment marker
+count 和 threshold state；没有 retained samples 时仍可回退到浏览器本地 live samples。Threshold
+读取会优先使用 exact-scope policy；没有 exact policy 时，可根据 retained sample scope evidence
+继承最近的父级 policy。Server/resource Web Monitor 也可以配置 exact-scope CPU
+`containerCpuPercent`、memory `usedBytes` 和 disk `usedBytes` thresholds，并在 exact-scope
+编辑时保留已有高级规则。完整 Observe charts 属于后续受治理的切片。
+
+<h2 id="runtime-monitoring-samples-and-rollups">Runtime monitoring samples and rollups</h2>
+
+`runtime-monitoring.samples.list` 和 `runtime-monitoring.rollup` 已暴露 retained sample 和
+rollup 读取 API。它们只会在 retained monitoring sample store 已经包含所请求 scope/window
+的脱敏样本时返回数据。当前 Web Monitor 会优先使用 retained samples；没有 retained samples 时，
+会通过 `runtime-usage.inspect` polling 显示浏览器本地 Monitor sparkline。它也会读取
+`runtime-monitoring.rollup` 的 series、deployment marker count 和 top contributor count，用来呈现
+backend rollup 状态。它跳转到 logs、events、diagnostics 时，会把当前 monitoring window 和稳定
+scope id 作为 query parameters 传过去，让这些受治理的 surface 可以保留排障上下文，同时不会把
+logs 复制进 monitoring records。Resource runtime logs 会把这个 handoff 用作 log `since` 边界；
+resource/server deployment 表会按 deployment timestamp 过滤；diagnostic summary copy 会把这个
+window 作为 `observationFrom` 和 `observationTo` 传入，让复制出来的 deployment/runtime log
+证据保持在同一窗口内。浏览器本地点不会被保存成 monitoring samples。
+
+```bash title="读取 retained runtime monitoring samples"
+appaloft runtime-monitoring samples resource:res_api --from 2026-01-01T00:00:00.000Z --to 2026-01-01T01:00:00.000Z --signal cpu
+```
+
+```http title="读取 retained runtime monitoring rollup"
+GET /api/runtime-monitoring/rollup?scope.kind=resource&scope.resourceId=res_api&window.from=2026-01-01T00%3A00%3A00.000Z&window.to=2026-01-01T01%3A00%3A00.000Z&bucket=minute
+```
+
+这些查询只读取有界、脱敏的 retained observations。它们不会采集新 metrics，不会执行 cleanup，
+不会停止或重启 runtime，不会把 log lines 复制到 monitoring records，也不会执行 threshold
+enforcement。
+
+<h2 id="external-observability-handoff">External observability handoff</h2>
+
+Appaloft runtime monitoring 有意小于完整 metrics 平台。Prometheus/PromQL、Grafana dashboards、
+自定义指标采集、应用 APM、tracing、alert routing、incident workflow、billing analytics、
+autoscaling、quota enforcement 和长期分析应该交给外部 observability 系统。Appaloft 只保留
+deployment-platform maintenance 视角：有界 retained usage samples、浅层 rollups、deployment
+markers、非 enforcing threshold state，以及到现有 logs、health、diagnostics 和安全 cleanup
+dry-run 的 scope/time-window handoff；当目标 surface 已有兼容边界时，会进行目标侧过滤。
+
+<h2 id="runtime-monitoring-thresholds">Runtime monitoring thresholds</h2>
+
+`runtime-monitoring.thresholds.configure` 写入 exact-scope 的 warning/critical threshold policy。
+`runtime-monitoring.thresholds.show` 会先读取 exact policy；没有 exact policy 时，可根据 retained
+sample scope evidence 继承最近的父级 policy。Server/resource Web Monitor 会读取 threshold state，
+并提供 CPU `containerCpuPercent`、memory `usedBytes` 和 disk `usedBytes` warning/critical
+threshold 配置入口；其它高级 metric 仍可通过 CLI/API 配置。保存 inherited readback 会创建当前
+scope 的 exact override。Thresholds 只用于观察和状态读取；它们不会 throttle、resize、restart、
+redeploy、prune、reject deployment、改变账单，或触发自动修复。
+
+```bash title="Configure a non-enforcing threshold"
+appaloft runtime-monitoring thresholds configure resource:res_api --rule '{"signal":"cpu","metric":"containerCpuPercent","warning":70,"critical":90,"comparator":"greater-than-or-equal"}'
+```
+
+```http title="Read threshold policy and latest state"
+GET /api/runtime-monitoring/thresholds?scope.kind=resource&scope.resourceId=res_api
+```
 
 如需预览 target-owned 清理，先用 dry-run 运行 prune：
 
@@ -192,6 +253,10 @@ appaloft resource diagnose res_web \
   --runtime-logs \
   --tail 50
 ```
+
+如果只想先看分区状态、稳定错误码和下一步排查方向，而不是完整 JSON，可以追加
+`--summary`。需要给支持人员或工单系统粘贴结构化 payload 时，保留默认 JSON 输出或显式使用
+`--json`。
 
 诊断摘要形状示例：
 

@@ -28,7 +28,9 @@ This query inherits:
 
 - [ADR-062: Runtime Usage Attribution Boundary](../decisions/ADR-062-runtime-usage-attribution-boundary.md)
 - [Runtime Usage Attribution And Monitoring](../specs/068-runtime-usage-attribution-and-monitoring/spec.md)
+- [Runtime Monitoring Observation Boundary](../specs/069-runtime-monitoring-observation-boundary/spec.md)
 - [Runtime Usage Attribution Test Matrix](../testing/runtime-usage-attribution-test-matrix.md)
+- [Runtime Monitoring Observation Test Matrix](../testing/runtime-monitoring-observation-test-matrix.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [ADR-047: Runtime Artifact And Workspace Prune Boundary](../decisions/ADR-047-runtime-artifact-workspace-prune-boundary.md)
 - [ADR-050: Docker Cache And Image Prune Boundary](../decisions/ADR-050-docker-cache-and-image-prune-boundary.md)
@@ -59,7 +61,7 @@ type InspectRuntimeUsageQueryInput = {
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `scope` | Yes | The server, project, environment, resource, or deployment scope to inspect. |
-| `mode` | No | First slice supports only `current`; retained samples and time windows are deferred. |
+| `mode` | No | Supports `current` point-in-time inspection. Retained samples and time-windowed rollups are active through the dedicated `runtime-monitoring.samples.list` and `runtime-monitoring.rollup` query boundaries, not this point-in-time query. |
 | `includeArtifacts` | No | Includes artifact-level attribution records when true. Defaults to true for detail surfaces. |
 | `includeWarnings` | No | Includes bounded partial/freshness/source warnings when true. Defaults to true. |
 
@@ -164,8 +166,9 @@ mean unavailable, not zero.
 5. Keep Docker volumes in their own class and do not mark them safely reclaimable.
 6. Treat Docker build cache and unused images as diagnostic attribution only. Deletion remains
    exclusively owned by `servers.capacity.prune`.
-7. Show current deployment/runtime identity only when evidence exists. Do not imply historical
-   time-series correlation in the first slice.
+7. Show current deployment/runtime identity only when evidence exists. Historical time-window
+   correlation is owned by `runtime-monitoring.rollup` deployment markers and must not be inferred
+   from a single point-in-time inspection result.
 
 ## Query Flow
 
@@ -198,13 +201,13 @@ paths, credentials, environment values, registry secrets, tokens, or unbounded p
 
 | Surface | Contract |
 | --- | --- |
-| CLI | First Code Round exposes `appaloft runtime-usage inspect <kind:id>` through the shared query schema. Compatibility aliases such as `appaloft server usage <serverId>`, `appaloft resource usage <resourceId>`, and `appaloft project usage <projectId>` may dispatch the same query only after help naming is accepted. |
-| HTTP/oRPC | First Code Round should expose a shared-schema read route such as `GET /api/runtime-usage/inspect` with query parameters derived from `InspectRuntimeUsageQueryInput`. |
-| Web | Detail pages may show compact usage readback only after typed DTOs and i18n keys exist. Web must not compute ownership or parse runtime output. |
+| CLI | `appaloft runtime-usage inspect <kind:id>` dispatches the shared query schema. Compatibility aliases such as `appaloft server usage <serverId>`, `appaloft resource usage <resourceId>`, and `appaloft project usage <projectId>` may dispatch the same query only after help naming is accepted. |
+| HTTP/oRPC | `GET /api/runtime-usage/inspect` exposes a shared-schema read route with query parameters derived from `InspectRuntimeUsageQueryInput`. |
+| Web | Server/resource Monitor surfaces show compact usage readback, retained samples, rollup summaries, deployment marker counts, threshold state, exact-scope threshold configuration, and browser-local fallback samples through typed DTOs and i18n keys. Project/environment surfaces stay rollup-only. Web must not compute ownership or parse runtime output. Retained chart windows use `runtime-monitoring.*` queries. |
 | SDK | Generated SDK metadata must come from the operation catalog after the query is implemented. |
-| Automation / MCP | Future read-only tool over the same operation key and query schema. |
+| Automation / MCP | Generated tool descriptor and read-only MCP handler dispatch this query through the same operation key and query schema. |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 - `runtime-usage.inspect` is implemented as an application query/schema/handler/service boundary
   with a `RuntimeUsageInspector` port and deterministic application tests.
@@ -212,8 +215,9 @@ paths, credentials, environment values, registry secrets, tokens, or unbounded p
   inspection and is registered in the shell composition root.
 - `runtime-usage.inspect` is wired in the operation catalog, `CORE_OPERATIONS.md`, CLI,
   HTTP/oRPC, contracts, public diagnostics docs, and generated SDK operation metadata for the
-  read-only query. Web server/resource readback exists over typed oRPC DTOs. Future MCP/tool
-  descriptors remain pending.
+  read-only query. Web server/resource readback exists over typed oRPC DTOs. Generated MCP/tool
+  descriptors and the read-only `runtime_usage_inspect` MCP handler/server are implemented through
+  the shared query boundary.
 - Project, environment, resource, and deployment scopes resolve through read models to candidate
   current deployments and server capacity context. When ownership evidence is incomplete, the query
   returns partial attribution with empty totals, `missing-metric-source` warnings, and sourceErrors
@@ -231,5 +235,8 @@ paths, credentials, environment values, registry secrets, tokens, or unbounded p
   artifacts when `containerName`, `swarm.serviceName`, or `swarm.stackName` is present.
 - `servers.capacity.inspect` already provides server-level capacity diagnostics and may be reused,
   but it is not a substitute for cross-scope usage attribution.
-- Retained samples, time-window rollups, charts, thresholds, alert delivery, quotas, and runtime
-  sizing remain deferred.
+- Retained samples, time-window rollups, charts, deployment markers, and non-enforcing thresholds
+  are implemented through `runtime-monitoring.samples.list`, `runtime-monitoring.rollup`,
+  `runtime-monitoring.thresholds.configure`, and `runtime-monitoring.thresholds.show`. They extend
+  this point-in-time attribution boundary without adding cleanup, quota, alert delivery, runtime
+  sizing, autoscaling, or enforcement behavior.

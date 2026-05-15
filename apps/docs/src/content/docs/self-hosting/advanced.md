@@ -22,6 +22,23 @@ sidebar:
 <h2 id="advanced-control-plane-modes">控制面模式</h2>
 
 Appaloft 支持本地优先、自托管和未来云辅助的控制面路径。用户需要理解状态归属和执行归属，而不是内部协调实现。
+`appaloft doctor`、`GET /api/system/doctor` 和 Web Instance 页面会暴露本地 readiness、
+provider/plugin 诊断和 scheduled worker 配置激活状态，但不会启动 worker 或派发维护工作。
+
+<h2 id="maintenance-worker-activation">维护 worker 激活</h2>
+
+维护 worker 是后台轮询器。`appaloft doctor`、`GET /api/system/doctor` 和 Web Instance 页面只展示
+worker 的配置状态，不会启动 worker、tick scheduler 或执行维护任务。
+
+默认情况下，certificate retry scheduler 会随后端服务启动，用来重试已接受的证书工作。preview cleanup
+retry、preview expiry cleanup、scheduled task runner、scheduled runtime prune、scheduled history
+retention 和 runtime monitoring collector 默认禁用；只有配置显式启用后才会随后端服务启动。
+
+即使 worker 已启用，它也仍然受自己的安全模式约束：scheduled runtime prune 需要已配置的 prune
+policy，history retention 受 retention policy 约束，runtime monitoring collector 只采集有界样本，
+scheduled task runner 只执行到期的 scheduled task run。
+doctor 输出和 Web Instance 面板也会展示每个 worker 对应的安全 `APPALOFT_*` 配置键；disabled
+worker 只有在 operator 修改对应配置后才会变成 active。
 
 <h2 id="advanced-binary-packaging">Binary 打包</h2>
 
