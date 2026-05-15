@@ -433,6 +433,73 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(plan.commands[0]?.command).not.toContain("docker volume");
   });
 
+  test("[STOR-RUNTIME-001][SWARM-TARGET-APPLY-001] renders storage mounts into Swarm image service create commands", () => {
+    const intentResult = renderDockerSwarmRuntimeIntent({
+      runtimePlan: imageRuntimePlan({
+        "storage.mounts": JSON.stringify([
+          {
+            attachmentId: "rsa_data",
+            storageVolumeId: "stv_data",
+            storageVolumeKind: "named-volume",
+            destinationPath: "/var/lib/app/data",
+            mountMode: "read-write",
+          },
+          {
+            attachmentId: "rsa_cache",
+            storageVolumeId: "stv_cache",
+            storageVolumeKind: "bind-mount",
+            sourcePath: "/srv/appaloft/cache",
+            destinationPath: "/cache",
+            mountMode: "read-only",
+          },
+        ]),
+      }),
+      identity: {
+        resourceId: "res_api",
+        deploymentId: "dep_storage",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_prod",
+      },
+    });
+
+    expect(intentResult.isOk()).toBe(true);
+    const intent = intentResult._unsafeUnwrap();
+    expect(intent.mounts).toEqual([
+      {
+        type: "volume",
+        source: "appaloft-stv_data",
+        target: "/var/lib/app/data",
+        readOnly: false,
+      },
+      {
+        type: "bind",
+        source: "/srv/appaloft/cache",
+        target: "/cache",
+        readOnly: true,
+      },
+    ]);
+    expect(intent.volumeRealizations).toEqual([
+      expect.objectContaining({
+        storageVolumeId: "stv_data",
+        volumeName: "appaloft-stv_data",
+        labels: expect.objectContaining({
+          "appaloft.managed": "true",
+          "appaloft.storage-volume-id": "stv_data",
+          "appaloft.storage-runtime-realized-by": "deployment-execution",
+        }),
+      }),
+    ]);
+
+    const plan = renderDockerSwarmApplyPlan(intent)._unsafeUnwrap();
+    const createCommand = plan.steps[0]?.command ?? "";
+    expect(createCommand).toContain(
+      "--mount 'type=volume,source=appaloft-stv_data,target=/var/lib/app/data'",
+    );
+    expect(createCommand).toContain(
+      "--mount 'type=bind,source=/srv/appaloft/cache,target=/cache,readonly'",
+    );
+  });
+
   test("[SWARM-TARGET-APPLY-001][SWARM-TARGET-ROUTE-001][SWARM-TARGET-SECRET-001] renders image apply plan as candidate rollout without public host ports", () => {
     const intentResult = renderDockerSwarmRuntimeIntent({
       runtimePlan: imageRuntimePlan(),
@@ -518,9 +585,20 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(plan.steps[3]?.command ?? "").toContain("appaloft.runtime-target=docker-swarm");
   });
 
-  test("[SWARM-TARGET-APPLY-001] keeps Compose apply planning unsupported until stack rollout execution is specified", () => {
+  test("[STOR-REALIZE-003][SWARM-TARGET-APPLY-001] renders Compose stack apply plan with storage mounts", () => {
     const intentResult = renderDockerSwarmRuntimeIntent({
-      runtimePlan: composeRuntimePlan({ swarmTargetService: "web" }),
+      runtimePlan: composeRuntimePlan({
+        swarmTargetService: "web",
+        "storage.mounts": JSON.stringify([
+          {
+            attachmentId: "rsa_data",
+            storageVolumeId: "stv_data",
+            storageVolumeKind: "named-volume",
+            destinationPath: "/var/lib/app/data",
+            mountMode: "read-write",
+          },
+        ]),
+      }),
       identity: {
         resourceId: "res_api",
         deploymentId: "dep_124",
@@ -532,17 +610,33 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(intentResult.isOk()).toBe(true);
     const result = renderDockerSwarmApplyPlan(intentResult._unsafeUnwrap());
 
-    expect(result.isErr()).toBe(true);
-    if (result.isErr()) {
-      expect(result.error.code).toBe("runtime_target_unsupported");
-      expect(result.error.details).toEqual(
-        expect.objectContaining({
-          phase: "runtime-target-render",
-          targetKind: "orchestrator-cluster",
-          providerKey: "docker-swarm",
-          missingCapability: "image-apply-plan",
-        }),
-      );
-    }
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.steps.map((step) => step.step)).toEqual([
+      "deploy-candidate-stack",
+      "verify-candidate-service",
+      "promote-route-target",
+      "cleanup-superseded-services",
+    ]);
+    const deployCommand = plan.steps[0]?.command ?? "";
+    expect(deployCommand).toContain("docker stack deploy");
+    expect(deployCommand).toContain("-c 'docker-compose.yml' -c \"$override_file\"");
+    expect(deployCommand).toContain("'appaloft-res-api-dst-preview-dep-124'");
+    expect(deployCommand).toContain('"appaloft.managed": "true"');
+    expect(deployCommand).toContain('"appaloft.deployment-id": "dep_124"');
+    expect(deployCommand).toContain('type: "volume"');
+    expect(deployCommand).toContain('source: "appaloft-stv_data"');
+    expect(deployCommand).toContain('target: "/var/lib/app/data"');
+    expect(deployCommand).toContain('"appaloft-stv_data":');
+    expect(deployCommand).toContain('"appaloft.storage-volume-id": "stv_data"');
+    expect(deployCommand).toContain(
+      '"appaloft.storage-runtime-realized-by": "deployment-execution"',
+    );
+    expect(deployCommand).not.toContain("docker volume prune");
+    expect(deployCommand).not.toContain("docker system prune");
+
+    const cleanupCommand = plan.steps[3]?.command ?? "";
+    expect(cleanupCommand).toContain("docker stack rm \"$stack_name\"");
+    expect(cleanupCommand).toContain("docker service rm \"$service_id\"");
   });
 });

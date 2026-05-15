@@ -1,14 +1,20 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   CreatedAt,
   DeploymentTarget,
+  DeploymentTargetCredentialKindValue,
   DeploymentTargetId,
   DeploymentTargetLifecycleStatusValue,
   DeploymentTargetName,
+  DeploymentTargetUsername,
   HostAddress,
   ok,
   PortNumber,
   ProviderKey,
+  SshPrivateKeyText,
   type Result,
   TargetKindValue,
 } from "@appaloft/core";
@@ -24,17 +30,107 @@ function unwrap<T>(result: Result<T>): T {
   return result._unsafeUnwrap();
 }
 
-function serverState(overrides: { providerKey?: string } = {}) {
+const localCapacityPruneEnabled = process.env.APPALOFT_E2E_CAPACITY_PRUNE_LOCAL === "true";
+const sshCapacityPruneEnabled = process.env.APPALOFT_E2E_SSH_CAPACITY_PRUNE === "true";
+
+function serverState(
+  overrides: {
+    host?: string;
+    port?: number;
+    privateKey?: string;
+    providerKey?: string;
+    username?: string;
+  } = {},
+) {
   return DeploymentTarget.rehydrate({
     id: unwrap(DeploymentTargetId.create("srv_primary")),
     name: DeploymentTargetName.rehydrate("Primary"),
     providerKey: ProviderKey.rehydrate(overrides.providerKey ?? "generic-ssh"),
     targetKind: TargetKindValue.rehydrate("single-server"),
-    host: HostAddress.rehydrate("203.0.113.10"),
-    port: PortNumber.rehydrate(22),
+    host: HostAddress.rehydrate(overrides.host ?? "203.0.113.10"),
+    port: PortNumber.rehydrate(overrides.port ?? 22),
     lifecycleStatus: DeploymentTargetLifecycleStatusValue.active(),
+    ...(overrides.privateKey
+      ? {
+          credential: {
+            kind: DeploymentTargetCredentialKindValue.rehydrate("ssh-private-key"),
+            username: DeploymentTargetUsername.rehydrate(overrides.username ?? "root"),
+            privateKey: SshPrivateKeyText.rehydrate(overrides.privateKey),
+          },
+        }
+      : {}),
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   }).toState();
+}
+
+function expandHome(path: string): string {
+  return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(2)) : path;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function sshConfig(): {
+  host: string;
+  port: string;
+  privateKeyFile: string;
+  privateKeyText: string;
+  username: string;
+} {
+  const host = process.env.APPALOFT_E2E_SSH_HOST;
+  const privateKeyFile = expandHome(process.env.APPALOFT_E2E_SSH_PRIVATE_KEY ?? "~/.ssh/appaloft");
+
+  if (!host) {
+    throw new Error("APPALOFT_E2E_SSH_HOST is required when APPALOFT_E2E_SSH_CAPACITY_PRUNE=true");
+  }
+
+  if (!existsSync(privateKeyFile)) {
+    throw new Error(`SSH private key file does not exist: ${privateKeyFile}`);
+  }
+
+  return {
+    host,
+    port: process.env.APPALOFT_E2E_SSH_PORT ?? "22",
+    privateKeyFile,
+    privateKeyText: readFileSync(privateKeyFile, "utf8"),
+    username: process.env.APPALOFT_E2E_SSH_USERNAME ?? "root",
+  };
+}
+
+function ssh(
+  config: ReturnType<typeof sshConfig>,
+  command: string,
+): {
+  exitCode: number;
+  stderr: string;
+  stdout: string;
+} {
+  const result = Bun.spawnSync(
+    [
+      "ssh",
+      "-i",
+      config.privateKeyFile,
+      "-p",
+      config.port,
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "StrictHostKeyChecking=accept-new",
+      `${config.username}@${config.host}`,
+      command,
+    ],
+    {
+      stderr: "pipe",
+      stdout: "pipe",
+    },
+  );
+
+  return {
+    exitCode: result.exitCode,
+    stderr: (result.stderr ?? new Uint8Array()).toString(),
+    stdout: (result.stdout ?? new Uint8Array()).toString(),
+  };
 }
 
 describe("runtime target capacity prune adapter", () => {
@@ -148,4 +244,157 @@ describe("runtime target capacity prune adapter", () => {
     expect(script).not.toContain("docker system prune");
     expect(script).not.toContain("docker rmi");
   });
+
+  if (!localCapacityPruneEnabled) {
+    test.skip("[RT-CAP-PRUNE-008] local explicit real local target prune requires APPALOFT_E2E_CAPACITY_PRUNE_LOCAL=true", () => {});
+  } else {
+    test("[RT-CAP-PRUNE-008] runs dry-run-first scoped prune against a real local runtime root", async () => {
+      const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-capacity-prune-"));
+      const workspace = join(runtimeRoot, "ssh-deployments", "preview_capacity_prune_smoke");
+      mkdirSync(workspace, { recursive: true });
+      writeFileSync(join(workspace, "artifact.txt"), "preview artifact\n");
+
+      const adapter = new RuntimeTargetCapacityPrunerAdapter(runtimeRoot);
+      try {
+        const dryRun = await adapter.prune(
+          {
+            requestId: "req_capacity_prune_real_local_dry_run",
+            entrypoint: "test",
+          },
+          {
+            server: serverState({ providerKey: "local-shell" }),
+            before: "2099-01-01T00:00:00.000Z",
+            categories: ["preview-workspaces"],
+            dryRun: true,
+          },
+        );
+
+        expect(dryRun.isOk()).toBe(true);
+        expect(dryRun._unsafeUnwrap()).toMatchObject({
+          dryRun: true,
+          summary: {
+            matchedCount: 1,
+            prunedCount: 0,
+          },
+          candidates: expect.arrayContaining([
+            expect.objectContaining({ action: "matched", target: workspace }),
+          ]),
+        });
+        expect(existsSync(workspace)).toBe(true);
+
+        const destructive = await adapter.prune(
+          {
+            requestId: "req_capacity_prune_real_local_destructive",
+            entrypoint: "test",
+          },
+          {
+            server: serverState({ providerKey: "local-shell" }),
+            before: "2099-01-01T00:00:00.000Z",
+            categories: ["preview-workspaces"],
+            dryRun: false,
+          },
+        );
+
+        expect(destructive.isOk()).toBe(true);
+        expect(destructive._unsafeUnwrap()).toMatchObject({
+          dryRun: false,
+          summary: {
+            matchedCount: 0,
+            prunedCount: 1,
+          },
+          candidates: expect.arrayContaining([
+            expect.objectContaining({ action: "pruned", target: workspace }),
+          ]),
+        });
+        expect(existsSync(workspace)).toBe(false);
+      } finally {
+        rmSync(runtimeRoot, { recursive: true, force: true });
+      }
+    }, 120000);
+  }
+
+  if (!sshCapacityPruneEnabled) {
+    test.skip("[RT-CAP-PRUNE-009] local explicit real SSH target prune requires APPALOFT_E2E_SSH_CAPACITY_PRUNE=true", () => {});
+  } else {
+    test("[RT-CAP-PRUNE-009] runs dry-run-first scoped prune against a real generic-SSH runtime root", async () => {
+      const config = sshConfig();
+      const remoteRoot = `/tmp/appaloft-capacity-prune-${Date.now()}`;
+      const workspace = `${remoteRoot}/ssh-deployments/preview_capacity_prune_ssh`;
+      const prepared = ssh(
+        config,
+        `mkdir -p ${shellQuote(workspace)} && printf '%s\\n' preview > ${shellQuote(
+          `${workspace}/artifact.txt`,
+        )}`,
+      );
+      expect(prepared.exitCode, prepared.stderr).toBe(0);
+
+      const adapter = new RuntimeTargetCapacityPrunerAdapter(
+        "/var/lib/appaloft/runtime",
+        remoteRoot,
+      );
+      const server = serverState({
+        host: config.host,
+        port: Number(config.port),
+        privateKey: config.privateKeyText,
+        providerKey: "generic-ssh",
+        username: config.username,
+      });
+
+      try {
+        const dryRun = await adapter.prune(
+          {
+            requestId: "req_capacity_prune_real_ssh_dry_run",
+            entrypoint: "test",
+          },
+          {
+            server,
+            before: "2099-01-01T00:00:00.000Z",
+            categories: ["preview-workspaces"],
+            dryRun: true,
+          },
+        );
+
+        expect(dryRun.isOk()).toBe(true);
+        expect(dryRun._unsafeUnwrap()).toMatchObject({
+          dryRun: true,
+          summary: {
+            matchedCount: 1,
+            prunedCount: 0,
+          },
+          candidates: expect.arrayContaining([
+            expect.objectContaining({ action: "matched", target: workspace }),
+          ]),
+        });
+        expect(ssh(config, `test -d ${shellQuote(workspace)}`).exitCode).toBe(0);
+
+        const destructive = await adapter.prune(
+          {
+            requestId: "req_capacity_prune_real_ssh_destructive",
+            entrypoint: "test",
+          },
+          {
+            server,
+            before: "2099-01-01T00:00:00.000Z",
+            categories: ["preview-workspaces"],
+            dryRun: false,
+          },
+        );
+
+        expect(destructive.isOk()).toBe(true);
+        expect(destructive._unsafeUnwrap()).toMatchObject({
+          dryRun: false,
+          summary: {
+            matchedCount: 0,
+            prunedCount: 1,
+          },
+          candidates: expect.arrayContaining([
+            expect.objectContaining({ action: "pruned", target: workspace }),
+          ]),
+        });
+        expect(ssh(config, `test ! -d ${shellQuote(workspace)}`).exitCode).toBe(0);
+      } finally {
+        ssh(config, `rm -rf ${shellQuote(remoteRoot)}`);
+      }
+    }, 120000);
+  }
 });

@@ -60,6 +60,10 @@ terminal sessions.
 Deployment detail pages may deep-link to a resource terminal with a selected `deploymentId`, but
 the terminal scope remains resource-owned.
 
+The first Web placement is resolved as a resource-owned operational tab. Deployment detail pages
+link into that tab with `tab=terminal&deploymentId=<id>`, and the resource page preserves the
+selected deployment id when opening `terminal-sessions.open`.
+
 ## Workspace Resolution Rules
 
 Server scope starts in the target account's login directory unless a later server profile operation
@@ -101,6 +105,9 @@ Web must:
 - use a terminal emulator component only for rendering and input capture;
 - dispatch `terminal-sessions.open` before attaching;
 - close the session on navigation away;
+- expose active terminal session lifecycle readback from Instance management through
+  `terminal-sessions.list`, with close and old-session-expire controls that never attach to
+  transports or read terminal output;
 - map structured errors to i18n keys;
 - avoid storing terminal output in local state beyond the visible session buffer unless the user
   explicitly copies output.
@@ -117,20 +124,41 @@ HTTP/WebSocket must:
 - propagate disconnects as abort/cancellation;
 - keep terminal frame shapes transport-owned and documented.
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
 The first workflow slice is implemented for Web resource pages, Web server detail, HTTP/oRPC open,
-WebSocket attach, runtime local-shell/generic-SSH gateway, and CLI descriptor commands.
+WebSocket attach, runtime local-shell/generic-SSH gateway, Docker container `exec` when retained or
+inferrable deployment metadata identifies the container, Docker Compose service `exec` when
+retained metadata identifies the Compose file, project, and service, CLI descriptor commands, and
+explicit CLI `--attach` sessions. Deployment detail pages now deep-link to the Resource terminal tab
+with the selected deployment id, so the resource-owned terminal command can resolve that
+deployment's workspace instead of always falling back to the latest runtime-owning attempt.
 
 Active session list/show/close/expire is modeled as gateway-owned lifecycle over ephemeral
-sessions. Durable closed-session history remains part of the separate audit/event read-surface
-roadmap item.
+sessions. Web Instance management can list active sessions, close one active session, and expire
+old active sessions without reading terminal output. The runtime gateway records durable
+`terminal-session-opened` and `terminal-session-closed` audit rows when an audit recorder is
+configured; those rows contain safe metadata only and do not make terminal input/output readable.
+When `terminal-sessions.expire` omits an explicit cutoff, the self-hosted runtime gateway applies a
+configured activity-aware active-session TTL, defaulting to 3600 seconds and configurable through
+`APPALOFT_TERMINAL_SESSION_ACTIVE_TTL_SECONDS`. Terminal input, resize frames, and backend output
+refresh the activity timestamp used by omitted-cutoff expiry.
+Active attach transports retain a bounded in-memory output tail for reconnect replay, defaulting to
+65536 bytes and configurable through `APPALOFT_TERMINAL_SESSION_OUTPUT_RETENTION_BYTES`; `0`
+disables replay. This replay is transport-only and does not make terminal output readable through
+list/show, lifecycle commands, audit rows, or durable read models.
 
-CLI direct TTY attachment, local true PTY resize, durable timeout/audit handling, container exec,
-compose service shells, and deployment-detail deep links remain follow-up work.
+HTTP WebSocket resize frames and CLI `--attach` initial `--rows`/`--cols` dimensions are forwarded
+to the attached terminal session, and the runtime gateway invokes subprocess resize hooks when the
+spawn adapter exposes them. Bun.WebView coverage exercises Instance lifecycle list/expire/close
+without rendering terminal output, resource and server terminal open/attach flows with a mocked
+attach socket and initial resize frame, and verifies client-side navigation sends a close frame for
+an attached resource terminal. Local Bun pipe sessions do not claim host PTY resize semantics unless
+the selected runtime adapter exposes a resize hook; this is an adapter capability boundary, not a
+separate Web affordance gap. CLI direct TTY attachment is implemented through explicit `--attach`;
+default CLI terminal commands still print the descriptor for scriptable workflows.
 
 ## Open Questions
 
-- Should Web expose terminal as a top-level resource tab or an action inside an operations tab?
-- Should deployment detail deep-link into resource terminal with `deploymentId`, or defer that until
-  after resource-page terminal is implemented?
+- Current WebView coverage uses a mocked attach socket while CLI/Web resize frame routing and
+  subprocess resize-hook behavior are covered at the command/transport boundary.

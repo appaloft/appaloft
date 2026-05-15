@@ -8,6 +8,7 @@
     ArrowRight,
     Copy,
     FolderOpen,
+    Gauge,
     Lock,
     Play,
     Plus,
@@ -21,6 +22,7 @@
     LockEnvironmentInput,
     RenameEnvironmentInput,
     RenameProjectInput,
+    RuntimeMonitoringRollupResponse,
     UnlockEnvironmentInput,
   } from "@appaloft/contracts";
 
@@ -35,6 +37,14 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
+  import { runtimeMonitoringRollupQueryOptions } from "$lib/console/runtime-usage-query";
+  import {
+    formatRuntimeMonitoringPercent,
+    latestRuntimeMonitoringRollupValue,
+    runtimeMonitoringRollupSummary,
+    runtimeMonitoringTopContributorItems,
+    type RuntimeMonitoringSignalKey,
+  } from "$lib/console/runtime-usage";
   import {
     deploymentDetailHref,
     findProject,
@@ -75,11 +85,61 @@
   const projectEnvironments = $derived(
     project ? environments.filter((environment) => environment.projectId === project.id) : [],
   );
+  let selectedMonitoringEnvironmentId = $state("");
+  $effect(() => {
+    if (projectEnvironments.length === 0) {
+      selectedMonitoringEnvironmentId = "";
+      return;
+    }
+
+    if (
+      !selectedMonitoringEnvironmentId ||
+      !projectEnvironments.some((environment) => environment.id === selectedMonitoringEnvironmentId)
+    ) {
+      selectedMonitoringEnvironmentId = projectEnvironments[0]?.id ?? "";
+    }
+  });
   const projectResources = $derived(
     project ? resources.filter((resource) => resource.projectId === project.id) : [],
   );
   const projectDeployments = $derived(
     project ? deployments.filter((deployment) => deployment.projectId === project.id) : [],
+  );
+  const projectRuntimeMonitoringScope = $derived({
+    kind: "project" as const,
+    projectId,
+  });
+  const environmentRuntimeMonitoringScope = $derived({
+    kind: "environment" as const,
+    environmentId: selectedMonitoringEnvironmentId,
+  });
+  const projectRuntimeMonitoringRollupQuery = createQuery(() =>
+    runtimeMonitoringRollupQueryOptions(
+      projectRuntimeMonitoringScope,
+      browser && projectId.length > 0,
+    ),
+  );
+  const environmentRuntimeMonitoringRollupQuery = createQuery(() =>
+    runtimeMonitoringRollupQueryOptions(
+      environmentRuntimeMonitoringScope,
+      browser && selectedMonitoringEnvironmentId.length > 0,
+    ),
+  );
+  const projectRuntimeMonitoringRollup = $derived(projectRuntimeMonitoringRollupQuery.data ?? null);
+  const environmentRuntimeMonitoringRollup = $derived(
+    environmentRuntimeMonitoringRollupQuery.data ?? null,
+  );
+  const projectMonitoringRollupSummary = $derived(
+    runtimeMonitoringRollupSummary(projectRuntimeMonitoringRollup),
+  );
+  const environmentMonitoringRollupSummary = $derived(
+    runtimeMonitoringRollupSummary(environmentRuntimeMonitoringRollup),
+  );
+  const projectMonitoringTopContributors = $derived(
+    runtimeMonitoringTopContributorItems(projectRuntimeMonitoringRollup),
+  );
+  const environmentMonitoringTopContributors = $derived(
+    runtimeMonitoringTopContributorItems(environmentRuntimeMonitoringRollup),
   );
   const projectAccessRoutes = $derived.by(() =>
     projectDeployments.flatMap((deployment) =>
@@ -96,6 +156,10 @@
         })),
       ),
     ),
+  );
+  const selectedMonitoringEnvironment = $derived(
+    projectEnvironments.find((environment) => environment.id === selectedMonitoringEnvironmentId) ??
+      null,
   );
   let lifecycleFeedback = $state<{
     kind: "success" | "error";
@@ -432,6 +496,21 @@
     });
   }
 
+  function monitoringSignalItems(rollup: RuntimeMonitoringRollupResponse | null) {
+    const signals: Array<{ key: RuntimeMonitoringSignalKey; label: string }> = [
+      { key: "cpu", label: $t(i18nKeys.console.runtimeUsage.cpu) },
+      { key: "memory", label: $t(i18nKeys.console.runtimeUsage.memory) },
+      { key: "disk", label: $t(i18nKeys.console.runtimeUsage.disk) },
+    ];
+
+    return signals.map((signal) => ({
+      ...signal,
+      value: formatRuntimeMonitoringPercent(
+        latestRuntimeMonitoringRollupValue(rollup, signal.key),
+      ),
+    }));
+  }
+
 </script>
 
 <svelte:head>
@@ -540,6 +619,147 @@
             <dd class="mt-1 text-2xl font-semibold">{projectAccessRoutes.length}</dd>
           </div>
         </dl>
+      </section>
+
+      <section class="console-panel space-y-5 p-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <Gauge class="size-5 text-muted-foreground" />
+              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.runtimeUsage.monitorTitle)}</h2>
+            </div>
+            <p class="text-sm text-muted-foreground">
+              {$t(i18nKeys.console.runtimeUsage.monitorDescription)}
+            </p>
+          </div>
+          {#if projectEnvironments.length > 0}
+            <label class="grid gap-1 text-sm sm:w-64" for="project-monitor-environment">
+              <span class="font-medium">{$t(i18nKeys.common.domain.environment)}</span>
+              <select
+                id="project-monitor-environment"
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                bind:value={selectedMonitoringEnvironmentId}
+              >
+                {#each projectEnvironments as environment (environment.id)}
+                  <option value={environment.id}>{environment.name}</option>
+                {/each}
+              </select>
+            </label>
+          {/if}
+        </div>
+
+        <div class="grid gap-4 xl:grid-cols-2">
+          <article class="rounded-md border bg-muted/20 p-4">
+            <div class="flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <h3 class="truncate text-sm font-semibold">
+                  {$t(i18nKeys.common.domain.project)} · {project.name}
+                </h3>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {#if projectRuntimeMonitoringRollupQuery.isPending}
+                    {$t(i18nKeys.console.runtimeUsage.rollupLoading)}
+                  {:else if projectMonitoringRollupSummary}
+                    {$t(i18nKeys.console.runtimeUsage.rollupBucket, {
+                      bucket: projectMonitoringRollupSummary.bucket,
+                    })}
+                  {:else}
+                    {$t(i18nKeys.console.runtimeUsage.rollupUnavailable)}
+                  {/if}
+                </p>
+              </div>
+              <Badge variant="outline">
+                {$t(i18nKeys.console.runtimeUsage.rollupTitle)}
+              </Badge>
+            </div>
+
+            <div class="mt-4 grid gap-2 sm:grid-cols-3">
+              {#each monitoringSignalItems(projectRuntimeMonitoringRollup) as signal (signal.key)}
+                <div class="rounded-md bg-background p-3">
+                  <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {signal.label}
+                  </p>
+                  <p class="mt-1 text-sm font-semibold">
+                    {signal.value ?? $t(i18nKeys.console.runtimeUsage.unavailable)}
+                  </p>
+                </div>
+              {/each}
+            </div>
+
+            {#if projectMonitoringTopContributors.length > 0}
+              <ul class="mt-4 space-y-2">
+                {#each projectMonitoringTopContributors as contributor (contributor.scope.kind + contributor.scopeId)}
+                  <li class="text-xs">
+                    <a class="font-medium hover:underline" href={contributor.href}>
+                      {contributor.scope.kind} · {contributor.scopeId}
+                    </a>
+                    <span class="text-muted-foreground">
+                      · {$t(i18nKeys.console.runtimeUsage.rollupContributorSamples, {
+                        count: contributor.sampleCount,
+                      })}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          </article>
+
+          <article class="rounded-md border bg-muted/20 p-4">
+            <div class="flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <h3 class="truncate text-sm font-semibold">
+                  {$t(i18nKeys.common.domain.environment)} · {selectedMonitoringEnvironment?.name ??
+                    $t(i18nKeys.console.projects.noEnvironment)}
+                </h3>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {#if projectEnvironments.length === 0}
+                    {$t(i18nKeys.console.projects.noEnvironment)}
+                  {:else if environmentRuntimeMonitoringRollupQuery.isPending}
+                    {$t(i18nKeys.console.runtimeUsage.rollupLoading)}
+                  {:else if environmentMonitoringRollupSummary}
+                    {$t(i18nKeys.console.runtimeUsage.rollupBucket, {
+                      bucket: environmentMonitoringRollupSummary.bucket,
+                    })}
+                  {:else}
+                    {$t(i18nKeys.console.runtimeUsage.rollupUnavailable)}
+                  {/if}
+                </p>
+              </div>
+              <Badge variant="outline">
+                {$t(i18nKeys.console.runtimeUsage.rollupTitle)}
+              </Badge>
+            </div>
+
+            <div class="mt-4 grid gap-2 sm:grid-cols-3">
+              {#each monitoringSignalItems(environmentRuntimeMonitoringRollup) as signal (signal.key)}
+                <div class="rounded-md bg-background p-3">
+                  <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {signal.label}
+                  </p>
+                  <p class="mt-1 text-sm font-semibold">
+                    {signal.value ?? $t(i18nKeys.console.runtimeUsage.unavailable)}
+                  </p>
+                </div>
+              {/each}
+            </div>
+
+            {#if environmentMonitoringTopContributors.length > 0}
+              <ul class="mt-4 space-y-2">
+                {#each environmentMonitoringTopContributors as contributor (contributor.scope.kind + contributor.scopeId)}
+                  <li class="text-xs">
+                    <a class="font-medium hover:underline" href={contributor.href}>
+                      {contributor.scope.kind} · {contributor.scopeId}
+                    </a>
+                    <span class="text-muted-foreground">
+                      · {$t(i18nKeys.console.runtimeUsage.rollupContributorSamples, {
+                        count: contributor.sampleCount,
+                      })}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          </article>
+        </div>
       </section>
 
       <section class="console-panel space-y-4 p-5">

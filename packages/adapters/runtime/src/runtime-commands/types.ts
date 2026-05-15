@@ -5,6 +5,8 @@ export type {
   DockerComposeUpCommandSpec,
   DockerInspectCommandSpec,
   DockerLogsCommandSpec,
+  DockerRunMountSpec,
+  DockerRunMountType,
   DockerPortPublishMode,
   DockerPublishedPortSpec,
   DockerRemoveContainerCommandSpec,

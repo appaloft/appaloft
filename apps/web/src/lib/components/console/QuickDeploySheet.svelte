@@ -25,7 +25,7 @@
     type QuickDeployWorkflowStepOutput,
   } from "@appaloft/contracts";
   import type { TranslationKey } from "@appaloft/i18n";
-  import type { Component } from "svelte";
+  import { onDestroy, type Component } from "svelte";
   import type {
     AuthSessionResponse,
     ConfigureServerCredentialInput,
@@ -102,6 +102,7 @@
   type ResourceHealthCheckInput = NonNullable<ResourceRuntimeProfileInput["healthCheck"]>;
   type ResourceNetworkProfileInput = NonNullable<CreateResourceInput["networkProfile"]>;
   type AppaloftDesktopBridge = {
+    copyText?: (text: string) => Promise<void>;
     selectDirectory?: () => Promise<string | null | undefined>;
   };
   type WindowWithAppaloftDesktopBridge = Window &
@@ -385,6 +386,11 @@
   let workflowProgressDialogOpen = $state(false);
   let lastCreatedDeploymentId = $state("");
   let lastAccessUrl = $state("");
+  let diagnosticSummaryLoading = $state(false);
+  let diagnosticSummaryCopyState = $state<"idle" | "copied" | "failed">("idle");
+  let diagnosticSummaryError = $state<string | null>(null);
+  let diagnosticSummaryCopyFallback = $state<string | null>(null);
+  let diagnosticSummaryCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
 
   const createProjectMutation = createMutation(() => ({
     mutationFn: (input: { name: string; description?: string }) => orpcClient.projects.create(input),
@@ -927,6 +933,17 @@
     selectedResourceAccessRoute?.url ?? $t(i18nKeys.console.quickDeploy.domainBindingsAfterDeploy),
   );
   const canAdvance = $derived(stepIsComplete(activeStep));
+  const quickDeployDiagnosticSummaryButtonLabel = $derived.by(() => {
+    if (diagnosticSummaryLoading) {
+      return $t(i18nKeys.console.resources.diagnosticSummaryLoading);
+    }
+
+    if (diagnosticSummaryCopyState === "copied") {
+      return $t(i18nKeys.console.resources.diagnosticSummaryCopied);
+    }
+
+    return $t(i18nKeys.console.resources.diagnosticSummaryCopy);
+  });
 
   const githubRepositoriesQuery = createQuery(() =>
     queryOptions({
@@ -950,6 +967,12 @@
 
   afterNavigate(() => {
     routerStateReady = true;
+  });
+
+  onDestroy(() => {
+    if (diagnosticSummaryCopyResetTimeout) {
+      clearTimeout(diagnosticSummaryCopyResetTimeout);
+    }
   });
 
   $effect(() => {
@@ -1777,6 +1800,112 @@
     workflowDeploymentProgressEvents = [];
   }
 
+  function resetDiagnosticSummaryCopy(): void {
+    diagnosticSummaryLoading = false;
+    diagnosticSummaryCopyState = "idle";
+    diagnosticSummaryError = null;
+    diagnosticSummaryCopyFallback = null;
+
+    if (diagnosticSummaryCopyResetTimeout) {
+      clearTimeout(diagnosticSummaryCopyResetTimeout);
+      diagnosticSummaryCopyResetTimeout = undefined;
+    }
+  }
+
+  function scheduleDiagnosticSummaryCopyReset(): void {
+    if (diagnosticSummaryCopyResetTimeout) {
+      clearTimeout(diagnosticSummaryCopyResetTimeout);
+    }
+
+    diagnosticSummaryCopyResetTimeout = setTimeout(() => {
+      diagnosticSummaryCopyState = "idle";
+      diagnosticSummaryCopyResetTimeout = undefined;
+    }, 2200);
+  }
+
+  async function copyTextToClipboard(text: string): Promise<void> {
+    const desktopCopyText = (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.copyText;
+    if (desktopCopyText) {
+      try {
+        await desktopCopyText(text);
+        return;
+      } catch {
+        // Fall back to browser clipboard APIs when an older desktop shell lacks permission.
+      }
+    }
+
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch {
+        // Fall back for desktop previews or browsers with restrictive clipboard permissions.
+      }
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.setAttribute("readonly", "");
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    document.body.append(textArea);
+    textArea.focus({ preventScroll: true });
+    textArea.select();
+    textArea.setSelectionRange(0, text.length);
+
+    try {
+      if (!document.execCommand("copy")) {
+        throw new Error($t(i18nKeys.console.resources.diagnosticSummaryCopyFailed));
+      }
+    } finally {
+      textArea.remove();
+    }
+  }
+
+  function selectDiagnosticSummaryFallback(event: Event): void {
+    const target = event.currentTarget;
+    if (target instanceof HTMLTextAreaElement) {
+      target.select();
+    }
+  }
+
+  async function copyQuickDeployDiagnosticSummary(): Promise<void> {
+    if (!selectedResourceId || !lastCreatedDeploymentId || diagnosticSummaryLoading) {
+      return;
+    }
+
+    diagnosticSummaryLoading = true;
+    diagnosticSummaryError = null;
+    diagnosticSummaryCopyFallback = null;
+
+    try {
+      const summary = await orpcClient.resources.diagnosticSummary({
+        resourceId: selectedResourceId,
+        deploymentId: lastCreatedDeploymentId,
+        includeDeploymentLogTail: true,
+        includeRuntimeLogTail: true,
+        includeProxyConfiguration: true,
+        tailLines: 20,
+      });
+      const copyJson = summary.copy.json;
+      try {
+        await copyTextToClipboard(copyJson);
+      } catch (copyError) {
+        diagnosticSummaryCopyFallback = copyJson;
+        throw copyError;
+      }
+      diagnosticSummaryCopyState = "copied";
+    } catch (error) {
+      diagnosticSummaryCopyState = "failed";
+      diagnosticSummaryError = readErrorMessage(error);
+    } finally {
+      diagnosticSummaryLoading = false;
+      if (diagnosticSummaryCopyState === "copied") {
+        scheduleDiagnosticSummaryCopyReset();
+      }
+    }
+  }
+
   function setWorkflowStepStatus(
     kind: QuickDeployWorkflowStep["kind"],
     status: QuickDeployWorkflowStepStatus,
@@ -1893,8 +2022,10 @@
   async function handleQuickDeploy(): Promise<void> {
     deployFeedback = null;
     lastCreatedDeploymentId = "";
+    lastAccessUrl = "";
     workflowProgressDialogOpen = false;
     resetWorkflowProgress();
+    resetDiagnosticSummaryCopy();
 
     try {
       if (!sourceLocator) {
@@ -3516,7 +3647,43 @@
                 >
                   {$t(i18nKeys.common.actions.viewDeployment)}
                 </Button>
+                <Button
+                  id="quick-deploy-diagnostic-summary-copy"
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={diagnosticSummaryLoading}
+                  onclick={() => {
+                    void copyQuickDeployDiagnosticSummary();
+                  }}
+                >
+                  {#if diagnosticSummaryLoading}
+                    <LoaderCircle class="size-4 animate-spin" />
+                  {/if}
+                  {quickDeployDiagnosticSummaryButtonLabel}
+                </Button>
               </div>
+              {#if diagnosticSummaryError}
+                <p class="mt-2 text-sm text-destructive">{diagnosticSummaryError}</p>
+              {/if}
+              {#if diagnosticSummaryCopyFallback}
+                <div class="mt-3 space-y-2 rounded-md border border-dashed bg-muted/20 p-3">
+                  <div class="space-y-1">
+                    <p class="text-sm font-medium">
+                      {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackTitle)}
+                    </p>
+                    <p class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackDescription)}
+                    </p>
+                  </div>
+                  <Textarea
+                    class="min-h-28 font-mono text-xs"
+                    readonly
+                    value={diagnosticSummaryCopyFallback}
+                    onfocus={selectDiagnosticSummaryFallback}
+                  />
+                </div>
+              {/if}
             {/if}
           </div>
         </section>

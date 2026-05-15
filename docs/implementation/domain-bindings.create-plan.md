@@ -169,4 +169,8 @@ Remaining implementation gaps:
 - `domain-ready` process-manager behavior and readiness read model;
 - outbox/inbox/dedupe persistence for long-running consumers;
 - Web console can create and list accepted bindings on standalone and resource-scoped surfaces, but it does not yet guide DNS verification, certificate issuance, or readiness troubleshooting.
-- Resource-scoped browser/e2e coverage is not implemented yet.
+
+Resource-scoped WebView coverage now exercises the resource detail create/list affordance and the
+ownership confirmation action through `ROUTE-TLS-ENTRY-002` and `ROUTE-TLS-ENTRY-007`; remaining Web
+follow-ups are DNS verification guidance, certificate issuance/readiness troubleshooting, and richer
+long-running workflow status.

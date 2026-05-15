@@ -28,7 +28,7 @@ import { deploymentTargetCredentialKinds, edgeProxyKinds, targetKinds } from "@a
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
-import { optionalValue, runCommand, runQuery } from "../runtime.js";
+import { optionalValue, runCommand, runQuery, runTerminalCommand } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const nameOption = Options.text("name");
@@ -60,6 +60,7 @@ const serverIdArg = Args.text({ name: "serverId" });
 const credentialIdArg = Args.text({ name: "credentialId" });
 const rowsOption = Options.text("rows").pipe(Options.withDefault("24"));
 const colsOption = Options.text("cols").pipe(Options.withDefault("80"));
+const attachTerminalOption = Options.boolean("attach").pipe(Options.withDefault(false));
 const scheduledRuntimePrunePolicyScopes = scheduledRuntimePrunePolicyScopeSchema.options;
 const policyIdArg = Args.text({ name: "policyId" });
 const policyIdOption = Options.text("policy-id").pipe(Options.optional);
@@ -492,9 +493,10 @@ const terminalCommand = EffectCommand.make(
     serverId: serverIdArg,
     rows: rowsOption,
     cols: colsOption,
+    attach: attachTerminalOption,
   },
-  ({ cols, rows, serverId }) =>
-    runCommand(
+  ({ attach, cols, rows, serverId }) =>
+    runTerminalCommand(
       OpenTerminalSessionCommand.create({
         scope: {
           kind: "server",
@@ -503,6 +505,11 @@ const terminalCommand = EffectCommand.make(
         initialRows: Number(rows),
         initialCols: Number(cols),
       }),
+      {
+        attach,
+        initialRows: Number(rows),
+        initialCols: Number(cols),
+      },
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverTerminal));
 

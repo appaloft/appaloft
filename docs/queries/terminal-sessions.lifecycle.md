@@ -57,10 +57,12 @@ access tokens, environment secret values, provider SDK objects, or raw provider 
 | --- | --- |
 | CLI | `appaloft terminal-session list`, `appaloft terminal-session show <sessionId>` |
 | HTTP/oRPC | `GET /api/terminal-sessions`, `GET /api/terminal-sessions/{sessionId}` |
-| Web | Future session management panel can consume the same queries. |
+| Web | Instance management lists active terminal sessions without attaching to terminal transports. |
 | MCP/tools | Future tools can expose the same read-only metadata. |
 
-## Current Implementation Notes And Migration Gaps
+## Current Implementation Notes And Governed Follow-Ups
 
-The first implementation reads active ephemeral sessions from the runtime terminal gateway. Durable
-audit/history of closed sessions remains part of the broader audit/event read-surface roadmap item.
+The first implementation reads active ephemeral sessions from the runtime terminal gateway. Web
+Instance management consumes the same query to render active-session lifecycle metadata without
+terminal input/output. Closed sessions are retained as safe `terminal-session-closed` audit rows
+through the audit-event read surface when the runtime gateway is configured with an audit recorder.

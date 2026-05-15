@@ -139,9 +139,11 @@ browser tests for these affordances do not exist yet.
 `resources.health` exists. Current status UI uses unknown only for loading/unobserved health,
 instead of latest deployment status.
 
-Resource/server terminal sessions are specified but not implemented; terminal UI coverage belongs to
-the operator terminal session matrix before the project/resource console can claim terminal
-alignment.
+Resource/server terminal sessions are implemented as operator-terminal affordances on resource and
+server detail. Ownership, transport, resize, close-on-navigation, CLI attach, HTTP WebSocket, and
+lifecycle coverage are governed by the
+[Operator Terminal Session Test Matrix](./operator-terminal-session-test-matrix.md), so this
+matrix treats terminal alignment as delegated rather than duplicating those rows.
 
 ## Open Questions
 

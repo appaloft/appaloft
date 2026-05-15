@@ -106,6 +106,7 @@ Retention defaults are non-executing policy records. They store the default rete
 
 ```bash title="Configure retention defaults"
 appaloft retention-default configure --scope system --category provider-job-logs --retention-days 30
+appaloft retention-default configure --scope system --category runtime-monitoring-samples --retention-days 1
 appaloft retention-default list --scope system
 appaloft retention-default show provider-job-logs --scope system
 ```

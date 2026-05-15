@@ -107,7 +107,7 @@ them through explicit future cleanup or lifecycle commands before deletion can p
 | --- | --- |
 | CLI | Expose `server show <serverId>`, `server rename <serverId> --name <name>`, `server proxy configure <serverId> --kind none\|traefik\|caddy`, `server deactivate <serverId>`, `server delete-check <serverId>`, and `server delete <serverId> --confirm <serverId>` with positional ids and explicit confirmation where destructive. |
 | HTTP/oRPC | Expose `GET /api/servers/{serverId}`, `POST /api/servers/{serverId}/rename`, `POST /api/servers/{serverId}/edge-proxy/configuration`, `POST /api/servers/{serverId}/deactivate`, `GET /api/servers/{serverId}/delete-check`, and `DELETE /api/servers/{serverId}` using operation schemas; no `PATCH /api/servers/{id}` is allowed. |
-| Web | Server detail reads `servers.show` for identity, proxy status, credential summary, rollups, and lifecycle status; it exposes a display-name rename text input/action for active and inactive servers when the detail page can carry the control; it should expose an edge-proxy kind select/radio action for active servers when the detail page can carry it and show read-only proxy status otherwise; it reads `servers.delete-check` for read-only delete-safety status. Destructive delete action UI is deferred until typed confirmation exists. |
+| Web | Server detail reads `servers.show` for identity, proxy status, credential summary, rollups, and lifecycle status; exposes a display-name rename text input/action for active and inactive servers; exposes an edge-proxy kind selector/action and typed-confirmation deactivate action for active servers; shows read-only proxy/deactivate state for inactive/deleted servers; reads `servers.delete-check`; and enables destructive delete only when delete safety is eligible and the operator types the exact server id confirmation. |
 | Repository config | Not applicable. Repository config must not select server identity. |
 | Future MCP/tools | Generate command/query tools from the operation catalog entries. |
 | Public docs | Existing `server.deployment-target` anchor explains server identity preservation, display-name, detail, deactivation, and delete-safety semantics. Existing `server.proxy-readiness` anchor explains edge proxy intent, readiness, and repair semantics. |
@@ -119,16 +119,16 @@ Web detail follow-up now reads the same query for server identity, proxy status,
 and rollups while keeping owner-scoped actions such as connectivity test and terminal open as
 separate operations.
 
-The deactivate/delete-safety Code Round implements API/oRPC and CLI closure for
-`servers.deactivate` and `servers.delete-check`. Web server detail shows read-only lifecycle and
-delete-safety status.
+The deactivate/delete-safety Code Round implements API/oRPC, CLI, and Web closure for
+`servers.deactivate` plus API/oRPC, CLI, and Web readback for `servers.delete-check`. Web server
+detail shows lifecycle and delete-safety status before destructive delete can be submitted.
 
 The guarded delete Code Round implements API/oRPC and CLI closure for `servers.delete` with
 soft-delete lifecycle state. The rename Code Round promotes display-name changes to an active
 operation. The edge-proxy configuration Code Round promotes intent-only proxy kind changes to an
-active operation. Reactivation, broad credential usage visibility, Web deactivate action UI, and
-Web destructive delete controls remain future work. Web destructive action UI is limited to
-read-only lifecycle/safety display until confirmation affordances exist.
+active operation. Web server detail now closes rename, edge-proxy configuration, typed
+deactivation, delete-safety readback, and typed destructive delete over the shared command/query
+schemas. Reactivation and broad credential usage visibility remain future work.
 
 ## Open Questions
 

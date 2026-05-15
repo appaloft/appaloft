@@ -15,6 +15,8 @@ import type {
   DockerRemoveContainerCommandSpec,
   DockerRemoveResourceContainersCommandSpec,
   DockerRunContainerCommandSpec,
+  DockerRunMountSpec,
+  DockerRunMountType,
   RuntimeCommandEnvironmentVariable,
   RuntimeCommandLabel,
   RuntimeCommandSequenceSpec,
@@ -33,8 +35,16 @@ export interface DockerRunContainerInput {
   detach?: boolean;
   env?: readonly DockerEnvironmentVariableInput[];
   labels?: readonly RuntimeCommandLabel[];
+  mounts?: readonly DockerRunMountInput[];
   publishedPorts?: readonly DockerPublishedPortSpec[];
   networkName?: string;
+}
+
+export interface DockerRunMountInput {
+  type: DockerRunMountType;
+  source: string;
+  target: string;
+  readOnly?: boolean;
 }
 
 export interface DockerBuildImageInput {
@@ -92,6 +102,15 @@ export class DockerCommandBuilder {
         ...(variable.redacted ? { redacted: variable.redacted } : {}),
       })),
       labels: input.labels ?? [],
+      mounts: (input.mounts ?? []).map((mount): DockerRunMountSpec => ({
+        type: mount.type,
+        source:
+          mount.type === "bind"
+            ? FilePathText.rehydrate(mount.source)
+            : DisplayNameText.rehydrate(mount.source),
+        target: FilePathText.rehydrate(mount.target),
+        readOnly: mount.readOnly ?? false,
+      })),
       publishedPorts: input.publishedPorts ?? [],
       ...(input.networkName ? { networkName: DisplayNameText.rehydrate(input.networkName) } : {}),
     };

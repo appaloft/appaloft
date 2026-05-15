@@ -532,6 +532,18 @@ async function recordDeploymentProcessAttempt(input: {
       ...(executionMetadata.safeAdapterErrorCode
         ? { safeAdapterErrorCode: executionMetadata.safeAdapterErrorCode }
         : {}),
+      ...(executionMetadata.capacityResource
+        ? { capacityResource: executionMetadata.capacityResource }
+        : {}),
+      ...(executionMetadata.capacitySignal
+        ? { capacitySignal: executionMetadata.capacitySignal }
+        : {}),
+      ...(executionMetadata.capacityInspectCommand
+        ? { capacityInspectCommand: executionMetadata.capacityInspectCommand }
+        : {}),
+      ...(executionMetadata.capacityPruneCommand
+        ? { capacityPruneCommand: executionMetadata.capacityPruneCommand }
+        : {}),
     },
   });
 

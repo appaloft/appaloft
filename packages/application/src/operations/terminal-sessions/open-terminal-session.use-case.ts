@@ -40,6 +40,36 @@ function appendRelativeDirectory(root: string, relativeDirectory?: string): stri
   return normalizedRelative ? `${normalizedRoot}/${normalizedRelative}` : normalizedRoot;
 }
 
+function sourceBaseDirectory(deployment: DeploymentSummary): string | null | undefined {
+  const rawBaseDirectory = deployment.runtimePlan.source.metadata?.baseDirectory?.trim();
+  if (!rawBaseDirectory) {
+    return undefined;
+  }
+
+  const normalized = rawBaseDirectory.replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!normalized || normalized.includes("\0") || /^[a-z][a-z0-9+.-]*:\/\//i.test(normalized)) {
+    return null;
+  }
+
+  const safeSegments = normalized
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .every((segment) => segment !== "." && segment !== ".." && !/[;&|`$<>]/u.test(segment));
+
+  return safeSegments ? normalized : null;
+}
+
+function appendSourceBaseDirectory(root: string, baseDirectory?: string | null): string {
+  if (!baseDirectory) {
+    return root;
+  }
+
+  const normalizedRoot = root.replace(/\/+$/, "");
+  return normalizedRoot.endsWith(`/${baseDirectory}`)
+    ? normalizedRoot
+    : `${normalizedRoot}/${baseDirectory}`;
+}
+
 function meaningfulWorkingDirectory(workingDirectory?: string): string | undefined {
   const trimmed = workingDirectory?.trim();
   if (!trimmed) {
@@ -54,12 +84,21 @@ function meaningfulWorkingDirectory(workingDirectory?: string): string | undefin
 }
 
 function resolveDeploymentWorkspace(deployment: DeploymentSummary): string | undefined {
-  return (
-    metadataValue(deployment, "workdir") ??
-    metadataValue(deployment, "remoteWorkdir") ??
+  const adapterResolvedWorkspace =
+    metadataValue(deployment, "workdir") ?? metadataValue(deployment, "remoteWorkdir");
+  if (adapterResolvedWorkspace) {
+    return adapterResolvedWorkspace;
+  }
+
+  const baseDirectory = sourceBaseDirectory(deployment);
+  if (baseDirectory === null) {
+    return undefined;
+  }
+
+  const sourceWorkspace =
     metadataValue(deployment, "sourceDir") ??
-    meaningfulWorkingDirectory(deployment.runtimePlan.execution.workingDirectory)
-  );
+    meaningfulWorkingDirectory(deployment.runtimePlan.execution.workingDirectory);
+  return sourceWorkspace ? appendSourceBaseDirectory(sourceWorkspace, baseDirectory) : undefined;
 }
 
 @injectable()

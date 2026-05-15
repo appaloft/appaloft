@@ -232,6 +232,7 @@ function storageAttachmentsFromState(state: ResourceState): ResourceStorageAttac
   return state.storageAttachments.map((attachment) => ({
     id: attachment.id.value,
     storageVolumeId: attachment.storageVolumeId.value,
+    storageVolumeKind: attachment.storageVolumeKind.value,
     destinationPath: attachment.destinationPath.value,
     mountMode: attachment.mountMode.value,
     attachedAt: attachment.attachedAt.value,
