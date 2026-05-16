@@ -13,6 +13,8 @@
 - [x] Choose the canonical skill artifact path.
 - [x] Write the public full Appaloft skill content.
 - [x] Write the public agent deploy skill content.
+- [x] Add concise skill references for entrypoint surfaces, CLI operation mapping, and deploy
+  protocol.
 - [x] Add stable public docs anchors and traceability rows.
 - [x] Link first-deployment, source, errors/statuses, logs/health, and recovery docs to the skill.
 - [x] Keep translated anchor ids stable.
@@ -38,4 +40,4 @@
 - [x] Run focused public docs tests.
 - [x] Run docs registry tests.
 - [x] Run CLI help tests if CLI help changes.
-- [x] Run generated package/installer tests.
+- [x] Run skill source and docs registry tests.

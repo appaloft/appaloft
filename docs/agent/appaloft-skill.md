@@ -68,6 +68,6 @@ The installable `appaloft` skill must include:
 ## Packaged Artifact
 
 - Full skill source: `skills/appaloft`.
+- Entrypoint surfaces: `skills/appaloft/references/surfaces.md`.
 - Complete CLI operation reference: `skills/appaloft/references/cli-entrypoints.md`.
 - Deploy subprotocol: `skills/appaloft/references/deploy-protocol.md`.
-- Narrow deploy skill source: `skills/appaloft-deploy`.

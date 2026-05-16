@@ -63,4 +63,5 @@ npx skills add appaloft/appaloft
 <h2 id="appaloft-skill-reference">规范文档</h2>
 
 完整规范位于 `docs/agent/appaloft-skill.md`。标准 skill source 位于仓库根目录
-`skills/appaloft`，npm 备用安装包内也镜像到 `skills/appaloft` 目录。
+`skills/appaloft`，部署子协议和入口边界分别位于 `skills/appaloft/references/deploy-protocol.md`
+和 `skills/appaloft/references/surfaces.md`。

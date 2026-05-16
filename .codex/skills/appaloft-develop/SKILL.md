@@ -236,6 +236,8 @@ For Appaloft:
 
 - update `skills/appaloft/SKILL.md` when the agent-facing workflow, safety rule, operation area, or
   outcome shape changes;
+- update `skills/appaloft/references/surfaces.md` when the skill install path, CLI/API/Web,
+  repository config, or future MCP/tool entrypoint boundary changes;
 - update `skills/appaloft/references/cli-entrypoints.md` whenever
   `packages/application/src/operation-catalog.ts` adds, removes, or changes a CLI transport;
 - update `skills/appaloft/references/deploy-protocol.md` and

@@ -129,8 +129,9 @@ The 1.0.0 product is ready only when all of these are checked:
   external automation, without importing `core`, `application`, repositories, handlers, or use
   cases.
 - [ ] A v1 Appaloft skill is installable with `npx skills add appaloft/appaloft`, covers every CLI
-  operation entrypoint as an AI-facing Appaloft surface, and keeps deploy as an internal
-  subprotocol of the full skill before MCP is required.
+  operation entrypoint plus CLI/HTTP/API/Web/repository-config/future-MCP surface selection as an
+  AI-facing Appaloft entrypoint, and keeps deploy as an internal subprotocol of the full skill
+  before MCP is required.
 - [x] Future MCP/tool contracts can be generated from the same operation catalog without inventing
   parallel behavior.
 - [ ] Framework/runtime detection covers the mainstream self-hosted web catalog with deterministic

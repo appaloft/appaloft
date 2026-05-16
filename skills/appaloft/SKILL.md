@@ -29,6 +29,8 @@ surface available in the session.
 
 - Read [references/cli-entrypoints.md](references/cli-entrypoints.md) when the task needs exact CLI
   forms or operation keys. It mirrors every CLI transport in the Appaloft operation catalog.
+- Read [references/surfaces.md](references/surfaces.md) when choosing between CLI, HTTP/API, Web,
+  repository config, and future MCP/tool entrypoints.
 - Read [references/deploy-protocol.md](references/deploy-protocol.md) for deploy, preview cleanup,
   plan, observe, retry, redeploy, and rollback tasks.
 

@@ -70,5 +70,5 @@ Agent 应返回一份短结果：
 
 <h2 id="agent-deploy-reference">规范文档</h2>
 
-完整规范位于仓库内的 `docs/agent/appaloft-deploy-skill.md`，标准 skill source 位于
-`skills/appaloft-deploy`，npm 备用安装包内也镜像到 `skills/appaloft-deploy` 目录。
+完整规范位于仓库内的 `docs/agent/appaloft-deploy-skill.md`。可安装的完整 skill 位于
+`skills/appaloft`，部署子协议位于 `skills/appaloft/references/deploy-protocol.md`。
