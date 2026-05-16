@@ -6059,7 +6059,7 @@ describe("console e2e with Bun.WebView", () => {
       await view.navigate(`${previewUrl}/servers/srv_demo?tab=danger`);
 
       await expectAnyText(view, ["Delete safety", "DELETE SAFETY", "删除安全检查"]);
-      await expectAnyText(view, ["Eligible", "可删除"]);
+      await expectAnyText(view, ["Eligible", "ELIGIBLE", "可删除"]);
       await clickButtonByAnyText(view, ["Delete server", "删除服务器"]);
       await setInputValue(view, "#server-delete-confirmation-input", "srv_demo");
       await clickFormSubmit(view, "#server-delete-form");
