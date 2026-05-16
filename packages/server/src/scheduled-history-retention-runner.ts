@@ -94,3 +94,10 @@ export function createScheduledHistoryRetentionRunner(
     },
   };
 }
+
+export function createDisabledScheduledHistoryRetentionRunner(): ScheduledHistoryRetentionRunner {
+  return {
+    start(): void {},
+    stop(): void {},
+  };
+}

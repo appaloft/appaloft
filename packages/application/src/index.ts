@@ -24,6 +24,7 @@ export * from "./environment-messages";
 export * from "./execution-context";
 export * from "./extensibility";
 export * from "./operation-catalog";
+export * from "./operation-guard";
 export * from "./operator-work-handlers";
 export * from "./operator-work-messages";
 export * from "./organization-handlers";

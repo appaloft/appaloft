@@ -20,6 +20,7 @@ import {
   type QueryBus,
   SetResourceVariableCommand,
   ShowProjectQuery,
+  SwitchCurrentOrganizationCommand,
 } from "@appaloft/application";
 import { err, ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
@@ -40,6 +41,7 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       entrypoint: input.entrypoint,
       locale: input.locale,
       actor: input.actor,
+      principal: input.principal,
     });
   }
 }
@@ -229,6 +231,74 @@ describe("product auth gate HTTP/oRPC routes", () => {
       "admin",
       "admin",
     ]);
+  });
+
+  test("[PRODUCT-AUTH-GATE-004] catalog metadata can relax command auth from admin to member", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let capturedAuthorizationRequest:
+      | Parameters<ProductSessionAuthorizationPort["authorizeProductSession"]>[1]
+      | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          user: {
+            userId: "usr_member",
+            email: "member@example.com",
+          },
+          currentOrganization: {
+            organizationId: "org_second",
+            name: "Second Appaloft",
+            slug: "second-appaloft",
+            role: "developer",
+          },
+          organizations: [],
+          loginMethods: [],
+        } as T);
+      },
+    } as CommandBus;
+    const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+      authorizeProductSession: async (_context, input) => {
+        capturedAuthorizationRequest = input;
+        return ok({
+          actor: {
+            kind: "user",
+            id: "usr_member",
+            label: "member@example.com",
+          },
+          email: "member@example.com",
+          organizationId: "org_self_hosted",
+          role: input.requiredRole,
+          userId: "usr_member",
+        });
+      },
+    };
+    const app = mountProductAuthGateRoutes({
+      commandBus,
+      productSessionAuthorizationPort,
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/organizations/current-context/switch", {
+        method: "POST",
+        headers: {
+          cookie: "better-auth.session_token=test-member-session",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          organizationId: "org_second",
+        }),
+      }),
+    );
+    const text = await response.text();
+
+    expect(response.status, text).toBe(200);
+    expect(capturedAuthorizationRequest).toMatchObject({
+      path: "/api/organizations/current-context/switch",
+      requiredRole: "member",
+    });
+    expect(capturedCommand).toBeInstanceOf(SwitchCurrentOrganizationCommand);
   });
 
   test("authorized product HTTP mutations dispatch with the authenticated user actor", async () => {
@@ -486,6 +556,66 @@ describe("product auth gate HTTP/oRPC routes", () => {
     expect(capturedActor).toMatchObject({
       kind: "user",
       id: "usr_member",
+    });
+  });
+
+  test("[PRODUCT-AUTH-READ-002] full organization team role flows into execution principal", async () => {
+    let capturedPrincipal: ExecutionContext["principal"];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const projectQueryBus = {
+      execute: async <T>(context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        expect(query).toBeInstanceOf(ShowProjectQuery);
+        capturedPrincipal = context.principal;
+        return ok({
+          id: "prj_demo",
+          name: "Demo Project",
+          slug: "demo-project",
+          lifecycleStatus: "active",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        } as T);
+      },
+    } as QueryBus;
+    const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+      authorizeProductSession: async (_context, input) =>
+        ok({
+          actor: {
+            kind: "user",
+            id: "usr_billing",
+            label: "billing@example.com",
+          },
+          email: "billing@example.com",
+          organizationId: "org_self_hosted",
+          organizationRole: "billing",
+          role: input.requiredRole,
+          userId: "usr_billing",
+        }),
+    };
+    const app = mountProductAuthGateRoutes({
+      commandBus,
+      productSessionAuthorizationPort,
+      queryBus: projectQueryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/projects/prj_demo", {
+        headers: {
+          cookie: "better-auth.session_token=test-billing-session",
+        },
+      }),
+    );
+    const text = await response.text();
+
+    expect(response.status, text).toBe(200);
+    expect(capturedPrincipal).toMatchObject({
+      activeOrganization: {
+        organizationId: "org_self_hosted",
+        productRole: "member",
+        role: "billing",
+      },
+      userId: "usr_billing",
     });
   });
 

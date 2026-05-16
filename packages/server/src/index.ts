@@ -87,7 +87,10 @@ import {
   type SystemPluginWebExtension,
 } from "@appaloft/plugin-sdk";
 import { container, type DependencyContainer } from "tsyringe";
-import { createCertificateRetrySchedulerRunner } from "./certificate-retry-scheduler-runner";
+import {
+  createCertificateRetrySchedulerRunner,
+  createDisabledCertificateRetrySchedulerRunner,
+} from "./certificate-retry-scheduler-runner";
 import { writeBootstrapDeployTokenOutput } from "./deploy-token-bootstrap";
 import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
 import { writeBootstrapFirstAdminOutput } from "./first-admin-bootstrap";
@@ -105,11 +108,26 @@ import { registerRuntimeDependencies } from "./register-runtime-dependencies";
 import { createReloadableDatabase, type ReloadableDatabaseConnection } from "./reloadable-database";
 import { SshRemoteStateWorkReadModel } from "./remote-state-work-read-model";
 import { resourceAccessFailureRendererTargetForStartedServer } from "./resource-access-failure-renderer-target";
-import { createRuntimeMonitoringCollectorRunner } from "./runtime-monitoring-collector-runner";
-import { createScheduledDependencyBackupRunner } from "./scheduled-dependency-backup-runner";
-import { createScheduledHistoryRetentionRunner } from "./scheduled-history-retention-runner";
-import { createScheduledRuntimePruneRunner } from "./scheduled-runtime-prune-runner";
-import { createScheduledTaskRunner } from "./scheduled-task-runner";
+import {
+  createDisabledRuntimeMonitoringCollectorRunner,
+  createRuntimeMonitoringCollectorRunner,
+} from "./runtime-monitoring-collector-runner";
+import {
+  createDisabledScheduledDependencyBackupRunner,
+  createScheduledDependencyBackupRunner,
+} from "./scheduled-dependency-backup-runner";
+import {
+  createDisabledScheduledHistoryRetentionRunner,
+  createScheduledHistoryRetentionRunner,
+} from "./scheduled-history-retention-runner";
+import {
+  createDisabledScheduledRuntimePruneRunner,
+  createScheduledRuntimePruneRunner,
+} from "./scheduled-runtime-prune-runner";
+import {
+  createDisabledScheduledTaskRunner,
+  createScheduledTaskRunner,
+} from "./scheduled-task-runner";
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -679,16 +697,17 @@ export async function createAppaloftServer(
     childContainer,
     tokens.automaticRouteContextLookupService,
   );
-  const certificateRetryScheduler = resolveToken<CertificateRetryScheduler>(
-    childContainer,
-    tokens.certificateRetryScheduler,
-  );
-  const certificateRetrySchedulerRunner = createCertificateRetrySchedulerRunner({
-    config: config.certificateRetryScheduler,
-    scheduler: certificateRetryScheduler,
-    executionContextFactory,
-    logger,
-  });
+  const certificateRetrySchedulerRunner = config.certificateRetryScheduler.enabled
+    ? createCertificateRetrySchedulerRunner({
+        config: config.certificateRetryScheduler,
+        scheduler: resolveToken<CertificateRetryScheduler>(
+          childContainer,
+          tokens.certificateRetryScheduler,
+        ),
+        executionContextFactory,
+        logger,
+      })
+    : createDisabledCertificateRetrySchedulerRunner();
   const previewCleanupRetrySchedulerRunner = config.previewCleanupRetryScheduler.enabled
     ? createPreviewCleanupRetrySchedulerRunner({
         config: config.previewCleanupRetryScheduler,
@@ -719,101 +738,92 @@ export async function createAppaloftServer(
         logger,
       })
     : createDisabledPreviewExpiryCleanupSchedulerRunner();
-  const scheduledTaskScheduler = resolveToken<ScheduledTaskScheduler>(
-    childContainer,
-    tokens.scheduledTaskScheduler,
-  );
-  const scheduledTaskRunWorker = resolveToken<ScheduledTaskRunWorker>(
-    childContainer,
-    tokens.scheduledTaskRunWorker,
-  );
-  const processAttemptDeliveryCandidateReader = resolveToken<ProcessAttemptDeliveryCandidateReader>(
-    childContainer,
-    tokens.processAttemptDeliveryCandidateReader,
-  );
-  const processAttemptRetryCandidateReader = resolveToken<ProcessAttemptRetryCandidateReader>(
-    childContainer,
-    tokens.processAttemptRetryCandidateReader,
-  );
-  const processAttemptRetryGenerator = resolveToken<ProcessAttemptRetryGenerator>(
-    childContainer,
-    tokens.processAttemptRetryGenerator,
-  );
-  const scheduledRuntimePruneService = resolveToken<ScheduledRuntimePruneService>(
-    childContainer,
-    tokens.scheduledRuntimePruneService,
-  );
-  const scheduledDependencyBackupService = resolveToken<ScheduledDependencyBackupService>(
-    childContainer,
-    tokens.scheduledDependencyBackupService,
-  );
-  const scheduledHistoryRetentionService = resolveToken<ScheduledHistoryRetentionService>(
-    childContainer,
-    tokens.scheduledHistoryRetentionService,
-  );
-  const runtimeMonitoringCollectorService = resolveToken<RuntimeMonitoringCollectorService>(
-    childContainer,
-    tokens.runtimeMonitoringCollectorService,
-  );
-  const serverReadModel = resolveToken<ServerReadModel>(childContainer, tokens.serverReadModel);
-  const projectReadModel = resolveToken<ProjectReadModel>(childContainer, tokens.projectReadModel);
-  const environmentReadModel = resolveToken<EnvironmentReadModel>(
-    childContainer,
-    tokens.environmentReadModel,
-  );
-  const resourceReadModel = resolveToken<ResourceReadModel>(
-    childContainer,
-    tokens.resourceReadModel,
-  );
-  const scheduledRuntimePrunePolicyReadModel = resolveToken<ScheduledRuntimePrunePolicyReadModel>(
-    childContainer,
-    tokens.scheduledRuntimePrunePolicyReadModel,
-  );
-  const dependencyResourceBackupPolicyRepository =
-    resolveToken<DependencyResourceBackupPolicyRepository>(
-      childContainer,
-      tokens.dependencyResourceBackupPolicyRepository,
-    );
-  const scheduledTaskRunner = createScheduledTaskRunner({
-    config: config.scheduledTaskRunner,
-    scheduler: scheduledTaskScheduler,
-    worker: scheduledTaskRunWorker,
-    processAttemptDeliveryCandidateReader,
-    processAttemptRetryCandidateReader,
-    processAttemptRetryGenerator,
-    executionContextFactory,
-    logger,
-  });
-  const scheduledRuntimePruneRunner = createScheduledRuntimePruneRunner({
-    config: config.scheduledRuntimePruneRunner,
-    policyReadModel: scheduledRuntimePrunePolicyReadModel,
-    service: scheduledRuntimePruneService,
-    executionContextFactory,
-    logger,
-  });
-  const scheduledDependencyBackupRunner = createScheduledDependencyBackupRunner({
-    config: config.scheduledDependencyBackupRunner,
-    policyRepository: dependencyResourceBackupPolicyRepository,
-    service: scheduledDependencyBackupService,
-    executionContextFactory,
-    logger,
-  });
-  const scheduledHistoryRetentionRunner = createScheduledHistoryRetentionRunner({
-    config: config.scheduledHistoryRetentionRunner,
-    service: scheduledHistoryRetentionService,
-    executionContextFactory,
-    logger,
-  });
-  const runtimeMonitoringCollectorRunner = createRuntimeMonitoringCollectorRunner({
-    config: config.runtimeMonitoringCollectorRunner,
-    serverReadModel,
-    projectReadModel,
-    environmentReadModel,
-    resourceReadModel,
-    service: runtimeMonitoringCollectorService,
-    executionContextFactory,
-    logger,
-  });
+  const scheduledTaskRunner = config.scheduledTaskRunner.enabled
+    ? createScheduledTaskRunner({
+        config: config.scheduledTaskRunner,
+        scheduler: resolveToken<ScheduledTaskScheduler>(
+          childContainer,
+          tokens.scheduledTaskScheduler,
+        ),
+        worker: resolveToken<ScheduledTaskRunWorker>(childContainer, tokens.scheduledTaskRunWorker),
+        processAttemptDeliveryCandidateReader: resolveToken<ProcessAttemptDeliveryCandidateReader>(
+          childContainer,
+          tokens.processAttemptDeliveryCandidateReader,
+        ),
+        processAttemptRetryCandidateReader: resolveToken<ProcessAttemptRetryCandidateReader>(
+          childContainer,
+          tokens.processAttemptRetryCandidateReader,
+        ),
+        processAttemptRetryGenerator: resolveToken<ProcessAttemptRetryGenerator>(
+          childContainer,
+          tokens.processAttemptRetryGenerator,
+        ),
+        executionContextFactory,
+        logger,
+      })
+    : createDisabledScheduledTaskRunner();
+  const scheduledRuntimePruneRunner = config.scheduledRuntimePruneRunner.enabled
+    ? createScheduledRuntimePruneRunner({
+        config: config.scheduledRuntimePruneRunner,
+        policyReadModel: resolveToken<ScheduledRuntimePrunePolicyReadModel>(
+          childContainer,
+          tokens.scheduledRuntimePrunePolicyReadModel,
+        ),
+        service: resolveToken<ScheduledRuntimePruneService>(
+          childContainer,
+          tokens.scheduledRuntimePruneService,
+        ),
+        executionContextFactory,
+        logger,
+      })
+    : createDisabledScheduledRuntimePruneRunner();
+  const scheduledDependencyBackupRunner = config.scheduledDependencyBackupRunner.enabled
+    ? createScheduledDependencyBackupRunner({
+        config: config.scheduledDependencyBackupRunner,
+        policyRepository: resolveToken<DependencyResourceBackupPolicyRepository>(
+          childContainer,
+          tokens.dependencyResourceBackupPolicyRepository,
+        ),
+        service: resolveToken<ScheduledDependencyBackupService>(
+          childContainer,
+          tokens.scheduledDependencyBackupService,
+        ),
+        executionContextFactory,
+        logger,
+      })
+    : createDisabledScheduledDependencyBackupRunner();
+  const scheduledHistoryRetentionRunner = config.scheduledHistoryRetentionRunner.enabled
+    ? createScheduledHistoryRetentionRunner({
+        config: config.scheduledHistoryRetentionRunner,
+        service: resolveToken<ScheduledHistoryRetentionService>(
+          childContainer,
+          tokens.scheduledHistoryRetentionService,
+        ),
+        executionContextFactory,
+        logger,
+      })
+    : createDisabledScheduledHistoryRetentionRunner();
+  const runtimeMonitoringCollectorRunner = config.runtimeMonitoringCollectorRunner.enabled
+    ? createRuntimeMonitoringCollectorRunner({
+        config: config.runtimeMonitoringCollectorRunner,
+        serverReadModel: resolveToken<ServerReadModel>(childContainer, tokens.serverReadModel),
+        projectReadModel: resolveToken<ProjectReadModel>(childContainer, tokens.projectReadModel),
+        environmentReadModel: resolveToken<EnvironmentReadModel>(
+          childContainer,
+          tokens.environmentReadModel,
+        ),
+        resourceReadModel: resolveToken<ResourceReadModel>(
+          childContainer,
+          tokens.resourceReadModel,
+        ),
+        service: resolveToken<RuntimeMonitoringCollectorService>(
+          childContainer,
+          tokens.runtimeMonitoringCollectorService,
+        ),
+        executionContextFactory,
+        logger,
+      })
+    : createDisabledRuntimeMonitoringCollectorRunner();
   const webStaticDir = await resolveWebStaticDir(config, options);
   const docsStaticDir = await resolveDocsStaticDir(config, options);
 

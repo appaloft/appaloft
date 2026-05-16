@@ -1,5 +1,5 @@
 import { domainError, err, ok, type Result, safeTry } from "@appaloft/core";
-import { inject, injectable } from "tsyringe";
+import { injectable } from "tsyringe";
 
 import { type CommandBus } from "../../cqrs";
 import {
@@ -15,7 +15,6 @@ import {
   type ProcessAttemptRecorder,
   type RuntimeTargetCapacityPruneResult,
 } from "../../ports";
-import { tokens } from "../../tokens";
 import {
   PruneServerCapacityCommand,
   type RuntimeTargetPruneCategory,
@@ -258,17 +257,11 @@ export class ScheduledRuntimePrunePolicyResolver {
 @injectable()
 export class ScheduledRuntimePruneService {
   constructor(
-    @inject(tokens.commandBus)
     private readonly commandBus: Pick<CommandBus, "execute">,
-    @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder,
-    @inject(tokens.processAttemptClaimer)
     private readonly processAttemptClaimer: ProcessAttemptClaimer,
-    @inject(tokens.processAttemptCompleter)
     private readonly processAttemptCompleter: ProcessAttemptCompleter,
-    @inject(tokens.idGenerator)
     private readonly idGenerator: IdGenerator,
-    @inject(tokens.clock)
     private readonly clock: Clock,
   ) {}
 

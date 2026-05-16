@@ -139,6 +139,7 @@ import {
   DeploymentLogsQueryService,
   DeploymentPlanQueryHandler,
   DeploymentPlanQueryService,
+  type DeploymentReadModel,
   DeploymentRecoveryReadinessQueryHandler,
   DeploymentRecoveryReadinessQueryService,
   DeploymentSnapshotFactory,
@@ -146,6 +147,7 @@ import {
   DetachResourceStorageUseCase,
   DiffEnvironmentsQueryService,
   DoctorQueryService,
+  type DomainBindingReadModel,
   EnvironmentEffectivePrecedenceQueryHandler,
   EnvironmentEffectivePrecedenceQueryService,
   type ExecutionContext,
@@ -312,6 +314,7 @@ import {
   ResourceEffectiveConfigQueryService,
   ResourceHealthQueryService,
   ResourceProxyConfigurationPreviewQueryService,
+  type ResourceReadModel,
   ResourceRuntimeControlUseCase,
   ResourceRuntimeLogsQueryService,
   RestartResourceRuntimeCommandHandler,
@@ -1763,13 +1766,47 @@ export function registerApplicationServices(
     tokens.previewPullRequestEventIngestService,
     PreviewPullRequestEventIngestService,
   );
-  container.registerSingleton(
-    tokens.previewEnvironmentCleanupService,
-    PreviewEnvironmentCleanupService,
-  );
+  container.register(tokens.previewEnvironmentCleanupService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new PreviewEnvironmentCleanupService(
+          dependencyContainer.resolve(tokens.previewEnvironmentRepository),
+          dependencyContainer.resolve(tokens.previewEnvironmentCleaner),
+          dependencyContainer.resolve(tokens.previewCleanupAttemptRecorder),
+          dependencyContainer.resolve(tokens.clock),
+          dependencyContainer.resolve(tokens.idGenerator),
+          dependencyContainer.resolve(tokens.processAttemptRecorder),
+          dependencyContainer.resolve(tokens.processAttemptClaimer),
+          dependencyContainer.resolve(tokens.processAttemptCompleter),
+        ),
+    ),
+  });
   container.registerSingleton(tokens.previewEnvironmentCleaner, ShellPreviewEnvironmentCleaner);
-  container.registerSingleton(tokens.previewCleanupRetryScheduler, PreviewCleanupRetryScheduler);
-  container.registerSingleton(tokens.previewExpiryCleanupScheduler, PreviewExpiryCleanupScheduler);
+  container.register(tokens.previewCleanupRetryScheduler, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new PreviewCleanupRetryScheduler(
+          dependencyContainer.resolve(tokens.previewEnvironmentCleanupService),
+          dependencyContainer.resolve(tokens.clock),
+          dependencyContainer.resolve(tokens.logger),
+          dependencyContainer.resolve(tokens.processAttemptRetryCandidateReader),
+          dependencyContainer.resolve(tokens.processAttemptDeliveryCandidateReader),
+          dependencyContainer.resolve(tokens.processAttemptRetryGenerator),
+          dependencyContainer.resolve(tokens.idGenerator),
+        ),
+    ),
+  });
+  container.register(tokens.previewExpiryCleanupScheduler, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new PreviewExpiryCleanupScheduler(
+          dependencyContainer.resolve(tokens.previewExpiredEnvironmentCandidateReader),
+          dependencyContainer.resolve(tokens.previewEnvironmentCleanupService),
+          dependencyContainer.resolve(tokens.clock),
+          dependencyContainer.resolve(tokens.logger),
+        ),
+    ),
+  });
   container.registerSingleton(
     tokens.configureResourceHealthUseCase,
     ConfigureResourceHealthUseCase,
@@ -1799,8 +1836,32 @@ export function registerApplicationServices(
     tokens.scheduledTaskRunAdmissionService,
     ScheduledTaskRunAdmissionService,
   );
-  container.registerSingleton(tokens.scheduledTaskRunWorker, ScheduledTaskRunWorker);
-  container.registerSingleton(tokens.scheduledTaskScheduler, ScheduledTaskScheduler);
+  container.register(tokens.scheduledTaskRunWorker, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new ScheduledTaskRunWorker(
+          dependencyContainer.resolve(tokens.scheduledTaskRunAttemptRepository),
+          dependencyContainer.resolve(tokens.scheduledTaskDefinitionRepository),
+          dependencyContainer.resolve(tokens.scheduledTaskRuntimePort),
+          dependencyContainer.resolve(tokens.scheduledTaskRunLogRecorder),
+          dependencyContainer.resolve(tokens.idGenerator),
+          dependencyContainer.resolve(tokens.clock),
+          dependencyContainer.resolve(tokens.processAttemptClaimer),
+          dependencyContainer.resolve(tokens.processAttemptCompleter),
+        ),
+    ),
+  });
+  container.register(tokens.scheduledTaskScheduler, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new ScheduledTaskScheduler(
+          dependencyContainer.resolve(tokens.scheduledTaskDueCandidateReader),
+          dependencyContainer.resolve(tokens.scheduledTaskRunAdmissionService),
+          dependencyContainer.resolve(tokens.clock),
+          dependencyContainer.resolve(tokens.logger),
+        ),
+    ),
+  });
   container.registerSingleton(
     tokens.listScheduledTasksQueryService,
     ListScheduledTasksQueryService,
@@ -1993,10 +2054,20 @@ export function registerApplicationServices(
     tokens.runtimeMonitoringRollupQueryService,
     RuntimeMonitoringRollupQueryService,
   );
-  container.registerSingleton(
-    tokens.runtimeMonitoringCollectorService,
-    RuntimeMonitoringCollectorService,
-  );
+  container.register(tokens.runtimeMonitoringCollectorService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RuntimeMonitoringCollectorService(
+          dependencyContainer.resolve(tokens.runtimeUsageInspectionQueryService),
+          dependencyContainer.resolve(tokens.runtimeMonitoringSampleWriteStore),
+          dependencyContainer.resolve(tokens.processAttemptRecorder),
+          dependencyContainer.resolve(tokens.processAttemptClaimer),
+          dependencyContainer.resolve(tokens.processAttemptCompleter),
+          dependencyContainer.resolve(tokens.idGenerator),
+          dependencyContainer.resolve(tokens.clock),
+        ),
+    ),
+  });
   container.registerSingleton(
     tokens.configureRuntimeMonitoringThresholdsUseCase,
     ConfigureRuntimeMonitoringThresholdsUseCase,
@@ -2018,14 +2089,35 @@ export function registerApplicationServices(
     tokens.showRetentionDefaultQueryService,
     ShowRetentionDefaultQueryService,
   );
-  container.registerSingleton(
-    tokens.scheduledHistoryRetentionService,
-    ScheduledHistoryRetentionService,
-  );
-  container.registerSingleton(
-    tokens.scheduledDependencyBackupService,
-    ScheduledDependencyBackupService,
-  );
+  container.register(tokens.scheduledHistoryRetentionService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new ScheduledHistoryRetentionService(
+          dependencyContainer.resolve(tokens.commandBus),
+          dependencyContainer.resolve(tokens.retentionDefaultRepository),
+          dependencyContainer.resolve(tokens.processAttemptRecorder),
+          dependencyContainer.resolve(tokens.processAttemptClaimer),
+          dependencyContainer.resolve(tokens.processAttemptCompleter),
+          dependencyContainer.resolve(tokens.idGenerator),
+          dependencyContainer.resolve(tokens.clock),
+          dependencyContainer.resolve(tokens.runtimeMonitoringSampleRetentionStore),
+        ),
+    ),
+  });
+  container.register(tokens.scheduledDependencyBackupService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new ScheduledDependencyBackupService(
+          dependencyContainer.resolve(tokens.commandBus),
+          dependencyContainer.resolve(tokens.dependencyResourceBackupPolicyRepository),
+          dependencyContainer.resolve(tokens.processAttemptRecorder),
+          dependencyContainer.resolve(tokens.processAttemptClaimer),
+          dependencyContainer.resolve(tokens.processAttemptCompleter),
+          dependencyContainer.resolve(tokens.idGenerator),
+          dependencyContainer.resolve(tokens.clock),
+        ),
+    ),
+  });
   container.registerSingleton(
     tokens.configureScheduledRuntimePrunePolicyUseCase,
     ConfigureScheduledRuntimePrunePolicyUseCase,
@@ -2042,7 +2134,19 @@ export function registerApplicationServices(
     tokens.scheduledRuntimePrunePolicyResolver,
     ScheduledRuntimePrunePolicyResolver,
   );
-  container.registerSingleton(tokens.scheduledRuntimePruneService, ScheduledRuntimePruneService);
+  container.register(tokens.scheduledRuntimePruneService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new ScheduledRuntimePruneService(
+          dependencyContainer.resolve(tokens.commandBus),
+          dependencyContainer.resolve(tokens.processAttemptRecorder),
+          dependencyContainer.resolve(tokens.processAttemptClaimer),
+          dependencyContainer.resolve(tokens.processAttemptCompleter),
+          dependencyContainer.resolve(tokens.idGenerator),
+          dependencyContainer.resolve(tokens.clock),
+        ),
+    ),
+  });
   container.registerSingleton(tokens.renameServerUseCase, RenameServerUseCase);
   container.registerSingleton(
     tokens.configureServerEdgeProxyUseCase,
@@ -2137,7 +2241,17 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.retryCertificateUseCase, RetryCertificateUseCase);
   container.registerSingleton(tokens.revokeCertificateUseCase, RevokeCertificateUseCase);
   container.registerSingleton(tokens.deleteCertificateUseCase, DeleteCertificateUseCase);
-  container.registerSingleton(tokens.certificateRetryScheduler, CertificateRetryScheduler);
+  container.register(tokens.certificateRetryScheduler, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new CertificateRetryScheduler(
+          dependencyContainer.resolve(tokens.certificateRetryCandidateReader),
+          dependencyContainer.resolve(tokens.issueOrRenewCertificateUseCase),
+          dependencyContainer.resolve(tokens.clock),
+          dependencyContainer.resolve(tokens.logger),
+        ),
+    ),
+  });
   container.registerSingleton(tokens.listCertificatesQueryService, ListCertificatesQueryService);
   container.registerSingleton(tokens.showCertificateQueryService, ShowCertificateQueryService);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
@@ -2170,10 +2284,16 @@ export function registerApplicationServices(
     tokens.resourceAccessFailureEvidenceLookupQueryService,
     ResourceAccessFailureEvidenceLookupQueryService,
   );
-  container.registerSingleton(
-    tokens.automaticRouteContextLookupService,
-    AutomaticRouteContextLookupService,
-  );
+  container.register(tokens.automaticRouteContextLookupService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new AutomaticRouteContextLookupService(
+          dependencyContainer.resolve<ResourceReadModel>(tokens.resourceReadModel),
+          dependencyContainer.resolve<DomainBindingReadModel>(tokens.domainBindingReadModel),
+          dependencyContainer.resolve<DeploymentReadModel>(tokens.deploymentReadModel),
+        ),
+    ),
+  });
   container.registerSingleton(tokens.resourceHealthQueryService, ResourceHealthQueryService);
   container.registerSingleton(
     tokens.resourceRuntimeLogsQueryService,

@@ -1846,10 +1846,21 @@ export function registerApplicationServices(
     tokens.previewPullRequestEventIngestService,
     PreviewPullRequestEventIngestService,
   );
-  container.registerSingleton(
-    tokens.previewEnvironmentCleanupService,
-    PreviewEnvironmentCleanupService,
-  );
+  container.register(tokens.previewEnvironmentCleanupService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new PreviewEnvironmentCleanupService(
+          dependencyContainer.resolve(tokens.previewEnvironmentRepository),
+          dependencyContainer.resolve(tokens.previewEnvironmentCleaner),
+          dependencyContainer.resolve(tokens.previewCleanupAttemptRecorder),
+          dependencyContainer.resolve(tokens.clock),
+          dependencyContainer.resolve(tokens.idGenerator),
+          dependencyContainer.resolve(tokens.processAttemptRecorder),
+          dependencyContainer.resolve(tokens.processAttemptClaimer),
+          dependencyContainer.resolve(tokens.processAttemptCompleter),
+        ),
+    ),
+  });
   container.registerSingleton(tokens.previewEnvironmentCleaner, ShellPreviewEnvironmentCleaner);
   container.registerSingleton(tokens.previewCleanupRetryScheduler, PreviewCleanupRetryScheduler);
   container.registerSingleton(tokens.previewExpiryCleanupScheduler, PreviewExpiryCleanupScheduler);
@@ -2143,7 +2154,19 @@ export function registerApplicationServices(
     tokens.scheduledRuntimePrunePolicyResolver,
     ScheduledRuntimePrunePolicyResolver,
   );
-  container.registerSingleton(tokens.scheduledRuntimePruneService, ScheduledRuntimePruneService);
+  container.register(tokens.scheduledRuntimePruneService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new ScheduledRuntimePruneService(
+          dependencyContainer.resolve(tokens.commandBus),
+          dependencyContainer.resolve(tokens.processAttemptRecorder),
+          dependencyContainer.resolve(tokens.processAttemptClaimer),
+          dependencyContainer.resolve(tokens.processAttemptCompleter),
+          dependencyContainer.resolve(tokens.idGenerator),
+          dependencyContainer.resolve(tokens.clock),
+        ),
+    ),
+  });
   container.registerSingleton(tokens.renameServerUseCase, RenameServerUseCase);
   container.registerSingleton(
     tokens.configureServerEdgeProxyUseCase,

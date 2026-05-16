@@ -153,6 +153,7 @@ import {
   type ExecutionActor,
   type ExecutionContext,
   type ExecutionContextFactory,
+  type ExecutionPrincipal,
   ExpireTerminalSessionsCommand,
   ExportAuditEventsQuery,
   ExportGlobalAuditEventsQuery,
@@ -160,6 +161,7 @@ import {
   expireTerminalSessionsCommandInputSchema,
   exportAuditEventsQueryInputSchema,
   exportGlobalAuditEventsQueryInputSchema,
+  findOperationCatalogEntryByMessageName,
   GetAuthBootstrapStatusQuery,
   GetCurrentOrganizationContextQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
@@ -1788,6 +1790,8 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
       });
     case "action_auth_forbidden":
     case "product_auth_forbidden":
+    case "operation_authorization_denied":
+    case "operation_check_denied":
       return new ORPCError("FORBIDDEN", {
         message,
         status: 403,
@@ -1861,7 +1865,6 @@ function unwrapResult<T>(context: ExecutionContext, result: Result<T>): T {
 }
 
 const productMutationRequiredRole: ProductOrganizationRole = "admin";
-const publicBootstrapCommandNames = new Set(["BootstrapFirstAdminCommand"]);
 
 function readOrganizationIdFromMessage(message: unknown): string | undefined {
   if (!message || typeof message !== "object" || !("organizationId" in message)) {
@@ -1877,7 +1880,7 @@ async function authorizeProductSessionForOperation(input: {
   operationName: string;
   organizationId?: string;
   requiredRole: ProductOrganizationRole;
-}): Promise<ExecutionActor | null> {
+}): Promise<{ actor: ExecutionActor; principal: ExecutionPrincipal } | null> {
   const { context } = input;
   if (!context.currentRequest || !context.productSessionAuthorizationPort) {
     return null;
@@ -1915,39 +1918,75 @@ async function authorizeProductSessionForOperation(input: {
     role: authorized.value.role,
   });
 
-  return authorized.value.actor;
+  return {
+    actor: authorized.value.actor,
+    principal: {
+      kind: authorized.value.actor.kind,
+      actorId: authorized.value.actor.id,
+      userId: authorized.value.userId,
+      ...(authorized.value.email ? { email: authorized.value.email } : {}),
+      activeOrganization: {
+        organizationId: authorized.value.organizationId,
+        role:
+          authorized.value.organizationRole ?? productRoleToOrganizationRole(authorized.value.role),
+        productRole: authorized.value.role,
+      },
+    },
+  };
 }
 
 async function authorizeProductSessionForCommand(
   context: AppaloftOrpcRequestContext,
   command: Command<unknown>,
-): Promise<ExecutionActor | null> {
-  if (publicBootstrapCommandNames.has(command.constructor.name)) {
+): Promise<{ actor: ExecutionActor; principal: ExecutionPrincipal } | null> {
+  const requiredRole = productRequiredRoleForCommand(command);
+  if (!requiredRole) {
     return null;
   }
 
   return authorizeProductSessionForOperation({
     context,
     operationName: command.constructor.name,
-    requiredRole: productRequiredRoleForCommand(command),
+    requiredRole,
     ...(readOrganizationIdFromMessage(command)
       ? { organizationId: readOrganizationIdFromMessage(command) as string }
       : {}),
   });
 }
 
-function productRequiredRoleForCommand(command: Command<unknown>): ProductOrganizationRole {
-  if (command instanceof SwitchCurrentOrganizationCommand) {
-    return "member";
+function productRoleToOrganizationRole(role: ProductOrganizationRole) {
+  if (role === "owner" || role === "admin") {
+    return role;
   }
+  return "developer";
+}
 
-  return productMutationRequiredRole;
+function productRequiredRoleForMessage(
+  messageName: string,
+  kind: "command" | "query",
+): ProductOrganizationRole | null | undefined {
+  const entry = findOperationCatalogEntryByMessageName(messageName);
+  const productSession = entry?.transportAccess?.productSession;
+  if (productSession === "public") {
+    return null;
+  }
+  if (productSession) {
+    return productSession.minRole;
+  }
+  if (kind === "command") {
+    return productMutationRequiredRole;
+  }
+  return undefined;
+}
+
+function productRequiredRoleForCommand(command: Command<unknown>): ProductOrganizationRole | null {
+  return productRequiredRoleForMessage(command.constructor.name, "command") ?? null;
 }
 
 async function authorizeProductSessionForQuery(
   context: AppaloftOrpcRequestContext,
   query: Query<unknown>,
-): Promise<ExecutionActor | null> {
+): Promise<{ actor: ExecutionActor; principal: ExecutionPrincipal } | null> {
   const requiredRole = productRequiredRoleForQuery(query);
   if (!requiredRole) {
     return null;
@@ -1964,6 +2003,11 @@ async function authorizeProductSessionForQuery(
 }
 
 function productRequiredRoleForQuery(query: Query<unknown>): ProductOrganizationRole | null {
+  const catalogRole = productRequiredRoleForMessage(query.constructor.name, "query");
+  if (catalogRole !== undefined) {
+    return catalogRole;
+  }
+
   if (
     query instanceof GetCurrentOrganizationContextQuery ||
     query instanceof ListProjectsQuery ||
@@ -2003,7 +2047,8 @@ async function executeCommand<TMessage extends Command<TResult>, TResult>(
         context.executionContextFactory,
         context.executionContext.entrypoint === "rpc" ? "rpc" : "http",
         context.currentRequest as Request,
-        productActor,
+        productActor.actor,
+        productActor.principal,
       )
     : context.executionContext;
 
@@ -2024,7 +2069,8 @@ async function executeQuery<TMessage extends Query<TResult>, TResult>(
         context.executionContextFactory,
         context.executionContext.entrypoint === "rpc" ? "rpc" : "http",
         context.currentRequest as Request,
-        productActor,
+        productActor.actor,
+        productActor.principal,
       )
     : context.executionContext;
 
@@ -2220,6 +2266,7 @@ function createRequestExecutionContext(
   entrypoint: "http" | "rpc",
   request: Request,
   actor?: ExecutionActor,
+  principal?: ExecutionPrincipal,
 ): ReturnType<ExecutionContextFactory["create"]> {
   const requestId = request.headers.get("x-request-id");
   const authorizationHeader = request.headers.get("authorization");
@@ -2227,6 +2274,7 @@ function createRequestExecutionContext(
 
   return executionContextFactory.create({
     ...(actor ? { actor } : {}),
+    ...(principal ? { principal } : {}),
     ...(authorizationHeader || cookieHeader
       ? {
           auth: {

@@ -10,6 +10,7 @@ type NullableUpdatableTimestampColumn = ColumnType<
 
 export interface ProjectsTable {
   id: string;
+  organization_id: ColumnType<string, string | undefined, string>;
   name: string;
   slug: string;
   description: string | null;

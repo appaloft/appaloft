@@ -1,6 +1,7 @@
 import {
   appaloftTraceAttributes,
   createReadModelSpanName,
+  type ProjectOwnershipReadModel,
   type ProjectReadModel,
   type RepositoryContext,
 } from "@appaloft/application";
@@ -35,6 +36,7 @@ function toProjectSummary(
 ): Awaited<ReturnType<ProjectReadModel["list"]>>[number] {
   return {
     id: row.id,
+    organizationId: row.organization_id,
     name: row.name,
     slug: row.slug,
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
@@ -47,10 +49,10 @@ function toProjectSummary(
   };
 }
 
-export class PgProjectReadModel implements ProjectReadModel {
+export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
-  async list(context: RepositoryContext) {
+  async list(context: RepositoryContext, input?: { organizationId?: string }) {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(
       createReadModelSpanName("project", "list"),
@@ -59,14 +61,20 @@ export class PgProjectReadModel implements ProjectReadModel {
           [appaloftTraceAttributes.readModelName]: "project",
         },
       },
-      async () =>
-        executor
+      async () => {
+        let query = executor
           .selectFrom("projects")
           .selectAll()
-          .where("lifecycle_status", "!=", "deleted")
+          .where("lifecycle_status", "!=", "deleted");
+        if (input?.organizationId) {
+          query = query.where("organization_id", "=", input.organizationId);
+        }
+
+        return query
           .orderBy("created_at", "desc")
           .execute()
-          .then((rows) => rows.map(toProjectSummary)),
+          .then((rows) => rows.map(toProjectSummary));
+      },
     );
   }
 
@@ -89,5 +97,16 @@ export class PgProjectReadModel implements ProjectReadModel {
         return row ? toProjectSummary(row) : null;
       },
     );
+  }
+
+  async findProjectOrganization(context: RepositoryContext, input: { projectId: string }) {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    const row = await executor
+      .selectFrom("projects")
+      .select(["id", "organization_id"])
+      .where("id", "=", input.projectId)
+      .executeTakeFirst();
+
+    return row ? { projectId: row.id, organizationId: row.organization_id } : null;
   }
 }

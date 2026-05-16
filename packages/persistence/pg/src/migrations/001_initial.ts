@@ -7,10 +7,19 @@ export const initialMigration = {
     await db.schema
       .createTable("projects")
       .addColumn("id", "text", (column) => column.primaryKey())
+      .addColumn("organization_id", "text", (column) =>
+        column.notNull().defaultTo("org_self_hosted"),
+      )
       .addColumn("name", "text", (column) => column.notNull())
       .addColumn("slug", "text", (column) => column.notNull().unique())
       .addColumn("description", "text")
       .addColumn("created_at", "timestamptz", (column) => column.notNull())
+      .execute();
+
+    await db.schema
+      .createIndex("projects_organization_id_idx")
+      .on("projects")
+      .column("organization_id")
       .execute();
 
     await db.schema

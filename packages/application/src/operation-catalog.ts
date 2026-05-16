@@ -216,6 +216,7 @@ import { expireTerminalSessionsCommandInputSchema } from "./operations/terminal-
 import { listTerminalSessionsQueryInputSchema } from "./operations/terminal-sessions/list-terminal-sessions.query";
 import { openTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/open-terminal-session.command";
 import { showTerminalSessionQueryInputSchema } from "./operations/terminal-sessions/show-terminal-session.query";
+import { type ProductOrganizationRole } from "./ports";
 import { tokens } from "./tokens";
 
 type OperationKind = "command" | "query";
@@ -259,6 +260,13 @@ export interface OperationCatalogEntry {
   serviceName: string;
   inputSchema?: ZodTypeAny;
   serviceToken: symbol;
+  transportAccess?: {
+    productSession?:
+      | {
+          minRole: ProductOrganizationRole;
+        }
+      | "public";
+  };
   transports: {
     cli?: string;
     orpc?: {
@@ -302,6 +310,9 @@ export const operationCatalog = [
     serviceName: "BootstrapFirstAdminUseCase",
     inputSchema: bootstrapFirstAdminCommandInputSchema,
     serviceToken: tokens.bootstrapFirstAdminUseCase,
+    transportAccess: {
+      productSession: "public",
+    },
     transports: {
       cli: "appaloft auth bootstrap-first-admin",
       orpc: { method: "POST", path: "/api/bootstrap/auth/first-admin" },
@@ -316,6 +327,11 @@ export const operationCatalog = [
     serviceName: "GetCurrentOrganizationContextQueryService",
     inputSchema: getCurrentOrganizationContextQueryInputSchema,
     serviceToken: tokens.getCurrentOrganizationContextQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
     transports: {
       cli: "appaloft organization context",
       orpc: { method: "GET", path: "/api/organizations/current-context" },
@@ -330,6 +346,11 @@ export const operationCatalog = [
     serviceName: "SwitchCurrentOrganizationUseCase",
     inputSchema: switchCurrentOrganizationCommandInputSchema,
     serviceToken: tokens.switchCurrentOrganizationUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
     transports: {
       cli: "appaloft organization switch <organizationId>",
       orpc: { method: "POST", path: "/api/organizations/current-context/switch" },
@@ -344,6 +365,11 @@ export const operationCatalog = [
     serviceName: "ListOrganizationMembersQueryService",
     inputSchema: listOrganizationMembersQueryInputSchema,
     serviceToken: tokens.listOrganizationMembersQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "admin",
+      },
+    },
     transports: {
       cli: "appaloft organization members list",
       orpc: { method: "GET", path: "/api/organizations/{organizationId}/members" },
@@ -358,6 +384,11 @@ export const operationCatalog = [
     serviceName: "ListOrganizationInvitationsQueryService",
     inputSchema: listOrganizationInvitationsQueryInputSchema,
     serviceToken: tokens.listOrganizationInvitationsQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "admin",
+      },
+    },
     transports: {
       cli: "appaloft organization invitations list",
       orpc: { method: "GET", path: "/api/organizations/{organizationId}/invitations" },
@@ -560,6 +591,11 @@ export const operationCatalog = [
     serviceName: "CreateProjectUseCase",
     inputSchema: createProjectCommandInputSchema,
     serviceToken: tokens.createProjectUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "admin",
+      },
+    },
     transports: {
       cli: "appaloft project create",
       orpc: { method: "POST", path: "/api/projects" },
@@ -574,6 +610,11 @@ export const operationCatalog = [
     serviceName: "ListProjectsQueryService",
     inputSchema: listProjectsQueryInputSchema,
     serviceToken: tokens.listProjectsQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
     transports: {
       cli: "appaloft project list",
       orpc: { method: "GET", path: "/api/projects" },
@@ -588,6 +629,11 @@ export const operationCatalog = [
     serviceName: "ShowProjectQueryService",
     inputSchema: showProjectQueryInputSchema,
     serviceToken: tokens.showProjectQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
     transports: {
       cli: "appaloft project show <projectId>",
       orpc: { method: "GET", path: "/api/projects/{projectId}" },
@@ -602,6 +648,11 @@ export const operationCatalog = [
     serviceName: "RenameProjectUseCase",
     inputSchema: renameProjectCommandInputSchema,
     serviceToken: tokens.renameProjectUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "admin",
+      },
+    },
     transports: {
       cli: "appaloft project rename <projectId> --name <name>",
       orpc: { method: "POST", path: "/api/projects/{projectId}/rename" },
@@ -630,6 +681,11 @@ export const operationCatalog = [
     serviceName: "ArchiveProjectUseCase",
     inputSchema: archiveProjectCommandInputSchema,
     serviceToken: tokens.archiveProjectUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "admin",
+      },
+    },
     transports: {
       cli: "appaloft project archive <projectId>",
       orpc: { method: "POST", path: "/api/projects/{projectId}/archive" },
@@ -3371,6 +3427,25 @@ export const operationCatalog = [
 ] as const satisfies readonly OperationCatalogEntry[];
 
 export type OperationKey = (typeof operationCatalog)[number]["key"];
+
+const operationCatalogByMessageName = new Map<string, OperationCatalogEntry>(
+  operationCatalog.map((entry) => [entry.messageName, entry]),
+);
+const operationCatalogByKey = new Map<string, OperationCatalogEntry>(
+  operationCatalog.map((entry) => [entry.key, entry]),
+);
+
+export function findOperationCatalogEntryByMessageName(
+  messageName: string,
+): OperationCatalogEntry | undefined {
+  return operationCatalogByMessageName.get(messageName);
+}
+
+export function findOperationCatalogEntryByKey(
+  operationKey: string,
+): OperationCatalogEntry | undefined {
+  return operationCatalogByKey.get(operationKey);
+}
 
 export type GenericAggregateMutationOperationViolation = {
   key: string;

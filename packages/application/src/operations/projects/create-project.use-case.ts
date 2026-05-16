@@ -1,8 +1,10 @@
 import {
   CreatedAt,
   DescriptionText,
+  defaultSelfHostedOrganizationId,
   domainError,
   err,
+  OrganizationId,
   ok,
   Project,
   ProjectBySlugSpec,
@@ -14,16 +16,23 @@ import {
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
   type EventBus,
   type IdGenerator,
+  type OperationGuardPort,
   type ProjectRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateProjectCommandInput } from "./create-project.command";
+
+const createProjectOperation = findOperationCatalogEntryByKey("projects.create");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 @injectable()
 export class CreateProjectUseCase {
@@ -38,13 +47,15 @@ export class CreateProjectUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: CreateProjectCommandInput,
   ): Promise<Result<{ id: string }>> {
-    const { clock, eventBus, idGenerator, logger, projectRepository } = this;
+    const { clock, eventBus, idGenerator, logger, operationGuardPort, projectRepository } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -52,9 +63,28 @@ export class CreateProjectUseCase {
       const createdAt = yield* CreatedAt.create(clock.now());
       const projectName = yield* ProjectName.create(input.name);
       const description = DescriptionText.fromOptional(input.description);
+      const organizationId =
+        input.organizationId ??
+        context.principal?.activeOrganization?.organizationId ??
+        defaultSelfHostedOrganizationId;
+      const projectOrganizationId = yield* OrganizationId.create(organizationId);
+
+      if (createProjectOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: createProjectOperation,
+          message: { ...input, organizationId },
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          organizationId,
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
+      }
 
       const project = yield* Project.create({
         id: projectId,
+        organizationId: projectOrganizationId,
         name: projectName,
         createdAt,
         ...(description ? { description } : {}),

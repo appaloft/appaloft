@@ -11,9 +11,19 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import { type ProjectReadModel, type ProjectSummary } from "../../ports";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
+import {
+  AllowAllOperationGuardPort,
+  type OperationGuardPort,
+  type ProjectReadModel,
+  type ProjectSummary,
+} from "../../ports";
 import { tokens } from "../../tokens";
 import { type ShowProjectQuery } from "./show-project.query";
+
+const showProjectOperation = findOperationCatalogEntryByKey("projects.show");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 function withShowProjectDetails(
   error: DomainError,
@@ -31,13 +41,17 @@ function withShowProjectDetails(
 
 @injectable()
 export class ShowProjectQueryService {
-  constructor(@inject(tokens.projectReadModel) private readonly readModel: ProjectReadModel) {}
+  constructor(
+    @inject(tokens.projectReadModel) private readonly readModel: ProjectReadModel,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
+  ) {}
 
   async execute(
     context: ExecutionContext,
     query: ShowProjectQuery,
   ): Promise<Result<ProjectSummary>> {
-    const { readModel } = this;
+    const { operationGuardPort, readModel } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -51,6 +65,22 @@ export class ShowProjectQueryService {
             projectId: query.projectId,
           }),
         );
+      }
+
+      if (showProjectOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: showProjectOperation,
+          message: query,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          ...(project.organizationId ? { organizationId: project.organizationId } : {}),
+          resourceRefs: {
+            projectId: query.projectId,
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
       }
 
       return ok(project);

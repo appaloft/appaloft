@@ -112,6 +112,7 @@ import {
   LogLevelValue,
   MessageText,
   OccurredAt,
+  OrganizationId,
   PackagingModeValue,
   PlanStepText,
   PortNumber,
@@ -1045,6 +1046,7 @@ export function rehydrateEnvironmentConfigSet(
 export function rehydrateProject(row: Selectable<Database["projects"]>) {
   return {
     id: ProjectId.rehydrate(row.id),
+    organizationId: OrganizationId.rehydrate(row.organization_id),
     name: ProjectName.rehydrate(row.name),
     slug: ProjectSlug.rehydrate(row.slug),
     lifecycleStatus: ProjectLifecycleStatusValue.rehydrate(
