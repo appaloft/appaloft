@@ -32,6 +32,7 @@ or Appaloft control-plane state.
 | RT-CAP-PRUNE-005 | Entrypoints share schema | CLI or HTTP/oRPC invokes prune | inputs are parsed | both dispatch `PruneServerCapacityCommand` through the command bus. |
 | RT-CAP-PRUNE-006 | Destructive prune audit output | destructive prune removes one or more candidates | command completes | one aggregate-scoped audit row is recorded with safe counts/categories only; audit recorder failure is returned as a sanitized warning. |
 | RT-CAP-PRUNE-007 | Explicit Docker cache/image prune | target Docker build cache or unused images are older than `before` | prune runs with `docker-build-cache` or `unused-images` selected | Appaloft dry-runs or prunes only those selected categories through Docker filtered prune commands, keeps them out of the default category set, and never prunes volumes or Appaloft state roots. |
+| RT-CAP-PRUNE-010 | Explicit remote-state marker prune | old SSH remote-state journals, backups, recovery markers, or recovered-lock archives exist under fixed state-root subdirectories | prune runs with `remote-state-markers` selected | Appaloft dry-runs or prunes only those marker/archive paths, keeps the category out of the default category set, and never prunes the state root, live lock, or live PGlite state. |
 
 ## Domain Ownership
 
@@ -56,8 +57,8 @@ or Appaloft control-plane state.
 ## Non-Goals
 
 - Docker volume prune.
-- Appaloft state-root, remote-state, backup, migration, audit/event, log, route, deployment
-  snapshot, resource, server, dependency, or storage-volume retention.
+- Appaloft state-root, live remote-state, audit/event, log, route, deployment snapshot, resource,
+  server, dependency, or storage-volume retention.
 - Docker volume prune or broad `docker system prune`.
 - Changing deployment admission, rollback readiness, or resource runtime controls.
 

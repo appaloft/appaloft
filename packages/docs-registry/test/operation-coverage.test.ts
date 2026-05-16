@@ -1515,6 +1515,7 @@ describe("public docs operation coverage", () => {
       ["resources.configure-network", "resource.network-profile"],
       ["resources.configure-access", "resource.access-profile"],
       ["resources.configure-health", "resource.health-profile"],
+      ["resources.reset-health", "resource.health-profile"],
     ] as const) {
       const coverage = getPublicDocsOperationCoverage(operationKey);
       const topic = publicDocsHelpTopics[topicId];
@@ -1538,6 +1539,11 @@ describe("public docs operation coverage", () => {
 
     for (const operationKey of [
       "resources.set-variable",
+      "resources.secrets.create",
+      "resources.secrets.rotate",
+      "resources.secrets.delete",
+      "resources.secrets.list",
+      "resources.secrets.show",
       "resources.import-variables",
       "resources.unset-variable",
       "resources.effective-config",
@@ -1553,6 +1559,11 @@ describe("public docs operation coverage", () => {
       expect(topic.specReferences).toEqual(
         expect.arrayContaining([
           "docs/commands/resources.import-variables.md",
+          "docs/commands/resources.secrets.create.md",
+          "docs/commands/resources.secrets.rotate.md",
+          "docs/commands/resources.secrets.delete.md",
+          "docs/queries/resources.secrets.list.md",
+          "docs/queries/resources.secrets.show.md",
           "docs/queries/resources.effective-config.md",
           "docs/testing/resource-profile-lifecycle-test-matrix.md",
           "docs/specs/031-resource-secret-operations-and-effective-config/spec.md",
@@ -1604,6 +1615,11 @@ describe("public docs operation coverage", () => {
       operationKey: "source-events.show",
       status: "documented",
       topicId: "source.auto-deploy-ignored-events",
+    });
+    expect(getPublicDocsOperationCoverage("source-events.replay")).toMatchObject({
+      operationKey: "source-events.replay",
+      status: "documented",
+      topicId: "source.auto-deploy-recovery",
     });
     expect(publicDocsHelpTopics["source.auto-deploy-setup"].webSurfaces?.join("\n")).toContain(
       "Resource detail auto-deploy settings",

@@ -36,6 +36,7 @@ Add a vertical query slice under `packages/application/src/operations/resources/
 - `resource-health.query.ts`;
 - `resource-health.handler.ts`;
 - `resource-health.query-service.ts`.
+- `resource-health-history.query.ts`, handler, and query service for retained readback.
 
 Add application ports/tokens as needed:
 
@@ -44,6 +45,7 @@ Add application ports/tokens as needed:
 - a bounded `ResourceHealthProbeRunner` for HTTP policy and public access execution when live mode
   is requested;
 - a bounded `ResourcePublicAccessProbe` for public URL checks when explicitly requested;
+- explicit resource health observation recorder/history read-model ports for retained summaries;
 - `tokens.resourceHealthQueryService`.
 
 The query handler must delegate to the query service and return the typed `Result`.
@@ -200,6 +202,8 @@ Implemented scope:
   configured policy without a current probe, and live HTTP policy pass/fail;
 - application tests in `packages/application/test/configure-resource-health.test.ts` for policy
   persistence, disabled policy, not found, and event publication.
+- `resources.health-history` query, CLI, HTTP/oRPC, contracts, operation catalog, PG/PGlite
+  `resource_health_observations` table, and recorder/read-model executable tests.
 
 Current implementation reads latest deployment context, resource-owned health policy, runtime
 lifecycle inferred from deployment state, configured deployment snapshot health path as fallback,
@@ -211,7 +215,7 @@ Still deferred:
 
 - provider-native runtime/container inspection and Docker health state;
 - command health checks;
-- background/scheduled health observation projection.
+- background/scheduled health observation cadence policy.
 - edge request failure diagnostic source composition using `resource_access_*` codes.
 
 ## Open Questions

@@ -153,10 +153,12 @@ Forbidden until later specs reintroduce them:
 Current Web deployment detail reads `deployments.show` for the primary detail contract, reads
 timeline replay/follow through `deployments.stream-events`, keeps attempt logs on
 `deployments.logs`, and shows recovery readiness/actions through the ADR-034 recovery boundary.
+Public active-attempt cancellation is separately governed by `deployments.cancel`.
 
 Create-time progress remains a request-local affordance for `deployments.create`; it is no longer
 the standalone observation boundary after command acceptance.
 
 ## Open Questions
 
-- None for the observation boundary. Public deployment cancel remains future ADR-016 follow-up work.
+- None for the observation boundary. Public deployment cancel is governed separately by
+  [deployments.cancel](../commands/deployments.cancel.md).

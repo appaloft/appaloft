@@ -38,14 +38,12 @@
 ## Cancel Decision
 
 - [x] Decide whether public `deployments.cancel` is required before `1.0.0-rc`.
-- [x] Record that public `deployments.cancel` is not required for this `0.12.x` hardening blocker;
-  it remains rebuild-required/deferred under ADR-016 unless a future Spec Round pulls it forward.
-- [x] Keep `deployments.cancel` absent from API/CLI/Web/MCP surfaces in this round.
-
-Deferred follow-up if maintainers later require public deployment cancel: update or add an ADR
-before local specs, then add `deployments.cancel` command spec, workflow spec, error spec, test
-matrix, implementation plan, public docs/help outcome, `CORE_OPERATIONS.md`, and operation catalog
-in the same governed round.
+- [x] Record that public `deployments.cancel` was not required for this original `0.12.x`
+  observation hardening blocker.
+- [x] Superseded by the later pre-RC closure round: `deployments.cancel` is now active through
+  `docs/specs/073-pre-rc-closure`, `docs/commands/deployments.cancel.md`,
+  `docs/workflows/deployments.cancel.md`, `docs/errors/deployments.cancel.md`, and
+  `docs/testing/deployments.cancel-test-matrix.md`.
 
 ## Rollback Candidate/Readiness Hardening
 

@@ -13,12 +13,14 @@ Resource profile + latest runtime instance
   -> configured health policy evaluation
   -> proxy route/public access observation
   -> ResourceHealthSummary projection/query
+  -> retained ResourceHealthSummary observations when an internal observer records them
   -> resource detail, project list, sidebar, CLI/API display
 ```
 
 It is not a deployment write operation. It must not add health fields back to `deployments.create`.
-Existing resources configure policy through `resources.configure-health`; the observation workflow
-then reads that policy without mutating it.
+Existing resources configure policy through `resources.configure-health`, reset it through
+`resources.reset-health`, and observe current state through `resources.health`; the observation
+workflow then reads that policy without mutating it.
 
 ## Global References
 
@@ -111,6 +113,18 @@ If live observation persists the latest summary for navigation/list performance,
 belongs to an internal observer/process and must not be hidden inside a read query unless a future
 ADR accepts query-time cache writes.
 
+Historical readback flow:
+
+```text
+internal resource-health observer
+  -> resources.health({ resourceId, mode: "live" | "cached" })
+  -> ResourceHealthObservationRecorder.record(...)
+  -> resources.health-history({ resourceId, window })
+```
+
+The historical query is read-only and must not perform live probes or trigger observation
+recording.
+
 Existing-resource policy configuration flow:
 
 ```text
@@ -119,6 +133,13 @@ resources.configure-health({ resourceId, healthCheck })
   -> publish resource-health-policy-configured
   -> resources.health({ resourceId, mode: "live" })
   -> evaluate current runtime/public access using the configured policy when supported
+```
+
+```text
+resources.reset-health({ resourceId })
+  -> remove resource-owned health policy fields
+  -> publish resource-health-policy-reset
+  -> resources.health({ resourceId })
 ```
 
 ## Status Aggregation
@@ -171,6 +192,8 @@ Examples:
 - Edge gateway reports `resource_access_upstream_timeout`: `overall = degraded` unless runtime
   health also proves an internal failure.
 - No health policy configured: `overall = unknown`, policy status is `not-configured`.
+- Health policy reset: `overall` follows the remaining runtime/access signals, and policy status is
+  `not-configured`.
 
 Route/access blocking reasons must use the shared route intent/status vocabulary from
 [Route Intent/Status And Access Diagnostics](../specs/020-route-intent-status-and-access-diagnostics/spec.md).
@@ -195,7 +218,7 @@ Whole-query `err(DomainError)` is reserved for:
 | Project resource list | Shows compact health plus latest deployment context. |
 | Deployment detail | May show the attempt's verify result and route snapshot, but must link back to resource current health. |
 | Diagnostic summary | Includes current health fields once the query/projection exists. |
-| CLI/API | Expose the same query contract without transport-specific health semantics. |
+| CLI/API | Expose the same query contract without transport-specific health semantics; retained timelines use `resources.health-history`. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -216,8 +239,10 @@ until provider-native runtime/container inspection feeds resource-owned health o
 
 Bounded live HTTP policy and public access probes are implemented for safe HTTP targets. Durable
 domain readiness composition now uses domain binding records so pending/non-ready durable domains
-degrade public access instead of being hidden by fallback routes. Docker health-state inspection,
-command policy execution, and scheduled summary persistence are still future work.
+degrade public access instead of being hidden by fallback routes. Retained health observation
+storage/readback is implemented through `resources.health-history` and an explicit recorder
+boundary. Docker health-state inspection, command policy execution, and scheduled observer cadence
+policy are still future work.
 
 ## Open Questions
 

@@ -12,6 +12,7 @@ searchAliases:
   - "port"
 relatedOperations:
   - resources.configure-health
+  - resources.reset-health
   - resources.configure-network
 sidebar:
   label: "Health and network"
@@ -30,6 +31,8 @@ Common fields:
 - Interval, timeout, retries, and start period.
 
 If no health check is configured, Appaloft can fall back to weaker runtime checks, but UI and docs should make that clear.
+
+Resetting the health profile removes the reusable health policy for future deployments and current health observation. It keeps runtime commands, network settings, deployment history, and the current runtime unchanged.
 
 <h2 id="resource-network-profile">Network profile</h2>
 
@@ -79,6 +82,10 @@ appaloft resource configure-health res_web \
   --timeout 5 \
   --retries 10 \
   --start-period 15
+```
+
+```bash title="Reset health policy"
+appaloft resource reset-health res_web
 ```
 
 ```bash title="Configure network profile"

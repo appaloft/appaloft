@@ -18,6 +18,8 @@ relatedOperations:
   - source-events.ingest
   - source-events.list
   - source-events.show
+  - source-events.replay
+  - source-events.prune
 sidebar:
   label: "Sources"
   order: 2
@@ -152,5 +154,19 @@ raw payload。
 dispatch 失败，先查看 source event detail，再根据情况修复 source profile、secret reference、策略状态或
 运行时阻塞。
 
+修复后可以用 `appaloft source-event replay <sourceEventId> --resource <resourceId>` 或
+`POST /api/source-events/{sourceEventId}/replay` 重放已保留的 safe delivery facts。Replay
+会重新按当前 Resource policy 匹配并走普通 `deployments.create` admission；它不会读取 raw
+webhook payload、signature、provider token 或 webhook secret。
+
 如果部署已被创建，后续恢复应使用普通 deployment recovery/readiness、retry、redeploy 或 rollback
 语义，而不是重放 webhook payload。
+
+<h2 id="source-auto-deploy-retention">Source event 保留</h2>
+
+使用 `appaloft source-event prune --before <iso>` 或 `POST /api/source-events/prune` 先检查已保留的
+source event delivery。Prune 默认 dry-run，并返回按 status 和 source kind 分组的匹配数量。只有在确认
+scope 和 cutoff 后，才传入 `--dry-run false` 执行清理。
+
+Retention cleanup 只删除已持久化的安全 source event 诊断记录。它不会删除 Resource、deployment、
+webhook secret、provider token、raw payload，也不会影响 cutoff 和 filter 之外事件的 replay 能力。

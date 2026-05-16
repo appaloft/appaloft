@@ -10,7 +10,11 @@ The active project lifecycle operations are:
 
 - `projects.show`
 - `projects.rename`
+- `projects.set-description`
 - `projects.archive`
+- `projects.restore`
+- `projects.delete-check`
+- `projects.delete`
 
 Generic `projects.update` remains forbidden by ADR-026.
 
@@ -30,11 +34,9 @@ Project lifecycle status is value-object backed.
 
 | Status | Meaning | Allowed public mutations |
 | --- | --- | --- |
-| `active` | Project can be used for project-scoped child creation and deployment admission. | `projects.rename`, `projects.archive`, child operations where their own specs allow. |
-| `archived` | Project identity and history are retained, but new project-scoped mutations are blocked. | Read queries only, plus future explicit restore/delete if specified. |
-
-Project hard delete, restore, and description editing are future behaviors and require separate
-specs.
+| `active` | Project can be used for project-scoped child creation and deployment admission. | `projects.rename`, `projects.set-description`, `projects.archive`, `projects.restore` idempotently, child operations where their own specs allow. |
+| `archived` | Project identity and history are retained, but new project-scoped mutations are blocked. | Read queries, `projects.restore`, `projects.delete-check`, and guarded `projects.delete` only when no retained blockers exist. |
+| `deleted` | Project is tombstoned and omitted from normal project read paths. | Idempotent write-side retry of `projects.delete` only when the tombstone is resolvable. |
 
 ## Workflow Rules
 
@@ -43,9 +45,24 @@ specs.
 `projects.rename` changes only project display name and derived slug. It must reject archived
 projects and slug conflicts.
 
+`projects.set-description` changes only project description metadata. Empty or omitted description
+clears the description. It must reject archived projects and must not change name, slug, lifecycle,
+child resources, environments, deployments, source links, domains, certificates, logs, audit
+retention, or runtime state.
+
 `projects.archive` transitions an active project to archived. It is idempotent for already archived
 projects. It must not cascade archive or delete child resources, environments, deployments, domain
 bindings, certificates, logs, source links, or audit state.
+
+`projects.restore` transitions an archived project back to active. It is idempotent for already
+active projects. It clears archive metadata and reopens future project-scoped admission through the
+normal child-operation guards. It must not create resources or environments, create deployments,
+retry deployments, mutate historical deployment snapshots, restore deleted child objects, or affect
+runtime state.
+
+`projects.delete-check` previews whether an archived project can be deleted without hiding retained
+child or support history. `projects.delete` soft-deletes only archived projects with no delete-check
+blockers and matching typed confirmation. It does not cascade cleanup.
 
 Project detail/settings surfaces may compose resource, environment, deployment, and access-route
 rollups from their own read models. Those rollups are read-only context. Project lifecycle commands
@@ -65,19 +82,17 @@ context.
 
 | Surface | Decision |
 | --- | --- |
-| CLI | Expose `project show`, `project rename`, and `project archive`; do not expose `project update`. |
-| HTTP/oRPC | Expose show, rename, and archive routes that reuse operation schemas. |
-| Web | Project detail/settings reads identity through `projects.show`, submits rename/archive through the named operations after confirmation where destructive, shows read-only resource/environment/deployment/access rollups, and labels project lifecycle changes as non-deployment, non-snapshot, non-runtime mutations. Project deploy actions still route through Resource or Quick Deploy. |
+| CLI | Expose `project show`, `project rename`, `project set-description`, `project archive`, `project restore`, `project delete-check`, and `project delete`; do not expose `project update`. |
+| HTTP/oRPC | Expose show, rename, set-description, archive, restore, delete-check, and delete routes that reuse operation schemas. |
+| Web | Project detail/settings reads identity through `projects.show`, submits rename/set-description/archive/restore through the named operations, reads `projects.delete-check`, and enables destructive delete only for archived/eligible projects with typed confirmation. |
 | Repository config | Not applicable. Repository config must not select project identity. |
-| Future MCP/tools | Generate tools from operation catalog entries for the three operations. |
-| Public docs | Stable project-management anchors describe show, rename, archive, and archived project behavior. |
+| Future MCP/tools | Generate tools from operation catalog entries for the named project lifecycle operations. |
+| Public docs | Stable project-management anchors describe show, rename, archive, restore, delete-check, and guarded delete behavior. |
 
 ## Current Implementation Notes And Migration Gaps
 
-Project description editing is deferred. If product needs it, add `projects.set-description` rather
-than `projects.update`.
-
-Project hard delete and restore are deferred.
+Normal read paths omit deleted project tombstones. Audit-only deleted project inspection remains a
+future read surface.
 
 ## Open Questions
 

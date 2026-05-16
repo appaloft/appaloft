@@ -183,9 +183,9 @@ Operator-facing surfaces should expose this without making deployment admission 
 - `servers.capacity.prune` is the first public target capacity prune command. It is dry-run-first,
   deployment-target scoped, cutoff-based, and limited to stopped Appaloft-managed containers plus
   preview/source workspace candidates whose ownership and rollback-safety evidence can be proven.
-  It excludes Docker volumes, Appaloft state roots, remote state, backups, migration journals,
-  audit/events, deployment snapshots, logs, routes, resource/server state, dependency data, and
-  storage volumes. Build-cache and unused-image deletion remain future governed extensions.
+  Docker build-cache, unused-image, and remote-state marker cleanup are explicit opt-in categories.
+  It excludes Docker volumes, Appaloft state roots, live remote `ssh-pglite` state, audit/events,
+  deployment snapshots, logs, routes, resource/server state, dependency data, and storage volumes.
 - `resources.diagnostic-summary` should include capacity context when a deployment or cleanup
   failure links to target capacity;
 - `resources.health` may degrade or report unknown when capacity blocks runtime observation;
