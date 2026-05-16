@@ -3341,7 +3341,7 @@ describe("console e2e with Bun.WebView", () => {
 
     await expectAnyText(view, ["Scheduled maintenance workers", "定时维护 workers"]);
     await expectAnyText(view, ["This panel does not start workers", "这个面板不会启动 worker"]);
-    await expectAnyText(view, ["1/7 enabled", "1/7 已启用"]);
+    await expectAnyText(view, ["1/7 enabled", "1/7 ENABLED", "1/7 已启用"]);
     await expectAnyText(view, ["Scheduled task runner", "Scheduled task runner"]);
     await expectAnyText(view, ["Scheduled runtime prune runner", "Scheduled runtime prune runner"]);
     await expectAnyText(view, ["Runtime monitoring collector", "Runtime monitoring collector"]);
@@ -3858,7 +3858,7 @@ describe("console e2e with Bun.WebView", () => {
         resourceId: "res_demo",
         deploymentId: "dep_demo",
       });
-      await expectAnyText(view, ["Copied", "已复制"]);
+      await expectAnyText(view, ["Copied", "Diagnostic JSON copied", "已复制", "诊断 JSON 已复制"]);
     } finally {
       if (previousDiagnosticRoute === undefined) {
         delete apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"];
@@ -5762,7 +5762,7 @@ describe("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["Runtime monitor", "运行时监控"]);
     await expectAnyText(view, ["Rollup window", "Rollup 窗口"]);
     await expectText(view, "Deployment dep_demo succeeded");
-    await expectAnyText(view, ["Top contributors", "主要贡献来源"]);
+    await expectAnyText(view, ["Top contributors", "TOP CONTRIBUTORS", "主要贡献来源"]);
     await expectAnyText(view, ["Threshold state", "Threshold 状态"]);
     await expectAnyText(view, ["Warning", "警告"]);
     await expectAnyText(view, ["Logs", "日志"]);
@@ -5785,7 +5785,7 @@ describe("console e2e with Bun.WebView", () => {
     await expectText(view, "edge");
     await expectAnyText(view, ["Runtime monitor", "运行时监控"]);
     await expectText(view, "Deployment dep_demo succeeded");
-    await expectAnyText(view, ["Top contributors", "主要贡献来源"]);
+    await expectAnyText(view, ["Top contributors", "TOP CONTRIBUTORS", "主要贡献来源"]);
 
     await view.navigate(`${previewUrl}/projects/prj_demo`);
     await expectText(view, "Demo");
@@ -6058,8 +6058,8 @@ describe("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/servers/srv_demo?tab=danger`);
 
-      await expectAnyText(view, ["Delete safety", "删除安全检查"]);
-      await expectAnyText(view, ["Eligible", "可删除"]);
+      await expectAnyText(view, ["Delete safety", "DELETE SAFETY", "删除安全检查"]);
+      await expectAnyText(view, ["Eligible", "ELIGIBLE", "可删除"]);
       await clickButtonByAnyText(view, ["Delete server", "删除服务器"]);
       await setInputValue(view, "#server-delete-confirmation-input", "srv_demo");
       await clickFormSubmit(view, "#server-delete-form");

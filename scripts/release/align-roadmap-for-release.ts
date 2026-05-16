@@ -15,6 +15,7 @@ interface Semver {
   major: number;
   minor: number;
   patch: number;
+  prerelease?: string;
 }
 
 interface PhaseSection {
@@ -29,9 +30,11 @@ const rootPackagePath = resolve("package.json");
 const releasePleaseManifestPath = resolve(".github/.release-please-manifest.json");
 
 function parseSemver(version: string): Semver {
-  const match = /^(\d+)\.(\d+)\.(\d+)$/u.exec(normalizeReleaseVersion(version));
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-(?<prerelease>[0-9A-Za-z.-]+))?$/u.exec(
+    normalizeReleaseVersion(version),
+  );
   if (!match) {
-    throw new Error(`Expected a stable SemVer version, received "${version}".`);
+    throw new Error(`Expected a SemVer version, received "${version}".`);
   }
 
   const [, major = "", minor = "", patch = ""] = match;
@@ -39,6 +42,7 @@ function parseSemver(version: string): Semver {
     major: Number.parseInt(major, 10),
     minor: Number.parseInt(minor, 10),
     patch: Number.parseInt(patch, 10),
+    ...(match.groups?.prerelease ? { prerelease: match.groups.prerelease } : {}),
   };
 }
 
@@ -51,6 +55,16 @@ function compareSemver(left: string, right: string): number {
     if (delta !== 0) {
       return delta;
     }
+  }
+
+  if (parsedLeft.prerelease && !parsedRight.prerelease) {
+    return -1;
+  }
+  if (!parsedLeft.prerelease && parsedRight.prerelease) {
+    return 1;
+  }
+  if (parsedLeft.prerelease && parsedRight.prerelease) {
+    return parsedLeft.prerelease.localeCompare(parsedRight.prerelease);
   }
 
   return 0;
