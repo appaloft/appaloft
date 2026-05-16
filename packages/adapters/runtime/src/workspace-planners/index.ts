@@ -4,6 +4,14 @@ import { javaWorkspacePlanner } from "./java";
 import { remixWorkspacePlanner } from "./javascript/remix";
 import { nextjsWorkspacePlanner } from "./nextjs";
 import { nodeWorkspacePlanner } from "./node";
+import {
+  dotnetWorkspacePlanner,
+  elixirWorkspacePlanner,
+  goWorkspacePlanner,
+  phpWorkspacePlanner,
+  rubyWorkspacePlanner,
+  rustWorkspacePlanner,
+} from "./polyglot";
 import { pythonWorkspacePlanner } from "./python";
 import {
   djangoWorkspacePlanner,
@@ -48,6 +56,12 @@ const workspaceRuntimePlanners: WorkspaceRuntimePlanner[] = [
   genericWsgiWorkspacePlanner,
   pythonWorkspacePlanner,
   javaWorkspacePlanner,
+  rubyWorkspacePlanner,
+  phpWorkspacePlanner,
+  goWorkspacePlanner,
+  dotnetWorkspacePlanner,
+  rustWorkspacePlanner,
+  elixirWorkspacePlanner,
   customWorkspacePlanner,
 ];
 

@@ -1,0 +1,7 @@
+{
+  "name": "appaloft/symfony-composer",
+  "require": {
+    "symfony/framework-bundle": "7.2.3",
+    "symfony/runtime": "7.2.3"
+  }
+}
