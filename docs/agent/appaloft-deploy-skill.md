@@ -32,24 +32,10 @@ Install the full Appaloft skill for Codex-compatible skill hosts:
 npx skills add appaloft/appaloft
 ```
 
-Direct package fallback for specialized hosts that only want the deploy subprotocol:
-
-```bash
-npx @appaloft/skills install appaloft/deploy
-```
-
-By default this installs to `${CODEX_HOME:-~/.codex}/skills/appaloft-deploy`. For repository-local
-or custom skill hosts, install into a directory:
-
-```bash
-npx @appaloft/skills install appaloft/deploy --target directory --path ./.agents/skills
-```
-
-Use `--force` to replace an existing installed copy and `--dry-run` to preview the destination.
-
-The install command only copies the skill package into a skill host. It does not deploy an app,
-create resources, call Appaloft deployment APIs, or wrap `appaloft deploy`. Deployment starts later,
-when the installed skill is loaded by an agent and the user asks that agent to deploy something.
+The install command only copies the full Appaloft skill into a skill host. It does not deploy an
+app, create resources, call Appaloft deployment APIs, or wrap `appaloft deploy`. Deployment starts
+later, when the installed skill is loaded by an agent and the user asks that agent to deploy
+something. The deploy protocol is part of the full Appaloft skill, not a separate npm installer.
 
 ## Guardrails
 

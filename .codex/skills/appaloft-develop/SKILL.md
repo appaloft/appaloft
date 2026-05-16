@@ -60,9 +60,7 @@ Read Appaloft governing sources in this order before non-trivial behavior work:
    - `docs/agent/appaloft-skill.md`
    - `skills/appaloft/SKILL.md`
    - `skills/appaloft/references/**`
-   - `packages/skills/skills/appaloft/**` as the npm fallback mirror
-   - `docs/agent/appaloft-deploy-skill.md`, `skills/appaloft-deploy/**`, and
-     `packages/skills/skills/appaloft-deploy/**` when deployment behavior changes
+   - `docs/agent/appaloft-deploy-skill.md` when deployment behavior changes
 
 Use `docs/ai/**` only as background analysis. It must not override accepted ADRs, the business operation map, global contracts, local specs, public documentation specs, or implementation plans.
 
@@ -236,22 +234,18 @@ behavior, or future MCP/tool descriptions.
 
 For Appaloft:
 
-- update `skills/appaloft/SKILL.md` and the mirrored
-  `packages/skills/skills/appaloft/SKILL.md` when the agent-facing workflow, safety rule,
-  operation area, or outcome shape changes;
-- update `skills/appaloft/references/cli-entrypoints.md` and the mirrored
-  `packages/skills/skills/appaloft/references/cli-entrypoints.md` whenever
+- update `skills/appaloft/SKILL.md` when the agent-facing workflow, safety rule, operation area, or
+  outcome shape changes;
+- update `skills/appaloft/references/cli-entrypoints.md` whenever
   `packages/application/src/operation-catalog.ts` adds, removes, or changes a CLI transport;
-- update `skills/appaloft/references/deploy-protocol.md`, the mirrored
-  `packages/skills/skills/appaloft/references/deploy-protocol.md`,
-  `docs/agent/appaloft-deploy-skill.md`, `skills/appaloft-deploy/**`, and
-  `packages/skills/skills/appaloft-deploy/**` when deployment, preview cleanup, plan, observe,
-  retry, redeploy, rollback, static/local source, BYOS, or access outcome behavior changes;
+- update `skills/appaloft/references/deploy-protocol.md` and
+  `docs/agent/appaloft-deploy-skill.md` when deployment, preview cleanup, plan, observe, retry,
+  redeploy, rollback, static/local source, BYOS, or access outcome behavior changes;
 - update `docs/agent/appaloft-skill.md`, public docs anchors, and docs registry/traceability when
   the install path, scope, help topic, or AI-facing semantics change;
-- keep `npx skills add appaloft/appaloft` as the canonical skill-manager install path and
-  `npx @appaloft/skills install appaloft/appaloft` as the direct package fallback unless a
-  governing spec changes that contract;
+- keep `npx skills add appaloft/appaloft` as the only canonical skill install path unless a
+  governing spec changes that contract; do not add an Appaloft-owned npm skill installer because it
+  blurs the boundary with the Appaloft CLI;
 - add or update tests that prove full skill coverage stays synchronized with the operation catalog,
   especially every `transports.cli` entry.
 

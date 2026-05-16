@@ -24,20 +24,10 @@ Install the full AI-facing Appaloft entrypoint:
 npx skills add appaloft/appaloft
 ```
 
-Direct package fallback:
-
-```bash
-npx @appaloft/skills install appaloft/appaloft
-```
-
 This only copies skill files into the target skill host. It does not deploy, create resources, call
 Appaloft APIs, or wrap the Appaloft CLI.
-
-The deploy-only skill stays available as a direct package fallback for specialized hosts:
-
-```bash
-npx @appaloft/skills install appaloft/deploy
-```
+Appaloft does not provide a separate npm skill installer; `npx skills add appaloft/appaloft` is the
+single skill-manager entrypoint.
 
 ## Entry Surface
 
@@ -81,5 +71,3 @@ The installable `appaloft` skill must include:
 - Complete CLI operation reference: `skills/appaloft/references/cli-entrypoints.md`.
 - Deploy subprotocol: `skills/appaloft/references/deploy-protocol.md`.
 - Narrow deploy skill source: `skills/appaloft-deploy`.
-- npm fallback mirrors: `packages/skills/skills/appaloft` and
-  `packages/skills/skills/appaloft-deploy`.
