@@ -20,14 +20,12 @@
 - [x] Add docs registry coverage for the skill anchor.
 - [x] Add text/contract checks that the skill contains no raw secret examples.
 - [x] Add checks that the skill references existing operation keys or CLI/API entrypoints only.
-- [x] Add generated artifact tests if `llms.txt`, package export, or skill bundle generation is
-  implemented; no generated artifact was selected for this v1 slice, so registry/text tests cover
-  the chosen docs artifact.
+- [x] Add installable package tests for `@appaloft/agent-skill`.
 
 ## Code Round
 
 - [x] Add CLI help pointer if the deploy help should reference the skill.
-- [x] Add generated/copyable skill packaging if selected.
+- [x] Add npm-installable skill packaging for `npx @appaloft/agent-skill install deploy`.
 - [x] Keep MCP integration optional and separate from the v1 skill path.
 
 ## Verification
@@ -35,4 +33,4 @@
 - [x] Run focused public docs tests.
 - [x] Run docs registry tests.
 - [x] Run CLI help tests if CLI help changes.
-- [x] Run generated artifact tests if generation changes.
+- [x] Run generated package/installer tests.

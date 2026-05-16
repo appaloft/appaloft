@@ -33,8 +33,8 @@
   - Generated descriptors or tool docs should provide an agent-safe sequence over existing
     operation keys.
 - Agent skill:
-  - The v1 Agent Deploy Skill should package the URL-first flow into copyable/installable
-    instructions before the MCP product surface is required.
+  - The v1 Agent Deploy Skill packages the URL-first flow into an installable skill before the MCP
+    product surface is required.
 
 ## Operation Catalog Impact
 

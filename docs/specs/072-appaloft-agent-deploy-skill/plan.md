@@ -32,9 +32,10 @@ The skill may mention future MCP tools, but it must not depend on them for v1.
 
 The Code/Docs Round has chosen the v1 distribution location:
 
-- `docs/agent/appaloft-deploy-skill.md` is the repository-local canonical skill source;
+- `docs/agent/appaloft-deploy-skill.md` is the canonical governing source;
+- `packages/agent-skill/skills/appaloft-deploy` is the installable skill folder;
+- `@appaloft/agent-skill` exposes `npx @appaloft/agent-skill install deploy`;
 - `.well-known` or public docs page export for copyable agent instructions;
-- a package or curated skill distribution if the target agent ecosystem supports it;
 - generated `llms.txt` or equivalent summary derived from the same source.
 
 Other generated exports remain optional follow-ups derived from the canonical source.
@@ -60,10 +61,9 @@ Other generated exports remain optional follow-ups derived from the canonical so
 1. Public docs page or repository skill artifact with the deploy protocol.
 2. Docs registry/topic link and public docs traceability row.
 3. CLI help pointer to the skill docs if appropriate.
-4. Generated/copyable skill packaging.
+4. npm-installable skill packaging.
 5. Optional MCP/tool descriptor cross-links after the MCP surface is productized.
 
 ## Open Questions
 
-- Which agent ecosystems need packaged install instructions after v1.
 - Whether v1 should publish an `llms.txt` summary for Appaloft deploy agents.

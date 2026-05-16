@@ -24,7 +24,7 @@ remains the formal tool transport; the skill is the first agent-facing product a
 
 | Term | Meaning | Boundary |
 | --- | --- | --- |
-| Agent Deploy Skill | Agent-readable instructions, examples, checks, and recovery rules for deploying with Appaloft. | Public docs / distributable skill artifact |
+| Agent Deploy Skill | Agent-readable instructions, examples, checks, and recovery rules for deploying with Appaloft. | Public docs / `@appaloft/agent-skill` package |
 | Agent Deploy Protocol | Ordered deploy workflow an agent follows before calling CLI/API operations. | Quick Deploy / first deploy |
 | Safe Source Inspection | Read-only project inspection that avoids uploading secrets, dependency caches, local state, and credentials. | Agent workflow |
 | Outcome Packet | Final response shape containing URL/access state, resource/deployment ids, logs, diagnostics, and recovery hints. | CLI/Web/docs/tool guidance |
@@ -71,8 +71,8 @@ The v1 skill must include:
 ## Public Surfaces
 
 - Public docs: a stable "Agent deploy skill" anchor before v1.
-- Repository artifact: a distributable skill file or package location decided during Code/Docs
-  Round.
+- Repository artifact: `packages/agent-skill/skills/appaloft-deploy`.
+- npm install path: `npx @appaloft/agent-skill install deploy`.
 - CLI help: short pointer from first-deploy or deploy help to the skill docs when agent deployment
   is documented.
 - MCP/tools: optional follow-up; not required for v1.

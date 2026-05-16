@@ -107,6 +107,8 @@ Goal: ship a v1-ready agent deploy skill before requiring MCP.
 Planning rules:
 
 - The skill explains how coding agents deploy through existing CLI/API behavior.
+- It ships as `@appaloft/agent-skill` with `npx @appaloft/agent-skill install deploy` for
+  Codex-compatible skill hosts and directory-based installs.
 - It must point to stable public docs anchors and reuse operation-catalog language without exposing
   internal DDD/CQRS terminology.
 - It must include safe source inspection, secret/cache exclusion, local static output handling,
