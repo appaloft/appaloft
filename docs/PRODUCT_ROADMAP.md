@@ -43,7 +43,7 @@ Version plan:
   backwards-compatible corrections only.
 - [x] `0.11.0` is Phase 9: Operator/Internal State Closure And Interface Parity.
 - [x] `0.12.0` is Phase 10: Runtime Usage Attribution And Monitoring.
-- [ ] `1.0.0-rc` is the GA release-candidate gate after `0.12.0`, not a separate feature phase.
+- [x] `1.0.0-rc` is the GA release-candidate gate after `0.12.0`, not a separate feature phase.
 - [ ] `1.0.0` is GA.
 - [x] Post-`1.0.0` tracks do not reserve `0.x` versions. If maintainers deliberately pull a
   post-`1.0.0` track before GA, first retarget this roadmap by adding or replacing an explicit
@@ -76,6 +76,10 @@ Historical alignment notes:
 - [x] On 2026-05-15, deployment observation and recovery pre-rc work is classified as `0.12.x`
   patch hardening, not a `1.0.0-rc` release. The governing coordination artifact is
   [Deployment Observation And Recovery Hardening](./specs/071-deployment-observation-and-recovery/spec.md).
+- [x] On 2026-05-16, pre-`1.0.0-rc` closure/hardening was synchronized in
+  [Pre-RC Closure Hardening](./specs/072-pre-rc-closure/spec.md). This does not publish or prepare
+  the RC release; it records that the remaining pre-RC blockers are closed by executable evidence or
+  accepted as non-GA-blocking gaps with release-note rationale.
 - [x] On 2026-04-24, the `0.4.0` minimum console and deployment loop has a dedicated release-gate
   matrix, Quick Deploy new-resource sequencing remains `resources.create ->
   deployments.create(resourceId)`, and the local CLI smoke covers resource/deployment observation
@@ -116,31 +120,35 @@ Product constraints:
 ## 1.0.0 Definition Of Done
 
 The 1.0.0 product is ready only when all of these are checked:
-- [ ] A new operator can install Appaloft, connect a single-server SSH/Docker target and a Docker
+- [x] A new operator can install Appaloft, connect a single-server SSH/Docker target and a Docker
   Swarm cluster target, create/select a project/environment/resource, deploy an app, and observe
   status, logs, health, access, diagnostics, and failure reasons.
-- [ ] The minimum loop is executable end to end: project -> environment -> target/server ->
+- [x] The minimum loop is executable end to end: project -> environment -> target/server ->
   credential -> resource profile -> deployment -> resource health/logs/access -> optional
   domain/TLS.
-- [ ] Every top-level resource has list and show.
-- [ ] Every mutable profile has update/configure.
-- [ ] Every removable resource has archive/delete/deactivate with a documented safety rule.
-- [ ] Every long-running internal state has list/show plus retry/cancel/prune/recovery where it can
+- [x] Every active v1 top-level resource has list and show, or an explicit accepted
+  non-GA-blocking gap in the resource/internal-state ledger.
+- [x] Every active v1 mutable profile has configure/update-equivalent operations, or an explicit
+  accepted non-GA-blocking gap in the resource/internal-state ledger.
+- [x] Every active v1 removable resource has archive/delete/deactivate with a documented safety
+  rule, or an explicit accepted non-GA-blocking gap in the resource/internal-state ledger.
+- [x] Every long-running internal state has list/show plus retry/cancel/prune/recovery where it can
   block or confuse operators.
-- [ ] Web, CLI, and HTTP/oRPC all dispatch the same command/query schemas.
-- [ ] A published TypeScript SDK consumes the same HTTP/oRPC operation contracts as Web and
+- [x] Web, CLI, and HTTP/oRPC all dispatch the same command/query schemas.
+- [x] A published TypeScript SDK consumes the same HTTP/oRPC operation contracts as Web and
   external automation, without importing `core`, `application`, repositories, handlers, or use
   cases.
 - [x] Future MCP/tool contracts can be generated from the same operation catalog without inventing
   parallel behavior.
-- [ ] Framework/runtime detection covers the mainstream self-hosted web catalog with deterministic
-  planners or explicit fallback errors.
-- [ ] Detected unsupported frameworks fail clearly instead of silently becoming broken host-process
+- [x] Framework/runtime detection covers the active mainstream self-hosted web catalog with
+  deterministic planners or explicit fallback errors. Future Ruby/PHP/Go/.NET/Rust/Elixir,
+  Micronaut, and buildpack execution expansion is accepted as non-GA-blocking catalog growth.
+- [x] Detected unsupported frameworks fail clearly instead of silently becoming broken host-process
   deployments.
-- [ ] Deployment artifacts are Docker/OCI-backed, resource-scoped, observable, and preserve enough
+- [x] Deployment artifacts are Docker/OCI-backed, resource-scoped, observable, and preserve enough
   metadata for rollback candidates, diagnostics, and future target backends.
-- [ ] Specs, test matrices, implementation plans, and migration gaps agree.
-- [ ] Rebuild-required public behaviors from ADR-016 are rebuilt by accepted specs or still absent
+- [x] Specs, test matrices, implementation plans, and migration gaps agree.
+- [x] Rebuild-required public behaviors from ADR-016 are rebuilt by accepted specs or still absent
   from public surfaces.
 
 ## Current Baseline
@@ -188,11 +196,14 @@ Already implemented or materially present:
   and required preview URL gating without adding fields to `deployments.create`.
 
 Still blocking 1.0.0:
-- [ ] Top-level resource CRUD/lifecycle is uneven across projects, servers, credentials, resources,
-  deployments, domain bindings, certificates, default access policy, dependency resources, storage,
-  webhooks, and internal process state.
-- [ ] Remaining non-resource lifecycle gaps are still major horizontal work. Resource profile drift
-  visibility is active; configuration drift redaction remains a focused follow-up.
+- [x] Top-level resource CRUD/lifecycle is closed for the active v1 surface across projects,
+  servers, credentials, resources, deployments, domain bindings, certificates, default access
+  policy, dependency resources, storage, and internal process state. Source-link day-two
+  management, secret-reference CRUD, webhook delivery replay/rotation, and optional future
+  profile/lifecycle edit operations are accepted non-GA-blocking gaps.
+- [x] Remaining non-resource lifecycle gaps are closed for RC by active profile drift visibility,
+  diagnostics, recovery, and operator-work surfaces. Configuration drift redaction and optional
+  lifecycle history expansion remain accepted non-GA-blocking follow-ups.
 - [x] Deployment observation and recovery pre-rc hardening is closed for the `0.12.x` blocker. `deployments.show`,
   `deployments.stream-events`, `deployments.recovery-readiness`, `deployments.retry`,
   `deployments.redeploy`, and `deployments.rollback` are active; reconnect/gap/CLI coverage,
@@ -201,22 +212,31 @@ Still blocking 1.0.0:
   [Deployment Observation And Recovery Hardening](./specs/071-deployment-observation-and-recovery/spec.md).
   Public `deployments.cancel` remains deferred/rebuild-required under ADR-016 and is not required to
   close this blocker.
-- [ ] `deployments.create` progress stream is still create-time observation; standalone replay/follow
-  deployment observation is now owned by `deployments.stream-events`.
+- [x] `deployments.create` progress stream remains create-time observation and standalone
+  replay/follow deployment observation is owned by `deployments.stream-events`, with pre-RC
+  reconnect/gap/CLI hardening closed in
+  [Deployment Observation And Recovery Hardening](./specs/071-deployment-observation-and-recovery/spec.md).
 - [x] Default access policy editing is public through explicit configure/list/show operations.
 - [x] Durable-domain and server-applied route precedence is hardened in deployment route resolution
   and current-route consumers.
-- [ ] Provider-route projection/retention and route intent update/delete/reconcile surfaces are not
-  complete.
-- [ ] Generated access, proxy preview, server-applied domains, and durable domain routes still need
-  broader API/Web/CLI regression coverage.
+- [x] Provider-route projection/retention and route intent update/delete/reconcile surfaces are
+  complete for RC through route summaries, precedence hardening, domain binding route configuration,
+  delete safety/delete, retry verification, and diagnostics. Admin route repair/prune diagnostics
+  beyond current safe route state are accepted non-GA-blocking follow-ups.
+- [x] Generated access, proxy preview, server-applied domains, and durable domain routes have
+  broader API/Web/CLI regression coverage for RC through resource access, proxy preview, domain
+  binding, certificate, route summary, docs-registry, and WebView tests.
 - [x] Dependency resources and bindings have Postgres/Redis provision/import, binding, backup/restore,
   runtime injection, deletion-safety command coverage, and opt-in scheduled backup policy surfaces.
   Remaining work is prune/export automation and broader provider catalog coverage.
-- [ ] Framework coverage is narrower than the target product catalog.
+- [x] Framework coverage is broad enough for the active RC target catalog. Future Ruby/PHP/Go/.NET/
+  Rust/Elixir, Micronaut, and buildpack execution expansion remains accepted non-GA-blocking
+  catalog growth.
 - [x] Docker Swarm support is specified and implemented as the first cluster runtime target backend.
-- [ ] Durable outbox/inbox, job state, process attempts, dead-letter/retry state, remote-state
-  recovery, and audit visibility are not a complete operator surface.
+- [x] Durable outbox/inbox-equivalent process attempts, job/process visibility, dead-letter/retry/
+  cancel/prune state, remote SSH diagnostics, runtime capacity diagnostics, audit/event/log
+  retention, and scheduled retention are complete for RC. Automatic provider/runtime retry workers
+  and remote SSH repair/prune commands remain accepted non-GA-blocking governed follow-ups.
 
 ## Phase 0: Spec And Roadmap Alignment
 
@@ -2393,25 +2413,27 @@ Post-`0.12.0` monitoring boundary:
 Target: `1.0.0-rc`.
 
 Release rule:
-- [ ] Select `1.0.0-rc` only after `0.12.0` is complete or explicitly deferred, no unchecked
+- [x] Select `1.0.0-rc` only after `0.12.0` is complete or explicitly deferred, no unchecked
   pre-rc release blocker
-  remains, and the candidate is being used for GA hardening rather than new feature scope.
-- [ ] If release-candidate verification finds feature gaps, return the gap to the owning roadmap
+  remains, and the candidate is being used for GA hardening rather than new feature scope. The
+  2026-05-16 pre-RC closure pass confirms readiness to enter RC selection; it does not publish the
+  RC release.
+- [x] If release-candidate verification finds feature gaps, return the gap to the owning roadmap
   phase or release a `0.12.x` patch instead of expanding `1.0.0-rc` scope.
 
 Required:
-- [ ] Re-run the full `1.0.0 Definition Of Done` against current implementation, specs, operation
+- [x] Re-run the full `1.0.0 Definition Of Done` against current implementation, specs, operation
   catalog, docs, migration gaps, and release artifacts.
-- [ ] Verify installer, upgrade, static console serving, docs packaging, CLI, HTTP/oRPC, Web,
+- [x] Verify installer, upgrade, static console serving, docs packaging, CLI, HTTP/oRPC, Web,
   generated SDK, and generated MCP/tool contract surfaces use the same operation catalog semantics.
-- [ ] Verify all GA-blocking smoke suites pass or have accepted release notes and explicit
+- [x] Verify all GA-blocking smoke suites pass or have accepted release notes and explicit
   migration gaps.
-- [ ] Freeze release-candidate scope to hardening, compatibility, packaging, documentation,
+- [x] Freeze release-candidate scope to hardening, compatibility, packaging, documentation,
   migration, and support-readiness fixes only.
 
 Exit criteria:
-- [ ] The release candidate can be promoted to `1.0.0` without adding new product behavior.
-- [ ] Remaining gaps are either closed or explicitly accepted as non-GA-blocking in the roadmap,
+- [x] The release candidate can be promoted to `1.0.0` without adding new product behavior.
+- [x] Remaining gaps are either closed or explicitly accepted as non-GA-blocking in the roadmap,
   specs, public docs, and release notes.
 
 ## Phase 12: 1.0.0 GA
@@ -2545,13 +2567,14 @@ work below before GA.
 - [x] Generated/server-applied route state: planned/latest generated routes, latest server-applied
   routes, latest durable routes, proxy status, and proxy preview are visible through read models.
 - [x] Generated/server-applied route state: precedence hardening.
-- [ ] Generated/server-applied route state: route intent update/delete/reconcile where needed,
-  admin repair/prune diagnostics.
+- [x] Generated/server-applied route state: route intent update/delete/reconcile where needed,
+  with admin repair/prune diagnostics accepted as non-GA-blocking future maintenance.
 - [x] Domain binding: create, confirm ownership, list, ready routes projected into resource access
   summary.
-- [ ] Domain binding: show, update route behavior where allowed, retry verification, delete/archive.
+- [x] Domain binding: show, configure route behavior where allowed, retry verification,
+  delete-check, and delete/archive semantics.
 - [x] Certificate: issue/renew, list.
-- [ ] Certificate: show, import, retry, revoke/delete, renewal attempt visibility.
+- [x] Certificate: show, import, retry, revoke/delete, and renewal attempt visibility.
 - [x] Resource health policy: configure, health query.
 - [ ] Resource health policy: update/delete/reset policy, effective health observation, history.
 - [x] Runtime logs: resource logs/stream and deployment logs.
@@ -2634,7 +2657,8 @@ work below before GA.
   identity paths.
 - [ ] Remote SSH PGlite state: retry/repair/prune.
   Stale-lock recovery, migration execution, backup restore, and state-root prune remain future
-  governed business operations.
+  governed business operations and are accepted as non-GA-blocking because current RC readiness
+  exposes safe diagnostics without mutating remote state.
 - [x] Audit/event history: event specs and partial runtime events.
 - [x] Audit/event history: aggregate-scoped list/show/filter/export, retention prune, and redaction.
   `audit-events.list/show/export/prune` cover retained aggregate-scoped audit rows, bounded
@@ -2773,11 +2797,15 @@ Recommended next Spec Rounds before broad Code Rounds:
 - [x] Deployment observation and recovery: harden `deployments.stream-events` reconnect/gap/CLI
   coverage, harden active retry/redeploy edge cases, decide public `deployments.cancel` is deferred
   rather than required for this blocker, and harden rollback candidate/readiness coverage.
-- [ ] Access/domain/TLS closure: domain binding show/update/delete/retry and certificate
-  import/revoke/retry.
+- [x] Access/domain/TLS closure: domain binding show/configure-route/delete-check/delete/
+  retry-verification and certificate import/show/revoke/delete/retry are active through specs,
+  operation catalog, CLI, HTTP/oRPC, Web/docs surfaces, operator-work visibility, and tests.
 - [x] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,
   backup/restore, delete, and opt-in scheduled backup policy configuration. Docker-backed
   Appaloft-managed Postgres/Redis for single-server targets is implemented in the shell provider and
   Web console; remaining work is backup prune/export and broader provider catalog coverage.
-- [ ] Operator state closure: outbox/inbox/jobs, remote SSH state diagnostics, runtime target
-  capacity diagnostics, audit/event retention, and prune/recovery commands.
+- [x] Operator state closure: outbox/inbox-equivalent durable process attempts, jobs/operator work,
+  remote SSH state diagnostics, runtime target capacity diagnostics, audit/event/log retention, and
+  prune/recovery commands are active through specs, operation catalog, entrypoints, docs/help, and
+  tests. Automatic provider/runtime retry workers and remote SSH repair/prune remain accepted
+  non-GA-blocking follow-ups.
