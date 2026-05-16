@@ -108,6 +108,52 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[AGENT-DEPLOY-SKILL-003] agent deploy skill resolves to public docs and governing source", () => {
+    const topic = publicDocsHelpTopics["agent.deploy-skill"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/agent/deploy-skill/#agent-deploy-skill",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/agent/deploy-skill/#agent-deploy-skill",
+    );
+    expect(topic.relatedOperation).toBe("deployments.create");
+    expect(topic.surfaces).toEqual(
+      expect.arrayContaining(["cli", "http-api", "repository-config", "mcp"]),
+    );
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/071-url-first-deployment-entry-experience/spec.md",
+        "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
+        "docs/agent/appaloft-deploy-skill.md",
+        "skills/appaloft/references/surfaces.md",
+        "skills/appaloft/references/deploy-protocol.md",
+      ]),
+    );
+  });
+
+  test("[APPALOFT-SKILL-001] full Appaloft skill resolves to public docs and packaged source", () => {
+    const topic = publicDocsHelpTopics["agent.appaloft-skill"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe("/docs/agent/appaloft-skill/#appaloft-skill");
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/agent/appaloft-skill/#appaloft-skill",
+    );
+    expect(topic.surfaces).toEqual(
+      expect.arrayContaining(["cli", "http-api", "web", "repository-config", "mcp"]),
+    );
+    expect(topic.aliases).toEqual(expect.arrayContaining(["npx skills add appaloft/appaloft"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/agent/appaloft-skill.md",
+        "skills/appaloft/SKILL.md",
+        "skills/appaloft/references/surfaces.md",
+        "skills/appaloft/references/cli-entrypoints.md",
+        "skills/appaloft/references/deploy-protocol.md",
+      ]),
+    );
+  });
+
   test("[PUB-DOCS-016] traceable topics point to spec files and product surfaces", () => {
     const defaultAccessTopic = publicDocsHelpTopics["default-access.policy"];
 

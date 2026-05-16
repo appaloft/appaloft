@@ -28,6 +28,15 @@ The smallest path is: create a project, choose an environment, register an SSH s
 - Use the Web console for interactive configuration and status review.
 - Use the CLI for local development, server-local operation, and GitHub Actions.
 - Use the HTTP API for integrations and control-plane automation.
+- AI agents should install the [Appaloft skill](/docs/en/agent/appaloft-skill/#appaloft-skill), then
+  follow the [Agent deploy skill](/docs/en/agent/deploy-skill/#agent-deploy-skill) subprotocol to
+  inspect the source safely and call existing CLI/API/Web entrypoints.
+
+<h2 id="agent-deploy-skill">AI agent deployment</h2>
+
+Agent deployment is not a new business operation. It translates "deploy this project" into the existing project, server, environment, resource, and deployment operations, then returns the access URL, deployment status, logs, diagnostics, and recovery commands first.
+
+For an already built static directory, an agent can use `appaloft deploy ./dist --as static-site`. This behaves like publishing a static output directory, while Appaloft still deploys to the user's selected BYOS target by default instead of silently uploading to a hosted cloud.
 
 <h2 id="start-success-check">Success check</h2>
 

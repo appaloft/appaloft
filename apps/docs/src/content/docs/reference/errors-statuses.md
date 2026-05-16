@@ -37,6 +37,12 @@ Appaloft 错误不能只给一段 message。公共入口应该保留稳定的 `c
 
 Web、CLI、HTTP/API 和未来 MCP 工具都应该按这些字段渲染错误，不能依赖 message 文本来判断错误类型。
 
+<h2 id="agent-readable-errors">Agent 可读错误</h2>
+
+AI agent 处理部署失败时，应优先读取稳定 `code`、`category`、`phase`、`retryable`、安全 details、docs link 和 remedies。Agent 不应该从自然语言 message 里猜测失败原因，也不应该要求用户直接修改数据库、远端 Docker 状态或 secret 文件。
+
+如果错误没有明确恢复动作，agent 应先运行安全诊断，例如 `appaloft resource diagnose <resourceId>`，再根据 recovery readiness 决定 retry、redeploy 或 rollback。
+
 <h2 id="operator-work-ledger">Operator work ledger</h2>
 
 当部署、代理引导、证书签发或远端状态维护这类后台工作没有按预期完成时，先查看工作台账，而不是猜测哪个恢复命令应该运行：

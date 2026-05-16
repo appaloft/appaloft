@@ -322,6 +322,65 @@ export const publicDocsHelpTopics = {
     relatedOperation: "deployments.create",
     aliases: ["source", "pathOrSource", "repository", "docker image", "static site", "来源"],
   },
+  "agent.deploy-skill": {
+    id: "agent.deploy-skill",
+    title: "Agent deploy skill",
+    description:
+      "How AI agents safely deploy Appaloft workloads without bypassing existing operations.",
+    page: {
+      "zh-CN": "agent/deploy-skill",
+      "en-US": "en/agent/deploy-skill",
+    },
+    anchor: "agent-deploy-skill",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "repository-config", "mcp"],
+    relatedOperation: "deployments.create",
+    aliases: ["agent deploy", "AI deploy", "deploy skill", "skill", "AI 部署", "部署 skill"],
+    specReferences: [
+      "docs/specs/071-url-first-deployment-entry-experience/spec.md",
+      "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
+      "docs/agent/appaloft-deploy-skill.md",
+      "skills/appaloft/references/surfaces.md",
+      "skills/appaloft/references/deploy-protocol.md",
+    ],
+    webSurfaces: ["apps/web Quick Deploy source-first entry and completion outcome links"],
+  },
+  "agent.appaloft-skill": {
+    id: "agent.appaloft-skill",
+    title: "Appaloft skill",
+    description:
+      "How AI agents use the full Appaloft operation catalog as a first-class AI-facing entrypoint.",
+    page: {
+      "zh-CN": "agent/appaloft-skill",
+      "en-US": "en/agent/appaloft-skill",
+    },
+    anchor: "appaloft-skill",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "web", "repository-config", "mcp"],
+    aliases: [
+      "appaloft skill",
+      "AI entrypoint",
+      "full skill",
+      "npx skills add appaloft/appaloft",
+      "完整 skill",
+      "AI 入口",
+    ],
+    specReferences: [
+      "docs/agent/appaloft-skill.md",
+      "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
+      "skills/appaloft/SKILL.md",
+      "skills/appaloft/references/surfaces.md",
+      "skills/appaloft/references/cli-entrypoints.md",
+      "skills/appaloft/references/deploy-protocol.md",
+    ],
+    webSurfaces: ["apps/docs/src/content/docs/agent/appaloft-skill.md"],
+  },
   "source.auto-deploy-setup": {
     id: "source.auto-deploy-setup",
     title: "Source auto-deploy setup",

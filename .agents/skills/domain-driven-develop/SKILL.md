@@ -1,6 +1,8 @@
 ---
 name: domain-driven-develop
 description: Domain Driven Develop workflow for initializing, discovering, specifying, testing, implementing, synchronizing, reporting, and reviewing domain-driven software. Use when Codex needs to initialize a product from a business idea, create project source-of-truth docs and a local profile skill, add or change business behavior, run event-storming-style discovery, create spec.md/plan.md/tasks.md feature artifacts, check ADRs/decision records, design or review domain models, align code with domain docs, apply DDD tactical patterns, design domain or integration events, decide whether CQRS is warranted, separate command/query flows, shape read models and projections, align test matrices with stable ids and implementation tests, maintain round checklists and final reports, align roadmap/version/SemVer gates, place logic across domain/application/adapters, design repositories and specifications, or enforce dependency injection and inversion-of-control boundaries.
+metadata:
+  internal: true
 ---
 
 # Domain Driven Develop

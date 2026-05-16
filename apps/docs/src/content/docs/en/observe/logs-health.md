@@ -86,6 +86,17 @@ The CLI should expose logs and health summaries for SSH and CI workflows.
 
 The HTTP API should return paginated logs, health summary, and structured status for automation.
 
+<h2 id="agent-deploy-follow-up">Agent deploy follow-up</h2>
+
+After a deployment, an agent should use logs and health summaries as the follow-up entrypoints
+instead of sending the user to raw server logs. Recommended commands:
+
+- `appaloft logs <deploymentId>`;
+- `appaloft resource diagnose <resourceId>`;
+- `appaloft deployments recovery-readiness <deploymentId>`.
+
+If the access URL is unavailable, read those structured signals before suggesting the next action.
+
 <h2 id="observe-log-health-recovery">Recover from results</h2>
 
 Common decisions:

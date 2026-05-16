@@ -58,6 +58,15 @@ This query is read-only. It returns:
 
 The `retry`, `redeploy`, and `rollback` write commands are active. A command is still blocked when readiness reports missing snapshots, missing artifacts, stale readiness, an active runtime operation, or an incompatible candidate.
 
+<h2 id="agent-deploy-recovery">Agent deploy recovery</h2>
+
+An agent should not retry immediately after a failure. It should read recovery readiness first and
+return blocked reasons, available candidates, and safe next actions. Only suggest retry, redeploy, or
+rollback when readiness explicitly allows it.
+
+If readiness asks for logs or diagnostics first, the agent should return those commands instead of
+directly mutating runtime, remote state, or secrets.
+
 <h2 id="deployment-recovery-retry">Retry</h2>
 
 Retry means creating a new deployment attempt from the failed deployment's immutable snapshot intent. It does not replay old events and does not resume a failed phase inside the old attempt.

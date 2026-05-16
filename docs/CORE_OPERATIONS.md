@@ -1606,6 +1606,9 @@ Web:
 - it must not hide business rules in components
 
 Future MCP / AI tools:
+- the v1 Appaloft skill is a public documentation/skill artifact over the CLI/API/Web operation
+  catalog, not a separate business transport and not an operation-catalog entry. The agent deploy
+  skill is its deploy subprotocol.
 - `@appaloft/ai-mcp` generates one serializable tool descriptor per operation catalog key
 - generated tool names are operation-key based, for example `projects_create`,
   `environments_create`, `deployments_plan`, and `deployments_create`
