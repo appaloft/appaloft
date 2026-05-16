@@ -824,6 +824,9 @@ Current boundary:
 - `deployments.stream-events` is the read-only replay/follow observation surface for one accepted
   deployment attempt. It does not replace immutable detail on `deployments.show`, full attempt
   logs on `deployments.logs`, or reintroduce `deployments.reattach` as a write command.
+  Reconnect/gap/CLI hardening is tracked by
+  [Deployment Observation And Recovery Hardening](./specs/071-deployment-observation-and-recovery/spec.md)
+  as `0.12.x` patch work before the `1.0.0-rc` gate.
 - `deployments.logs.prune` is a narrow embedded deployment log retention mutation. It dry-runs by
   default, requires a cutoff, optionally narrows by deployment id, resource id, or server id, and
   removes only matching entries from Deployment row `logs` when destructive mode is explicit. It
@@ -834,7 +837,9 @@ Current boundary:
 - `deployments.recovery-readiness` is the active read-only recovery decision surface. It returns
   retry, redeploy, rollback, rollback-candidate, blocked-reason, and recommended-action facts for
   Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. Retry, redeploy, and rollback are active write
-  commands that must use its freshness marker when callers have one.
+  commands that must use its freshness marker when callers have one. The `0.12.x` recovery
+  hardening blocker closes edge-case coverage and records that public `deployments.cancel` remains
+  deferred/rebuild-required under ADR-016, not a new retry/redeploy/rollback operation boundary.
 - mutation coordination is scope-based, not whole-server based:
   `deployments.create` coordinates by logical resource-runtime scope and
   `deployments.cleanup-preview` coordinates by logical preview-lifecycle scope. Low-level SSH

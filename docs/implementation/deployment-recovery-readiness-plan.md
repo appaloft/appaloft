@@ -2,9 +2,9 @@
 
 ## Status
 
-Readiness query Code Round implemented. Retry and redeploy command slices are active. Rollback
-remains a future command slice scoped by
-[Deployment Rollback](../specs/041-deployment-rollback/spec.md).
+Readiness query Code Round implemented. Retry, redeploy, and rollback command slices are active.
+Remaining work is `0.12.x` patch hardening tracked by
+[Deployment Observation And Recovery Hardening](../specs/071-deployment-observation-and-recovery/spec.md).
 
 ## Governing Sources
 
@@ -13,6 +13,7 @@ remains a future command slice scoped by
 - [Deployment Recovery Readiness Spec](../specs/012-deployment-recovery-readiness/spec.md)
 - [Deployment Recovery Readiness Plan](../specs/012-deployment-recovery-readiness/plan.md)
 - [Deployment Recovery Readiness Tasks](../specs/012-deployment-recovery-readiness/tasks.md)
+- [Deployment Observation And Recovery Hardening](../specs/071-deployment-observation-and-recovery/spec.md)
 - [Deployment Recovery Readiness Test Matrix](../testing/deployment-recovery-readiness-test-matrix.md)
 
 ## Code Round Order
@@ -38,7 +39,7 @@ Current deferred gaps for this slice:
 ### 2. Retry And Redeploy Command Slice
 
 - Governed by [Deployment Retry And Redeploy](../specs/040-deployment-retry-redeploy/spec.md).
-- Add `deployments.retry` and `deployments.redeploy` command slices after readiness query is active.
+- `deployments.retry` and `deployments.redeploy` are active command slices.
 - Extract or share the deployment attempt execution/terminal-persistence pipeline so create,
   retry, and redeploy do not drift.
 - Re-evaluate readiness server-side.
@@ -64,6 +65,14 @@ Current deferred gaps for this slice:
 - HTTP/oRPC exposes the readiness query and active recovery commands through catalog-backed routes.
 - Public docs/help anchors describe retry, redeploy, rollback, blocked reasons, and stream gap
   behavior without DDD/CQRS terminology.
+
+### 5. Pre-RC Hardening Slice
+
+- Harden `deployments.stream-events` reconnect/gap/CLI coverage before recovery-command edge cases.
+- Close active retry/redeploy deferred rows for stale markers, non-retryable attempts, invalid
+  current profiles, and coordination conflicts.
+- Decide public `deployments.cancel` in a separate ADR/spec round if it remains a GA blocker.
+- Harden rollback candidate/readiness compatibility rows without adding stateful rollback.
 
 ## Non-Goals For First Code Round
 

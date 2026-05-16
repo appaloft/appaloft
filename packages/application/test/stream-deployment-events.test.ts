@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { ok, type Result } from "@appaloft/core";
+import { err, ok, type Result } from "@appaloft/core";
 
 import { createExecutionContext, type ExecutionContext, type RepositoryContext } from "../src";
 import { StreamDeploymentEventsQuery } from "../src/messages";
@@ -59,6 +59,22 @@ class StaticDeploymentEventStream implements DeploymentEventStream {
   }
 }
 
+class ThrowingDeploymentEventStream implements DeploymentEventStream {
+  closed = false;
+
+  async close(): Promise<void> {
+    this.closed = true;
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<DeploymentEventStreamEnvelope> {
+    return {
+      async next(): Promise<IteratorResult<DeploymentEventStreamEnvelope>> {
+        throw new Error("stream exploded");
+      },
+    };
+  }
+}
+
 class RecordingDeploymentEventObserver implements DeploymentEventObserver {
   calls: Array<{
     context: DeploymentEventObservationContext;
@@ -80,6 +96,23 @@ class RecordingDeploymentEventObserver implements DeploymentEventObserver {
       signal,
     });
     return ok(this.stream);
+  }
+}
+
+class FailingDeploymentEventObserver implements DeploymentEventObserver {
+  calls = 0;
+
+  async open(): Promise<Result<DeploymentEventStream>> {
+    this.calls += 1;
+    return err({
+      code: "deployment_event_stream_unavailable",
+      category: "infra",
+      message: "Deployment event stream is unavailable",
+      retryable: true,
+      details: {
+        phase: "event-source-load",
+      },
+    });
   }
 }
 
@@ -259,7 +292,306 @@ describe("stream deployment events query service", () => {
     expect(reader.calls[0]?.request.follow).toBe(true);
   });
 
-  test("[DOMAIN-EVENT-RETENTION-005] bounded replay prefers retained stream gap envelopes", async () => {
+  test("[DEP-EVENTS-QRY-005] returns a source-unavailable startup error", async () => {
+    const reader = new FailingDeploymentEventObserver();
+    const service = new StreamDeploymentEventsQueryService(
+      new StaticDeploymentReadModel([deploymentSummary()]),
+      reader,
+    );
+
+    const result = await service.execute(
+      createTestContext(),
+      StreamDeploymentEventsQuery.create({
+        deploymentId: "dep_demo",
+        follow: false,
+        historyLimit: 10,
+        includeHistory: true,
+        untilTerminal: true,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "deployment_event_stream_unavailable",
+      details: {
+        queryName: "deployments.stream-events",
+        phase: "event-source-load",
+        deploymentId: "dep_demo",
+      },
+    });
+    expect(reader.calls).toBe(1);
+  });
+
+  test("[DEP-EVENTS-QRY-007] finite historical-only replay closes the source", async () => {
+    const stream = new StaticDeploymentEventStream([
+      {
+        schemaVersion: "deployments.stream-events/v1",
+        kind: "event",
+        event: {
+          deploymentId: "dep_demo",
+          sequence: 1,
+          cursor: "dep_demo:1",
+          emittedAt: "2026-01-01T00:00:01.000Z",
+          source: "progress-projection",
+          eventType: "deployment-progress",
+          phase: "deploy",
+          summary: "Deploying",
+        },
+      },
+      {
+        schemaVersion: "deployments.stream-events/v1",
+        kind: "closed",
+        reason: "source-ended",
+        cursor: "dep_demo:1",
+      },
+    ]);
+    const reader = new RecordingDeploymentEventObserver(stream);
+    const service = new StreamDeploymentEventsQueryService(
+      new StaticDeploymentReadModel([deploymentSummary()]),
+      reader,
+    );
+
+    const result = await service.execute(
+      createTestContext(),
+      StreamDeploymentEventsQuery.create({
+        deploymentId: "dep_demo",
+        follow: false,
+        historyLimit: 10,
+        includeHistory: true,
+        untilTerminal: false,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const output = result._unsafeUnwrap();
+    expect(output.mode).toBe("bounded");
+    if (output.mode === "bounded") {
+      expect(output.envelopes.at(-1)).toMatchObject({
+        kind: "closed",
+        reason: "source-ended",
+      });
+    }
+    expect(stream.closed).toBe(true);
+  });
+
+  test("[DEP-EVENTS-QRY-008][DEP-EVENTS-OWN-001][DEP-EVENTS-OWN-003][DEP-EVENTS-OWN-004] event stream returns structured envelopes only", async () => {
+    const stream = new StaticDeploymentEventStream([
+      {
+        schemaVersion: "deployments.stream-events/v1",
+        kind: "event",
+        event: {
+          deploymentId: "dep_demo",
+          sequence: 1,
+          cursor: "dep_demo:1",
+          emittedAt: "2026-01-01T00:00:01.000Z",
+          source: "progress-projection",
+          eventType: "deployment-progress",
+          phase: "deploy",
+          summary: "Deploying",
+        },
+      },
+    ]);
+    const service = new StreamDeploymentEventsQueryService(
+      new StaticDeploymentReadModel(
+        [deploymentSummary()],
+        [
+          {
+            timestamp: "2026-01-01T00:00:01.000Z",
+            source: "application",
+            phase: "deploy",
+            level: "info",
+            message: "raw container log line",
+          },
+        ],
+      ),
+      new RecordingDeploymentEventObserver(stream),
+    );
+
+    const result = await service.execute(
+      createTestContext(),
+      StreamDeploymentEventsQuery.create({
+        deploymentId: "dep_demo",
+        follow: false,
+        historyLimit: 10,
+        includeHistory: true,
+        untilTerminal: true,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const output = result._unsafeUnwrap();
+    expect(output.mode).toBe("bounded");
+    if (output.mode === "bounded") {
+      expect(output.envelopes).toHaveLength(1);
+      expect(output.envelopes[0]?.kind).toBe("event");
+      expect(JSON.stringify(output.envelopes)).not.toContain("runtimePlan");
+      expect(JSON.stringify(output.envelopes)).not.toContain("raw container log line");
+      expect(JSON.stringify(output.envelopes)).not.toContain("deployments.retry");
+      expect(JSON.stringify(output.envelopes)).not.toContain("deployments.redeploy");
+      expect(JSON.stringify(output.envelopes)).not.toContain("deployments.rollback");
+      expect(JSON.stringify(output.envelopes)).not.toContain("deployments.cancel");
+    }
+  });
+
+  test("[DEP-EVENTS-STREAM-002] preserves heartbeat envelopes in follow mode", async () => {
+    const stream = new StaticDeploymentEventStream([
+      {
+        schemaVersion: "deployments.stream-events/v1",
+        kind: "heartbeat",
+        at: "2026-01-01T00:00:02.000Z",
+        cursor: "dep_demo:1",
+      },
+      {
+        schemaVersion: "deployments.stream-events/v1",
+        kind: "closed",
+        reason: "idle-timeout",
+        cursor: "dep_demo:1",
+      },
+    ]);
+    const service = new StreamDeploymentEventsQueryService(
+      new StaticDeploymentReadModel([deploymentSummary()]),
+      new RecordingDeploymentEventObserver(stream),
+    );
+
+    const result = await service.execute(
+      createTestContext(),
+      StreamDeploymentEventsQuery.create({
+        deploymentId: "dep_demo",
+        follow: true,
+        historyLimit: 10,
+        includeHistory: true,
+        untilTerminal: true,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const output = result._unsafeUnwrap();
+    expect(output.mode).toBe("stream");
+    if (output.mode === "stream") {
+      const envelopes: DeploymentEventStreamEnvelope[] = [];
+      for await (const envelope of output.stream) {
+        envelopes.push(envelope);
+      }
+      expect(envelopes.map((envelope) => envelope.kind)).toEqual(["heartbeat", "closed"]);
+    }
+  });
+
+  test("[DEP-EVENTS-STREAM-006] preserves post-open follow error envelopes", async () => {
+    const stream = new StaticDeploymentEventStream([
+      {
+        schemaVersion: "deployments.stream-events/v1",
+        kind: "error",
+        error: {
+          code: "deployment_event_follow_failed",
+          category: "infra",
+          message: "Deployment event follow failed",
+          retryable: true,
+          details: {
+            queryName: "deployments.stream-events",
+            phase: "live-follow",
+            deploymentId: "dep_demo",
+          },
+        },
+      },
+    ]);
+    const service = new StreamDeploymentEventsQueryService(
+      new StaticDeploymentReadModel([deploymentSummary()]),
+      new RecordingDeploymentEventObserver(stream),
+    );
+
+    const result = await service.execute(
+      createTestContext(),
+      StreamDeploymentEventsQuery.create({
+        deploymentId: "dep_demo",
+        follow: true,
+        historyLimit: 10,
+        includeHistory: true,
+        untilTerminal: true,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const output = result._unsafeUnwrap();
+    expect(output.mode).toBe("stream");
+    if (output.mode === "stream") {
+      const envelopes: DeploymentEventStreamEnvelope[] = [];
+      for await (const envelope of output.stream) {
+        envelopes.push(envelope);
+      }
+      expect(envelopes).toHaveLength(1);
+      expect(envelopes[0]).toMatchObject({
+        kind: "error",
+        error: {
+          code: "deployment_event_follow_failed",
+          details: {
+            phase: "live-follow",
+          },
+        },
+      });
+    }
+  });
+
+  test("[DEP-EVENTS-OWN-002] reconnect remains read-only query delegation", async () => {
+    const stream = new StaticDeploymentEventStream([]);
+    const reader = new RecordingDeploymentEventObserver(stream);
+    const service = new StreamDeploymentEventsQueryService(
+      new StaticDeploymentReadModel([deploymentSummary()]),
+      reader,
+    );
+
+    const result = await service.execute(
+      createTestContext(),
+      StreamDeploymentEventsQuery.create({
+        deploymentId: "dep_demo",
+        cursor: "dep_demo:1",
+        follow: true,
+        historyLimit: 10,
+        includeHistory: true,
+        untilTerminal: true,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(reader.calls).toHaveLength(1);
+    expect(reader.calls[0]?.request).toMatchObject({
+      cursor: "dep_demo:1",
+      follow: true,
+    });
+  });
+
+  test("[DEP-EVENTS-QRY-005] converts bounded replay iterator failures to structured replay errors", async () => {
+    const stream = new ThrowingDeploymentEventStream();
+    const service = new StreamDeploymentEventsQueryService(
+      new StaticDeploymentReadModel([deploymentSummary()]),
+      new RecordingDeploymentEventObserver(stream),
+    );
+
+    const result = await service.execute(
+      createTestContext(),
+      StreamDeploymentEventsQuery.create({
+        deploymentId: "dep_demo",
+        cursor: "dep_demo:1",
+        follow: false,
+        historyLimit: 10,
+        includeHistory: true,
+        untilTerminal: true,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "deployment_event_replay_failed",
+      details: {
+        queryName: "deployments.stream-events",
+        phase: "event-replay",
+        deploymentId: "dep_demo",
+        cursor: "dep_demo:1",
+      },
+    });
+    expect(stream.closed).toBe(true);
+  });
+
+  test("[DOMAIN-EVENT-RETENTION-005][DEP-EVENTS-STREAM-005] bounded replay prefers retained stream gap envelopes", async () => {
     const legacyObserver = new RecordingDeploymentEventObserver(
       new StaticDeploymentEventStream([
         {

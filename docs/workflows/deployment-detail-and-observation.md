@@ -131,13 +131,12 @@ Allowed on deployment detail:
 - open diagnostic summary with `resourceId` and optional `deploymentId`;
 - open resource runtime logs when the current runtime instance is still relevant;
 - open create-time progress dialog for the same accepted deployment.
+- open recovery readiness and active retry/redeploy/rollback actions only when derived from
+  `deployments.recovery-readiness` and the corresponding operation catalog entry is active.
 
 Forbidden until later specs reintroduce them:
 
-- retry deployment;
-- redeploy resource;
 - cancel deployment;
-- rollback deployment;
 - deployment-owned health check action.
 
 ## Entrypoint Contract
@@ -152,12 +151,12 @@ Forbidden until later specs reintroduce them:
 ## Current Implementation Notes And Migration Gaps
 
 Current Web deployment detail reads `deployments.show` for the primary detail contract, reads
-timeline replay/follow through `deployments.stream-events`, and keeps attempt logs on
-`deployments.logs`.
+timeline replay/follow through `deployments.stream-events`, keeps attempt logs on
+`deployments.logs`, and shows recovery readiness/actions through the ADR-034 recovery boundary.
 
 Create-time progress remains a request-local affordance for `deployments.create`; it is no longer
 the standalone observation boundary after command acceptance.
 
 ## Open Questions
 
-- None for the observation boundary. Recovery write behavior remains future ADR-016 follow-up work.
+- None for the observation boundary. Public deployment cancel remains future ADR-016 follow-up work.

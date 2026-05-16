@@ -16,6 +16,7 @@ readiness, error, test matrix, implementation plan, public docs/help, `CORE_OPER
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 - [Deployment Recovery Readiness Spec](../specs/012-deployment-recovery-readiness/spec.md)
 - [Deployment Rollback](../specs/041-deployment-rollback/spec.md)
+- [Deployment Observation And Recovery Hardening](../specs/071-deployment-observation-and-recovery/spec.md)
 - [Durable Process Delivery Baseline](../specs/060-durable-process-delivery-baseline/spec.md)
 - [deployments.recovery-readiness Query Spec](../queries/deployments.recovery-readiness.md)
 - [Deployment Recovery Readiness Error Spec](../errors/deployment-recovery-readiness.md)

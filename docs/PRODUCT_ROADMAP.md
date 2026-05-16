@@ -73,6 +73,9 @@ Historical alignment notes:
   query slice, HTTP/oRPC replay and stream routes, CLI events command, shell observer, and Web
   deployment detail timeline. Remaining work is reconnect/gap/CLI test hardening, not first-class
   query implementation.
+- [x] On 2026-05-15, deployment observation and recovery pre-rc work is classified as `0.12.x`
+  patch hardening, not a `1.0.0-rc` release. The governing coordination artifact is
+  [Deployment Observation And Recovery Hardening](./specs/071-deployment-observation-and-recovery/spec.md).
 - [x] On 2026-04-24, the `0.4.0` minimum console and deployment loop has a dedicated release-gate
   matrix, Quick Deploy new-resource sequencing remains `resources.create ->
   deployments.create(resourceId)`, and the local CLI smoke covers resource/deployment observation
@@ -190,8 +193,14 @@ Still blocking 1.0.0:
   webhooks, and internal process state.
 - [ ] Remaining non-resource lifecycle gaps are still major horizontal work. Resource profile drift
   visibility is active; configuration drift redaction remains a focused follow-up.
-- [ ] Retry/redeploy, cancel, and rollback are not public operations. `deployments.show` and
-  `deployments.stream-events` are already active.
+- [x] Deployment observation and recovery pre-rc hardening is closed for the `0.12.x` blocker. `deployments.show`,
+  `deployments.stream-events`, `deployments.recovery-readiness`, `deployments.retry`,
+  `deployments.redeploy`, and `deployments.rollback` are active; reconnect/gap/CLI coverage,
+  recovery edge-case coverage, rollback candidate target compatibility, and the public
+  `deployments.cancel` GA decision are synchronized in
+  [Deployment Observation And Recovery Hardening](./specs/071-deployment-observation-and-recovery/spec.md).
+  Public `deployments.cancel` remains deferred/rebuild-required under ADR-016 and is not required to
+  close this blocker.
 - [ ] `deployments.create` progress stream is still create-time observation; standalone replay/follow
   deployment observation is now owned by `deployments.stream-events`.
 - [x] Default access policy editing is public through explicit configure/list/show operations.
@@ -2761,9 +2770,9 @@ Recommended next Spec Rounds before broad Code Rounds:
 - [x] Framework support tier matrix: broaden fixture-by-fixture real Docker/SSH deployment smoke
   rows for the active JavaScript/TypeScript/Python/JVM catalog through shared GitHub Actions/local
   explicit smoke descriptors.
-- [ ] Deployment observation and recovery: harden `deployments.stream-events` reconnect/gap/CLI
-  coverage, then rebuild retry/redeploy, rollback candidate/readiness, and ADR-016 recovery
-  decisions.
+- [x] Deployment observation and recovery: harden `deployments.stream-events` reconnect/gap/CLI
+  coverage, harden active retry/redeploy edge cases, decide public `deployments.cancel` is deferred
+  rather than required for this blocker, and harden rollback candidate/readiness coverage.
 - [ ] Access/domain/TLS closure: domain binding show/update/delete/retry and certificate
   import/revoke/retry.
 - [x] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,
