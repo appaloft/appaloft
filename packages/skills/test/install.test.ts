@@ -20,7 +20,7 @@ describe("@appaloft/skills installer", () => {
       const result = runCli(["install", "deploy", "--target", "directory", "--path", target]);
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout.toString()).toContain("Installed appaloft-deploy");
+      expect(result.stdout.toString()).toContain("Installed skill appaloft-deploy");
       expect(await Bun.file(join(target, "appaloft-deploy", "SKILL.md")).text()).toContain(
         "name: appaloft-deploy",
       );
@@ -60,5 +60,13 @@ describe("@appaloft/skills installer", () => {
     } finally {
       rmSync(codexHome, { recursive: true, force: true });
     }
+  });
+
+  test("[AGENT-SKILL-INSTALL-004] describes installation as file copy, not deployment", () => {
+    const result = runCli(["--help"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.toString()).toContain("copies skill files only");
+    expect(result.stdout.toString()).toContain("does not run deployments");
   });
 });

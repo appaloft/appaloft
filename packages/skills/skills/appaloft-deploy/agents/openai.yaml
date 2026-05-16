@@ -1,4 +1,4 @@
 interface:
   display_name: "Appaloft Deploy"
   short_description: "Deploy Appaloft workloads safely."
-  default_prompt: "Use the Appaloft Deploy skill to inspect the source safely, choose the Appaloft CLI/API entrypoint, deploy, and report URL, logs, diagnostics, and recovery readiness."
+  default_prompt: "Use the Appaloft Deploy skill to inspect the source safely, choose the active Appaloft CLI/API/Web entrypoint, deploy through Appaloft, and report URL, logs, diagnostics, and recovery readiness."
