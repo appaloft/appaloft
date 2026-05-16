@@ -43,12 +43,12 @@ function expectSkillMirror(skillName: string) {
 }
 
 describe("@appaloft/skills installer", () => {
-  test("[APPALOFT-SKILL-INSTALL-001] installs the full Appaloft skill through the source-format alias", async () => {
+  test("[APPALOFT-SKILL-INSTALL-001] installs the full Appaloft skill through the direct fallback", async () => {
     const target = mkdtempSync(join(tmpdir(), "appaloft-skill-"));
     try {
       const result = runCli([
         "install",
-        "appaloft/appaloft/skills/appaloft",
+        "appaloft/appaloft",
         "--target",
         "directory",
         "--path",
@@ -73,7 +73,7 @@ describe("@appaloft/skills installer", () => {
     try {
       const result = runCli([
         "install",
-        "appaloft/appaloft/skills/appaloft-deploy",
+        "appaloft/deploy",
         "--target",
         "directory",
         "--path",
@@ -129,12 +129,24 @@ describe("@appaloft/skills installer", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout.toString()).toContain("copies skill files only");
     expect(result.stdout.toString()).toContain("does not run deployments");
-    expect(result.stdout.toString()).toContain("npx skills add appaloft/appaloft/skills/appaloft");
+    expect(result.stdout.toString()).toContain("npx skills add appaloft/appaloft");
   });
 
   test("[AGENT-SKILL-SOURCE-001] mirrors standard repository skill sources into the npm fallback package", () => {
     expectSkillMirror("appaloft");
     expectSkillMirror("appaloft-deploy");
+  });
+
+  test("[AGENT-SKILL-SOURCE-002] keeps the short repository install focused on the public Appaloft skill", () => {
+    expect(readFileSync(join(repositorySkillsRoot, "appaloft", "SKILL.md"), "utf8")).not.toContain(
+      "internal: true",
+    );
+    expect(
+      readFileSync(join(repositorySkillsRoot, "appaloft-deploy", "SKILL.md"), "utf8"),
+    ).toContain("internal: true");
+    expect(
+      readFileSync(join(repositorySkillsRoot, "domain-driven-develop", "SKILL.md"), "utf8"),
+    ).toContain("internal: true");
   });
 
   test("[APPALOFT-SKILL-CATALOG-001] full skill covers every CLI catalog entry", async () => {

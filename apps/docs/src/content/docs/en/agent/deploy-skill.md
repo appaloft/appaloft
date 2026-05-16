@@ -32,13 +32,13 @@ one fast entrypoint, not the boundary of the skill.
 
 <h2 id="agent-deploy-install">Install the skill</h2>
 
-Install the deploy subprotocol skill:
+Install the full Appaloft skill:
 
 ```bash
-npx skills add appaloft/appaloft/skills/appaloft-deploy
+npx skills add appaloft/appaloft
 ```
 
-Direct npm package fallback:
+Specialized hosts that only need the deploy subprotocol can use the direct npm package fallback:
 
 ```bash
 npx @appaloft/skills install appaloft/deploy

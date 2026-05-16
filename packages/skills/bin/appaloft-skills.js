@@ -28,8 +28,7 @@ Usage:
   appaloft-skills list
 
 Examples:
-  npx skills add appaloft/appaloft/skills/appaloft
-  npx skills add appaloft/appaloft/skills/appaloft-deploy
+  npx skills add appaloft/appaloft
   npx @appaloft/skills install appaloft/appaloft --target directory --path ./.agents/skills
   npx @appaloft/skills install appaloft/appaloft --target codex --force
   npx @appaloft/skills install appaloft/deploy

@@ -143,9 +143,7 @@ describe("public docs help registry", () => {
     expect(topic.surfaces).toEqual(
       expect.arrayContaining(["cli", "http-api", "web", "repository-config", "mcp"]),
     );
-    expect(topic.aliases).toEqual(
-      expect.arrayContaining(["npx skills add appaloft/appaloft/skills/appaloft"]),
-    );
+    expect(topic.aliases).toEqual(expect.arrayContaining(["npx skills add appaloft/appaloft"]));
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
         "docs/agent/appaloft-skill.md",
