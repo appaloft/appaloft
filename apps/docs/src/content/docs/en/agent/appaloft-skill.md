@@ -35,10 +35,10 @@ agent environment.
 Install the full Appaloft skill:
 
 ```bash
-npx @appaloft/skills add appaloft
+npx skills add appaloft
 ```
 
-Equivalent explicit form:
+Direct package fallback:
 
 ```bash
 npx @appaloft/skills install appaloft

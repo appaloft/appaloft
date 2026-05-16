@@ -29,7 +29,7 @@ this protocol.
 Install the full Appaloft skill for Codex-compatible skill hosts:
 
 ```bash
-npx @appaloft/skills add appaloft
+npx skills add appaloft
 ```
 
 Install only the deploy subprotocol when the host should receive a narrower deploy guide:

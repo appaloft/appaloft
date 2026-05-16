@@ -35,7 +35,7 @@ one fast entrypoint, not the boundary of the skill.
 Install the full Appaloft skill:
 
 ```bash
-npx @appaloft/skills add appaloft
+npx skills add appaloft
 ```
 
 Codex-compatible skill hosts that only need the deploy subprotocol can install it directly:

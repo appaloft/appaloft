@@ -17,13 +17,12 @@ const skillAliases = new Map([
 const helpText = `Installs Appaloft agent skills. This command copies skill files only; it does not run deployments.
 
 Usage:
-  appaloft-skills add appaloft [--target codex|directory] [--path <dir>] [--force] [--dry-run]
   appaloft-skills install appaloft [--target codex|directory] [--path <dir>] [--force] [--dry-run]
   appaloft-skills install deploy [--target codex|directory] [--path <dir>] [--force] [--dry-run]
   appaloft-skills list
 
 Examples:
-  npx @appaloft/skills add appaloft
+  npx skills add appaloft
   npx @appaloft/skills install appaloft --target codex --force
   npx @appaloft/skills install appaloft --target directory --path ./.agents/skills
   npx @appaloft/skills install deploy
