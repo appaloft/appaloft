@@ -1053,10 +1053,11 @@ export class BunDependencyResourceNativeCommandRunner
         return err(dump.error);
       }
       const ttlMs = Number.parseInt(new TextDecoder().decode(ttl.value).trim(), 10);
+      const dumpPayload = this.redisCliBulkPayload(dump.value);
       backupKeys.push({
         key,
         ttlMs: Number.isFinite(ttlMs) ? ttlMs : -1,
-        dumpBase64: Buffer.from(dump.value).toString("base64"),
+        dumpBase64: Buffer.from(dumpPayload).toString("base64"),
       });
     }
 
@@ -1109,7 +1110,7 @@ export class BunDependencyResourceNativeCommandRunner
       }
       const payload = Buffer.from(entry.dumpBase64, "base64");
       const ttlMs = entry.ttlMs > 0 ? String(entry.ttlMs) : "0";
-      const restored = this.runRedisCli(input, ["-x", "RESTORE", entry.key, ttlMs, "REPLACE"], {
+      const restored = this.runRedisCli(input, ["-x", "RESTORE", entry.key, ttlMs], {
         stdin: payload,
       });
       if (restored.isErr()) {
@@ -1128,6 +1129,7 @@ export class BunDependencyResourceNativeCommandRunner
     let started: ReturnType<typeof Bun.spawnSync>;
     try {
       started = Bun.spawnSync(command, {
+        env: process.env,
         ...(options.stdin ? { stdin: options.stdin } : {}),
         stdout: "pipe",
         stderr: "pipe",
@@ -1141,7 +1143,17 @@ export class BunDependencyResourceNativeCommandRunner
       );
     }
     if (started.success) {
-      return ok(started.stdout ? Uint8Array.from(started.stdout) : new Uint8Array());
+      const stdout = started.stdout ? Uint8Array.from(started.stdout) : new Uint8Array();
+      const output = new TextDecoder().decode(stdout).trimStart();
+      if (output.startsWith("ERR ") || output.startsWith("WRONGTYPE ")) {
+        return err(
+          redisLogicalBackupError("Redis native backup command failed", input, {
+            tool: "redis-cli",
+            exitCode: started.exitCode,
+          }),
+        );
+      }
+      return ok(stdout);
     }
 
     return err(
@@ -1150,6 +1162,13 @@ export class BunDependencyResourceNativeCommandRunner
         exitCode: started.exitCode,
       }),
     );
+  }
+
+  private redisCliBulkPayload(value: Uint8Array): Uint8Array {
+    if (value.length > 0 && value[value.length - 1] === 10) {
+      return value.slice(0, -1);
+    }
+    return value;
   }
 }
 
