@@ -1,17 +1,20 @@
 ARG BUN_VERSION=1.3.13
 
+FROM node:24-bookworm AS node-runtime
+
 FROM oven/bun:${BUN_VERSION}-debian AS builder
 WORKDIR /app
 ARG BUN_VERSION=1.3.13
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN bun --version | grep -x "${BUN_VERSION}"
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 
 COPY . .
 
 RUN bun install --frozen-lockfile
 RUN bun run --cwd apps/shell build
 RUN bun run --cwd apps/web build
-RUN bun run --cwd apps/docs build
+RUN cd apps/docs && node node_modules/astro/bin/astro.mjs check && node node_modules/astro/bin/astro.mjs build
 RUN mkdir -p /app/dist/pglite-runtime-assets \
   && bun -e 'const { dirname, join } = await import("node:path"); const entry = Bun.resolveSync("@electric-sql/pglite", "/app/packages/persistence/pg/src/index.ts"); const dir = dirname(entry); for (const file of ["pglite.data", "pglite.wasm", "initdb.wasm"]) await Bun.write(`/app/dist/pglite-runtime-assets/${file}`, Bun.file(join(dir, file)));'
 
