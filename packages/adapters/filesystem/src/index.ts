@@ -42,7 +42,10 @@ import {
 } from "@appaloft/deployment-config";
 
 interface LocalProjectProfile {
-  runtimeFamily: Extract<SourceRuntimeFamily, "java" | "node" | "python">;
+  runtimeFamily: Extract<
+    SourceRuntimeFamily,
+    "dotnet" | "elixir" | "go" | "java" | "node" | "php" | "python" | "ruby" | "rust"
+  >;
   framework?: SourceFramework;
   packageManager?: SourcePackageManager;
   applicationShape?: SourceApplicationShape;
@@ -516,6 +519,129 @@ function detectJavaPackageManager(input: {
   return input.hasPom ? "maven" : "gradle";
 }
 
+function detectRubyFramework(gemfile: string | null): SourceFramework | undefined {
+  if (textMentionsPackage(gemfile, "rails")) {
+    return "rails";
+  }
+
+  if (textMentionsPackage(gemfile, "sinatra")) {
+    return "sinatra";
+  }
+
+  return undefined;
+}
+
+function detectPhpFramework(
+  composerJson: Record<string, unknown> | null,
+): SourceFramework | undefined {
+  const dependencies = stringRecord(composerJson?.require);
+  const devDependencies = stringRecord(composerJson?.["require-dev"]);
+
+  if (hasAnyPackage(dependencies, devDependencies, ["laravel/framework"])) {
+    return "laravel";
+  }
+
+  if (
+    hasAnyPackage(dependencies, devDependencies, [
+      "symfony/framework-bundle",
+      "symfony/http-kernel",
+      "symfony/runtime",
+    ])
+  ) {
+    return "symfony";
+  }
+
+  return undefined;
+}
+
+function detectGoFramework(goMod: string | null): SourceFramework | undefined {
+  if (textMentionsPackage(goMod, "github.com/gin-gonic/gin")) {
+    return "gin";
+  }
+
+  if (textMentionsPackage(goMod, "github.com/labstack/echo")) {
+    return "echo";
+  }
+
+  if (textMentionsPackage(goMod, "github.com/gofiber/fiber")) {
+    return "fiber";
+  }
+
+  if (textMentionsPackage(goMod, "github.com/go-chi/chi")) {
+    return "chi";
+  }
+
+  return undefined;
+}
+
+function goModuleName(goMod: string | null): string | undefined {
+  return goMod
+    ?.match(/^\s*module\s+([^\s]+)\s*$/m)?.[1]
+    ?.split("/")
+    .at(-1);
+}
+
+function findSingleFileWithExtension(path: string, extension: string): string | undefined {
+  const fileNames = readdirSync(path).filter((fileName) => {
+    try {
+      return statSync(join(path, fileName)).isFile() && fileName.endsWith(extension);
+    } catch {
+      return false;
+    }
+  });
+
+  return fileNames.length === 1 ? fileNames[0] : undefined;
+}
+
+function detectDotnetProject(path: string): {
+  fileName: string;
+  text: string;
+} | null {
+  const fileName = findSingleFileWithExtension(path, ".csproj");
+  if (!fileName) {
+    return null;
+  }
+
+  const text = readText(join(path, fileName));
+  return text === null ? null : { fileName, text };
+}
+
+function dotnetRuntimeVersion(csproj: string): string | undefined {
+  const targetFramework = firstXmlText(csproj, "TargetFramework");
+  const major = targetFramework?.match(/^net(\d+)\./u)?.[1];
+  return major ? `${major}.0` : undefined;
+}
+
+function rustProjectName(cargoToml: string | null): string | undefined {
+  return cargoToml?.match(/^\s*name\s*=\s*"([^"]+)"/m)?.[1];
+}
+
+function detectRustFramework(cargoToml: string | null): SourceFramework | undefined {
+  if (textMentionsPackage(cargoToml, "axum")) {
+    return "axum";
+  }
+
+  if (textMentionsPackage(cargoToml, "actix-web")) {
+    return "actix-web";
+  }
+
+  if (textMentionsPackage(cargoToml, "rocket")) {
+    return "rocket";
+  }
+
+  return undefined;
+}
+
+function elixirProjectName(mixExs: string | null): string | undefined {
+  return mixExs?.match(/\bapp:\s*:([a-zA-Z0-9_]+)/u)?.[1];
+}
+
+function detectElixirFramework(mixExs: string | null): SourceFramework | undefined {
+  return textMentionsPackage(mixExs, "phoenix") || /\{:phoenix,/u.test(mixExs ?? "")
+    ? "phoenix"
+    : undefined;
+}
+
 function firstXmlText(text: string | null, tag: string): string | undefined {
   const escaped = tag.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   return text?.match(new RegExp(`<${escaped}>\\s*([^<]+?)\\s*</${escaped}>`, "u"))?.[1];
@@ -699,10 +825,163 @@ class JavaProjectProfileDetector implements LocalProjectProfileDetector {
   }
 }
 
+class RubyProjectProfileDetector implements LocalProjectProfileDetector {
+  detect(path: string): LocalProjectProfile | null {
+    const gemfilePath = join(path, "Gemfile");
+    if (!existsSync(gemfilePath)) {
+      return null;
+    }
+
+    const gemfile = readText(gemfilePath);
+    const framework = detectRubyFramework(gemfile);
+    const runtimeVersion = readFirstExistingVersion(path, [".ruby-version"]);
+
+    return {
+      runtimeFamily: "ruby",
+      ...(framework ? { framework } : {}),
+      applicationShape: "serverful-http",
+      ...(runtimeVersion ? { runtimeVersion } : {}),
+      ...(framework ? { projectName: basename(path) } : {}),
+      detectedFiles: [],
+      detectedScripts: [],
+    };
+  }
+}
+
+class PhpProjectProfileDetector implements LocalProjectProfileDetector {
+  detect(path: string): LocalProjectProfile | null {
+    const composerPath = join(path, "composer.json");
+    if (!existsSync(composerPath)) {
+      return null;
+    }
+
+    const composerJson = readJsonObject(composerPath);
+    const framework = detectPhpFramework(composerJson);
+    const projectName =
+      typeof composerJson?.name === "string" ? composerJson.name.split("/").at(-1) : undefined;
+
+    return {
+      runtimeFamily: "php",
+      ...(framework ? { framework } : {}),
+      packageManager: "composer",
+      applicationShape: "serverful-http",
+      ...(projectName ? { projectName } : {}),
+      detectedFiles: ["composer-json"],
+      detectedScripts: [],
+    };
+  }
+}
+
+class GoProjectProfileDetector implements LocalProjectProfileDetector {
+  detect(path: string): LocalProjectProfile | null {
+    const goModPath = join(path, "go.mod");
+    if (!existsSync(goModPath)) {
+      return null;
+    }
+
+    const goMod = readText(goModPath);
+    const framework = detectGoFramework(goMod);
+    const runtimeVersion = readFirstExistingVersion(path, [".go-version"]);
+    const projectName = goModuleName(goMod);
+
+    return {
+      runtimeFamily: "go",
+      ...(framework ? { framework } : {}),
+      packageManager: "go",
+      applicationShape: "serverful-http",
+      ...(runtimeVersion ? { runtimeVersion } : {}),
+      ...(projectName ? { projectName } : {}),
+      detectedFiles: ["go-mod"],
+      detectedScripts: [],
+    };
+  }
+}
+
+class DotnetProjectProfileDetector implements LocalProjectProfileDetector {
+  detect(path: string): LocalProjectProfile | null {
+    const project = detectDotnetProject(path);
+    if (!project) {
+      return null;
+    }
+
+    const isAspnetCore =
+      /<Project\s+Sdk=["']Microsoft\.NET\.Sdk\.Web["']/u.test(project.text) ||
+      project.text.includes("Microsoft.AspNetCore.App");
+    const runtimeVersion = dotnetRuntimeVersion(project.text);
+
+    return {
+      runtimeFamily: "dotnet",
+      ...(isAspnetCore ? { framework: "aspnet-core" } : {}),
+      packageManager: "dotnet",
+      applicationShape: "serverful-http",
+      ...(runtimeVersion ? { runtimeVersion } : {}),
+      projectName: project.fileName.replace(/\.csproj$/u, ""),
+      detectedFiles: ["csproj"],
+      detectedScripts: [],
+    };
+  }
+}
+
+class RustProjectProfileDetector implements LocalProjectProfileDetector {
+  detect(path: string): LocalProjectProfile | null {
+    const cargoTomlPath = join(path, "Cargo.toml");
+    if (!existsSync(cargoTomlPath)) {
+      return null;
+    }
+
+    const cargoToml = readText(cargoTomlPath);
+    const framework = detectRustFramework(cargoToml);
+    const runtimeVersion = readFirstExistingVersion(path, ["rust-toolchain"]);
+    const projectName = rustProjectName(cargoToml);
+
+    return {
+      runtimeFamily: "rust",
+      ...(framework ? { framework } : {}),
+      packageManager: "cargo",
+      applicationShape: "serverful-http",
+      ...(runtimeVersion ? { runtimeVersion } : {}),
+      ...(projectName ? { projectName } : {}),
+      detectedFiles: ["cargo-toml"],
+      detectedScripts: [],
+    };
+  }
+}
+
+class ElixirProjectProfileDetector implements LocalProjectProfileDetector {
+  detect(path: string): LocalProjectProfile | null {
+    const mixExsPath = join(path, "mix.exs");
+    if (!existsSync(mixExsPath)) {
+      return null;
+    }
+
+    const mixExs = readText(mixExsPath);
+    const framework = detectElixirFramework(mixExs);
+    const runtimeVersion = readFirstExistingVersion(path, [".tool-versions"]);
+    const projectName = elixirProjectName(mixExs);
+
+    return {
+      runtimeFamily: "elixir",
+      ...(framework ? { framework } : {}),
+      packageManager: "mix",
+      applicationShape: "serverful-http",
+      ...(runtimeVersion ? { runtimeVersion } : {}),
+      ...(projectName ? { projectName } : {}),
+      detectedFiles: ["mix-exs"],
+      detectedScripts: [],
+    };
+  }
+}
+
 const localProjectProfileDetectors: LocalProjectProfileDetector[] = [
   new NodeProjectProfileDetector(),
   new PythonProjectProfileDetector(),
   new JavaProjectProfileDetector(),
+  new RubyProjectProfileDetector(),
+  new PhpProjectProfileDetector(),
+  new GoProjectProfileDetector(),
+  new DotnetProjectProfileDetector(),
+  new RustProjectProfileDetector(),
+  new ElixirProjectProfileDetector(),
 ];
 
 function detectLocalProjectProfile(path: string): LocalProjectProfile | null {

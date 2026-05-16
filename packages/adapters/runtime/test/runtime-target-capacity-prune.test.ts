@@ -173,6 +173,7 @@ describe("runtime target capacity prune adapter", () => {
         "PRUNE_CANDIDATE\tpreview-workspaces\tpreview_old\t/var/lib/appaloft/runtime/ssh-deployments/preview_old\t2026-01-01T00:00:00.000Z\t4096\tmatched\t",
         "PRUNE_CANDIDATE\tdocker-build-cache\tdocker-build-cache\tdocker-build-cache\t2026-01-01T00:00:00.000Z\t8192\tmatched\t",
         "PRUNE_CANDIDATE\tunused-images\tdocker-unused-images\tdocker-unused-images\t2026-01-01T00:00:00.000Z\t16384\tmatched\t",
+        "PRUNE_CANDIDATE\tremote-state-markers\tstate-root\t/var/lib/appaloft/runtime/state\t\t0\texcluded\tremote-state-excluded",
       ].join("\n"),
       server: serverState(),
       before: "2026-01-01T00:05:00.000Z",
@@ -182,6 +183,7 @@ describe("runtime target capacity prune adapter", () => {
         "source-workspaces",
         "docker-build-cache",
         "unused-images",
+        "remote-state-markers",
       ],
       dryRun: true,
       prunedAt: "2026-01-01T00:10:00.000Z",
@@ -192,11 +194,11 @@ describe("runtime target capacity prune adapter", () => {
       schemaVersion: "servers.capacity.prune/v1",
       dryRun: true,
       summary: {
-        inspectedCount: 7,
+        inspectedCount: 8,
         matchedCount: 3,
         prunedCount: 0,
         skippedCount: 2,
-        excludedCount: 2,
+        excludedCount: 3,
       },
     });
   });
@@ -243,6 +245,32 @@ describe("runtime target capacity prune adapter", () => {
     expect(script).not.toContain("docker volume prune");
     expect(script).not.toContain("docker system prune");
     expect(script).not.toContain("docker rmi");
+  });
+
+  test("[RT-CAP-PRUNE-010] rendered prune script keeps remote-state marker cleanup opt-in and state-root preserving", () => {
+    const defaultScript = renderRuntimeTargetCapacityPruneScript({
+      runtimeRoot: "/var/lib/appaloft/runtime",
+      before: "2026-01-01T00:05:00.000Z",
+      categories: ["source-workspaces"],
+      dryRun: true,
+    });
+    const explicitScript = renderRuntimeTargetCapacityPruneScript({
+      runtimeRoot: "/var/lib/appaloft/runtime",
+      before: "2026-01-01T00:05:00.000Z",
+      categories: ["remote-state-markers"],
+      dryRun: false,
+    });
+
+    expect(defaultScript).toContain("if has_category remote-state-markers");
+    expect(explicitScript).toContain('"$APPALOFT_STATE_ROOT"/journals/*.json');
+    expect(explicitScript).toContain('"$APPALOFT_STATE_ROOT"/backups/*');
+    expect(explicitScript).toContain('"$APPALOFT_STATE_ROOT"/recovery/*.json');
+    expect(explicitScript).toContain('"$APPALOFT_STATE_ROOT"/locks/recovered/*');
+    expect(explicitScript).toContain("remote-state-excluded");
+    expect(explicitScript).toContain('rm -f "$marker"');
+    expect(explicitScript).toContain('rm -rf "$marker"');
+    expect(explicitScript).not.toContain('rm -rf "$APPALOFT_STATE_ROOT"');
+    expect(explicitScript).not.toContain("pglite");
   });
 
   if (!localCapacityPruneEnabled) {

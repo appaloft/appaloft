@@ -544,6 +544,117 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     baseImage: "eclipse-temurin:21-jdk",
     startCommand: "java -jar target/generic-java-jar-1.0.0.jar",
   },
+  {
+    matrixIds: "WF-PLAN-CAT-011",
+    fixture: "rails-ruby",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "ruby",
+    runtimeKind: "ruby",
+    applicationShape: "serverful-http",
+    framework: "rails",
+    baseImage: "ruby:3.3-slim",
+    installCommand: "bundle install",
+    startCommand: "bundle exec rails server -b 0.0.0.0 -p 3000",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-011",
+    fixture: "sinatra-rack",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "ruby",
+    runtimeKind: "ruby",
+    applicationShape: "serverful-http",
+    framework: "sinatra",
+    baseImage: "ruby:3.3-slim",
+    installCommand: "bundle install",
+    startCommand: "bundle exec rackup -o 0.0.0.0 -p 3000",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-011",
+    fixture: "laravel-composer",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "php",
+    runtimeKind: "php",
+    applicationShape: "serverful-http",
+    framework: "laravel",
+    packageManager: "composer",
+    baseImage: "composer:2",
+    installCommand: "composer install --no-dev --prefer-dist --no-interaction",
+    startCommand: "php artisan serve --host=0.0.0.0 --port=3000",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-011",
+    fixture: "symfony-composer",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "php",
+    runtimeKind: "php",
+    applicationShape: "serverful-http",
+    framework: "symfony",
+    packageManager: "composer",
+    baseImage: "composer:2",
+    installCommand: "composer install --no-dev --prefer-dist --no-interaction",
+    startCommand: "php -S 0.0.0.0:3000 -t public",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-012",
+    fixture: "go-gin",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "go",
+    runtimeKind: "go",
+    applicationShape: "serverful-http",
+    framework: "gin",
+    packageManager: "go",
+    baseImage: "golang:1.23-bookworm",
+    buildCommand: "go build -o /app/appaloft-app .",
+    startCommand: "/app/appaloft-app",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-014",
+    fixture: "dotnet-aspnet",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "dotnet",
+    runtimeKind: "aspnet-core",
+    applicationShape: "serverful-http",
+    framework: "aspnet-core",
+    packageManager: "dotnet",
+    baseImage: "mcr.microsoft.com/dotnet/sdk:8.0",
+    buildCommand: "dotnet publish -c Release -o /app/publish",
+    startCommand: "dotnet /app/publish/dotnet-aspnet.dll",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-015",
+    fixture: "rust-axum",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "rust",
+    runtimeKind: "rust",
+    applicationShape: "serverful-http",
+    framework: "axum",
+    packageManager: "cargo",
+    baseImage: "rust:1.84-bookworm",
+    buildCommand: "cargo build --release",
+    startCommand: "./target/release/rust-axum",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-015",
+    fixture: "elixir-phoenix",
+    port: 4000,
+    buildStrategy: "workspace-commands",
+    planner: "elixir",
+    runtimeKind: "phoenix",
+    applicationShape: "serverful-http",
+    framework: "phoenix",
+    packageManager: "mix",
+    baseImage: "hexpm/elixir:1.17.3-erlang-27.2-debian-bookworm-20241223-slim",
+    installCommand: "mix local.hex --force && mix local.rebar --force && mix deps.get --only prod",
+    buildCommand: "MIX_ENV=prod mix release",
+    startCommand: "_build/prod/rel/appaloft_phoenix/bin/appaloft_phoenix start",
+  },
 ];
 
 type ResourceRuntimeStrategy = "auto" | "static" | "workspace-commands";
@@ -623,7 +734,13 @@ function smokeMatrixIdFor(fixture: PlannerFixtureExpectation): string {
     fixture.runtimeKind === "generic-wsgi" ||
     fixture.runtimeKind === "spring-boot" ||
     fixture.runtimeKind === "quarkus" ||
-    fixture.runtimeKind === "java"
+    fixture.runtimeKind === "java" ||
+    fixture.runtimeKind === "ruby" ||
+    fixture.runtimeKind === "php" ||
+    fixture.runtimeKind === "go" ||
+    fixture.runtimeKind === "aspnet-core" ||
+    fixture.runtimeKind === "rust" ||
+    fixture.runtimeKind === "phoenix"
   ) {
     return "WF-PLAN-SMOKE-003";
   }
