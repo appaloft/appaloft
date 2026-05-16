@@ -70,6 +70,7 @@
         "@appaloft/provider-generic-ssh": "workspace:*",
         "@appaloft/provider-local-shell": "workspace:*",
         "@appaloft/provider-tencent": "workspace:*",
+        "@appaloft/server": "workspace:*",
         "nanoid": "^5.1.11",
         "reflect-metadata": "^0.2.2",
         "tsyringe": "^4.10.0",
@@ -467,6 +468,41 @@
     "packages/sdk-generator": {
       "name": "@appaloft/sdk-generator",
     },
+    "packages/server": {
+      "name": "@appaloft/server",
+      "dependencies": {
+        "@appaloft/adapter-cli": "workspace:*",
+        "@appaloft/adapter-filesystem": "workspace:*",
+        "@appaloft/adapter-http-elysia": "workspace:*",
+        "@appaloft/adapter-runtime": "workspace:*",
+        "@appaloft/ai-mcp": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/auth-better": "workspace:*",
+        "@appaloft/config": "workspace:*",
+        "@appaloft/contracts": "workspace:*",
+        "@appaloft/core": "workspace:*",
+        "@appaloft/integration-core": "workspace:*",
+        "@appaloft/integration-github": "workspace:*",
+        "@appaloft/integration-gitlab": "workspace:*",
+        "@appaloft/observability": "workspace:*",
+        "@appaloft/persistence-pg": "workspace:*",
+        "@appaloft/plugin-builtins": "workspace:*",
+        "@appaloft/plugin-host": "workspace:*",
+        "@appaloft/plugin-sdk": "workspace:*",
+        "@appaloft/provider-aliyun": "workspace:*",
+        "@appaloft/provider-certificate-acme": "workspace:*",
+        "@appaloft/provider-core": "workspace:*",
+        "@appaloft/provider-default-access-domain-sslip": "workspace:*",
+        "@appaloft/provider-edge-proxy-caddy": "workspace:*",
+        "@appaloft/provider-edge-proxy-traefik": "workspace:*",
+        "@appaloft/provider-generic-ssh": "workspace:*",
+        "@appaloft/provider-local-shell": "workspace:*",
+        "@appaloft/provider-tencent": "workspace:*",
+        "nanoid": "^5.1.11",
+        "reflect-metadata": "^0.2.2",
+        "tsyringe": "^4.10.0",
+      },
+    },
     "packages/testkit": {
       "name": "@appaloft/testkit",
       "dependencies": {
@@ -579,6 +615,8 @@
     "@appaloft/sdk": ["@appaloft/sdk@workspace:packages/sdk"],
 
     "@appaloft/sdk-generator": ["@appaloft/sdk-generator@workspace:packages/sdk-generator"],
+
+    "@appaloft/server": ["@appaloft/server@workspace:packages/server"],
 
     "@appaloft/shell": ["@appaloft/shell@workspace:apps/shell"],
 
