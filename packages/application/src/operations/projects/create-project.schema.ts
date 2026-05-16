@@ -4,6 +4,7 @@ import { nonEmptyTrimmedString } from "../shared-schema";
 
 export const createProjectCommandInputSchema = z.object({
   name: nonEmptyTrimmedString("Project name"),
+  organizationId: nonEmptyTrimmedString("Organization id").optional(),
   description: z.string().optional(),
 });
 

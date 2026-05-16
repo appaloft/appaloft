@@ -9,7 +9,7 @@ import {
   UpdatedAt,
   UpsertPreviewEnvironmentSpec,
 } from "@appaloft/core";
-import { inject, injectable } from "tsyringe";
+import { injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
@@ -28,7 +28,6 @@ import {
   EmptyProcessAttemptCompleter,
   NoopProcessAttemptRecorder,
 } from "../../process-attempt-journal";
-import { tokens } from "../../tokens";
 
 export interface CleanupPreviewEnvironmentInput {
   previewEnvironmentId: string;
@@ -90,21 +89,13 @@ function cleanupProcessDedupeKey(input: {
 @injectable()
 export class PreviewEnvironmentCleanupService {
   constructor(
-    @inject(tokens.previewEnvironmentRepository)
     private readonly previewEnvironmentRepository: PreviewEnvironmentRepository,
-    @inject(tokens.previewEnvironmentCleaner)
     private readonly previewEnvironmentCleaner: PreviewEnvironmentCleaner,
-    @inject(tokens.previewCleanupAttemptRecorder)
     private readonly previewCleanupAttemptRecorder: PreviewCleanupAttemptRecorder,
-    @inject(tokens.clock)
     private readonly clock: Clock,
-    @inject(tokens.idGenerator)
     private readonly idGenerator: IdGenerator,
-    @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
-    @inject(tokens.processAttemptClaimer)
     private readonly processAttemptClaimer: ProcessAttemptClaimer = new EmptyProcessAttemptClaimer(),
-    @inject(tokens.processAttemptCompleter)
     private readonly processAttemptCompleter: ProcessAttemptCompleter = new EmptyProcessAttemptCompleter(),
   ) {}
 

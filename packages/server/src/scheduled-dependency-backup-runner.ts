@@ -122,3 +122,10 @@ export function createScheduledDependencyBackupRunner(
     },
   };
 }
+
+export function createDisabledScheduledDependencyBackupRunner(): ScheduledDependencyBackupRunner {
+  return {
+    start(): void {},
+    stop(): void {},
+  };
+}

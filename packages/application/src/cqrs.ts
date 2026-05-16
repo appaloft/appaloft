@@ -10,7 +10,7 @@ import {
   createQuerySpanName,
   type ExecutionContext,
 } from "./execution-context";
-import { type AppLogger } from "./ports";
+import { type AppLogger, type OperationGuardPort } from "./ports";
 
 type MessageConstructor<TMessage, TArgs extends unknown[] = unknown[]> = new (
   ...args: TArgs
@@ -89,6 +89,7 @@ export class CommandBus {
   constructor(
     private readonly container: DependencyContainer,
     private readonly logger: AppLogger,
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute<TResult>(
@@ -111,6 +112,24 @@ export class CommandBus {
       command: command.constructor.name,
       handler: handlerType.name,
     });
+
+    if (this.operationGuardPort) {
+      const { checkOperationGuards, operationCatalogEntryForMessage } = await import(
+        "./operation-guard"
+      );
+      const operationEntry = operationCatalogEntryForMessage(command);
+      if (operationEntry) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: operationEntry,
+          message: command,
+          operationGuardPort: this.operationGuardPort,
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
+      }
+    }
 
     const handler = this.container.resolve(handlerType as never) as CommandHandlerContract<
       Command<TResult>,
@@ -158,6 +177,7 @@ export class QueryBus {
   constructor(
     private readonly container: DependencyContainer,
     private readonly logger: AppLogger,
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute<TResult>(
@@ -180,6 +200,24 @@ export class QueryBus {
       query: query.constructor.name,
       handler: handlerType.name,
     });
+
+    if (this.operationGuardPort) {
+      const { checkOperationGuards, operationCatalogEntryForMessage } = await import(
+        "./operation-guard"
+      );
+      const operationEntry = operationCatalogEntryForMessage(query);
+      if (operationEntry) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: operationEntry,
+          message: query,
+          operationGuardPort: this.operationGuardPort,
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
+      }
+    }
 
     const handler = this.container.resolve(handlerType as never) as QueryHandlerContract<
       Query<TResult>,

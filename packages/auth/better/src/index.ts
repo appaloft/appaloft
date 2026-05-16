@@ -396,12 +396,15 @@ export class BetterAuthRuntime implements AuthRuntime {
         },
       });
       let resolvedOrganizationId = organizationId;
-      let role = normalizeProductOrganizationRole(readString(activeRole, "role"));
+      const activeRoleValue = readString(activeRole, "role");
+      let organizationRole = normalizeOrganizationTeamRole(activeRoleValue);
+      let role = normalizeProductOrganizationRole(activeRoleValue);
       if (!role && !input.organizationId) {
         const fallback = await this.firstAuthorizedOrganizationRole(headers);
         if (fallback) {
           resolvedOrganizationId = fallback.organizationId;
           role = fallback.role;
+          organizationRole = productRoleToOrganizationRole(fallback.role);
         }
       }
       if (!role) {
@@ -420,6 +423,7 @@ export class BetterAuthRuntime implements AuthRuntime {
         },
         ...(email ? { email } : {}),
         organizationId: resolvedOrganizationId,
+        ...(organizationRole ? { organizationRole } : {}),
         role,
         userId,
       });
@@ -1037,6 +1041,13 @@ function productRoleAllows(role: ProductOrganizationRole, requiredRole: ProductO
     owner: 3,
   };
   return rank[role] >= rank[requiredRole];
+}
+
+function productRoleToOrganizationRole(role: ProductOrganizationRole): OrganizationTeamRole {
+  if (role === "owner" || role === "admin") {
+    return role;
+  }
+  return "developer";
 }
 
 function productAuthMissing(

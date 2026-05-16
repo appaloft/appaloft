@@ -124,3 +124,10 @@ export function createScheduledRuntimePruneRunner(
     },
   };
 }
+
+export function createDisabledScheduledRuntimePruneRunner(): ScheduledRuntimePruneRunner {
+  return {
+    start(): void {},
+    stop(): void {},
+  };
+}

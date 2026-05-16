@@ -1,4 +1,5 @@
 import {
+  defaultSelfHostedOrganizationId,
   domainError,
   err,
   ok,
@@ -15,10 +16,22 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import { type AppLogger, type Clock, type EventBus, type ProjectRepository } from "../../ports";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
+import {
+  AllowAllOperationGuardPort,
+  type AppLogger,
+  type Clock,
+  type EventBus,
+  type OperationGuardPort,
+  type ProjectRepository,
+} from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type RenameProjectCommandInput } from "./rename-project.command";
+
+const renameProjectOperation = findOperationCatalogEntryByKey("projects.rename");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 @injectable()
 export class RenameProjectUseCase {
@@ -31,13 +44,15 @@ export class RenameProjectUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: RenameProjectCommandInput,
   ): Promise<Result<{ id: string }>> {
-    const { clock, eventBus, logger, projectRepository } = this;
+    const { clock, eventBus, logger, operationGuardPort, projectRepository } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -52,6 +67,24 @@ export class RenameProjectUseCase {
 
       if (!project) {
         return err(domainError.notFound("project", input.projectId));
+      }
+
+      const organizationId =
+        project.toState().organizationId?.value ?? defaultSelfHostedOrganizationId;
+      if (renameProjectOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: renameProjectOperation,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          organizationId,
+          resourceRefs: {
+            projectId: input.projectId,
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
       }
 
       const existing = await projectRepository.findOne(

@@ -278,3 +278,10 @@ export function createScheduledTaskRunner(input: ScheduledTaskRunnerInput): Sche
     },
   };
 }
+
+export function createDisabledScheduledTaskRunner(): ScheduledTaskRunner {
+  return {
+    start(): void {},
+    stop(): void {},
+  };
+}

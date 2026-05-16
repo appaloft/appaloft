@@ -1,6 +1,6 @@
 import { AggregateRoot } from "../shared/entity";
 import { domainError } from "../shared/errors";
-import { type ProjectId } from "../shared/identifiers";
+import { OrganizationId, type ProjectId } from "../shared/identifiers";
 import { err, ok, type Result } from "../shared/result";
 import { ProjectLifecycleStatusValue } from "../shared/state-machine";
 import {
@@ -18,6 +18,7 @@ import {
 
 export interface ProjectState {
   id: ProjectId;
+  organizationId?: OrganizationId;
   name: ProjectName;
   slug: ProjectSlug;
   description?: DescriptionText;
@@ -31,6 +32,8 @@ export interface ProjectState {
 export interface ProjectVisitor<TContext, TResult> {
   visitProject(project: Project, context: TContext): TResult;
 }
+
+export const defaultSelfHostedOrganizationId = "org_self_hosted";
 
 function projectArchivedError(input: {
   projectId: ProjectId;
@@ -55,6 +58,7 @@ export class Project extends AggregateRoot<ProjectState> {
 
   static create(input: {
     id: ProjectId;
+    organizationId?: OrganizationId;
     name: ProjectName;
     description?: DescriptionText;
     createdAt: CreatedAt;
@@ -62,6 +66,8 @@ export class Project extends AggregateRoot<ProjectState> {
     return ProjectSlug.fromName(input.name).map((slug) => {
       const project = new Project({
         id: input.id,
+        organizationId:
+          input.organizationId ?? OrganizationId.rehydrate(defaultSelfHostedOrganizationId),
         name: input.name,
         slug,
         lifecycleStatus: ProjectLifecycleStatusValue.active(),
@@ -70,6 +76,7 @@ export class Project extends AggregateRoot<ProjectState> {
       });
 
       project.recordDomainEvent("project.created", input.createdAt, {
+        organizationId: project.toState().organizationId?.value ?? defaultSelfHostedOrganizationId,
         slug: slug.value,
       });
 
@@ -80,6 +87,8 @@ export class Project extends AggregateRoot<ProjectState> {
   static rehydrate(state: ProjectState): Project {
     return new Project({
       ...state,
+      organizationId:
+        state.organizationId ?? OrganizationId.rehydrate(defaultSelfHostedOrganizationId),
       lifecycleStatus: state.lifecycleStatus ?? ProjectLifecycleStatusValue.active(),
       ...(state.archivedAt ? { archivedAt: state.archivedAt } : {}),
       ...(state.archiveReason ? { archiveReason: state.archiveReason } : {}),
