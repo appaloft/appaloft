@@ -33,8 +33,12 @@ import {
 
 import { createExecutionContext, toRepositoryContext } from "../src";
 import {
+  CreateResourceSecretReferenceUseCase,
+  DeleteResourceSecretReferenceUseCase,
   ImportResourceVariablesUseCase,
   ResourceEffectiveConfigQueryService,
+  ResourceSecretReferenceQueryService,
+  RotateResourceSecretReferenceUseCase,
   SetResourceVariableUseCase,
   UnsetResourceVariableUseCase,
 } from "../src/use-cases";
@@ -123,12 +127,31 @@ async function createHarness(input?: { environment?: Environment; resource?: Res
     eventBus,
     setVariableUseCase: new SetResourceVariableUseCase(resources, clock, eventBus, logger),
     importVariablesUseCase: new ImportResourceVariablesUseCase(resources, clock, eventBus, logger),
+    createSecretReferenceUseCase: new CreateResourceSecretReferenceUseCase(
+      resources,
+      clock,
+      eventBus,
+      logger,
+    ),
+    rotateSecretReferenceUseCase: new RotateResourceSecretReferenceUseCase(
+      resources,
+      clock,
+      eventBus,
+      logger,
+    ),
+    deleteSecretReferenceUseCase: new DeleteResourceSecretReferenceUseCase(
+      resources,
+      clock,
+      eventBus,
+      logger,
+    ),
     unsetVariableUseCase: new UnsetResourceVariableUseCase(resources, clock, eventBus, logger),
     effectiveConfigQueryService: new ResourceEffectiveConfigQueryService(
       resources,
       environments,
       clock,
     ),
+    secretReferenceQueryService: new ResourceSecretReferenceQueryService(resources, clock),
   };
 }
 
@@ -245,6 +268,138 @@ describe("resource config operations", () => {
         }),
       ]),
     );
+  });
+
+  test("[RES-SECRET-CRUD-001] [RES-SECRET-CRUD-004] creates and lists masked resource secret references", async () => {
+    const { context, createSecretReferenceUseCase, eventBus, secretReferenceQueryService } =
+      await createHarness();
+
+    const createResult = await createSecretReferenceUseCase.execute(context, {
+      resourceId: "res_web",
+      key: "WEBHOOK_SECRET",
+      value: "super-secret",
+      exposure: "runtime",
+    });
+
+    expect(createResult.isOk()).toBe(true);
+    expect(createResult._unsafeUnwrap()).toEqual({
+      resourceId: "res_web",
+      key: "WEBHOOK_SECRET",
+      exposure: "runtime",
+    });
+    expect(eventBus.events).toEqual([
+      expect.objectContaining({
+        type: "resource-secret-reference-created",
+        aggregateId: "res_web",
+        payload: expect.objectContaining({
+          secretKey: "WEBHOOK_SECRET",
+          exposure: "runtime",
+        }),
+      }),
+    ]);
+
+    const listResult = await secretReferenceQueryService.list(context, {
+      resourceId: "res_web",
+      exposure: "runtime",
+    });
+
+    expect(listResult.isOk()).toBe(true);
+    expect(listResult._unsafeUnwrap()).toEqual({
+      schemaVersion: "resources.secrets.list/v1",
+      resourceId: "res_web",
+      items: [
+        {
+          resourceId: "res_web",
+          key: "WEBHOOK_SECRET",
+          value: "****",
+          scope: "resource",
+          exposure: "runtime",
+          kind: "secret",
+          isSecret: true,
+          updatedAt: "2026-01-01T00:00:10.000Z",
+        },
+      ],
+      generatedAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
+  test("[RES-SECRET-CRUD-002] [RES-SECRET-CRUD-005] updates and shows one masked resource secret reference", async () => {
+    const {
+      context,
+      createSecretReferenceUseCase,
+      secretReferenceQueryService,
+      rotateSecretReferenceUseCase,
+    } = await createHarness();
+
+    await createSecretReferenceUseCase
+      .execute(context, {
+        resourceId: "res_web",
+        key: "WEBHOOK_SECRET",
+        value: "old-secret",
+        exposure: "runtime",
+      })
+      .then((result) => expect(result.isOk()).toBe(true));
+
+    const updateResult = await rotateSecretReferenceUseCase.execute(context, {
+      resourceId: "res_web",
+      key: "WEBHOOK_SECRET",
+      value: "new-secret",
+      exposure: "runtime",
+    });
+
+    expect(updateResult.isOk()).toBe(true);
+    const showResult = await secretReferenceQueryService.show(context, {
+      resourceId: "res_web",
+      key: "WEBHOOK_SECRET",
+      exposure: "runtime",
+    });
+
+    expect(showResult.isOk()).toBe(true);
+    expect(showResult._unsafeUnwrap()).toEqual({
+      schemaVersion: "resources.secrets.show/v1",
+      secret: {
+        resourceId: "res_web",
+        key: "WEBHOOK_SECRET",
+        value: "****",
+        scope: "resource",
+        exposure: "runtime",
+        kind: "secret",
+        isSecret: true,
+        updatedAt: "2026-01-01T00:00:10.000Z",
+      },
+      generatedAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
+  test("[RES-SECRET-CRUD-003] deletes an existing resource secret reference", async () => {
+    const {
+      context,
+      createSecretReferenceUseCase,
+      deleteSecretReferenceUseCase,
+      secretReferenceQueryService,
+    } = await createHarness();
+
+    await createSecretReferenceUseCase
+      .execute(context, {
+        resourceId: "res_web",
+        key: "WEBHOOK_SECRET",
+        value: "old-secret",
+        exposure: "runtime",
+      })
+      .then((result) => expect(result.isOk()).toBe(true));
+
+    const deleteResult = await deleteSecretReferenceUseCase.execute(context, {
+      resourceId: "res_web",
+      key: "WEBHOOK_SECRET",
+      exposure: "runtime",
+    });
+
+    expect(deleteResult.isOk()).toBe(true);
+    const listResult = await secretReferenceQueryService.list(context, {
+      resourceId: "res_web",
+    });
+    expect(listResult.isOk()).toBe(true);
+    expect(listResult._unsafeUnwrap().items).toEqual([]);
   });
 
   test("[RES-PROFILE-CONFIG-003] rejects build-time secret variables", async () => {

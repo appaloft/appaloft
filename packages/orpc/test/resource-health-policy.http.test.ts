@@ -11,6 +11,7 @@ import {
   type ExecutionContextFactory,
   type Query,
   type QueryBus,
+  ResetResourceHealthCommand,
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
@@ -85,5 +86,39 @@ describe("resource health policy HTTP route", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ id: "res_web" });
     expect(capturedCommand).toBeInstanceOf(ConfigureResourceHealthCommand);
+  });
+
+  test("[RES-HEALTH-CFG-007] dispatches ResetResourceHealthCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "res_web" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/resources/res_web/health-policy/reset", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ resourceId: "res_web" }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ id: "res_web" });
+    expect(capturedCommand).toBeInstanceOf(ResetResourceHealthCommand);
   });
 });

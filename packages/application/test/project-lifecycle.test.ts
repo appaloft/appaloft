@@ -7,6 +7,7 @@ import {
   CreatedAt,
   DescriptionText,
   type DomainEvent,
+  ok,
   Project,
   ProjectByIdSpec,
   ProjectId,
@@ -28,8 +29,12 @@ import {
 import { createExecutionContext, toRepositoryContext } from "../src";
 import {
   ArchiveProjectUseCase,
+  CheckProjectDeleteSafetyQueryService,
   CreateEnvironmentUseCase,
+  DeleteProjectUseCase,
   RenameProjectUseCase,
+  RestoreProjectUseCase,
+  SetProjectDescriptionUseCase,
   ShowProjectQueryService,
 } from "../src/use-cases";
 
@@ -57,7 +62,12 @@ function projectFixture(input?: {
 
 function projectEvent(
   events: unknown[],
-  type: "project-renamed" | "project-archived",
+  type:
+    | "project-renamed"
+    | "project-description-set"
+    | "project-archived"
+    | "project-restored"
+    | "project-deleted",
 ): DomainEvent {
   const event = events.find(
     (candidate): candidate is DomainEvent =>
@@ -71,6 +81,21 @@ function projectEvent(
   }
 
   return event;
+}
+
+class FakeProjectDeletionBlockerReader {
+  constructor(
+    private readonly blockers: Array<{
+      kind: "environment" | "resource" | "deployment-history" | "audit-retention";
+      relatedEntityId?: string;
+      relatedEntityType?: string;
+      count?: number;
+    }> = [],
+  ) {}
+
+  async findBlockers() {
+    return ok(this.blockers);
+  }
 }
 
 async function createHarness(projectsInput: Project[] = [projectFixture()]) {
@@ -178,6 +203,93 @@ describe("project lifecycle operations", () => {
     expect(eventBus.events).toHaveLength(0);
   });
 
+  test("[PROJ-LIFE-DESC-001][PROJ-LIFE-EVT-003] sets project description metadata only", async () => {
+    const { clock, context, eventBus, logger, projects, repositoryContext } = await createHarness();
+    const useCase = new SetProjectDescriptionUseCase(projects, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      description: "Customer API workspace",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await projects.findOne(
+      repositoryContext,
+      ProjectByIdSpec.create(ProjectId.rehydrate("prj_demo")),
+    );
+    const state = persisted?.toState();
+    expect(state?.description?.value).toBe("Customer API workspace");
+    expect(state?.name.value).toBe("Demo Project");
+    expect(state?.slug.value).toBe("demo-project");
+    expect(state?.lifecycleStatus.value).toBe("active");
+
+    const event = projectEvent(eventBus.events, "project-description-set");
+    expect(event.aggregateId).toBe("prj_demo");
+    expect(event.payload).toMatchObject({
+      projectId: "prj_demo",
+      projectSlug: "demo-project",
+      previousDescription: "Demo project",
+      nextDescription: "Customer API workspace",
+      changedAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
+  test("[PROJ-LIFE-DESC-002][PROJ-LIFE-DESC-003] clears descriptions idempotently", async () => {
+    const { clock, context, eventBus, logger, projects, repositoryContext } = await createHarness();
+    const useCase = new SetProjectDescriptionUseCase(projects, clock, eventBus, logger);
+
+    const first = await useCase.execute(context, {
+      projectId: "prj_demo",
+      description: "",
+    });
+    const second = await useCase.execute(context, {
+      projectId: "prj_demo",
+      description: "",
+    });
+
+    expect(first.isOk()).toBe(true);
+    expect(second.isOk()).toBe(true);
+    const persisted = await projects.findOne(
+      repositoryContext,
+      ProjectByIdSpec.create(ProjectId.rehydrate("prj_demo")),
+    );
+    expect(persisted?.toState().description).toBeUndefined();
+    expect(
+      eventBus.events.filter(
+        (event): event is DomainEvent =>
+          Boolean(event) &&
+          typeof event === "object" &&
+          (event as { type?: unknown }).type === "project-description-set",
+      ),
+    ).toHaveLength(1);
+  });
+
+  test("[PROJ-LIFE-DESC-004] rejects description changes after archive", async () => {
+    const { clock, context, eventBus, logger, projects } = await createHarness([
+      projectFixture({
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:00:05.000Z",
+      }),
+    ]);
+    const useCase = new SetProjectDescriptionUseCase(projects, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      description: "Should not persist",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "project_archived",
+      details: {
+        commandName: "projects.set-description",
+        lifecycleStatus: "archived",
+        projectId: "prj_demo",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
   test("[PROJ-LIFE-ARCHIVE-001] archives an active project and publishes project-archived", async () => {
     const { clock, context, eventBus, logger, projects, repositoryContext } = await createHarness();
     const useCase = new ArchiveProjectUseCase(projects, clock, eventBus, logger);
@@ -230,6 +342,240 @@ describe("project lifecycle operations", () => {
     );
     expect(persisted?.toState().archivedAt?.value).toBe("2026-01-01T00:00:05.000Z");
     expect(persisted?.toState().archiveReason?.value).toBe("Existing reason");
+  });
+
+  test("[PROJ-LIFE-RESTORE-001][PROJ-LIFE-EVT-004] restores an archived project and publishes project-restored", async () => {
+    const { clock, context, eventBus, logger, projects, repositoryContext } = await createHarness([
+      projectFixture({
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:00:05.000Z",
+        archiveReason: "Existing reason",
+      }),
+    ]);
+    const useCase = new RestoreProjectUseCase(projects, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await projects.findOne(
+      repositoryContext,
+      ProjectByIdSpec.create(ProjectId.rehydrate("prj_demo")),
+    );
+    const state = persisted?.toState();
+    expect(state?.lifecycleStatus.value).toBe("active");
+    expect(state?.archivedAt).toBeUndefined();
+    expect(state?.archiveReason).toBeUndefined();
+
+    const event = projectEvent(eventBus.events, "project-restored");
+    expect(event.aggregateId).toBe("prj_demo");
+    expect(event.payload).toMatchObject({
+      projectId: "prj_demo",
+      projectSlug: "demo-project",
+      restoredAt: "2026-01-01T00:00:10.000Z",
+      previousArchivedAt: "2026-01-01T00:00:05.000Z",
+      previousArchiveReason: "Existing reason",
+    });
+  });
+
+  test("[PROJ-LIFE-RESTORE-002] treats an already active project as idempotent", async () => {
+    const { clock, context, eventBus, logger, projects, repositoryContext } = await createHarness();
+    const useCase = new RestoreProjectUseCase(projects, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(eventBus.events).toHaveLength(0);
+    const persisted = await projects.findOne(
+      repositoryContext,
+      ProjectByIdSpec.create(ProjectId.rehydrate("prj_demo")),
+    );
+    expect(persisted?.toState().lifecycleStatus.value).toBe("active");
+  });
+
+  test("[PROJ-LIFE-DELETE-CHECK-001] active project delete-check returns active-project blocker", async () => {
+    const { clock, context, projectReadModel } = await createHarness();
+    const service = new CheckProjectDeleteSafetyQueryService(
+      projectReadModel,
+      new FakeProjectDeletionBlockerReader(),
+      clock,
+    );
+
+    const result = await service.execute(context, { projectId: "prj_demo" });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      schemaVersion: "projects.delete-check/v1",
+      projectId: "prj_demo",
+      lifecycleStatus: "active",
+      eligible: false,
+      blockers: [
+        {
+          kind: "active-project",
+          relatedEntityId: "prj_demo",
+          relatedEntityType: "project",
+          count: 1,
+        },
+      ],
+      checkedAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
+  test("[PROJ-LIFE-DELETE-CHECK-002] archived project delete-check reports retained blockers", async () => {
+    const { clock, context, projectReadModel } = await createHarness([
+      projectFixture({
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:00:05.000Z",
+      }),
+    ]);
+    const service = new CheckProjectDeleteSafetyQueryService(
+      projectReadModel,
+      new FakeProjectDeletionBlockerReader([
+        {
+          kind: "resource",
+          relatedEntityId: "res_demo",
+          relatedEntityType: "resource",
+          count: 1,
+        },
+      ]),
+      clock,
+    );
+
+    const result = await service.execute(context, { projectId: "prj_demo" });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      schemaVersion: "projects.delete-check/v1",
+      projectId: "prj_demo",
+      lifecycleStatus: "archived",
+      eligible: false,
+      blockers: [
+        {
+          kind: "resource",
+          relatedEntityId: "res_demo",
+          relatedEntityType: "resource",
+          count: 1,
+        },
+      ],
+    });
+  });
+
+  test("[PROJ-LIFE-DELETE-001][PROJ-LIFE-EVT-005] deletes an archived project with matching confirmation and no blockers", async () => {
+    const { clock, context, eventBus, logger, projects, projectReadModel, repositoryContext } =
+      await createHarness([
+        projectFixture({
+          lifecycleStatus: "archived",
+          archivedAt: "2026-01-01T00:00:05.000Z",
+          archiveReason: "Retired",
+        }),
+      ]);
+    const useCase = new DeleteProjectUseCase(
+      projects,
+      new FakeProjectDeletionBlockerReader(),
+      clock,
+      eventBus,
+      logger,
+    );
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      confirmation: { projectId: "prj_demo" },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await projects.findOne(
+      repositoryContext,
+      ProjectByIdSpec.create(ProjectId.rehydrate("prj_demo")),
+    );
+    expect(persisted?.toState().lifecycleStatus.value).toBe("deleted");
+    expect(persisted?.toState().deletedAt?.value).toBe("2026-01-01T00:00:10.000Z");
+    await expect(
+      projectReadModel.findOne(
+        repositoryContext,
+        ProjectByIdSpec.create(ProjectId.rehydrate("prj_demo")),
+      ),
+    ).resolves.toBeNull();
+
+    const event = projectEvent(eventBus.events, "project-deleted");
+    expect(event.aggregateId).toBe("prj_demo");
+    expect(event.payload).toMatchObject({
+      projectId: "prj_demo",
+      projectSlug: "demo-project",
+      deletedAt: "2026-01-01T00:00:10.000Z",
+      archivedAt: "2026-01-01T00:00:05.000Z",
+      archiveReason: "Retired",
+    });
+  });
+
+  test("[PROJ-LIFE-DELETE-002] rejects project delete when blockers remain", async () => {
+    const { clock, context, eventBus, logger, projects } = await createHarness([
+      projectFixture({
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:00:05.000Z",
+      }),
+    ]);
+    const useCase = new DeleteProjectUseCase(
+      projects,
+      new FakeProjectDeletionBlockerReader([
+        {
+          kind: "deployment-history",
+          relatedEntityId: "dep_demo",
+          relatedEntityType: "deployment",
+          count: 1,
+        },
+      ]),
+      clock,
+      eventBus,
+      logger,
+    );
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      confirmation: { projectId: "prj_demo" },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "project_delete_blocked",
+      details: {
+        lifecycleStatus: "archived",
+        phase: "project-lifecycle-guard",
+        projectId: "prj_demo",
+        deletionBlockers: ["deployment-history"],
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[PROJ-LIFE-DELETE-003] rejects active project delete before blocker reads", async () => {
+    const { clock, context, eventBus, logger, projects } = await createHarness();
+    const useCase = new DeleteProjectUseCase(
+      projects,
+      new FakeProjectDeletionBlockerReader(),
+      clock,
+      eventBus,
+      logger,
+    );
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      confirmation: { projectId: "prj_demo" },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "project_delete_blocked",
+      details: {
+        lifecycleStatus: "active",
+        phase: "project-lifecycle-guard",
+        projectId: "prj_demo",
+        deletionBlockers: ["active-project"],
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
   });
 
   test("[PROJ-LIFE-MUTATION-GUARD-001] rejects project mutations after archive", async () => {

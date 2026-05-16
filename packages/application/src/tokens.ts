@@ -8,6 +8,7 @@ export const tokens = {
   deploymentEventObserver: Symbol.for("appaloft.deployment_event_observer"),
   sourceLinkRepository: Symbol.for("appaloft.source_link_repository"),
   sourceLinkReadModel: Symbol.for("appaloft.source_link_read_model"),
+  sourceLinkQueryService: Symbol.for("appaloft.source_link_query_service"),
   defaultAccessDomainPolicyRepository: Symbol.for(
     "appaloft.default_access_domain_policy_repository",
   ),
@@ -29,6 +30,7 @@ export const tokens = {
   serverEdgeProxyBootstrapper: Symbol.for("appaloft.server_edge_proxy_bootstrapper"),
   deploymentConfigReader: Symbol.for("appaloft.deployment_config_reader"),
   projectRepository: Symbol.for("appaloft.project_repository"),
+  projectDeletionBlockerReader: Symbol.for("appaloft.project_deletion_blocker_reader"),
   serverRepository: Symbol.for("appaloft.server_repository"),
   serverDeletionBlockerReader: Symbol.for("appaloft.server_deletion_blocker_reader"),
   destinationRepository: Symbol.for("appaloft.destination_repository"),
@@ -107,10 +109,15 @@ export const tokens = {
   resourceAccessFailureEvidenceReadModel: Symbol.for(
     "appaloft.resource_access_failure_evidence_read_model",
   ),
+  resourceHealthObservationRecorder: Symbol.for("appaloft.resource_health_observation_recorder"),
+  resourceHealthObservationHistoryReadModel: Symbol.for(
+    "appaloft.resource_health_observation_history_read_model",
+  ),
   sourceEventRecorder: Symbol.for("appaloft.source_event_recorder"),
   sourceEventPolicyReader: Symbol.for("appaloft.source_event_policy_reader"),
   sourceEventDeploymentDispatcher: Symbol.for("appaloft.source_event_deployment_dispatcher"),
   sourceEventReadModel: Symbol.for("appaloft.source_event_read_model"),
+  sourceEventRetentionStore: Symbol.for("appaloft.source_event_retention_store"),
   auditEventRecorder: Symbol.for("appaloft.audit_event_recorder"),
   auditEventReadModel: Symbol.for("appaloft.audit_event_read_model"),
   auditEventRetentionStore: Symbol.for("appaloft.audit_event_retention_store"),
@@ -121,6 +128,7 @@ export const tokens = {
   domainEventStreamRecorder: Symbol.for("appaloft.domain_event_stream_recorder"),
   domainEventStreamRetentionStore: Symbol.for("appaloft.domain_event_stream_retention_store"),
   deploymentLogRetentionStore: Symbol.for("appaloft.deployment_log_retention_store"),
+  deploymentAttemptRetentionStore: Symbol.for("appaloft.deployment_attempt_retention_store"),
   resourceRuntimeLogArchiveStore: Symbol.for("appaloft.resource_runtime_log_archive_store"),
   retentionDefaultRepository: Symbol.for("appaloft.retention_default_repository"),
   previewLifecycleService: Symbol.for("appaloft.preview_lifecycle_service"),
@@ -189,7 +197,13 @@ export const tokens = {
     "appaloft.change_organization_member_role_use_case",
   ),
   listProjectsQueryService: Symbol.for("appaloft.list_projects_query_service"),
+  checkProjectDeleteSafetyQueryService: Symbol.for(
+    "appaloft.check_project_delete_safety_query_service",
+  ),
+  deleteProjectUseCase: Symbol.for("appaloft.delete_project_use_case"),
   renameProjectUseCase: Symbol.for("appaloft.rename_project_use_case"),
+  restoreProjectUseCase: Symbol.for("appaloft.restore_project_use_case"),
+  setProjectDescriptionUseCase: Symbol.for("appaloft.set_project_description_use_case"),
   showProjectQueryService: Symbol.for("appaloft.show_project_query_service"),
   configureDefaultAccessDomainPolicyUseCase: Symbol.for(
     "appaloft.configure_default_access_domain_policy_use_case",
@@ -273,8 +287,18 @@ export const tokens = {
   configureResourceSourceUseCase: Symbol.for("appaloft.configure_resource_source_use_case"),
   configureResourceAccessUseCase: Symbol.for("appaloft.configure_resource_access_use_case"),
   configureResourceHealthUseCase: Symbol.for("appaloft.configure_resource_health_use_case"),
+  resetResourceHealthUseCase: Symbol.for("appaloft.reset_resource_health_use_case"),
   configureResourceNetworkUseCase: Symbol.for("appaloft.configure_resource_network_use_case"),
   configureResourceRuntimeUseCase: Symbol.for("appaloft.configure_resource_runtime_use_case"),
+  createResourceSecretReferenceUseCase: Symbol.for(
+    "appaloft.create_resource_secret_reference_use_case",
+  ),
+  rotateResourceSecretReferenceUseCase: Symbol.for(
+    "appaloft.update_resource_secret_reference_use_case",
+  ),
+  deleteResourceSecretReferenceUseCase: Symbol.for(
+    "appaloft.delete_resource_secret_reference_use_case",
+  ),
   importResourceVariablesUseCase: Symbol.for("appaloft.import_resource_variables_use_case"),
   setResourceVariableUseCase: Symbol.for("appaloft.set_resource_variable_use_case"),
   unsetResourceVariableUseCase: Symbol.for("appaloft.unset_resource_variable_use_case"),
@@ -347,6 +371,9 @@ export const tokens = {
   resourceEffectiveConfigQueryService: Symbol.for(
     "appaloft.resource_effective_config_query_service",
   ),
+  resourceSecretReferenceQueryService: Symbol.for(
+    "appaloft.resource_secret_reference_query_service",
+  ),
   resourceDiagnosticSummaryQueryService: Symbol.for(
     "appaloft.resource_diagnostic_summary_query_service",
   ),
@@ -355,6 +382,7 @@ export const tokens = {
   ),
   automaticRouteContextLookupService: Symbol.for("appaloft.automatic_route_context_lookup_service"),
   resourceHealthQueryService: Symbol.for("appaloft.resource_health_query_service"),
+  resourceHealthHistoryQueryService: Symbol.for("appaloft.resource_health_history_query_service"),
   resourceHealthProbeRunner: Symbol.for("appaloft.resource_health_probe_runner"),
   resourceRuntimeLogsQueryService: Symbol.for("appaloft.resource_runtime_logs_query_service"),
   archiveResourceRuntimeLogsUseCase: Symbol.for("appaloft.archive_resource_runtime_logs_use_case"),
@@ -386,6 +414,8 @@ export const tokens = {
   runScheduledTaskNowUseCase: Symbol.for("appaloft.run_scheduled_task_now_use_case"),
   scheduledTaskScheduler: Symbol.for("appaloft.scheduled_task_scheduler"),
   ingestSourceEventUseCase: Symbol.for("appaloft.ingest_source_event_use_case"),
+  pruneSourceEventsUseCase: Symbol.for("appaloft.prune_source_events_use_case"),
+  replaySourceEventUseCase: Symbol.for("appaloft.replay_source_event_use_case"),
   sourceEventVerificationPort: Symbol.for("appaloft.source_event_verification_port"),
   githubSourceEventWebhookVerifier: Symbol.for("appaloft.github_source_event_webhook_verifier"),
   githubPreviewPullRequestWebhookVerifier: Symbol.for(
@@ -427,6 +457,7 @@ export const tokens = {
   previewCleanupRetryScheduler: Symbol.for("appaloft.preview_cleanup_retry_scheduler"),
   openTerminalSessionUseCase: Symbol.for("appaloft.open_terminal_session_use_case"),
   terminalSessionLifecycleService: Symbol.for("appaloft.terminal_session_lifecycle_service"),
+  deleteSourceLinkUseCase: Symbol.for("appaloft.delete_source_link_use_case"),
   relinkSourceLinkUseCase: Symbol.for("appaloft.relink_source_link_use_case"),
   resourceProxyConfigurationPreviewQueryService: Symbol.for(
     "appaloft.resource_proxy_configuration_preview_query_service",
@@ -447,6 +478,9 @@ export const tokens = {
   retryDeploymentUseCase: Symbol.for("appaloft.retry_deployment_use_case"),
   redeployDeploymentUseCase: Symbol.for("appaloft.redeploy_deployment_use_case"),
   rollbackDeploymentUseCase: Symbol.for("appaloft.rollback_deployment_use_case"),
+  cancelDeploymentUseCase: Symbol.for("appaloft.cancel_deployment_use_case"),
+  archiveDeploymentUseCase: Symbol.for("appaloft.archive_deployment_use_case"),
+  pruneDeploymentsUseCase: Symbol.for("appaloft.prune_deployments_use_case"),
   cleanupPreviewUseCase: Symbol.for("appaloft.cleanup_preview_use_case"),
   createDomainBindingUseCase: Symbol.for("appaloft.create_domain_binding_use_case"),
   configureDomainBindingRouteUseCase: Symbol.for(

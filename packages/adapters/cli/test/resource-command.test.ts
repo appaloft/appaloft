@@ -404,6 +404,19 @@ describe("CLI resource commands", () => {
     });
   });
 
+  test("[RES-HEALTH-CFG-007] resource reset-health dispatches the application command", async () => {
+    const { ResetResourceHealthCommand } = await import("@appaloft/application");
+    const { commands, program } = await createCommandCaptureHarness(
+      "req_cli_resource_reset_health_test",
+    );
+
+    await parseCli(program, ["node", "appaloft", "resource", "reset-health", "res_demo"]);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ResetResourceHealthCommand);
+    expect(commands[0]).toMatchObject({ resourceId: "res_demo" });
+  });
+
   test("[RES-PROFILE-ENTRY-003] resource set-variable dispatches the application command", async () => {
     ensureReflectMetadata();
     const { SetResourceVariableCommand, createExecutionContext } = await import(
@@ -490,6 +503,90 @@ describe("CLI resource commands", () => {
     expect(commands[0]).toMatchObject({
       resourceId: "res_demo",
       key: "DATABASE_URL",
+      exposure: "runtime",
+    });
+  });
+
+  test("[RES-SECRET-CRUD-008] resource secrets create/update/delete dispatch application commands", async () => {
+    const {
+      CreateResourceSecretReferenceCommand,
+      DeleteResourceSecretReferenceCommand,
+      RotateResourceSecretReferenceCommand,
+    } = await import("@appaloft/application");
+    const { commands, program } = await createCommandCaptureHarness(
+      "req_cli_resource_secrets_commands_test",
+    );
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "secrets",
+      "create",
+      "res_demo",
+      "WEBHOOK_SECRET",
+      "secret",
+    ]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "secrets",
+      "update",
+      "res_demo",
+      "WEBHOOK_SECRET",
+      "rotated",
+      "--exposure",
+      "runtime",
+    ]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "secrets",
+      "delete",
+      "res_demo",
+      "WEBHOOK_SECRET",
+    ]);
+
+    expect(commands).toHaveLength(3);
+    expect(commands[0]).toBeInstanceOf(CreateResourceSecretReferenceCommand);
+    expect(commands[0]).toMatchObject({
+      resourceId: "res_demo",
+      key: "WEBHOOK_SECRET",
+      value: "secret",
+      exposure: "runtime",
+    });
+    expect(commands[1]).toBeInstanceOf(RotateResourceSecretReferenceCommand);
+    expect(commands[2]).toBeInstanceOf(DeleteResourceSecretReferenceCommand);
+  });
+
+  test("[RES-SECRET-CRUD-009] resource secrets list/show dispatch application queries", async () => {
+    const { ListResourceSecretReferencesQuery, ShowResourceSecretReferenceQuery } = await import(
+      "@appaloft/application"
+    );
+    const { program, queries } = await createCommandCaptureHarness(
+      "req_cli_resource_secrets_queries_test",
+    );
+
+    await parseCli(program, ["node", "appaloft", "resource", "secrets", "list", "res_demo"]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "secrets",
+      "show",
+      "res_demo",
+      "WEBHOOK_SECRET",
+    ]);
+
+    expect(queries).toHaveLength(2);
+    expect(queries[0]).toBeInstanceOf(ListResourceSecretReferencesQuery);
+    expect(queries[0]).toMatchObject({ resourceId: "res_demo" });
+    expect(queries[1]).toBeInstanceOf(ShowResourceSecretReferenceQuery);
+    expect(queries[1]).toMatchObject({
+      resourceId: "res_demo",
+      key: "WEBHOOK_SECRET",
       exposure: "runtime",
     });
   });
@@ -607,6 +704,40 @@ describe("CLI resource commands", () => {
       includeChecks: true,
       includePublicAccessProbe: true,
       includeRuntimeProbe: true,
+    });
+  });
+
+  test("[RES-HEALTH-HIST-003] resource health-history dispatches the shared health history query", async () => {
+    const { ResourceHealthHistoryQuery } = await import("@appaloft/application");
+    const { program, queries } = await createCommandCaptureHarness(
+      "req_cli_resource_health_history_test",
+    );
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "health-history",
+      "res_demo",
+      "--from",
+      "2026-01-01T00:00:00.000Z",
+      "--to",
+      "2026-01-01T01:00:00.000Z",
+      "--limit",
+      "25",
+    ]);
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(ResourceHealthHistoryQuery);
+    expect(queries[0]).toMatchObject({
+      input: {
+        resourceId: "res_demo",
+        window: {
+          from: "2026-01-01T00:00:00.000Z",
+          to: "2026-01-01T01:00:00.000Z",
+        },
+        limit: 25,
+      },
     });
   });
 

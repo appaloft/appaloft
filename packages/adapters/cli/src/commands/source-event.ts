@@ -1,7 +1,12 @@
-import { ListSourceEventsQuery, ShowSourceEventQuery } from "@appaloft/application";
+import {
+  ListSourceEventsQuery,
+  PruneSourceEventsCommand,
+  ReplaySourceEventCommand,
+  ShowSourceEventQuery,
+} from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
-import { optionalValue, runQuery } from "../runtime.js";
+import { optionalValue, runCommand, runQuery } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const sourceEventIdArg = Args.text({ name: "sourceEventId" });
@@ -20,6 +25,9 @@ const statusOption = Options.choice("status", sourceEventStatuses).pipe(Options.
 const sourceKindOption = Options.choice("source-kind", sourceEventKinds).pipe(Options.optional);
 const limitOption = Options.text("limit").pipe(Options.optional);
 const cursorOption = Options.text("cursor").pipe(Options.optional);
+const idempotencyKeyOption = Options.text("idempotency-key").pipe(Options.optional);
+const beforeOption = Options.text("before");
+const dryRunOption = Options.choice("dry-run", ["true", "false"]).pipe(Options.optional);
 
 function optionalLimit(value?: string): number | undefined {
   if (!value) {
@@ -73,7 +81,49 @@ const showCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.sourceEventShow));
 
+const replayCommand = EffectCommand.make(
+  "replay",
+  {
+    sourceEventId: sourceEventIdArg,
+    project: projectOption,
+    resource: resourceOption,
+    idempotencyKey: idempotencyKeyOption,
+  },
+  ({ idempotencyKey, project, resource, sourceEventId }) =>
+    runCommand(
+      ReplaySourceEventCommand.create({
+        sourceEventId,
+        ...(optionalValue(project) ? { projectId: optionalValue(project) } : {}),
+        ...(optionalValue(resource) ? { resourceId: optionalValue(resource) } : {}),
+        ...(optionalValue(idempotencyKey) ? { idempotencyKey: optionalValue(idempotencyKey) } : {}),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.sourceEventReplay));
+
+const pruneCommand = EffectCommand.make(
+  "prune",
+  {
+    before: beforeOption,
+    project: projectOption,
+    resource: resourceOption,
+    status: statusOption,
+    sourceKind: sourceKindOption,
+    dryRun: dryRunOption,
+  },
+  ({ before, dryRun, project, resource, sourceKind, status }) =>
+    runCommand(
+      PruneSourceEventsCommand.create({
+        before,
+        dryRun: optionalValue(dryRun) !== "false",
+        ...(optionalValue(project) ? { projectId: optionalValue(project) } : {}),
+        ...(optionalValue(resource) ? { resourceId: optionalValue(resource) } : {}),
+        ...(optionalValue(status) ? { status: optionalValue(status) } : {}),
+        ...(optionalValue(sourceKind) ? { sourceKind: optionalValue(sourceKind) } : {}),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.sourceEventPrune));
+
 export const sourceEventCommand = EffectCommand.make("source-event").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.sourceEvent),
-  EffectCommand.withSubcommands([listCommand, showCommand]),
+  EffectCommand.withSubcommands([listCommand, showCommand, replayCommand, pruneCommand]),
 );

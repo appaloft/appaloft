@@ -1,3 +1,5 @@
+import { type ConfigScope, type VariableExposure, type VariableKind } from "@appaloft/core";
+
 import {
   type DeploymentSummary,
   type RequestedDeploymentMethod,
@@ -27,6 +29,16 @@ export interface ResourceProfileDriftProfile {
   runtimeProfile?: LoosePartial<ResourceDetailRuntimeProfile>;
   networkProfile?: LoosePartial<ResourceDetailNetworkProfile>;
   accessProfile?: LoosePartial<ResourceAccessProfile>;
+  configuration?: ResourceProfileConfigurationEntry[];
+}
+
+export interface ResourceProfileConfigurationEntry {
+  key: string;
+  value: string;
+  kind: VariableKind;
+  exposure: VariableExposure;
+  scope: ConfigScope;
+  isSecret: boolean;
 }
 
 interface ProfileFieldDefinition {
@@ -160,6 +172,18 @@ function diagnosticValue(value: ComparableValue): ResourceProfileDiagnosticValue
   };
 }
 
+function configurationDiagnosticValue(
+  value: ResourceProfileConfigurationEntry | undefined,
+): ResourceProfileDiagnosticValue {
+  if (!value) {
+    return { state: "missing" };
+  }
+
+  return {
+    state: value.isSecret || value.kind === "secret" ? "redacted" : "masked",
+  };
+}
+
 function messageFor(input: {
   comparison: ResourceProfileDriftComparison;
   fieldPath: string;
@@ -173,6 +197,23 @@ function messageFor(input: {
   }
 
   return `Resource profile differs from latest deployment snapshot at ${input.fieldPath}.`;
+}
+
+function configurationEntriesByIdentity(
+  entries: ResourceProfileConfigurationEntry[] | undefined,
+): Map<string, ResourceProfileConfigurationEntry> {
+  return new Map((entries ?? []).map((entry) => [`${entry.key}:${entry.exposure}`, entry]));
+}
+
+function configurationFieldPath(entry: ResourceProfileConfigurationEntry): string {
+  return `configuration.${entry.exposure}.${entry.key}`;
+}
+
+function configurationSuggestedCommand(input: {
+  comparedValue: ResourceProfileConfigurationEntry | undefined;
+  resourceValue: ResourceProfileConfigurationEntry | undefined;
+}): ResourceProfileDriftSuggestedCommand {
+  return input.comparedValue ? "resources.set-variable" : "resources.unset-variable";
 }
 
 function configPointerFor(input: {
@@ -195,7 +236,7 @@ function configPointerFor(input: {
 export function compareResourceProfileDrift(
   input: ResourceProfileDriftInput,
 ): ResourceDetailProfileDiagnostic[] {
-  return profileFieldDefinitions.flatMap((field) => {
+  const profileDrift = profileFieldDefinitions.flatMap((field) => {
     const resourceValue = field.getValue(input.resource);
     const comparedValue = field.getValue(input.profile);
 
@@ -225,6 +266,68 @@ export function compareResourceProfileDrift(
 
     return [diagnostic];
   });
+
+  const resourceConfiguration = configurationEntriesByIdentity(input.resource.configuration);
+  const comparedConfiguration = configurationEntriesByIdentity(input.profile.configuration);
+  const configurationDrift = [
+    ...new Set([...resourceConfiguration.keys(), ...comparedConfiguration.keys()]),
+  ]
+    .sort()
+    .flatMap((identity) => {
+      const resourceValue = resourceConfiguration.get(identity);
+      const comparedValue = comparedConfiguration.get(identity);
+
+      if (
+        resourceValue?.value === comparedValue?.value &&
+        resourceValue?.scope === comparedValue?.scope &&
+        resourceValue?.kind === comparedValue?.kind &&
+        resourceValue?.isSecret === comparedValue?.isSecret
+      ) {
+        return [];
+      }
+
+      if (!resourceValue && !comparedValue) {
+        return [];
+      }
+
+      const representative = resourceValue ?? comparedValue;
+      if (!representative) {
+        return [];
+      }
+
+      const fieldPath = configurationFieldPath(representative);
+      const configPointer = configPointerFor({
+        prefix: input.configPointerPrefix,
+        fieldPath,
+      });
+      const diagnostic = {
+        code: "resource_profile_drift",
+        severity: input.blocksDeploymentAdmission ? "blocking" : "info",
+        message: messageFor({ comparison: input.comparison, fieldPath }),
+        path: fieldPath,
+        section: "configuration",
+        fieldPath,
+        configKey: representative.key,
+        configExposure: representative.exposure,
+        configKind: representative.kind,
+        configScope: representative.scope,
+        configSource:
+          input.comparison === "resource-vs-latest-snapshot"
+            ? "deployment-snapshot"
+            : "entry-profile",
+        comparison: input.comparison,
+        resourceValue: configurationDiagnosticValue(resourceValue),
+        [input.comparedValueKey]: configurationDiagnosticValue(comparedValue),
+        ...(input.latestDeploymentId ? { latestDeploymentId: input.latestDeploymentId } : {}),
+        ...(configPointer ? { configPointer } : {}),
+        blocksDeploymentAdmission: input.blocksDeploymentAdmission,
+        suggestedCommand: configurationSuggestedCommand({ comparedValue, resourceValue }),
+      } satisfies ResourceDetailProfileDiagnostic;
+
+      return [diagnostic];
+    });
+
+  return [...profileDrift, ...configurationDrift];
 }
 
 function buildStrategyToDeploymentMethod(
@@ -271,6 +374,14 @@ export function resourceProfileFromDeploymentSnapshot(
       generatedAccessMode: execution.accessRoutes?.length ? "inherit" : "disabled",
       pathPrefix: execution.accessRoutes?.[0]?.pathPrefix ?? "/",
     },
+    configuration: deployment.environmentSnapshot.variables.map((variable) => ({
+      key: variable.key,
+      value: variable.value,
+      kind: variable.kind,
+      exposure: variable.exposure,
+      scope: variable.scope,
+      isSecret: variable.isSecret,
+    })),
   };
 }
 

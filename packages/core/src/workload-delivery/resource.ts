@@ -41,7 +41,7 @@ import {
   type ResourceServiceKindValue,
   type RuntimePlanStrategyValue,
   VariableExposureValue,
-  type VariableKindValue,
+  VariableKindValue,
 } from "../shared/state-machine";
 import {
   type ArchivedAt,
@@ -1048,6 +1048,165 @@ export class Resource extends AggregateRoot<ResourceState> {
       });
   }
 
+  createSecretReference(input: {
+    key: ConfigKey;
+    value: ConfigValueText;
+    exposure: VariableExposureValue;
+    updatedAt: UpdatedAt;
+  }): Result<void> {
+    const active = this.rejectInactiveResource("resources.secrets.create");
+    if (active.isErr()) {
+      return active;
+    }
+
+    const scope = ConfigScopeValue.rehydrate("resource");
+    const configSet = EnvironmentConfigSet.rehydrate(this.state.variables.toState());
+    const existing = configSet.find((entry) =>
+      entry.matchesVariable({ key: input.key, exposure: input.exposure, scope }),
+    );
+
+    if (existing) {
+      return err(
+        domainError.validation("Resource secret reference already exists", {
+          phase: "resource-secret-reference-lifecycle",
+          resourceId: this.state.id.value,
+          secretKey: input.key.value,
+          exposure: input.exposure.value,
+        }),
+      );
+    }
+
+    return configSet
+      .setEntry({
+        key: input.key,
+        value: input.value,
+        kind: VariableKindValue.rehydrate("secret"),
+        exposure: input.exposure,
+        scope,
+        isSecret: true,
+        updatedAt: input.updatedAt,
+      })
+      .map((nextEntry) => {
+        this.state.variables = configSet;
+        this.recordDomainEvent("resource-secret-reference-created", input.updatedAt, {
+          resourceId: this.state.id.value,
+          projectId: this.state.projectId.value,
+          environmentId: this.state.environmentId.value,
+          secretKey: nextEntry.toState().key.value,
+          exposure: nextEntry.toState().exposure.value,
+          createdAt: input.updatedAt.value,
+        });
+        return undefined;
+      });
+  }
+
+  rotateSecretReference(input: {
+    key: ConfigKey;
+    value: ConfigValueText;
+    exposure: VariableExposureValue;
+    updatedAt: UpdatedAt;
+  }): Result<void> {
+    const active = this.rejectInactiveResource("resources.secrets.rotate");
+    if (active.isErr()) {
+      return active;
+    }
+
+    const scope = ConfigScopeValue.rehydrate("resource");
+    const configSet = EnvironmentConfigSet.rehydrate(this.state.variables.toState());
+    const existing = configSet.find((entry) =>
+      entry.matchesVariable({ key: input.key, exposure: input.exposure, scope }),
+    );
+
+    if (!existing) {
+      return err(domainError.notFound("resource_secret_reference", input.key.value));
+    }
+
+    if (!existing.isSecret || existing.kind !== "secret") {
+      return err(
+        domainError.validation("Resource config entry is not a secret reference", {
+          phase: "resource-secret-reference-lifecycle",
+          resourceId: this.state.id.value,
+          secretKey: input.key.value,
+          exposure: input.exposure.value,
+        }),
+      );
+    }
+
+    return configSet
+      .setEntry({
+        key: input.key,
+        value: input.value,
+        kind: VariableKindValue.rehydrate("secret"),
+        exposure: input.exposure,
+        scope,
+        isSecret: true,
+        updatedAt: input.updatedAt,
+      })
+      .map((nextEntry) => {
+        this.state.variables = configSet;
+        this.recordDomainEvent("resource-secret-reference-rotated", input.updatedAt, {
+          resourceId: this.state.id.value,
+          projectId: this.state.projectId.value,
+          environmentId: this.state.environmentId.value,
+          secretKey: nextEntry.toState().key.value,
+          exposure: nextEntry.toState().exposure.value,
+          updatedAt: input.updatedAt.value,
+        });
+        return undefined;
+      });
+  }
+
+  deleteSecretReference(input: {
+    key: ConfigKey;
+    exposure: VariableExposureValue;
+    updatedAt: UpdatedAt;
+  }): Result<void> {
+    const active = this.rejectInactiveResource("resources.secrets.delete");
+    if (active.isErr()) {
+      return active;
+    }
+
+    const scope = ConfigScopeValue.rehydrate("resource");
+    const configSet = EnvironmentConfigSet.rehydrate(this.state.variables.toState());
+    const existing = configSet.find((entry) =>
+      entry.matchesVariable({ key: input.key, exposure: input.exposure, scope }),
+    );
+
+    if (!existing) {
+      return err(domainError.notFound("resource_secret_reference", input.key.value));
+    }
+
+    if (!existing.isSecret || existing.kind !== "secret") {
+      return err(
+        domainError.validation("Resource config entry is not a secret reference", {
+          phase: "resource-secret-reference-lifecycle",
+          resourceId: this.state.id.value,
+          secretKey: input.key.value,
+          exposure: input.exposure.value,
+        }),
+      );
+    }
+
+    return configSet
+      .unsetEntry({
+        key: input.key,
+        exposure: input.exposure,
+        scope,
+      })
+      .map(() => {
+        this.state.variables = configSet;
+        this.recordDomainEvent("resource-secret-reference-deleted", input.updatedAt, {
+          resourceId: this.state.id.value,
+          projectId: this.state.projectId.value,
+          environmentId: this.state.environmentId.value,
+          secretKey: input.key.value,
+          exposure: input.exposure.value,
+          deletedAt: input.updatedAt.value,
+        });
+        return undefined;
+      });
+  }
+
   unsetVariable(input: {
     key: ConfigKey;
     exposure: VariableExposureValue;
@@ -1593,6 +1752,31 @@ export class Resource extends AggregateRoot<ResourceState> {
       retries: input.policy.retries.value,
       startPeriodSeconds: input.policy.startPeriodSeconds.value,
       configuredAt: input.configuredAt.value,
+    });
+
+    return ok(undefined);
+  }
+
+  resetHealthPolicy(input: { resetAt: UpdatedAt }): Result<void> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.reset-health");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    const currentProfile = this.state.runtimeProfile;
+    if (currentProfile) {
+      const { healthCheck, healthCheckPath, ...rest } =
+        cloneResourceRuntimeProfileState(currentProfile);
+      void healthCheck;
+      void healthCheckPath;
+      this.state.runtimeProfile = rest;
+    }
+
+    this.recordDomainEvent("resource-health-policy-reset", input.resetAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resetAt: input.resetAt.value,
     });
 
     return ok(undefined);

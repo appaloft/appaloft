@@ -263,6 +263,9 @@ function toDeploymentSummary(
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
     ...(startedAt ? { startedAt } : {}),
     ...(finishedAt ? { finishedAt } : {}),
+    ...(row.archived_at
+      ? { archivedAt: normalizeTimestamp(row.archived_at) ?? row.archived_at }
+      : {}),
     ...(row.rollback_of_deployment_id
       ? { rollbackOfDeploymentId: row.rollback_of_deployment_id }
       : {}),
@@ -280,6 +283,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
     input?: {
       projectId?: string;
       resourceId?: string;
+      includeArchived?: boolean;
     },
   ) {
     const executor = resolveRepositoryExecutor(this.db, context);
@@ -299,6 +303,10 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
 
         if (input?.resourceId) {
           query = query.where("resource_id", "=", input.resourceId);
+        }
+
+        if (!input?.includeArchived) {
+          query = query.where("archived_at", "is", null);
         }
 
         const rows = await query.execute();

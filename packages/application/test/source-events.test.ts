@@ -12,9 +12,12 @@ import {
   type SourceEventOutcomeUpdate,
   type SourceEventPolicyCandidate,
   type SourceEventPolicyReader,
+  type SourceEventPruneInput,
+  type SourceEventPruneStoreResult,
   type SourceEventReadModel,
   type SourceEventRecord,
   type SourceEventRecorder,
+  type SourceEventRetentionStore,
   type SourceEventShowInput,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
@@ -26,6 +29,9 @@ import { GenericSignedSourceEventVerifier } from "../src/operations/source-event
 import { IngestSourceEventUseCase } from "../src/operations/source-events/ingest-source-event.use-case";
 import { ListSourceEventsQuery } from "../src/operations/source-events/list-source-events.query";
 import { ListSourceEventsQueryService } from "../src/operations/source-events/list-source-events.query-service";
+import { PruneSourceEventsCommand } from "../src/operations/source-events/prune-source-events.command";
+import { PruneSourceEventsUseCase } from "../src/operations/source-events/prune-source-events.use-case";
+import { ReplaySourceEventUseCase } from "../src/operations/source-events/replay-source-event.use-case";
 import { ShowSourceEventQuery } from "../src/operations/source-events/show-source-event.query";
 import { ShowSourceEventQueryService } from "../src/operations/source-events/show-source-event.query-service";
 
@@ -38,7 +44,9 @@ class SequentialIdGenerator {
   }
 }
 
-class MemorySourceEventStore implements SourceEventRecorder, SourceEventReadModel {
+class MemorySourceEventStore
+  implements SourceEventRecorder, SourceEventReadModel, SourceEventRetentionStore
+{
   readonly records: SourceEventRecord[] = [];
 
   async findByDedupeKey(
@@ -125,6 +133,48 @@ class MemorySourceEventStore implements SourceEventRecorder, SourceEventReadMode
           (!input.resourceId || record.matchedResourceIds.includes(input.resourceId)),
       ) ?? null
     );
+  }
+
+  async prune(
+    _context: RepositoryContext,
+    input: SourceEventPruneInput,
+  ): Promise<Result<SourceEventPruneStoreResult>> {
+    const matches = this.records.filter(
+      (record) =>
+        record.receivedAt < input.before &&
+        (!input.projectId || record.projectId === input.projectId) &&
+        (!input.resourceId || record.matchedResourceIds.includes(input.resourceId)) &&
+        (!input.status || record.status === input.status) &&
+        (!input.sourceKind || record.sourceKind === input.sourceKind),
+    );
+    const countsByStatus: Record<string, number> = {};
+    const countsBySourceKind: Record<string, number> = {};
+    for (const record of matches) {
+      countsByStatus[record.status] = (countsByStatus[record.status] ?? 0) + 1;
+      countsBySourceKind[record.sourceKind] = (countsBySourceKind[record.sourceKind] ?? 0) + 1;
+    }
+
+    if (input.dryRun) {
+      return ok({
+        matchedCount: matches.length,
+        prunedCount: 0,
+        countsByStatus,
+        countsBySourceKind,
+      });
+    }
+
+    this.records.splice(
+      0,
+      this.records.length,
+      ...this.records.filter((record) => !matches.includes(record)),
+    );
+
+    return ok({
+      matchedCount: matches.length,
+      prunedCount: matches.length,
+      countsByStatus,
+      countsBySourceKind,
+    });
   }
 }
 
@@ -274,6 +324,14 @@ function createHarness(
     ),
     list: new ListSourceEventsQueryService(sourceEvents, clock),
     show: new ShowSourceEventQueryService(sourceEvents),
+    replay: new ReplaySourceEventUseCase(
+      sourceEvents,
+      sourceEvents,
+      policyReader ?? new MemorySourceEventPolicyReader([]),
+      options.deploymentDispatcher ?? new MemorySourceEventDeploymentDispatcher(),
+      clock,
+    ),
+    prune: new PruneSourceEventsUseCase(sourceEvents, clock),
   };
 }
 
@@ -972,6 +1030,158 @@ describe("source event application baseline", () => {
         },
       ],
     });
+  });
+
+  test("[SRC-AUTO-REPLAY-001] replays a retained safe delivery through current policy matching", async () => {
+    const dispatcher = new MemorySourceEventDeploymentDispatcher(["dep_replay"]);
+    const { context, replay, sourceEvents } = createHarness({
+      deploymentDispatcher: dispatcher,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_web",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            providerRepositoryId: "repo_1",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ],
+    });
+    sourceEvents.records.push({
+      ...sourceEventRecordFixture(),
+      status: "failed",
+      policyResults: [
+        {
+          resourceId: "res_web",
+          status: "dispatch-failed",
+          reason: "dispatch-failed",
+          errorCode: "source_event_dispatch_failed",
+        },
+      ],
+      createdDeploymentIds: [],
+    });
+
+    const result = await replay.execute(context, {
+      sourceEventId: "sevt_demo",
+      resourceId: "res_web",
+      idempotencyKey: "replay_once",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      schemaVersion: "source-events.replay/v1",
+      sourceEventId: "sevt_demo",
+      status: "dispatched",
+      matchedResourceIds: ["res_web"],
+      createdDeploymentIds: ["dep_replay"],
+      replayedAt: "2026-01-01T00:00:10.000Z",
+    });
+    expect(dispatcher.inputs).toEqual([
+      {
+        sourceEventId: "sevt_demo",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_web",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+      },
+    ]);
+    expect(sourceEvents.records[0]).toMatchObject({
+      status: "dispatched",
+      policyResults: [
+        {
+          resourceId: "res_web",
+          status: "dispatched",
+          deploymentId: "dep_replay",
+        },
+      ],
+      createdDeploymentIds: ["dep_replay"],
+    });
+  });
+
+  test("[SRC-AUTO-REPLAY-003] source event replay requires scope and retained delivery", async () => {
+    const { context, replay } = createHarness();
+
+    const unscoped = await replay.execute(context, { sourceEventId: "sevt_missing" });
+    const missing = await replay.execute(context, {
+      sourceEventId: "sevt_missing",
+      resourceId: "res_web",
+    });
+
+    expect(unscoped.isErr()).toBe(true);
+    expect(unscoped._unsafeUnwrapErr()).toMatchObject({
+      code: "source_event_scope_required",
+      details: {
+        phase: "source-event-replay",
+        sourceEventId: "sevt_missing",
+      },
+    });
+    expect(missing.isErr()).toBe(true);
+    expect(missing._unsafeUnwrapErr()).toMatchObject({
+      code: "source_event_not_found",
+      details: {
+        phase: "source-event-replay",
+        sourceEventId: "sevt_missing",
+      },
+    });
+  });
+
+  test("[SRC-AUTO-PRUNE-001] dry-runs source event retention by default", async () => {
+    const { context, prune, sourceEvents } = createHarness();
+    sourceEvents.records.push(
+      sourceEventRecordFixture(),
+      {
+        ...sourceEventRecordFixture(),
+        sourceEventId: "sevt_newer",
+        dedupeKey: "delivery:github:repo_1:appaloft/demo:https://github.com/appaloft/demo:newer",
+        receivedAt: "2026-01-02T00:00:00.000Z",
+      },
+      {
+        ...sourceEventRecordFixture(),
+        sourceEventId: "sevt_generic",
+        sourceKind: "generic-signed",
+        dedupeKey: "delivery:generic-signed::https://github.com/appaloft/demo:generic_delivery_1",
+        status: "failed",
+        receivedAt: "2026-01-01T00:00:01.000Z",
+      },
+    );
+
+    const command = PruneSourceEventsCommand.create({
+      before: "2026-01-01T12:00:00.000Z",
+      resourceId: "res_web",
+    })._unsafeUnwrap();
+    const result = await prune.execute(context, command);
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      schemaVersion: "source-events.prune/v1",
+      before: "2026-01-01T12:00:00.000Z",
+      resourceId: "res_web",
+      dryRun: true,
+      matchedCount: 2,
+      prunedCount: 0,
+      countsByStatus: {
+        dispatched: 1,
+        failed: 1,
+      },
+      countsBySourceKind: {
+        github: 1,
+        "generic-signed": 1,
+      },
+      prunedAt: "2026-01-01T00:00:10.000Z",
+    });
+    expect(sourceEvents.records.map((record) => record.sourceEventId)).toEqual([
+      "sevt_demo",
+      "sevt_newer",
+      "sevt_generic",
+    ]);
   });
 
   test("source event queries require bounded project or Resource scope", async () => {

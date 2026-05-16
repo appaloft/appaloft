@@ -11,6 +11,7 @@ import {
   type Query,
   type QueryBus,
   ResourceDiagnosticSummaryQuery,
+  ResourceHealthHistoryQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   ShowDomainBindingQuery,
@@ -221,7 +222,7 @@ function createApp() {
       }
 
       if (query instanceof ResourceHealthQuery) {
-        return ok({
+        const summary = {
           schemaVersion: "resources.health/v1",
           resourceId: "res_web",
           generatedAt: "2026-01-01T00:00:10.000Z",
@@ -269,6 +270,46 @@ function createApp() {
               relatedState: "check-health",
             },
           ],
+        };
+        return ok({
+          ...summary,
+        } as T);
+      }
+
+      if (query instanceof ResourceHealthHistoryQuery) {
+        const summary = {
+          schemaVersion: "resources.health/v1",
+          resourceId: "res_web",
+          generatedAt: "2026-01-01T00:00:10.000Z",
+          observedAt: "2026-01-01T00:00:10.000Z",
+          overall: "degraded",
+          runtime: { lifecycle: "running", health: "unknown" },
+          healthPolicy: { status: "not-configured", enabled: false },
+          publicAccess: { status: "failed", url: durableRoute.url, kind: "durable-domain" },
+          proxy: { status: "ready", providerKey: "traefik" },
+          checks: [],
+          sourceErrors: [],
+        };
+        return ok({
+          schemaVersion: "resources.health-history/v1",
+          resourceId: "res_web",
+          from: query.input.window.from,
+          to: query.input.window.to,
+          generatedAt: "2026-01-01T00:00:11.000Z",
+          observations: [
+            {
+              observationId: "rho_web_1",
+              observedAt: "2026-01-01T00:00:10.000Z",
+              overall: "degraded",
+              runtimeLifecycle: "running",
+              runtimeHealth: "unknown",
+              publicAccessStatus: "failed",
+              proxyStatus: "ready",
+              healthPolicyStatus: "not-configured",
+              summary,
+            },
+          ],
+          sourceErrors: [],
         } as T);
       }
 
@@ -507,6 +548,11 @@ describe("access/proxy/health/diagnostic HTTP regression harness", () => {
     const healthResponse = await app.handle(
       new Request("http://localhost/api/resources/res_web/health"),
     );
+    const healthHistoryResponse = await app.handle(
+      new Request(
+        "http://localhost/api/resources/res_web/health-history?window.from=2026-01-01T00%3A00%3A00.000Z&window.to=2026-01-01T00%3A30%3A00.000Z",
+      ),
+    );
     const proxyResponse = await app.handle(
       new Request("http://localhost/api/resources/res_web/proxy-configuration"),
     );
@@ -521,6 +567,7 @@ describe("access/proxy/health/diagnostic HTTP regression harness", () => {
 
     expect(showResponse.status).toBe(200);
     expect(healthResponse.status).toBe(200);
+    expect(healthHistoryResponse.status).toBe(200);
     expect(proxyResponse.status).toBe(200);
     expect(diagnosticResponse.status).toBe(200);
     expect(domainBindingResponse.status).toBe(200);
@@ -571,6 +618,7 @@ describe("access/proxy/health/diagnostic HTTP regression harness", () => {
     });
     expect(capturedQueries.some((query) => query instanceof ShowResourceQuery)).toBe(true);
     expect(capturedQueries.some((query) => query instanceof ResourceHealthQuery)).toBe(true);
+    expect(capturedQueries.some((query) => query instanceof ResourceHealthHistoryQuery)).toBe(true);
     expect(
       capturedQueries.some((query) => query instanceof ResourceProxyConfigurationPreviewQuery),
     ).toBe(true);

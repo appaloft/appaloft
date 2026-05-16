@@ -285,6 +285,38 @@ describe("servers.capacity.prune", () => {
     expect(pruner.inputs[1]?.categories).toEqual(["docker-build-cache", "unused-images"]);
   });
 
+  test("[RT-CAP-PRUNE-010] remote-state marker prune category requires explicit opt-in", async () => {
+    const pruner = new FakeCapacityPruner();
+    const useCase = createUseCase({ pruner });
+    const context = createExecutionContext({
+      requestId: "req_server_capacity_prune_remote_state_markers_test",
+      entrypoint: "system",
+    });
+    const defaultCommand = unwrap(
+      PruneServerCapacityCommand.create({
+        serverId: "srv_primary",
+        before: "2026-01-01T00:05:00.000Z",
+      }),
+    );
+    const explicitCommand = unwrap(
+      PruneServerCapacityCommand.create({
+        serverId: "srv_primary",
+        before: "2026-01-01T00:05:00.000Z",
+        categories: ["remote-state-markers"],
+      }),
+    );
+
+    await useCase.execute(context, defaultCommand.input);
+    await useCase.execute(context, explicitCommand.input);
+
+    expect(pruner.inputs[0]?.categories).toEqual([
+      "stopped-containers",
+      "preview-workspaces",
+      "source-workspaces",
+    ]);
+    expect(pruner.inputs[1]?.categories).toEqual(["remote-state-markers"]);
+  });
+
   test("[RT-CAP-PRUNE-006] destructive no-op prune does not record audit output", async () => {
     const pruner = new FakeCapacityPruner(0);
     const auditRecorder = new MemoryAuditEventRecorder();

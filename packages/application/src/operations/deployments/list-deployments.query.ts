@@ -17,6 +17,7 @@ export class ListDeploymentsQuery extends Query<{ items: DeploymentSummary[] }> 
   constructor(
     public readonly projectId?: string,
     public readonly resourceId?: string,
+    public readonly includeArchived = false,
   ) {
     super();
   }
@@ -27,6 +28,7 @@ export class ListDeploymentsQuery extends Query<{ items: DeploymentSummary[] }> 
         new ListDeploymentsQuery(
           trimToUndefined(parsed.projectId),
           trimToUndefined(parsed.resourceId),
+          parsed.includeArchived,
         ),
     );
   }

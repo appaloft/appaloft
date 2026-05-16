@@ -14,6 +14,7 @@ export class ListDeploymentsQueryService {
     input?: {
       projectId?: string;
       resourceId?: string;
+      includeArchived?: boolean;
     },
   ): Promise<{ items: Awaited<ReturnType<DeploymentReadModel["list"]>> }> {
     return { items: await this.readModel.list(toRepositoryContext(context), input) };

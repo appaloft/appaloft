@@ -1,12 +1,15 @@
 import {
+  type ArchiveDeploymentCommandInput,
   type ArchiveEnvironmentCommandInput,
   type ArchiveProjectCommandInput,
   type ArchiveResourceCommandInput,
   type BindResourceDependencyCommandInput,
   type BootstrapFirstAdminCommandInput,
   type BootstrapServerProxyCommandInput,
+  type CancelDeploymentCommandInput,
   type ChangeOrganizationMemberRoleCommandInput,
   type CheckDomainBindingDeleteSafetyQueryInput,
+  type CheckProjectDeleteSafetyQueryInput,
   type CheckServerDeleteSafetyQueryInput,
   type CleanupPreviewCommandInput,
   type CloneEnvironmentCommandInput,
@@ -34,6 +37,7 @@ import {
   type CreateEnvironmentCommandInput,
   type CreateProjectCommandInput,
   type CreateResourceCommandInput,
+  type CreateResourceSecretReferenceCommandInput,
   type CreateScheduledTaskCommandInput,
   type CreateSshCredentialCommandInput,
   type DeactivateServerCommandInput,
@@ -41,9 +45,12 @@ import {
   type DeleteDependencyResourceCommandInput,
   type DeleteDomainBindingCommandInput,
   type DeletePreviewEnvironmentCommandInput,
+  type DeleteProjectCommandInput,
   type DeleteResourceCommandInput,
+  type DeleteResourceSecretReferenceCommandInput,
   type DeleteScheduledTaskCommandInput,
   type DeleteServerCommandInput,
+  type DeleteSourceLinkCommandInput,
   type DeleteSshCredentialCommandInput,
   type DeploymentLogsQueryInput,
   type DeploymentPlanQueryInput,
@@ -76,11 +83,13 @@ import {
   type ListOrganizationMembersQueryInput,
   type ListPreviewEnvironmentsQueryInput,
   type ListResourceDependencyBindingsQueryInput,
+  type ListResourceSecretReferencesQueryInput,
   type ListResourcesQueryInput,
   type ListRuntimeMonitoringSamplesQueryInput,
   type ListScheduledTaskRunsQueryInput,
   type ListScheduledTasksQueryInput,
   type ListSourceEventsQueryInput,
+  type ListSourceLinksQueryInput,
   type ListSshCredentialsQueryInput,
   type ListTerminalSessionsQueryInput,
   type LockEnvironmentCommandInput,
@@ -88,7 +97,10 @@ import {
   type PromoteEnvironmentCommandInput,
   type ProvisionPostgresDependencyResourceCommandInput,
   type ProvisionRedisDependencyResourceCommandInput,
+  type PruneDeploymentLogsCommandInput,
+  type PruneDeploymentsCommandInput,
   type PruneServerCapacityCommandInput,
+  type PruneSourceEventsCommandInput,
   type RedeployDeploymentCommandInput,
   type RegisterServerCommandInput,
   type RelinkSourceLinkCommandInput,
@@ -97,14 +109,18 @@ import {
   type RenameEnvironmentCommandInput,
   type RenameProjectCommandInput,
   type RenameServerCommandInput,
+  type ReplaySourceEventCommandInput,
+  type ResetResourceHealthCommandInput,
   type ResourceAccessFailureEvidenceLookupQueryInput,
   type ResourceDiagnosticSummaryQueryInput,
   type ResourceEffectiveConfigQueryInput,
+  type ResourceHealthHistoryQueryInput,
   type ResourceHealthQueryInput,
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
   type RestartResourceRuntimeCommandInput,
   type RestoreDependencyResourceBackupCommandInput,
+  type RestoreProjectCommandInput,
   type RetryCertificateCommandInput,
   type RetryDeploymentCommandInput,
   type RetryDomainBindingVerificationCommandInput,
@@ -113,11 +129,13 @@ import {
   type RollbackDeploymentCommandInput,
   type RotateDeployTokenCommandInput,
   type RotateResourceDependencyBindingSecretCommandInput,
+  type RotateResourceSecretReferenceCommandInput,
   type RotateSshCredentialCommandInput,
   type RunScheduledTaskNowCommandInput,
   type RuntimeMonitoringRollupQueryInput,
   type ScheduledTaskRunLogsQueryInput,
   type SetEnvironmentVariableCommandInput,
+  type SetProjectDescriptionCommandInput,
   type SetResourceVariableCommandInput,
   type ShowCertificateQueryInput,
   type ShowDefaultAccessDomainPolicyQueryInput,
@@ -134,11 +152,13 @@ import {
   type ShowProjectQueryInput,
   type ShowResourceDependencyBindingQueryInput,
   type ShowResourceQueryInput,
+  type ShowResourceSecretReferenceQueryInput,
   type ShowRuntimeMonitoringThresholdsQueryInput,
   type ShowScheduledTaskQueryInput,
   type ShowScheduledTaskRunQueryInput,
   type ShowServerQueryInput,
   type ShowSourceEventQueryInput,
+  type ShowSourceLinkQueryInput,
   type ShowSshCredentialQueryInput,
   type ShowTerminalSessionQueryInput,
   type StartResourceRuntimeCommandInput,
@@ -153,6 +173,7 @@ import {
   type UnsetResourceVariableCommandInput,
 } from "@appaloft/application/schemas";
 import {
+  type ArchiveDeploymentResponse,
   type ArchiveEnvironmentResponse,
   type ArchiveProjectResponse,
   type ArchiveResourceResponse,
@@ -160,8 +181,10 @@ import {
   type AttachResourceStorageResponse,
   type BindResourceDependencyResponse,
   type BootstrapServerProxyResponse,
+  type CancelDeploymentResponse,
   type ChangeOrganizationMemberRoleResponse,
   type CheckDomainBindingDeleteSafetyResponse,
+  type CheckProjectDeleteSafetyResponse,
   type CheckServerDeleteSafetyResponse,
   type CleanupPreviewResponse,
   type CleanupStorageVolumeRuntimeInput,
@@ -188,6 +211,7 @@ import {
   type CreateEnvironmentResponse,
   type CreateProjectResponse,
   type CreateResourceResponse,
+  type CreateResourceSecretReferenceResponse,
   type CreateSshCredentialResponse,
   type CreateStorageVolumeInput,
   type CreateStorageVolumeResponse,
@@ -196,7 +220,9 @@ import {
   type DeleteCertificateResponse,
   type DeleteDomainBindingResponse,
   type DeletePreviewEnvironmentResponse,
+  type DeleteProjectResponse,
   type DeleteResourceResponse,
+  type DeleteResourceSecretReferenceResponse,
   type DeleteScheduledTaskResponse,
   type DeleteServerResponse,
   type DeleteSshCredentialResponse,
@@ -241,6 +267,7 @@ import {
   type ListProjectsResponse,
   type ListProvidersResponse,
   type ListResourceDependencyBindingsResponse,
+  type ListResourceSecretReferencesResponse,
   type ListResourcesResponse,
   type ListScheduledRuntimePrunePoliciesResponse,
   type ListScheduledTaskRunsResponse,
@@ -254,7 +281,10 @@ import {
   type LockEnvironmentResponse,
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
+  type PruneDeploymentLogsResponse,
+  type PruneDeploymentsResponse,
   type PruneServerCapacityResponse,
+  type PruneSourceEventsResponse,
   type RedeployDeploymentResponse,
   type RegisterServerResponse,
   type RemoveOrganizationMemberResponse,
@@ -263,15 +293,19 @@ import {
   type RenameServerResponse,
   type RenameStorageVolumeInput,
   type RenameStorageVolumeResponse,
+  type ReplaySourceEventResponse,
+  type ResetResourceHealthResponse,
   type ResourceAccessFailureEvidenceLookup,
   type ResourceDetail,
   type ResourceDiagnosticSummary,
   type ResourceEffectiveConfigResponse,
+  type ResourceHealthHistory,
   type ResourceHealthSummary,
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
   type RestartResourceRuntimeResponse,
+  type RestoreProjectResponse,
   type RetryCertificateResponse,
   type RetryDeploymentResponse,
   type RetryDomainBindingVerificationResponse,
@@ -280,6 +314,7 @@ import {
   type RollbackDeploymentResponse,
   type RotateDeployTokenResponse,
   type RotateResourceDependencyBindingSecretResponse,
+  type RotateResourceSecretReferenceResponse,
   type RotateSshCredentialResponse,
   type RunScheduledTaskNowResponse,
   type RuntimeMonitoringRollupResponse,
@@ -287,6 +322,7 @@ import {
   type RuntimeMonitoringThresholdsResponse,
   type ScheduledTaskCommandResponse,
   type ScheduledTaskRunLogsResponse,
+  type SetProjectDescriptionResponse,
   type SetResourceVariableResponse,
   type ShowCertificateResponse,
   type ShowDefaultAccessDomainPolicyResponse,
@@ -301,6 +337,7 @@ import {
   type ShowPreviewPolicyResponse,
   type ShowProjectResponse,
   type ShowResourceDependencyBindingResponse,
+  type ShowResourceSecretReferenceResponse,
   type ShowScheduledRuntimePrunePolicyResponse,
   type ShowScheduledTaskResponse,
   type ShowScheduledTaskRunResponse,
@@ -344,6 +381,32 @@ export interface RelinkSourceLinkResponse {
   resourceId: string;
   serverId?: string;
   destinationId?: string;
+}
+
+export interface SourceLinkRecord {
+  sourceFingerprint: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId?: string;
+  destinationId?: string;
+  updatedAt: string;
+  reason?: string;
+}
+
+export interface ListSourceLinksResponse {
+  schemaVersion: "source-links.list/v1";
+  items: SourceLinkRecord[];
+}
+
+export interface ShowSourceLinkResponse {
+  schemaVersion: "source-links.show/v1";
+  sourceLink: SourceLinkRecord;
+}
+
+export interface DeleteSourceLinkResponse {
+  sourceFingerprint: string;
+  deleted: boolean;
 }
 
 export type ProductLoginMethodKey = "local-password" | "github" | "google" | "oidc";
@@ -490,10 +553,34 @@ export type AppaloftOrpcClientContract = {
       RenameProjectResponse,
       AppaloftClientError
     >;
+    setDescription: Client<
+      AppaloftClientContext,
+      SetProjectDescriptionCommandInput,
+      SetProjectDescriptionResponse,
+      AppaloftClientError
+    >;
     archive: Client<
       AppaloftClientContext,
       ArchiveProjectCommandInput,
       ArchiveProjectResponse,
+      AppaloftClientError
+    >;
+    restore: Client<
+      AppaloftClientContext,
+      RestoreProjectCommandInput,
+      RestoreProjectResponse,
+      AppaloftClientError
+    >;
+    deleteCheck: Client<
+      AppaloftClientContext,
+      CheckProjectDeleteSafetyQueryInput,
+      CheckProjectDeleteSafetyResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeleteProjectCommandInput,
+      DeleteProjectResponse,
       AppaloftClientError
     >;
   };
@@ -783,6 +870,12 @@ export type AppaloftOrpcClientContract = {
       ConfigureResourceHealthResponse,
       AppaloftClientError
     >;
+    resetHealth: Client<
+      AppaloftClientContext,
+      ResetResourceHealthCommandInput,
+      ResetResourceHealthResponse,
+      AppaloftClientError
+    >;
     configureNetwork: Client<
       AppaloftClientContext,
       ConfigureResourceNetworkCommandInput,
@@ -819,6 +912,38 @@ export type AppaloftOrpcClientContract = {
       SetResourceVariableResponse,
       AppaloftClientError
     >;
+    secrets: {
+      create: Client<
+        AppaloftClientContext,
+        CreateResourceSecretReferenceCommandInput,
+        CreateResourceSecretReferenceResponse,
+        AppaloftClientError
+      >;
+      rotate: Client<
+        AppaloftClientContext,
+        RotateResourceSecretReferenceCommandInput,
+        RotateResourceSecretReferenceResponse,
+        AppaloftClientError
+      >;
+      delete: Client<
+        AppaloftClientContext,
+        DeleteResourceSecretReferenceCommandInput,
+        DeleteResourceSecretReferenceResponse,
+        AppaloftClientError
+      >;
+      list: Client<
+        AppaloftClientContext,
+        ListResourceSecretReferencesQueryInput,
+        ListResourceSecretReferencesResponse,
+        AppaloftClientError
+      >;
+      show: Client<
+        AppaloftClientContext,
+        ShowResourceSecretReferenceQueryInput,
+        ShowResourceSecretReferenceResponse,
+        AppaloftClientError
+      >;
+    };
     importVariables: Client<
       AppaloftClientContext,
       ImportResourceVariablesCommandInput,
@@ -853,6 +978,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ResourceHealthQueryInput,
       ResourceHealthSummary,
+      AppaloftClientError
+    >;
+    healthHistory: Client<
+      AppaloftClientContext,
+      ResourceHealthHistoryQueryInput,
+      ResourceHealthHistory,
       AppaloftClientError
     >;
     proxyConfiguration: Client<
@@ -1295,6 +1426,24 @@ export type AppaloftOrpcClientContract = {
       RollbackDeploymentResponse,
       AppaloftClientError
     >;
+    cancel: Client<
+      AppaloftClientContext,
+      CancelDeploymentCommandInput,
+      CancelDeploymentResponse,
+      AppaloftClientError
+    >;
+    archive: Client<
+      AppaloftClientContext,
+      ArchiveDeploymentCommandInput,
+      ArchiveDeploymentResponse,
+      AppaloftClientError
+    >;
+    prune: Client<
+      AppaloftClientContext,
+      PruneDeploymentsCommandInput,
+      PruneDeploymentsResponse,
+      AppaloftClientError
+    >;
     createStream: Client<
       AppaloftClientContext,
       CreateDeploymentCommandInput,
@@ -1305,6 +1454,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       DeploymentLogsQueryInput,
       DeploymentLogsResponse,
+      AppaloftClientError
+    >;
+    pruneLogs: Client<
+      AppaloftClientContext,
+      PruneDeploymentLogsCommandInput,
+      PruneDeploymentLogsResponse,
       AppaloftClientError
     >;
     events: Client<
@@ -1381,12 +1536,42 @@ export type AppaloftOrpcClientContract = {
       ShowSourceEventResponse,
       AppaloftClientError
     >;
+    replay: Client<
+      AppaloftClientContext,
+      ReplaySourceEventCommandInput,
+      ReplaySourceEventResponse,
+      AppaloftClientError
+    >;
+    prune: Client<
+      AppaloftClientContext,
+      PruneSourceEventsCommandInput,
+      PruneSourceEventsResponse,
+      AppaloftClientError
+    >;
   };
   sourceLinks: {
+    list: Client<
+      AppaloftClientContext,
+      ListSourceLinksQueryInput,
+      ListSourceLinksResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowSourceLinkQueryInput,
+      ShowSourceLinkResponse,
+      AppaloftClientError
+    >;
     relink: Client<
       AppaloftClientContext,
       RelinkSourceLinkCommandInput,
       RelinkSourceLinkResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeleteSourceLinkCommandInput,
+      DeleteSourceLinkResponse,
       AppaloftClientError
     >;
   };

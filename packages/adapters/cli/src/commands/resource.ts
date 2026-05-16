@@ -11,26 +11,33 @@ import {
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
   CreateResourceCommand,
+  CreateResourceSecretReferenceCommand,
   DeleteResourceCommand,
+  DeleteResourceSecretReferenceCommand,
   DetachResourceStorageCommand,
   ImportResourceVariablesCommand,
   ListResourceDependencyBindingsQuery,
   ListResourceRuntimeLogArchivesQuery,
+  ListResourceSecretReferencesQuery,
   ListResourcesQuery,
   OpenTerminalSessionCommand,
   PruneResourceRuntimeLogArchivesCommand,
+  ResetResourceHealthCommand,
   ResourceAccessFailureEvidenceLookupQuery,
   ResourceDiagnosticSummaryQuery,
   ResourceEffectiveConfigQuery,
+  ResourceHealthHistoryQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   ResourceRuntimeLogsQuery,
   RestartResourceRuntimeCommand,
   RotateResourceDependencyBindingSecretCommand,
+  RotateResourceSecretReferenceCommand,
   SetResourceVariableCommand,
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
   ShowResourceRuntimeLogArchiveQuery,
+  ShowResourceSecretReferenceQuery,
   StartResourceRuntimeCommand,
   StopResourceRuntimeCommand,
   UnbindResourceDependencyCommand,
@@ -161,6 +168,9 @@ const publicAccessProbeOption = Options.boolean("public-access-probe").pipe(
   Options.withDefault(false),
 );
 const runtimeProbeOption = Options.boolean("runtime-probe").pipe(Options.withDefault(false));
+const healthHistoryFromOption = Options.text("from");
+const healthHistoryToOption = Options.text("to");
+const healthHistoryLimitOption = Options.text("limit").pipe(Options.withDefault("200"));
 const healthPathOption = Options.text("path").pipe(Options.withDefault("/"));
 const healthMethodOption = Options.choice("method", ["GET", "HEAD", "POST", "OPTIONS"]).pipe(
   Options.withDefault("GET"),
@@ -197,11 +207,16 @@ const includeProxyConfigurationOption = Options.boolean("proxy-configuration").p
 const jsonOption = Options.boolean("json").pipe(Options.withDefault(true));
 const followOption = Options.boolean("follow").pipe(Options.withDefault(false));
 const variableExposureOption = Options.choice("exposure", variableExposures);
+const secretExposureOption = Options.choice("exposure", variableExposures).pipe(
+  Options.withDefault("runtime"),
+);
 const variableKindOption = Options.choice("kind", variableKinds).pipe(
   Options.withDefault("plain-config"),
 );
 const variableSecretOption = Options.boolean("secret").pipe(Options.withDefault(false));
 const importContentOption = Options.text("content");
+const secretKeyArg = Args.text({ name: "key" });
+const secretValueArg = Args.text({ name: "value" });
 const storageDestinationPathOption = Options.text("destination-path");
 const storageMountModeOption = Options.choice("mount-mode", ["read-write", "read-only"]).pipe(
   Options.withDefault("read-write"),
@@ -652,6 +667,104 @@ const unsetVariableCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceUnsetVariable));
 
+const secretsCreateCommand = EffectCommand.make(
+  "create",
+  {
+    resourceId: resourceIdArg,
+    key: secretKeyArg,
+    value: secretValueArg,
+    exposure: secretExposureOption,
+  },
+  ({ exposure, key, resourceId, value }) =>
+    runCommand(
+      CreateResourceSecretReferenceCommand.create({
+        resourceId,
+        key,
+        value,
+        exposure,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceSecretsCreate));
+
+const secretsUpdateCommand = EffectCommand.make(
+  "update",
+  {
+    resourceId: resourceIdArg,
+    key: secretKeyArg,
+    value: secretValueArg,
+    exposure: secretExposureOption,
+  },
+  ({ exposure, key, resourceId, value }) =>
+    runCommand(
+      RotateResourceSecretReferenceCommand.create({
+        resourceId,
+        key,
+        value,
+        exposure,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceSecretsRotate));
+
+const secretsDeleteCommand = EffectCommand.make(
+  "delete",
+  {
+    resourceId: resourceIdArg,
+    key: secretKeyArg,
+    exposure: secretExposureOption,
+  },
+  ({ exposure, key, resourceId }) =>
+    runCommand(
+      DeleteResourceSecretReferenceCommand.create({
+        resourceId,
+        key,
+        exposure,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceSecretsDelete));
+
+const secretsListCommand = EffectCommand.make(
+  "list",
+  {
+    resourceId: resourceIdArg,
+    exposure: Options.choice("exposure", variableExposures).pipe(Options.optional),
+  },
+  ({ exposure, resourceId }) =>
+    runQuery(
+      ListResourceSecretReferencesQuery.create({
+        resourceId,
+        exposure: optionalValue(exposure),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceSecretsList));
+
+const secretsShowCommand = EffectCommand.make(
+  "show",
+  {
+    resourceId: resourceIdArg,
+    key: secretKeyArg,
+    exposure: secretExposureOption,
+  },
+  ({ exposure, key, resourceId }) =>
+    runQuery(
+      ShowResourceSecretReferenceQuery.create({
+        resourceId,
+        key,
+        exposure,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceSecretsShow));
+
+const secretsCommand = EffectCommand.make("secrets").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.resourceSecrets),
+  EffectCommand.withSubcommands([
+    secretsCreateCommand,
+    secretsUpdateCommand,
+    secretsDeleteCommand,
+    secretsListCommand,
+    secretsShowCommand,
+  ]),
+);
+
 const terminalCommand = EffectCommand.make(
   "terminal",
   {
@@ -790,6 +903,27 @@ const healthCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceHealth));
 
+const healthHistoryCommand = EffectCommand.make(
+  "health-history",
+  {
+    resourceId: resourceIdArg,
+    from: healthHistoryFromOption,
+    to: healthHistoryToOption,
+    limit: healthHistoryLimitOption,
+    json: jsonOption,
+  },
+  ({ from, json, limit, resourceId, to }) => {
+    void json;
+    return runQuery(
+      ResourceHealthHistoryQuery.create({
+        resourceId,
+        window: { from, to },
+        limit: Number.parseInt(limit, 10),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceHealthHistory));
+
 const configureHealthCommand = EffectCommand.make(
   "configure-health",
   {
@@ -855,6 +989,18 @@ const configureHealthCommand = EffectCommand.make(
     );
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureHealth));
+
+const resetHealthCommand = EffectCommand.make(
+  "reset-health",
+  {
+    resourceId: resourceIdArg,
+    json: jsonOption,
+  },
+  ({ json, resourceId }) => {
+    void json;
+    return runCommand(ResetResourceHealthCommand.create({ resourceId }));
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceResetHealth));
 
 const configureNetworkCommand = EffectCommand.make(
   "configure-network",
@@ -1151,6 +1297,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     archiveCommand,
     deleteCommand,
     setVariableCommand,
+    secretsCommand,
     importVariablesCommand,
     unsetVariableCommand,
     terminalCommand,
@@ -1159,9 +1306,11 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     runtimeCommand,
     accessFailureCommand,
     healthCommand,
+    healthHistoryCommand,
     configureSourceCommand,
     configureRuntimeCommand,
     configureHealthCommand,
+    resetHealthCommand,
     configureNetworkCommand,
     configureAccessCommand,
     configureAutoDeployCommand,

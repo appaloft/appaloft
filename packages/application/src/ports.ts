@@ -453,6 +453,43 @@ export interface ProjectRepository {
   upsert(context: RepositoryContext, project: Project, spec: ProjectMutationSpec): Promise<void>;
 }
 
+export type ProjectDeleteBlockerKind =
+  | "active-project"
+  | "environment"
+  | "resource"
+  | "deployment-history"
+  | "domain-binding"
+  | "certificate"
+  | "source-link"
+  | "source-event"
+  | "dependency-resource"
+  | "storage-volume"
+  | "scheduled-task"
+  | "preview-environment"
+  | "runtime-monitoring"
+  | "runtime-log-retention"
+  | "provider-job-log"
+  | "domain-event-retention"
+  | "audit-retention";
+
+export interface ProjectDeleteBlocker {
+  kind: ProjectDeleteBlockerKind;
+  relatedEntityId?: string;
+  relatedEntityType?: string;
+  count?: number;
+}
+
+export interface ProjectDeletionBlocker extends Omit<ProjectDeleteBlocker, "kind"> {
+  kind: Exclude<ProjectDeleteBlockerKind, "active-project">;
+}
+
+export interface ProjectDeletionBlockerReader {
+  findBlockers(
+    context: RepositoryContext,
+    input: { projectId: string },
+  ): Promise<Result<ProjectDeletionBlocker[], DomainError>>;
+}
+
 export interface ServerRepository {
   findOne(context: RepositoryContext, spec: ServerSelectionSpec): Promise<Server | null>;
   upsert(context: RepositoryContext, server: Server, spec: ServerMutationSpec): Promise<void>;
@@ -1333,6 +1370,15 @@ export interface ProjectSummary {
   createdAt: string;
 }
 
+export interface ProjectDeleteSafety {
+  schemaVersion: "projects.delete-check/v1";
+  projectId: string;
+  lifecycleStatus: "active" | "archived";
+  eligible: boolean;
+  blockers: ProjectDeleteBlocker[];
+  checkedAt: string;
+}
+
 export interface ServerSummary {
   id: string;
   name: string;
@@ -2031,7 +2077,8 @@ export type RuntimeTargetCapacityPruneCategory =
   | "preview-workspaces"
   | "source-workspaces"
   | "docker-build-cache"
-  | "unused-images";
+  | "unused-images"
+  | "remote-state-markers";
 
 export type RuntimeTargetCapacityPruneSkippedReason =
   | "active-runtime"
@@ -3059,6 +3106,11 @@ export interface ResourceDetailProfileDiagnostic {
   path?: string;
   section?: ResourceProfileDriftSection;
   fieldPath?: string;
+  configKey?: string;
+  configExposure?: VariableExposure;
+  configKind?: VariableKind;
+  configScope?: ConfigScope;
+  configSource?: "resource" | "entry-profile" | "deployment-snapshot";
   comparison?: ResourceProfileDriftComparison;
   resourceValue?: ResourceProfileDiagnosticValue;
   entryProfileValue?: ResourceProfileDiagnosticValue;
@@ -3335,6 +3387,30 @@ export interface ResourceEffectiveConfigView {
   effectiveEntries: ResourceConfigEntryView[];
   overrides: ResourceConfigOverrideSummary[];
   precedence: ConfigScope[];
+  generatedAt: string;
+}
+
+export interface ResourceSecretReferenceSummary {
+  resourceId: string;
+  key: string;
+  value: "****";
+  scope: "resource";
+  exposure: VariableExposure;
+  isSecret: true;
+  kind: "secret";
+  updatedAt: string;
+}
+
+export interface ListResourceSecretReferencesResult {
+  schemaVersion: "resources.secrets.list/v1";
+  resourceId: string;
+  items: ResourceSecretReferenceSummary[];
+  generatedAt: string;
+}
+
+export interface ShowResourceSecretReferenceResult {
+  schemaVersion: "resources.secrets.show/v1";
+  secret: ResourceSecretReferenceSummary;
   generatedAt: string;
 }
 
@@ -3811,6 +3887,62 @@ export interface ResourceHealthSummary {
   publicAccess: ResourcePublicAccessHealthSection;
   proxy: ResourceProxyHealthSection;
   checks: ResourceHealthCheck[];
+  sourceErrors: ResourceHealthSourceError[];
+}
+
+export interface ResourceHealthObservationRecord {
+  observationId: string;
+  resourceId: string;
+  observedAt: string;
+  retainedUntil: string;
+  summary: ResourceHealthSummary;
+}
+
+export interface ResourceHealthHistoryObservation {
+  observationId: string;
+  observedAt: string;
+  overall: ResourceHealthOverall;
+  runtimeLifecycle: ResourceRuntimeLifecycle;
+  runtimeHealth: ResourceRuntimeHealth;
+  publicAccessStatus: ResourcePublicAccessHealthSection["status"];
+  proxyStatus: ResourceProxyHealthSection["status"];
+  healthPolicyStatus: ResourceHealthPolicySection["status"];
+  latestDeploymentId?: string;
+  summary: ResourceHealthSummary;
+}
+
+export interface ResourceHealthHistoryReadInput {
+  resourceId: string;
+  window: RuntimeMonitoringWindow;
+  limit: number;
+}
+
+export interface ResourceHealthHistoryReadResult {
+  observations: ResourceHealthHistoryObservation[];
+  sourceErrors: ResourceHealthSourceError[];
+}
+
+export interface ResourceHealthObservationRecorder {
+  record(
+    context: RepositoryContext,
+    record: ResourceHealthObservationRecord,
+  ): Promise<Result<ResourceHealthHistoryObservation>>;
+}
+
+export interface ResourceHealthObservationHistoryReadModel {
+  listObservations(
+    context: ExecutionContext,
+    input: ResourceHealthHistoryReadInput,
+  ): Promise<Result<ResourceHealthHistoryReadResult>>;
+}
+
+export interface ResourceHealthHistory {
+  schemaVersion: "resources.health-history/v1";
+  resourceId: string;
+  from: string;
+  to: string;
+  generatedAt: string;
+  observations: ResourceHealthHistoryObservation[];
   sourceErrors: ResourceHealthSourceError[];
 }
 
@@ -4513,6 +4645,7 @@ export interface DeploymentSummary {
   createdAt: string;
   startedAt?: string;
   finishedAt?: string;
+  archivedAt?: string;
   rollbackOfDeploymentId?: string;
   logCount: number;
 }
@@ -5931,6 +6064,32 @@ export interface DeploymentLogPruneResult extends DeploymentLogPruneStoreResult 
   prunedAt: string;
 }
 
+export interface DeploymentAttemptPruneInput {
+  before: string;
+  deploymentId?: string;
+  resourceId?: string;
+  serverId?: string;
+  dryRun: boolean;
+}
+
+export interface DeploymentAttemptPruneStoreResult {
+  matchedCount: number;
+  prunedCount: number;
+  guardedCount: number;
+  affectedDeploymentIds: string[];
+  guardedDeploymentIds: string[];
+}
+
+export interface DeploymentAttemptPruneResult extends DeploymentAttemptPruneStoreResult {
+  schemaVersion: "deployments.prune/v1";
+  before: string;
+  deploymentId?: string;
+  resourceId?: string;
+  serverId?: string;
+  dryRun: boolean;
+  prunedAt: string;
+}
+
 export interface AuditEventRecordInput {
   id: string;
   aggregateId: string;
@@ -5946,6 +6105,43 @@ export interface IngestSourceEventResult {
   createdDeploymentIds: string[];
   ignoredReasons: SourceEventIgnoredReason[];
   dedupeOfSourceEventId?: string;
+}
+
+export interface ReplaySourceEventResult {
+  schemaVersion: "source-events.replay/v1";
+  sourceEventId: string;
+  status: SourceEventStatus;
+  matchedResourceIds: string[];
+  createdDeploymentIds: string[];
+  ignoredReasons: SourceEventIgnoredReason[];
+  replayedAt: string;
+}
+
+export interface SourceEventPruneInput {
+  before: string;
+  projectId?: string;
+  resourceId?: string;
+  status?: SourceEventStatus;
+  sourceKind?: SourceEventSourceKind;
+  dryRun: boolean;
+}
+
+export interface SourceEventPruneStoreResult {
+  matchedCount: number;
+  prunedCount: number;
+  countsByStatus: Record<string, number>;
+  countsBySourceKind: Record<string, number>;
+}
+
+export interface SourceEventPruneResult extends SourceEventPruneStoreResult {
+  schemaVersion: "source-events.prune/v1";
+  before: string;
+  projectId?: string;
+  resourceId?: string;
+  status?: SourceEventStatus;
+  sourceKind?: SourceEventSourceKind;
+  dryRun: boolean;
+  prunedAt: string;
 }
 
 export interface VerifiedSourceEventInput {
@@ -6447,6 +6643,13 @@ export interface SourceEventReadModel {
   ): Promise<SourceEventDetail | null>;
 }
 
+export interface SourceEventRetentionStore {
+  prune(
+    context: RepositoryContext,
+    input: SourceEventPruneInput,
+  ): Promise<Result<SourceEventPruneStoreResult>>;
+}
+
 export interface AuditEventReadModel {
   list(context: RepositoryContext, input: AuditEventListInput): Promise<AuditEventListPage>;
   findOne(context: RepositoryContext, input: AuditEventShowInput): Promise<AuditEventDetail | null>;
@@ -6525,6 +6728,13 @@ export interface DeploymentLogRetentionStore {
     context: RepositoryContext,
     input: DeploymentLogPruneInput,
   ): Promise<Result<DeploymentLogPruneStoreResult>>;
+}
+
+export interface DeploymentAttemptRetentionStore {
+  prune(
+    context: RepositoryContext,
+    input: DeploymentAttemptPruneInput,
+  ): Promise<Result<DeploymentAttemptPruneStoreResult>>;
 }
 
 export interface RuntimeMonitoringSampleRetentionStore {
@@ -6999,6 +7209,7 @@ export interface DeploymentReadModel {
     input?: {
       projectId?: string;
       resourceId?: string;
+      includeArchived?: boolean;
     },
   ): Promise<DeploymentSummary[]>;
   findOne(

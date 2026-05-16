@@ -90,6 +90,7 @@ async function createPreviewDeployCliHarness(
     deploymentSummaries?: unknown[];
     sourceLinkRecord?: Record<string, unknown> | null;
     resourceDetail?: Record<string, unknown> | null;
+    resourceEffectiveConfig?: Record<string, unknown> | null;
   } = {},
 ) {
   const { createExecutionContext } = await import("@appaloft/application");
@@ -132,6 +133,28 @@ async function createPreviewDeployCliHarness(
         return ok(
           (input.resourceDetail ?? {
             runtimeProfile: undefined,
+          }) as Record<string, unknown> as T,
+        );
+      }
+      if (query.constructor.name === "ResourceEffectiveConfigQuery") {
+        return ok(
+          (input.resourceEffectiveConfig ?? {
+            schemaVersion: "resources.effective-config/v1",
+            resourceId: "res_existing",
+            environmentId: "env_existing",
+            ownedEntries: [],
+            effectiveEntries: [],
+            overrides: [],
+            precedence: [
+              "defaults",
+              "system",
+              "organization",
+              "project",
+              "environment",
+              "resource",
+              "deployment",
+            ],
+            generatedAt: "2026-05-16T00:00:00.000Z",
           }) as Record<string, unknown> as T,
         );
       }
@@ -1143,6 +1166,11 @@ describe("CLI deployment config entry workflow", () => {
         serverId: "srv_existing",
       },
       resourceDetail: {
+        source: {
+          kind: "local-folder",
+          locator: workspace,
+          displayName: workspace.split("/").at(-1) ?? "workspace",
+        },
         runtimeProfile: {
           strategy: "workspace-commands",
           buildCommand: "bun run build",
@@ -1307,6 +1335,170 @@ describe("CLI deployment config entry workflow", () => {
     expect(
       harness.commands.find(
         (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
+      ),
+    ).toBeUndefined();
+    expect(
+      harness.commands.find((command) => command.constructor.name === "CreateDeploymentCommand"),
+    ).toBeUndefined();
+  });
+
+  test("[RES-PROFILE-DRIFT-002][RES-PROFILE-DRIFT-003] deploy action blocks entry config shadowed by resource overrides without leaking values", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-existing-config-profile-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  buildCommand: bun run build",
+        "  startCommand: bun run start",
+        "network:",
+        "  internalPort: 4310",
+        "env:",
+        "  API_URL: https://entry.example.test",
+        "secrets:",
+        "  DATABASE_URL:",
+        "    from: ci-env:DATABASE_URL",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      sourceLinkRecord: {
+        projectId: "proj_existing",
+        environmentId: "env_existing",
+        resourceId: "res_existing",
+        serverId: "srv_existing",
+      },
+      resourceDetail: {
+        source: {
+          kind: "local-folder",
+          locator: workspace,
+          displayName: workspace.split("/").at(-1) ?? "workspace",
+        },
+        runtimeProfile: {
+          strategy: "workspace-commands",
+          buildCommand: "bun run build",
+          startCommand: "bun run start",
+        },
+        networkProfile: {
+          internalPort: 4310,
+          upstreamProtocol: "http",
+          exposureMode: "reverse-proxy",
+        },
+      },
+      resourceEffectiveConfig: {
+        schemaVersion: "resources.effective-config/v1",
+        resourceId: "res_existing",
+        environmentId: "env_existing",
+        ownedEntries: [
+          {
+            key: "API_URL",
+            value: "https://resource.example.test",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: false,
+            kind: "plain-config",
+          },
+          {
+            key: "DATABASE_URL",
+            value: "****",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+          },
+        ],
+        effectiveEntries: [
+          {
+            key: "API_URL",
+            value: "https://resource.example.test",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: false,
+            kind: "plain-config",
+          },
+          {
+            key: "DATABASE_URL",
+            value: "****",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+          },
+        ],
+        overrides: [],
+        precedence: [
+          "defaults",
+          "system",
+          "organization",
+          "project",
+          "environment",
+          "resource",
+          "deployment",
+        ],
+        generatedAt: "2026-05-16T00:00:00.000Z",
+      },
+    });
+
+    try {
+      await withBunEnv(
+        {
+          DATABASE_URL: "postgres://entry-user:entry-pass@example.test/app",
+          GITHUB_HEAD_REF: undefined,
+          GITHUB_REF: undefined,
+          GITHUB_REPOSITORY: undefined,
+          GITHUB_REPOSITORY_ID: undefined,
+          GITHUB_SHA: undefined,
+          GITHUB_WORKSPACE: undefined,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            const result = await harness.program
+              .parseAsync([
+                "node",
+                "appaloft",
+                "deploy",
+                workspace,
+                "--config",
+                configPath,
+                "--method",
+                "workspace-commands",
+                "--server-host",
+                "203.0.113.10",
+                "--server-provider",
+                "generic-ssh",
+              ])
+              .then(
+                () => ({ ok: true as const }),
+                (error: unknown) => ({ ok: false as const, error }),
+              );
+
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+              const errorText = String(result.error);
+              expect(errorText).toContain("resource_profile_drift");
+              expect(errorText).toContain("resource-profile-resolution");
+              expect(errorText).toContain("resource-vs-entry-profile");
+              expect(errorText).toContain("configuration.runtime.API_URL");
+              expect(errorText).toContain("resources.set-variable");
+              expect(errorText).not.toContain("postgres://entry-user");
+              expect(errorText).not.toContain("https://entry.example.test");
+              expect(errorText).not.toContain("https://resource.example.test");
+            }
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.queries.map((query) => query.constructor.name)).toContain("ShowResourceQuery");
+    expect(harness.queries.map((query) => query.constructor.name)).toContain(
+      "ResourceEffectiveConfigQuery",
+    );
+    expect(
+      harness.commands.find(
+        (command) => command.constructor.name === "SetEnvironmentVariableCommand",
       ),
     ).toBeUndefined();
     expect(
