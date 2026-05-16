@@ -8,6 +8,35 @@
   global error/async/adapter contracts, and public docs governance.
 - [x] Record no-ADR-needed rationale because existing accepted ADRs govern the active boundaries.
 
+## Workflow Round Trace
+
+- [x] Access/domain/TLS Spec Round evidence: ADR-002 through ADR-009, ADR-017, ADR-019, ADR-035,
+  routing/domain/TLS workflow, route-intent diagnostics, domain-binding lifecycle, and certificate
+  lifecycle specs are linked from `spec.md`.
+- [x] Access/domain/TLS Test/Test-First evidence: routing/domain/TLS and certificate import matrices
+  plus application/oRPC/CLI/docs-registry tests are linked and rerun.
+- [x] Access/domain/TLS Code Round evidence: active `domain-bindings.*` and `certificates.*`
+  operation slices, catalog entries, CLI/oRPC/Web/docs surfaces, and operator-work projections are
+  present on latest `main`.
+- [x] Access/domain/TLS Docs Round evidence: access/domain/TLS public docs and docs-registry
+  operation/help-topic coverage are active.
+- [x] Access/domain/TLS Final Sync evidence: roadmap, release-note rationale, and this artifact now
+  distinguish closed RC behavior from accepted route-admin/force-HTTPS follow-ups.
+- [x] Operator state Spec Round evidence: ADR-047 through ADR-064, ADR-054, operator-work,
+  durable-process, runtime capacity/usage, audit/event/log retention, and scheduled retention specs
+  are linked from `spec.md`.
+- [x] Operator state Test/Test-First evidence: operator-work, durable-process, runtime capacity,
+  runtime usage, audit event, provider job log, release hardening, docs-registry, SDK/MCP tests are
+  linked and rerun.
+- [x] Operator state Code Round evidence: active `operator-work.*`, capacity inspect/prune,
+  runtime-usage, audit/event/provider retention, CLI/oRPC/Web/docs-registry/SDK/MCP slices are
+  present on latest `main`.
+- [x] Operator state Docs Round evidence: observe/diagnostics, operations docs, docs-registry
+  coverage, and release-hardening evidence are active.
+- [x] Operator state Final Sync evidence: roadmap, release-note rationale, and this artifact now
+  distinguish closed RC behavior from accepted automatic-worker and remote-SSH repair/prune
+  follow-ups.
+
 ## Blocker Closure
 
 - [x] Close top-level resource CRUD/lifecycle blocker for active v1 surface and record accepted
@@ -71,4 +100,4 @@
 
 - [x] Mark verification commands with observed results.
 - [x] Ensure the final PR description states this is pre-RC closure/hardening, not an RC release.
-- [ ] Commit each smallest completed unit independently.
+- [x] Commit each smallest completed unit independently.

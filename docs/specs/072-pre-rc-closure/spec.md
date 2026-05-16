@@ -49,6 +49,22 @@ No new ADR is required in this artifact because the command boundaries, lifecycl
 readiness rules, persistence shape, public contracts, and operation catalog entries are already
 governed by accepted ADRs and local specs linked from the operation map.
 
+## Round Trace
+
+This artifact is the final coordination layer for work that was already split across earlier
+accepted specs and code rounds on `main`. It must not be read as "Sync first, implementation later."
+The trace below records the full round chain for the two requested workflows:
+
+| Workflow | Spec Round evidence | Test/Test-First evidence | Code Round evidence | Docs Round evidence | Final Sync outcome |
+| --- | --- | --- | --- | --- | --- |
+| Access/domain/TLS closure | ADR-002 through ADR-009, ADR-017, ADR-019, ADR-035; [Routing Domain And TLS](../../workflows/routing-domain-and-tls.md); [Route Intent/Status And Access Diagnostics](../020-route-intent-status-and-access-diagnostics/spec.md); [Domain Binding Lifecycle](../021-domain-binding-lifecycle/spec.md); [Certificate Lifecycle Closure](../023-certificate-lifecycle-closure/spec.md). | [Routing Domain And TLS Test Matrix](../../testing/routing-domain-and-tls-test-matrix.md), [certificates.import Test Matrix](../../testing/certificates.import-test-matrix.md), operation/docs coverage rows in [Public Documentation Test Matrix](../../testing/public-documentation-test-matrix.md). | Active application slices under `packages/application/src/operations/domain-bindings/**` and `packages/application/src/operations/certificates/**`; operation catalog entries for `domain-bindings.show/configure-route/delete-check/delete/retry-verification` and `certificates.import/show/retry/revoke/delete`; CLI/oRPC/Web/docs-registry coverage. | `apps/docs/src/content/docs/access/domains/**`, `apps/docs/src/content/docs/access/tls/**`, `packages/docs-registry` operation/help-topic coverage. | Closed for RC. Future route admin repair/prune and full force-HTTPS policy controls remain accepted non-GA-blocking gaps, not hidden RC scope. |
+| Operator state closure | ADR-047 through ADR-064, especially ADR-054; [Operator Work Ledger](../010-operator-work-ledger/spec.md); [Durable Process Delivery Baseline](../060-durable-process-delivery-baseline/spec.md); runtime capacity/usage, audit/event/log retention, scheduled prune/history retention specs 055 through 069. | [Operator Work Ledger Test Matrix](../../testing/operator-work-ledger-test-matrix.md), [Durable Process Delivery Test Matrix](../../testing/durable-process-delivery-test-matrix.md), [Runtime Target Capacity Test Matrix](../../testing/runtime-target-capacity-test-matrix.md), [Runtime Usage Attribution Test Matrix](../../testing/runtime-usage-attribution-test-matrix.md), [Audit Event Read Surface Test Matrix](../../testing/audit-event-read-surface-test-matrix.md), [Provider Job Log Retention Test Matrix](../../testing/provider-job-log-retention-test-matrix.md). | Active application slices for `operator-work.*`, `servers.capacity.inspect/prune`, `runtime-usage.inspect`, `audit-events.*`, `domain-events.prune`, and `provider-job-logs.prune`; CLI/oRPC/Web/docs-registry/SDK/MCP descriptor coverage; persistence/read-model support from the owning prior rounds. | `apps/docs/src/content/docs/observe/diagnostics.md`, self-hosting/operations docs, `packages/docs-registry` operation/help-topic coverage, and release-hardening documentation. | Closed for RC. Automatic provider/runtime retry workers and remote SSH repair/prune remain accepted non-GA-blocking governed follow-ups because current RC behavior exposes diagnostics, explicit retry/mark/cancel/dead-letter/prune, and fail-closed release gates. |
+
+Because the code rounds were already merged before this branch was created from latest `main`, this
+PR's code delta is intentionally source-of-truth synchronization and verification evidence. The
+final Sync Round is meaningful only because the linked prior specs, tests, operation catalog entries,
+adapters, public docs, SDK/MCP metadata, and verification commands are present and passing.
+
 ## Scenarios And Acceptance Criteria
 
 | ID | Scenario | Given | When | Then |

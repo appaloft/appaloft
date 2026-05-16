@@ -21,7 +21,9 @@
 ## Architecture Approach
 
 - Domain/application placement: no new aggregate or command boundary is introduced. This round
-  verifies and synchronizes already governed business operations.
+  verifies and synchronizes already governed business operations. The requested access/domain/TLS
+  and operator-state code rounds are represented by prior merged slices; this branch audits those
+  slices and performs the final Sync Round, rather than inventing a second implementation path.
 - Repository/specification/visitor impact: none. Active persistence/read-model behavior remains
   owned by the relevant prior specs.
 - Event/CQRS/read-model impact: keep read-only observations in queries and write-side mutations in
@@ -30,6 +32,16 @@
   docs must continue to derive from `operation-catalog.ts` and shared command/query schemas.
 - Persistence/migration impact: no migration in this closure artifact. Accepted future persistence
   work remains in owning roadmap gaps.
+
+## Workflow Round Plan
+
+| Workflow | Required round state | Plan outcome |
+| --- | --- | --- |
+| Access/domain/TLS closure | Spec, Test/Test-First, Code, Docs, and Sync must all be traceable before RC. | Use the existing accepted routing/domain/TLS, domain-binding, certificate, route diagnostic, and public docs specs as the Spec/Docs source; verify application, CLI, oRPC, operation catalog, docs-registry, SDK/MCP, and Web/read-model evidence; sync roadmap and release notes only after tests pass. |
+| Operator state closure | Spec, Test/Test-First, Code, Docs, and Sync must all be traceable before RC. | Use ADR-054 and the operator-work/runtime/audit/event/log retention specs as the Spec source; verify operator-work, capacity, runtime usage, audit/event/provider retention, docs-registry, SDK/MCP, and release hardening evidence; sync accepted future worker/remote-repair gaps explicitly. |
+
+If any required operation, test matrix, adapter, public docs outcome, or catalog entry is missing,
+the closure must return to the owning Spec/Test/Code round instead of checking the Phase 11 gate.
 
 ## Roadmap And Compatibility
 
@@ -56,6 +68,16 @@ Focused local verification should cover:
 Environment-gated real Docker/SSH/provider smokes remain first-class release gates. Local pre-RC
 closure may record them as not run when credentials or Docker/SSH targets are unavailable, but
 release-readiness workflows fail closed when their `require_*` inputs are set.
+
+## Sync Strategy
+
+1. Re-audit source-of-truth documents before editing roadmap state.
+2. Verify active workflow evidence with focused automated tests.
+3. Update the coordination artifact with round trace and accepted gaps.
+4. Update `docs/PRODUCT_ROADMAP.md` only after the evidence exists.
+5. Update release-hardening and release-note rationale so future RC notes cannot silently omit
+   accepted non-GA gaps.
+6. Re-run lint, typecheck, and diff checks before finalizing the PR.
 
 ## Risks And Migration Gaps
 
