@@ -149,6 +149,12 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
   };
 }
 
+function deploymentWithoutEnvironmentSnapshot(): DeploymentSummary {
+  const deployment: Partial<DeploymentSummary> = deploymentSummary();
+  delete deployment.environmentSnapshot;
+  return deployment as DeploymentSummary;
+}
+
 function createService(input?: {
   deployments?: DeploymentSummary[];
   resources?: ResourceSummary[];
@@ -217,6 +223,46 @@ describe("DeploymentRecoveryReadinessQueryService", () => {
     );
   });
 
+  test("[DEP-RECOVERY-READINESS-003] blocks retry when the retained deployment snapshot is missing", async () => {
+    const readiness = unwrap(
+      await createService({
+        deployments: [deploymentWithoutEnvironmentSnapshot()],
+      }).execute(createTestContext(), createQuery()),
+    );
+
+    expect(readiness.retryable).toBe(false);
+    expect(readiness.retry.allowed).toBe(false);
+    expect(readiness.retry.reasons.map((reason) => reason.code)).toContain("snapshot-missing");
+    expect(readiness.recommendedActions).not.toContainEqual(
+      expect.objectContaining({
+        targetOperation: "deployments.retry",
+      }),
+    );
+  });
+
+  test("[DEP-RECOVERY-READINESS-005] blocks redeploy when the current Resource profile is unavailable", async () => {
+    const readiness = unwrap(
+      await createService({
+        resources: [],
+      }).execute(createTestContext(), createQuery()),
+    );
+
+    expect(readiness.redeployable).toBe(false);
+    expect(readiness.redeploy.allowed).toBe(false);
+    expect(readiness.redeploy.reasons).toContainEqual(
+      expect.objectContaining({
+        code: "resource-profile-invalid",
+        relatedEntityId: "res_web",
+        relatedEntityType: "resource",
+      }),
+    );
+    expect(readiness.recommendedActions).not.toContainEqual(
+      expect.objectContaining({
+        targetOperation: "deployments.redeploy",
+      }),
+    );
+  });
+
   test("[DEP-RECOVERY-READINESS-006] returns rollback-ready retained successful candidates", async () => {
     const readiness = unwrap(
       await createService({
@@ -281,6 +327,47 @@ describe("DeploymentRecoveryReadinessQueryService", () => {
     expect(readiness.rollback.candidates[0]?.reasons.map((reason) => reason.code)).toContain(
       "runtime-artifact-missing",
     );
+  });
+
+  test("[DEP-RECOVERY-READINESS-008] blocks successful rollback candidates on target mismatch", async () => {
+    const readiness = unwrap(
+      await createService({
+        deployments: [
+          deploymentSummary(),
+          deploymentSummary({
+            id: "dep_success_other_destination",
+            status: "succeeded",
+            destinationId: "dst_other",
+            finishedAt: "2026-01-01T00:00:04.000Z",
+            runtimePlan: {
+              ...deploymentSummary().runtimePlan,
+              runtimeArtifact: {
+                kind: "image",
+                intent: "build-image",
+                image: "registry.example.com/acme/web@sha256:demo",
+              },
+            },
+          }),
+        ],
+      }).execute(createTestContext(), createQuery()),
+    );
+
+    expect(readiness.rollbackReady).toBe(false);
+    expect(readiness.rollback.allowed).toBe(false);
+    expect(readiness.rollback.reasons.map((reason) => reason.code)).toContain(
+      "rollback-candidate-target-mismatch",
+    );
+    expect(readiness.rollback.candidates).toEqual([
+      expect.objectContaining({
+        deploymentId: "dep_success_other_destination",
+        rollbackReady: false,
+        reasons: expect.arrayContaining([
+          expect.objectContaining({
+            code: "rollback-candidate-target-mismatch",
+          }),
+        ]),
+      }),
+    ]);
   });
 
   test("[DEP-RECOVERY-READINESS-011] returns not_found when the deployment does not exist", async () => {

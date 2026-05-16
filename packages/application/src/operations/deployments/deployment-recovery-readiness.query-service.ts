@@ -134,26 +134,56 @@ function runtimeTargetSummary(deployment: DeploymentSummary): string {
   return `${deployment.runtimePlan.target.kind}:${deployment.runtimePlan.target.providerKey}`;
 }
 
-function toRollbackCandidate(deployment: DeploymentSummary): RollbackCandidateReadiness {
-  const candidateSourceSummary = sourceSummary(deployment);
-  const candidateArtifactSummary = artifactSummary(deployment);
-  const reasons = hasRollbackArtifact(deployment)
-    ? []
-    : [
-        reason("runtime-artifact-missing", {
-          relatedDeploymentId: deployment.id,
-          recommendation: "Choose another successful deployment or redeploy the current profile.",
-        }),
-      ];
+function hasRollbackTargetMismatch(input: {
+  source: DeploymentSummary;
+  candidate: DeploymentSummary;
+}): boolean {
+  return (
+    input.source.projectId !== input.candidate.projectId ||
+    input.source.environmentId !== input.candidate.environmentId ||
+    input.source.serverId !== input.candidate.serverId ||
+    input.source.destinationId !== input.candidate.destinationId ||
+    input.source.runtimePlan.target.kind !== input.candidate.runtimePlan.target.kind ||
+    input.source.runtimePlan.target.providerKey !== input.candidate.runtimePlan.target.providerKey
+  );
+}
+
+function toRollbackCandidate(input: {
+  source: DeploymentSummary;
+  candidate: DeploymentSummary;
+}): RollbackCandidateReadiness {
+  const { candidate, source } = input;
+  const targetMismatch = hasRollbackTargetMismatch({ source, candidate });
+  const candidateSourceSummary = sourceSummary(candidate);
+  const candidateArtifactSummary = artifactSummary(candidate);
+  const reasons: DeploymentRecoveryReadinessReason[] = [
+    ...(hasRollbackArtifact(candidate)
+      ? []
+      : [
+          reason("runtime-artifact-missing", {
+            relatedDeploymentId: candidate.id,
+            recommendation: "Choose another successful deployment or redeploy the current profile.",
+          }),
+        ]),
+    ...(targetMismatch
+      ? [
+          reason("rollback-candidate-target-mismatch", {
+            relatedDeploymentId: candidate.id,
+            recommendation:
+              "Choose a candidate from the same runtime target/destination or redeploy the current profile.",
+          }),
+        ]
+      : []),
+  ];
 
   return {
-    deploymentId: deployment.id,
-    finishedAt: deployment.finishedAt ?? deployment.createdAt,
+    deploymentId: candidate.id,
+    finishedAt: candidate.finishedAt ?? candidate.createdAt,
     status: "succeeded",
     ...(candidateSourceSummary ? { sourceSummary: candidateSourceSummary } : {}),
     ...(candidateArtifactSummary ? { artifactSummary: candidateArtifactSummary } : {}),
-    environmentSnapshotId: deployment.environmentSnapshot.id,
-    runtimeTargetSummary: runtimeTargetSummary(deployment),
+    environmentSnapshotId: candidate.environmentSnapshot.id,
+    runtimeTargetSummary: runtimeTargetSummary(candidate),
     rollbackReady: reasons.length === 0,
     reasons,
   };
@@ -357,7 +387,7 @@ export class DeploymentRecoveryReadinessQueryService {
         .sort((left, right) =>
           (right.finishedAt ?? right.createdAt).localeCompare(left.finishedAt ?? left.createdAt),
         )
-        .map(toRollbackCandidate);
+        .map((candidate) => toRollbackCandidate({ source: deployment, candidate }));
 
       const readyRollbackCandidate = rollbackCandidates.find(
         (candidate) => candidate.rollbackReady,
@@ -371,9 +401,13 @@ export class DeploymentRecoveryReadinessQueryService {
               }),
             ]
           : [
-              reason("runtime-artifact-missing", {
-                recommendation: "Choose another candidate or redeploy the current profile.",
-              }),
+              ...(rollbackCandidates[0]?.reasons.length
+                ? rollbackCandidates[0].reasons
+                : [
+                    reason("runtime-artifact-missing", {
+                      recommendation: "Choose another candidate or redeploy the current profile.",
+                    }),
+                  ]),
             ];
 
       const retryable = retryReasons.length === 0;

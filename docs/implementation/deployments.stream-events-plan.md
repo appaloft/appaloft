@@ -17,6 +17,7 @@ replace ADRs, query specs, workflow specs, error specs, or test matrices.
 - [deployments.stream-events Query Spec](../queries/deployments.stream-events.md)
 - [Deployment Event Stream Error Spec](../errors/deployments.stream-events.md)
 - [Deployment Event Stream Test Matrix](../testing/deployments.stream-events-test-matrix.md)
+- [Deployment Observation And Recovery Hardening](../specs/071-deployment-observation-and-recovery/spec.md)
 - [Deployment Detail And Observation Workflow Spec](../workflows/deployment-detail-and-observation.md)
 - [deployments.show Query Spec](../queries/deployments.show.md)
 - [Core Operations](../CORE_OPERATIONS.md)
@@ -176,6 +177,9 @@ Remaining hardening gaps:
 - explicit gap-envelope and post-open follow-failure tests;
 - CLI follow/cancellation executable coverage;
 - future richer durable lifecycle sourcing when outbox/process state becomes first-class.
+
+The next Code Round should treat those gaps as `0.12.x` patch hardening before the `1.0.0-rc` gate.
+It must not add deployment mutation behavior or reintroduce write-side reattach.
 
 ## Open Questions
 

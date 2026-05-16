@@ -2,9 +2,10 @@
 
 ## Status
 
-Active read-only query. The first Code Round implements this operation in the application query
-slice, operation catalog, HTTP/oRPC, CLI, and Web deployment detail as a read-only recovery decision
-surface. Recovery write commands remain inactive accepted candidates.
+Active read-only query. The query is implemented in the application query slice, operation catalog,
+HTTP/oRPC, CLI, and Web deployment detail as the shared recovery decision surface.
+`deployments.retry`, `deployments.redeploy`, and `deployments.rollback` are active write commands
+that re-evaluate readiness server-side before accepting recovery work.
 
 ## Governing Sources
 
@@ -108,7 +109,8 @@ for inactive write commands, and is available through:
 
 Deferred gaps:
 
-- write-side admission for `deployments.retry`, `deployments.redeploy`, and `deployments.rollback`;
-- full artifact retention/prune horizon semantics;
-- stale readiness marker enforcement for future write commands;
+- broader artifact retention/prune horizon semantics;
+- richer target compatibility evidence for rollback candidate readiness;
+- deferred recovery-command edge-case rows in
+  [Deployment Recovery Readiness Test Matrix](../testing/deployment-recovery-readiness-test-matrix.md);
 - future MCP tool descriptor over the same operation.

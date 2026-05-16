@@ -117,15 +117,15 @@ It must not:
 
 ## Current Implementation Notes And Migration Gaps
 
-`deployments.show` is already active in the public catalog and entrypoints. Standalone
-`deployments.stream-events` is not implemented yet.
+`deployments.show` and standalone `deployments.stream-events` are active in the public catalog and
+entrypoints. Web deployment detail uses `deployments.show` for immutable detail, reads timeline
+replay/follow through `deployments.stream-events`, and keeps attempt logs on `deployments.logs`.
 
-Current Web detail still relies on `deployments.show` for summary and may reconnect to the
-create-time progress transport when that transport is still available. That remains a migration seam
-until `deployments.stream-events` becomes the formal observation query.
-
-Retry, redeploy, rollback candidate/readiness, and rollback write semantics remain separate future
-Spec Rounds under ADR-016.
+ADR-034 and the recovery specs have since activated `deployments.recovery-readiness`,
+`deployments.retry`, `deployments.redeploy`, and `deployments.rollback`. Remaining pre-rc work is
+hardening, not first-class boundary creation: cursor reconnect, explicit gap envelopes, post-open
+follow failure behavior, CLI follow/cancellation coverage, and recovery edge-case tests are tracked
+by [Deployment Observation And Recovery Hardening](../specs/071-deployment-observation-and-recovery/spec.md).
 
 ## Open Questions
 
