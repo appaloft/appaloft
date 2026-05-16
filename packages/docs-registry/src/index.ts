@@ -326,7 +326,7 @@ export const publicDocsHelpTopics = {
     id: "agent.deploy-skill",
     title: "Agent deploy skill",
     description:
-      "How AI agents safely deploy apps and static sites through Appaloft without bypassing existing operations.",
+      "How AI agents safely deploy Appaloft workloads without bypassing existing operations.",
     page: {
       "zh-CN": "agent/deploy-skill",
       "en-US": "en/agent/deploy-skill",
@@ -343,7 +343,7 @@ export const publicDocsHelpTopics = {
       "docs/specs/071-url-first-deployment-entry-experience/spec.md",
       "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
       "docs/agent/appaloft-deploy-skill.md",
-      "packages/agent-skill/package.json",
+      "packages/skills/package.json",
     ],
     webSurfaces: ["apps/web Quick Deploy source-first entry and completion outcome links"],
   },

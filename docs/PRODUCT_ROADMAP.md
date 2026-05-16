@@ -128,7 +128,7 @@ The 1.0.0 product is ready only when all of these are checked:
 - [ ] A published TypeScript SDK consumes the same HTTP/oRPC operation contracts as Web and
   external automation, without importing `core`, `application`, repositories, handlers, or use
   cases.
-- [ ] A v1 agent deploy skill is installable with `npx @appaloft/agent-skill install deploy` and
+- [ ] A v1 agent deploy skill is installable with `npx @appaloft/skills install deploy` and
   explains the safe first-deploy protocol for coding agents before MCP is required, including
   source inspection, secret exclusion, explicit operation sequencing, URL-first outcome output,
   diagnostics, and recovery guidance.
@@ -2752,8 +2752,8 @@ External baseline research points to this practical minimum:
   frameworks.
 - [ ] AI-agent safe deployment protocol and outcome-first completion output generated from the same
   operation catalog, public docs, and future MCP/tool descriptors.
-- [ ] Pre-v1 Appaloft agent deploy skill: publish `@appaloft/agent-skill` so coding agents can run
-  `npx @appaloft/agent-skill install deploy` and deploy through CLI/API safely before the full MCP
+- [ ] Pre-v1 Appaloft agent deploy skill: publish `@appaloft/skills` so coding agents can run
+  `npx @appaloft/skills install deploy` and deploy through CLI/API safely before the full MCP
   product surface exists. Governed by
   [Appaloft Agent Deploy Skill](./specs/072-appaloft-agent-deploy-skill/spec.md).
 

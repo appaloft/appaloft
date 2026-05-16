@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const cliPath = join(import.meta.dir, "../bin/appaloft-agent-skill.js");
+const cliPath = join(import.meta.dir, "../bin/appaloft-skills.js");
 
 function runCli(args: string[], env: Record<string, string> = {}) {
   return Bun.spawnSync(["node", cliPath, ...args], {
@@ -13,7 +13,7 @@ function runCli(args: string[], env: Record<string, string> = {}) {
   });
 }
 
-describe("@appaloft/agent-skill installer", () => {
+describe("@appaloft/skills installer", () => {
   test("[AGENT-SKILL-INSTALL-001] installs the deploy skill into a directory target", async () => {
     const target = mkdtempSync(join(tmpdir(), "appaloft-agent-skill-"));
     try {

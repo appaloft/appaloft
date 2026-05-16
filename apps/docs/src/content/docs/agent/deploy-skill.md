@@ -1,6 +1,6 @@
 ---
 title: "Agent deploy skill"
-description: "让 AI agent 通过 Appaloft 安全部署应用和静态站点。"
+description: "让 AI agent 通过 Appaloft 安全部署 Web、服务、镜像、Compose、worker 和静态站点。"
 docType: task
 localeState:
   zh-CN: complete
@@ -25,28 +25,28 @@ sidebar:
 Appaloft Deploy Skill 是 v1 前置能力。它不是新的部署操作，也不是 MCP 的替代实现；它是一套给 AI
 agent 使用的用户层协议，让 agent 使用现有 CLI、HTTP API 或 Web Quick Deploy 完成部署。
 
-Skill 的目标是让 agent 优先回答用户真正关心的问题：访问地址、部署状态、日志、诊断摘要和恢复路径。
+Skill 的目标是覆盖完整 Appaloft 部署入口，让 agent 优先回答用户真正关心的问题：访问地址、部署状态、日志、诊断摘要和恢复路径。静态输出只是最快的入口之一，不是 skill 的边界。
 
 <h2 id="agent-deploy-install">安装 skill</h2>
 
 Codex 兼容的 skill host 可以直接安装：
 
 ```bash
-npx @appaloft/agent-skill install deploy
+npx @appaloft/skills install deploy
 ```
 
 默认安装到 `${CODEX_HOME:-~/.codex}/skills/appaloft-deploy`。如果需要安装到仓库内或其他 agent 的 skill 目录：
 
 ```bash
-npx @appaloft/agent-skill install deploy --target directory --path ./.agents/skills
+npx @appaloft/skills install deploy --target directory --path ./.agents/skills
 ```
 
 已有同名 skill 时需要显式传 `--force`。
 
 <h2 id="agent-deploy-flow">推荐流程</h2>
 
-1. 安全检查来源：只读取项目结构、构建脚本、Docker/Compose 配置、静态输出目录和 Appaloft 配置。
-2. 选择最小入口：已有静态输出用 `appaloft deploy ./dist --as static-site`，源码静态站点用 `--method static --publish-dir <dir>`。
+1. 安全检查来源：只读取项目结构、构建脚本、运行端口、镜像引用、Docker/Compose 配置、静态输出目录和 Appaloft 配置。
+2. 选择最小入口：Appaloft config 优先；然后根据证据选择 prebuilt image、Compose、Dockerfile、静态输出、静态源码或 workspace commands。
 3. 使用既有操作：创建或选择项目、服务器、环境和资源，然后发起 `deployments.create`。
 4. 输出结果：优先给访问 URL，其次给 deployment id、resource id、日志命令、诊断命令和 recovery readiness 命令。
 
@@ -73,4 +73,4 @@ Agent 应返回一份短结果：
 
 <h2 id="agent-deploy-reference">规范文档</h2>
 
-完整规范位于仓库内的 `docs/agent/appaloft-deploy-skill.md`，可安装 skill 位于 npm 包 `@appaloft/agent-skill` 的 `skills/appaloft-deploy` 目录。
+完整规范位于仓库内的 `docs/agent/appaloft-deploy-skill.md`，可安装 skill 位于 npm 包 `@appaloft/skills` 的 `skills/appaloft-deploy` 目录。

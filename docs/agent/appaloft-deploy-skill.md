@@ -8,9 +8,11 @@
 
 ## Purpose
 
-The skill turns a user request such as "deploy this app" or "publish this static output" into the
-same Appaloft flow a human would use. The canonical source lives in this document and the packaged
-installable skill lives at `packages/agent-skill/skills/appaloft-deploy`.
+The skill turns a user request such as "deploy this app", "deploy this API", "deploy this Compose
+stack", "deploy this image", or "publish this static output" into the same Appaloft flow a human
+would use. Static output is one low-friction entrypoint, not the scope of the skill. The canonical
+source lives in this document and the packaged installable skill lives at
+`packages/skills/skills/appaloft-deploy`.
 
 1. Inspect the source safely.
 2. Choose the smallest supported entrypoint.
@@ -26,14 +28,14 @@ this protocol.
 Install the skill for Codex-compatible skill hosts:
 
 ```bash
-npx @appaloft/agent-skill install deploy
+npx @appaloft/skills install deploy
 ```
 
 By default this installs to `${CODEX_HOME:-~/.codex}/skills/appaloft-deploy`. For repository-local
 or custom skill hosts, install into a directory:
 
 ```bash
-npx @appaloft/agent-skill install deploy --target directory --path ./.agents/skills
+npx @appaloft/skills install deploy --target directory --path ./.agents/skills
 ```
 
 Use `--force` to replace an existing installed copy and `--dry-run` to preview the destination.
@@ -52,8 +54,8 @@ Use `--force` to replace an existing installed copy and `--dry-run` to preview t
 - Prefer the user's BYOS target. Appaloft should not silently upload artifacts to a hosted cloud
   service unless the user explicitly selects a hosted feature that documents that behavior.
 - For local static output, use `appaloft deploy ./dist --as static-site` or the equivalent Web/API
-  workflow. The static directory is the source; Appaloft still deploys it through the normal
-  resource and deployment operations.
+  workflow. This is only one Appaloft deploy mode; Dockerfile, Compose, prebuilt image, and
+  workspace-command deployments still use the same resource and deployment operation boundary.
 
 ## Source Inspection
 
@@ -62,6 +64,8 @@ Inspect only metadata needed to choose a deployment path:
 - package manager and scripts;
 - framework evidence;
 - Dockerfile or Compose files;
+- prebuilt image references;
+- runtime ports and start commands;
 - static output directories such as `dist`, `build`, or `public`;
 - Appaloft config files;
 - existing public docs or README deployment hints.
@@ -73,12 +77,13 @@ needed, ask the user to register or reference them through Appaloft.
 
 Use this order:
 
-1. If the user points at an already built static directory, run `appaloft deploy <dir> --as static-site`.
-2. If the repository has an Appaloft deployment config, run `appaloft deploy <source>`.
-3. If the repository is a static site source, run `appaloft deploy <source> --method static --publish-dir <dir>`.
-4. If Docker Compose is the clearest source of truth, run `appaloft deploy <source> --method docker-compose`.
-5. If a Dockerfile is the clearest source of truth, run `appaloft deploy <source> --method dockerfile`.
-6. Otherwise use workspace commands with explicit install, build, start, and port options.
+1. If the repository has an Appaloft deployment config, run `appaloft deploy <source>`.
+2. If the user names a prebuilt image, run `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
+3. If Docker Compose is the clearest source of truth, run `appaloft deploy <source> --method docker-compose`.
+4. If a Dockerfile is the clearest source of truth, run `appaloft deploy <source> --method dockerfile`.
+5. If the user points at an already built static directory, run `appaloft deploy <dir> --as static-site`.
+6. If the repository is a static site source, run `appaloft deploy <source> --method static --publish-dir <dir>`.
+7. Otherwise use workspace commands with explicit install, build, start, and port options.
 
 When Web is the active surface, choose the equivalent Quick Deploy source card and keep advanced
 runtime fields hidden until the source evidence requires them.

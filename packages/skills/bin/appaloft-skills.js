@@ -13,19 +13,19 @@ const skillAliases = new Map([
 ]);
 
 const helpText = `Usage:
-  appaloft-agent-skill install deploy [--target codex|directory] [--path <dir>] [--force] [--dry-run]
-  appaloft-agent-skill list
+  appaloft-skills install deploy [--target codex|directory] [--path <dir>] [--force] [--dry-run]
+  appaloft-skills list
 
 Examples:
-  npx @appaloft/agent-skill install deploy
-  npx @appaloft/agent-skill install deploy --target codex --force
-  npx @appaloft/agent-skill install deploy --target directory --path ./.agents/skills
+  npx @appaloft/skills install deploy
+  npx @appaloft/skills install deploy --target codex --force
+  npx @appaloft/skills install deploy --target directory --path ./.agents/skills
 `;
 
 function parseArgs(argv) {
   const [command, skill = "", ...rest] = argv;
   const options = {
-    command: command ?? "help",
+    command: !command || command === "--help" || command === "-h" ? "help" : command,
     skill,
     target: "codex",
     force: false,
