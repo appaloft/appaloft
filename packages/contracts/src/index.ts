@@ -285,6 +285,7 @@ export const systemPluginWebExtensionSchema = z.object({
 
 export const projectSummarySchema = z.object({
   id: z.string(),
+  organizationId: z.string().optional(),
   name: z.string(),
   slug: z.string(),
   description: z.string().optional(),
@@ -296,6 +297,7 @@ export const projectSummarySchema = z.object({
 
 export const createProjectInputSchema = z.object({
   name: z.string().min(1),
+  organizationId: z.string().min(1).optional(),
   description: z.string().optional(),
 });
 

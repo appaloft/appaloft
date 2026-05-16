@@ -39,6 +39,7 @@ class DefaultExecutionContextFactory implements ExecutionContextFactory {
       tracer: this.tracer,
       ...(input.actor ? { actor: input.actor } : {}),
       ...(input.auth ? { auth: input.auth } : {}),
+      ...(input.principal ? { principal: input.principal } : {}),
     };
   }
 }

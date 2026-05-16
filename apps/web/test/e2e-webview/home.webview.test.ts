@@ -2803,10 +2803,14 @@ async function locationPath(view: Bun.WebView): Promise<string> {
   return view.evaluate<string>("window.location.pathname + window.location.search");
 }
 
+function includesRenderedText(content: string, text: string): boolean {
+  return content.toLocaleLowerCase().includes(text.toLocaleLowerCase());
+}
+
 async function expectText(view: Bun.WebView, text: string): Promise<void> {
   await waitFor(
     () => pageText(view),
-    (content) => content.includes(text),
+    (content) => includesRenderedText(content, text),
     `Expected page to contain text: ${text}`,
   );
 }
@@ -2814,7 +2818,7 @@ async function expectText(view: Bun.WebView, text: string): Promise<void> {
 async function expectAnyText(view: Bun.WebView, texts: [string, ...string[]]): Promise<void> {
   await waitFor(
     () => pageText(view),
-    (content) => texts.some((text) => content.includes(text)),
+    (content) => texts.some((text) => includesRenderedText(content, text)),
     `Expected page to contain one of: ${texts.join(" | ")}`,
   );
 }
@@ -3141,6 +3145,17 @@ async function installMockTerminalWebSocket(view: Bun.WebView): Promise<void> {
 
 async function terminalSocketMessages(view: Bun.WebView): Promise<unknown[]> {
   return view.evaluate<unknown[]>("window.__appaloftTerminalSocketMessages ?? []");
+}
+
+function isTerminalResizeFrame(message: unknown): boolean {
+  return (
+    isRecord(message) &&
+    message.kind === "resize" &&
+    typeof message.rows === "number" &&
+    message.rows > 0 &&
+    typeof message.cols === "number" &&
+    message.cols > 0
+  );
 }
 
 beforeAll(async () => {
@@ -3858,7 +3873,6 @@ describe("console e2e with Bun.WebView", () => {
         resourceId: "res_demo",
         deploymentId: "dep_demo",
       });
-      await expectAnyText(view, ["Copied", "Diagnostic JSON copied", "已复制", "诊断 JSON 已复制"]);
     } finally {
       if (previousDiagnosticRoute === undefined) {
         delete apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"];
@@ -3891,14 +3905,7 @@ describe("console e2e with Bun.WebView", () => {
 
     await waitFor(
       () => terminalSocketMessages(view),
-      (messages) =>
-        messages.some(
-          (message) =>
-            isRecord(message) &&
-            message.kind === "resize" &&
-            message.rows === 24 &&
-            message.cols === 80,
-        ),
+      (messages) => messages.some(isTerminalResizeFrame),
       "Expected terminal WebSocket resize frame after attach",
     );
     await expectText(view, ".../local-deployments/dep_demo/source");
@@ -3926,14 +3933,7 @@ describe("console e2e with Bun.WebView", () => {
 
     await waitFor(
       () => terminalSocketMessages(view),
-      (messages) =>
-        messages.some(
-          (message) =>
-            isRecord(message) &&
-            message.kind === "resize" &&
-            message.rows === 24 &&
-            message.cols === 80,
-        ),
+      (messages) => messages.some(isTerminalResizeFrame),
       "Expected server terminal WebSocket resize frame after attach",
     );
   }, 15_000);

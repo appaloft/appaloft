@@ -42,6 +42,7 @@ class KyselyProjectMutationVisitor
     return {
       values: {
         id: spec.state.id.value,
+        organization_id: spec.state.organizationId?.value ?? "org_self_hosted",
         name: spec.state.name.value,
         slug: spec.state.slug.value,
         description: spec.state.description?.value ?? null,
@@ -81,6 +82,7 @@ export class PgProjectRepository implements ProjectRepository {
           .onConflict((conflict) =>
             conflict.column("id").doUpdateSet({
               name: mutation.values.name,
+              organization_id: mutation.values.organization_id,
               slug: mutation.values.slug,
               description: mutation.values.description,
               lifecycle_status: mutation.values.lifecycle_status,

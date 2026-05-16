@@ -33,6 +33,7 @@ import {
   type DomainBindingSelectionSpec,
   type DomainBindingStatus,
   type DomainError,
+  type DomainErrorDetails,
   type DomainEvent,
   type DomainRouteFailurePhase,
   type EdgeProxyKind,
@@ -100,6 +101,7 @@ import {
   type ExecutionActor,
   type ExecutionContext,
   type RepositoryContext,
+  type TraceAttributes,
 } from "./execution-context";
 import {
   type AppliedRouteContextMetadata,
@@ -1361,6 +1363,7 @@ export interface CertificateHttpChallengeTokenStore {
 
 export interface ProjectSummary {
   id: string;
+  organizationId?: string;
   name: string;
   slug: string;
   description?: string;
@@ -6216,6 +6219,8 @@ export interface ActionDeployTokenAuthorizationPort {
   ): Promise<Result<ActionDeployTokenAuthorizationResult>>;
 }
 
+export type OrganizationTeamRole = "admin" | "billing" | "developer" | "owner" | "viewer";
+
 export type ProductOrganizationRole = "admin" | "member" | "owner";
 
 export interface ProductSessionAuthorizationInput {
@@ -6231,6 +6236,7 @@ export interface ProductSessionAuthorizationResult {
   actor: ExecutionActor;
   email?: string;
   organizationId: string;
+  organizationRole?: OrganizationTeamRole;
   role: ProductOrganizationRole;
   userId: string;
 }
@@ -6241,8 +6247,6 @@ export interface ProductSessionAuthorizationPort {
     input: ProductSessionAuthorizationInput,
   ): Promise<Result<ProductSessionAuthorizationResult>>;
 }
-
-export type OrganizationTeamRole = "admin" | "billing" | "developer" | "owner" | "viewer";
 
 export interface OrganizationCurrentUserSummary {
   userId: string;
@@ -6367,6 +6371,171 @@ export interface OrganizationTeamManagementPort {
     input: RemoveOrganizationMemberInput,
   ): Promise<Result<{ memberId: string; organizationId: string; removedAt: string }>>;
 }
+
+export type OperationKind = "command" | "query";
+
+export type OperationCheckKind =
+  | "authorization"
+  | "entitlement"
+  | "policy"
+  | "quota"
+  | "validation"
+  | (string & {});
+
+export interface OperationCheckResourceRefs {
+  projectId?: string;
+  environmentId?: string;
+  resourceId?: string;
+  serverId?: string;
+  destinationId?: string;
+  deploymentId?: string;
+  dependencyResourceId?: string;
+  storageVolumeId?: string;
+  [key: string]: string | undefined;
+}
+
+export interface OperationCheckRequest {
+  operationKey: string;
+  operationName: string;
+  kind: OperationKind;
+  action?: string;
+  actor?: ExecutionActor;
+  organizationId?: string;
+  organizationRole?: OrganizationTeamRole;
+  productRole?: ProductOrganizationRole;
+  userId?: string;
+  email?: string;
+  resourceRefs?: OperationCheckResourceRefs;
+  contextAttributes?: DomainErrorDetails;
+}
+
+export interface OperationCheckResult {
+  allowed: boolean;
+  checkKey: string;
+  kind: OperationCheckKind;
+  reason: string;
+  details?: DomainErrorDetails;
+  traceAttributes?: TraceAttributes;
+}
+
+export interface OperationCheckPort {
+  readonly checkKey: string;
+  readonly kind: OperationCheckKind;
+
+  checkOperation(
+    context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationCheckResult>;
+}
+
+export interface OperationGuardDecision {
+  allowed: boolean;
+  checks: OperationCheckResult[];
+  deniedBy?: {
+    checkKey: string;
+    kind: OperationCheckKind;
+  };
+  details?: DomainErrorDetails;
+  reason: string;
+  traceAttributes?: TraceAttributes;
+}
+
+export interface OperationGuardPort {
+  checkOperation(
+    context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision>;
+}
+
+export class AllowAllOperationGuardPort implements OperationGuardPort {
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    return {
+      allowed: true,
+      checks: [],
+      reason: "community-compatibility-default-allow",
+      details: {
+        operationKey: request.operationKey,
+      },
+    };
+  }
+}
+
+function operationCheckSpanName(checkKey: string): string {
+  return `appaloft.operation_check.${checkKey
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase()}`;
+}
+
+export class CompositeOperationGuardPort implements OperationGuardPort {
+  constructor(private readonly checks: OperationCheckPort[] = []) {}
+
+  async checkOperation(
+    context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    const results: OperationCheckResult[] = [];
+
+    for (const check of this.checks) {
+      const result = await context.tracer.startActiveSpan(
+        operationCheckSpanName(check.checkKey),
+        {
+          attributes: {
+            "appaloft.operation.check.key": check.checkKey,
+            "appaloft.operation.check.kind": check.kind,
+            "appaloft.operation.key": request.operationKey,
+            "appaloft.operation.name": request.operationName,
+          },
+        },
+        async (span) => {
+          const checkResult = await check.checkOperation(context, request);
+          span.setAttribute("appaloft.operation.check.allowed", checkResult.allowed);
+          span.setAttribute("appaloft.operation.check.reason", checkResult.reason);
+          if (checkResult.traceAttributes) {
+            span.setAttributes(checkResult.traceAttributes);
+          }
+          span.setStatus(checkResult.allowed ? "ok" : "error", checkResult.reason);
+          return checkResult;
+        },
+      );
+
+      results.push(result);
+
+      if (!result.allowed) {
+        return {
+          allowed: false,
+          checks: results,
+          deniedBy: {
+            checkKey: result.checkKey,
+            kind: result.kind,
+          },
+          reason: result.reason,
+          ...(result.details ? { details: result.details } : {}),
+          ...(result.traceAttributes ? { traceAttributes: result.traceAttributes } : {}),
+        };
+      }
+    }
+
+    return {
+      allowed: true,
+      checks: results,
+      reason: results.length > 0 ? "all-operation-checks-passed" : "no-operation-checks-registered",
+    };
+  }
+}
+
+export type OperationAuthorizationKind = OperationKind;
+export type OperationAuthorizationResourceRefs = OperationCheckResourceRefs;
+export type OperationAuthorizationRequest = OperationCheckRequest;
+export type OperationAuthorizationDecision = OperationGuardDecision;
+export interface OperationAuthorizationPort extends OperationGuardPort {}
+export class AllowAllOperationAuthorizationPort
+  extends AllowAllOperationGuardPort
+  implements OperationAuthorizationPort {}
 
 export interface DeployTokenMaterial {
   token: string;
@@ -6934,8 +7103,22 @@ export interface PreviewPolicyDecisionReadModel {
 }
 
 export interface ProjectReadModel {
-  list(context: RepositoryContext): Promise<ProjectSummary[]>;
+  list(context: RepositoryContext, input?: { organizationId?: string }): Promise<ProjectSummary[]>;
   findOne(context: RepositoryContext, spec: ProjectSelectionSpec): Promise<ProjectSummary | null>;
+}
+
+export interface ProjectOwnership {
+  projectId: string;
+  organizationId: string;
+}
+
+export interface ProjectOwnershipReadModel {
+  findProjectOrganization(
+    context: RepositoryContext,
+    input: {
+      projectId: string;
+    },
+  ): Promise<ProjectOwnership | null>;
 }
 
 export interface ServerReadModel {

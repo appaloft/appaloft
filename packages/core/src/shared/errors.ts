@@ -268,6 +268,10 @@ export const domainError = {
   ): DomainError => createError("project_archived", "user", message, details),
   projectDeleteBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
     createError("project_delete_blocked", "user", message, details),
+  operationCheckDenied: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("operation_check_denied", "user", message, details),
+  operationAuthorizationDenied: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("operation_authorization_denied", "user", message, details),
   environmentArchived: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

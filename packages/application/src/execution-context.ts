@@ -20,6 +20,23 @@ export interface ExecutionActor {
   label?: string;
 }
 
+export type ExecutionOrganizationTeamRole = "admin" | "billing" | "developer" | "owner" | "viewer";
+export type ExecutionProductOrganizationRole = "admin" | "member" | "owner";
+
+export interface ExecutionOrganizationRoleContext {
+  organizationId: string;
+  role: ExecutionOrganizationTeamRole;
+  productRole?: ExecutionProductOrganizationRole;
+}
+
+export interface ExecutionPrincipal {
+  kind: ExecutionActor["kind"];
+  actorId: string;
+  activeOrganization?: ExecutionOrganizationRoleContext;
+  email?: string;
+  userId?: string;
+}
+
 export interface ExecutionAuthContext {
   authorizationHeader?: string;
   cookieHeader?: string;
@@ -48,6 +65,7 @@ export interface ExecutionContext {
   auth?: ExecutionAuthContext;
   entrypoint: AppEntrypoint;
   locale: AppaloftLocale;
+  principal?: ExecutionPrincipal;
   requestId: string;
   t: AppaloftTranslate;
   tracer: AppTracer;
@@ -56,6 +74,7 @@ export interface ExecutionContext {
 export interface RepositoryContext {
   actor?: ExecutionActor;
   locale: AppaloftLocale;
+  principal?: ExecutionPrincipal;
   requestId: string;
   t: AppaloftTranslate;
   tracer: AppTracer;
@@ -68,6 +87,7 @@ export interface ExecutionContextFactory {
     auth?: ExecutionAuthContext;
     entrypoint: AppEntrypoint;
     locale?: string;
+    principal?: ExecutionPrincipal;
     requestId?: string;
   }): ExecutionContext;
 }
@@ -100,6 +120,7 @@ export function createExecutionContext(input: {
   auth?: ExecutionAuthContext;
   entrypoint: AppEntrypoint;
   locale?: string;
+  principal?: ExecutionPrincipal;
   requestId?: string;
   tracer?: AppTracer;
   t?: AppaloftTranslate;
@@ -115,6 +136,7 @@ export function createExecutionContext(input: {
     tracer: input.tracer ?? noopTracer,
     ...(input.actor ? { actor: input.actor } : {}),
     ...(input.auth ? { auth: input.auth } : {}),
+    ...(input.principal ? { principal: input.principal } : {}),
   };
 }
 
@@ -135,6 +157,8 @@ export const appaloftTraceAttributes = {
   readModelName: `${appaloftTraceAttributePrefix}.read_model.name`,
   repositoryName: `${appaloftTraceAttributePrefix}.repository.name`,
   deploymentId: `${appaloftTraceAttributePrefix}.deployment.id`,
+  organizationId: `${appaloftTraceAttributePrefix}.organization.id`,
+  organizationRole: `${appaloftTraceAttributePrefix}.organization.role`,
   resourceId: `${appaloftTraceAttributePrefix}.resource.id`,
   requestId: `${appaloftTraceAttributePrefix}.request.id`,
   runtimeKind: `${appaloftTraceAttributePrefix}.runtime.kind`,
@@ -157,6 +181,8 @@ export function createExecutionContextAttributes(context: ExecutionContext): Tra
     [appaloftTraceAttributes.locale]: context.locale,
     [appaloftTraceAttributes.actorId]: context.actor?.id,
     [appaloftTraceAttributes.actorKind]: context.actor?.kind,
+    [appaloftTraceAttributes.organizationId]: context.principal?.activeOrganization?.organizationId,
+    [appaloftTraceAttributes.organizationRole]: context.principal?.activeOrganization?.role,
   };
 }
 
@@ -179,6 +205,7 @@ export function toRepositoryContext(
     t: context.t,
     tracer: context.tracer,
     ...(context.actor ? { actor: context.actor } : {}),
+    ...(context.principal ? { principal: context.principal } : {}),
     ...(input?.transaction ? { transaction: input.transaction } : {}),
   };
 }
