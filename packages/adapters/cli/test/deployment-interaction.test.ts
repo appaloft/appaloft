@@ -20,6 +20,7 @@ describe("CLI quick deploy draft mapping", () => {
   test("[QUICK-DEPLOY-ENTRY-008] maps static site flags to resources.create draft fields", async () => {
     ensureReflectMetadata();
     const {
+      normalizeUrlFirstDeploymentEntry,
       networkProfileFromDeploymentInput,
       resourceKindForDeploymentMethod,
       runtimeProfileFromDeploymentInput,
@@ -50,6 +51,22 @@ describe("CLI quick deploy draft mapping", () => {
       upstreamProtocol: "http",
       exposureMode: "reverse-proxy",
     });
+    const staticEntry = normalizeUrlFirstDeploymentEntry({
+      entryMode: "static-site",
+      sourceLocator: "./dist",
+    });
+    expect(staticEntry.isOk()).toBe(true);
+    expect(staticEntry._unsafeUnwrap()).toEqual({
+      deploymentMethod: "static",
+      publishDirectory: ".",
+    });
+    expect(
+      normalizeUrlFirstDeploymentEntry({
+        entryMode: "static-site",
+        requestedDeploymentMethod: "dockerfile",
+        sourceLocator: "./dist",
+      }).isErr(),
+    ).toBe(true);
   });
 
   test("[QUICK-DEPLOY-WF-040] keeps non-static CLI drafts on the application defaults", async () => {

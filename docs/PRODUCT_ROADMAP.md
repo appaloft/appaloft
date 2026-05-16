@@ -128,6 +128,9 @@ The 1.0.0 product is ready only when all of these are checked:
 - [ ] A published TypeScript SDK consumes the same HTTP/oRPC operation contracts as Web and
   external automation, without importing `core`, `application`, repositories, handlers, or use
   cases.
+- [ ] A v1 agent deploy skill explains the safe first-deploy protocol for coding agents before MCP
+  is required, including source inspection, secret exclusion, explicit operation sequencing,
+  URL-first outcome output, diagnostics, and recovery guidance.
 - [x] Future MCP/tool contracts can be generated from the same operation catalog without inventing
   parallel behavior.
 - [ ] Framework/runtime detection covers the mainstream self-hosted web catalog with deterministic
@@ -2432,12 +2435,16 @@ Exit criteria:
 
 Target: post-`1.0.0` planning by default.
 
+The v1 Appaloft Agent Deploy Skill is not part of this post-`1.0.0` track set. It is a GA readiness
+item above because it is a documentation/skill entry experience over existing CLI/API operations,
+not a new MCP transport or template capability.
+
 These tracks are recorded so future Spec Rounds do not model MCP servers, AI tool servers, or
 template-backed software as a separate deployment engine. They are not current release blockers and
 do not authorize runtime code before their own ADR/spec/test gates.
 
 Governing planning document:
-- [AI-Native Resource Template And MCP Roadmap](./implementation/ai-native-resource-template-roadmap.md)
+- [AI-Native Skill, Resource Template, And MCP Roadmap](./implementation/ai-native-resource-template-roadmap.md)
 
 Roadmap principles:
 - [ ] Preserve Appaloft's existing Resource, Workload, ResourceInstance, ResourceBinding,
@@ -2727,6 +2734,12 @@ External baseline research points to this practical minimum:
 - [ ] Buildpack/auto-detect option with explicit plan output. The contract now has a Phase 5
   feature artifact and stable matrix ids; Code Round still needs executable preview parity.
 - [x] Static site packaging and first-class publish-directory semantics.
+- [ ] URL-first first-deploy entry experience: let CLI/Web/future tools lead with "source or local
+  static output in, verified URL out" while still dispatching explicit Resource and Deployment
+  operations. Governed by
+  [URL-First Deployment Entry Experience](./specs/071-url-first-deployment-entry-experience/spec.md).
+- [ ] Upload-like local static output entry: accept an already-built local static output directory
+  as deploy input for BYOS targets without introducing Appaloft-hosted artifact routing by default.
 - [x] Generated domains and custom domains as separate concepts.
 - [ ] Full HTTPS/ACME, force HTTPS, and redirect lifecycle closure.
 - [ ] Environment variables, build-time arguments, build secrets, and secret masking.
@@ -2736,10 +2749,23 @@ External baseline research points to this practical minimum:
 - [ ] Deployment history, standalone event stream, health checks, rollbacks, and resource limits.
 - [ ] Framework auto-detection broad enough for modern frontend frameworks and common backend
   frameworks.
+- [ ] AI-agent safe deployment protocol and outcome-first completion output generated from the same
+  operation catalog, public docs, and future MCP/tool descriptors.
+- [ ] Pre-v1 Appaloft agent deploy skill: publish a skill artifact or stable docs anchor that lets
+  coding agents deploy through CLI/API safely before the full MCP product surface exists. Governed
+  by [Appaloft Agent Deploy Skill](./specs/072-appaloft-agent-deploy-skill/spec.md).
 
 ## Immediate Spec-Round Todo
 
 Recommended next Spec Rounds before broad Code Rounds:
+- [x] URL-first deployment entry experience: categorize low-friction deployment lessons as
+  user-layer Quick Deploy/first-deploy work, keep BYOS/runtime boundaries unchanged, and record
+  follow-up tests/docs in
+  [docs/specs/071-url-first-deployment-entry-experience](./specs/071-url-first-deployment-entry-experience/spec.md).
+- [x] Appaloft agent deploy skill: position skill as the v1-priority AI-native affordance before
+  MCP, define the safe deploy protocol and outcome packet, and keep it mapped to existing CLI/API
+  operations in
+  [docs/specs/072-appaloft-agent-deploy-skill](./specs/072-appaloft-agent-deploy-skill/spec.md).
 - [ ] Resource profile lifecycle: reset/delete policy semantics and remaining profile/config drift
   redaction coverage after source/runtime/network/access profile configuration. Resource profile
   drift visibility now has a Spec Round artifact at

@@ -36,6 +36,16 @@ Appaloft errors should not collapse to a message string. Public entrypoints shou
 
 Web, CLI, HTTP/API, and future MCP tools should render errors from those fields instead of branching on message text.
 
+<h2 id="agent-readable-errors">Agent-readable errors</h2>
+
+When an AI agent handles a deployment failure, it should read stable `code`, `category`, `phase`,
+`retryable`, safe details, docs links, and remedies first. It should not infer behavior from message
+text or ask the user to edit databases, remote Docker state, or secret files directly.
+
+If an error has no clear remedy, the agent should run safe diagnostics such as
+`appaloft resource diagnose <resourceId>` before choosing retry, redeploy, or rollback from
+recovery readiness.
+
 <h2 id="operator-work-ledger">Operator work ledger</h2>
 
 When deployment, proxy bootstrap, certificate, or remote-state background work does not finish as expected, inspect the work ledger before guessing which recovery command to run:

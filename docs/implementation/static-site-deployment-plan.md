@@ -155,6 +155,12 @@ The minimal Code Round deliverable is:
 Cache headers, custom static server images, custom generated route policy, CDN publication, object
 storage hosting, and domain/TLS convenience flows are follow-up behaviors.
 
+Upload-like local static output entry is also a follow-up behavior, governed by
+[URL-First Deployment Entry Experience](../specs/071-url-first-deployment-entry-experience/spec.md).
+It may improve how users start from an already-built local `dist`/`build` directory, but it must
+still resolve to the same static Resource profile and Docker/OCI static-server execution path unless
+a later ADR accepts hosted artifact storage or non-container static hosting.
+
 ## Current Implementation Notes And Migration Gaps
 
 Current code has `static-site` resource kind, `RuntimePlanStrategy = static`,
@@ -186,3 +192,6 @@ introduce raw host-process static serving or provider-specific deployment comman
 ## Open Questions
 
 - None for the minimal static site deployment behavior.
+- Future URL-first entry work must choose the CLI/Web spelling for local static output deploy and
+  decide how local artifact materialization is retained for diagnostics and rollback evidence on
+  local-shell versus generic-SSH targets.

@@ -29,6 +29,13 @@ sidebar:
 - Web console 适合交互式配置和观察状态。
 - CLI 适合本地开发、服务器内运行和 GitHub Actions。
 - HTTP API 适合集成系统和自动化控制面。
+- AI agent 应使用 [Agent deploy skill](/docs/agent/deploy-skill/#agent-deploy-skill)，先安全识别来源，再调用现有 CLI/API/Web 入口。
+
+<h2 id="agent-deploy-skill">AI agent 部署</h2>
+
+Agent 部署不是新的业务操作。它把“部署这个项目”翻译成已有的项目、服务器、环境、资源和部署操作，并在完成时优先返回访问 URL、部署状态、日志、诊断摘要和恢复命令。
+
+对于已经构建好的静态目录，agent 可以使用 `appaloft deploy ./dist --as static-site`。这类似上传一个静态输出目录，但 Appaloft 默认仍部署到用户选择的 BYOS 目标，不会隐式上传到托管云。
 
 <h2 id="start-success-check">成功标准</h2>
 

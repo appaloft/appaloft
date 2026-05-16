@@ -666,6 +666,14 @@ adapter-owned static-server Dockerfiles for local/generic-SSH image builds. Loca
 smoke coverage verifies generated nginx packaging and runtime health, and generic-SSH Docker static
 smoke coverage is bound to the GitHub Actions secret-gated plus local explicit SSH gate.
 
+URL-first and upload-like entry refinements are governed follow-ups under
+[URL-First Deployment Entry Experience](../specs/071-url-first-deployment-entry-experience/spec.md).
+They may make CLI/Web/future tool flows feel like "source or local static output in, verified URL
+out", but they must still map to explicit context/resource commands followed by ids-only
+`deployments.create`. A local static output entry may copy or materialize files only into the
+selected local/control-plane/runtime workspace needed for BYOS execution; it must not silently use
+Appaloft-hosted artifact storage or Appaloft-owned route serving.
+
 Until provider-backed disambiguation exists, callers should supply explicit `gitRef` and
 `baseDirectory` when a GitHub tree URL uses a slash-containing branch or tag name.
 
@@ -674,6 +682,12 @@ Until provider-backed disambiguation exists, callers should supply explicit `git
 - A future non-durable backend convenience endpoint for Quick Deploy remains a governed design
   question; automation can continue to sequence explicit operations until a durable workflow command
   exists.
+- URL-first completion output should lead with URL/access state, Resource, Deployment, logs,
+  diagnostics, and recovery hints, while keeping Project/Environment/DeploymentTarget details
+  available as progressive detail.
+- Agent-facing Quick Deploy guidance should define the same safe operation sequence as CLI/Web:
+  inspect source, exclude secrets and dependency caches, select or create context, deploy, observe
+  events, and return URL plus diagnostics.
 - Resource source/runtime/network operation names are active:
   `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
   Access profile configuration remains a separate governed behavior under ADR-017 and the

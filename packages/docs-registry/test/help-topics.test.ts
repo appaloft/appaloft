@@ -108,6 +108,28 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[AGENT-DEPLOY-SKILL-003] agent deploy skill resolves to public docs and governing source", () => {
+    const topic = publicDocsHelpTopics["agent.deploy-skill"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/agent/deploy-skill/#agent-deploy-skill",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/agent/deploy-skill/#agent-deploy-skill",
+    );
+    expect(topic.relatedOperation).toBe("deployments.create");
+    expect(topic.surfaces).toEqual(
+      expect.arrayContaining(["cli", "http-api", "repository-config", "mcp"]),
+    );
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/071-url-first-deployment-entry-experience/spec.md",
+        "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
+        "docs/agent/appaloft-deploy-skill.md",
+      ]),
+    );
+  });
+
   test("[PUB-DOCS-016] traceable topics point to spec files and product surfaces", () => {
     const defaultAccessTopic = publicDocsHelpTopics["default-access.policy"];
 
