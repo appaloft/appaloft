@@ -255,6 +255,46 @@ describe("public docs operation coverage", () => {
     expect(plan).not.toContain("Edge access failure diagnostics are not yet composed");
   });
 
+  test("[AGENT-DEPLOY-SKILL-001][AGENT-DEPLOY-SKILL-002] deploy skill is safe and operation-backed", async () => {
+    const skill = await Bun.file("docs/agent/appaloft-deploy-skill.md").text();
+    const fullSkill = await Bun.file("docs/agent/appaloft-skill.md").text();
+    const packagedSkill = await Bun.file("skills/appaloft/SKILL.md").text();
+    const surfaces = await Bun.file("skills/appaloft/references/surfaces.md").text();
+    const cliEntrypoints = await Bun.file("skills/appaloft/references/cli-entrypoints.md").text();
+    const operationKeys = new Set(operationCatalog.map((operation) => operation.key));
+
+    for (const operationKey of [
+      "projects.create",
+      "servers.register",
+      "environments.create",
+      "resources.create",
+      "deployments.create",
+    ]) {
+      expect(operationKeys.has(operationKey), operationKey).toBe(true);
+      expect(skill).toContain(operationKey);
+    }
+
+    expect(skill).toContain("appaloft deploy ./dist --as static-site");
+    expect(fullSkill).toContain("npx skills add appaloft/appaloft");
+    expect(packagedSkill).toContain("AI-facing Appaloft entrypoint");
+    expect(packagedSkill).toContain("references/surfaces.md");
+    expect(surfaces).toContain("CLI");
+    expect(surfaces).toContain("HTTP/API");
+    expect(surfaces).toContain("Web");
+    expect(surfaces).toContain("MCP/tools");
+    expect(surfaces).toContain("Do not suggest an Appaloft-owned npm");
+    for (const operation of operationCatalog) {
+      if (operation.transports.cli) {
+        expect(cliEntrypoints).toContain(operation.transports.cli);
+      }
+    }
+    expect(skill).not.toMatch(/-----BEGIN [A-Z ]+PRIVATE KEY-----/);
+    expect(packagedSkill).not.toMatch(/-----BEGIN [A-Z ]+PRIVATE KEY-----/);
+    expect(skill).not.toMatch(/(?:password|token|secret|privateKey)\s*=/i);
+    expect(skill).not.toContain("Run quick-deploy.create");
+    expect(packagedSkill).not.toContain("Run quick-deploy.create");
+  });
+
   test("[OP-WORK-DOCS-001] operator work queries record read-only docs coverage", async () => {
     const listCoverage = getPublicDocsOperationCoverage("operator-work.list");
     const showCoverage = getPublicDocsOperationCoverage("operator-work.show");

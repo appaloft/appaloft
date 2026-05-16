@@ -108,6 +108,47 @@ export type QuickDeployWorkflowResult = {
   deploymentId: string;
 };
 
+export type QuickDeployOutcomeAccess =
+  | {
+      status: "available";
+      url: string;
+    }
+  | {
+      status: "pending" | "unavailable" | "unknown";
+      url?: string;
+      reason?: string;
+    };
+
+export type QuickDeployOutcomePacket = QuickDeployWorkflowResult & {
+  access: QuickDeployOutcomeAccess;
+  commands: {
+    openDeployment: string;
+    openResource: string;
+    logs: string;
+    diagnosticSummary: string;
+    recoveryReadiness: string;
+  };
+};
+
+export function createQuickDeployOutcomePacket(
+  result: QuickDeployWorkflowResult,
+  input: {
+    access?: QuickDeployOutcomeAccess;
+  } = {},
+): QuickDeployOutcomePacket {
+  return {
+    ...result,
+    access: input.access ?? { status: "unknown" },
+    commands: {
+      openDeployment: `appaloft deployments show ${result.deploymentId}`,
+      openResource: `appaloft resource show ${result.resourceId}`,
+      logs: `appaloft logs ${result.deploymentId}`,
+      diagnosticSummary: `appaloft resource diagnose ${result.resourceId}`,
+      recoveryReadiness: `appaloft deployments recovery-readiness ${result.deploymentId}`,
+    },
+  };
+}
+
 export type QuickDeployWorkflowStep =
   | {
       kind: "projects.create";

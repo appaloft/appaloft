@@ -64,6 +64,7 @@ export const cliDocsHrefs = {
   selfHostedOrganizationTeam: resolvePublicDocsHelpHref(
     "self-hosting.organization-team-management",
   ),
+  agentDeploySkill: resolvePublicDocsHelpHref("agent.deploy-skill"),
 } as const;
 
 export const cliCommandDescriptions = {

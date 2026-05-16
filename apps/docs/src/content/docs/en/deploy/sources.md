@@ -56,6 +56,10 @@ CLI source examples:
 appaloft deploy ./apps/web --method static --publish-dir build
 ```
 
+```bash title="Built static output"
+appaloft deploy ./dist --as static-site
+```
+
 ```bash title="Git repository"
 appaloft deploy https://github.com/example/web \
   --method static \
@@ -72,6 +76,20 @@ appaloft resource configure-source res_web \
   --git-ref main \
   --base-directory apps/web
 ```
+
+<h2 id="local-static-output">Local static output</h2>
+
+When you already have a `dist`, `build`, or similar static output directory, pass that directory as
+the Appaloft source:
+
+```bash
+appaloft deploy ./dist --as static-site
+```
+
+This changes only the user-layer entry experience. It normalizes to a static-site Resource and an
+ordinary deployment request; it does not add a `quick-deploy.create` operation or upload the
+directory to an Appaloft hosted cloud. Unless you explicitly choose a hosted feature, the target is
+still the server or environment you selected.
 
 <h2 id="deployment-source-output">What you see after deployment</h2>
 

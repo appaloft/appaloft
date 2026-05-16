@@ -1,6 +1,8 @@
 ---
 name: release
 description: Appaloft release runbook for manually triggered GitHub Actions releases, including mandatory roadmap alignment and version-gate checks before release. Use when Codex is asked to prepare, trigger, publish, monitor, retry, or explain an Appaloft release; choose or verify a release version from docs/PRODUCT_ROADMAP.md; create or inspect a Release Please PR; publish GitHub Release assets, npm packages, Homebrew tap updates, GHCR images, desktop bundles, or CLI binaries; or verify release prerequisites and secrets.
+metadata:
+  internal: true
 ---
 
 # Release

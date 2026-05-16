@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   createQuickDeployGeneratedResourceName,
+  createQuickDeployOutcomePacket,
   createResourceInputSchema,
   normalizeQuickDeployGeneratedNameBase,
   type QuickDeployCreateResourceInput,
@@ -996,6 +997,35 @@ describe("quick deploy workflow", () => {
     });
 
     expect(parsed.success).toBe(true);
+  });
+
+  test("[QUICK-DEPLOY-WF-062] outcome packet keeps URL-first completion follow-ups machine-readable", () => {
+    expect(
+      createQuickDeployOutcomePacket(
+        {
+          projectId: "proj_1",
+          serverId: "srv_1",
+          environmentId: "env_1",
+          resourceId: "res_web",
+          deploymentId: "dep_1",
+        },
+        { access: { status: "available", url: "https://web.example.com" } },
+      ),
+    ).toEqual({
+      projectId: "proj_1",
+      serverId: "srv_1",
+      environmentId: "env_1",
+      resourceId: "res_web",
+      deploymentId: "dep_1",
+      access: { status: "available", url: "https://web.example.com" },
+      commands: {
+        openDeployment: "appaloft deployments show dep_1",
+        openResource: "appaloft resource show res_web",
+        logs: "appaloft logs dep_1",
+        diagnosticSummary: "appaloft resource diagnose res_web",
+        recoveryReadiness: "appaloft deployments recovery-readiness dep_1",
+      },
+    });
   });
 
   test("[QUICK-DEPLOY-ENTRY-013][WF-PLAN-ENTRY-005] framework runtime draft validates through shared resources.create schema", () => {

@@ -63,6 +63,7 @@ import {
 import {
   type DeploymentMethod,
   deploymentMethods,
+  isRemoteOrImageSource,
   normalizeCliPathOrSource,
 } from "./deployment-source.js";
 import { type DeploymentStateBackendDecision } from "./deployment-state.js";
@@ -112,6 +113,8 @@ type ResourceRuntimeProfileDraftInput = Partial<ResourceRuntimeProfileInput>;
 type ConfigurableResourceRuntimeProfileInput = ConfigureResourceRuntimeInput["runtimeProfile"];
 export type DeploymentEnvironmentVariableSeed = QuickDeployEnvironmentVariableInput;
 export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
+export const deploymentEntryModes = ["static-site"] as const;
+export type DeploymentEntryMode = (typeof deploymentEntryModes)[number];
 
 export interface DeploymentEnvironmentVariablesFromConfigOptions {
   env?: Record<string, string | undefined>;
@@ -197,6 +200,50 @@ export function resourceKindForDeploymentMethod(
   }
 
   return deploymentMethod === "docker-compose" ? "compose-stack" : "application";
+}
+
+export function normalizeUrlFirstDeploymentEntry(input: {
+  requestedDeploymentMethod?: DeploymentMethod;
+  entryMode?: DeploymentEntryMode;
+  sourceLocator?: string;
+  publishDirectory?: string;
+}): Result<{
+  deploymentMethod?: DeploymentMethod;
+  publishDirectory?: string;
+}> {
+  if (!input.entryMode) {
+    return ok({
+      ...(input.requestedDeploymentMethod
+        ? { deploymentMethod: input.requestedDeploymentMethod }
+        : {}),
+      ...(input.publishDirectory ? { publishDirectory: input.publishDirectory } : {}),
+    });
+  }
+
+  if (
+    input.entryMode === "static-site" &&
+    input.requestedDeploymentMethod &&
+    input.requestedDeploymentMethod !== "auto" &&
+    input.requestedDeploymentMethod !== "static"
+  ) {
+    return err(
+      domainError.validation("Static site entry cannot use a non-static deployment method", {
+        phase: "deployment-entry",
+        entryMode: input.entryMode,
+        requestedDeploymentMethod: input.requestedDeploymentMethod,
+      }),
+    );
+  }
+
+  const sourceLocator = input.sourceLocator?.trim();
+  const defaultPublishDirectory =
+    sourceLocator && !isRemoteOrImageSource(sourceLocator) ? "." : undefined;
+  const publishDirectory = input.publishDirectory ?? defaultPublishDirectory;
+
+  return ok({
+    deploymentMethod: "static",
+    ...(publishDirectory ? { publishDirectory } : {}),
+  });
 }
 
 function inferResourceFromSource(

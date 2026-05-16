@@ -589,6 +589,23 @@ entry helper coverage. Local Docker static smoke coverage now exercises the gene
 path, and the generic-SSH Docker path has GitHub Actions secret-gated plus local explicit static
 smoke coverage through `APPALOFT_E2E_SSH_QUICK_DEPLOY=true`.
 
+URL-first deployment entry experience is positioned as a future user-layer workflow refinement, not
+as a new business operation. It is governed by
+[URL-First Deployment Entry Experience](./specs/071-url-first-deployment-entry-experience/spec.md)
+and must continue to sequence explicit operations such as `resources.create` and
+`deployments.create`. Upload-like local static output entry means materializing a local source or
+static output directory into the selected Appaloft runtime path for a BYOS target; it must not imply
+Appaloft-hosted artifact storage, Appaloft-owned public routing, a `quick-deploy.create` command, or
+new `deployments.create` source/runtime fields without a later ADR/spec.
+
+The Appaloft Skill is positioned as a v1 user-layer documentation/skill artifact, not a business
+operation or MCP requirement. Its deploy subprotocol is governed by
+[Appaloft Agent Deploy Skill](./specs/072-appaloft-agent-deploy-skill/spec.md) and must describe how
+agents use existing CLI/API/Web operations safely, including full operation-catalog coverage, source
+inspection, secret exclusion, explicit context/resource/deployment sequencing, URL-first outcomes,
+diagnostics, and recovery.
+MCP remains a later optional transport generated from the operation catalog.
+
 Resource profile lifecycle has an active public subset: `resources.show`,
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
 `resources.configure-access`, `resources.configure-health`, `resources.set-variable`,

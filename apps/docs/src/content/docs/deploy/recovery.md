@@ -59,6 +59,12 @@ appaloft deployments recovery-readiness <deploymentId>
 
 当前 `retry`、`redeploy` 和 `rollback` 写命令已启用。当 readiness 返回缺少快照、缺少 artifact、readiness 过期、运行时正在被占用或候选不兼容时，命令仍会被阻塞。
 
+<h2 id="agent-deploy-recovery">Agent 部署恢复</h2>
+
+Agent 不应该在失败后直接重试。它应先读取 recovery readiness，并把阻塞原因、可用候选和安全下一步返回给用户。只有 readiness 明确允许时，才建议 retry、redeploy 或 rollback。
+
+如果 readiness 要求先看日志或诊断摘要，agent 应返回对应命令，而不是直接修改运行时、远端状态或 secret。
+
 <h2 id="deployment-recovery-retry">Retry</h2>
 
 Retry 的语义是“基于失败部署的不可变 snapshot intent 创建新的部署 attempt”。它不是重放旧事件，也不是在旧 attempt 中继续执行失败阶段。

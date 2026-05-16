@@ -17,6 +17,7 @@
   } from "@lucide/svelte";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
+    createQuickDeployOutcomePacket,
     createQuickDeployGeneratedResourceName,
     normalizeQuickDeployGeneratedNameBase,
     runQuickDeployWorkflow,
@@ -575,8 +576,12 @@
     }
 
     if (createsStaticSiteResource) {
-      segments.push("--method static");
-      segments.push(`--publish-dir ${staticPublishDirectory.trim() || "/dist"}`);
+      if ((staticPublishDirectory.trim() || "/dist") === ".") {
+        segments.push("--as static-site");
+      } else {
+        segments.push("--method static");
+        segments.push(`--publish-dir ${staticPublishDirectory.trim() || "/dist"}`);
+      }
       if (staticInstallCommand.trim()) {
         segments.push(`--install ${staticInstallCommand.trim()}`);
       }
@@ -2233,17 +2238,24 @@
       );
       lastAccessUrl =
         selectCurrentResourceAccessRoute(refreshedResource?.accessSummary)?.route.url ?? "";
+      const quickDeployOutcome = createQuickDeployOutcomePacket(workflowResult, {
+        access: lastAccessUrl
+          ? { status: "available", url: lastAccessUrl }
+          : { status: "unknown", reason: "access-route-unavailable" },
+      });
 
       deployFeedback = {
         kind: "success",
         title: $t(i18nKeys.console.quickDeploy.deployFeedbackSuccessTitle),
         detail:
-          lastAccessUrl ||
+          (quickDeployOutcome.access.status === "available"
+            ? quickDeployOutcome.access.url
+            : undefined) ||
           $t(i18nKeys.console.quickDeploy.deploymentIdDetail, {
-            deploymentId: workflowResult.deploymentId,
+            deploymentId: quickDeployOutcome.deploymentId,
           }),
       };
-      lastCreatedDeploymentId = workflowResult.deploymentId;
+      lastCreatedDeploymentId = quickDeployOutcome.deploymentId;
     } catch (error) {
       workflowProgressError = readErrorMessage(error);
       lastAccessUrl = "";

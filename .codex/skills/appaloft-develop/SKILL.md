@@ -1,6 +1,8 @@
 ---
 name: appaloft-develop
 description: Appaloft project-specific Domain Driven Develop profile. Use with the installed domain-driven-develop skill when Codex works on Appaloft business behavior, roadmap/version-based next behavior selection, event-storming discovery, future docs/specs feature artifacts, ADR/decision alignment, source-of-truth specs, public docs, tests, Web/API/CLI entrypoints, operation catalog alignment, release-sensitive compatibility impact, or Code Round implementation. This profile only binds Appaloft business facts and repository paths; use domain-driven-develop for the generic Init/Discover/Spec/Docs/Test-First/Code/Sync/Next-Behavior/Post-Implementation workflow and DDD tactical rules.
+metadata:
+  internal: true
 ---
 
 # Appaloft Develop
@@ -53,6 +55,12 @@ Read Appaloft governing sources in this order before non-trivial behavior work:
    - `tasks.md`
 13. Implementation plans under `docs/implementation/**`
 14. `packages/application/src/operation-catalog.ts`
+15. AI-facing skill artifacts when user-visible behavior, entrypoints, operations, diagnostics, or
+    recovery guidance change:
+   - `docs/agent/appaloft-skill.md`
+   - `skills/appaloft/SKILL.md`
+   - `skills/appaloft/references/**`
+   - `docs/agent/appaloft-deploy-skill.md` when deployment behavior changes
 
 Use `docs/ai/**` only as background analysis. It must not override accepted ADRs, the business operation map, global contracts, local specs, public documentation specs, or implementation plans.
 
@@ -108,7 +116,7 @@ For Appaloft:
 - Current package and release-line facts live in `package.json`, `.github/.release-please-manifest.json`, `CHANGELOG.md`, and the release-alignment block in `docs/PRODUCT_ROADMAP.md`; do not copy a current version number into this profile.
 - Before `1.0.0`, classify public-surface compatibility as `pre-1.0-policy` plus the concrete public impact. Do not use pre-`1.0.0` flexibility to skip roadmap, docs, test, or migration-gap updates.
 - Release-sensitive behavior must state roadmap target, intended version target when known, compatibility impact, affected public surfaces, and release-note/changelog/migration requirement.
-- Public surfaces include CLI commands and help, HTTP/oRPC schemas, Web-visible behavior, repository config fields, public docs anchors, event schemas, plugin/tool schemas, release artifacts, installation scripts, and generated release manifests.
+- Public surfaces include CLI commands and help, HTTP/oRPC schemas, Web-visible behavior, repository config fields, public docs anchors, AI-facing skill artifacts, event schemas, plugin/tool schemas, release artifacts, installation scripts, and generated release manifests.
 - If a behavior belongs to a later roadmap phase, do not implement it as current work unless the user explicitly asks to pull it forward; update the roadmap or implementation plan if it is pulled forward.
 - If implementation, operation catalog, specs, tests, or public docs disagree with `docs/PRODUCT_ROADMAP.md`, treat that as Sync Round before Code Round.
 - When preparing, triggering, publishing, retrying, or explaining an actual release, use the local `release` skill in addition to this profile and follow its explicit confirmation rules.
@@ -212,9 +220,40 @@ Treat these as separate Appaloft surfaces over the same operation:
 - Web console
 - repository config files
 - public documentation/help
+- AI-facing Appaloft skill
 - future MCP/tool entrypoints
 
 Adapters dispatch through `CommandBus` or `QueryBus`. Transport input parameters reuse matching command/query input schemas and do not redefine parallel transport-only business shapes.
+
+## Appaloft Skill Sync Gate
+
+Run this gate during Post-Implementation Sync, and before reporting formal work complete, whenever a
+change affects user-visible behavior, CLI/API/Web entrypoints, repository config, operation catalog
+entries, public docs/help, errors/statuses, diagnostics, recovery actions, roadmap/versioned
+behavior, or future MCP/tool descriptions.
+
+For Appaloft:
+
+- update `skills/appaloft/SKILL.md` when the agent-facing workflow, safety rule, operation area, or
+  outcome shape changes;
+- update `skills/appaloft/references/surfaces.md` when the skill install path, CLI/API/Web,
+  repository config, or future MCP/tool entrypoint boundary changes;
+- update `skills/appaloft/references/cli-entrypoints.md` whenever
+  `packages/application/src/operation-catalog.ts` adds, removes, or changes a CLI transport;
+- update `skills/appaloft/references/deploy-protocol.md` and
+  `docs/agent/appaloft-deploy-skill.md` when deployment, preview cleanup, plan, observe, retry,
+  redeploy, rollback, static/local source, BYOS, or access outcome behavior changes;
+- update `docs/agent/appaloft-skill.md`, public docs anchors, and docs registry/traceability when
+  the install path, scope, help topic, or AI-facing semantics change;
+- keep `npx skills add appaloft/appaloft` as the only canonical skill install path unless a
+  governing spec changes that contract; do not add an Appaloft-owned npm skill installer because it
+  blurs the boundary with the Appaloft CLI;
+- add or update tests that prove full skill coverage stays synchronized with the operation catalog,
+  especially every `transports.cli` entry.
+
+If a change is intentionally not relevant to the Appaloft skill, record the not-applicable reason in
+the Sync Round report. Do not mark a user-facing behavior complete while required skill updates are
+missing.
 
 ## Code Round
 
@@ -258,6 +297,7 @@ For formal work, summarize:
 - changed docs/code/tests/entrypoints;
 - test matrix ids and automated test bindings;
 - operation catalog and `docs/CORE_OPERATIONS.md` sync state;
+- Appaloft skill sync state, including changed skill files or a not-applicable reason;
 - public docs/help outcome;
 - verification result;
 - remaining migration gaps or open questions;

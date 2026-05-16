@@ -52,8 +52,10 @@ import {
   type DeploymentEnvironmentVariableSeed,
   type DeploymentPromptSeed,
   type DeploymentServerAppliedRouteSeed,
+  deploymentEntryModes,
   deploymentEnvironmentVariablesFromConfig,
   deploymentPromptSeedFromConfig,
+  normalizeUrlFirstDeploymentEntry,
   resolveInteractiveDeploymentInput,
 } from "./deployment-interaction.js";
 import { type RemoteStateSession } from "./deployment-remote-state.js";
@@ -98,6 +100,7 @@ const resourceNameOption = Options.text("resource-name").pipe(Options.optional);
 const resourceKindOption = Options.choice("resource-kind", resourceKinds).pipe(Options.optional);
 const resourceDescriptionOption = Options.text("resource-description").pipe(Options.optional);
 const methodOption = Options.choice("method", deploymentMethods).pipe(Options.optional);
+const entryModeOption = Options.choice("as", deploymentEntryModes).pipe(Options.optional);
 const configOption = Options.text("config").pipe(Options.optional);
 const previewModes = ["pull-request"] as const;
 const previewOption = Options.choice("preview", previewModes).pipe(Options.optional);
@@ -1111,6 +1114,7 @@ export const deployCommand = EffectCommand.make(
     resourceKind: resourceKindOption,
     resourceDescription: resourceDescriptionOption,
     method: methodOption,
+    entryMode: entryModeOption,
     config: configOption,
     preview: previewOption,
     previewId: previewIdOption,
@@ -1154,6 +1158,7 @@ export const deployCommand = EffectCommand.make(
     hostPort,
     install,
     method,
+    entryMode,
     optionalSecret,
     pathOrSource,
     port,
@@ -1188,7 +1193,20 @@ export const deployCommand = EffectCommand.make(
   }) =>
     Effect.gen(function* () {
       const sourceLocator = optionalValue(pathOrSource);
-      const requestedDeploymentMethod = optionalValue(method);
+      const requestedEntryMode = optionalValue(entryMode);
+      const requestedDeploymentMethodFromFlag = optionalValue(method);
+      const publishDirectoryFromFlag = optionalValue(publishDir);
+      const urlFirstEntry = yield* resultToEffect(
+        normalizeUrlFirstDeploymentEntry({
+          ...(requestedDeploymentMethodFromFlag
+            ? { requestedDeploymentMethod: requestedDeploymentMethodFromFlag }
+            : {}),
+          ...(requestedEntryMode ? { entryMode: requestedEntryMode } : {}),
+          sourceLocator: sourceLocator ?? ".",
+          ...(publishDirectoryFromFlag ? { publishDirectory: publishDirectoryFromFlag } : {}),
+        }),
+      );
+      const requestedDeploymentMethod = urlFirstEntry.deploymentMethod;
       const portValue = optionalNumber(port);
       const configFilePath = optionalValue(config);
       const projectId = optionalValue(project);
@@ -1211,7 +1229,7 @@ export const deployCommand = EffectCommand.make(
       const buildCommand = optionalValue(build);
       const startCommand = optionalValue(start);
       const runtimeNameValue = optionalValue(runtimeName);
-      const publishDirectory = optionalValue(publishDir);
+      const publishDirectory = urlFirstEntry.publishDirectory;
       const sourceBaseDirectoryValue = optionalValue(sourceBaseDirectory);
       const dockerfilePathValue = optionalValue(dockerfilePath);
       const dockerComposeFilePathValue = optionalValue(dockerComposeFilePath);
