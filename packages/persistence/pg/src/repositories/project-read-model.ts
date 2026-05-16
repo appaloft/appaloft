@@ -63,6 +63,7 @@ export class PgProjectReadModel implements ProjectReadModel {
         executor
           .selectFrom("projects")
           .selectAll()
+          .where("lifecycle_status", "!=", "deleted")
           .orderBy("created_at", "desc")
           .execute()
           .then((rows) => rows.map(toProjectSummary)),
@@ -82,6 +83,7 @@ export class PgProjectReadModel implements ProjectReadModel {
       async () => {
         const row = await spec
           .accept(executor.selectFrom("projects").selectAll(), new KyselyProjectSelectionVisitor())
+          .where("lifecycle_status", "!=", "deleted")
           .executeTakeFirst();
 
         return row ? toProjectSummary(row) : null;

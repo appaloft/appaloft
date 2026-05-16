@@ -138,7 +138,7 @@ export const resourceLifecycleStatuses = ["active", "archived", "deleted"] as co
 
 export type ResourceLifecycleStatus = (typeof resourceLifecycleStatuses)[number];
 
-export const projectLifecycleStatuses = ["active", "archived"] as const;
+export const projectLifecycleStatuses = ["active", "archived", "deleted"] as const;
 
 export type ProjectLifecycleStatus = (typeof projectLifecycleStatuses)[number];
 

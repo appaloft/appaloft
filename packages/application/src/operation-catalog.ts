@@ -44,6 +44,8 @@ import { listDeployTokensQueryInputSchema } from "./operations/deploy-tokens/lis
 import { revokeDeployTokenCommandInputSchema } from "./operations/deploy-tokens/revoke-deploy-token.schema";
 import { rotateDeployTokenCommandInputSchema } from "./operations/deploy-tokens/rotate-deploy-token.schema";
 import { showDeployTokenQueryInputSchema } from "./operations/deploy-tokens/show-deploy-token.schema";
+import { archiveDeploymentCommandInputSchema } from "./operations/deployments/archive-deployment.command";
+import { cancelDeploymentCommandInputSchema } from "./operations/deployments/cancel-deployment.command";
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
@@ -51,6 +53,7 @@ import { deploymentPlanQueryInputSchema } from "./operations/deployments/deploym
 import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deployments/deployment-recovery-readiness.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
 import { pruneDeploymentLogsCommandInputSchema } from "./operations/deployments/prune-deployment-logs.command";
+import { pruneDeploymentsCommandInputSchema } from "./operations/deployments/prune-deployments.command";
 import { redeployDeploymentCommandInputSchema } from "./operations/deployments/redeploy-deployment.command";
 import { retryDeploymentCommandInputSchema } from "./operations/deployments/retry-deployment.command";
 import { rollbackDeploymentCommandInputSchema } from "./operations/deployments/rollback-deployment.command";
@@ -98,9 +101,13 @@ import { listPreviewEnvironmentsQueryInputSchema } from "./operations/preview-de
 import { showPreviewEnvironmentQueryInputSchema } from "./operations/preview-deployments/show-preview-environment.query";
 import { showPreviewPolicyQueryInputSchema } from "./operations/preview-deployments/show-preview-policy.query";
 import { archiveProjectCommandInputSchema } from "./operations/projects/archive-project.command";
+import { checkProjectDeleteSafetyQueryInputSchema } from "./operations/projects/check-project-delete-safety.query";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
+import { deleteProjectCommandInputSchema } from "./operations/projects/delete-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
 import { renameProjectCommandInputSchema } from "./operations/projects/rename-project.command";
+import { restoreProjectCommandInputSchema } from "./operations/projects/restore-project.command";
+import { setProjectDescriptionCommandInputSchema } from "./operations/projects/set-project-description.command";
 import { showProjectQueryInputSchema } from "./operations/projects/show-project.query";
 import { pruneProviderJobLogsCommandInputSchema } from "./operations/provider-job-logs/prune-provider-job-logs.command";
 import { archiveResourceCommandInputSchema } from "./operations/resources/archive-resource.command";
@@ -113,15 +120,20 @@ import { configureResourceNetworkCommandInputSchema } from "./operations/resourc
 import { configureResourceRuntimeCommandInputSchema } from "./operations/resources/configure-resource-runtime.command";
 import { configureResourceSourceCommandInputSchema } from "./operations/resources/configure-resource-source.command";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
+import { createResourceSecretReferenceCommandInputSchema } from "./operations/resources/create-resource-secret-reference.command";
 import { deleteResourceCommandInputSchema } from "./operations/resources/delete-resource.command";
+import { deleteResourceSecretReferenceCommandInputSchema } from "./operations/resources/delete-resource-secret-reference.command";
 import { detachResourceStorageCommandInputSchema } from "./operations/resources/detach-resource-storage.command";
 import { importResourceVariablesCommandInputSchema } from "./operations/resources/import-resource-variables.command";
 import { listResourceDependencyBindingsQueryInputSchema } from "./operations/resources/list-resource-dependency-bindings.query";
+import { listResourceSecretReferencesQueryInputSchema } from "./operations/resources/list-resource-secret-references.query";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
+import { resetResourceHealthCommandInputSchema } from "./operations/resources/reset-resource-health.command";
 import { resourceAccessFailureEvidenceLookupQueryInputSchema } from "./operations/resources/resource-access-failure-evidence-lookup.query";
 import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resources/resource-diagnostic-summary.query";
 import { resourceEffectiveConfigQueryInputSchema } from "./operations/resources/resource-effective-config.query";
 import { resourceHealthQueryInputSchema } from "./operations/resources/resource-health.query";
+import { resourceHealthHistoryQueryInputSchema } from "./operations/resources/resource-health-history.query";
 import { resourceProxyConfigurationPreviewQueryInputSchema } from "./operations/resources/resource-proxy-configuration-preview.query";
 import {
   restartResourceRuntimeCommandInputSchema,
@@ -136,9 +148,11 @@ import {
 } from "./operations/resources/resource-runtime-log-archives.schema";
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
 import { rotateResourceDependencyBindingSecretCommandInputSchema } from "./operations/resources/rotate-resource-dependency-binding-secret.command";
+import { rotateResourceSecretReferenceCommandInputSchema } from "./operations/resources/rotate-resource-secret-reference.command";
 import { setResourceVariableCommandInputSchema } from "./operations/resources/set-resource-variable.command";
 import { showResourceQueryInputSchema } from "./operations/resources/show-resource.query";
 import { showResourceDependencyBindingQueryInputSchema } from "./operations/resources/show-resource-dependency-binding.query";
+import { showResourceSecretReferenceQueryInputSchema } from "./operations/resources/show-resource-secret-reference.query";
 import { unbindResourceDependencyCommandInputSchema } from "./operations/resources/unbind-resource-dependency.command";
 import { unsetResourceVariableCommandInputSchema } from "./operations/resources/unset-resource-variable.command";
 import { configureRetentionDefaultsCommandInputSchema } from "./operations/retention-defaults/configure-retention-defaults.command";
@@ -181,8 +195,13 @@ import { showSshCredentialQueryInputSchema } from "./operations/servers/show-ssh
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
 import { ingestSourceEventCommandInputSchema } from "./operations/source-events/ingest-source-event.command";
 import { listSourceEventsQueryInputSchema } from "./operations/source-events/list-source-events.query";
+import { pruneSourceEventsCommandInputSchema } from "./operations/source-events/prune-source-events.command";
+import { replaySourceEventCommandInputSchema } from "./operations/source-events/replay-source-event.command";
 import { showSourceEventQueryInputSchema } from "./operations/source-events/show-source-event.query";
+import { deleteSourceLinkCommandInputSchema } from "./operations/source-links/delete-source-link.command";
+import { listSourceLinksQueryInputSchema } from "./operations/source-links/list-source-links.query";
 import { relinkSourceLinkCommandInputSchema } from "./operations/source-links/relink-source-link.command";
+import { showSourceLinkQueryInputSchema } from "./operations/source-links/show-source-link.query";
 import { cleanupStorageVolumeRuntimeCommandInputSchema } from "./operations/storage-volumes/cleanup-storage-volume-runtime.command";
 import { createStorageVolumeCommandInputSchema } from "./operations/storage-volumes/create-storage-volume.command";
 import { deleteStorageVolumeCommandInputSchema } from "./operations/storage-volumes/delete-storage-volume.command";
@@ -589,6 +608,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "projects.set-description",
+    kind: "command",
+    domain: "projects",
+    messageName: "SetProjectDescriptionCommand",
+    handlerName: "SetProjectDescriptionCommandHandler",
+    serviceName: "SetProjectDescriptionUseCase",
+    inputSchema: setProjectDescriptionCommandInputSchema,
+    serviceToken: tokens.setProjectDescriptionUseCase,
+    transports: {
+      cli: "appaloft project set-description <projectId>",
+      orpc: { method: "POST", path: "/api/projects/{projectId}/description" },
+    },
+  },
+  {
     key: "projects.archive",
     kind: "command",
     domain: "projects",
@@ -600,6 +633,48 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft project archive <projectId>",
       orpc: { method: "POST", path: "/api/projects/{projectId}/archive" },
+    },
+  },
+  {
+    key: "projects.restore",
+    kind: "command",
+    domain: "projects",
+    messageName: "RestoreProjectCommand",
+    handlerName: "RestoreProjectCommandHandler",
+    serviceName: "RestoreProjectUseCase",
+    inputSchema: restoreProjectCommandInputSchema,
+    serviceToken: tokens.restoreProjectUseCase,
+    transports: {
+      cli: "appaloft project restore <projectId>",
+      orpc: { method: "POST", path: "/api/projects/{projectId}/restore" },
+    },
+  },
+  {
+    key: "projects.delete-check",
+    kind: "query",
+    domain: "projects",
+    messageName: "CheckProjectDeleteSafetyQuery",
+    handlerName: "CheckProjectDeleteSafetyQueryHandler",
+    serviceName: "CheckProjectDeleteSafetyQueryService",
+    inputSchema: checkProjectDeleteSafetyQueryInputSchema,
+    serviceToken: tokens.checkProjectDeleteSafetyQueryService,
+    transports: {
+      cli: "appaloft project delete-check <projectId>",
+      orpc: { method: "GET", path: "/api/projects/{projectId}/delete-check" },
+    },
+  },
+  {
+    key: "projects.delete",
+    kind: "command",
+    domain: "projects",
+    messageName: "DeleteProjectCommand",
+    handlerName: "DeleteProjectCommandHandler",
+    serviceName: "DeleteProjectUseCase",
+    inputSchema: deleteProjectCommandInputSchema,
+    serviceToken: tokens.deleteProjectUseCase,
+    transports: {
+      cli: "appaloft project delete <projectId> --confirm <projectId>",
+      orpc: { method: "DELETE", path: "/api/projects/{projectId}" },
     },
   },
   {
@@ -1064,6 +1139,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "resources.reset-health",
+    kind: "command",
+    domain: "resources",
+    messageName: "ResetResourceHealthCommand",
+    handlerName: "ResetResourceHealthCommandHandler",
+    serviceName: "ResetResourceHealthUseCase",
+    inputSchema: resetResourceHealthCommandInputSchema,
+    serviceToken: tokens.resetResourceHealthUseCase,
+    transports: {
+      cli: "appaloft resource reset-health <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/health-policy/reset" },
+    },
+  },
+  {
     key: "resources.configure-source",
     kind: "command",
     domain: "resources",
@@ -1176,6 +1265,76 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource set-variable <resourceId> <key> <value>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/variables" },
+    },
+  },
+  {
+    key: "resources.secrets.create",
+    kind: "command",
+    domain: "resources",
+    messageName: "CreateResourceSecretReferenceCommand",
+    handlerName: "CreateResourceSecretReferenceCommandHandler",
+    serviceName: "CreateResourceSecretReferenceUseCase",
+    inputSchema: createResourceSecretReferenceCommandInputSchema,
+    serviceToken: tokens.createResourceSecretReferenceUseCase,
+    transports: {
+      cli: "appaloft resource secrets create <resourceId> <key> <value>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/secrets" },
+    },
+  },
+  {
+    key: "resources.secrets.rotate",
+    kind: "command",
+    domain: "resources",
+    messageName: "RotateResourceSecretReferenceCommand",
+    handlerName: "RotateResourceSecretReferenceCommandHandler",
+    serviceName: "RotateResourceSecretReferenceUseCase",
+    inputSchema: rotateResourceSecretReferenceCommandInputSchema,
+    serviceToken: tokens.rotateResourceSecretReferenceUseCase,
+    transports: {
+      cli: "appaloft resource secrets rotate <resourceId> <key> <value>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/secrets/{key}" },
+    },
+  },
+  {
+    key: "resources.secrets.delete",
+    kind: "command",
+    domain: "resources",
+    messageName: "DeleteResourceSecretReferenceCommand",
+    handlerName: "DeleteResourceSecretReferenceCommandHandler",
+    serviceName: "DeleteResourceSecretReferenceUseCase",
+    inputSchema: deleteResourceSecretReferenceCommandInputSchema,
+    serviceToken: tokens.deleteResourceSecretReferenceUseCase,
+    transports: {
+      cli: "appaloft resource secrets delete <resourceId> <key>",
+      orpc: { method: "DELETE", path: "/api/resources/{resourceId}/secrets/{key}" },
+    },
+  },
+  {
+    key: "resources.secrets.list",
+    kind: "query",
+    domain: "resources",
+    messageName: "ListResourceSecretReferencesQuery",
+    handlerName: "ListResourceSecretReferencesQueryHandler",
+    serviceName: "ResourceSecretReferenceQueryService",
+    inputSchema: listResourceSecretReferencesQueryInputSchema,
+    serviceToken: tokens.resourceSecretReferenceQueryService,
+    transports: {
+      cli: "appaloft resource secrets list <resourceId>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/secrets" },
+    },
+  },
+  {
+    key: "resources.secrets.show",
+    kind: "query",
+    domain: "resources",
+    messageName: "ShowResourceSecretReferenceQuery",
+    handlerName: "ShowResourceSecretReferenceQueryHandler",
+    serviceName: "ResourceSecretReferenceQueryService",
+    inputSchema: showResourceSecretReferenceQueryInputSchema,
+    serviceToken: tokens.resourceSecretReferenceQueryService,
+    transports: {
+      cli: "appaloft resource secrets show <resourceId> <key>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/secrets/{key}" },
     },
   },
   {
@@ -1401,6 +1560,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource health <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/health" },
+    },
+  },
+  {
+    key: "resources.health-history",
+    kind: "query",
+    domain: "resources",
+    messageName: "ResourceHealthHistoryQuery",
+    handlerName: "ResourceHealthHistoryQueryHandler",
+    serviceName: "ResourceHealthHistoryQueryService",
+    inputSchema: resourceHealthHistoryQueryInputSchema,
+    serviceToken: tokens.resourceHealthHistoryQueryService,
+    transports: {
+      cli: "appaloft resource health-history <resourceId> --from <iso> --to <iso>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/health-history" },
     },
   },
   {
@@ -2170,6 +2343,48 @@ export const operationCatalog = [
     },
   },
   {
+    key: "deployments.cancel",
+    kind: "command",
+    domain: "deployments",
+    messageName: "CancelDeploymentCommand",
+    handlerName: "CancelDeploymentCommandHandler",
+    serviceName: "CancelDeploymentUseCase",
+    inputSchema: cancelDeploymentCommandInputSchema,
+    serviceToken: tokens.cancelDeploymentUseCase,
+    transports: {
+      cli: "appaloft deployments cancel <deploymentId> --confirm <deploymentId>",
+      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/cancel" },
+    },
+  },
+  {
+    key: "deployments.archive",
+    kind: "command",
+    domain: "deployments",
+    messageName: "ArchiveDeploymentCommand",
+    handlerName: "ArchiveDeploymentCommandHandler",
+    serviceName: "ArchiveDeploymentUseCase",
+    inputSchema: archiveDeploymentCommandInputSchema,
+    serviceToken: tokens.archiveDeploymentUseCase,
+    transports: {
+      cli: "appaloft deployments archive <deploymentId> --confirm <deploymentId>",
+      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/archive" },
+    },
+  },
+  {
+    key: "deployments.prune",
+    kind: "command",
+    domain: "deployments",
+    messageName: "PruneDeploymentsCommand",
+    handlerName: "PruneDeploymentsCommandHandler",
+    serviceName: "PruneDeploymentsUseCase",
+    inputSchema: pruneDeploymentsCommandInputSchema,
+    serviceToken: tokens.pruneDeploymentsUseCase,
+    transports: {
+      cli: "appaloft deployments prune --before <iso>",
+      orpc: { method: "POST", path: "/api/deployments/prune" },
+    },
+  },
+  {
     key: "resources.runtime.stop",
     kind: "command",
     domain: "resources",
@@ -2409,6 +2624,34 @@ export const operationCatalog = [
     },
   },
   {
+    key: "source-links.list",
+    kind: "query",
+    domain: "source-links",
+    messageName: "ListSourceLinksQuery",
+    handlerName: "ListSourceLinksQueryHandler",
+    serviceName: "SourceLinkQueryService",
+    inputSchema: listSourceLinksQueryInputSchema,
+    serviceToken: tokens.sourceLinkQueryService,
+    transports: {
+      cli: "appaloft source-links list",
+      orpc: { method: "GET", path: "/api/source-links" },
+    },
+  },
+  {
+    key: "source-links.show",
+    kind: "query",
+    domain: "source-links",
+    messageName: "ShowSourceLinkQuery",
+    handlerName: "ShowSourceLinkQueryHandler",
+    serviceName: "SourceLinkQueryService",
+    inputSchema: showSourceLinkQueryInputSchema,
+    serviceToken: tokens.sourceLinkQueryService,
+    transports: {
+      cli: "appaloft source-links show <sourceFingerprint>",
+      orpc: { method: "GET", path: "/api/source-links/{sourceFingerprint}" },
+    },
+  },
+  {
     key: "source-links.relink",
     kind: "command",
     domain: "source-links",
@@ -2420,6 +2663,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft source-links relink",
       orpc: { method: "POST", path: "/api/source-links/relink" },
+    },
+  },
+  {
+    key: "source-links.delete",
+    kind: "command",
+    domain: "source-links",
+    messageName: "DeleteSourceLinkCommand",
+    handlerName: "DeleteSourceLinkCommandHandler",
+    serviceName: "DeleteSourceLinkUseCase",
+    inputSchema: deleteSourceLinkCommandInputSchema,
+    serviceToken: tokens.deleteSourceLinkUseCase,
+    transports: {
+      cli: "appaloft source-links delete <sourceFingerprint>",
+      orpc: { method: "DELETE", path: "/api/source-links/{sourceFingerprint}" },
     },
   },
   {
@@ -2722,6 +2979,34 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft source-event show <sourceEventId> --resource <resourceId> | --project <projectId>",
       orpc: { method: "GET", path: "/api/source-events/{sourceEventId}" },
+    },
+  },
+  {
+    key: "source-events.replay",
+    kind: "command",
+    domain: "source-events",
+    messageName: "ReplaySourceEventCommand",
+    handlerName: "ReplaySourceEventCommandHandler",
+    serviceName: "ReplaySourceEventUseCase",
+    inputSchema: replaySourceEventCommandInputSchema,
+    serviceToken: tokens.replaySourceEventUseCase,
+    transports: {
+      cli: "appaloft source-event replay <sourceEventId> --resource <resourceId> | --project <projectId>",
+      orpc: { method: "POST", path: "/api/source-events/{sourceEventId}/replay" },
+    },
+  },
+  {
+    key: "source-events.prune",
+    kind: "command",
+    domain: "source-events",
+    messageName: "PruneSourceEventsCommand",
+    handlerName: "PruneSourceEventsCommandHandler",
+    serviceName: "PruneSourceEventsUseCase",
+    inputSchema: pruneSourceEventsCommandInputSchema,
+    serviceToken: tokens.pruneSourceEventsUseCase,
+    transports: {
+      cli: "appaloft source-event prune --before <iso>",
+      orpc: { method: "POST", path: "/api/source-events/prune" },
     },
   },
   {

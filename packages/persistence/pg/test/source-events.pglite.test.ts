@@ -316,4 +316,157 @@ describe("source event persistence", () => {
       rmSync(dataDir, { force: true, recursive: true });
     }
   });
+
+  test("[SRC-AUTO-PRUNE-001] [SRC-AUTO-PRUNE-002] prunes only selected retained source events", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-source-event-prune-"));
+    const { createDatabase, createMigrator, PgSourceEventRepository, PgSourceEventRetentionStore } =
+      await import("../src");
+    const { ListSourceEventsQuery, ListSourceEventsQueryService } = await import(
+      "@appaloft/application"
+    );
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const executionContext = createExecutionContext({
+        requestId: "req_source_event_prune_pglite_test",
+        entrypoint: "system",
+      });
+      const repositoryContext = toRepositoryContext(executionContext);
+      const sourceEvents = new PgSourceEventRepository(database.db);
+      const retention = new PgSourceEventRetentionStore(database.db);
+      const list = new ListSourceEventsQueryService(
+        sourceEvents,
+        new FixedClock("2026-01-03T00:00:00.000Z"),
+      );
+
+      await sourceEvents.record(repositoryContext, {
+        sourceEventId: "sevt_old_selected",
+        projectId: "prj_demo",
+        matchedResourceIds: ["res_web"],
+        sourceKind: "github",
+        eventKind: "push",
+        sourceIdentity: {
+          locator: "https://github.com/appaloft/demo",
+          providerRepositoryId: "repo_1",
+          repositoryFullName: "appaloft/demo",
+        },
+        ref: "main",
+        revision: "old123",
+        deliveryId: "delivery_old_selected",
+        dedupeKey:
+          "delivery:github:repo_1:appaloft/demo:https://github.com/appaloft/demo:delivery_old_selected",
+        dedupeStatus: "new",
+        verification: {
+          status: "verified",
+          method: "provider-signature",
+        },
+        status: "failed",
+        ignoredReasons: [],
+        policyResults: [],
+        createdDeploymentIds: [],
+        receivedAt: "2026-01-01T00:00:00.000Z",
+      });
+      await sourceEvents.record(repositoryContext, {
+        sourceEventId: "sevt_old_other_resource",
+        projectId: "prj_demo",
+        matchedResourceIds: ["res_api"],
+        sourceKind: "github",
+        eventKind: "push",
+        sourceIdentity: {
+          locator: "https://github.com/appaloft/demo",
+          providerRepositoryId: "repo_1",
+          repositoryFullName: "appaloft/demo",
+        },
+        ref: "main",
+        revision: "old456",
+        deliveryId: "delivery_old_other",
+        dedupeKey:
+          "delivery:github:repo_1:appaloft/demo:https://github.com/appaloft/demo:delivery_old_other",
+        dedupeStatus: "new",
+        verification: {
+          status: "verified",
+          method: "provider-signature",
+        },
+        status: "failed",
+        ignoredReasons: [],
+        policyResults: [],
+        createdDeploymentIds: [],
+        receivedAt: "2026-01-01T00:00:00.000Z",
+      });
+      await sourceEvents.record(repositoryContext, {
+        sourceEventId: "sevt_new_selected",
+        projectId: "prj_demo",
+        matchedResourceIds: ["res_web"],
+        sourceKind: "github",
+        eventKind: "push",
+        sourceIdentity: {
+          locator: "https://github.com/appaloft/demo",
+          providerRepositoryId: "repo_1",
+          repositoryFullName: "appaloft/demo",
+        },
+        ref: "main",
+        revision: "new123",
+        deliveryId: "delivery_new_selected",
+        dedupeKey:
+          "delivery:github:repo_1:appaloft/demo:https://github.com/appaloft/demo:delivery_new_selected",
+        dedupeStatus: "new",
+        verification: {
+          status: "verified",
+          method: "provider-signature",
+        },
+        status: "failed",
+        ignoredReasons: [],
+        policyResults: [],
+        createdDeploymentIds: [],
+        receivedAt: "2026-01-02T00:00:00.000Z",
+      });
+
+      const dryRun = await retention.prune(repositoryContext, {
+        before: "2026-01-01T12:00:00.000Z",
+        resourceId: "res_web",
+        status: "failed",
+        dryRun: true,
+      });
+      expect(dryRun.isOk()).toBe(true);
+      expect(dryRun._unsafeUnwrap()).toMatchObject({
+        matchedCount: 1,
+        prunedCount: 0,
+        countsByStatus: { failed: 1 },
+        countsBySourceKind: { github: 1 },
+      });
+
+      const pruned = await retention.prune(repositoryContext, {
+        before: "2026-01-01T12:00:00.000Z",
+        resourceId: "res_web",
+        status: "failed",
+        dryRun: false,
+      });
+      expect(pruned.isOk()).toBe(true);
+      expect(pruned._unsafeUnwrap()).toMatchObject({
+        matchedCount: 1,
+        prunedCount: 1,
+      });
+
+      const listed = await list.execute(
+        executionContext,
+        ListSourceEventsQuery.create({ projectId: "prj_demo", limit: 10 })._unsafeUnwrap(),
+      );
+      expect(listed.isOk()).toBe(true);
+      expect(
+        listed
+          ._unsafeUnwrap()
+          .items.map((item) => item.sourceEventId)
+          .sort(),
+      ).toEqual(["sevt_new_selected", "sevt_old_other_resource"]);
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
 });

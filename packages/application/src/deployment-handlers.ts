@@ -1,4 +1,6 @@
 export * from "./operations/deployments/apply-action-preview-route.handler";
+export * from "./operations/deployments/archive-deployment.handler";
+export * from "./operations/deployments/cancel-deployment.handler";
 export * from "./operations/deployments/cleanup-preview.handler";
 export * from "./operations/deployments/confirm-action-preview-route.handler";
 export * from "./operations/deployments/create-deployment.handler";
@@ -9,6 +11,8 @@ export * from "./operations/deployments/list-deployments.handler";
 export * from "./operations/deployments/mark-server-applied-route-status-on-deployment-finished.handler";
 export * from "./operations/deployments/prune-deployment-logs.handler";
 export * from "./operations/deployments/prune-deployment-logs.use-case";
+export * from "./operations/deployments/prune-deployments.handler";
+export * from "./operations/deployments/prune-deployments.use-case";
 export * from "./operations/deployments/redeploy-deployment.handler";
 export * from "./operations/deployments/retry-deployment.handler";
 export * from "./operations/deployments/rollback-deployment.handler";

@@ -1,4 +1,6 @@
 export * from "./operations/deployments/apply-action-preview-route.command";
+export * from "./operations/deployments/archive-deployment.command";
+export * from "./operations/deployments/cancel-deployment.command";
 export * from "./operations/deployments/cleanup-preview.command";
 export * from "./operations/deployments/confirm-action-preview-route.command";
 export * from "./operations/deployments/create-deployment.command";
@@ -8,6 +10,7 @@ export * from "./operations/deployments/deployment-preview-access";
 export * from "./operations/deployments/deployment-recovery-readiness.query";
 export * from "./operations/deployments/list-deployments.query";
 export * from "./operations/deployments/prune-deployment-logs.command";
+export * from "./operations/deployments/prune-deployments.command";
 export * from "./operations/deployments/redeploy-deployment.command";
 export * from "./operations/deployments/retry-deployment.command";
 export * from "./operations/deployments/rollback-deployment.command";

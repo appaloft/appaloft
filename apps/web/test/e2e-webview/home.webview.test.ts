@@ -1170,6 +1170,35 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         },
       };
     },
+    "/api/rpc/projects/restore": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { projectId?: string } | null;
+      return {
+        json: {
+          id: input?.projectId ?? "prj_demo",
+        },
+      };
+    },
+    "/api/rpc/projects/deleteCheck": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { projectId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "projects.delete-check/v1",
+          projectId: input?.projectId ?? "prj_demo",
+          lifecycleStatus: "archived",
+          eligible: true,
+          blockers: [],
+          checkedAt: "2026-01-01T00:00:00.000Z",
+        },
+      };
+    },
+    "/api/rpc/projects/delete": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { projectId?: string } | null;
+      return {
+        json: {
+          id: input?.projectId ?? "prj_demo",
+        },
+      };
+    },
     "/api/rpc/servers/list": {
       json: {
         items: [
@@ -3571,22 +3600,118 @@ describe("console e2e with Bun.WebView", () => {
       );
       expect(createResourceLinksDisabled).toBe(true);
 
-      const renameDisabled = await waitFor(
+      const renameDisabledRestoreAvailable = await waitFor(
         () =>
           view.evaluate<boolean>(
             `(() => {
               const input = document.querySelector("#project-name");
-              const archiveButton = document.querySelector("#project-archive-button");
+              const restoreButton = document.querySelector("#project-restore-button");
               return input instanceof HTMLInputElement &&
-                archiveButton instanceof HTMLButtonElement &&
+                restoreButton instanceof HTMLButtonElement &&
                 input.disabled &&
-                archiveButton.disabled;
+                !restoreButton.disabled;
             })()`,
           ),
         Boolean,
-        "Expected archived project settings controls to be disabled",
+        "Expected archived project rename to be disabled and restore to be available",
       );
-      expect(renameDisabled).toBe(true);
+      expect(renameDisabledRestoreAvailable).toBe(true);
+
+      await view.evaluate("window.confirm = () => true");
+      const restoreClicked = await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const button = document.querySelector("#project-restore-button");
+              if (!(button instanceof HTMLButtonElement)) {
+                return false;
+              }
+              button.click();
+              return true;
+            })()`,
+          ),
+        Boolean,
+        "Expected project restore button",
+      );
+      expect(restoreClicked).toBe(true);
+
+      const restoreRequest = await waitForRecordedRequest("/api/rpc/projects/restore");
+      expect(readOrpcJsonPayload(restoreRequest.body)).toEqual({
+        projectId: "prj_demo",
+      });
+    } finally {
+      apiResponses.dashboard["/api/rpc/projects/list"] = previousListRoute;
+      apiResponses.dashboard["/api/rpc/projects/show"] = previousShowRoute;
+    }
+  }, 15_000);
+
+  test("[PROJ-LIFE-ENTRY-008-WEB] deletes an archived project through delete-check gated action", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    const previousListRoute = apiResponses.dashboard["/api/rpc/projects/list"];
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/projects/show"];
+    const archivedProject = {
+      id: "prj_demo",
+      name: "Demo",
+      slug: "demo",
+      description: "Demo project",
+      lifecycleStatus: "archived",
+      archivedAt: "2026-01-01T00:00:05.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    apiResponses.dashboard["/api/rpc/projects/list"] = {
+      json: {
+        items: [archivedProject],
+      },
+    };
+    apiResponses.dashboard["/api/rpc/projects/show"] = {
+      json: archivedProject,
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/projects/prj_demo`);
+
+      const deleteReady = await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const button = document.querySelector("#project-delete-button");
+              return button instanceof HTMLButtonElement && !button.disabled;
+            })()`,
+          ),
+        Boolean,
+        "Expected delete button to be enabled by project delete-check",
+      );
+      expect(deleteReady).toBe(true);
+
+      await view.evaluate("window.prompt = () => 'prj_demo'");
+      const deleteClicked = await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const button = document.querySelector("#project-delete-button");
+              if (!(button instanceof HTMLButtonElement)) {
+                return false;
+              }
+              button.click();
+              return true;
+            })()`,
+          ),
+        Boolean,
+        "Expected project delete button",
+      );
+      expect(deleteClicked).toBe(true);
+
+      const deleteCheckRequest = await waitForRecordedRequest("/api/rpc/projects/deleteCheck");
+      expect(readOrpcJsonPayload(deleteCheckRequest.body)).toEqual({
+        projectId: "prj_demo",
+      });
+      const deleteRequest = await waitForRecordedRequest("/api/rpc/projects/delete");
+      expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
+        projectId: "prj_demo",
+        confirmation: { projectId: "prj_demo" },
+      });
     } finally {
       apiResponses.dashboard["/api/rpc/projects/list"] = previousListRoute;
       apiResponses.dashboard["/api/rpc/projects/show"] = previousShowRoute;

@@ -64,6 +64,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "resources.list",
       "resources.show",
       "resources.health",
+      "resources.health-history",
       "resources.runtime-logs",
       "resources.proxy-configuration.preview",
       "resources.diagnostic-summary",
@@ -97,6 +98,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "resources.configure-network",
       "resources.configure-access",
       "resources.configure-health",
+      "resources.health-history",
       "resources.set-variable",
       "resources.import-variables",
       "resources.unset-variable",
@@ -132,12 +134,16 @@ describe("operation catalog aggregate mutation boundary", () => {
       "resources.configure-auto-deploy",
       "source-events.list",
       "source-events.show",
+      "source-events.prune",
       "deployments.list",
       "deployments.show",
       "deployments.logs",
       "deployments.stream-events",
       "deployments.recovery-readiness",
       "deployments.rollback",
+      "deployments.cancel",
+      "deployments.archive",
+      "deployments.prune",
     ];
     const entriesByKey = new Map<string, OperationCatalogEntry>(
       operationCatalog.map((entry) => [entry.key, entry]),
@@ -157,6 +163,7 @@ describe("operation catalog aggregate mutation boundary", () => {
     const observationOperationKeys = [
       "resources.show",
       "resources.health",
+      "resources.health-history",
       "resources.runtime-logs",
       "resources.proxy-configuration.preview",
       "resources.diagnostic-summary",
@@ -412,6 +419,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "deployments.logs",
       "deployments.stream-events",
       "resources.health",
+      "resources.health-history",
       "resources.diagnostic-summary",
       "resources.proxy-configuration.preview",
     ];
@@ -801,9 +809,15 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
-  test("[SRC-AUTO-QUERY-001][SRC-AUTO-QUERY-002] source event reads are exposed through the active operation catalog", () => {
+  test("[SRC-AUTO-QUERY-001][SRC-AUTO-QUERY-002][SRC-AUTO-REPLAY-002][SRC-AUTO-PRUNE-003] source event operations are exposed through the active operation catalog", () => {
     const listEntry = operationCatalog.find((candidate) => candidate.key === "source-events.list");
     const showEntry = operationCatalog.find((candidate) => candidate.key === "source-events.show");
+    const replayEntry = operationCatalog.find(
+      (candidate) => candidate.key === "source-events.replay",
+    );
+    const pruneEntry = operationCatalog.find(
+      (candidate) => candidate.key === "source-events.prune",
+    );
 
     expect(listEntry).toMatchObject({
       kind: "query",
@@ -827,8 +841,32 @@ describe("operation catalog aggregate mutation boundary", () => {
         orpc: { method: "GET", path: "/api/source-events/{sourceEventId}" },
       },
     });
+    expect(replayEntry).toMatchObject({
+      kind: "command",
+      domain: "source-events",
+      messageName: "ReplaySourceEventCommand",
+      handlerName: "ReplaySourceEventCommandHandler",
+      serviceName: "ReplaySourceEventUseCase",
+      transports: {
+        cli: "appaloft source-event replay <sourceEventId> --resource <resourceId> | --project <projectId>",
+        orpc: { method: "POST", path: "/api/source-events/{sourceEventId}/replay" },
+      },
+    });
+    expect(pruneEntry).toMatchObject({
+      kind: "command",
+      domain: "source-events",
+      messageName: "PruneSourceEventsCommand",
+      handlerName: "PruneSourceEventsCommandHandler",
+      serviceName: "PruneSourceEventsUseCase",
+      transports: {
+        cli: "appaloft source-event prune --before <iso>",
+        orpc: { method: "POST", path: "/api/source-events/prune" },
+      },
+    });
     expect(listEntry?.inputSchema).toBeDefined();
     expect(showEntry?.inputSchema).toBeDefined();
+    expect(replayEntry?.inputSchema).toBeDefined();
+    expect(pruneEntry?.inputSchema).toBeDefined();
   });
 
   test("[AUDIT-EVENT-CATALOG-001] audit event reads are exposed through the active operation catalog", () => {

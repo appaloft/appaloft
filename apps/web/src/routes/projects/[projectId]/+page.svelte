@@ -12,16 +12,20 @@
     Lock,
     Play,
     Plus,
+    RotateCcw,
     Save,
+    Trash2,
     Unlock,
   } from "@lucide/svelte";
   import type {
     ArchiveEnvironmentInput,
     ArchiveProjectInput,
     CloneEnvironmentInput,
+    DeleteProjectInput,
     LockEnvironmentInput,
     RenameEnvironmentInput,
     RenameProjectInput,
+    RestoreProjectInput,
     RuntimeMonitoringRollupResponse,
     UnlockEnvironmentInput,
   } from "@appaloft/contracts";
@@ -69,6 +73,14 @@
       staleTime: 5_000,
     }),
   );
+  const projectDeleteSafetyQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["projects", "delete-check", projectId],
+      queryFn: () => orpcClient.projects.deleteCheck({ projectId }),
+      enabled: browser && projectId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
@@ -82,6 +94,14 @@
   );
   const project = $derived(projectDetailQuery.data ?? findProject(projects, projectId));
   const isProjectArchived = $derived(project?.lifecycleStatus === "archived");
+  const projectDeleteSafety = $derived(projectDeleteSafetyQuery.data ?? null);
+  const projectDeleteBlockerCount = $derived(projectDeleteSafety?.blockers.length ?? 0);
+  const canDeleteProject = $derived(
+    Boolean(project) &&
+      isProjectArchived &&
+      projectDeleteSafety?.eligible === true &&
+      !projectDeleteSafetyQuery.isPending,
+  );
   const projectEnvironments = $derived(
     project ? environments.filter((environment) => environment.projectId === project.id) : [],
   );
@@ -186,6 +206,7 @@
       };
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
       void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
+      void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", result.id] });
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -205,6 +226,7 @@
       };
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
       void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
+      void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", result.id] });
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -212,6 +234,48 @@
         title: $t(i18nKeys.console.projects.archiveFailed),
         detail: readErrorMessage(error),
       };
+    },
+  }));
+  const restoreProjectMutation = createMutation(() => ({
+    mutationFn: (input: RestoreProjectInput) => orpcClient.projects.restore(input),
+    onSuccess: (result) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.projects.restoreSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
+      void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", result.id] });
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.projects.restoreFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const deleteProjectMutation = createMutation(() => ({
+    mutationFn: (input: DeleteProjectInput) => orpcClient.projects.delete(input),
+    onSuccess: (result) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.projects.deleteSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      window.location.href = "/projects";
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.projects.deleteFailed),
+        detail: readErrorMessage(error),
+      };
+      if (project) {
+        void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", project.id] });
+      }
     },
   }));
   const archiveEnvironmentMutation = createMutation(() => ({
@@ -383,6 +447,38 @@
     lifecycleFeedback = null;
     archiveProjectMutation.mutate({
       projectId: project.id,
+    });
+  }
+
+  function restoreProject(): void {
+    if (!browser || !project || !isProjectArchived || restoreProjectMutation.isPending) {
+      return;
+    }
+
+    if (!window.confirm($t(i18nKeys.console.projects.restoreConfirm))) {
+      return;
+    }
+
+    lifecycleFeedback = null;
+    restoreProjectMutation.mutate({
+      projectId: project.id,
+    });
+  }
+
+  function deleteProject(): void {
+    if (!browser || !project || !canDeleteProject || deleteProjectMutation.isPending) {
+      return;
+    }
+
+    const confirmation = window.prompt($t(i18nKeys.console.projects.deleteConfirmPrompt), "");
+    if (confirmation !== project.id) {
+      return;
+    }
+
+    lifecycleFeedback = null;
+    deleteProjectMutation.mutate({
+      projectId: project.id,
+      confirmation: { projectId: confirmation },
     });
   }
 
@@ -776,18 +872,51 @@
               {$t(i18nKeys.console.projects.settingsDescription)}
             </p>
           </div>
-          <Button
-            id="project-archive-button"
-            type="button"
-            variant="destructive"
-            disabled={isProjectArchived || archiveProjectMutation.isPending}
-            onclick={archiveProject}
-          >
-            <Archive class="size-4" />
-            {archiveProjectMutation.isPending
-              ? $t(i18nKeys.common.actions.saving)
-              : $t(i18nKeys.console.projects.archiveAction)}
-          </Button>
+          {#if isProjectArchived}
+            <div class="flex flex-wrap gap-2">
+              <Button
+                id="project-restore-button"
+                type="button"
+                disabled={restoreProjectMutation.isPending}
+                onclick={restoreProject}
+              >
+                <RotateCcw class="size-4" />
+                {restoreProjectMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.console.projects.restoreAction)}
+              </Button>
+              <Button
+                id="project-delete-button"
+                type="button"
+                variant="destructive"
+                disabled={!canDeleteProject || deleteProjectMutation.isPending}
+                title={projectDeleteBlockerCount > 0
+                  ? $t(i18nKeys.console.projects.deleteBlocked, {
+                      count: projectDeleteBlockerCount,
+                    })
+                  : undefined}
+                onclick={deleteProject}
+              >
+                <Trash2 class="size-4" />
+                {deleteProjectMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.console.projects.deleteAction)}
+              </Button>
+            </div>
+          {:else}
+            <Button
+              id="project-archive-button"
+              type="button"
+              variant="destructive"
+              disabled={archiveProjectMutation.isPending}
+              onclick={archiveProject}
+            >
+              <Archive class="size-4" />
+              {archiveProjectMutation.isPending
+                ? $t(i18nKeys.common.actions.saving)
+                : $t(i18nKeys.console.projects.archiveAction)}
+            </Button>
+          {/if}
         </div>
 
         {#if isProjectArchived}

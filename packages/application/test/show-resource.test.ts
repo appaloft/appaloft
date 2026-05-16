@@ -4,6 +4,8 @@ import { describe, expect, test } from "bun:test";
 import {
   ArchivedAt,
   CommandText,
+  ConfigKey,
+  ConfigValueText,
   CreatedAt,
   DeletedAt,
   DescriptionText,
@@ -50,6 +52,8 @@ import {
   StorageVolumeId,
   StorageVolumeKindValue,
   UpdatedAt,
+  VariableExposureValue,
+  VariableKindValue,
 } from "@appaloft/core";
 
 import { createExecutionContext, type ExecutionContext, type toRepositoryContext } from "../src";
@@ -606,6 +610,94 @@ describe("ShowResourceQueryService", () => {
       },
       latestDeploymentId: "dep_new",
     });
+  });
+
+  test("[RES-PROFILE-DRIFT-003] redacts configuration drift values", async () => {
+    const resource = detailedResource();
+    resource
+      .setVariable({
+        key: ConfigKey.rehydrate("DATABASE_URL"),
+        value: ConfigValueText.rehydrate("postgres://resource-secret"),
+        kind: VariableKindValue.rehydrate("secret"),
+        exposure: VariableExposureValue.rehydrate("runtime"),
+        isSecret: true,
+        updatedAt: UpdatedAt.rehydrate("2026-01-01T00:00:04.000Z"),
+      })
+      ._unsafeUnwrap();
+    resource
+      .setVariable({
+        key: ConfigKey.rehydrate("PUBLIC_BASE_URL"),
+        value: ConfigValueText.rehydrate("https://resource.example.test"),
+        kind: VariableKindValue.rehydrate("plain-config"),
+        exposure: VariableExposureValue.rehydrate("build-time"),
+        updatedAt: UpdatedAt.rehydrate("2026-01-01T00:00:04.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const result = await createService({
+      resources: [resource],
+      deployments: [
+        deploymentSummary({
+          environmentSnapshot: {
+            ...deploymentSummary().environmentSnapshot,
+            variables: [
+              {
+                key: "DATABASE_URL",
+                value: "postgres://snapshot-secret",
+                kind: "secret",
+                exposure: "runtime",
+                scope: "resource",
+                isSecret: true,
+              },
+              {
+                key: "PUBLIC_BASE_URL",
+                value: "https://snapshot.example.test",
+                kind: "plain-config",
+                exposure: "build-time",
+                scope: "resource",
+                isSecret: false,
+              },
+            ],
+          },
+        }),
+      ],
+    }).execute(createTestContext(), createQuery());
+
+    const detail = unwrap(result);
+    const configDrift = detail.diagnostics.filter(
+      (diagnostic) =>
+        diagnostic.code === "resource_profile_drift" && diagnostic.section === "configuration",
+    );
+
+    expect(configDrift).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fieldPath: "configuration.runtime.DATABASE_URL",
+          configKey: "DATABASE_URL",
+          configExposure: "runtime",
+          configKind: "secret",
+          configScope: "resource",
+          configSource: "deployment-snapshot",
+          resourceValue: { state: "redacted" },
+          deploymentSnapshotValue: { state: "redacted" },
+          suggestedCommand: "resources.set-variable",
+        }),
+        expect.objectContaining({
+          fieldPath: "configuration.build-time.PUBLIC_BASE_URL",
+          configKey: "PUBLIC_BASE_URL",
+          configExposure: "build-time",
+          configKind: "plain-config",
+          configScope: "resource",
+          configSource: "deployment-snapshot",
+          resourceValue: { state: "masked" },
+          deploymentSnapshotValue: { state: "masked" },
+          suggestedCommand: "resources.set-variable",
+        }),
+      ]),
+    );
+    expect(JSON.stringify(configDrift)).not.toContain("postgres://");
+    expect(JSON.stringify(configDrift)).not.toContain("resource.example.test");
+    expect(JSON.stringify(configDrift)).not.toContain("snapshot.example.test");
   });
 
   test("[RES-PROFILE-SHOW-005] returns safe diagnostics for incomplete profile", async () => {

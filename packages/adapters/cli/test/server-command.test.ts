@@ -320,6 +320,8 @@ describe("CLI server commands", () => {
         "docker-build-cache",
         "--category",
         "unused-images",
+        "--category",
+        "remote-state-markers",
         "--dry-run",
         "false",
       ]);
@@ -333,7 +335,7 @@ describe("CLI server commands", () => {
       input: {
         serverId: "srv_primary",
         before: "2026-01-01T00:05:00.000Z",
-        categories: ["docker-build-cache", "unused-images"],
+        categories: ["docker-build-cache", "unused-images", "remote-state-markers"],
         dryRun: false,
       },
     });

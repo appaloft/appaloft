@@ -58,6 +58,7 @@ export const cliDocsHrefs = {
   sourceAutoDeployDedupe: resolvePublicDocsHelpHref("source.auto-deploy-dedupe"),
   sourceAutoDeployIgnoredEvents: resolvePublicDocsHelpHref("source.auto-deploy-ignored-events"),
   sourceAutoDeployRecovery: resolvePublicDocsHelpHref("source.auto-deploy-recovery"),
+  sourceAutoDeployRetention: resolvePublicDocsHelpHref("source.auto-deploy-retention"),
   scheduledTaskLifecycle: resolvePublicDocsHelpHref("scheduled-task.resource-lifecycle"),
   selfHostedActionDeployToken: resolvePublicDocsHelpHref("self-hosting.action-deploy-token-auth"),
   selfHostedFirstAdmin: resolvePublicDocsHelpHref("self-hosting.first-admin-bootstrap"),
@@ -78,7 +79,7 @@ export const cliCommandDescriptions = {
   deploymentList: withDocs("List deployments", "deployment.lifecycle"),
   deploymentShow: withDocs("Show deployment detail", "deployment.lifecycle"),
   deploymentRecoveryReadiness: withDocs(
-    "Show retry, redeploy, and rollback readiness for a deployment",
+    "Show retry, redeploy, cancel, and rollback readiness for a deployment",
     "deployment.recovery-readiness",
   ),
   deploymentRetry: withDocs(
@@ -91,6 +92,18 @@ export const cliCommandDescriptions = {
   ),
   deploymentRollback: withDocs(
     "Roll back to a retained successful deployment candidate",
+    "deployment.recovery-readiness",
+  ),
+  deploymentCancel: withDocs(
+    "Cancel an active deployment attempt",
+    "deployment.recovery-readiness",
+  ),
+  deploymentArchive: withDocs(
+    "Archive a terminal deployment attempt",
+    "deployment.recovery-readiness",
+  ),
+  deploymentPrune: withDocs(
+    "Dry-run or prune archived deployment attempts",
     "deployment.recovery-readiness",
   ),
   deploymentEvents: withDocs(
@@ -129,16 +142,24 @@ export const cliCommandDescriptions = {
     "deployment.product-grade-previews",
   ),
   sourceLinks: withDocs("Source fingerprint link operations", "deployment.source-relink"),
+  sourceLinkList: withDocs("List source fingerprint links", "deployment.source-relink"),
+  sourceLinkShow: withDocs("Show one source fingerprint link", "deployment.source-relink"),
   sourceLinkRelink: withDocs(
     "Relink a source fingerprint to an explicit resource",
     "deployment.source-relink",
   ),
+  sourceLinkDelete: withDocs("Delete one source fingerprint link", "deployment.source-relink"),
   sourceEvent: withDocs("Source event diagnostics", "source.auto-deploy-setup"),
   sourceEventList: withDocs(
     "List source event deliveries for a project or resource",
     "source.auto-deploy-dedupe",
   ),
   sourceEventShow: withDocs("Show one source event delivery", "source.auto-deploy-ignored-events"),
+  sourceEventReplay: withDocs("Replay one source event delivery", "source.auto-deploy-recovery"),
+  sourceEventPrune: withDocs(
+    "Dry-run or prune retained source event deliveries",
+    "source.auto-deploy-retention",
+  ),
   remoteState: withDocs("Remote state diagnostics", "errors.remote-state-lock"),
   remoteStateLock: withDocs("SSH remote-state lock diagnostics", "errors.remote-state-lock"),
   remoteStateLockInspect: withDocs(
@@ -251,7 +272,14 @@ export const cliCommandDescriptions = {
   projectList: withDocs("List projects", "project.concept"),
   projectShow: withDocs("Show project identity and lifecycle", "project.lifecycle"),
   projectRename: withDocs("Rename a project", "project.lifecycle"),
+  projectSetDescription: withDocs("Set or clear a project description", "project.lifecycle"),
   projectArchive: withDocs("Archive a project", "project.lifecycle"),
+  projectRestore: withDocs("Restore an archived project", "project.lifecycle"),
+  projectDeleteCheck: withDocs("Preview project delete safety", "project.lifecycle"),
+  projectDelete: withDocs(
+    "Delete an archived project after blockers are clear",
+    "project.lifecycle",
+  ),
   server: withDocs("Server operations", "server.deployment-target"),
   serverRegister: withDocs(
     "Register a single-server or Docker Swarm deployment target",
@@ -392,12 +420,17 @@ export const cliCommandDescriptions = {
     "resource.runtime-controls",
   ),
   resourceHealth: withDocs("Show current resource health", "observability.health-summary"),
+  resourceHealthHistory: withDocs(
+    "List retained resource health observations",
+    "observability.health-summary",
+  ),
   resourceConfigureSource: withDocs("Configure resource source profile", "resource.source-profile"),
   resourceConfigureRuntime: withDocs(
     "Configure resource runtime profile",
     "resource.runtime-profile",
   ),
   resourceConfigureHealth: withDocs("Configure resource health policy", "resource.health-profile"),
+  resourceResetHealth: withDocs("Reset resource health policy", "resource.health-profile"),
   resourceConfigureNetwork: withDocs(
     "Configure resource network profile",
     "resource.network-profile",
@@ -627,6 +660,30 @@ export const cliCommandDescriptions = {
   ),
   resourceSetVariable: withDocs(
     "Set a resource-scoped variable override",
+    "environment.variable-precedence",
+  ),
+  resourceSecrets: withDocs(
+    "Manage resource-owned secret references",
+    "environment.variable-precedence",
+  ),
+  resourceSecretsCreate: withDocs(
+    "Create a resource-owned secret reference",
+    "environment.variable-precedence",
+  ),
+  resourceSecretsRotate: withDocs(
+    "Rotate a resource-owned secret reference",
+    "environment.variable-precedence",
+  ),
+  resourceSecretsDelete: withDocs(
+    "Delete a resource-owned secret reference",
+    "environment.variable-precedence",
+  ),
+  resourceSecretsList: withDocs(
+    "List masked resource-owned secret references",
+    "environment.variable-precedence",
+  ),
+  resourceSecretsShow: withDocs(
+    "Show one masked resource-owned secret reference",
     "environment.variable-precedence",
   ),
   resourceImportVariables: withDocs(

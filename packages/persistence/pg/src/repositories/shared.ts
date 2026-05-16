@@ -1054,6 +1054,9 @@ export function rehydrateProject(row: Selectable<Database["projects"]>) {
       ? { archivedAt: ArchivedAt.rehydrate(normalizeTimestamp(row.archived_at) ?? row.archived_at) }
       : {}),
     ...(row.archive_reason ? { archiveReason: ArchiveReason.rehydrate(row.archive_reason) } : {}),
+    ...(row.deleted_at
+      ? { deletedAt: DeletedAt.rehydrate(normalizeTimestamp(row.deleted_at) ?? row.deleted_at) }
+      : {}),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
     ...(row.description ? { description: DescriptionText.rehydrate(row.description) } : {}),
   };
@@ -1787,6 +1790,9 @@ export function rehydrateDeploymentRow(row: Selectable<Database["deployments"]>)
       : {}),
     ...(row.superseded_by_deployment_id
       ? { supersededByDeploymentId: DeploymentId.rehydrate(row.superseded_by_deployment_id) }
+      : {}),
+    ...(row.archived_at
+      ? { archivedAt: ArchivedAt.rehydrate(normalizeTimestamp(row.archived_at) ?? row.archived_at) }
       : {}),
   };
 }

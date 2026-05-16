@@ -308,9 +308,66 @@ export const renameProjectInputSchema = z.object({
   name: z.string().min(1),
 });
 
+export const setProjectDescriptionInputSchema = z.object({
+  projectId: z.string().min(1),
+  description: z.string().optional(),
+});
+
 export const archiveProjectInputSchema = z.object({
   projectId: z.string().min(1),
   reason: z.string().min(1).max(280).optional(),
+});
+
+export const restoreProjectInputSchema = z.object({
+  projectId: z.string().min(1),
+});
+
+export const checkProjectDeleteSafetyInputSchema = z.object({
+  projectId: z.string().min(1),
+});
+
+export const deleteProjectInputSchema = z.object({
+  projectId: z.string().min(1),
+  confirmation: z.object({
+    projectId: z.string().min(1),
+  }),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const projectDeleteBlockerKindSchema = z.enum([
+  "active-project",
+  "environment",
+  "resource",
+  "deployment-history",
+  "domain-binding",
+  "certificate",
+  "source-link",
+  "source-event",
+  "dependency-resource",
+  "storage-volume",
+  "scheduled-task",
+  "preview-environment",
+  "runtime-monitoring",
+  "runtime-log-retention",
+  "provider-job-log",
+  "domain-event-retention",
+  "audit-retention",
+]);
+
+export const projectDeleteBlockerSchema = z.object({
+  kind: projectDeleteBlockerKindSchema,
+  relatedEntityId: z.string().optional(),
+  relatedEntityType: z.string().optional(),
+  count: z.number().int().nonnegative().optional(),
+});
+
+export const checkProjectDeleteSafetyResponseSchema = z.object({
+  schemaVersion: z.literal("projects.delete-check/v1"),
+  projectId: z.string(),
+  lifecycleStatus: z.enum(["active", "archived"]),
+  eligible: z.boolean(),
+  blockers: z.array(projectDeleteBlockerSchema),
+  checkedAt: z.string(),
 });
 
 export const createProjectResponseSchema = z.object({
@@ -327,7 +384,19 @@ export const renameProjectResponseSchema = z.object({
   id: z.string(),
 });
 
+export const setProjectDescriptionResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const archiveProjectResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const restoreProjectResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const deleteProjectResponseSchema = z.object({
   id: z.string(),
 });
 
@@ -1156,6 +1225,7 @@ export const runtimeTargetPruneCategorySchema = z.enum([
   "source-workspaces",
   "docker-build-cache",
   "unused-images",
+  "remote-state-markers",
 ]);
 
 export const runtimeTargetCapacityPruneCandidateSchema = z.object({
@@ -1850,6 +1920,47 @@ export const resourceHealthSummarySchema = z.object({
   sourceErrors: z.array(resourceHealthSourceErrorSchema),
 });
 
+export const resourceHealthHistoryInputSchema = z.object({
+  resourceId: z.string().min(1),
+  window: z.object({
+    from: z.string().datetime(),
+    to: z.string().datetime(),
+  }),
+  limit: z.number().int().min(1).max(720).default(200),
+});
+
+export const resourceHealthHistoryObservationSchema = z.object({
+  observationId: z.string(),
+  observedAt: z.string(),
+  overall: resourceHealthOverallSchema,
+  runtimeLifecycle: z.enum([
+    "not-deployed",
+    "starting",
+    "running",
+    "restarting",
+    "degraded",
+    "stopped",
+    "exited",
+    "unknown",
+  ]),
+  runtimeHealth: z.enum(["healthy", "unhealthy", "unknown", "not-configured"]),
+  publicAccessStatus: z.enum(["ready", "not-ready", "failed", "unknown", "not-configured"]),
+  proxyStatus: z.enum(["ready", "not-ready", "failed", "unknown", "not-configured"]),
+  healthPolicyStatus: z.enum(["configured", "not-configured", "unsupported"]),
+  latestDeploymentId: z.string().optional(),
+  summary: resourceHealthSummarySchema,
+});
+
+export const resourceHealthHistorySchema = z.object({
+  schemaVersion: z.literal("resources.health-history/v1"),
+  resourceId: z.string(),
+  from: z.string(),
+  to: z.string(),
+  generatedAt: z.string(),
+  observations: z.array(resourceHealthHistoryObservationSchema),
+  sourceErrors: z.array(resourceHealthSourceErrorSchema),
+});
+
 export const resourceSummarySchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -2295,6 +2406,23 @@ export const resourceDetailProfileDiagnosticSchema = z.object({
   path: z.string().optional(),
   section: z.enum(["source", "runtime", "network", "access", "health", "configuration"]).optional(),
   fieldPath: z.string().optional(),
+  configKey: z.string().optional(),
+  configExposure: z.enum(["build-time", "runtime"]).optional(),
+  configKind: z
+    .enum(["deployment-strategy", "plain-config", "provider-specific", "secret"])
+    .optional(),
+  configScope: z
+    .enum([
+      "defaults",
+      "system",
+      "organization",
+      "project",
+      "environment",
+      "deployment",
+      "resource",
+    ])
+    .optional(),
+  configSource: z.enum(["resource", "entry-profile", "deployment-snapshot"]).optional(),
   comparison: z
     .enum([
       "resource-vs-entry-profile",
@@ -2355,6 +2483,37 @@ export const setResourceVariableInputSchema = z.object({
   isSecret: z.boolean().optional(),
 });
 
+export const createResourceSecretReferenceInputSchema = z.object({
+  resourceId: z.string().min(1),
+  key: z.string().min(1),
+  value: z.string().min(1),
+  exposure: z.enum(["build-time", "runtime"]).default("runtime"),
+});
+
+export const rotateResourceSecretReferenceInputSchema = z.object({
+  resourceId: z.string().min(1),
+  key: z.string().min(1),
+  value: z.string().min(1),
+  exposure: z.enum(["build-time", "runtime"]).default("runtime"),
+});
+
+export const deleteResourceSecretReferenceInputSchema = z.object({
+  resourceId: z.string().min(1),
+  key: z.string().min(1),
+  exposure: z.enum(["build-time", "runtime"]).default("runtime"),
+});
+
+export const listResourceSecretReferencesInputSchema = z.object({
+  resourceId: z.string().min(1),
+  exposure: z.enum(["build-time", "runtime"]).optional(),
+});
+
+export const showResourceSecretReferenceInputSchema = z.object({
+  resourceId: z.string().min(1),
+  key: z.string().min(1),
+  exposure: z.enum(["build-time", "runtime"]).default("runtime"),
+});
+
 export const importResourceVariablesInputSchema = z.object({
   resourceId: z.string().min(1),
   content: z.string().min(1),
@@ -2380,6 +2539,36 @@ export const resourceEffectiveConfigSchema = z.object({
   generatedAt: z.string(),
 });
 
+export const resourceSecretReferenceSummarySchema = z.object({
+  resourceId: z.string(),
+  key: z.string(),
+  value: z.literal("****"),
+  scope: z.literal("resource"),
+  exposure: z.enum(["build-time", "runtime"]),
+  isSecret: z.literal(true),
+  kind: z.literal("secret"),
+  updatedAt: z.string(),
+});
+
+export const listResourceSecretReferencesResponseSchema = z.object({
+  schemaVersion: z.literal("resources.secrets.list/v1"),
+  resourceId: z.string(),
+  items: z.array(resourceSecretReferenceSummarySchema),
+  generatedAt: z.string(),
+});
+
+export const showResourceSecretReferenceResponseSchema = z.object({
+  schemaVersion: z.literal("resources.secrets.show/v1"),
+  secret: resourceSecretReferenceSummarySchema,
+  generatedAt: z.string(),
+});
+
+export const resourceSecretReferenceMutationResponseSchema = z.object({
+  resourceId: z.string(),
+  key: z.string(),
+  exposure: z.enum(["build-time", "runtime"]),
+});
+
 export const environmentEffectivePrecedenceSchema = z.object({
   schemaVersion: z.literal("environments.effective-precedence/v1"),
   environmentId: z.string(),
@@ -2391,6 +2580,12 @@ export const environmentEffectivePrecedenceSchema = z.object({
 });
 
 export const setResourceVariableResponseSchema = z.null();
+export const createResourceSecretReferenceResponseSchema =
+  resourceSecretReferenceMutationResponseSchema;
+export const rotateResourceSecretReferenceResponseSchema =
+  resourceSecretReferenceMutationResponseSchema;
+export const deleteResourceSecretReferenceResponseSchema =
+  resourceSecretReferenceMutationResponseSchema;
 export const importedResourceVariableEntrySchema = z.object({
   key: z.string(),
   value: z.string(),
@@ -2490,6 +2685,14 @@ export const configureResourceHealthResponseSchema = z.object({
   id: z.string(),
 });
 
+export const resetResourceHealthInputSchema = z.object({
+  resourceId: z.string().min(1),
+});
+
+export const resetResourceHealthResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const configureResourceNetworkInputSchema = z.object({
   resourceId: z.string().min(1),
   networkProfile: resourceNetworkProfileSchema,
@@ -2580,6 +2783,22 @@ export const showSourceEventInputSchema = z.object({
   resourceId: z.string().min(1).optional(),
 });
 
+export const replaySourceEventInputSchema = z.object({
+  sourceEventId: z.string().min(1),
+  projectId: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const pruneSourceEventsInputSchema = z.object({
+  before: z.string().datetime(),
+  projectId: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  status: sourceEventStatusSchema.optional(),
+  sourceKind: sourceEventSourceKindSchema.optional(),
+  dryRun: z.boolean().default(true),
+});
+
 export const sourceEventListItemSchema = z.object({
   sourceEventId: z.string(),
   projectId: z.string().optional(),
@@ -2636,6 +2855,31 @@ export const showSourceEventResponseSchema = z.object({
   policyResults: z.array(sourceEventPolicyResultSchema),
   createdDeploymentIds: z.array(z.string()),
   receivedAt: z.string(),
+});
+
+export const replaySourceEventResponseSchema = z.object({
+  schemaVersion: z.literal("source-events.replay/v1"),
+  sourceEventId: z.string(),
+  status: sourceEventStatusSchema,
+  matchedResourceIds: z.array(z.string()),
+  createdDeploymentIds: z.array(z.string()),
+  ignoredReasons: z.array(sourceEventIgnoredReasonSchema),
+  replayedAt: z.string(),
+});
+
+export const pruneSourceEventsResponseSchema = z.object({
+  schemaVersion: z.literal("source-events.prune/v1"),
+  before: z.string(),
+  projectId: z.string().optional(),
+  resourceId: z.string().optional(),
+  status: sourceEventStatusSchema.optional(),
+  sourceKind: sourceEventSourceKindSchema.optional(),
+  dryRun: z.boolean(),
+  matchedCount: z.number().int().nonnegative(),
+  prunedCount: z.number().int().nonnegative(),
+  countsByStatus: z.record(z.string(), z.number().int().nonnegative()),
+  countsBySourceKind: z.record(z.string(), z.number().int().nonnegative()),
+  prunedAt: z.string(),
 });
 
 const auditEventPayloadValueSchema = z.union([
@@ -4156,6 +4400,7 @@ export const deploymentSummarySchema = z.object({
   createdAt: z.string(),
   startedAt: z.string().optional(),
   finishedAt: z.string().optional(),
+  archivedAt: z.string().optional(),
   rollbackOfDeploymentId: z.string().optional(),
 });
 
@@ -4211,9 +4456,52 @@ export const rollbackDeploymentInputSchema = z.object({
   readinessGeneratedAt: z.string().optional(),
 });
 
+export const cancelDeploymentInputSchema = z.object({
+  deploymentId: z.string().min(1),
+  confirm: z.string().min(1),
+  resourceId: z.string().min(1).optional(),
+});
+
+export const archiveDeploymentInputSchema = z.object({
+  deploymentId: z.string().min(1),
+  confirm: z.string().min(1),
+  resourceId: z.string().min(1).optional(),
+});
+
+export const pruneDeploymentsInputSchema = z.object({
+  before: z.string(),
+  deploymentId: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  serverId: z.string().min(1).optional(),
+  dryRun: z.boolean().default(true),
+});
+
 export const retryDeploymentResponseSchema = createDeploymentResponseSchema;
 export const redeployDeploymentResponseSchema = createDeploymentResponseSchema;
 export const rollbackDeploymentResponseSchema = createDeploymentResponseSchema;
+export const cancelDeploymentResponseSchema = z.object({
+  id: z.string(),
+  status: z.literal("canceled"),
+  canceledAt: z.string(),
+});
+export const archiveDeploymentResponseSchema = z.object({
+  id: z.string(),
+  archivedAt: z.string(),
+});
+export const pruneDeploymentsResponseSchema = z.object({
+  schemaVersion: z.literal("deployments.prune/v1"),
+  before: z.string(),
+  deploymentId: z.string().optional(),
+  resourceId: z.string().optional(),
+  serverId: z.string().optional(),
+  dryRun: z.boolean(),
+  matchedCount: z.number(),
+  prunedCount: z.number(),
+  guardedCount: z.number(),
+  affectedDeploymentIds: z.array(z.string()),
+  guardedDeploymentIds: z.array(z.string()),
+  prunedAt: z.string(),
+});
 
 export const stopResourceRuntimeInputSchema = z.object({
   resourceId: z.string().min(1),
@@ -5544,12 +5832,22 @@ export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 export type CreateProjectInput = z.infer<typeof createProjectInputSchema>;
 export type ShowProjectInput = z.infer<typeof showProjectInputSchema>;
 export type RenameProjectInput = z.infer<typeof renameProjectInputSchema>;
+export type SetProjectDescriptionInput = z.infer<typeof setProjectDescriptionInputSchema>;
 export type ArchiveProjectInput = z.infer<typeof archiveProjectInputSchema>;
+export type RestoreProjectInput = z.infer<typeof restoreProjectInputSchema>;
+export type CheckProjectDeleteSafetyInput = z.infer<typeof checkProjectDeleteSafetyInputSchema>;
+export type DeleteProjectInput = z.infer<typeof deleteProjectInputSchema>;
 export type CreateProjectResponse = z.infer<typeof createProjectResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
 export type ShowProjectResponse = z.infer<typeof showProjectResponseSchema>;
 export type RenameProjectResponse = z.infer<typeof renameProjectResponseSchema>;
+export type SetProjectDescriptionResponse = z.infer<typeof setProjectDescriptionResponseSchema>;
 export type ArchiveProjectResponse = z.infer<typeof archiveProjectResponseSchema>;
+export type RestoreProjectResponse = z.infer<typeof restoreProjectResponseSchema>;
+export type CheckProjectDeleteSafetyResponse = z.infer<
+  typeof checkProjectDeleteSafetyResponseSchema
+>;
+export type DeleteProjectResponse = z.infer<typeof deleteProjectResponseSchema>;
 export type ServerSummary = z.infer<typeof serverSummarySchema>;
 export type SshCredentialSummary = z.infer<typeof sshCredentialSummarySchema>;
 export type SshCredentialUsageServer = z.infer<typeof sshCredentialUsageServerSchema>;
@@ -5689,6 +5987,11 @@ export type ResourceHealthOverall = z.infer<typeof resourceHealthOverallSchema>;
 export type RouteAccessBlockingReason = z.infer<typeof routeAccessBlockingReasonSchema>;
 export type RouteIntentStatusDescriptor = z.infer<typeof routeIntentStatusDescriptorSchema>;
 export type ResourceHealthSummary = z.infer<typeof resourceHealthSummarySchema>;
+export type ResourceHealthHistoryInput = z.infer<typeof resourceHealthHistoryInputSchema>;
+export type ResourceHealthHistoryObservation = z.infer<
+  typeof resourceHealthHistoryObservationSchema
+>;
+export type ResourceHealthHistory = z.infer<typeof resourceHealthHistorySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type ResourceDetail = z.infer<typeof resourceDetailSchema>;
 export type ResourceStorageAttachmentSummary = z.infer<
@@ -5716,6 +6019,7 @@ export type ResourceDependencyBindingSummary = z.infer<
 export type ResourceConfigEntry = z.infer<typeof resourceConfigEntrySchema>;
 export type ResourceConfigOverrideSummary = z.infer<typeof resourceConfigOverrideSummarySchema>;
 export type ResourceEffectiveConfig = z.infer<typeof resourceEffectiveConfigSchema>;
+export type ResourceSecretReferenceSummary = z.infer<typeof resourceSecretReferenceSummarySchema>;
 export type ShowResourceInput = z.infer<typeof showResourceInputSchema>;
 export type ShowResourceResponse = z.infer<typeof showResourceResponseSchema>;
 export type ResourceSourceBindingInput = z.infer<typeof resourceSourceBindingInputSchema>;
@@ -5728,6 +6032,8 @@ export type DeleteResourceInput = z.infer<typeof deleteResourceInputSchema>;
 export type DeleteResourceResponse = z.infer<typeof deleteResourceResponseSchema>;
 export type ConfigureResourceHealthInput = z.infer<typeof configureResourceHealthInputSchema>;
 export type ConfigureResourceHealthResponse = z.infer<typeof configureResourceHealthResponseSchema>;
+export type ResetResourceHealthInput = z.infer<typeof resetResourceHealthInputSchema>;
+export type ResetResourceHealthResponse = z.infer<typeof resetResourceHealthResponseSchema>;
 export type ConfigureResourceNetworkInput = z.infer<typeof configureResourceNetworkInputSchema>;
 export type ConfigureResourceNetworkResponse = z.infer<
   typeof configureResourceNetworkResponseSchema
@@ -5748,6 +6054,10 @@ export type SourceEventVerificationSummary = z.infer<typeof sourceEventVerificat
 export type SourceEventPolicyResult = z.infer<typeof sourceEventPolicyResultSchema>;
 export type ShowSourceEventInput = z.infer<typeof showSourceEventInputSchema>;
 export type ShowSourceEventResponse = z.infer<typeof showSourceEventResponseSchema>;
+export type ReplaySourceEventInput = z.infer<typeof replaySourceEventInputSchema>;
+export type ReplaySourceEventResponse = z.infer<typeof replaySourceEventResponseSchema>;
+export type PruneSourceEventsInput = z.infer<typeof pruneSourceEventsInputSchema>;
+export type PruneSourceEventsResponse = z.infer<typeof pruneSourceEventsResponseSchema>;
 export type PreviewEnvironmentStatus = z.infer<typeof previewEnvironmentStatusSchema>;
 export type PreviewEnvironmentSourceSummary = z.infer<typeof previewEnvironmentSourceSummarySchema>;
 export type PreviewEnvironmentSummary = z.infer<typeof previewEnvironmentSummarySchema>;
@@ -5773,6 +6083,36 @@ export type ConfigureResourceSourceInput = z.infer<typeof configureResourceSourc
 export type ConfigureResourceSourceResponse = z.infer<typeof configureResourceSourceResponseSchema>;
 export type SetResourceVariableInput = z.infer<typeof setResourceVariableInputSchema>;
 export type SetResourceVariableResponse = z.infer<typeof setResourceVariableResponseSchema>;
+export type CreateResourceSecretReferenceInput = z.infer<
+  typeof createResourceSecretReferenceInputSchema
+>;
+export type CreateResourceSecretReferenceResponse = z.infer<
+  typeof createResourceSecretReferenceResponseSchema
+>;
+export type RotateResourceSecretReferenceInput = z.infer<
+  typeof rotateResourceSecretReferenceInputSchema
+>;
+export type RotateResourceSecretReferenceResponse = z.infer<
+  typeof rotateResourceSecretReferenceResponseSchema
+>;
+export type DeleteResourceSecretReferenceInput = z.infer<
+  typeof deleteResourceSecretReferenceInputSchema
+>;
+export type DeleteResourceSecretReferenceResponse = z.infer<
+  typeof deleteResourceSecretReferenceResponseSchema
+>;
+export type ListResourceSecretReferencesInput = z.infer<
+  typeof listResourceSecretReferencesInputSchema
+>;
+export type ListResourceSecretReferencesResponse = z.infer<
+  typeof listResourceSecretReferencesResponseSchema
+>;
+export type ShowResourceSecretReferenceInput = z.infer<
+  typeof showResourceSecretReferenceInputSchema
+>;
+export type ShowResourceSecretReferenceResponse = z.infer<
+  typeof showResourceSecretReferenceResponseSchema
+>;
 export type ImportResourceVariablesInput = z.infer<typeof importResourceVariablesInputSchema>;
 export type ImportResourceVariablesResponse = z.infer<typeof importResourceVariablesResponseSchema>;
 export type UnsetResourceVariableInput = z.infer<typeof unsetResourceVariableInputSchema>;
@@ -5946,6 +6286,12 @@ export type RedeployDeploymentInput = z.infer<typeof redeployDeploymentInputSche
 export type RedeployDeploymentResponse = z.infer<typeof redeployDeploymentResponseSchema>;
 export type RollbackDeploymentInput = z.infer<typeof rollbackDeploymentInputSchema>;
 export type RollbackDeploymentResponse = z.infer<typeof rollbackDeploymentResponseSchema>;
+export type CancelDeploymentInput = z.infer<typeof cancelDeploymentInputSchema>;
+export type CancelDeploymentResponse = z.infer<typeof cancelDeploymentResponseSchema>;
+export type ArchiveDeploymentInput = z.infer<typeof archiveDeploymentInputSchema>;
+export type ArchiveDeploymentResponse = z.infer<typeof archiveDeploymentResponseSchema>;
+export type PruneDeploymentsInput = z.infer<typeof pruneDeploymentsInputSchema>;
+export type PruneDeploymentsResponse = z.infer<typeof pruneDeploymentsResponseSchema>;
 export type StopResourceRuntimeInput = z.infer<typeof stopResourceRuntimeInputSchema>;
 export type StopResourceRuntimeResponse = z.infer<typeof stopResourceRuntimeResponseSchema>;
 export type StartResourceRuntimeInput = z.infer<typeof startResourceRuntimeInputSchema>;
