@@ -1,13 +1,14 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createExecutionContext, type DependencyResourceSecretStore } from "@appaloft/application";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 
 import {
+  BunDependencyResourceNativeCommandRunner,
   ShellDependencyResourceBackupProvider,
   type ShellDependencyResourceNativeCommandInput,
   type ShellDependencyResourceNativeCommandRunner,
@@ -401,7 +402,7 @@ describe("ShellDependencyResourceBackupProvider", () => {
     const roadmap = await readFile("docs/PRODUCT_ROADMAP.md", "utf8");
     expect(backupSpec).toContain("native Postgres and Redis backup/restore commands");
     expect(dependencyMatrix).toContain("native Postgres backup and native Redis logical backup");
-    expect(coreOperations).toContain("native Redis\n  logical backup/restore commands");
+    expect(coreOperations).toContain("native Redis logical backup/restore commands");
     expect(coreOperations).not.toContain(
       "provider-owned, and Redis references use safe metadata-only",
     );
@@ -512,5 +513,75 @@ describe("ShellDependencyResourceBackupProvider", () => {
       restoreAttemptId: "dra_shell_redis_native",
     });
     expect(JSON.stringify(restoreArtifact)).not.toContain("raw-password");
+  });
+
+  test("[DEP-RES-BACKUP-001] [DEP-RES-BACKUP-006] passes Redis RESTORE payload as the serialized value argument", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-dependency-backup-redis-cli-"));
+    const artifactPath = join(dataDir, "redis-backup.json");
+    const binDir = join(dataDir, "bin");
+    const argsLog = join(dataDir, "redis-cli.args.log");
+    const stdinLog = join(dataDir, "redis-cli.stdin.log");
+    await mkdir(binDir);
+    await Bun.write(
+      artifactPath,
+      `${JSON.stringify({
+        schemaVersion: "appaloft.redis-logical-backup/v1",
+        generatedAt: "2026-05-16T00:00:00.000Z",
+        keyCount: 1,
+        keys: [
+          {
+            key: "appaloft:e2e:dependency-backup:restore-command",
+            ttlMs: -1,
+            dumpBase64: Buffer.from("serialized-redis-dump").toString("base64"),
+          },
+        ],
+      })}\n`,
+    );
+    await Bun.write(
+      join(binDir, "redis-cli"),
+      `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$*" >> "$APPALOFT_TEST_REDIS_CLI_ARGS_LOG"
+if [[ "$*" == *" -x RESTORE "* ]]; then
+  cat > "$APPALOFT_TEST_REDIS_CLI_STDIN_LOG"
+fi
+`,
+    );
+    await chmod(join(binDir, "redis-cli"), 0o755);
+
+    const previousPath = process.env.PATH;
+    const previousArgsLog = process.env.APPALOFT_TEST_REDIS_CLI_ARGS_LOG;
+    const previousStdinLog = process.env.APPALOFT_TEST_REDIS_CLI_STDIN_LOG;
+    process.env.PATH = `${binDir}:${previousPath ?? ""}`;
+    process.env.APPALOFT_TEST_REDIS_CLI_ARGS_LOG = argsLog;
+    process.env.APPALOFT_TEST_REDIS_CLI_STDIN_LOG = stdinLog;
+    try {
+      const restored = await new BunDependencyResourceNativeCommandRunner().run({
+        operation: "redis-restore",
+        connectionUrl: "redis://127.0.0.1:6379/0",
+        artifactPath,
+        redactions: ["redis://127.0.0.1:6379/0"],
+      });
+
+      expect(restored.isOk()).toBe(true);
+      const calls = (await readFile(argsLog, "utf8")).trim().split(/\r?\n/);
+      expect(calls).toEqual([
+        "-u redis://127.0.0.1:6379/0 DEL appaloft:e2e:dependency-backup:restore-command",
+        "-u redis://127.0.0.1:6379/0 -x RESTORE appaloft:e2e:dependency-backup:restore-command 0",
+      ]);
+      expect(await readFile(stdinLog, "utf8")).toBe("serialized-redis-dump");
+    } finally {
+      process.env.PATH = previousPath;
+      if (previousArgsLog === undefined) {
+        delete process.env.APPALOFT_TEST_REDIS_CLI_ARGS_LOG;
+      } else {
+        process.env.APPALOFT_TEST_REDIS_CLI_ARGS_LOG = previousArgsLog;
+      }
+      if (previousStdinLog === undefined) {
+        delete process.env.APPALOFT_TEST_REDIS_CLI_STDIN_LOG;
+      } else {
+        process.env.APPALOFT_TEST_REDIS_CLI_STDIN_LOG = previousStdinLog;
+      }
+    }
   });
 });
