@@ -53,6 +53,12 @@ describe("release build workflow", () => {
         "{{ needs.resolve.outputs.prerelease == 'false' }}",
       ].join(""),
     );
+    const updateReleaseNotesStep = workflow.match(
+      / {6}- name: Update Release Notes\n(?<body>[\s\S]*?)\n\n {6}- name: Upload Final Release Metadata/,
+    );
+    expect(updateReleaseNotesStep?.groups?.body).toContain("GH_TOKEN");
+    expect(updateReleaseNotesStep?.groups?.body).toContain("APPALOFT_RELEASE_PRERELEASE");
+    expect(updateReleaseNotesStep?.groups?.body.match(/^ {8}env:/gm)?.length).toBe(1);
   });
 
   test("[RELEASE-HARDENING-006] keeps release-readiness smoke commands first-class", async () => {
