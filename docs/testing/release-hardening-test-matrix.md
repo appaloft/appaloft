@@ -13,6 +13,7 @@ release while other Phase 9 roadmap items or exit criteria remain unchecked.
 | RELEASE-HARDENING-005 | Deploy-console and deploy-action install-console workflows use the released installer over SSH, keep pure SSH deploy separate, preserve trusted overrides, and keep secrets out of repository config. | Workflow/action wrapper contract | Automated in `scripts/test/deploy-console-workflow.test.ts` and `scripts/test/deploy-action-wrapper.test.ts`. |
 | RELEASE-HARDENING-006 | Local, Docker, Compose, prebuilt image, static, full framework fixture Docker, full framework fixture SSH, aggregate framework, scheduled-task Docker, scheduled-task SSH, aggregate scheduled-task, storage-cleanup Docker, storage-cleanup SSH, aggregate storage-cleanup, runtime-usage Docker, runtime-usage SSH, aggregate runtime-usage, capacity-prune local, capacity-prune SSH, aggregate capacity-prune, GitHub preview provider smoke, dependency Redis backup smoke, Swarm, install-auth, SSH preflight, aggregate SSH, SSH remote-state, SSH quick-deploy, and redacted SSH evidence-capture smoke commands remain first-class package scripts and release workflow gates for release readiness. | Smoke command contract | Automated in `scripts/test/release-build-workflow.test.ts` by checking package scripts, framework fixture smoke entrypoints, scheduled-task real runtime smoke entrypoints, storage cleanup real runtime smoke entrypoints, runtime usage real target smoke entrypoints, capacity prune real target smoke entrypoints, GitHub preview provider smoke entrypoints, dependency Redis backup smoke entrypoints, SSH preflight fail-closed behavior, evidence redaction, and workflow references including `storage-cleanup-e2e.yml`, `runtime-usage-e2e.yml`, `capacity-prune-e2e.yml`, `preview-provider-e2e.yml`, and `dependency-redis-backup-e2e.yml`; real execution remains environment-gated where Docker/SSH/GitHub provider credentials or service containers are required. |
 | RELEASE-HARDENING-007 | The release alignment gate allows stable `0.11.0` only after Phase 9 release-readiness checklist items are checked and the SSH confidence layer is represented by explicit local or GitHub Actions gates. | Roadmap release gate | Automated in `scripts/test/release-build-workflow.test.ts` by invoking `scripts/release/align-roadmap-for-release.ts --target-version 0.11.0 --check` and expecting the current real-gate release-readiness contract not to block roadmap alignment. |
+| RELEASE-HARDENING-008 | Pre-`1.0.0-rc` closure verifies the seven remaining blocker decisions, eight RC selection gates, active operation catalog/docs/SDK/MCP parity, and accepted non-GA-blocking gap rationale without publishing the RC release. | Roadmap/spec/docs sync gate | Governed by `docs/specs/072-pre-rc-closure` and verified by targeted operation catalog, docs registry, SDK/MCP descriptor, access/domain/TLS, operator-work, retention, framework fixture, release-hardening, lint, typecheck, and `git diff --check` commands recorded in that artifact. |
 
 ## Verification Evidence
 
@@ -172,6 +173,11 @@ release while other Phase 9 roadmap items or exit criteria remain unchecked.
   release alignment script allows `Release-As: 0.11.0` only after Phase 9 release readiness is
   checked and the SSH smoke confidence layer is exposed through local explicit scripts plus
   fail-closed reusable GitHub Actions gates.
+- 2026-05-16 pre-RC closure sync: `docs/specs/072-pre-rc-closure` records that this is
+  pre-`1.0.0-rc` closure/hardening, not the RC release itself. The artifact maps the remaining
+  seven blockers to closed or accepted non-GA-blocking outcomes and maps all eight Phase 11 RC
+  verification gates to evidence. Accepted gaps must be carried into RC release notes if a release
+  is generated from this state.
 
 ## Current Governed Follow-Ups
 

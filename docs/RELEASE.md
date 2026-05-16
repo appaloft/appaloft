@@ -24,6 +24,28 @@ GitHub Release, and distribution artifacts.
 - npm package versions are injected during the publish job so release PRs do not need to rewrite
   workspace package versions or `bun.lock`.
 
+## Pre-RC Known Gap Rationale
+
+The pre-`1.0.0-rc` closure artifact is
+[`docs/specs/072-pre-rc-closure`](./specs/072-pre-rc-closure/spec.md). It is a hardening and
+support-readiness sync artifact, not an RC release instruction.
+
+If release notes are generated from that state, list these as accepted non-GA-blocking limitations
+rather than hidden RC scope:
+
+- optional future lifecycle/profile expansions: project description, project hard delete/restore,
+  source-link day-two management, resource health reset/history, secret-reference CRUD, webhook
+  delivery replay/rotation, and advanced provider/plugin diagnostics;
+- route/admin maintenance beyond current safe route state, including admin route repair/prune
+  diagnostics and future force-HTTPS policy controls;
+- framework catalog expansion beyond the active supported set: Ruby, PHP, Go, .NET, Rust, Elixir,
+  Micronaut, and real buildpack execution;
+- automatic provider/runtime retry workers beyond current durable process attempt visibility and
+  operation-specific retry commands;
+- remote SSH PGlite repair/prune operations beyond current safe diagnostics;
+- exhaustive help-affordance crawling for every possible Web/CLI/API/MCP link beyond current
+  registered docs-topic coverage.
+
 ## Build Locally
 
 ```bash
