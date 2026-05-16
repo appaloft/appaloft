@@ -259,6 +259,7 @@ describe("public docs operation coverage", () => {
     const skill = await Bun.file("docs/agent/appaloft-deploy-skill.md").text();
     const fullSkill = await Bun.file("docs/agent/appaloft-skill.md").text();
     const packagedSkill = await Bun.file("skills/appaloft/SKILL.md").text();
+    const surfaces = await Bun.file("skills/appaloft/references/surfaces.md").text();
     const cliEntrypoints = await Bun.file("skills/appaloft/references/cli-entrypoints.md").text();
     const operationKeys = new Set(operationCatalog.map((operation) => operation.key));
 
@@ -276,6 +277,12 @@ describe("public docs operation coverage", () => {
     expect(skill).toContain("appaloft deploy ./dist --as static-site");
     expect(fullSkill).toContain("npx skills add appaloft/appaloft");
     expect(packagedSkill).toContain("AI-facing Appaloft entrypoint");
+    expect(packagedSkill).toContain("references/surfaces.md");
+    expect(surfaces).toContain("CLI");
+    expect(surfaces).toContain("HTTP/API");
+    expect(surfaces).toContain("Web");
+    expect(surfaces).toContain("MCP/tools");
+    expect(surfaces).toContain("Do not suggest an Appaloft-owned npm");
     for (const operation of operationCatalog) {
       if (operation.transports.cli) {
         expect(cliEntrypoints).toContain(operation.transports.cli);

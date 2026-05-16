@@ -70,4 +70,5 @@ The complete CLI map ships with the package at `skills/appaloft/references/cli-e
 <h2 id="appaloft-skill-reference">Source document</h2>
 
 The complete governing source lives in `docs/agent/appaloft-skill.md`. The standard skill source is
-`skills/appaloft`; the npm fallback package mirrors it under `skills/appaloft`.
+`skills/appaloft`; deploy protocol and entrypoint boundaries live under
+`skills/appaloft/references/`.

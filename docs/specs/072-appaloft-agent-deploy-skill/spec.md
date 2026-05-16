@@ -27,7 +27,6 @@ remains the formal tool transport; the skill is the first agent-facing product a
 | Term | Meaning | Boundary |
 | --- | --- | --- |
 | Appaloft Skill | Complete AI-facing Appaloft entrypoint over the same operation catalog exposed through CLI, HTTP/API, Web, and future MCP surfaces. | Public docs / standard `skills/appaloft` source |
-| Agent Deploy Protocol | Agent-readable instructions, examples, checks, and recovery rules for deploying with Appaloft. | Public docs / full Appaloft skill reference |
 | Agent Deploy Protocol | Ordered deploy workflow an agent follows before calling CLI/API operations. | Quick Deploy / first deploy |
 | Safe Source Inspection | Read-only project inspection that avoids uploading secrets, dependency caches, local state, and credentials. | Agent workflow |
 | Outcome Packet | Final response shape containing URL/access state, resource/deployment ids, logs, diagnostics, and recovery hints. | CLI/Web/docs/tool guidance |
@@ -52,6 +51,7 @@ The v1 full Appaloft skill must include:
 - install or copy instructions for the supported agent environments;
 - every CLI transport entry from `packages/application/src/operation-catalog.ts`, with operation
   keys beside CLI forms;
+- entrypoint surface guidance for CLI, HTTP/API, Web, repository config, and future MCP/tool use;
 - guidance that the skill is a first-class AI entrypoint, peer to CLI/HTTP/API/Web/future MCP but
   not an agent-only business surface;
 - coverage for deploy, observe, recover, configure, administer, and maintenance workflows;
@@ -86,7 +86,8 @@ The deploy subprotocol must include:
 ## Public Surfaces
 
 - Public docs: stable "Appaloft skill" and "Agent deploy skill" anchors before v1.
-- Repository artifact: standard source `skills/appaloft`.
+- Repository artifact: standard source `skills/appaloft` with references for entrypoint surfaces,
+  CLI operation mapping, and deploy protocol.
 - standard install path: `npx skills add appaloft/appaloft`.
 - no Appaloft-owned npm skill installer; this keeps skill installation distinct from the Appaloft
   CLI.

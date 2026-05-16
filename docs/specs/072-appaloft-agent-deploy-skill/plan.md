@@ -39,6 +39,8 @@ The Code/Docs Round has chosen the v1 distribution location:
 - `docs/agent/appaloft-deploy-skill.md` is the canonical governing source for the deploy
   subprotocol;
 - `skills/appaloft` is the standard discoverable full skill folder;
+- `skills/appaloft/references/surfaces.md` records the CLI, HTTP/API, Web, repository config, and
+  future MCP/tool entrypoint boundaries;
 - deploy is an internal subprotocol in `skills/appaloft/references/deploy-protocol.md`;
 - the standard install path is `npx skills add appaloft/appaloft`;
 - Appaloft does not expose an npm skill installer because that would blur the boundary with the
@@ -69,7 +71,7 @@ Other generated exports remain optional follow-ups derived from the canonical so
 1. Public docs page or repository skill artifact with the deploy protocol.
 2. Docs registry/topic link and public docs traceability row.
 3. CLI help pointer to the skill docs if appropriate.
-4. npm-installable skill packaging.
+4. Optional `.well-known`/`llms.txt` exports after the canonical skill source stabilizes.
 5. Optional MCP/tool descriptor cross-links after the MCP surface is productized.
 
 ## Open Questions

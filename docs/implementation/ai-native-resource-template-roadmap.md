@@ -107,8 +107,8 @@ high-frequency subprotocol.
 
 Planning rules:
 
-- The skill explains how coding agents use existing CLI/API/Web behavior across the complete
-  operation catalog.
+- The skill explains how coding agents use existing CLI/API/Web behavior, repository config, and
+  future MCP/tool boundaries across the complete operation catalog.
 - It uses the standard skill-manager path `npx skills add appaloft/appaloft` for Codex-compatible
   skill hosts. Appaloft does not provide a separate npm skill installer; deploy remains a
   subprotocol inside the full skill.

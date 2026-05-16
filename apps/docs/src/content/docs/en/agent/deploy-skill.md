@@ -79,6 +79,6 @@ suggesting the next action.
 
 <h2 id="agent-deploy-reference">Source document</h2>
 
-The complete governing source lives in `docs/agent/appaloft-deploy-skill.md`. The standard skill
-source is `skills/appaloft-deploy`; the npm fallback package mirrors it under
-`skills/appaloft-deploy`.
+The complete governing source lives in `docs/agent/appaloft-deploy-skill.md`. The installable full
+skill lives at `skills/appaloft`; its deploy protocol lives at
+`skills/appaloft/references/deploy-protocol.md`.

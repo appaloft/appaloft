@@ -12,8 +12,8 @@ The full [Appaloft Skill](./appaloft-skill.md) is the AI-facing product entrypoi
 subprotocol turns a user request such as "deploy this app", "deploy this API", "deploy this Compose
 stack", "deploy this image", or "publish this static output" into the same Appaloft flow a human
 would use. Static output is one low-friction entrypoint, not the scope of the skill. The canonical
-source lives in this document and the standard installable skill source lives at
-`skills/appaloft-deploy`.
+source lives in this document and the installable full skill references it from
+`skills/appaloft/references/deploy-protocol.md`.
 
 1. Inspect the source safely.
 2. Choose the smallest supported entrypoint.
