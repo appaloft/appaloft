@@ -432,6 +432,7 @@ jobs:
       - name: Update Release Notes
         env:
           GH_TOKEN: ${{ github.token }}
+          APPALOFT_RELEASE_PRERELEASE: ${{ needs.resolve.outputs.prerelease }}
         run: |
           bun run release:notes -- \
             --version "${APPALOFT_APP_VERSION}" \
@@ -449,8 +450,6 @@ jobs:
             --title "Appaloft ${APPALOFT_APP_VERSION}" \
             --notes-file "${RUNNER_TEMP}/release-notes.md" \
             "${release_flags[@]}"
-        env:
-          APPALOFT_RELEASE_PRERELEASE: ${{ needs.resolve.outputs.prerelease }}
 
       - name: Upload Final Release Metadata
         uses: actions/upload-artifact@v4
