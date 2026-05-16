@@ -17,6 +17,8 @@ relatedOperations:
   - source-events.ingest
   - source-events.list
   - source-events.show
+  - source-events.replay
+  - source-events.prune
 sidebar:
   label: "Sources"
   order: 2
@@ -157,5 +159,21 @@ The first Phase 7 ingestion path records source event state and synchronous disp
 does not promise automatic background retry. If dispatch fails, inspect source event detail first,
 then fix the source profile, secret reference, policy state, or runtime blocker.
 
+After the fix, use `appaloft source-event replay <sourceEventId> --resource <resourceId>` or
+`POST /api/source-events/{sourceEventId}/replay` to replay retained safe delivery facts. Replay
+re-matches current Resource policy and uses ordinary `deployments.create` admission; it does not
+read raw webhook payloads, signatures, provider tokens, or webhook secrets.
+
 If a deployment was created, use ordinary deployment recovery/readiness, retry, redeploy, or
 rollback semantics rather than replaying the webhook payload.
+
+<h2 id="source-auto-deploy-retention">Source event retention</h2>
+
+Use `appaloft source-event prune --before <iso>` or `POST /api/source-events/prune` to inspect
+retained source event deliveries before cleanup. Prune defaults to dry-run and returns matched
+counts by status and source kind. Add `--dry-run false` only after the scope and cutoff are
+reviewed.
+
+Retention cleanup removes only persisted safe source event diagnostics. It does not delete
+Resources, deployments, webhook secrets, provider tokens, raw payloads, or replay capability for
+events outside the selected cutoff and filters.

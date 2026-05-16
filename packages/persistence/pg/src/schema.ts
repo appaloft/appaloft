@@ -16,6 +16,7 @@ export interface ProjectsTable {
   lifecycle_status: ColumnType<string, string | undefined, string>;
   archived_at: ColumnType<string | null, string | null | undefined, string | null>;
   archive_reason: ColumnType<string | null, string | null | undefined, string | null>;
+  deleted_at: ColumnType<string | null, string | null | undefined, string | null>;
   created_at: TimestampColumn;
 }
 
@@ -342,6 +343,7 @@ export interface DeploymentsTable {
   rollback_of_deployment_id: string | null;
   supersedes_deployment_id: string | null;
   superseded_by_deployment_id: string | null;
+  archived_at: string | null;
 }
 
 export interface DomainBindingsTable {
@@ -961,6 +963,22 @@ export interface RuntimeMonitoringThresholdPoliciesTable {
   updated_by_actor_kind: string | null;
 }
 
+export interface ResourceHealthObservationsTable {
+  id: string;
+  resource_id: string;
+  observed_at: string;
+  overall: string;
+  runtime_lifecycle: string;
+  runtime_health: string;
+  public_access_status: string;
+  proxy_status: string;
+  health_policy_status: string;
+  latest_deployment_id: string | null;
+  summary: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  retained_until: string;
+  created_at: TimestampColumn;
+}
+
 export interface Database {
   account: BetterAuthAccountsTable;
   projects: ProjectsTable;
@@ -1011,6 +1029,7 @@ export interface Database {
   retention_defaults: RetentionDefaultsTable;
   runtime_monitoring_samples: RuntimeMonitoringSamplesTable;
   runtime_monitoring_threshold_policies: RuntimeMonitoringThresholdPoliciesTable;
+  resource_health_observations: ResourceHealthObservationsTable;
   deploy_tokens: DeployTokensTable;
   invitation: BetterAuthInvitationsTable;
   member: BetterAuthMembersTable;

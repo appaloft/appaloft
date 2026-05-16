@@ -961,6 +961,8 @@ Current scope:
   compatibility and efficient target lookup
 - owns execution-continuation and supersede runtime-cancellation questions; application guards and
   deployment use cases should ask `Deployment` instead of branching on raw deployment status values
+- owns terminal attempt archive eligibility; archive is allowed only after terminal status and is
+  separate from destructive retention prune
 
 ### ResourceBinding
 

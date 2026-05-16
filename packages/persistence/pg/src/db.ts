@@ -77,6 +77,9 @@ import { dependencyResourceBackupPoliciesMigration } from "./migrations/068_depe
 import { runtimeMonitoringSamplesMigration } from "./migrations/069_runtime_monitoring_samples";
 import { resourceStorageAttachmentSnapshotsMigration } from "./migrations/070_resource_storage_attachment_snapshots";
 import { runtimeMonitoringThresholdPoliciesMigration } from "./migrations/071_runtime_monitoring_threshold_policies";
+import { resourceHealthObservationsMigration } from "./migrations/072_resource_health_observations";
+import { projectDeleteTombstoneMigration } from "./migrations/073_project_delete_tombstone";
+import { deploymentArchivePruneMigration } from "./migrations/074_deployment_archive_prune";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -244,6 +247,9 @@ class StaticMigrationProvider implements MigrationProvider {
       "069_runtime_monitoring_samples": runtimeMonitoringSamplesMigration,
       "070_resource_storage_attachment_snapshots": resourceStorageAttachmentSnapshotsMigration,
       "071_runtime_monitoring_threshold_policies": runtimeMonitoringThresholdPoliciesMigration,
+      "072_resource_health_observations": resourceHealthObservationsMigration,
+      "073_project_delete_tombstone": projectDeleteTombstoneMigration,
+      "074_deployment_archive_prune": deploymentArchivePruneMigration,
     };
   }
 }

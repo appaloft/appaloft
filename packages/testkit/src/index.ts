@@ -65,6 +65,7 @@ import {
   type MutationCoordinatorRunExclusiveInput,
   type ProjectReadModel,
   type ProjectRepository,
+  type ProjectSummary,
   projectResourceAccessSummary,
   type RepositoryContext,
   type ResourceDependencyBindingReadModel,
@@ -554,24 +555,22 @@ export class MemoryProjectRepository implements ProjectRepository {
 export class MemoryProjectReadModel implements ProjectReadModel {
   constructor(private readonly repository: MemoryProjectRepository) {}
 
-  async list(context: RepositoryContext) {
+  async list(context: RepositoryContext): Promise<ProjectSummary[]> {
     void context;
-    return [...this.repository.items.values()].map((project) => {
-      const state = project.toState();
-      return {
-        id: state.id.value,
-        name: state.name.value,
-        slug: state.slug.value,
-        ...(state.description ? { description: state.description.value } : {}),
-        lifecycleStatus: state.lifecycleStatus.value,
-        ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
-        ...(state.archiveReason ? { archiveReason: state.archiveReason.value } : {}),
-        createdAt: state.createdAt.value,
-      };
+    return [...this.repository.items.values()].flatMap((project) => {
+      const summary = projectSummaryFromState(project);
+      if (!summary) {
+        return [];
+      }
+
+      return [summary];
     });
   }
 
-  async findOne(context: RepositoryContext, spec: Parameters<ProjectReadModel["findOne"]>[1]) {
+  async findOne(
+    context: RepositoryContext,
+    spec: Parameters<ProjectReadModel["findOne"]>[1],
+  ): Promise<ProjectSummary | null> {
     void context;
     if (spec instanceof ProjectByIdSpec) {
       const project = this.repository.items.get(spec.id.value);
@@ -579,39 +578,41 @@ export class MemoryProjectReadModel implements ProjectReadModel {
         return null;
       }
 
-      const state = project.toState();
-      return {
-        id: state.id.value,
-        name: state.name.value,
-        slug: state.slug.value,
-        ...(state.description ? { description: state.description.value } : {}),
-        lifecycleStatus: state.lifecycleStatus.value,
-        ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
-        ...(state.archiveReason ? { archiveReason: state.archiveReason.value } : {}),
-        createdAt: state.createdAt.value,
-      };
+      return projectSummaryFromState(project);
     }
 
     if (spec instanceof ProjectBySlugSpec) {
       for (const project of this.repository.items.values()) {
-        const state = project.toState();
-        if (state.slug.equals(spec.slug)) {
-          return {
-            id: state.id.value,
-            name: state.name.value,
-            slug: state.slug.value,
-            ...(state.description ? { description: state.description.value } : {}),
-            lifecycleStatus: state.lifecycleStatus.value,
-            ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
-            ...(state.archiveReason ? { archiveReason: state.archiveReason.value } : {}),
-            createdAt: state.createdAt.value,
-          };
+        const summary = projectSummaryFromState(project);
+        if (!summary) {
+          continue;
+        }
+        if (project.toState().slug.equals(spec.slug)) {
+          return summary;
         }
       }
     }
 
     return null;
   }
+}
+
+function projectSummaryFromState(project: Project): ProjectSummary | null {
+  const state = project.toState();
+  if (state.lifecycleStatus.isDeleted()) {
+    return null;
+  }
+
+  return {
+    id: state.id.value,
+    name: state.name.value,
+    slug: state.slug.value,
+    ...(state.description ? { description: state.description.value } : {}),
+    lifecycleStatus: state.lifecycleStatus.value as ProjectSummary["lifecycleStatus"],
+    ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
+    ...(state.archiveReason ? { archiveReason: state.archiveReason.value } : {}),
+    createdAt: state.createdAt.value,
+  };
 }
 
 export class MemoryServerRepository implements ServerRepository {
@@ -2258,6 +2259,7 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
     input?: {
       projectId?: string;
       resourceId?: string;
+      includeArchived?: boolean;
     },
   ) {
     void context;
@@ -2269,6 +2271,7 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
       .filter((deployment) =>
         input?.resourceId ? deployment.resourceId.value === input.resourceId : true,
       )
+      .filter((deployment) => (input?.includeArchived ? true : !deployment.archivedAt))
       .map((deployment): DeploymentSummary => {
         const executionMetadata = deployment.runtimePlan.execution.metadata ?? {};
         const sourceMetadata = deployment.runtimePlan.source.metadata ?? {};
@@ -2478,6 +2481,7 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
           createdAt: deployment.createdAt.value,
           ...(deployment.startedAt ? { startedAt: deployment.startedAt.value } : {}),
           ...(deployment.finishedAt ? { finishedAt: deployment.finishedAt.value } : {}),
+          ...(deployment.archivedAt ? { archivedAt: deployment.archivedAt.value } : {}),
           ...(deployment.rollbackOfDeploymentId
             ? { rollbackOfDeploymentId: deployment.rollbackOfDeploymentId.value }
             : {}),

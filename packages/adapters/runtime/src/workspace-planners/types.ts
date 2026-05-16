@@ -31,18 +31,27 @@ export type {
 export const generatedWorkspaceDockerfileName = "Dockerfile.appaloft";
 
 export type WorkspaceRuntimeKind =
+  | "aspnet-core"
   | "custom"
   | "django"
+  | "dotnet"
+  | "elixir"
   | "fastapi"
   | "flask"
   | "generic-asgi"
   | "generic-wsgi"
+  | "go"
   | "java"
+  | "laravel"
   | "nextjs"
   | "node"
+  | "php"
+  | "phoenix"
   | "python"
   | "quarkus"
+  | "ruby"
   | "remix"
+  | "rust"
   | "spring-boot";
 
 export interface WorkspacePlannerInput {

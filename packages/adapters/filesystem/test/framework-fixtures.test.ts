@@ -557,6 +557,117 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
     detectedFiles: ["jvm-runnable-jar"],
     fixedVersions: {},
   },
+  {
+    matrixIds: "WF-PLAN-CAT-011",
+    fixture: "rails-ruby",
+    runtimeFamily: "ruby",
+    framework: "rails",
+    applicationShape: "serverful-http",
+    fixedVersions: {
+      filesContain: {
+        Gemfile: ['gem "rails", "7.2.2"'],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-011",
+    fixture: "sinatra-rack",
+    runtimeFamily: "ruby",
+    framework: "sinatra",
+    applicationShape: "serverful-http",
+    fixedVersions: {
+      filesContain: {
+        Gemfile: ['gem "sinatra", "4.1.1"', 'gem "rack", "3.1.8"'],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-011",
+    fixture: "laravel-composer",
+    runtimeFamily: "php",
+    framework: "laravel",
+    packageManager: "composer",
+    applicationShape: "serverful-http",
+    detectedFiles: ["composer-json"],
+    fixedVersions: {
+      filesContain: {
+        "composer.json": ['"laravel/framework": "11.44.2"'],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-011",
+    fixture: "symfony-composer",
+    runtimeFamily: "php",
+    framework: "symfony",
+    packageManager: "composer",
+    applicationShape: "serverful-http",
+    detectedFiles: ["composer-json"],
+    fixedVersions: {
+      filesContain: {
+        "composer.json": ['"symfony/framework-bundle": "7.2.3"'],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-012",
+    fixture: "go-gin",
+    runtimeFamily: "go",
+    framework: "gin",
+    packageManager: "go",
+    applicationShape: "serverful-http",
+    detectedFiles: ["go-mod"],
+    fixedVersions: {
+      filesContain: {
+        "go.mod": ["github.com/gin-gonic/gin v1.10.0"],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-014",
+    fixture: "dotnet-aspnet",
+    runtimeFamily: "dotnet",
+    framework: "aspnet-core",
+    packageManager: "dotnet",
+    applicationShape: "serverful-http",
+    detectedFiles: ["csproj"],
+    fixedVersions: {
+      filesContain: {
+        "dotnet-aspnet.csproj": [
+          "Microsoft.NET.Sdk.Web",
+          "<TargetFramework>net8.0</TargetFramework>",
+        ],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-015",
+    fixture: "rust-axum",
+    runtimeFamily: "rust",
+    framework: "axum",
+    packageManager: "cargo",
+    applicationShape: "serverful-http",
+    detectedFiles: ["cargo-toml"],
+    fixedVersions: {
+      filesContain: {
+        "Cargo.toml": ['axum = "0.8.1"', 'tokio = "1.43.0"'],
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-015",
+    fixture: "elixir-phoenix",
+    runtimeFamily: "elixir",
+    framework: "phoenix",
+    packageManager: "mix",
+    applicationShape: "serverful-http",
+    detectedFiles: ["mix-exs"],
+    fixedVersions: {
+      filesContain: {
+        "mix.exs": ['{:phoenix, "1.7.18"}'],
+      },
+    },
+  },
 ];
 
 function objectRecord(value: unknown): Record<string, unknown> {

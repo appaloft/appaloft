@@ -5,6 +5,8 @@ import {
   type ActionDeployTokenAuthorizationPort,
   type AppLogger,
   ApplyActionPreviewRouteCommand,
+  ArchiveDeploymentCommand,
+  CancelDeploymentCommand,
   CleanupPreviewCommand,
   type Command,
   type CommandBus,
@@ -18,6 +20,7 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  PruneDeploymentsCommand,
   type Query,
   type QueryBus,
   RedeployDeploymentCommand,
@@ -2059,6 +2062,169 @@ describe("deployment create HTTP route", () => {
       rollbackCandidateDeploymentId: "dep_success",
       resourceId: "res_demo",
       readinessGeneratedAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
+  test("[DEP-CANCEL-ENTRY-002] dispatches CancelDeploymentCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          id: "dep_cancel",
+          status: "canceled",
+          canceledAt: "2026-01-01T00:00:15.000Z",
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments/dep_cancel/cancel", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          confirm: "dep_cancel",
+          resourceId: "res_demo",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      id: "dep_cancel",
+      status: "canceled",
+      canceledAt: "2026-01-01T00:00:15.000Z",
+    });
+    expect(capturedCommand).toBeInstanceOf(CancelDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      deploymentId: "dep_cancel",
+      confirm: "dep_cancel",
+      resourceId: "res_demo",
+    });
+  });
+
+  test("[DEP-ARCHIVE-ENTRY-002] dispatches ArchiveDeploymentCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          id: "dep_archive",
+          archivedAt: "2026-01-01T00:01:00.000Z",
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments/dep_archive/archive", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          confirm: "dep_archive",
+          resourceId: "res_demo",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      id: "dep_archive",
+      archivedAt: "2026-01-01T00:01:00.000Z",
+    });
+    expect(capturedCommand).toBeInstanceOf(ArchiveDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      deploymentId: "dep_archive",
+      confirm: "dep_archive",
+      resourceId: "res_demo",
+    });
+  });
+
+  test("[DEP-PRUNE-ENTRY-002] dispatches PruneDeploymentsCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          schemaVersion: "deployments.prune/v1",
+          before: "2026-01-01T00:05:00.000Z",
+          resourceId: "res_demo",
+          dryRun: false,
+          matchedCount: 1,
+          guardedCount: 0,
+          prunedCount: 1,
+          affectedDeploymentIds: ["dep_old"],
+          guardedDeploymentIds: [],
+          prunedAt: "2026-01-01T00:10:00.000Z",
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments/prune", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          before: "2026-01-01T00:05:00.000Z",
+          resourceId: "res_demo",
+          dryRun: false,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      schemaVersion: "deployments.prune/v1",
+      before: "2026-01-01T00:05:00.000Z",
+      resourceId: "res_demo",
+      dryRun: false,
+      matchedCount: 1,
+      guardedCount: 0,
+      prunedCount: 1,
+      affectedDeploymentIds: ["dep_old"],
+      guardedDeploymentIds: [],
+      prunedAt: "2026-01-01T00:10:00.000Z",
+    });
+    expect(capturedCommand).toBeInstanceOf(PruneDeploymentsCommand);
+    expect(capturedCommand).toMatchObject({
+      before: "2026-01-01T00:05:00.000Z",
+      resourceId: "res_demo",
+      dryRun: false,
     });
   });
 

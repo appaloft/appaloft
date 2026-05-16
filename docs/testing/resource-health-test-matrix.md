@@ -128,6 +128,9 @@ These rows are governed by
 | RES-HEALTH-ENTRY-006 | e2e-preferred | Deployment detail | Attempt succeeded, resource unhealthy | Deployment page links back to current resource health instead of implying the attempt proves availability. |
 | RES-HEALTH-ENTRY-007 | e2e-preferred | CLI | `resource health --json` | Prints `ResourceHealthSummary` JSON from the query. |
 | RES-HEALTH-ENTRY-008 | e2e-preferred | API/oRPC | HTTP query | Reuses input schema and returns `ResourceHealthSummary`. |
+| RES-HEALTH-HIST-001 | integration | Application/PG | Retained health observations exist for a resource window | `resources.health-history` returns only matching `ResourceHealthSummary` snapshots without invoking live probes or mutation. |
+| RES-HEALTH-HIST-002 | contract | Query schema | Inverted or over-broad window | Input validation rejects the request before read-model dispatch. |
+| RES-HEALTH-HIST-003 | e2e-preferred | CLI/API/oRPC | Bounded health history request | Entrypoints dispatch `ResourceHealthHistoryQuery` through the shared schema and return `resources.health-history/v1`. |
 
 ## Configure Health Command Matrix
 
@@ -139,6 +142,9 @@ These rows are governed by
 | RES-HEALTH-CFG-004 | integration | Resource missing | Unknown resource id | `err(not_found)` | No event is published and no resource is persisted. |
 | RES-HEALTH-CFG-005 | contract | Invalid HTTP policy | Enabled HTTP policy without HTTP config or invalid port/status/path | `err(validation_error)` | Input schema rejects invalid policy before use case execution. |
 | RES-HEALTH-CFG-006 | e2e-preferred | Configure HTTP policy through Web resource detail | Existing resource detail health settings form | `resources.configure-health` is dispatched and health/detail state is invalidated | Web does not present the save as deployment creation, runtime restart, or proof of current health. |
+| RES-HEALTH-CFG-007 | e2e-preferred | Reset policy through public entrypoint | Existing resource has configured health policy and runtime profile fields | `ok({ id })`, then resource profile no longer has `healthCheck` or `healthCheckPath` | CLI and HTTP/oRPC dispatch `ResetResourceHealthCommand`; non-health runtime profile fields are preserved. |
+| RES-HEALTH-CFG-008 | integration | Reset archived resource | Archived resource | `err(resource_archived)` | No event is published and no resource is persisted. |
+| RES-HEALTH-CFG-009 | contract | Invalid reset input | Empty `resourceId` | `err(validation_error)` | Input schema rejects invalid reset input before use case execution. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -158,12 +164,18 @@ Current covered cases:
   `RES-HEALTH-QRY-021` and `ACCESS-DIAG-005`;
 - `resources.configure-health` is covered by application integration tests, HTTP/oRPC entrypoint
   tests, CLI dispatch tests, and Web resource detail WebView coverage.
+- `resources.reset-health` is covered by application integration tests plus CLI and HTTP/oRPC
+  dispatch tests.
+- `resources.health-history` is covered by application query-service tests, PG/PGlite
+  recorder/read-model tests, CLI dispatch tests, and HTTP/oRPC dispatch tests under
+  `RES-HEALTH-HIST-001` to `RES-HEALTH-HIST-003`.
 
 Current runtime adapter tests cover some deployment-time health checks. Those tests should remain
 attempt-scoped and new tests should cover the resource-owned observation contract separately.
 
-Remaining test gaps include provider-native runtime inspection, Docker health state, command policy
-support/unsupported cases, and Web e2e mocking of mixed resource health states. Edge access
+Remaining test gaps include complete provider-native runtime inspection, Docker health state,
+command policy support/unsupported cases, scheduled health observation cadence policy, and Web e2e
+mocking of mixed resource health states. Edge access
 failure diagnostic source rows `RES-HEALTH-QRY-018` and `RES-HEALTH-QRY-019` are also future
 coverage.
 

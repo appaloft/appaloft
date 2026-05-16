@@ -25,8 +25,8 @@ import {
 } from "@appaloft/testkit";
 
 import { createExecutionContext, toRepositoryContext } from "../src";
-import { ConfigureResourceHealthCommand } from "../src/messages";
-import { ConfigureResourceHealthUseCase } from "../src/use-cases";
+import { ConfigureResourceHealthCommand, ResetResourceHealthCommand } from "../src/messages";
+import { ConfigureResourceHealthUseCase, ResetResourceHealthUseCase } from "../src/use-cases";
 
 function resourceFixture(): Resource {
   return Resource.rehydrate({
@@ -70,6 +70,21 @@ function configuredEvent(events: unknown[]): DomainEvent {
   return event;
 }
 
+function resetEvent(events: unknown[]): DomainEvent {
+  const event = events.find(
+    (candidate): candidate is DomainEvent =>
+      Boolean(candidate) &&
+      typeof candidate === "object" &&
+      (candidate as { type?: unknown }).type === "resource-health-policy-reset",
+  );
+
+  if (!event) {
+    throw new Error("resource-health-policy-reset event was not captured");
+  }
+
+  return event;
+}
+
 async function createHarness(resource: Resource = resourceFixture()) {
   const context = createExecutionContext({
     requestId: "req_configure_resource_health_test",
@@ -89,6 +104,7 @@ async function createHarness(resource: Resource = resourceFixture()) {
     resources,
     eventBus,
     useCase: new ConfigureResourceHealthUseCase(resources, clock, eventBus, logger),
+    resetUseCase: new ResetResourceHealthUseCase(resources, clock, eventBus, logger),
   };
 }
 
@@ -169,6 +185,52 @@ describe("ConfigureResourceHealthUseCase", () => {
     expect(state?.runtimeProfile?.startCommand?.value).toBe("bun run start");
   });
 
+  test("[RES-HEALTH-CFG-007] resets health policy and preserves runtime profile fields", async () => {
+    const { context, eventBus, repositoryContext, resetUseCase, resources, useCase } =
+      await createHarness();
+
+    const configured = await useCase.execute(context, {
+      resourceId: "res_web",
+      healthCheck: {
+        enabled: true,
+        type: "http",
+        intervalSeconds: 5,
+        timeoutSeconds: 5,
+        retries: 10,
+        startPeriodSeconds: 5,
+        http: {
+          method: "GET",
+          scheme: "http",
+          host: "localhost",
+          path: "/health",
+          expectedStatusCode: 200,
+        },
+      },
+    });
+    expect(configured.isOk()).toBe(true);
+
+    const reset = await resetUseCase.execute(context, { resourceId: "res_web" });
+
+    expect(reset.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    const state = persisted?.toState();
+    expect(state?.runtimeProfile?.strategy.value).toBe("workspace-commands");
+    expect(state?.runtimeProfile?.startCommand?.value).toBe("bun run start");
+    expect(state?.runtimeProfile?.healthCheck).toBeUndefined();
+    expect(state?.runtimeProfile?.healthCheckPath).toBeUndefined();
+
+    const event = resetEvent(eventBus.events);
+    expect(event.payload).toMatchObject({
+      resourceId: "res_web",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resetAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
   test("[RES-HEALTH-CFG-004] rejects missing resource without publishing event", async () => {
     const { context, eventBus, useCase } = await createHarness();
 
@@ -230,6 +292,23 @@ describe("ConfigureResourceHealthUseCase", () => {
     expect(eventBus.events).toHaveLength(0);
   });
 
+  test("[RES-HEALTH-CFG-008] rejects health policy reset for archived resources", async () => {
+    const { context, eventBus, resetUseCase } = await createHarness(archivedResourceFixture());
+
+    const result = await resetUseCase.execute(context, { resourceId: "res_web" });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_archived",
+      details: {
+        phase: "resource-lifecycle-guard",
+        resourceId: "res_web",
+        commandName: "resources.reset-health",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
   test("[RES-HEALTH-CFG-005] rejects enabled HTTP policy without HTTP config at schema boundary", () => {
     const command = ConfigureResourceHealthCommand.create({
       resourceId: "res_web",
@@ -238,6 +317,13 @@ describe("ConfigureResourceHealthUseCase", () => {
         type: "http",
       },
     });
+
+    expect(command.isErr()).toBe(true);
+    expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+
+  test("[RES-HEALTH-CFG-009] rejects invalid health reset input at schema boundary", () => {
+    const command = ResetResourceHealthCommand.create({ resourceId: "" });
 
     expect(command.isErr()).toBe(true);
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");

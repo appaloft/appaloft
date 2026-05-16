@@ -32,7 +32,7 @@ mutation behavior.
 | Retry | New attempt from a failed/interrupted/canceled/superseded attempt's retained immutable snapshot intent. | Deployment recovery | retry deployment |
 | Redeploy | New attempt from the current Resource profile and current effective configuration. | Deployment recovery | deploy current profile again |
 | Rollback | New attempt from a retained successful rollback candidate snapshot/artifact. | Deployment recovery | restore previous version |
-| Cancel deployment | Future public command, still rebuild-required under ADR-016. | Deployment lifecycle | stop deployment |
+| Cancel deployment | Active pre-RC rebuilt command for non-terminal attempts. | Deployment lifecycle | stop deployment |
 
 ## Roadmap Position
 
@@ -40,10 +40,11 @@ Current state:
 
 - `deployments.show`, `deployments.logs`, and `deployments.stream-events` are active observation
   surfaces.
-- `deployments.recovery-readiness`, `deployments.retry`, `deployments.redeploy`, and
-  `deployments.rollback` are active recovery surfaces under ADR-034.
-- `deployments.cancel`, deployment-scoped manual health check, and write-side reattach remain
-  rebuild-required under ADR-016.
+- `deployments.recovery-readiness`, `deployments.retry`, `deployments.redeploy`,
+  `deployments.rollback`, pre-RC rebuilt `deployments.cancel`, and terminal history maintenance
+  commands `deployments.archive`/`deployments.prune` are active recovery/lifecycle surfaces.
+- deployment-scoped manual health check and write-side reattach remain rebuild-required under
+  ADR-016.
 
 `0.12.x` patch hardening includes:
 
@@ -56,9 +57,9 @@ Current state:
 
 `1.0.0-rc` blocker decisions closed by this round:
 
-- public `deployments.cancel` is not required to close this deployment observation/recovery blocker;
-  supersede behavior, stream cancellation, and `operator-work.cancel` cover their existing bounded
-  semantics without creating a deployment cancel command;
+- public `deployments.cancel` was not required to close the original `0.12.x` observation blocker,
+  but the later pre-RC closure round rebuilt it as an active-attempt command with separate
+  command/workflow/error/testing evidence;
 - remaining recovery edge-case blocker rows are automated for readiness, retry, redeploy, and
   rollback candidate compatibility;
 - future MCP/tool descriptors for observation and recovery remain generated-catalog follow-up work,
@@ -71,7 +72,7 @@ Deferred from this hardening slice:
 - a separate paginated rollback-candidate query;
 - projection-rebuild-stable cursor redesign beyond the retained event observation store and current
   gap-envelope contract;
-- public deployment cancel implementation before its own accepted spec.
+- broader cancel/delete/reattach behavior beyond the accepted `deployments.cancel` command.
 - standalone browser-flow coverage for Web reconnect controls beyond existing type/contract
   coverage.
 
@@ -87,18 +88,18 @@ Deferred from this hardening slice:
 | DOR-HARDEN-006 | Recovery readiness ignores client stream gaps | Event stream reports a gap but durable deployment/snapshot/artifact state exists | Operator reads recovery readiness | Readiness computes from durable state, not from the client gap. |
 | DOR-HARDEN-007 | Retry/redeploy edge cases are covered | Recovery commands are active | Code Round adds missing deferred tests | Non-retryable attempts, stale markers, invalid current profiles, and coordination conflicts reject safely. |
 | DOR-HARDEN-008 | Rollback candidates stay durable and safe | A candidate lacks retained artifact/snapshot or target compatibility | Operator reads readiness or runs rollback | Readiness/command blocks with stable safe reason codes and no stateful data rollback claim. |
-| DOR-HARDEN-009 | Cancel remains gated | Operator wants to cancel an active deployment | Current public surface is inspected | No public cancel entrypoint appears until a separate ADR/spec/test matrix accepts semantics. |
+| DOR-HARDEN-009 | Cancel is separately governed | Operator wants to cancel an active deployment | Current public surface is inspected | Public cancel appears only through the accepted `deployments.cancel` command, workflow, error, and test-matrix contract. |
 
 ## Public Surfaces
 
 | Surface | Outcome |
 | --- | --- |
-| API/oRPC | Active `deployments.stream-events` bounded/streaming endpoints; active recovery query and retry/redeploy/rollback commands. Harden contract and streaming tests before RC. |
-| CLI | Active `appaloft deployments events`, `recovery-readiness`, `retry`, `redeploy`, and `rollback`. Harden follow/cancellation and structured gap/error rendering. |
-| Web/UI | Active deployment detail timeline and recovery panel. Harden reconnect behavior and boundary assertions; no cancel button until separate Spec Round. |
+| API/oRPC | Active `deployments.stream-events` bounded/streaming endpoints; active recovery query and retry/redeploy/rollback/cancel/archive/prune commands. Harden contract and streaming tests before RC. |
+| CLI | Active `appaloft deployments events`, `recovery-readiness`, `retry`, `redeploy`, `rollback`, `cancel`, `archive`, and `prune`. Harden follow/cancellation and structured gap/error rendering. |
+| Web/UI | Active deployment detail timeline and recovery panel. Harden reconnect behavior and boundary assertions; public cancel has docs/help and typed client coverage, while an interactive button remains a quality follow-up. |
 | Config | Not applicable; deployment observation/recovery consumes deployment/resource state, not repository config fields. |
 | Events | No new public event names in this hardening slice. Existing lifecycle envelopes and recovery trigger metadata remain governed by ADR-029 and ADR-034. |
-| Public docs/help | Existing anchors cover recovery (`deploy/recovery`) and streaming SDK behavior (`reference/typescript-sdk`). This slice records a docs outcome without adding new user-facing behavior; cancel docs remain deferred. |
+| Public docs/help | Existing anchors cover recovery (`deploy/recovery`) and streaming SDK behavior (`reference/typescript-sdk`). Cancel, archive, and prune are documented under the recovery anchor after the pre-RC rebuilt commands. |
 | Future MCP/tool | Deferred-gap unless RC scope explicitly requires generated descriptors for observation/recovery tools. Tools must map to existing operation keys and schemas. |
 
 ## Domain Ownership
@@ -117,15 +118,17 @@ Deferred from this hardening slice:
 
 - Do not implement production code in this Spec Round.
 - Do not select or prepare a `1.0.0-rc` release from this artifact alone.
-- Do not add hidden `deployments.cancel`, write-side `reattach`, manual deployment health check, or
+- Do not add hidden deployment cancel aliases, write-side `reattach`, manual deployment health check, or
   recovery scheduler behavior.
 - Do not weaken stream-gap or recovery-readiness contracts to match missing tests.
 - Do not claim stateful rollback.
 
 ## Closed Decisions
 
-- Public `deployments.cancel` is deferred. If maintainers later require it before RC, start a
-  separate ADR/spec/test-matrix round before adding API/CLI/Web/MCP surfaces.
+- Public `deployments.cancel` was later pulled into pre-RC closure through the separate
+  `docs/specs/073-pre-rc-closure` round, with `docs/commands/deployments.cancel.md`,
+  `docs/workflows/deployments.cancel.md`, `docs/errors/deployments.cancel.md`, and
+  `docs/testing/deployments.cancel-test-matrix.md` as the active contract.
 - `DEP-RECOVERY-READINESS-003`, `DEP-RECOVERY-READINESS-005`, `DEP-RECOVERY-READINESS-008`,
   `DEP-RETRY-002` through `DEP-RETRY-004`, and `DEP-REDEPLOY-002` through `DEP-REDEPLOY-004` are
   now automated blocker coverage.

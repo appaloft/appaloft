@@ -4,7 +4,8 @@
 
 Project lifecycle commands and queries use the shared platform error model and neverthrow
 conventions. This file defines the project-specific error profile for `projects.show`,
-`projects.rename`, `projects.archive`, and project-context guards used by child operations.
+`projects.rename`, `projects.archive`, `projects.restore`, `projects.delete-check`,
+`projects.delete`, and project-context guards used by child operations.
 
 Errors must use stable `code`, `category`, `phase`, `retriable`, and related entity details. They
 must not rely on message text as the contract.
@@ -25,28 +26,32 @@ type ProjectLifecycleErrorDetails = {
   commandName?:
     | "projects.rename"
     | "projects.archive"
+    | "projects.restore"
+    | "projects.delete"
     | "environments.create"
     | "resources.create"
     | "deployments.create";
-  queryName?: "projects.show";
-  eventName?: "project-renamed" | "project-archived";
+  queryName?: "projects.show" | "projects.delete-check";
+  eventName?: "project-renamed" | "project-archived" | "project-restored" | "project-deleted";
   phase:
     | "command-validation"
     | "query-validation"
     | "context-resolution"
     | "project-read"
     | "project-admission"
+    | "project-delete-check-read"
     | "project-lifecycle-guard"
     | "project-persistence"
     | "event-publication"
     | "event-consumption";
   projectId?: string;
   projectSlug?: string;
-  lifecycleStatus?: "active" | "archived";
+  lifecycleStatus?: "active" | "archived" | "deleted";
   archivedAt?: string;
   archiveReason?: string;
   relatedEntityId?: string;
-  relatedEntityType?: "project";
+  relatedEntityType?: string;
+  deletionBlockers?: readonly string[];
 };
 ```
 
@@ -69,7 +74,9 @@ metadata.
 | `not_found` | `not-found` | `context-resolution` | No | Project cannot be found or is not visible. |
 | `project_slug_conflict` | `conflict` | `project-admission` | No | Derived project slug is already owned by another project. |
 | `project_archived` | `conflict` | `project-lifecycle-guard` | No | Mutation or deployment admission targeted an archived project. |
+| `project_delete_blocked` | `conflict` | `project-lifecycle-guard` | No | Project delete was requested before archive or while retained delete-check blockers remain. |
 | `invariant_violation` | `domain` | `project-lifecycle-guard` | No | Project aggregate lifecycle transition rejected the requested change. |
+| `infra_error` | `infra` | `project-delete-check-read` | Conditional | Project delete blocker checks could not be safely assembled. |
 | `infra_error` | `infra` | `project-persistence` | Conditional | Project state could not be safely persisted. |
 | `infra_error` | `infra` | `event-publication` | Conditional | Project event publication or outbox recording failed before command success could be returned. |
 

@@ -123,6 +123,7 @@ import {
   PgDependencyResourceReadModel,
   PgDependencyResourceRepository,
   PgDependencyResourceSecretStore,
+  PgDeploymentAttemptRetentionStore,
   PgDeploymentLogRetentionStore,
   PgDeploymentReadModel,
   PgDeploymentRepository,
@@ -147,6 +148,7 @@ import {
   PgPreviewPolicyDecisionProjection,
   PgPreviewPolicyRepository,
   PgProcessAttemptJournal,
+  PgProjectDeletionBlockerReader,
   PgProjectReadModel,
   PgProjectRepository,
   PgProviderJobLogRetentionStore,
@@ -154,6 +156,8 @@ import {
   PgResourceDeletionBlockerReader,
   PgResourceDependencyBindingReadModel,
   PgResourceDependencyBindingRepository,
+  PgResourceHealthObservationHistoryReadModel,
+  PgResourceHealthObservationRecorder,
   PgResourceReadModel,
   PgResourceRepository,
   PgResourceRuntimeControlAttemptRecorder,
@@ -177,6 +181,7 @@ import {
   PgServerReadModel,
   PgServerRepository,
   PgSourceEventRepository,
+  PgSourceEventRetentionStore,
   PgSourceLinkReadModel,
   PgSshCredentialReadModel,
   PgSshCredentialRepository,
@@ -953,6 +958,16 @@ export function registerRuntimeDependencies(
       () => new PgRuntimeMonitoringThresholdPolicyRepository(input.database.db),
     ),
   });
+  container.register(tokens.resourceHealthObservationHistoryReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceHealthObservationHistoryReadModel(input.database.db),
+    ),
+  });
+  container.register(tokens.resourceHealthObservationRecorder, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceHealthObservationRecorder(input.database.db),
+    ),
+  });
   container.register(tokens.runtimeTargetCapacityPruner, {
     useFactory: instanceCachingFactory(
       () =>
@@ -984,6 +999,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.projectRepository, {
     useFactory: instanceCachingFactory(() => new PgProjectRepository(input.database.db)),
+  });
+  container.register(tokens.projectDeletionBlockerReader, {
+    useFactory: instanceCachingFactory(() => new PgProjectDeletionBlockerReader(input.database.db)),
   });
   container.register(tokens.serverRepository, {
     useFactory: instanceCachingFactory(() => new PgServerRepository(input.database.db)),
@@ -1132,6 +1150,9 @@ export function registerRuntimeDependencies(
   container.register(tokens.sourceEventReadModel, {
     useFactory: instanceCachingFactory(() => new PgSourceEventRepository(input.database.db)),
   });
+  container.register(tokens.sourceEventRetentionStore, {
+    useFactory: instanceCachingFactory(() => new PgSourceEventRetentionStore(input.database.db)),
+  });
   container.register(tokens.auditEventRecorder, {
     useFactory: instanceCachingFactory(() => new PgAuditEventReadModel(input.database.db)),
   });
@@ -1167,6 +1188,11 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.deploymentLogRetentionStore, {
     useFactory: instanceCachingFactory(() => new PgDeploymentLogRetentionStore(input.database.db)),
+  });
+  container.register(tokens.deploymentAttemptRetentionStore, {
+    useFactory: instanceCachingFactory(
+      () => new PgDeploymentAttemptRetentionStore(input.database.db),
+    ),
   });
   container.register(tokens.resourceRuntimeLogArchiveStore, {
     useFactory: instanceCachingFactory(

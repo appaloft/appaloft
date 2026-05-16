@@ -51,6 +51,9 @@ sidebar:
 - 默认访问地址状态。
 - 自定义域名和 TLS readiness 摘要。
 
+保留的健康观察历史通过 `resources.health-history` 读取。它返回内部观察器已经记录的
+`ResourceHealthSummary` 快照，不会触发 live probe、部署、重启或策略修改。
+
 <h2 id="resource-runtime-controls">运行时控制</h2>
 
 运行时控制是 Phase 7 计划能力，用于对一个资源的当前运行时实例执行 stop、start 或 restart。它只改变当前进程或容器状态，不会删除资源、部署历史、存储、依赖绑定、路由、证书、日志或审计数据。

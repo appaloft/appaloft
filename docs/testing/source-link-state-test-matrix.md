@@ -70,6 +70,9 @@ This matrix inherits:
 | DMBH-CONTEXT-001 | unit + integration | Relink context ownership is model-owned | Relink validates environment/project, resource/project/environment, destination/server, and resource/destination relationships | Existing relink context mismatch behavior remains unchanged | Existing errors remain unchanged | Core tests prove ownership predicates; relink application tests prove unchanged admission behavior |
 | SOURCE-LINK-STATE-012 | integration | Relink uses source-link coordination | Another relink or source-link mutation currently owns the same source fingerprint while a different source fingerprint exists on the same state backend | Command may wait for a bounded retry window on the same logical source-link scope, then fails with retriable coordination timeout if it still cannot acquire it; unrelated source fingerprints must not be blocked only because they share a server or state root | `coordination_timeout`, phase `operation-coordination` when the same source-link scope cannot be acquired within the retry window |
 | SOURCE-LINK-STATE-012A | integration | SSH final upload merges disjoint source-link state changes | `ssh-pglite` relink runs against a local mirror and another command advances the remote revision with disjoint authoritative rows | Relink still completes after final upload retries against the fresher remote snapshot | None | Updated source link and unrelated remote rows both remain present |
+| SOURCE-LINK-STATE-021 | application / CLI / HTTP | List source links | Source links exist for one project/resource/server filter | `source-links.list` returns `source-links.list/v1` with safe source fingerprint link records and no mutation | None | Read model list only |
+| SOURCE-LINK-STATE-022 | application / CLI / HTTP | Show source link | A source fingerprint link exists | `source-links.show` returns `source-links.show/v1` with one safe record; missing link returns `not_found` | `not_found` for missing link | Repository read only |
+| SOURCE-LINK-STATE-023 | application / CLI / HTTP | Delete source link | A source fingerprint link exists and the operator explicitly deletes it | `source-links.delete` removes only the link mapping and returns `deleted = true`; projects/resources/deployments/runtime state are untouched | `not_found` for missing link | Source-link scoped command -> repository delete |
 
 ## PostgreSQL / PGlite Persistence Matrix
 
@@ -108,6 +111,13 @@ Current implementation has application command, CLI, HTTP/oRPC, and Web dispatch
 `packages/orpc/test/source-link-relink.http.test.ts`, and
 `apps/web/src/lib/console/source-links.test.ts`. Shell startup plans the same SSH remote PGlite
 mirror for relink in `apps/shell/test/remote-pglite-state-sync.test.ts`.
+
+`SOURCE-LINK-STATE-021` through `SOURCE-LINK-STATE-023` are covered in
+`packages/application/test/relink-source-link.test.ts`,
+`packages/adapters/cli/test/source-link-command.test.ts`, and
+`packages/orpc/test/source-link-relink.http.test.ts`. These rows add direct list/show/delete
+operator surfaces without adding archive semantics; source links remain explicit mappings, not a
+lifecycle aggregate with an archived state.
 
 `DMBH-CONTEXT-001` is covered by `packages/core/test/context-ownership.test.ts` for
 Environment/Resource/Destination ownership predicates and by

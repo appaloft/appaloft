@@ -3,7 +3,12 @@ import { domainError } from "../shared/errors";
 import { type ProjectId } from "../shared/identifiers";
 import { err, ok, type Result } from "../shared/result";
 import { ProjectLifecycleStatusValue } from "../shared/state-machine";
-import { type ArchivedAt, type CreatedAt, type UpdatedAt } from "../shared/temporal";
+import {
+  type ArchivedAt,
+  type CreatedAt,
+  type DeletedAt,
+  type UpdatedAt,
+} from "../shared/temporal";
 import {
   type ArchiveReason,
   type DescriptionText,
@@ -19,6 +24,7 @@ export interface ProjectState {
   lifecycleStatus: ProjectLifecycleStatusValue;
   archivedAt?: ArchivedAt;
   archiveReason?: ArchiveReason;
+  deletedAt?: DeletedAt;
   createdAt: CreatedAt;
 }
 
@@ -77,6 +83,7 @@ export class Project extends AggregateRoot<ProjectState> {
       lifecycleStatus: state.lifecycleStatus ?? ProjectLifecycleStatusValue.active(),
       ...(state.archivedAt ? { archivedAt: state.archivedAt } : {}),
       ...(state.archiveReason ? { archiveReason: state.archiveReason } : {}),
+      ...(state.deletedAt ? { deletedAt: state.deletedAt } : {}),
     });
   }
 
@@ -96,6 +103,21 @@ export class Project extends AggregateRoot<ProjectState> {
   }
 
   ensureCanAcceptMutation(commandName: string): Result<void> {
+    if (this.state.lifecycleStatus.isDeleted()) {
+      const error = domainError.notFound("project", this.state.id.value);
+      return err({
+        ...error,
+        details: {
+          ...(error.details ?? {}),
+          phase: "project-lifecycle-guard",
+          projectId: this.state.id.value,
+          projectSlug: this.state.slug.value,
+          lifecycleStatus: "deleted",
+          commandName,
+        },
+      });
+    }
+
     if (this.state.lifecycleStatus.isArchived()) {
       return err(
         projectArchivedError({
@@ -165,6 +187,93 @@ export class Project extends AggregateRoot<ProjectState> {
       projectSlug: this.state.slug.value,
       archivedAt: input.archivedAt.value,
       ...(input.reason ? { reason: input.reason.value } : {}),
+    });
+
+    return ok({ changed: true });
+  }
+
+  restore(input: { restoredAt: UpdatedAt }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isActive()) {
+      return ok({ changed: false });
+    }
+
+    const lifecycleStatus = this.state.lifecycleStatus.restore();
+    if (lifecycleStatus.isErr()) {
+      return err(lifecycleStatus.error);
+    }
+
+    const previousArchivedAt = this.state.archivedAt;
+    const previousArchiveReason = this.state.archiveReason;
+    this.state.lifecycleStatus = lifecycleStatus.value;
+    delete this.state.archivedAt;
+    delete this.state.archiveReason;
+
+    this.recordDomainEvent("project-restored", input.restoredAt, {
+      projectId: this.state.id.value,
+      projectSlug: this.state.slug.value,
+      restoredAt: input.restoredAt.value,
+      ...(previousArchivedAt ? { previousArchivedAt: previousArchivedAt.value } : {}),
+      ...(previousArchiveReason ? { previousArchiveReason: previousArchiveReason.value } : {}),
+    });
+
+    return ok({ changed: true });
+  }
+
+  delete(input: { deletedAt: DeletedAt }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isDeleted()) {
+      return ok({ changed: false });
+    }
+
+    const lifecycleStatus = this.state.lifecycleStatus.delete();
+    if (lifecycleStatus.isErr()) {
+      return err(lifecycleStatus.error);
+    }
+
+    this.state.lifecycleStatus = lifecycleStatus.value;
+    this.state.deletedAt = input.deletedAt;
+
+    this.recordDomainEvent("project-deleted", input.deletedAt, {
+      projectId: this.state.id.value,
+      projectSlug: this.state.slug.value,
+      deletedAt: input.deletedAt.value,
+      ...(this.state.archivedAt ? { archivedAt: this.state.archivedAt.value } : {}),
+      ...(this.state.archiveReason ? { archiveReason: this.state.archiveReason.value } : {}),
+    });
+
+    return ok({ changed: true });
+  }
+
+  setDescription(input: {
+    description?: DescriptionText;
+    changedAt: UpdatedAt;
+  }): Result<{ changed: boolean }> {
+    const lifecycleGuard = this.ensureCanAcceptMutation("projects.set-description");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    const previousDescription = this.state.description;
+    const nextDescription = input.description;
+
+    if (
+      (!previousDescription && !nextDescription) ||
+      (previousDescription && nextDescription && previousDescription.equals(nextDescription))
+    ) {
+      return ok({ changed: false });
+    }
+
+    if (nextDescription) {
+      this.state.description = nextDescription;
+    } else {
+      delete this.state.description;
+    }
+
+    this.recordDomainEvent("project-description-set", input.changedAt, {
+      projectId: this.state.id.value,
+      projectSlug: this.state.slug.value,
+      changedAt: input.changedAt.value,
+      ...(previousDescription ? { previousDescription: previousDescription.value } : {}),
+      ...(nextDescription ? { nextDescription: nextDescription.value } : {}),
     });
 
     return ok({ changed: true });

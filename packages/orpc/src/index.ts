@@ -4,11 +4,13 @@ import {
   type ActionDeployTokenWorkflow,
   type AppLogger,
   ApplyActionPreviewRouteCommand,
+  ArchiveDeploymentCommand,
   ArchiveEnvironmentCommand,
   ArchiveProjectCommand,
   ArchiveResourceCommand,
   ArchiveResourceRuntimeLogsCommand,
   AttachResourceStorageCommand,
+  archiveDeploymentCommandInputSchema,
   archiveEnvironmentCommandInputSchema,
   archiveProjectCommandInputSchema,
   archiveResourceCommandInputSchema,
@@ -20,9 +22,11 @@ import {
   bindResourceDependencyCommandInputSchema,
   bootstrapFirstAdminCommandInputSchema,
   bootstrapServerProxyCommandInputSchema,
+  CancelDeploymentCommand,
   CancelOperatorWorkCommand,
   ChangeOrganizationMemberRoleCommand,
   CheckDomainBindingDeleteSafetyQuery,
+  CheckProjectDeleteSafetyQuery,
   CheckServerDeleteSafetyQuery,
   CleanupPreviewCommand,
   CleanupStorageVolumeRuntimeCommand,
@@ -59,12 +63,15 @@ import {
   CreateEnvironmentCommand,
   CreateProjectCommand,
   CreateResourceCommand,
+  CreateResourceSecretReferenceCommand,
   CreateScheduledTaskCommand,
   CreateSshCredentialCommand,
   CreateStorageVolumeCommand,
+  cancelDeploymentCommandInputSchema,
   cancelOperatorWorkCommandInputSchema,
   changeOrganizationMemberRoleCommandInputSchema,
   checkDomainBindingDeleteSafetyQueryInputSchema,
+  checkProjectDeleteSafetyQueryInputSchema,
   checkServerDeleteSafetyQueryInputSchema,
   cleanupPreviewCommandInputSchema,
   cleanupStorageVolumeRuntimeCommandInputSchema,
@@ -96,6 +103,7 @@ import {
   createEnvironmentCommandInputSchema,
   createProjectCommandInputSchema,
   createResourceCommandInputSchema,
+  createResourceSecretReferenceCommandInputSchema,
   createScheduledTaskCommandInputSchema,
   createSshCredentialCommandInputSchema,
   createStorageVolumeCommandInputSchema,
@@ -105,9 +113,12 @@ import {
   DeleteDependencyResourceCommand,
   DeleteDomainBindingCommand,
   DeletePreviewEnvironmentCommand,
+  DeleteProjectCommand,
   DeleteResourceCommand,
+  DeleteResourceSecretReferenceCommand,
   DeleteScheduledTaskCommand,
   DeleteServerCommand,
+  DeleteSourceLinkCommand,
   DeleteSshCredentialCommand,
   DeleteStorageVolumeCommand,
   type DeploymentEventStreamEnvelope,
@@ -125,9 +136,12 @@ import {
   deleteDependencyResourceCommandInputSchema,
   deleteDomainBindingCommandInputSchema,
   deletePreviewEnvironmentCommandInputSchema,
+  deleteProjectCommandInputSchema,
   deleteResourceCommandInputSchema,
+  deleteResourceSecretReferenceCommandInputSchema,
   deleteScheduledTaskCommandInputSchema,
   deleteServerCommandInputSchema,
+  deleteSourceLinkCommandInputSchema,
   deleteSshCredentialCommandInputSchema,
   deleteStorageVolumeCommandInputSchema,
   deploymentLogsQueryInputSchema,
@@ -192,6 +206,7 @@ import {
   ListProvidersQuery,
   ListResourceDependencyBindingsQuery,
   ListResourceRuntimeLogArchivesQuery,
+  ListResourceSecretReferencesQuery,
   ListResourcesQuery,
   ListRetentionDefaultsQuery,
   ListRuntimeMonitoringSamplesQuery,
@@ -200,6 +215,7 @@ import {
   ListScheduledTasksQuery,
   ListServersQuery,
   ListSourceEventsQuery,
+  ListSourceLinksQuery,
   ListSshCredentialsQuery,
   ListStorageVolumesQuery,
   ListTerminalSessionsQuery,
@@ -223,6 +239,7 @@ import {
   listPreviewEnvironmentsQueryInputSchema,
   listResourceDependencyBindingsQueryInputSchema,
   listResourceRuntimeLogArchivesQueryInputSchema,
+  listResourceSecretReferencesQueryInputSchema,
   listResourcesQueryInputSchema,
   listRetentionDefaultsQueryInputSchema,
   listRuntimeMonitoringSamplesQueryInputSchema,
@@ -230,6 +247,7 @@ import {
   listScheduledTaskRunsQueryInputSchema,
   listScheduledTasksQueryInputSchema,
   listSourceEventsQueryInputSchema,
+  listSourceLinksQueryInputSchema,
   listSshCredentialsQueryInputSchema,
   listStorageVolumesQueryInputSchema,
   listTerminalSessionsQueryInputSchema,
@@ -246,22 +264,26 @@ import {
   PruneAuditEventArchivesCommand,
   PruneAuditEventsCommand,
   PruneDeploymentLogsCommand,
+  PruneDeploymentsCommand,
   PruneDomainEventsCommand,
   PruneOperatorWorkCommand,
   PruneProviderJobLogsCommand,
   PruneResourceRuntimeLogArchivesCommand,
   PruneServerCapacityCommand,
+  PruneSourceEventsCommand,
   promoteEnvironmentCommandInputSchema,
   provisionPostgresDependencyResourceCommandInputSchema,
   provisionRedisDependencyResourceCommandInputSchema,
   pruneAuditEventArchivesCommandInputSchema,
   pruneAuditEventsCommandInputSchema,
   pruneDeploymentLogsCommandInputSchema,
+  pruneDeploymentsCommandInputSchema,
   pruneDomainEventsCommandInputSchema,
   pruneOperatorWorkCommandInputSchema,
   pruneProviderJobLogsCommandInputSchema,
   pruneResourceRuntimeLogArchivesCommandInputSchema,
   pruneServerCapacityCommandInputSchema,
+  pruneSourceEventsCommandInputSchema,
   type Query,
   type QueryBus,
   RedeployDeploymentCommand,
@@ -274,6 +296,8 @@ import {
   RenameProjectCommand,
   RenameServerCommand,
   RenameStorageVolumeCommand,
+  ReplaySourceEventCommand,
+  ResetResourceHealthCommand,
   ResolveActionServerConfigDeploymentTargetCommand,
   type ResolveActionServerConfigDeploymentTargetResponse,
   ResolveGenericSignedSourceEventSecretQuery,
@@ -281,6 +305,7 @@ import {
   ResourceAccessFailureEvidenceLookupQuery,
   ResourceDiagnosticSummaryQuery,
   ResourceEffectiveConfigQuery,
+  ResourceHealthHistoryQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   type ResourceRuntimeLogEvent,
@@ -289,6 +314,7 @@ import {
   type ResourceRuntimeLogsResult,
   RestartResourceRuntimeCommand,
   RestoreDependencyResourceBackupCommand,
+  RestoreProjectCommand,
   RetryCertificateCommand,
   RetryDeploymentCommand,
   RetryDomainBindingVerificationCommand,
@@ -298,6 +324,7 @@ import {
   RollbackDeploymentCommand,
   RotateDeployTokenCommand,
   RotateResourceDependencyBindingSecretCommand,
+  RotateResourceSecretReferenceCommand,
   RotateSshCredentialCommand,
   RunScheduledTaskNowCommand,
   RuntimeMonitoringRollupQuery,
@@ -311,14 +338,18 @@ import {
   renameProjectCommandInputSchema,
   renameServerCommandInputSchema,
   renameStorageVolumeCommandInputSchema,
+  replaySourceEventCommandInputSchema,
+  resetResourceHealthCommandInputSchema,
   resourceAccessFailureEvidenceLookupQueryInputSchema,
   resourceDiagnosticSummaryQueryInputSchema,
   resourceEffectiveConfigQueryInputSchema,
+  resourceHealthHistoryQueryInputSchema,
   resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
   restartResourceRuntimeCommandInputSchema,
   restoreDependencyResourceBackupCommandInputSchema,
+  restoreProjectCommandInputSchema,
   retryCertificateCommandInputSchema,
   retryDeploymentCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
@@ -328,11 +359,13 @@ import {
   rollbackDeploymentCommandInputSchema,
   rotateDeployTokenCommandInputSchema,
   rotateResourceDependencyBindingSecretCommandInputSchema,
+  rotateResourceSecretReferenceCommandInputSchema,
   rotateSshCredentialCommandInputSchema,
   runScheduledTaskNowCommandInputSchema,
   runtimeMonitoringRollupQueryInputSchema,
   ScheduledTaskRunLogsQuery,
   SetEnvironmentVariableCommand,
+  SetProjectDescriptionCommand,
   SetResourceVariableCommand,
   ShowAuditEventArchiveQuery,
   ShowAuditEventLegalHoldQuery,
@@ -353,6 +386,7 @@ import {
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
   ShowResourceRuntimeLogArchiveQuery,
+  ShowResourceSecretReferenceQuery,
   ShowRetentionDefaultQuery,
   ShowRuntimeMonitoringThresholdsQuery,
   ShowScheduledRuntimePrunePolicyQuery,
@@ -360,6 +394,7 @@ import {
   ShowScheduledTaskRunQuery,
   ShowServerQuery,
   ShowSourceEventQuery,
+  ShowSourceLinkQuery,
   ShowSshCredentialQuery,
   ShowStorageVolumeQuery,
   ShowTerminalSessionQuery,
@@ -372,6 +407,7 @@ import {
   SwitchCurrentOrganizationCommand,
   scheduledTaskRunLogsQueryInputSchema,
   setEnvironmentVariableCommandInputSchema,
+  setProjectDescriptionCommandInputSchema,
   setResourceVariableCommandInputSchema,
   showAuditEventArchiveQueryInputSchema,
   showAuditEventLegalHoldQueryInputSchema,
@@ -392,6 +428,7 @@ import {
   showResourceDependencyBindingQueryInputSchema,
   showResourceQueryInputSchema,
   showResourceRuntimeLogArchiveQueryInputSchema,
+  showResourceSecretReferenceQueryInputSchema,
   showRetentionDefaultQueryInputSchema,
   showRuntimeMonitoringThresholdsQueryInputSchema,
   showScheduledRuntimePrunePolicyQueryInputSchema,
@@ -399,6 +436,7 @@ import {
   showScheduledTaskRunQueryInputSchema,
   showServerQueryInputSchema,
   showSourceEventQueryInputSchema,
+  showSourceLinkQueryInputSchema,
   showSshCredentialQueryInputSchema,
   showStorageVolumeQueryInputSchema,
   showTerminalSessionQueryInputSchema,
@@ -419,6 +457,7 @@ import {
   unsetResourceVariableCommandInputSchema,
 } from "@appaloft/application";
 import {
+  archiveDeploymentResponseSchema,
   archiveEnvironmentResponseSchema,
   archiveProjectResponseSchema,
   archiveResourceResponseSchema,
@@ -428,9 +467,11 @@ import {
   auditEventLegalHoldResponseSchema,
   bindResourceDependencyResponseSchema,
   bootstrapServerProxyResponseSchema,
+  cancelDeploymentResponseSchema,
   cancelOperatorWorkResponseSchema,
   changeOrganizationMemberRoleResponseSchema,
   checkDomainBindingDeleteSafetyResponseSchema,
+  checkProjectDeleteSafetyResponseSchema,
   checkServerDeleteSafetyResponseSchema,
   cleanupPreviewResponseSchema,
   cleanupStorageVolumeRuntimeResponseSchema,
@@ -457,6 +498,7 @@ import {
   createEnvironmentResponseSchema,
   createProjectResponseSchema,
   createResourceResponseSchema,
+  createResourceSecretReferenceResponseSchema,
   createSshCredentialResponseSchema,
   createStorageVolumeResponseSchema,
   currentOrganizationContextResponseSchema,
@@ -465,7 +507,9 @@ import {
   deleteCertificateResponseSchema,
   deleteDomainBindingResponseSchema,
   deletePreviewEnvironmentResponseSchema,
+  deleteProjectResponseSchema,
   deleteResourceResponseSchema,
+  deleteResourceSecretReferenceResponseSchema,
   deleteScheduledTaskResponseSchema,
   deleteServerResponseSchema,
   deleteSshCredentialResponseSchema,
@@ -514,6 +558,7 @@ import {
   listProvidersResponseSchema,
   listResourceDependencyBindingsResponseSchema,
   listResourceRuntimeLogArchivesResponseSchema,
+  listResourceSecretReferencesResponseSchema,
   listResourcesResponseSchema,
   listRetentionDefaultsResponseSchema,
   listScheduledRuntimePrunePoliciesResponseSchema,
@@ -531,11 +576,13 @@ import {
   pruneAuditEventArchivesResponseSchema,
   pruneAuditEventsResponseSchema,
   pruneDeploymentLogsResponseSchema,
+  pruneDeploymentsResponseSchema,
   pruneDomainEventsResponseSchema,
   pruneOperatorWorkResponseSchema,
   pruneProviderJobLogsResponseSchema,
   pruneResourceRuntimeLogArchivesResponseSchema,
   pruneServerCapacityResponseSchema,
+  pruneSourceEventsResponseSchema,
   redeployDeploymentResponseSchema,
   registerServerResponseSchema,
   removeOrganizationMemberResponseSchema,
@@ -543,15 +590,19 @@ import {
   renameProjectResponseSchema,
   renameServerResponseSchema,
   renameStorageVolumeResponseSchema,
+  replaySourceEventResponseSchema,
+  resetResourceHealthResponseSchema,
   resourceAccessFailureEvidenceLookupSchema,
   resourceDetailSchema,
   resourceDiagnosticSummarySchema,
   resourceEffectiveConfigResponseSchema,
+  resourceHealthHistorySchema,
   resourceHealthSummarySchema,
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
   restartResourceRuntimeResponseSchema,
+  restoreProjectResponseSchema,
   retryCertificateResponseSchema,
   retryDeploymentResponseSchema,
   retryDomainBindingVerificationResponseSchema,
@@ -561,6 +612,7 @@ import {
   rollbackDeploymentResponseSchema,
   rotateDeployTokenResponseSchema,
   rotateResourceDependencyBindingSecretResponseSchema,
+  rotateResourceSecretReferenceResponseSchema,
   rotateSshCredentialResponseSchema,
   runScheduledTaskNowResponseSchema,
   runtimeMonitoringRollupResponseSchema,
@@ -568,6 +620,7 @@ import {
   runtimeMonitoringThresholdsResponseSchema,
   scheduledTaskCommandResponseSchema,
   scheduledTaskRunLogsResponseSchema,
+  setProjectDescriptionResponseSchema,
   setResourceVariableResponseSchema,
   showAuditEventArchiveResponseSchema,
   showAuditEventLegalHoldResponseSchema,
@@ -586,6 +639,7 @@ import {
   showProjectResponseSchema,
   showResourceDependencyBindingResponseSchema,
   showResourceRuntimeLogArchiveResponseSchema,
+  showResourceSecretReferenceResponseSchema,
   showRetentionDefaultResponseSchema,
   showScheduledRuntimePrunePolicyResponseSchema,
   showScheduledTaskResponseSchema,
@@ -759,6 +813,28 @@ const relinkSourceLinkResponseSchema = z.object({
   serverId: z.string().optional(),
   destinationId: z.string().optional(),
 });
+const sourceLinkRecordSchema = z.object({
+  sourceFingerprint: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  resourceId: z.string(),
+  serverId: z.string().optional(),
+  destinationId: z.string().optional(),
+  updatedAt: z.string(),
+  reason: z.string().optional(),
+});
+const listSourceLinksResponseSchema = z.object({
+  schemaVersion: z.literal("source-links.list/v1"),
+  items: z.array(sourceLinkRecordSchema),
+});
+const showSourceLinkResponseSchema = z.object({
+  schemaVersion: z.literal("source-links.show/v1"),
+  sourceLink: sourceLinkRecordSchema,
+});
+const deleteSourceLinkResponseSchema = z.object({
+  sourceFingerprint: z.string(),
+  deleted: z.boolean(),
+});
 
 const base = os.$context<AppaloftOrpcRequestContext>();
 const emptyResponseSchema = z.null();
@@ -863,7 +939,19 @@ export const apiRouteDescriptions = {
     "deployment.plan-preview",
   ),
   deploymentRecoveryReadiness: routeDescription(
-    "Reads retry, redeploy, rollback, and rollback candidate readiness for one deployment.",
+    "Reads retry, redeploy, cancel, rollback, and rollback candidate readiness for one deployment.",
+    "deployment.recovery-readiness",
+  ),
+  deploymentCancel: routeDescription(
+    "Cancels an active deployment attempt after explicit deployment id confirmation.",
+    "deployment.recovery-readiness",
+  ),
+  deploymentArchive: routeDescription(
+    "Archives a terminal deployment attempt without deleting logs, events, runtime artifacts, or retained operator evidence.",
+    "deployment.recovery-readiness",
+  ),
+  pruneDeployments: routeDescription(
+    "Dry-runs or prunes archived terminal deployment attempts when no retained references guard them.",
     "deployment.recovery-readiness",
   ),
   projectLifecycle: routeDescription("Read, rename, and archive projects.", "project.lifecycle"),
@@ -1005,6 +1093,10 @@ export const apiRouteDescriptions = {
   ),
   configureResourceHealth: routeDescription(
     "Configures readiness and health checks used during verification.",
+    "resource.health-profile",
+  ),
+  resetResourceHealth: routeDescription(
+    "Resets the reusable resource health policy without deploying or restarting runtime.",
     "resource.health-profile",
   ),
   configureResourceNetwork: routeDescription(
@@ -1171,6 +1263,26 @@ export const apiRouteDescriptions = {
     "Sets one resource-scoped variable or secret override.",
     "environment.variable-precedence",
   ),
+  createResourceSecretReference: routeDescription(
+    "Creates one resource-owned runtime secret reference without exposing its value on reads.",
+    "environment.variable-precedence",
+  ),
+  rotateResourceSecretReference: routeDescription(
+    "Rotates the value of one existing resource-owned secret reference.",
+    "environment.variable-precedence",
+  ),
+  deleteResourceSecretReference: routeDescription(
+    "Deletes one existing resource-owned secret reference.",
+    "environment.variable-precedence",
+  ),
+  listResourceSecretReferences: routeDescription(
+    "Lists masked resource-owned secret references for one resource.",
+    "environment.variable-precedence",
+  ),
+  showResourceSecretReference: routeDescription(
+    "Reads one masked resource-owned secret reference.",
+    "environment.variable-precedence",
+  ),
   importResourceVariables: routeDescription(
     "Imports pasted .env content into resource-scoped variables and secrets.",
     "environment.variable-precedence",
@@ -1312,6 +1424,10 @@ export const apiRouteDescriptions = {
     "Reads current resource health.",
     "observability.health-summary",
   ),
+  resourceHealthHistory: routeDescription(
+    "Reads retained resource health observations for a bounded time window.",
+    "observability.health-summary",
+  ),
   resourceProxyConfigurationPreview: routeDescription(
     "Previews generated proxy configuration for a resource.",
     "resource.network-profile",
@@ -1400,8 +1516,28 @@ export const apiRouteDescriptions = {
     "Reads one safe source event delivery with dedupe, policy, and dispatch details.",
     "source.auto-deploy-ignored-events",
   ),
+  replaySourceEvent: routeDescription(
+    "Replays one retained safe source event delivery through current auto-deploy policy matching.",
+    "source.auto-deploy-recovery",
+  ),
+  pruneSourceEvents: routeDescription(
+    "Dry-runs or prunes retained safe source event deliveries by cutoff and optional scope filters.",
+    "source.auto-deploy-retention",
+  ),
+  listSourceLinks: routeDescription(
+    "Lists source fingerprint links for deployment identity diagnostics.",
+    "deployment.source",
+  ),
+  showSourceLink: routeDescription(
+    "Reads one source fingerprint link for deployment identity diagnostics.",
+    "deployment.source",
+  ),
   relinkSourceLink: routeDescription(
     "Moves a source fingerprint link to an explicit project, environment, resource, and optional deployment target.",
+    "deployment.source",
+  ),
+  deleteSourceLink: routeDescription(
+    "Deletes one source fingerprint link so later config deploys must resolve identity again.",
     "deployment.source",
   ),
   configurePreviewPolicy: routeDescription(
@@ -2314,6 +2450,19 @@ export const renameProjectProcedure = base
     executeCommand(context, RenameProjectCommand.create(input)),
   );
 
+export const setProjectDescriptionProcedure = base
+  .route({
+    method: "POST",
+    path: "/projects/{projectId}/description",
+    description: apiRouteDescriptions.projectLifecycle,
+    successStatus: 200,
+  })
+  .input(setProjectDescriptionCommandInputSchema)
+  .output(setProjectDescriptionResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, SetProjectDescriptionCommand.create(input)),
+  );
+
 export const archiveProjectProcedure = base
   .route({
     method: "POST",
@@ -2325,6 +2474,45 @@ export const archiveProjectProcedure = base
   .output(archiveProjectResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, ArchiveProjectCommand.create(input)),
+  );
+
+export const restoreProjectProcedure = base
+  .route({
+    method: "POST",
+    path: "/projects/{projectId}/restore",
+    description: apiRouteDescriptions.projectLifecycle,
+    successStatus: 200,
+  })
+  .input(restoreProjectCommandInputSchema)
+  .output(restoreProjectResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RestoreProjectCommand.create(input)),
+  );
+
+export const checkProjectDeleteSafetyProcedure = base
+  .route({
+    method: "GET",
+    path: "/projects/{projectId}/delete-check",
+    description: apiRouteDescriptions.projectLifecycle,
+    successStatus: 200,
+  })
+  .input(checkProjectDeleteSafetyQueryInputSchema)
+  .output(checkProjectDeleteSafetyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, CheckProjectDeleteSafetyQuery.create(input)),
+  );
+
+export const deleteProjectProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/projects/{projectId}",
+    description: apiRouteDescriptions.projectLifecycle,
+    successStatus: 200,
+  })
+  .input(deleteProjectCommandInputSchema)
+  .output(deleteProjectResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteProjectCommand.create(input)),
   );
 
 export const listServersProcedure = base
@@ -2841,6 +3029,19 @@ export const configureResourceHealthProcedure = base
     executeCommand(context, ConfigureResourceHealthCommand.create(input)),
   );
 
+export const resetResourceHealthProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/health-policy/reset",
+    description: apiRouteDescriptions.resetResourceHealth,
+    successStatus: 200,
+  })
+  .input(resetResourceHealthCommandInputSchema)
+  .output(resetResourceHealthResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ResetResourceHealthCommand.create(input)),
+  );
+
 export const configureResourceNetworkProcedure = base
   .route({
     method: "POST",
@@ -2945,6 +3146,41 @@ export const relinkSourceLinkProcedure = base
     executeCommand(context, RelinkSourceLinkCommand.create(input)),
   );
 
+export const listSourceLinksProcedure = base
+  .route({
+    method: "GET",
+    path: "/source-links",
+    description: apiRouteDescriptions.listSourceLinks,
+    successStatus: 200,
+  })
+  .input(listSourceLinksQueryInputSchema)
+  .output(listSourceLinksResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ListSourceLinksQuery.create(input)));
+
+export const showSourceLinkProcedure = base
+  .route({
+    method: "GET",
+    path: "/source-links/{sourceFingerprint}",
+    description: apiRouteDescriptions.showSourceLink,
+    successStatus: 200,
+  })
+  .input(showSourceLinkQueryInputSchema)
+  .output(showSourceLinkResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowSourceLinkQuery.create(input)));
+
+export const deleteSourceLinkProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/source-links/{sourceFingerprint}",
+    description: apiRouteDescriptions.deleteSourceLink,
+    successStatus: 200,
+  })
+  .input(deleteSourceLinkCommandInputSchema)
+  .output(deleteSourceLinkResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteSourceLinkCommand.create(input)),
+  );
+
 export const setResourceVariableProcedure = base
   .route({
     method: "POST",
@@ -2956,6 +3192,71 @@ export const setResourceVariableProcedure = base
   .output(setResourceVariableResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, SetResourceVariableCommand.create(input)),
+  );
+
+export const createResourceSecretReferenceProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/secrets",
+    description: apiRouteDescriptions.createResourceSecretReference,
+    successStatus: 201,
+  })
+  .input(createResourceSecretReferenceCommandInputSchema)
+  .output(createResourceSecretReferenceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateResourceSecretReferenceCommand.create(input)),
+  );
+
+export const rotateResourceSecretReferenceProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/secrets/{key}",
+    description: apiRouteDescriptions.rotateResourceSecretReference,
+    successStatus: 200,
+  })
+  .input(rotateResourceSecretReferenceCommandInputSchema)
+  .output(rotateResourceSecretReferenceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RotateResourceSecretReferenceCommand.create(input)),
+  );
+
+export const deleteResourceSecretReferenceProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/resources/{resourceId}/secrets/{key}",
+    description: apiRouteDescriptions.deleteResourceSecretReference,
+    successStatus: 200,
+  })
+  .input(deleteResourceSecretReferenceCommandInputSchema)
+  .output(deleteResourceSecretReferenceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteResourceSecretReferenceCommand.create(input)),
+  );
+
+export const listResourceSecretReferencesProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/secrets",
+    description: apiRouteDescriptions.listResourceSecretReferences,
+    successStatus: 200,
+  })
+  .input(listResourceSecretReferencesQueryInputSchema)
+  .output(listResourceSecretReferencesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListResourceSecretReferencesQuery.create(input)),
+  );
+
+export const showResourceSecretReferenceProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/secrets/{key}",
+    description: apiRouteDescriptions.showResourceSecretReference,
+    successStatus: 200,
+  })
+  .input(showResourceSecretReferenceQueryInputSchema)
+  .output(showResourceSecretReferenceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowResourceSecretReferenceQuery.create(input)),
   );
 
 export const importResourceVariablesProcedure = base
@@ -3453,6 +3754,32 @@ export const showSourceEventProcedure = base
   .output(showSourceEventResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ShowSourceEventQuery.create(input)));
 
+export const replaySourceEventProcedure = base
+  .route({
+    method: "POST",
+    path: "/source-events/{sourceEventId}/replay",
+    description: apiRouteDescriptions.replaySourceEvent,
+    successStatus: 200,
+  })
+  .input(replaySourceEventCommandInputSchema)
+  .output(replaySourceEventResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ReplaySourceEventCommand.create(input)),
+  );
+
+export const pruneSourceEventsProcedure = base
+  .route({
+    method: "POST",
+    path: "/source-events/prune",
+    description: apiRouteDescriptions.pruneSourceEvents,
+    successStatus: 200,
+  })
+  .input(pruneSourceEventsCommandInputSchema)
+  .output(pruneSourceEventsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneSourceEventsCommand.create(input)),
+  );
+
 export const listAuditEventsProcedure = base
   .route({
     method: "GET",
@@ -3806,6 +4133,34 @@ export const rollbackDeploymentProcedure = base
     executeCommand(context, RollbackDeploymentCommand.create(input)),
   );
 
+export const cancelDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/{deploymentId}/cancel",
+    summary: "Cancel deployment",
+    description: apiRouteDescriptions.deploymentCancel,
+    successStatus: 200,
+  })
+  .input(cancelDeploymentCommandInputSchema)
+  .output(cancelDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CancelDeploymentCommand.create(input)),
+  );
+
+export const archiveDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/{deploymentId}/archive",
+    summary: "Archive deployment",
+    description: apiRouteDescriptions.deploymentArchive,
+    successStatus: 200,
+  })
+  .input(archiveDeploymentCommandInputSchema)
+  .output(archiveDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ArchiveDeploymentCommand.create(input)),
+  );
+
 export const showDeploymentProcedure = base
   .route({
     method: "GET",
@@ -3872,6 +4227,19 @@ export const pruneDeploymentLogsProcedure = base
   .output(pruneDeploymentLogsResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, PruneDeploymentLogsCommand.create(input)),
+  );
+
+export const pruneDeploymentsProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/prune",
+    description: apiRouteDescriptions.pruneDeployments,
+    successStatus: 200,
+  })
+  .input(pruneDeploymentsCommandInputSchema)
+  .output(pruneDeploymentsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneDeploymentsCommand.create(input)),
   );
 
 export const deploymentEventReplayProcedure = base
@@ -4086,6 +4454,19 @@ export const resourceHealthProcedure = base
   .input(resourceHealthQueryInputSchema)
   .output(resourceHealthSummarySchema)
   .handler(async ({ input, context }) => executeQuery(context, ResourceHealthQuery.create(input)));
+
+export const resourceHealthHistoryProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/health-history",
+    description: apiRouteDescriptions.resourceHealthHistory,
+    successStatus: 200,
+  })
+  .input(resourceHealthHistoryQueryInputSchema)
+  .output(resourceHealthHistorySchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ResourceHealthHistoryQuery.create(input)),
+  );
 
 export const resourceProxyConfigurationPreviewProcedure = base
   .route({
@@ -4687,7 +5068,11 @@ export const appaloftOrpcRouter = {
     create: createProjectProcedure,
     show: showProjectProcedure,
     rename: renameProjectProcedure,
+    setDescription: setProjectDescriptionProcedure,
     archive: archiveProjectProcedure,
+    restore: restoreProjectProcedure,
+    deleteCheck: checkProjectDeleteSafetyProcedure,
+    delete: deleteProjectProcedure,
   },
   servers: {
     list: listServersProcedure,
@@ -4762,6 +5147,7 @@ export const appaloftOrpcRouter = {
     archive: archiveResourceProcedure,
     delete: deleteResourceProcedure,
     configureHealth: configureResourceHealthProcedure,
+    resetHealth: resetResourceHealthProcedure,
     configureNetwork: configureResourceNetworkProcedure,
     configureAccess: configureResourceAccessProcedure,
     configureAutoDeploy: configureResourceAutoDeployProcedure,
@@ -4770,12 +5156,20 @@ export const appaloftOrpcRouter = {
     configureRuntime: configureResourceRuntimeProcedure,
     configureSource: configureResourceSourceProcedure,
     setVariable: setResourceVariableProcedure,
+    secrets: {
+      create: createResourceSecretReferenceProcedure,
+      rotate: rotateResourceSecretReferenceProcedure,
+      delete: deleteResourceSecretReferenceProcedure,
+      list: listResourceSecretReferencesProcedure,
+      show: showResourceSecretReferenceProcedure,
+    },
     importVariables: importResourceVariablesProcedure,
     unsetVariable: unsetResourceVariableProcedure,
     effectiveConfig: resourceEffectiveConfigProcedure,
     diagnosticSummary: resourceDiagnosticSummaryProcedure,
     accessFailureEvidence: resourceAccessFailureEvidenceLookupProcedure,
     health: resourceHealthProcedure,
+    healthHistory: resourceHealthHistoryProcedure,
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
     logs: resourceRuntimeLogsProcedure,
     logsStream: resourceRuntimeLogsStreamProcedure,
@@ -4869,6 +5263,9 @@ export const appaloftOrpcRouter = {
     retry: retryDeploymentProcedure,
     redeploy: redeployDeploymentProcedure,
     rollback: rollbackDeploymentProcedure,
+    cancel: cancelDeploymentProcedure,
+    archive: archiveDeploymentProcedure,
+    prune: pruneDeploymentsProcedure,
     plan: deploymentPlanProcedure,
     show: showDeploymentProcedure,
     recoveryReadiness: deploymentRecoveryReadinessProcedure,
@@ -4890,6 +5287,8 @@ export const appaloftOrpcRouter = {
   sourceEvents: {
     list: listSourceEventsProcedure,
     show: showSourceEventProcedure,
+    replay: replaySourceEventProcedure,
+    prune: pruneSourceEventsProcedure,
   },
   auditEvents: {
     list: listAuditEventsProcedure,
@@ -4917,7 +5316,10 @@ export const appaloftOrpcRouter = {
     prune: pruneDomainEventsProcedure,
   },
   sourceLinks: {
+    list: listSourceLinksProcedure,
+    show: showSourceLinkProcedure,
     relink: relinkSourceLinkProcedure,
+    delete: deleteSourceLinkProcedure,
   },
   previewPolicies: {
     configure: configurePreviewPolicyProcedure,
@@ -6639,7 +7041,10 @@ export function mountAppaloftOrpcRoutes(
     "/api/projects",
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",
+    "/api/projects/:projectId/description",
     "/api/projects/:projectId/archive",
+    "/api/projects/:projectId/restore",
+    "/api/projects/:projectId/delete-check",
     "/api/credentials/ssh",
     "/api/credentials/ssh/:credentialId",
     "/api/credentials/ssh/:credentialId/rotate",
@@ -6683,7 +7088,9 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/redeploy",
     "/api/resources/:resourceId/source",
     "/api/resources/:resourceId/health",
+    "/api/resources/:resourceId/health-history",
     "/api/resources/:resourceId/health-policy",
+    "/api/resources/:resourceId/health-policy/reset",
     "/api/resources/:resourceId/network-profile",
     "/api/resources/:resourceId/access-profile",
     "/api/resources/:resourceId/runtime-profile",
@@ -6735,15 +7142,24 @@ export function mountAppaloftOrpcRoutes(
     "/api/deployments/cleanup-preview",
     "/api/deployments/:deploymentId/retry",
     "/api/deployments/:deploymentId/rollback",
+    "/api/deployments/:deploymentId/cancel",
+    "/api/deployments/:deploymentId/archive",
     "/api/deployments/plan",
     "/api/deployments/:deploymentId",
     "/api/deployments/:deploymentId/recovery-readiness",
     "/api/deployments/stream",
+    "/api/deployments/prune",
     "/api/deployments/logs/prune",
     "/api/deployments/:deploymentId/logs",
     "/api/deployments/:deploymentId/events",
     "/api/deployments/:deploymentId/events/stream",
+    "/api/source-events",
+    "/api/source-events/prune",
+    "/api/source-events/:sourceEventId",
+    "/api/source-events/:sourceEventId/replay",
+    "/api/source-links",
     "/api/source-links/relink",
+    "/api/source-links/:sourceFingerprint",
     "/api/dependency-resources",
     "/api/dependency-resources/postgres/provision",
     "/api/dependency-resources/postgres/import",

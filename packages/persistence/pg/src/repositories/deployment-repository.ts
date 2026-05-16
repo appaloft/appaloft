@@ -104,6 +104,7 @@ class KyselyDeploymentMutationVisitor
         rollback_of_deployment_id: spec.state.rollbackOfDeploymentId?.value ?? null,
         supersedes_deployment_id: spec.state.supersedesDeploymentId?.value ?? null,
         superseded_by_deployment_id: spec.state.supersededByDeploymentId?.value ?? null,
+        archived_at: spec.state.archivedAt?.value ?? null,
       },
     };
   }
@@ -220,6 +221,7 @@ export class PgDeploymentRepository implements DeploymentRepository {
             rollback_of_deployment_id: mutation.values.rollback_of_deployment_id ?? null,
             supersedes_deployment_id: mutation.values.supersedes_deployment_id ?? null,
             superseded_by_deployment_id: mutation.values.superseded_by_deployment_id ?? null,
+            archived_at: mutation.values.archived_at ?? null,
           })
           .where("id", "=", state.id.value)
           .where((builder) =>

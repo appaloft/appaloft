@@ -300,6 +300,7 @@
     "source-workspaces",
     "docker-build-cache",
     "unused-images",
+    "remote-state-markers",
   ] as const satisfies ServerCapacityPruneCategory[];
   let capacityPruneBefore = $state("");
   let capacityPruneObservationHandoffKey = $state("");
@@ -309,6 +310,7 @@
     "source-workspaces": true,
     "docker-build-cache": false,
     "unused-images": false,
+    "remote-state-markers": false,
   });
   let capacityPruneResult = $state<PruneServerCapacityResponse | null>(null);
   let capacityPruneFeedback = $state<{
@@ -725,6 +727,8 @@
         return $t(i18nKeys.console.servers.capacityCategoryStoppedContainers);
       case "unused-images":
         return $t(i18nKeys.console.servers.capacityCategoryUnusedImages);
+      case "remote-state-markers":
+        return $t(i18nKeys.console.servers.capacityCategoryRemoteStateMarkers);
     }
   }
 

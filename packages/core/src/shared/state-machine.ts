@@ -684,12 +684,24 @@ export class DeploymentStatusValue extends StateMachineValueObject<
     return this.value === "failed" || this.value === "canceled";
   }
 
+  isTerminal(): boolean {
+    return this.canStartNewDeployment();
+  }
+
   allowsExecutionContinuation(): boolean {
     return this.value !== "cancel-requested" && this.value !== "canceled";
   }
 
+  canCancel(): boolean {
+    return ["created", "planning", "planned", "running", "cancel-requested"].includes(this.value);
+  }
+
   requiresRuntimeCancellationForSupersede(): boolean {
     return this.value === "running";
+  }
+
+  requiresRuntimeCancellationForManualCancel(): boolean {
+    return this.value === "running" || this.value === "cancel-requested";
   }
 
   cancel(): Result<DeploymentStatusValue> {
@@ -1502,12 +1514,28 @@ export class ProjectLifecycleStatusValue extends StateMachineValueObject<
     );
   }
 
+  restore(): Result<ProjectLifecycleStatusValue> {
+    return this.ensureCurrent(["archived"], "Only archived projects can be restored").map(
+      () => new ProjectLifecycleStatusValue("active"),
+    );
+  }
+
+  delete(): Result<ProjectLifecycleStatusValue> {
+    return this.ensureCurrent(["archived"], "Only archived projects can be deleted").map(
+      () => new ProjectLifecycleStatusValue("deleted"),
+    );
+  }
+
   isActive(): boolean {
     return this.value === "active";
   }
 
   isArchived(): boolean {
     return this.value === "archived";
+  }
+
+  isDeleted(): boolean {
+    return this.value === "deleted";
   }
 }
 

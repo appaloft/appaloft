@@ -89,6 +89,28 @@ export class DeploymentLifecycleService {
     });
   }
 
+  requestCancellation(deployment: Deployment): Result<void> {
+    const { clock } = this;
+
+    return safeTry(function* () {
+      const requestedAt = yield* StartedAt.create(clock.now());
+      const requestResult = deployment.requestCancellation(requestedAt);
+      yield* requestResult;
+      return ok(undefined);
+    });
+  }
+
+  cancel(deployment: Deployment, logs: DeploymentLogEntry[] = []): Result<void> {
+    const { clock } = this;
+
+    return safeTry(function* () {
+      const finishedAt = yield* FinishedAt.create(clock.now());
+      const cancelResult = deployment.cancel(finishedAt, logs);
+      yield* cancelResult;
+      return ok(undefined);
+    });
+  }
+
   failExecution(deployment: Deployment, error: DomainError): Result<void> {
     const { clock } = this;
 
