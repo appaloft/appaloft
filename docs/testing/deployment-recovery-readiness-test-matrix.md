@@ -4,7 +4,10 @@
 
 Active readiness-query matrix plus recovery-command matrix. `deployments.recovery-readiness`
 has automated application and HTTP coverage. `deployments.retry`, `deployments.redeploy`, and
-`deployments.rollback` are active write-command rows.
+`deployments.rollback` are active write-command rows. `deployments.cancel` has a separate active
+matrix because cancel mutates an existing active attempt instead of creating a recovery attempt.
+`deployments.archive` and `deployments.prune` have a separate active matrix because they govern
+terminal attempt visibility and destructive retention, not recovery admission.
 
 The retry/redeploy write-command Code Round is scoped by
 [Deployment Retry And Redeploy](../specs/040-deployment-retry-redeploy/spec.md). Rollback is scoped
@@ -22,6 +25,11 @@ by [Deployment Rollback](../specs/041-deployment-rollback/spec.md).
 - [deployments.retry Command Spec](../commands/deployments.retry.md)
 - [deployments.redeploy Command Spec](../commands/deployments.redeploy.md)
 - [deployments.rollback Command Spec](../commands/deployments.rollback.md)
+- [deployments.cancel Command Spec](../commands/deployments.cancel.md)
+- [Deployments Cancel Test Matrix](./deployments.cancel-test-matrix.md)
+- [deployments.archive Command Spec](../commands/deployments.archive.md)
+- [deployments.prune Command Spec](../commands/deployments.prune.md)
+- [Deployment Archive And Prune Test Matrix](./deployment-archive-prune-test-matrix.md)
 
 ## Readiness Query Coverage
 
@@ -57,13 +65,15 @@ by [Deployment Rollback](../specs/041-deployment-rollback/spec.md).
 | `DEP-ROLLBACK-004` | Rollback readiness marker is stale. | Command rejects with `deployment_recovery_state_stale`. | `packages/application/test/deployment-rollback.test.ts` | Passing |
 | `DEP-ROLLBACK-005` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without admitting competing recovery work. | `packages/application/test/deployment-rollback.test.ts` | Passing |
 | `DEP-ROLLBACK-ENTRY-001` | CLI, HTTP/oRPC, Web, and operation catalog expose rollback through the shared command schema. | Each entrypoint dispatches `RollbackDeploymentCommand` with deployment id, selected candidate id, optional resource id, and optional readiness freshness. | `packages/orpc/test/deployment-create.http.test.ts`, package typechecks | Passing |
+| `DEP-CANCEL-*` | Cancel one active deployment attempt without deleting deployment history or creating a replacement attempt. | See dedicated matrix for running/planned/terminal/confirmation branches plus CLI and HTTP/oRPC entrypoints. | `docs/testing/deployments.cancel-test-matrix.md` | Passing/Pending as listed there |
+| `DEP-ARCHIVE-*` / `DEP-PRUNE-*` | Archive terminal attempts and prune only archived, unguarded attempts through a dry-run-first retention boundary. | See dedicated matrix for terminal archive guard, default archive filtering, guarded PGlite retention, CLI, HTTP/oRPC, OpenAPI, and SDK entrypoints. | `docs/testing/deployment-archive-prune-test-matrix.md` | Passing/Pending as listed there |
 
 ## Entrypoint Coverage
 
 | ID | Scenario | Expected assertion | Automation binding | Status |
 | --- | --- | --- | --- | --- |
 | `DEP-RECOVERY-WEB-001` | Web deployment detail renders failed deployment. | UI uses readiness query output for recovery cards, blocked reasons, retry/redeploy action buttons, and rollback candidate action gated by `allowed && commandActive`. | `apps/web` Svelte semantic check | Passing |
-| `DEP-RECOVERY-CLI-001` | CLI inspects and acts on failed deployment. | CLI exposes read-only `appaloft deployments recovery-readiness <deploymentId>` plus active retry/redeploy/rollback commands over shared schemas. | CLI typecheck / operation catalog | Passing |
+| `DEP-RECOVERY-CLI-001` | CLI inspects and acts on failed or active deployment. | CLI exposes read-only `appaloft deployments recovery-readiness <deploymentId>` plus active retry/redeploy/rollback/cancel commands over shared schemas. | CLI typecheck / operation catalog / `DEP-CANCEL-ENTRY-001` | Passing |
 | `DEP-RECOVERY-HTTP-001` | HTTP/oRPC client requests readiness. | Response schema preserves booleans, candidate data, blocked reason codes, and generated state marker. | `packages/orpc/test/deployment-recovery-readiness.http.test.ts` | Passing |
 | `DEP-RECOVERY-MCP-001` | Future tool asks for deployment recovery options. | Tool output can map directly to `recoverable`, `retryable`, `redeployable`, `rollbackReady`, and safe next actions without bespoke policy. | future MCP descriptor | Deferred gap |
 
@@ -71,6 +81,9 @@ by [Deployment Rollback](../specs/041-deployment-rollback/spec.md).
 
 The active readiness query has application and HTTP/oRPC automated coverage plus CLI/Web type-level
 coverage. Retry, redeploy, and rollback write commands are active across CLI, HTTP/oRPC, and Web.
+The rebuilt cancel command and the terminal archive/prune commands are active across CLI and
+HTTP/oRPC with public docs/help and typed client metadata; Web interactive button coverage remains a
+quality follow-up rather than a hidden product gap.
 Remaining deferred gaps belong to browser-flow coverage, future MCP descriptors, and any later
 backend-specific artifact retention/prune-horizon evidence. The `0.12.x` hardening blocker rows for
 readiness, retry, redeploy, rollback candidate compatibility, and command coordination are now

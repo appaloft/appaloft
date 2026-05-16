@@ -197,7 +197,9 @@ unsupported future fields.
 
 When a package/config is valid but the selected resource has protected profile drift, the workflow
 must follow the existing resource profile drift contract instead of silently overwriting resource
-profile state.
+profile state. Config entries must also honor the same protected drift rule when a resource-scoped
+effective config override would shadow an entry config key; drift errors report only safe
+key/exposure/kind/scope metadata and omit raw values.
 
 ## Preview Context
 

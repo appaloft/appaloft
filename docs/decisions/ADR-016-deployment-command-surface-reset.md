@@ -83,6 +83,12 @@ commands are no longer rebuild-required because their readiness query, command s
 contracts, test matrix, public docs/help, operation catalog entries, CLI commands, HTTP/oRPC routes,
 and Web recovery affordances are aligned.
 
+Pre-`1.0.0-rc` closure hardening has also rebuilt `deployments.cancel` as a narrow active-attempt
+cancel command with exact deployment id confirmation, `resource-runtime` coordination, shared
+CommandBus/HTTP-oRPC/CLI schemas, command/workflow/error/testing docs, public docs/help coverage,
+and `DEP-CANCEL-*` executable evidence. This is not the old removed cancel surface and does not
+delete history, reattach observation, retry, redeploy, rollback, or manually run health checks.
+
 `deployments.cleanup-preview` is allowed only as a preview-scoped explicit cleanup operation keyed
 by trusted preview source identity. It must not expand into a generic deployment cancel/delete
 surface without its own ADR/spec work.
@@ -91,7 +97,8 @@ surface without its own ADR/spec work.
 
 - Users can create and observe deployments, and they can explicitly clean preview-scoped runtime
   state through `deployments.cleanup-preview`.
-- Users still cannot cancel, reattach, or manually run deployment health checks through public
+- Users can cancel active deployment attempts through the rebuilt `deployments.cancel` boundary.
+  Users still cannot reattach or manually run deployment health checks through public deployment
   commands. Retry, redeploy, and rollback are available only through their ADR-034 recovery
   boundaries.
 - Web UI must remove buttons and panels that dispatch still-removed commands.
@@ -111,6 +118,9 @@ surface without its own ADR/spec work.
 - [Deployment Recovery Readiness](../specs/012-deployment-recovery-readiness/spec.md)
 - [Deployment Retry And Redeploy](../specs/040-deployment-retry-redeploy/spec.md)
 - [Deployment Rollback](../specs/041-deployment-rollback/spec.md)
+- [deployments.cancel command spec](../commands/deployments.cancel.md)
+- [deployments.cancel workflow](../workflows/deployments.cancel.md)
+- [deployments.cancel test matrix](../testing/deployments.cancel-test-matrix.md)
 - [Deployment Recovery Readiness Test Matrix](../testing/deployment-recovery-readiness-test-matrix.md)
 - [Quick Deploy workflow](../workflows/quick-deploy.md)
 - [Quick Deploy test matrix](../testing/quick-deploy-test-matrix.md)
@@ -125,9 +135,11 @@ surface without its own ADR/spec work.
 Public operation registrations and entrypoints for still-removed deployment write commands remain
 pruned from the v1 Web/API/CLI/MCP-facing surface. The active deployment write surface now includes
 `deployments.create`, preview-scoped `deployments.cleanup-preview`, and ADR-034 recovery commands
-`deployments.retry`, `deployments.redeploy`, and `deployments.rollback`. Existing low-level runtime
-backend methods, core state-machine helpers, and persisted read-model fields may remain as internal
-or historical capabilities until future specs reintroduce any remaining public operations.
+`deployments.retry`, `deployments.redeploy`, and `deployments.rollback`, plus the pre-RC rebuilt
+`deployments.cancel` active-attempt command and the pre-RC terminal history maintenance commands
+`deployments.archive` and `deployments.prune`. Existing low-level runtime backend methods, core
+state-machine helpers, and persisted read-model fields may remain as internal or historical
+capabilities until future specs reintroduce any remaining public operations.
 
 ## Open Questions
 

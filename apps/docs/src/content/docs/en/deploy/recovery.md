@@ -9,12 +9,16 @@ searchAliases:
   - "relink"
   - "preview cleanup"
   - "retry"
+  - "cancel"
   - "rollback"
 relatedOperations:
   - deployments.recovery-readiness
   - deployments.retry
   - deployments.redeploy
   - deployments.rollback
+  - deployments.cancel
+  - deployments.archive
+  - deployments.prune
   - source-links.relink
   - deployments.cleanup-preview
 sidebar:
@@ -52,11 +56,11 @@ appaloft deployments recovery-readiness <deploymentId>
 This query is read-only. It returns:
 
 - machine-readable `recoverable`, `retryable`, `redeployable`, and `rollbackReady` fields;
-- blocked reasons for `retry`, `redeploy`, and `rollback`;
+- blocked reasons for `retry`, `redeploy`, and `rollback`, plus context for whether an active attempt should be canceled;
 - rollback candidates and whether a candidate is missing artifact or snapshot data;
 - safe next actions such as opening detail, logs, the event stream, or a diagnostic summary.
 
-The `retry`, `redeploy`, and `rollback` write commands are active. A command is still blocked when readiness reports missing snapshots, missing artifacts, stale readiness, an active runtime operation, or an incompatible candidate.
+The `retry`, `redeploy`, `rollback`, and active-attempt `cancel` write commands are active. Recovery commands are still blocked when readiness reports missing snapshots, missing artifacts, stale readiness, an active runtime operation, or an incompatible candidate.
 
 <h2 id="agent-deploy-recovery">Agent deploy recovery</h2>
 
@@ -87,6 +91,18 @@ Rollback means creating a new rollback attempt from a historical successful depl
 
 Run `appaloft deployments rollback <deploymentId> --candidate <candidateDeploymentId>` or call `POST /api/deployments/{deploymentId}/rollback` after checking readiness and selecting a rollback-ready candidate.
 
+<h2 id="deployment-recovery-cancel">Cancel</h2>
+
+Cancel stops one non-terminal deployment attempt. It does not delete deployment history, logs, events, runtime artifacts, route intent, the Resource, or environment configuration.
+
+Run `appaloft deployments cancel <deploymentId> --confirm <deploymentId>` or call `POST /api/deployments/{deploymentId}/cancel`. The confirmation value must exactly match the deployment id. Terminal attempts such as succeeded, failed, canceled, or rolled-back deployments are rejected.
+
+<h2 id="deployment-recovery-archive-prune">Archive and prune attempts</h2>
+
+Archive hides a terminal deployment attempt from default history without deleting logs, events, runtime artifacts, provider job logs, audit rows, route state, rollback candidates, or operator-work evidence. Run `appaloft deployments archive <deploymentId> --confirm <deploymentId>` or call `POST /api/deployments/{deploymentId}/archive`.
+
+Prune is dry-run-first. Run `appaloft deployments prune --before <iso>` or call `POST /api/deployments/prune`. Destructive prune requires `dryRun: false` and deletes only archived terminal attempts that are older than the cutoff and have no retained source, retry, rollback, supersede, provider-log, runtime-log, or runtime-control references.
+
 <h2 id="deployment-recovery-rollback-candidates">Rollback candidates</h2>
 
 A rollback candidate must be a historical successful deployment for the same resource and must still retain:
@@ -115,6 +131,6 @@ Recommended decisions:
 
 <h2 id="deployment-recovery-surfaces">Entrypoint differences</h2>
 
-The Web console places recovery actions near deployment status. The CLI fits preview cleanup, source relink, retry, redeploy, and rollback. The HTTP API exposes machine-readable status, error codes, and recovery hints.
+The Web console places recovery actions near deployment status. The CLI fits preview cleanup, source relink, retry, redeploy, rollback, and cancel. The HTTP API exposes machine-readable status, error codes, and recovery hints.
 
 Recovery should not require direct database edits or manual runtime state deletion.

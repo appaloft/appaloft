@@ -53,8 +53,9 @@
 
 1. Hardened `deployments.stream-events` reconnect/gap/CLI coverage.
 2. Hardened active `deployments.retry` and `deployments.redeploy` edge-case coverage.
-3. Decided public `deployments.cancel` is not required for this blocker and remains deferred under
-   ADR-016 until a future governed round.
+3. Originally decided public `deployments.cancel` was not required for this blocker; the later
+   pre-RC closure round pulled it forward through a separate governed command/workflow/error/test
+   matrix and executable evidence.
 4. Hardened rollback candidate/readiness coverage for incompatible target/destination candidates.
 
 `deployments.retry`, `deployments.redeploy`, and `deployments.rollback` are already active. The plan
@@ -101,5 +102,6 @@ uses "harden" for these operations, not "rebuild from zero".
   without requiring a real long-running deployment target.
 - Recovery edge cases stay in recovery command use cases and readiness query services, not Web/CLI
   button logic.
-- Cancel remains a separate deferred public command. Do not smuggle cancel through stream
-  cancellation, operator-work cancel, cleanup-preview, or supersede behavior.
+- Cancel is now a separate active public command under `deployments.cancel`. Do not smuggle broader
+  cancel/delete/reattach semantics through stream cancellation, operator-work cancel,
+  cleanup-preview, or supersede behavior.

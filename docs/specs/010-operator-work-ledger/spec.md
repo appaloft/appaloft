@@ -141,6 +141,7 @@ The implementation may not:
 - Remote-state read visibility is limited to safe lock, migration, backup, and recovery-marker
   summaries. Remote-state stale-lock recovery, migration execution, backup restore, and state-root
   prune remain CLI/runtime workflows until governed as business commands.
-- Automated retry execution, runtime/provider cancellation, runtime artifact/workspace prune,
-  remote-state recovery mutations, and broader audit/event retention policy remain positioned for
-  future slices.
+- Runtime artifact/workspace prune, including explicit old remote-state marker cleanup, is governed
+  by `servers.capacity.prune` rather than `operator-work.*`. Automated retry execution,
+  runtime/provider cancellation, remote-state recovery mutations, and broader audit/event retention
+  policy remain positioned for future slices.

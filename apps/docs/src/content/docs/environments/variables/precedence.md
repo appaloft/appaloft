@@ -16,6 +16,11 @@ relatedOperations:
   - environments.unset-variable
   - environments.effective-precedence
   - resources.set-variable
+  - resources.secrets.create
+  - resources.secrets.rotate
+  - resources.secrets.delete
+  - resources.secrets.list
+  - resources.secrets.show
   - resources.import-variables
   - resources.unset-variable
   - resources.effective-config
@@ -61,11 +66,12 @@ Appaloft 的配置优先级是 defaults、system、organization、project、envi
 
 Web console 应显示环境变量和资源级变量列表、secret 屏蔽状态、最近修改时间、作用域和部署快照提示。
 
-CLI 适合 `set`、`unset`、`effective-precedence`、`effective-config`、`diff` 和自动化脚本。CLI 输出 secret 时只应显示 masked 状态，不显示值。
+CLI 适合 `set`、`unset`、`resource secrets ...`、`effective-precedence`、`effective-config`、`diff` 和自动化脚本。CLI 输出 secret 时只应显示 masked 状态，不显示值。
 
 HTTP API 应返回变量 key、作用域、是否 secret、来源层级和 masked value。API 不应返回明文 secret。
 
 `environments.effective-precedence` 用于检查单个环境在资源覆盖之前会贡献的有效变量。
+`resources.secrets.create/rotate/delete/list/show` 是资源级 secret reference 的显式生命周期入口。
 `resources.import-variables` 用于把粘贴的 `.env` 内容导入单个资源；重复 key 采用最后一行生效，并在结果里报告覆盖信息。`resources.effective-config` 用于检查资源级变量覆盖环境变量之后的部署输入视图，并显示安全的来源/覆盖摘要。
 
 <h2 id="environment-variable-recovery">常见问题</h2>

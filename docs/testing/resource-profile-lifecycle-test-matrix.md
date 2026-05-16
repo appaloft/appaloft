@@ -10,6 +10,11 @@ This matrix covers the active resource profile lifecycle operations:
 - `resources.configure-network`
 - `resources.configure-access`
 - `resources.set-variable`
+- `resources.secrets.create`
+- `resources.secrets.rotate`
+- `resources.secrets.delete`
+- `resources.secrets.list`
+- `resources.secrets.show`
 - `resources.unset-variable`
 - `resources.effective-config`
 - `resources.archive`
@@ -28,6 +33,11 @@ generic `resources.update`.
 - [resources.configure-network Command Spec](../commands/resources.configure-network.md)
 - [resources.configure-access Command Spec](../commands/resources.configure-access.md)
 - [resources.set-variable Command Spec](../commands/resources.set-variable.md)
+- [resources.secrets.create Command Spec](../commands/resources.secrets.create.md)
+- [resources.secrets.rotate Command Spec](../commands/resources.secrets.rotate.md)
+- [resources.secrets.delete Command Spec](../commands/resources.secrets.delete.md)
+- [resources.secrets.list Query Spec](../queries/resources.secrets.list.md)
+- [resources.secrets.show Query Spec](../queries/resources.secrets.show.md)
 - [resources.unset-variable Command Spec](../commands/resources.unset-variable.md)
 - [resources.effective-config Query Spec](../queries/resources.effective-config.md)
 - [resources.archive Command Spec](../commands/resources.archive.md)
@@ -99,6 +109,16 @@ generic `resources.update`.
 | RES-PROFILE-CONFIG-017 | `resources.effective-config` | Query service | Environment and resource define the same `key + exposure`. | Returns safe override summary with selected scope `resource` and overridden environment scope. |
 | RES-PROFILE-CONFIG-018 | `resources.import-variables` | Command use case | Archived resource receives a `.env` import. | Returns `resource_archived`, no event, no mutation. |
 | RES-PROFILE-CONFIG-019 | Operation catalog | Catalog | Resource import is public. | `resources.import-variables` appears in `CORE_OPERATIONS.md` and `operation-catalog.ts` with CLI and oRPC transports. |
+| RES-SECRET-CRUD-001 | `resources.secrets.create` | Command use case | New Resource-owned runtime secret reference. | Persists `kind = "secret"`, `isSecret = true`, `scope = "resource"`, returns only safe id/key/exposure metadata, and publishes `resource-secret-reference-created`. |
+| RES-SECRET-CRUD-002 | `resources.secrets.rotate` | Command use case | Existing Resource-owned secret reference rotated. | Replaces the value, keeps masked read semantics, and publishes `resource-secret-reference-rotated`. |
+| RES-SECRET-CRUD-003 | `resources.secrets.delete` | Command use case | Existing Resource-owned secret reference removed. | Deletes the Resource-owned secret entry and publishes `resource-secret-reference-deleted`. |
+| RES-SECRET-CRUD-004 | `resources.secrets.list` | Query service | Resource has secret references. | Returns `resources.secrets.list/v1` with `value = "****"` only. |
+| RES-SECRET-CRUD-005 | `resources.secrets.show` | Query service | Existing Resource-owned secret reference read. | Returns `resources.secrets.show/v1` with `value = "****"` only. |
+| RES-SECRET-CRUD-006 | HTTP/oRPC | Entrypoint | Secret create/update/delete routes submitted. | Dispatches the matching command through `CommandBus` using shared schemas. |
+| RES-SECRET-CRUD-007 | HTTP/oRPC | Entrypoint | Secret list/show routes submitted. | Dispatches the matching query through `QueryBus` using shared schemas. |
+| RES-SECRET-CRUD-008 | CLI | Entrypoint | Secret create/update/delete commands submitted. | Dispatches the matching application command through `CommandBus`; no CLI-only secret lifecycle exists. |
+| RES-SECRET-CRUD-009 | CLI | Entrypoint | Secret list/show commands submitted. | Dispatches the matching application query through `QueryBus` and returns masked output only. |
+| RES-SECRET-CRUD-010 | Operation catalog/docs | Catalog | Secret reference CRUD/list/show is public. | `CORE_OPERATIONS.md`, `BUSINESS_OPERATION_MAP.md`, `operation-catalog.ts`, CLI help, HTTP/oRPC, public docs registry, and future MCP-tool decision surfaces name the same operations. |
 | DMBH-RES-NET-001 | `Resource` | Core domain unit | Resource network exposure mode and health-check type vary across direct-port, reverse-proxy, HTTP, and unsupported health checks. | `Resource` owns admission while exposure mode and health-check type value objects answer single-value predicates. |
 | RES-PROFILE-ARCHIVE-001 | `resources.archive` | Command use case | Active resource archived. | Persists archived lifecycle, publishes `resource-archived`, returns `ok({ id })`. |
 | RES-PROFILE-ARCHIVE-002 | `resources.archive` | Command use case | Already archived resource. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event. |
@@ -178,6 +198,12 @@ Automated coverage now exists for:
 - `RES-PROFILE-HEALTH-001` in `packages/application/test/configure-resource-health.test.ts`;
 - `RES-PROFILE-CONFIG-001` through `RES-PROFILE-CONFIG-012` in
   `packages/application/test/resource-config.test.ts`;
+- `RES-SECRET-CRUD-001` through `RES-SECRET-CRUD-005` in
+  `packages/application/test/resource-config.test.ts`;
+- `RES-SECRET-CRUD-006` and `RES-SECRET-CRUD-007` in
+  `packages/orpc/test/resource-config.http.test.ts`;
+- `RES-SECRET-CRUD-008` and `RES-SECRET-CRUD-009` in
+  `packages/adapters/cli/test/resource-command.test.ts`;
 - `RES-PROFILE-ARCHIVE-001`, `RES-PROFILE-ARCHIVE-002`, `RES-PROFILE-ARCHIVE-003`, and
   `RES-PROFILE-ARCHIVE-005` in `packages/application/test/archive-resource.test.ts`;
 - `RES-PROFILE-ARCHIVE-004` in `packages/application/test/create-deployment.test.ts`;
@@ -222,7 +248,10 @@ Automated coverage now exists for:
 no-behavior-change domain unit row that supports existing deployment admission and plan-preview
 rows rather than a new public capability.
 
-`RES-PROFILE-DRIFT-003` remains deferred until configuration drift compares effective Resource
-config against entry config with key/exposure/scope/reference-only diagnostics. `RES-PROFILE-SOURCE-006`
-remains future event-consumer projection work. `RES-PROFILE-DELETE-009` event payload coverage is
-asserted through the successful delete command test.
+`RES-PROFILE-DRIFT-003` is covered for Resource versus latest deployment snapshot configuration
+drift in `packages/application/test/show-resource.test.ts` and for config deploy entry
+configuration shadowed by resource-scoped effective config overrides in
+`packages/adapters/cli/test/deployment-config.test.ts`; diagnostics expose key, exposure, kind,
+scope, source, and masked/redacted value states only.
+`RES-PROFILE-SOURCE-006` remains future event-consumer projection work. `RES-PROFILE-DELETE-009`
+event payload coverage is asserted through the successful delete command test.

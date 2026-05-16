@@ -17,6 +17,10 @@ relatedOperations:
   - resources.configure-source
   - resources.configure-runtime
   - resources.show
+  - source-links.list
+  - source-links.show
+  - source-links.relink
+  - source-links.delete
 sidebar:
   label: "Source and runtime"
   order: 3
@@ -78,6 +82,10 @@ Profile drift 表示资源当前保存的 profile、入口配置文件里的 pro
 - 更新 profile 后重新运行部署。历史部署快照不会被修改。
 
 Secret 和配置值在 diagnostics、错误、日志和支持信息中必须保持 masked。排查时只依赖 key、scope、exposure、reference 或 suggested command，不复制 raw secret value。
+
+重复执行 config deploy 时，source fingerprint link 会记录某个 repository source 应复用哪个
+project、environment、resource，以及可选 server。使用 `appaloft source-links list` 或 `show`
+查看这个安全映射；使用 `relink` 显式 retarget；使用 `delete` 只移除映射，不删除资源或部署历史。
 
 <h2 id="resource-source-runtime-surfaces">入口说明</h2>
 

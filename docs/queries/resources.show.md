@@ -139,6 +139,18 @@ type ResourceDetailProfileDiagnostic = {
   severity: "info" | "warning" | "blocking";
   section: "source" | "runtime" | "network" | "access" | "health" | "configuration";
   fieldPath: string;
+  configKey?: string;
+  configExposure?: "build-time" | "runtime";
+  configKind?: "deployment-strategy" | "plain-config" | "provider-specific" | "secret";
+  configScope?:
+    | "defaults"
+    | "system"
+    | "organization"
+    | "project"
+    | "environment"
+    | "deployment"
+    | "resource";
+  configSource?: "resource" | "entry-profile" | "deployment-snapshot";
   comparison?:
     | "resource-vs-entry-profile"
     | "resource-vs-latest-snapshot"
@@ -177,7 +189,8 @@ Required drift behavior:
   - `health` -> `resources.configure-health`;
   - `configuration` -> `resources.set-variable` or `resources.unset-variable`.
 - Secret values and credential-bearing source data must be masked. Diagnostics may report key,
-  exposure, kind, scope, reference identity, and redacted equality state, but never plaintext values.
+  exposure, kind, scope, source/reference identity, and redacted equality state, but never plaintext
+  values.
 
 ## Status And Ownership Rules
 

@@ -28,6 +28,7 @@ This command inherits:
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
 - [resources.archive Command Spec](./resources.archive.md)
+- [resources.reset-health Command Spec](./resources.reset-health.md)
 - [resources.health Query Spec](../queries/resources.health.md)
 - [Resource Health Observation Workflow](../workflows/resource-health-observation.md)
 - [Resource Health Error Spec](../errors/resources.health.md)
@@ -115,6 +116,9 @@ network, route, domain, or runtime-target state.
 
 When `enabled = false`, the policy is stored as disabled and `resources.health` reports health
 policy `not-configured`; this is distinct from a missing resource.
+
+Use `resources.reset-health` when the operator wants to remove the reusable policy fields entirely
+while preserving other runtime profile settings.
 
 Archived resources reject this command. Operators may still use `resources.health` to inspect
 retained health context when the read model/runtime observation can safely provide it.

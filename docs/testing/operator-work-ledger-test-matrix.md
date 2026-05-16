@@ -77,8 +77,12 @@ This matrix begins with durable process attempt journal reads plus deployment, p
 certificate, remote-state, source-link, and route-realization aggregation. Aggregate-scoped audit
 event read surfaces are covered by
 [Audit Event Read Surface Test Matrix](./audit-event-read-surface-test-matrix.md). Remote-state
-stale-lock recovery, migration execution, backup restore, state-root prune, automated retry
-execution, runtime/provider cancellation, and runtime artifact/workspace prune remain future
-extensions. `operator-work.mark-recovered`, `operator-work.dead-letter`, `operator-work.cancel`,
+stale-lock recovery and migration execution are covered by the SSH remote-state lifecycle and CLI
+diagnostics; remote-state backup and recovery markers are read into the operator-work ledger as
+safe diagnostics. Runtime artifact/workspace prune, including explicit old remote-state marker
+cleanup, is governed by `servers.capacity.prune` rather than `operator-work.*`.
+`operator-work.mark-recovered`, `operator-work.dead-letter`, `operator-work.cancel`,
 `operator-work.retry`, and `operator-work.prune` are limited to durable process attempt ledger rows
-and do not repair or delete runtime or remote-state resources.
+and do not repair or delete runtime or remote-state resources. Runtime/provider cancellation
+requires workflow-specific commands such as `deployments.cancel` or `resources.runtime.stop`,
+instead of generic operator-work mutation.

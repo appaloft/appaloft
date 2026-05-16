@@ -10,8 +10,10 @@ Accepted
 same-resource deployment request may supersede one previous active attempt instead of blindly
 rejecting every later request.
 
-This does not reintroduce a public `deployments.cancel` command. Supersede is an internal workflow
-branch owned by `deployments.create`.
+This did not by itself reintroduce a public `deployments.cancel` command. Supersede remains an
+internal workflow branch owned by `deployments.create`; the later pre-RC `deployments.cancel`
+command is separately governed by its command/workflow/error/testing docs and does not change
+supersede ownership.
 
 The governing rule is:
 
@@ -30,7 +32,8 @@ The governing rule is:
   attempt for the same resource.
 - supersede failure is an explicit `deployments.create` error branch, not a silent best-effort
   cleanup.
-- public cancel, redeploy, and rollback commands remain outside the v1 surface under ADR-016.
+- public cancel is active only through the separately governed `deployments.cancel` command;
+  supersede remains internal to `deployments.create`.
 
 ## Governed Specs
 

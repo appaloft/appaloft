@@ -19,10 +19,11 @@ Command success means Appaloft has inspected the target for selected candidate c
 `dryRun` is `false`, deleted only candidates whose target ownership, cutoff, active-runtime, and
 rollback-safety evidence passed.
 
-It does not prune Docker volumes, Appaloft state roots, remote-state backups, migration journals,
-deployment snapshots, audit events, event streams, logs, provider resources, resource state,
-deployment state, server state, dependency data, storage volumes, routes, or compatibility ledger
-rows.
+It does not prune Docker volumes, Appaloft state roots, live remote `ssh-pglite` state, deployment
+snapshots, audit events, event streams, logs, provider resources, resource state, deployment state,
+server state, dependency data, storage volumes, routes, or compatibility ledger rows. Remote-state
+marker cleanup is limited to the explicit `remote-state-markers` category and fixed marker/archive
+subdirectories.
 
 ## Input Model
 
@@ -30,7 +31,7 @@ rows.
 | --- | --- | --- |
 | `serverId` | Required | Deployment target/server whose runtime target capacity should be pruned. |
 | `before` | Required | ISO timestamp cutoff. Only candidates with `updatedAt < before` are eligible. |
-| `categories` | Optional | Defaults to `stopped-containers`, `preview-workspaces`, and `source-workspaces`; `docker-build-cache` and `unused-images` require explicit opt-in. |
+| `categories` | Optional | Defaults to `stopped-containers`, `preview-workspaces`, and `source-workspaces`; `docker-build-cache`, `unused-images`, and `remote-state-markers` require explicit opt-in. |
 | `dryRun` | Optional | Defaults to `true`. When true, returns candidates without deleting target artifacts. |
 
 Allowed categories are:
@@ -39,10 +40,11 @@ Allowed categories are:
 - `preview-workspaces`;
 - `source-workspaces`;
 - `docker-build-cache`;
-- `unused-images`.
+- `unused-images`;
+- `remote-state-markers`.
 
-Docker build cache and unused images are intentionally absent from the default category set. Docker
-volumes remain absent from the command.
+Docker build cache, unused images, and remote-state markers are intentionally absent from the
+default category set. Docker volumes remain absent from the command.
 
 ## Admission Flow
 
@@ -69,10 +71,13 @@ The command must:
 - Docker volumes and Appaloft state roots are excluded by default and must not be deleted.
 - `docker-build-cache` and `unused-images` must be explicitly selected and must use Docker filtered
   prune commands with `until=<before>`.
+- `remote-state-markers` must be explicitly selected and may remove only old files or directories
+  under `state/journals/*.json`, `state/backups/*`, `state/recovery/*.json`, and
+  `state/locks/recovered/*`.
 - The adapter must never run broad `docker system prune`.
 - Unused image pruning must rely on Docker image prune safety rather than direct image id, tag, or
   digest removal.
-- Remote `ssh-pglite` state roots, backups, and migration data are excluded.
+- Remote `ssh-pglite` state roots, live lock state, and live PGlite data are excluded.
 - The adapter must skip rather than delete when labels, paths, timestamps, active-runtime state, or
   rollback-safety evidence are incomplete.
 - Results and errors must not include raw shell output, credentials, environment values, private
@@ -115,10 +120,13 @@ At minimum, Code Round coverage must prove:
   excluded;
 - unsupported target providers return `runtime_target_unsupported` before runtime mutation;
 - CLI and HTTP/oRPC dispatch use the shared command schema.
+- remote-state marker cleanup is opt-in, dry-run-first, and preserves the state root and live
+  `ssh-pglite` data.
 
 ## Current Implementation Notes And Governed Follow-Ups
 
 The implementation covers local-shell and generic-SSH target adapters for stopped Appaloft-managed
 containers, materialized workspace candidates, explicit Docker build-cache prune, explicit
-unused-image prune, CLI, HTTP/oRPC, and server Web dry-run-first dispatch. Docker volume prune,
-event-stream/outbox publication, and broad retention automation remain future governed slices.
+unused-image prune, explicit remote-state marker prune, CLI, HTTP/oRPC, and server Web
+dry-run-first dispatch. Docker volume prune, live remote-state repair/restore, event-stream/outbox
+publication, and broad retention automation remain future governed slices.

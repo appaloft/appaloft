@@ -13,6 +13,7 @@ searchAliases:
   - "健康检查"
 relatedOperations:
   - resources.configure-health
+  - resources.reset-health
   - resources.configure-network
 sidebar:
   label: "Health and network"
@@ -31,6 +32,8 @@ Health profile 决定 verify 阶段如何判断应用是否可用。它应该和
 - interval、timeout、retries 和 start period。
 
 如果没有配置健康检查，Appaloft 可以退回到较弱的运行状态判断，但文档和 UI 应明确这不是完整 readiness。
+
+重置 health profile 会移除后续部署和当前健康观测使用的可复用 health policy。它不会改变 runtime commands、network settings、deployment history 或当前运行时。
 
 <h2 id="resource-network-profile">Network profile</h2>
 
@@ -80,6 +83,10 @@ appaloft resource configure-health res_web \
   --timeout 5 \
   --retries 10 \
   --start-period 15
+```
+
+```bash title="重置 health policy"
+appaloft resource reset-health res_web
 ```
 
 ```bash title="配置 network profile"

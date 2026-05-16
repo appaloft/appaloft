@@ -194,33 +194,63 @@ Already implemented or materially present:
 Still blocking 1.0.0:
 - [ ] Top-level resource CRUD/lifecycle is uneven across projects, servers, credentials, resources,
   deployments, domain bindings, certificates, default access policy, dependency resources, storage,
-  webhooks, and internal process state.
-- [ ] Remaining non-resource lifecycle gaps are still major horizontal work. Resource profile drift
-  visibility is active; configuration drift redaction remains a focused follow-up.
+  webhooks, and internal process state. Source-link list/show/delete now have application, CLI,
+  HTTP-oRPC, catalog, docs-registry, OpenAPI, and SDK evidence. Project restore is active through
+  `projects.restore` with application, CLI, HTTP-oRPC, Web, catalog, docs-registry, OpenAPI, and SDK
+  evidence. Project delete safety and guarded tombstone delete are active through
+  `projects.delete-check` and `projects.delete`, with application, CLI, HTTP-oRPC, Web, PGlite,
+  catalog, docs-registry, OpenAPI, SDK, and public docs evidence. Source-link archive is still not
+  implemented because source links remain mappings rather than lifecycle aggregates.
+- [x] Remaining non-resource lifecycle gaps are closed for the pre-RC blocker set. Resource profile drift
+  visibility is active; Resource-vs-latest-snapshot configuration drift redaction is covered, and
+  config deploy now blocks entry config keys shadowed by resource-scoped effective config overrides
+  without leaking raw values. Active auto-deploy/webhook/source-event and health-policy
+  configure/observe baselines have executable evidence. Generic signed webhook credential rotation
+  is covered by Resource-owned secret reference rotate, and source-event delivery replay is active
+  through `source-events.replay` with CLI, HTTP/oRPC, catalog, docs-registry, OpenAPI, and SDK
+  evidence. Resource health-history is active with application, persistence, CLI, HTTP/oRPC,
+  catalog, docs-registry, OpenAPI, SDK, and public docs evidence. Broader webhook day-two
+  management is covered for the current pre-RC scope by dry-run-first `source-events.prune`
+  retention cleanup with application, PGlite, CLI, HTTP/oRPC, catalog, docs-registry, public docs,
+  OpenAPI, and SDK evidence; provider-specific webhook control planes beyond the active GitHub and
+  generic-signed routes remain future provider scope, not hidden RC scope.
 - [x] Deployment observation and recovery pre-rc hardening is closed for the `0.12.x` blocker. `deployments.show`,
   `deployments.stream-events`, `deployments.recovery-readiness`, `deployments.retry`,
-  `deployments.redeploy`, and `deployments.rollback` are active; reconnect/gap/CLI coverage,
-  recovery edge-case coverage, rollback candidate target compatibility, and the public
-  `deployments.cancel` GA decision are synchronized in
-  [Deployment Observation And Recovery Hardening](./specs/071-deployment-observation-and-recovery/spec.md).
-  Public `deployments.cancel` remains deferred/rebuild-required under ADR-016 and is not required to
-  close this blocker.
-- [ ] `deployments.create` progress stream is still create-time observation; standalone replay/follow
-  deployment observation is now owned by `deployments.stream-events`.
+  `deployments.redeploy`, `deployments.rollback`, and `deployments.cancel` are active;
+  reconnect/gap/CLI coverage, recovery edge-case coverage, rollback candidate target
+  compatibility, and active-attempt cancel evidence are synchronized in
+  [Deployment Observation And Recovery Hardening](./specs/071-deployment-observation-and-recovery/spec.md)
+  and [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
+- [x] `deployments.create` progress stream remains create-time observation, and standalone
+  replay/follow deployment observation is owned by `deployments.stream-events` with application,
+  HTTP/oRPC, OpenAPI, SDK generator, and SDK executable evidence recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
 - [x] Default access policy editing is public through explicit configure/list/show operations.
 - [x] Durable-domain and server-applied route precedence is hardened in deployment route resolution
   and current-route consumers.
-- [ ] Provider-route projection/retention and route intent update/delete/reconcile surfaces are not
-  complete.
-- [ ] Generated access, proxy preview, server-applied domains, and durable domain routes still need
-  broader API/Web/CLI regression coverage.
+- [x] Provider-route projection/retention and route intent update/delete/reconcile surfaces are
+  covered by active domain-binding route operations, server-applied route persistence/cleanup, and
+  edge-proxy provider projection tests recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
+- [x] Generated access, proxy preview, server-applied domains, and durable domain route API/Web/CLI
+  regression coverage is closed by the access/domain/TLS and Web evidence recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
 - [x] Dependency resources and bindings have Postgres/Redis provision/import, binding, backup/restore,
   runtime injection, deletion-safety command coverage, and opt-in scheduled backup policy surfaces.
   Remaining work is prune/export automation and broader provider catalog coverage.
-- [ ] Framework coverage is narrower than the target product catalog.
+- [x] Framework coverage is broadened for the target catalog through JavaScript/TypeScript/Python/JVM
+  plus Ruby/PHP/Go/.NET/Rust/Elixir detector, planner, fixture, and docs evidence recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md). Real buildpack execution
+  remains a separate unchecked buildpack row and is not claimed by this blocker.
 - [x] Docker Swarm support is specified and implemented as the first cluster runtime target backend.
-- [ ] Durable outbox/inbox, job state, process attempts, dead-letter/retry state, remote-state
-  recovery, and audit visibility are not a complete operator surface.
+- [x] Durable outbox/inbox-equivalent process delivery, job state, process attempts,
+  dead-letter/retry state, remote-state recovery, and audit visibility are closed for the pre-RC
+  blocker set. Active `operator-work.*`, process-attempt claim/retry/generation, scheduled worker
+  handoff, dependency backup/restore process-attempt claim/completion, runtime capacity, retention,
+  audit/event, scheduled retention, SSH diagnostics/recovery/migration evidence, and explicit old
+  remote-state marker prune evidence are recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md). Real destructive local/SSH
+  prune smokes remain opt-in CI/secret-gated verification.
 
 ## Phase 0: Spec And Roadmap Alignment
 
@@ -318,7 +348,7 @@ Post-`0.4.0` gaps assigned to later phases:
   and clone slices.
 - Access policy editing, route precedence hardening, route intent repair, domain binding mutation
   lifecycle, and certificate import/revoke/retry/delete remain Phase 6 work.
-- Deployment retry/redeploy, cancel, rollback, dependency resources, storage, secrets, webhooks,
+- Deployment retry/redeploy, rollback, dependency resources, storage, secrets, webhooks,
   auto-deploy, and product-grade preview deployments remain Phase 7 work.
 - Durable outbox/inbox/job state, recovery/prune commands, runtime target capacity diagnostics,
   audit/event history, remote SSH state diagnostics, and terminal session lifecycle closure remain
@@ -2311,13 +2341,14 @@ Exit criteria:
   `domain-events.prune` and `deployments.stream-events` retained replay/gap behavior; Appaloft-owned
   runtime log archive snapshots by `resources.runtime-logs.archive` and
   `resources.runtime-log-archives.*`; runtime artifacts, source workspaces, explicit Docker build
-  cache, and unused images by `servers.capacity.prune` plus scheduled runtime prune policies; and
+  cache, unused images, and old remote-state marker archives by `servers.capacity.prune` plus
+  scheduled runtime prune policies; and
   scheduled history retention by retention defaults dispatching the existing manual prune commands.
-  Remote-state backups, migration journals, and state roots are explicitly excluded from runtime
-  capacity prune and audit/log/event/process retention commands; current behavior is inspect,
-  stale-lock recovery, migration backup/restore during state sync, and safe operator-work
-  diagnostics, while standalone state-root prune or backup-delete remains a future governed
-  extension rather than an unowned retention action.
+  Live remote-state data, live locks, and state roots are explicitly excluded from runtime capacity
+  prune and audit/log/event/process retention commands; current behavior is inspect, explicit old
+  marker/archive prune, stale-lock recovery, migration backup/restore during state sync, and safe
+  operator-work diagnostics, while standalone state-root prune or backup-delete remains a future
+  governed extension rather than an unowned retention action.
 - [x] TypeScript SDK, CLI, HTTP/oRPC, Web, and generated MCP/tool contracts are verified from the
   same operation catalog after auth/org rules are active, with no SDK-only business operations or
   transport-only business schemas.
@@ -2507,8 +2538,12 @@ work below before GA.
 - [x] Project: `projects.create`, `projects.list`.
 - [x] Project: show, rename, archive safety, Web detail/settings closure, and
   resource/environment/deployment/access rollups.
-- [ ] Project post-Phase 4: description editing through a future `projects.set-description`
-  command, and delete/restore safety through future explicit specs if accepted.
+- [x] Project post-Phase 4: description editing is active through `projects.set-description`,
+  archived project restore is active through `projects.restore`, and archived project delete safety
+  plus guarded tombstone delete are active through `projects.delete-check` and `projects.delete`,
+  with application, CLI, HTTP-oRPC, Web, PGlite, catalog, docs-registry, OpenAPI, SDK, and public
+  docs evidence recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
 - [x] Environment: create/list/show, set/unset variable, diff, promote.
 - [x] Environment: effective precedence query.
 - [x] Environment: archive.
@@ -2528,10 +2563,19 @@ work below before GA.
 - [x] Resource: reusable access-profile mutation semantics where specs require separate commands.
 - [x] Resource: profile drift visibility.
 - [x] Source link: relink through CLI.
-- [ ] Source link: list/show/delete or archive, PostgreSQL/control-plane persistence before API/Web.
+- [x] Source link: list/show/delete or archive, PostgreSQL/control-plane persistence before API/Web.
+  Closed for the list/show/delete path by the application, CLI, HTTP-oRPC, catalog,
+  docs-registry, OpenAPI, SDK, public docs, and AI-facing CLI-entrypoint evidence recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md). Source links remain mapping
+  state rather than lifecycle aggregates, so no source-link archive operation is claimed.
 - [x] Deployment attempt: create/list/show/logs.
 - [x] Deployment attempt: stream events.
-- [ ] Deployment attempt: retry/redeploy, cancel, rollback candidate/readiness, archive/prune.
+- [x] Deployment attempt: retry/redeploy, rollback candidate/readiness, archive/prune.
+  Cancel is active through `deployments.cancel`, and terminal attempt archive plus dry-run-first
+  guarded prune are active through `deployments.archive` and `deployments.prune`, with application,
+  persistence, CLI, HTTP/oRPC, catalog, docs-registry, OpenAPI, SDK, public docs, and AI-facing
+  CLI-entrypoint evidence recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
 - [x] Runtime artifact/instance: internal snapshot and resource/deployment diagnostic context.
 - [x] Runtime artifact/instance: capacity diagnostics, cleanup/prune, preview artifact cleanup, and
   rollback-candidate retention.
@@ -2553,15 +2597,28 @@ work below before GA.
 - [x] Generated/server-applied route state: planned/latest generated routes, latest server-applied
   routes, latest durable routes, proxy status, and proxy preview are visible through read models.
 - [x] Generated/server-applied route state: precedence hardening.
-- [ ] Generated/server-applied route state: route intent update/delete/reconcile where needed,
-  admin repair/prune diagnostics.
+- [x] Generated/server-applied route state: route intent update/delete/reconcile where needed,
+  provider-route projection/retention, and API/CLI/Web coverage.
+  Closed by the domain-binding route, server-applied route, provider projection, access regression,
+  and Web evidence recorded in [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
 - [x] Domain binding: create, confirm ownership, list, ready routes projected into resource access
   summary.
-- [ ] Domain binding: show, update route behavior where allowed, retry verification, delete/archive.
+- [x] Domain binding: show, update route behavior where allowed, retry verification, delete/archive.
+  Closed by domain binding lifecycle and route/access evidence recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
 - [x] Certificate: issue/renew, list.
-- [ ] Certificate: show, import, retry, revoke/delete, renewal attempt visibility.
+- [x] Certificate: show, import, retry, revoke/delete, renewal attempt visibility.
+  Closed by certificate lifecycle evidence recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
 - [x] Resource health policy: configure, health query.
-- [ ] Resource health policy: update/delete/reset policy, effective health observation, history.
+- [x] Resource health policy: reset/delete policy fields.
+  Closed by `resources.reset-health` application, CLI, HTTP/oRPC, catalog, docs, and SDK evidence
+  recorded in [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
+- [x] Resource health policy: effective health observation history.
+  Closed by `resources.health-history` application query, PG/PGlite
+  `resource_health_observations` recorder/read-model, CLI, HTTP/oRPC, contracts, catalog, OpenAPI,
+  SDK metadata, public docs/help, and executable `RES-HEALTH-HIST-*` evidence recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
 - [x] Runtime logs: resource logs/stream and deployment logs.
 - [x] Runtime logs: bounded logs, unavailable-state diagnostics, retention/prune.
   Resource runtime logs, deployment logs, provider job log retention prune, embedded deployment log
@@ -2570,8 +2627,13 @@ work below before GA.
   retention defaults, domain event stream retention, outbox/inbox retention, and scheduled
   retention automation remain under the broader audit/event retention gaps.
 - [x] Environment/resource secrets: environment set/unset variable baseline.
-- [ ] Environment/resource secrets: secret reference create/list/show/update/delete, masking,
-  build/runtime scope.
+- [x] Environment/resource secrets: secret reference create/list/show/update/delete, masking,
+  build/runtime scope. Closed by explicit Resource-owned secret reference lifecycle operations
+  `resources.secrets.create`, `resources.secrets.rotate` (the value update operation),
+  `resources.secrets.delete`, `resources.secrets.list`, and `resources.secrets.show` with
+  application, CLI, HTTP/oRPC, operation catalog, public docs/help, OpenAPI, SDK metadata, and
+  typecheck evidence recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
 - [x] Storage volume: create/list/show/rename/delete, attach/detach, backup relationship metadata,
   deployment-driven runtime realization, and dry-run-first runtime cleanup.
 - [x] Dependency resource instance: provision/import/list/show/rename/delete for Postgres and Redis.
@@ -2641,8 +2703,10 @@ work below before GA.
   migration journal, backup, and recovery-marker rows without mutating remote state or leaking SSH
   identity paths.
 - [ ] Remote SSH PGlite state: retry/repair/prune.
-  Stale-lock recovery, migration execution, backup restore, and state-root prune remain future
-  governed business operations.
+  Stale-lock recovery and explicit old marker/archive prune have executable evidence, but
+  standalone migration execution, backup restore, state-root prune, and generic durable worker
+  promotion remain future governed business operations unless maintainer-approved as non-GA-blocking
+  for this pre-RC closure.
 - [x] Audit/event history: event specs and partial runtime events.
 - [x] Audit/event history: aggregate-scoped list/show/filter/export, retention prune, and redaction.
   `audit-events.list/show/export/prune` cover retained aggregate-scoped audit rows, bounded
@@ -2726,16 +2790,24 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
 - [x] Java/JVM: add Spring Boot first.
 - [x] Java/JVM: add Quarkus Maven JVM jar mode.
 - [ ] Java/JVM: add Micronaut if demand justifies it.
-- [ ] Ruby: add Rails and generic Rack/Sinatra planners or explicit fallback errors.
-- [ ] PHP: add Composer app planner with PHP-FPM or app-server policy.
-- [ ] Go: add generic Go build plus common HTTP framework detection as metadata/defaults.
-- [ ] .NET: add ASP.NET Core planner with `dotnet publish` artifact rules.
-- [ ] Rust: add generic Cargo build plus common HTTP framework metadata/defaults.
-- [ ] Elixir: add Phoenix release planner with `mix` and runtime image policy.
+- [x] Ruby: add Rails and generic Rack/Sinatra planners or explicit fallback errors.
+- [x] PHP: add Composer app planner with PHP-FPM or app-server policy.
+- [x] Go: add generic Go build plus common HTTP framework detection as metadata/defaults.
+- [x] .NET: add ASP.NET Core planner with `dotnet publish` artifact rules.
+- [x] Rust: add generic Cargo build plus common HTTP framework metadata/defaults.
+- [x] Elixir: add Phoenix release planner with `mix` and runtime image policy.
 - [ ] Buildpack-style auto-detection: add only after explicit planners remain deterministic; expose
   generated plan, builder policy, limitations, overrides/fix paths, and unsupported-field errors.
   The current Spec Round limits this to adapter-owned accelerator preview/contract guardrails and
   does not claim real `pack`/lifecycle execution.
+
+2026-05-16 pre-RC framework closure evidence:
+
+- Ruby, PHP, Go, .NET, Rust, and Elixir now have deterministic source-detection fixtures,
+  workspace-command planner output, and headless Docker/OCI smoke coverage under
+  `WF-PLAN-CAT-011`, `WF-PLAN-CAT-012`, `WF-PLAN-CAT-014`, `WF-PLAN-CAT-015`, and
+  `WF-PLAN-SMOKE-003`. This closes the broad framework auto-detection blocker without claiming
+  real `pack`/lifecycle buildpack execution.
 
 ## External Baseline Gap Checklist
 
@@ -2757,7 +2829,7 @@ External baseline research points to this practical minimum:
 - [x] Git source binding, Action PR previews, and product-grade preview deployments.
 - [ ] Webhook/auto-deploy delivery attempts, replay, secret rotation, and day-two management.
 - [ ] Deployment history, standalone event stream, health checks, rollbacks, and resource limits.
-- [ ] Framework auto-detection broad enough for modern frontend frameworks and common backend
+- [x] Framework auto-detection broad enough for modern frontend frameworks and common backend
   frameworks.
 - [x] AI-agent safe deployment protocol and outcome-first completion output generated from the same
   operation catalog and public docs, with future MCP/tool descriptors reusing the same semantics.
@@ -2800,13 +2872,20 @@ Recommended next Spec Rounds before broad Code Rounds:
   rows for the active JavaScript/TypeScript/Python/JVM catalog through shared GitHub Actions/local
   explicit smoke descriptors.
 - [x] Deployment observation and recovery: harden `deployments.stream-events` reconnect/gap/CLI
-  coverage, harden active retry/redeploy edge cases, decide public `deployments.cancel` is deferred
-  rather than required for this blocker, and harden rollback candidate/readiness coverage.
-- [ ] Access/domain/TLS closure: domain binding show/update/delete/retry and certificate
+  coverage, harden active retry/redeploy edge cases, rebuild public `deployments.cancel` with
+  executable evidence, and harden rollback candidate/readiness coverage.
+- [x] Access/domain/TLS closure: domain binding show/update/delete/retry and certificate
   import/revoke/retry.
+  Closed by application, CLI, HTTP/oRPC, Web, provider-route, and docs/catalog evidence recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
 - [x] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,
   backup/restore, delete, and opt-in scheduled backup policy configuration. Docker-backed
   Appaloft-managed Postgres/Redis for single-server targets is implemented in the shell provider and
   Web console; remaining work is backup prune/export and broader provider catalog coverage.
 - [ ] Operator state closure: outbox/inbox/jobs, remote SSH state diagnostics, runtime target
   capacity diagnostics, audit/event retention, and prune/recovery commands.
+  Active operator-work, runtime capacity, audit/event/log retention, scheduled retention, SSH
+  diagnostics, and explicit old remote-state marker prune evidence is recorded in
+  [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md). Standalone remote SSH
+  migration execution, backup restore, state-root prune, and generic durable worker promotion remain
+  pending implementation or maintainer approval as non-GA-blocking.

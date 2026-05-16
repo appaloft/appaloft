@@ -12,7 +12,13 @@ It is not a single command. Every user-visible mutation must dispatch one explic
 - `resources.configure-network`
 - `resources.configure-access`
 - `resources.configure-health`
+- `resources.reset-health`
 - `resources.set-variable`
+- `resources.secrets.create`
+- `resources.secrets.rotate`
+- `resources.secrets.delete`
+- `resources.secrets.list`
+- `resources.secrets.show`
 - `resources.import-variables`
 - `resources.unset-variable`
 - `resources.attach-storage`
@@ -42,7 +48,13 @@ This workflow inherits:
 - [resources.configure-network Command Spec](../commands/resources.configure-network.md)
 - [resources.configure-access Command Spec](../commands/resources.configure-access.md)
 - [resources.configure-health Command Spec](../commands/resources.configure-health.md)
+- [resources.reset-health Command Spec](../commands/resources.reset-health.md)
 - [resources.set-variable Command Spec](../commands/resources.set-variable.md)
+- [resources.secrets.create Command Spec](../commands/resources.secrets.create.md)
+- [resources.secrets.rotate Command Spec](../commands/resources.secrets.rotate.md)
+- [resources.secrets.delete Command Spec](../commands/resources.secrets.delete.md)
+- [resources.secrets.list Query Spec](../queries/resources.secrets.list.md)
+- [resources.secrets.show Query Spec](../queries/resources.secrets.show.md)
 - [resources.import-variables Command Spec](../commands/resources.import-variables.md)
 - [resources.unset-variable Command Spec](../commands/resources.unset-variable.md)
 - [resources.attach-storage Command Spec](../commands/resources.attach-storage.md)
@@ -91,7 +103,13 @@ cleanup.
 | Change internal listener/exposure profile | `resources.configure-network` | `ResourceNetworkProfile` | Domains, generated access policy, proxy routes, current runtime |
 | Change generated access preferences | `resources.configure-access` | `ResourceAccessProfile` | Network endpoint, default access policy records, domains, certificates, current runtime |
 | Change health probe policy | `resources.configure-health` | Resource health policy | Source/runtime/network profile outside health policy fields |
+| Reset health probe policy | `resources.reset-health` | Resource health policy | Source/runtime/network profile outside health policy fields |
 | Set one resource-scoped variable override | `resources.set-variable` | Resource config override layer | Environment variables, deployment snapshots, current runtime, domains |
+| Create one resource-scoped secret reference | `resources.secrets.create` | Resource config override layer | Environment variables, deployment snapshots, current runtime, provider-native secret stores |
+| Rotate one resource-scoped secret reference | `resources.secrets.rotate` | Resource config override layer | Environment variables, deployment snapshots, current runtime, provider-native secret stores |
+| Delete one resource-scoped secret reference | `resources.secrets.delete` | Resource config override layer | Environment variables, deployment snapshots, current runtime, provider-native secret stores |
+| List resource-scoped secret references | `resources.secrets.list` | Nothing | Raw secret values, current runtime, deployment snapshots |
+| Show one resource-scoped secret reference | `resources.secrets.show` | Nothing | Raw secret values, current runtime, deployment snapshots |
 | Import pasted `.env` variables | `resources.import-variables` | Resource config override layer | Environment variables, deployment snapshots, current runtime, domains, dependency bindings |
 | Remove one resource-scoped variable override | `resources.unset-variable` | Resource config override layer | Environment variables, deployment snapshots, current runtime, domains |
 | Inspect effective future deployment configuration | `resources.effective-config` | Nothing | Resource lifecycle, current runtime, historical deployment snapshots |
@@ -153,6 +171,12 @@ resources.show(resourceId)
   -> resources.health(resourceId)
 ```
 
+```text
+Resource detail -> reset health policy
+  -> resources.reset-health(resourceId)
+  -> resources.health(resourceId)
+```
+
 Resource variables:
 
 ```text
@@ -160,6 +184,17 @@ resources.show(resourceId)
   -> resources.effective-config(resourceId)
   -> resources.set-variable(resourceId, variable)
   -> resources.effective-config(resourceId)
+```
+
+Resource secret references:
+
+```text
+resources.show(resourceId)
+  -> resources.secrets.list(resourceId)
+  -> resources.secrets.create(resourceId, key, value)
+  -> resources.secrets.show(resourceId, key)
+  -> resources.secrets.rotate(resourceId, key, value)
+  -> resources.secrets.delete(resourceId, key)
 ```
 
 Resource `.env` import:
@@ -228,6 +263,9 @@ Archived resources:
 - reject `resources.configure-access`;
 - reject `resources.configure-health`;
 - reject `resources.set-variable`;
+- reject `resources.secrets.create`;
+- reject `resources.secrets.rotate`;
+- reject `resources.secrets.delete`;
 - reject `resources.import-variables`;
 - reject `resources.unset-variable`;
 - reject `resources.attach-storage`;
@@ -256,6 +294,10 @@ Resource-scoped variables participate in that same future-only rule. Accepted re
 secrets override environment-scoped entries with the same `key` plus `exposure` identity when a
 future deployment snapshot is materialized. Changing or deleting a resource-scoped variable does
 not mutate historical deployment snapshots or update a currently running workload in place.
+Explicit Resource secret reference create/update/delete/list/show operations are the public CRUD
+surface for Resource-owned runtime secret references. Their read models always return masked
+`value = "****"` and must not expose raw secret values through CLI, HTTP/oRPC, Web, public docs,
+or future MCP tools.
 Pasted `.env` imports follow the same future-only rule. They are bulk resource override mutations,
 not deployment commands and not current-runtime hot reloads.
 
@@ -306,7 +348,8 @@ Admission rules:
 - Entry workflow normalized profile versus current Resource profile drift blocks config deploy before
   `deployments.create` unless the entry workflow first dispatches the matching explicit operation
   such as `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
-  `resources.configure-access`, `resources.configure-health`, `resources.set-variable`, or
+  `resources.configure-access`, `resources.configure-health`, `resources.reset-health`,
+  `resources.set-variable`, or
   `resources.unset-variable`.
 - `deployments.create` must not receive entry profile fields or drift overrides.
 - Secret/configuration drift must stay redacted and must never expose raw values in diagnostics,
@@ -330,17 +373,19 @@ network and access profiles, but they keep their own commands and lifecycle even
 | Entrypoint | Required behavior |
 | --- | --- |
 | Web | Resource detail is owner-scoped. Each source/runtime/network/access/health/configuration/storage section dispatches the matching operation and refetches `resources.show`, `resources.effective-config`, or the relevant observation query. Editors must make the future deployment boundary visible: saving them persists durable resource profile or override state for future deployment admission, verification, route planning, or deployment snapshot materialization; it does not create deployments, rewrite historical deployment snapshots, immediately restart current runtime, bind domains, issue certificates, apply proxy routes, or provision/delete provider-native volumes. |
-| CLI | Each operation has its own `appaloft resource ...` subcommand. No `appaloft resource update` generic mutation. `appaloft resource import-variables <resourceId> --content <dotenv>` imports pasted `.env` content and masks secret values in output. `appaloft resource show --json` may expose drift diagnostics, and config deploy must report blocking entry-profile drift with the explicit command to run. |
-| oRPC / HTTP | Each operation has its own route using the application command/query schema. No parallel transport-only input shape. `POST /api/resources/{resourceId}/variables/import` dispatches `resources.import-variables`. `POST /api/resources/{resourceId}/storage-attachments` dispatches `resources.attach-storage`; `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` dispatches `resources.detach-storage`. `GET /api/resources/{resourceId}` carries drift diagnostics and storage attachment summaries through `resources.show` rather than a new resource query. |
+| CLI | Each operation has its own `appaloft resource ...` subcommand. No `appaloft resource update` generic mutation. `appaloft resource secrets ...` manages explicit secret references and returns masked read output. `appaloft resource import-variables <resourceId> --content <dotenv>` imports pasted `.env` content and masks secret values in output. `appaloft resource show --json` may expose drift diagnostics, and config deploy must report blocking entry-profile drift with the explicit command to run. |
+| oRPC / HTTP | Each operation has its own route using the application command/query schema. No parallel transport-only input shape. `POST /api/resources/{resourceId}/secrets`, `POST /api/resources/{resourceId}/secrets/{key}`, `DELETE /api/resources/{resourceId}/secrets/{key}`, `GET /api/resources/{resourceId}/secrets`, and `GET /api/resources/{resourceId}/secrets/{key}` dispatch `resources.secrets.*`. `POST /api/resources/{resourceId}/variables/import` dispatches `resources.import-variables`. `POST /api/resources/{resourceId}/storage-attachments` dispatches `resources.attach-storage`; `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` dispatches `resources.detach-storage`. `GET /api/resources/{resourceId}` carries drift diagnostics and storage attachment summaries through `resources.show` rather than a new resource query. |
 | Automation / MCP | Future tools map one-to-one to operation keys. Tools must not combine unrelated source/runtime/network/archive/delete behavior. Future MCP drift visibility should reuse `resources.show` diagnostics and suggested operation keys. |
 
 ## Current Implementation Notes And Migration Gaps
 
 Current implementation has active resource create/list, `resources.show`,
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-health`,
+`resources.reset-health`,
 `resources.configure-network`, `resources.configure-access`, `resources.set-variable`,
-`resources.unset-variable`, `resources.effective-config`, `resources.archive`, and
-`resources.delete` surfaces. The Web resource detail page dispatches `resources.show` for durable
+`resources.secrets.create/rotate/delete/list/show`, `resources.unset-variable`,
+`resources.effective-config`, `resources.archive`, and `resources.delete` surfaces. The Web
+resource detail page dispatches `resources.show` for durable
 profile data, dispatches source/runtime/network/access/health/configuration forms through separate
 commands, and dispatches archive/delete through dedicated lifecycle actions. Resource detail renders
 the future deployment boundary so operators can distinguish durable resource-level profile edits

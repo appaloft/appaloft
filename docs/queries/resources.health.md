@@ -35,6 +35,7 @@ This query inherits:
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [ADR-038: Resource Runtime Control Ownership](../decisions/ADR-038-resource-runtime-control-ownership.md)
 - [Resource Health Observation Workflow](../workflows/resource-health-observation.md)
+- [resources.health-history Query Spec](./resources.health-history.md)
 - [Resource Runtime Controls](../specs/043-resource-runtime-controls/spec.md)
 - [Resource Access Failure Diagnostics Workflow](../workflows/resource-access-failure-diagnostics.md)
 - [Resource Health Error Spec](../errors/resources.health.md)
@@ -308,6 +309,9 @@ All errors use [Resource Health Error Spec](../errors/resources.health.md).
 | oRPC / HTTP | `GET /api/resources/{resourceId}/health` using the query schema. | Implemented |
 | Automation / MCP | Future query/tool over the same operation key. | Future |
 
+Historical readback is exposed separately through `resources.health-history`; this query remains
+the current snapshot boundary.
+
 ## Current Implementation Notes And Migration Gaps
 
 `resources.health` is implemented as an application query slice and exposed through operation
@@ -323,7 +327,9 @@ Provider-native runtime inspection has initial Docker Swarm service-task coverag
 sanitized `swarm.serviceName` metadata can return normalized runtime health/check fields from
 `docker service ps` task state. Docker health-state inspection for single-container/Compose
 runtimes, command health checks, remote-manager Swarm probing, and scheduled health summary
-persistence are still future work. Unsupported live inspection sources are reported as source
+persistence cadence policy are still future work. Retained health observation storage/readback is
+available through `resources.health-history` and the explicit
+`ResourceHealthObservationRecorder`; unsupported live inspection sources are reported as source
 errors inside `ok(ResourceHealthSummary)`.
 
 Runtime deployment verification still checks local loopback or Docker container reachability during

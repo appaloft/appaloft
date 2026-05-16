@@ -15,6 +15,10 @@ relatedOperations:
   - resources.configure-source
   - resources.configure-runtime
   - resources.show
+  - source-links.list
+  - source-links.show
+  - source-links.relink
+  - source-links.delete
 sidebar:
   label: "Source and runtime"
   order: 3
@@ -76,6 +80,11 @@ To resolve it:
 - Deploy again after updating the profile. Historical deployment snapshots are not edited.
 
 Secret and configuration values must stay masked in diagnostics, errors, logs, and support payloads. Use keys, scope, exposure, references, and suggested commands while troubleshooting; do not copy raw secret values.
+
+For repeated config deploys, source fingerprint links remember which project, environment,
+resource, and optional server a repository source should reuse. Use `appaloft source-links list` or
+`show` to inspect that safe mapping, `relink` to retarget it intentionally, and `delete` to remove
+the mapping without deleting the resource or deployment history.
 
 <h2 id="resource-source-runtime-surfaces">Entrypoints</h2>
 
