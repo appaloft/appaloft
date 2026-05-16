@@ -42,4 +42,13 @@ describe("Docker runtime image packaging", () => {
     expect(dockerfile).toContain("/app/dist/pglite-runtime-assets/pglite.wasm /app/pglite.wasm");
     expect(dockerfile).toContain("/app/dist/pglite-runtime-assets/initdb.wasm /app/initdb.wasm");
   });
+
+  test("[RELEASE-HARDENING-003] Docker docs build uses Node for Astro validation", async () => {
+    const dockerfile = await Bun.file(new URL("../../Dockerfile", import.meta.url)).text();
+
+    expect(dockerfile).toContain("FROM node:24-bookworm AS node-runtime");
+    expect(dockerfile).toContain(
+      "node node_modules/astro/bin/astro.mjs check && node node_modules/astro/bin/astro.mjs build",
+    );
+  });
 });
