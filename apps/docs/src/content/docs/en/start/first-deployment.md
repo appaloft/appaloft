@@ -28,7 +28,9 @@ The smallest path is: create a project, choose an environment, register an SSH s
 - Use the Web console for interactive configuration and status review.
 - Use the CLI for local development, server-local operation, and GitHub Actions.
 - Use the HTTP API for integrations and control-plane automation.
-- AI agents should use the [Agent deploy skill](/docs/en/agent/deploy-skill/#agent-deploy-skill) to inspect the source safely and then call existing CLI/API/Web entrypoints.
+- AI agents should install the [Appaloft skill](/docs/en/agent/appaloft-skill/#appaloft-skill), then
+  follow the [Agent deploy skill](/docs/en/agent/deploy-skill/#agent-deploy-skill) subprotocol to
+  inspect the source safely and call existing CLI/API/Web entrypoints.
 
 <h2 id="agent-deploy-skill">AI agent deployment</h2>
 

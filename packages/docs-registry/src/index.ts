@@ -347,6 +347,38 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: ["apps/web Quick Deploy source-first entry and completion outcome links"],
   },
+  "agent.appaloft-skill": {
+    id: "agent.appaloft-skill",
+    title: "Appaloft skill",
+    description:
+      "How AI agents use the full Appaloft operation catalog as a first-class AI-facing entrypoint.",
+    page: {
+      "zh-CN": "agent/appaloft-skill",
+      "en-US": "en/agent/appaloft-skill",
+    },
+    anchor: "appaloft-skill",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "web", "repository-config", "mcp"],
+    aliases: [
+      "appaloft skill",
+      "AI entrypoint",
+      "full skill",
+      "skills add appaloft",
+      "完整 skill",
+      "AI 入口",
+    ],
+    specReferences: [
+      "docs/agent/appaloft-skill.md",
+      "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
+      "packages/skills/skills/appaloft/SKILL.md",
+      "packages/skills/skills/appaloft/references/cli-entrypoints.md",
+      "packages/skills/package.json",
+    ],
+    webSurfaces: ["apps/docs/src/content/docs/agent/appaloft-skill.md"],
+  },
   "source.auto-deploy-setup": {
     id: "source.auto-deploy-setup",
     title: "Source auto-deploy setup",

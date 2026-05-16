@@ -590,11 +590,12 @@ static output directory into the selected Appaloft runtime path for a BYOS targe
 Appaloft-hosted artifact storage, Appaloft-owned public routing, a `quick-deploy.create` command, or
 new `deployments.create` source/runtime fields without a later ADR/spec.
 
-The Appaloft Agent Deploy Skill is positioned as a v1 user-layer documentation/skill artifact, not a
-business operation or MCP requirement. It is governed by
+The Appaloft Skill is positioned as a v1 user-layer documentation/skill artifact, not a business
+operation or MCP requirement. Its deploy subprotocol is governed by
 [Appaloft Agent Deploy Skill](./specs/072-appaloft-agent-deploy-skill/spec.md) and must describe how
-agents use existing CLI/API operations safely, including source inspection, secret exclusion,
-explicit context/resource/deployment sequencing, URL-first outcomes, diagnostics, and recovery.
+agents use existing CLI/API/Web operations safely, including full operation-catalog coverage, source
+inspection, secret exclusion, explicit context/resource/deployment sequencing, URL-first outcomes,
+diagnostics, and recovery.
 MCP remains a later optional transport generated from the operation catalog.
 
 Resource profile lifecycle has an active public subset: `resources.show`,
