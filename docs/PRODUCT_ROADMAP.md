@@ -2735,11 +2735,11 @@ External baseline research points to this practical minimum:
 - [ ] Buildpack/auto-detect option with explicit plan output. The contract now has a Phase 5
   feature artifact and stable matrix ids; Code Round still needs executable preview parity.
 - [x] Static site packaging and first-class publish-directory semantics.
-- [ ] URL-first first-deploy entry experience: let CLI/Web/future tools lead with "source or local
+- [x] URL-first first-deploy entry experience: let CLI/Web/future tools lead with "source or local
   static output in, verified URL out" while still dispatching explicit Resource and Deployment
   operations. Governed by
   [URL-First Deployment Entry Experience](./specs/071-url-first-deployment-entry-experience/spec.md).
-- [ ] Upload-like local static output entry: accept an already-built local static output directory
+- [x] Upload-like local static output entry: accept an already-built local static output directory
   as deploy input for BYOS targets without introducing Appaloft-hosted artifact routing by default.
 - [x] Generated domains and custom domains as separate concepts.
 - [ ] Full HTTPS/ACME, force HTTPS, and redirect lifecycle closure.
@@ -2750,9 +2750,9 @@ External baseline research points to this practical minimum:
 - [ ] Deployment history, standalone event stream, health checks, rollbacks, and resource limits.
 - [ ] Framework auto-detection broad enough for modern frontend frameworks and common backend
   frameworks.
-- [ ] AI-agent safe deployment protocol and outcome-first completion output generated from the same
-  operation catalog, public docs, and future MCP/tool descriptors.
-- [ ] Pre-v1 Appaloft skill: publish a standard skill-manager install path so coding agents can run
+- [x] AI-agent safe deployment protocol and outcome-first completion output generated from the same
+  operation catalog and public docs, with future MCP/tool descriptors reusing the same semantics.
+- [x] Pre-v1 Appaloft skill: publish a standard skill-manager install path so coding agents can run
   `npx skills add appaloft/appaloft` and use the complete operation catalog safely before the full
   MCP product surface exists. Deploy remains an internal subprotocol of the full Appaloft skill.
   Governed by
