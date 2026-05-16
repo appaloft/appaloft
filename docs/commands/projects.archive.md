@@ -37,6 +37,7 @@ This command inherits:
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [projects.show Query Spec](../queries/projects.show.md)
+- [projects.restore Command Spec](./projects.restore.md)
 - [project-archived Event Spec](../events/project-archived.md)
 - [Project Lifecycle Workflow](../workflows/project-lifecycle.md)
 - [Project Lifecycle Error Spec](../errors/projects.lifecycle.md)
@@ -79,6 +80,7 @@ future resource/runtime lifecycle operations.
 After archive:
 
 - `projects.show` and `projects.list` may return the project with lifecycle metadata;
+- `projects.restore` may return the project to active admission;
 - `projects.rename` must reject the project;
 - `environments.create`, `resources.create`, and `deployments.create` must reject the archived
   project context;
@@ -121,9 +123,9 @@ All errors use [Project Lifecycle Error Spec](../errors/projects.lifecycle.md).
 
 ## Current Implementation Notes And Migration Gaps
 
-Project hard delete is not specified. Archive is the only public project lifecycle mutation in this
-round. Existing child resources remain resource-owned and require their own lifecycle commands.
+Project delete is specified separately by `projects.delete-check` and `projects.delete`. Existing
+child resources remain resource-owned and require their own lifecycle commands.
 
 ## Open Questions
 
-- None for project archive semantics. Project hard delete remains future work.
+- None for project archive semantics.

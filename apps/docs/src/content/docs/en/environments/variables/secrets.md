@@ -12,6 +12,11 @@ searchAliases:
 relatedOperations:
   - environments.set-variable
   - resources.set-variable
+  - resources.secrets.create
+  - resources.secrets.rotate
+  - resources.secrets.delete
+  - resources.secrets.list
+  - resources.secrets.show
   - resources.import-variables
   - resources.effective-config
 sidebar:
@@ -25,6 +30,10 @@ Secret values are for runtime use and should not appear in read models, logs, di
 payloads, or effective-config responses as plaintext.
 
 Users should see the existence and state of a secret, such as masked value, last update time, source environment, and whether it participates in deployment snapshots. They should not see plaintext values.
+
+Resource-level secrets can be created with `appaloft resource secrets create`, rotated with
+`update`, removed with `delete`, and inspected with `list`/`show`. Those operations affect future
+deployment snapshots only; they do not hot-update a running instance.
 
 When pasted `.env` content is imported into a resource, Appaloft treats secret-like keys as runtime
 secrets, such as `DATABASE_URL`, `*_TOKEN`, `*_PASSWORD`, and `*_PRIVATE_KEY`. Import summaries,
@@ -45,8 +54,8 @@ After rotating a secret, redeploy resources so running instances read the new de
 
 Recommended flow:
 
-1. Set the new secret in the target environment or on the target resource when the override is
-   resource-specific.
+1. Set the new secret in the target environment or use `appaloft resource secrets rotate` for a
+   resource-specific secret.
 2. Create new deployments for affected resources.
 3. Confirm health and logs show the app reading the new value safely.
 4. Confirm the old secret is no longer used.

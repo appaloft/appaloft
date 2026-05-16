@@ -50,6 +50,10 @@ Health summaries should include:
 - Generated access status.
 - Custom domain and TLS readiness summary.
 
+Retained health history is read through `resources.health-history`. It returns
+`ResourceHealthSummary` snapshots that an internal observer has already recorded, without running
+live probes, deployments, restarts, or policy changes.
+
 <h2 id="resource-runtime-controls">Runtime controls</h2>
 
 Runtime controls are a planned Phase 7 capability for stopping, starting, or restarting the current runtime instance for one resource. They only affect current process or container state. They do not delete resources, deployment history, storage, dependency bindings, routes, certificates, logs, or audit data.

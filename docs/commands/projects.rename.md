@@ -103,8 +103,8 @@ All errors use [Project Lifecycle Error Spec](../errors/projects.lifecycle.md).
 
 ## Current Implementation Notes And Migration Gaps
 
-Project description editing remains intentionally absent until a named command such as
-`projects.set-description` is specified. No generic `projects.update` entrypoint is allowed.
+Project description editing is handled by `projects.set-description`. No generic
+`projects.update` entrypoint is allowed.
 
 ## Open Questions
 

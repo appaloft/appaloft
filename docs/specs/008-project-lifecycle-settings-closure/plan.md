@@ -44,7 +44,7 @@
 
 ## Risks And Migration Gaps
 
-- Project description editing, hard delete, restore, and delete-check remain future explicit
-  operation candidates, not Phase 4 lifecycle closure blockers.
+- Project description editing, restore, delete-check, and guarded delete are now explicit
+  operations; bulk child cleanup remains outside this lifecycle closure.
 - Phase 4 release remains blocked until the remaining roadmap items outside this Project lifecycle
   closure are checked.

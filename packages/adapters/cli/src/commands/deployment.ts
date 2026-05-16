@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import {
+  ArchiveDeploymentCommand,
+  CancelDeploymentCommand,
   CleanupPreviewCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
@@ -9,6 +11,7 @@ import {
   DeploymentRecoveryReadinessQuery,
   ListDeploymentsQuery,
   PruneDeploymentLogsCommand,
+  PruneDeploymentsCommand,
   publicPreviewUrlsFromDeploymentSummary,
   RedeployDeploymentCommand,
   RetryDeploymentCommand,
@@ -143,9 +146,12 @@ const deploymentHistoryLimitOption = Options.text("history-limit").pipe(Options.
 const includeHistoryOption = Options.boolean("include-history").pipe(Options.withDefault(true));
 const untilTerminalOption = Options.boolean("until-terminal").pipe(Options.withDefault(true));
 const dryRunOption = Options.boolean("dry-run").pipe(Options.withDefault(true));
+const includeArchivedOption = Options.boolean("include-archived").pipe(Options.withDefault(false));
 const readinessGeneratedAtOption = Options.text("readiness-generated-at").pipe(Options.optional);
 const sourceDeploymentOption = Options.text("source-deployment").pipe(Options.optional);
 const rollbackCandidateOption = Options.text("candidate");
+const confirmDeploymentCancelOption = Options.text("confirm");
+const confirmDeploymentArchiveOption = Options.text("confirm");
 const deploymentStateBackendKinds = [
   "ssh-pglite",
   "local-pglite",
@@ -1554,12 +1560,14 @@ const listDeploymentsCommand = EffectCommand.make(
   {
     project: projectOption,
     resource: resourceOption,
+    includeArchived: includeArchivedOption,
   },
-  ({ project, resource }) =>
+  ({ includeArchived, project, resource }) =>
     runQuery(
       ListDeploymentsQuery.create({
         projectId: optionalValue(project),
         resourceId: optionalValue(resource),
+        includeArchived,
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentList));
@@ -1670,6 +1678,61 @@ const rollbackDeploymentCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRollback));
 
+const cancelDeploymentCommand = EffectCommand.make(
+  "cancel",
+  {
+    deploymentId: deploymentIdArg,
+    confirm: confirmDeploymentCancelOption,
+    resource: resourceOption,
+  },
+  ({ confirm, deploymentId, resource }) =>
+    runCommand(
+      CancelDeploymentCommand.create({
+        deploymentId,
+        confirm,
+        resourceId: optionalValue(resource),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentCancel));
+
+const archiveDeploymentCommand = EffectCommand.make(
+  "archive",
+  {
+    deploymentId: deploymentIdArg,
+    confirm: confirmDeploymentArchiveOption,
+    resource: resourceOption,
+  },
+  ({ confirm, deploymentId, resource }) =>
+    runCommand(
+      ArchiveDeploymentCommand.create({
+        deploymentId,
+        confirm,
+        resourceId: optionalValue(resource),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentArchive));
+
+const pruneDeploymentsCommand = EffectCommand.make(
+  "prune",
+  {
+    before: Options.text("before"),
+    deployment: Options.text("deployment").pipe(Options.optional),
+    resource: resourceOption,
+    server: serverOption,
+    dryRun: dryRunOption,
+  },
+  ({ before, deployment, dryRun, resource, server }) =>
+    runCommand(
+      PruneDeploymentsCommand.create({
+        before,
+        ...(optionalValue(deployment) ? { deploymentId: optionalValue(deployment) } : {}),
+        ...(optionalValue(resource) ? { resourceId: optionalValue(resource) } : {}),
+        ...(optionalValue(server) ? { serverId: optionalValue(server) } : {}),
+        dryRun,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentPrune));
+
 const streamDeploymentEventsCommand = EffectCommand.make(
   "events",
   {
@@ -1706,6 +1769,9 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
     retryDeploymentCommand,
     redeployDeploymentCommand,
     rollbackDeploymentCommand,
+    cancelDeploymentCommand,
+    archiveDeploymentCommand,
+    pruneDeploymentsCommand,
     deploymentLogsMaintenanceCommand,
     streamDeploymentEventsCommand,
   ]),

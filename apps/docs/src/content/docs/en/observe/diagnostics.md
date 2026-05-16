@@ -175,9 +175,16 @@ Docker build cache and unused image cleanup are explicit opt-in categories:
 appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --category docker-build-cache --category unused-images
 ```
 
+Old SSH remote-state marker archives are also explicit opt-in:
+
+```bash title="Dry-run remote-state marker prune"
+appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --category remote-state-markers
+```
+
 Destructive prune still requires `--dry-run false`. Appaloft never runs broad `docker system prune`
 or Docker volume prune from this command, and it preserves Appaloft state roots, active runtimes,
-rollback candidates, deployment snapshots, audit/events, logs, and business state.
+live remote state, rollback candidates, deployment snapshots, audit/events, logs, and business
+state.
 
 <h2 id="scheduled-runtime-prune-policy">Scheduled runtime prune policy</h2>
 

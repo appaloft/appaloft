@@ -15,8 +15,10 @@
   latest deployment snapshot informational drift.
 - [x] `RES-PROFILE-DRIFT-002`: add application/query or CLI test for entry profile vs current
   Resource profile blocking drift with suggested commands.
-- [ ] `RES-PROFILE-DRIFT-003`: add secret/configuration redaction test. Deferred until the
-  configuration section compares effective Resource config against entry profile config.
+- [x] `RES-PROFILE-DRIFT-003`: add secret/configuration redaction test. The current closure covers
+  Resource profile versus latest deployment snapshot configuration drift and config deploy entry
+  configuration shadowed by resource-scoped effective config overrides with key/exposure/kind/scope
+  metadata and masked/redacted value states only.
 - [x] `RES-PROFILE-DRIFT-004`: add HTTP/oRPC contract test for the `resources.show` diagnostic
   shape.
 - [x] `RES-PROFILE-DRIFT-005`: add Web resource detail drift display test. Covered by static Web
@@ -33,6 +35,8 @@
 - [x] Implement shared resource profile drift comparator in the application/read-model boundary.
 - [x] Extend `resources.show` diagnostics with sectioned drift items when profile diagnostics are
   requested.
+- [x] Extend configuration drift diagnostics to compare Resource variables against the latest
+  deployment snapshot without exposing raw values.
 - [x] Extend config deploy workflow preflight to reject unapplied existing-resource drift before
   `deployments.create`.
 - [x] Add structured `resource_profile_drift` details.
@@ -50,6 +54,7 @@
 ## Verification
 
 - [x] Run targeted application tests for `resources.show` and config deploy workflow.
+- [x] Run targeted application test for `RES-PROFILE-DRIFT-003` configuration redaction.
 - [x] Run targeted CLI tests for config deploy error rendering and resource command remedies.
 - [x] Run targeted oRPC/HTTP resource-show contract tests.
 - [x] Run targeted Web resource detail test for drift display through static help assertions and
@@ -60,5 +65,6 @@
 
 - [x] Reconcile `docs/specs/011-resource-profile-drift-visibility/`, source-of-truth specs,
   operation catalog state, public docs/help anchors, test matrix ids, and implementation.
-- [x] Mark remaining auto-apply or public-docs gaps as explicit deferred gaps if they are not closed
-  in the first Code Round.
+- [x] Mark remaining auto-apply behavior as an explicit deferred gap. Entry-profile effective
+  configuration comparison is covered for config deploy keys shadowed by resource-scoped effective
+  config overrides; no raw config or secret values appear in the admission error.

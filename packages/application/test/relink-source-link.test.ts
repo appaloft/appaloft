@@ -49,14 +49,22 @@ import {
   type MutationCoordinatorRunExclusiveInput,
   toRepositoryContext,
 } from "../src";
-import { RelinkSourceLinkCommand } from "../src/messages";
 import {
+  DeleteSourceLinkCommand,
+  ListSourceLinksQuery,
+  RelinkSourceLinkCommand,
+  ShowSourceLinkQuery,
+} from "../src/messages";
+import {
+  SourceLinkBySourceFingerprintSpec,
+  type SourceLinkReadModel,
   type SourceLinkRecord,
   type SourceLinkRepository,
   type SourceLinkSelectionSpec,
   type SourceLinkSelectionSpecVisitor,
 } from "../src/ports";
-import { RelinkSourceLinkUseCase } from "../src/use-cases";
+import { SourceLinkQueryService } from "../src/source-link-handlers";
+import { DeleteSourceLinkUseCase, RelinkSourceLinkUseCase } from "../src/use-cases";
 
 class MemorySourceLinkRepository implements SourceLinkRepository {
   readonly upsertCalls: SourceLinkRecord[] = [];
@@ -112,6 +120,24 @@ class TimeoutMutationCoordinator implements MutationCoordinator {
         retryAfterSeconds: Math.ceil(input.policy.retryIntervalMs / 1000),
       }),
     );
+  }
+}
+
+class MemorySourceLinkReadModel implements SourceLinkReadModel {
+  constructor(private readonly records: SourceLinkRecord[]) {}
+
+  async list(
+    _context: Parameters<SourceLinkReadModel["list"]>[0],
+    input: Parameters<SourceLinkReadModel["list"]>[1],
+  ): Promise<SourceLinkRecord[]> {
+    return this.records
+      .filter(
+        (record) =>
+          (!input?.projectId || record.projectId === input.projectId) &&
+          (!input?.resourceId || record.resourceId === input.resourceId) &&
+          (!input?.serverId || record.serverId === input.serverId),
+      )
+      .slice(0, input?.limit ?? 50);
   }
 }
 
@@ -247,6 +273,117 @@ describe("RelinkSourceLinkCommand", () => {
       expectedCurrentResourceId: "res_old",
       reason: "move to canonical resource",
     });
+  });
+});
+
+describe("SourceLinkQueryService", () => {
+  test("[SOURCE-LINK-STATE-021] lists source fingerprint links with safe filters", async () => {
+    const { context, sourceLinkRepository } = await createRelinkFixture({
+      sourceLink: {
+        sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        updatedAt: "2026-04-19T00:00:00.000Z",
+        reason: "linked",
+      },
+    });
+    const query = ListSourceLinksQuery.create({ projectId: "prj_demo", limit: 10 });
+    expect(query.isOk()).toBe(true);
+    if (query.isErr()) {
+      throw new Error(query.error.message);
+    }
+    const service = new SourceLinkQueryService(
+      new MemorySourceLinkReadModel([
+        {
+          sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          serverId: "srv_demo",
+          updatedAt: "2026-04-19T00:00:00.000Z",
+          reason: "linked",
+        },
+      ]),
+      sourceLinkRepository,
+    );
+
+    const result = await service.list(context, query.value);
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) {
+      throw new Error(result.error.message);
+    }
+    expect(result.value).toEqual({
+      schemaVersion: "source-links.list/v1",
+      items: [
+        expect.objectContaining({
+          sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+          projectId: "prj_demo",
+          resourceId: "res_demo",
+        }),
+      ],
+    });
+  });
+
+  test("[SOURCE-LINK-STATE-022] shows one source fingerprint link", async () => {
+    const { sourceLinkRepository } = await createRelinkFixture();
+    const query = ShowSourceLinkQuery.create({
+      sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+    });
+    expect(query.isOk()).toBe(true);
+    if (query.isErr()) {
+      throw new Error(query.error.message);
+    }
+    const service = new SourceLinkQueryService(
+      new MemorySourceLinkReadModel([]),
+      sourceLinkRepository,
+    );
+
+    const result = await service.show(query.value);
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) {
+      throw new Error(result.error.message);
+    }
+    expect(result.value.sourceLink).toMatchObject({
+      sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+      resourceId: "res_old",
+    });
+  });
+});
+
+describe("DeleteSourceLinkUseCase", () => {
+  test("[SOURCE-LINK-STATE-023] deletes one source fingerprint link explicitly", async () => {
+    const { context, sourceLinkRepository } = await createRelinkFixture();
+    const command = DeleteSourceLinkCommand.create({
+      sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+      reason: "reset link",
+    });
+    expect(command.isOk()).toBe(true);
+    if (command.isErr()) {
+      throw new Error(command.error.message);
+    }
+    const useCase = new DeleteSourceLinkUseCase(
+      sourceLinkRepository,
+      new PassThroughMutationCoordinator(),
+    );
+
+    const result = await useCase.execute(context, command.value);
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) {
+      throw new Error(result.error.message);
+    }
+    expect(result.value).toEqual({
+      sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+      deleted: true,
+    });
+    const deleted = await sourceLinkRepository.findOne(
+      SourceLinkBySourceFingerprintSpec.create("source-fingerprint:v1:branch%3Amain"),
+    );
+    expect(deleted).toEqual(ok(null));
   });
 });
 

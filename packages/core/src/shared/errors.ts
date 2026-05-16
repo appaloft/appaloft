@@ -266,6 +266,8 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("project_archived", "user", message, details),
+  projectDeleteBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("project_delete_blocked", "user", message, details),
   environmentArchived: (
     message: string,
     details?: Record<string, string | number | boolean | null>,
@@ -296,6 +298,14 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("deployment_not_rollback_ready", "user", message, details),
+  deploymentCancelNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("deployment_cancel_not_allowed", "user", message, details),
+  deploymentArchiveNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("deployment_archive_not_allowed", "user", message, details),
   deploymentRollbackCandidateNotFound: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

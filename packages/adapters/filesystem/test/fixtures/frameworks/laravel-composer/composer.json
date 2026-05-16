@@ -1,0 +1,6 @@
+{
+  "name": "appaloft/laravel-composer",
+  "require": {
+    "laravel/framework": "11.44.2"
+  }
+}

@@ -82,20 +82,28 @@ Implemented operations:
 | List projects | Product-session member query | `projects.list` | `ListProjectsQuery` | `ListProjectsQueryInput` | `appaloft project list` | `GET /api/projects` |
 | Show project | Product-session member query | `projects.show` | `ShowProjectQuery` | `ShowProjectQueryInput` | `appaloft project show <projectId>` | `GET /api/projects/{projectId}` |
 | Rename project | Command | `projects.rename` | `RenameProjectCommand` | `RenameProjectCommandInput` | `appaloft project rename <projectId> --name <name>` | `POST /api/projects/{projectId}/rename` |
+| Set project description | Command | `projects.set-description` | `SetProjectDescriptionCommand` | `SetProjectDescriptionCommandInput` | `appaloft project set-description <projectId>` | `POST /api/projects/{projectId}/description` |
 | Archive project | Command | `projects.archive` | `ArchiveProjectCommand` | `ArchiveProjectCommandInput` | `appaloft project archive <projectId>` | `POST /api/projects/{projectId}/archive` |
+| Restore project | Command | `projects.restore` | `RestoreProjectCommand` | `RestoreProjectCommandInput` | `appaloft project restore <projectId>` | `POST /api/projects/{projectId}/restore` |
+| Check project delete safety | Query | `projects.delete-check` | `CheckProjectDeleteSafetyQuery` | `CheckProjectDeleteSafetyQueryInput` | `appaloft project delete-check <projectId>` | `GET /api/projects/{projectId}/delete-check` |
+| Delete project | Command | `projects.delete` | `DeleteProjectCommand` | `DeleteProjectCommandInput` | `appaloft project delete <projectId> --confirm <projectId>` | `DELETE /api/projects/{projectId}` |
 
 Current boundary:
 - a project is currently metadata plus deployment ownership
-- project lifecycle state is explicit; archived projects remain readable but reject new
-  project-scoped mutations and deployment admission
+- project lifecycle state is explicit; archived projects remain readable, reject new
+  project-scoped mutations and deployment admission, and can be restored through `projects.restore`
+- `projects.delete-check` and guarded `projects.delete` soft-delete only archived projects with no
+  retained blockers; delete does not cascade child cleanup or erase support/audit history
 - project detail surfaces should make resources the primary list and resource creation the primary
   write affordance
 - project-level "view deployments" is a secondary rollup over resources
 - project detail/settings may compose read-only resource, environment, deployment, and access
   rollups, but those rollups are not `projects.show` output and do not make Project the owner of
   child mutation or runtime state
-- project rename/archive must not create deployments, mutate historical deployment snapshots, or
-  immediately affect runtime state
+- project rename/set-description/archive must not create deployments, mutate historical deployment
+  snapshots, or immediately affect runtime state
+- project delete is guarded by `projects.delete-check`, requires an archived project, and soft
+  deletes only the project tombstone when no retained child/support blockers remain
 - project-level "new deployment" must be labeled and implemented as Quick Deploy or another entry
   workflow that selects or creates a resource before dispatching `deployments.create`
 - project source binding is not yet a first-class aggregate concept
@@ -106,15 +114,6 @@ Current boundary:
 
 Core next operations expected here:
 - `projects.configure-source` if project source binding becomes a first-class aggregate concept
-- `projects.set-description` if description editing becomes a first-class mutation
-- project hard delete or restore only after safety rules are specified
-
-Those future operations are not required for the Phase 4 project lifecycle/settings closure. Until
-they are specified, the project-level closure is `projects.show`, `projects.rename`, and
-`projects.archive`.
-
-Those are expected domain operations, but they are not implemented yet and must not be assumed by
-transports until added here and to the operation catalog.
 
 ## Deployment Targets
 
@@ -218,9 +217,11 @@ Runtime monitoring operations:
 - `servers.capacity.prune` is a runtime target maintenance mutation. It dry-runs by default,
   requires a cutoff, and may delete only safe target-owned stopped containers or materialized
   workspace candidates whose ownership, age, active-runtime, and rollback-safety evidence passes.
-  Docker build-cache and unused-image pruning require explicit category opt-in and use filtered
-  Docker prune commands. It must preserve active runtimes, rollback candidates, Docker volumes,
-  Appaloft state roots, remote state, backups, migration journals, audit/events, deployment
+  Docker build-cache, unused-image, and remote-state marker pruning require explicit category
+  opt-in; Docker categories use filtered Docker prune commands, while remote-state marker cleanup is
+  limited to old journals, backup archives, recovery markers, and recovered-lock archives under
+  fixed state-root subdirectories. It must preserve active runtimes, rollback candidates, Docker
+  volumes, Appaloft state roots, live remote `ssh-pglite` state, audit/events, deployment
   snapshots, logs, routes, resource state, server state, dependencies, and storage volumes. Server
   Web capacity controls call the same query/command boundary and keep destructive prune behind an
   explicit operator action after a dry-run preview.
@@ -327,11 +328,15 @@ Implemented operations:
 | Create resource | Command | `resources.create` | `CreateResourceCommand` | `CreateResourceCommandInput` | `appaloft resource create` | `POST /api/resources` |
 | Configure resource source profile | Command | `resources.configure-source` | `ConfigureResourceSourceCommand` | `ConfigureResourceSourceCommandInput` | `appaloft resource configure-source <resourceId>` | `POST /api/resources/{resourceId}/source` |
 | Configure resource health policy | Command | `resources.configure-health` | `ConfigureResourceHealthCommand` | `ConfigureResourceHealthCommandInput` | `appaloft resource configure-health <resourceId>` | `POST /api/resources/{resourceId}/health-policy` |
+| Reset resource health policy | Command | `resources.reset-health` | `ResetResourceHealthCommand` | `ResetResourceHealthCommandInput` | `appaloft resource reset-health <resourceId>` | `POST /api/resources/{resourceId}/health-policy/reset` |
 | Configure resource runtime profile | Command | `resources.configure-runtime` | `ConfigureResourceRuntimeCommand` | `ConfigureResourceRuntimeCommandInput` | `appaloft resource configure-runtime <resourceId>` | `POST /api/resources/{resourceId}/runtime-profile` |
 | Configure resource network profile | Command | `resources.configure-network` | `ConfigureResourceNetworkCommand` | `ConfigureResourceNetworkCommandInput` | `appaloft resource configure-network <resourceId>` | `POST /api/resources/{resourceId}/network-profile` |
 | Configure resource access profile | Command | `resources.configure-access` | `ConfigureResourceAccessCommand` | `ConfigureResourceAccessCommandInput` | `appaloft resource configure-access <resourceId>` | `POST /api/resources/{resourceId}/access-profile` |
 | Configure resource auto-deploy policy | Command | `resources.configure-auto-deploy` | `ConfigureResourceAutoDeployCommand` | `ConfigureResourceAutoDeployCommandInput` | `appaloft resource auto-deploy <resourceId>` | `POST /api/resources/{resourceId}/auto-deploy` |
 | Set resource variable | Command | `resources.set-variable` | `SetResourceVariableCommand` | `SetResourceVariableCommandInput` | `appaloft resource set-variable <resourceId> <key> <value>` | `POST /api/resources/{resourceId}/variables` |
+| Create resource secret reference | Command | `resources.secrets.create` | `CreateResourceSecretReferenceCommand` | `CreateResourceSecretReferenceCommandInput` | `appaloft resource secrets create <resourceId> <key> <value>` | `POST /api/resources/{resourceId}/secrets` |
+| Rotate resource secret reference | Command | `resources.secrets.rotate` | `RotateResourceSecretReferenceCommand` | `RotateResourceSecretReferenceCommandInput` | `appaloft resource secrets rotate <resourceId> <key> <value>` | `POST /api/resources/{resourceId}/secrets/{key}` |
+| Delete resource secret reference | Command | `resources.secrets.delete` | `DeleteResourceSecretReferenceCommand` | `DeleteResourceSecretReferenceCommandInput` | `appaloft resource secrets delete <resourceId> <key>` | `DELETE /api/resources/{resourceId}/secrets/{key}` |
 | Import resource variables | Command | `resources.import-variables` | `ImportResourceVariablesCommand` | `ImportResourceVariablesCommandInput` | `appaloft resource import-variables <resourceId> --content <dotenv>` | `POST /api/resources/{resourceId}/variables/import` |
 | Unset resource variable | Command | `resources.unset-variable` | `UnsetResourceVariableCommand` | `UnsetResourceVariableCommandInput` | `appaloft resource unset-variable <resourceId> <key>` | `DELETE /api/resources/{resourceId}/variables/{key}` |
 | Archive resource | Command | `resources.archive` | `ArchiveResourceCommand` | `ArchiveResourceCommandInput` | `appaloft resource archive <resourceId>` | `POST /api/resources/{resourceId}/archive` |
@@ -339,6 +344,8 @@ Implemented operations:
 | List resources | Product-session member query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
 | Show resource profile | Product-session member query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
 | Read resource effective configuration | Query | `resources.effective-config` | `ResourceEffectiveConfigQuery` | `ResourceEffectiveConfigQueryInput` | `appaloft resource effective-config <resourceId>` | `GET /api/resources/{resourceId}/effective-config` |
+| List resource secret references | Query | `resources.secrets.list` | `ListResourceSecretReferencesQuery` | `ListResourceSecretReferencesQueryInput` | `appaloft resource secrets list <resourceId>` | `GET /api/resources/{resourceId}/secrets` |
+| Show resource secret reference | Query | `resources.secrets.show` | `ShowResourceSecretReferenceQuery` | `ShowResourceSecretReferenceQueryInput` | `appaloft resource secrets show <resourceId> <key>` | `GET /api/resources/{resourceId}/secrets/{key}` |
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
 | Stop resource runtime | Command | `resources.runtime.stop` | `StopResourceRuntimeCommand` | `StopResourceRuntimeCommandInput` | `appaloft resource runtime stop <resourceId>` | `POST /api/resources/{resourceId}/runtime/stop` |
 | Start resource runtime | Command | `resources.runtime.start` | `StartResourceRuntimeCommand` | `StartResourceRuntimeCommandInput` | `appaloft resource runtime start <resourceId>` | `POST /api/resources/{resourceId}/runtime/start` |
@@ -347,6 +354,7 @@ Implemented operations:
 | Read resource diagnostic summary | Query | `resources.diagnostic-summary` | `ResourceDiagnosticSummaryQuery` | `ResourceDiagnosticSummaryQueryInput` | `appaloft resource diagnose <resourceId>` | `GET /api/resources/{resourceId}/diagnostic-summary` |
 | Lookup resource access failure evidence | Query | `resources.access-failure-evidence.lookup` | `ResourceAccessFailureEvidenceLookupQuery` | `ResourceAccessFailureEvidenceLookupQueryInput` | `appaloft resource access-failure <requestId>` | `GET /api/resource-access-failures/{requestId}` |
 | Read resource health | Query | `resources.health` | `ResourceHealthQuery` | `ResourceHealthQueryInput` | `appaloft resource health <resourceId>` | `GET /api/resources/{resourceId}/health` |
+| Read resource health history | Query | `resources.health-history` | `ResourceHealthHistoryQuery` | `ResourceHealthHistoryQueryInput` | `appaloft resource health-history <resourceId> --from <iso> --to <iso>` | `GET /api/resources/{resourceId}/health-history` |
 | Open resource terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft resource terminal <resourceId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
 Phase 7 storage operations:
@@ -624,9 +632,12 @@ Current boundary:
   It is not a separate operation and must not add profile fields or drift overrides to
   `deployments.create`.
 - resource-scoped variables and secrets are resource-owned through `resources.set-variable`,
-  `resources.import-variables`, and `resources.unset-variable`; these commands replace only the
+  `resources.import-variables`, `resources.unset-variable`, and explicit
+  `resources.secrets.create/rotate/delete/list/show`; these commands replace or read only the
   resource override layer used during future deployment snapshot materialization after environment
-  precedence is resolved.
+  precedence is resolved. The explicit secret-reference lifecycle returns only safe id/key/exposure
+  metadata or masked `value = "****"` read models and is the public CRUD surface for Resource-owned
+  secret references.
 - storage volume lifecycle is implemented for Phase 7 through
   `storage-volumes.create/list/show/rename/delete` and `resources.attach-storage/detach-storage`.
   Storage attachments are Resource profile state and new deployments snapshot them into
@@ -703,12 +714,20 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
+| List source fingerprint links | Query | `source-links.list` | `ListSourceLinksQuery` | `ListSourceLinksQueryInput` | `appaloft source-links list` | `GET /api/source-links` |
+| Show source fingerprint link | Query | `source-links.show` | `ShowSourceLinkQuery` | `ShowSourceLinkQueryInput` | `appaloft source-links show <sourceFingerprint>` | `GET /api/source-links/{sourceFingerprint}` |
 | Relink source fingerprint | Command | `source-links.relink` | `RelinkSourceLinkCommand` | `RelinkSourceLinkCommandInput` | `appaloft source-links relink <sourceFingerprint>` | `POST /api/source-links/relink` |
+| Delete source fingerprint link | Command | `source-links.delete` | `DeleteSourceLinkCommand` | `DeleteSourceLinkCommandInput` | `appaloft source-links delete <sourceFingerprint>` | `DELETE /api/source-links/{sourceFingerprint}` |
 
 Current boundary:
+- `source-links.list` and `source-links.show` read safe source link records only. They do not
+  inspect repository provider secrets, mutate link state, recover remote state, or create
+  deployments.
 - `source-links.relink` updates source link mapping only. It does not mutate resource profiles,
   environment variables, credentials, deployment history, domain bindings, or server-applied route
   state.
+- `source-links.delete` removes the link mapping only. It does not delete projects, environments,
+  resources, deployments, domain bindings, server-applied routes, or runtime state.
 - CLI SSH mode may still use brief state-root coordination for remote PGlite maintenance when the
   relink command is invoked with trusted SSH target options such as `--server-host`, but the
   command's user-visible admission semantics are governed by source-fingerprint scoped mutation
@@ -735,6 +754,8 @@ Implemented operations:
 | Ingest source event | Command | `source-events.ingest` | `IngestSourceEventCommand` | `IngestSourceEventCommandInput` | Not exposed | `POST /api/resources/{resourceId}/source-events/generic-signed`<br>`POST /api/integrations/github/source-events` |
 | List source events | Query | `source-events.list` | `ListSourceEventsQuery` | `ListSourceEventsQueryInput` | `appaloft source-event list --resource <resourceId>` | `GET /api/source-events` |
 | Show source event | Query | `source-events.show` | `ShowSourceEventQuery` | `ShowSourceEventQueryInput` | `appaloft source-event show <sourceEventId> --resource <resourceId>` | `GET /api/source-events/{sourceEventId}` |
+| Replay source event | Command | `source-events.replay` | `ReplaySourceEventCommand` | `ReplaySourceEventCommandInput` | `appaloft source-event replay <sourceEventId> --resource <resourceId>` | `POST /api/source-events/{sourceEventId}/replay` |
+| Prune source events | Command | `source-events.prune` | `PruneSourceEventsCommand` | `PruneSourceEventsCommandInput` | `appaloft source-event prune --before <iso>` | `POST /api/source-events/prune` |
 
 Current boundary:
 - `source-events.ingest` is active for the Resource-scoped generic signed HTTP route and the
@@ -749,6 +770,14 @@ Current boundary:
 - `source-events.list` and `source-events.show` are read-only diagnostics over persisted source
   event records. They require project or Resource scope and must not replay events, retry failed
   dispatch, mutate auto-deploy policy, or create deployments.
+- `source-events.replay` replays one retained safe source event delivery through current
+  Resource-owned auto-deploy policy matching and the existing `deployments.create` admission path.
+  It never reuses raw webhook payloads, signatures, provider tokens, or webhook secret values, and
+  it requires project or Resource scope for public callers.
+- `source-events.prune` dry-runs by default and then, when explicitly requested, deletes only safe
+  retained source event diagnostic rows matching a cutoff and optional project, Resource, status, or
+  source-kind filters. It does not replay events, delete Resources or deployments, or touch webhook
+  secret material.
 - Additional provider-specific Git webhook ingestion remains deferred until provider payload
   parsing and signature extraction are specified and tested.
 - Web Resource detail source-event diagnostics consume `source-events.list`; CLI and HTTP/oRPC
@@ -774,6 +803,9 @@ Implemented operations:
 | Retry deployment attempt | Command | `deployments.retry` | `RetryDeploymentCommand` | `RetryDeploymentCommandInput` | `appaloft deployments retry <deploymentId>` | `POST /api/deployments/{deploymentId}/retry` |
 | Redeploy current resource profile | Command | `deployments.redeploy` | `RedeployDeploymentCommand` | `RedeployDeploymentCommandInput` | `appaloft deployments redeploy <resourceId>` | `POST /api/resources/{resourceId}/redeploy` |
 | Roll back deployment | Command | `deployments.rollback` | `RollbackDeploymentCommand` | `RollbackDeploymentCommandInput` | `appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>` | `POST /api/deployments/{deploymentId}/rollback` |
+| Cancel active deployment attempt | Command | `deployments.cancel` | `CancelDeploymentCommand` | `CancelDeploymentCommandInput` | `appaloft deployments cancel <deploymentId> --confirm <deploymentId>` | `POST /api/deployments/{deploymentId}/cancel` |
+| Archive deployment attempt | Command | `deployments.archive` | `ArchiveDeploymentCommand` | `ArchiveDeploymentCommandInput` | `appaloft deployments archive <deploymentId> --confirm <deploymentId>` | `POST /api/deployments/{deploymentId}/archive` |
+| Prune archived deployment attempts | Command | `deployments.prune` | `PruneDeploymentsCommand` | `PruneDeploymentsCommandInput` | `appaloft deployments prune --before <iso>` | `POST /api/deployments/prune` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `appaloft logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
 | Prune deployment logs | Command | `deployments.logs.prune` | `PruneDeploymentLogsCommand` | `PruneDeploymentLogsCommandInput` | `appaloft deployments logs prune --before <iso>` | `POST /api/deployments/logs/prune` |
 | Stream deployment events | Query | `deployments.stream-events` | `StreamDeploymentEventsQuery` | `StreamDeploymentEventsQueryInput` | `appaloft deployments events <deploymentId>` | `GET /api/deployments/{deploymentId}/events` and `GET /api/deployments/{deploymentId}/events/stream` |
@@ -786,8 +818,8 @@ Current boundary:
 - `deployments.create` accepts deployment context references only: `projectId`, `environmentId`,
   `resourceId`, `serverId`, and optional `destinationId`
 - when a same-resource active deployment already exists, `deployments.create` may supersede that
-  prior attempt through internal cancellation plus durable execution fencing; this does not
-  reintroduce a public `deployments.cancel` command and is governed by
+  prior attempt through internal cancellation plus durable execution fencing; this is distinct from
+  the public `deployments.cancel` command and is governed by
   [ADR-027: Deployment Supersede And Execution Fencing](./decisions/ADR-027-deployment-supersede-and-execution-fencing.md)
 - `deployments.cleanup-preview` accepts only a trusted preview-scoped source fingerprint and must
   not expand into generic cancel, redeploy, rollback, or resource delete behavior. It removes
@@ -834,12 +866,20 @@ Current boundary:
   runtime logs, provider job logs, audit rows, event streams, outbox/inbox records, process
   attempts, snapshots, runtime artifacts, source workspaces, build cache, resources, servers,
   routes, or business state.
+- `deployments.archive` is a narrow attempt-history lifecycle mutation. It requires exact
+  deployment id confirmation, accepts only terminal attempts, records `archivedAt`, hides archived
+  attempts from default `deployments.list`, and does not delete logs, events, runtime artifacts,
+  provider job logs, audit rows, route state, rollback candidates, or operator-work evidence.
+- `deployments.prune` is a dry-run-first attempt-history retention mutation. It deletes only
+  archived terminal deployment rows older than the cutoff after retained lineage, rollback,
+  supersede, provider-log, runtime-log, and runtime-control references are checked. Guarded rows are
+  reported and preserved.
 - `deployments.recovery-readiness` is the active read-only recovery decision surface. It returns
   retry, redeploy, rollback, rollback-candidate, blocked-reason, and recommended-action facts for
-  Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. Retry, redeploy, and rollback are active write
-  commands that must use its freshness marker when callers have one. The `0.12.x` recovery
-  hardening blocker closes edge-case coverage and records that public `deployments.cancel` remains
-  deferred/rebuild-required under ADR-016, not a new retry/redeploy/rollback operation boundary.
+  Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. Retry, redeploy, rollback, the pre-RC rebuilt
+  `deployments.cancel` active-attempt command, and terminal history maintenance commands
+  `deployments.archive`/`deployments.prune` are active write commands. Cancel and archive require
+  exact deployment id confirmation; cancel coordinates on the same resource-runtime scope.
 - mutation coordination is scope-based, not whole-server based:
   `deployments.create` coordinates by logical resource-runtime scope and
   `deployments.cleanup-preview` coordinates by logical preview-lifecycle scope. Low-level SSH
@@ -1064,9 +1104,11 @@ Product-grade preview policy operations:
   evidence and a planner registry. Mainstream web framework support is a workload-planner concern:
   planners choose base image, package manager/build tool commands, static output or packaged
   artifacts, and start commands while keeping Web/API/CLI command schemas provider-neutral.
-- cancel, manual deployment health check, and reattach are not public
-  operations in the v1 surface. They must be reintroduced only after new source-of-truth specs,
-  test matrices, implementation plans, and Web/API/CLI contracts are accepted.
+- manual deployment health check and write-side reattach are not public operations in the v1
+  surface. They must be reintroduced only after new source-of-truth specs, test matrices,
+  implementation plans, and Web/API/CLI contracts are accepted. `deployments.cancel` has been
+  reintroduced only as a narrow active-attempt command with explicit confirmation and
+  `resource-runtime` coordination.
 - Deployment recovery readiness is active under
   [ADR-034: Deployment Recovery Readiness](./decisions/ADR-034-deployment-recovery-readiness.md).
   The `deployments.recovery-readiness` query is the shared read-only source for retry, redeploy,
@@ -1357,9 +1399,11 @@ Runtime log archive retention operations:
   Docker/Compose/Swarm/SSH/PM2/systemd/file-tail/provider log stores, deployment logs, provider job
   logs, audit rows, domain event streams, outbox/inbox records, process attempts, snapshots,
   runtime artifacts, source workspaces, build cache, or business state
-- remote-state stale-lock recovery, migration execution, backup restore, state-root prune, and
-  runtime artifact/workspace prune remain future extensions when their governed commands and
-  persisted read models exist
+- remote-state stale-lock recovery, migration execution, backup/marker diagnostics, and state-root
+  marker pruning are active through the SSH remote-state lifecycle, remote-state diagnostics read
+  model, and `servers.capacity.prune` remote-state-marker category. Full raw remote PGlite backup
+  restore is not exposed as an operator shortcut; remote sync restore/recovery remains bounded to
+  the SSH state lifecycle and guarded upload path rather than `operator-work.*`.
 
 Terminal session lifecycle boundary:
 - `terminal-sessions.list` and `terminal-sessions.show` expose only active ephemeral session

@@ -522,16 +522,18 @@ The drift comparison uses the same Resource Profile Drift Visibility vocabulary 
 | `network` | internal port, upstream protocol, exposure mode, target service, host port | `resources.configure-network` |
 | `access` | generated access mode and generated route path prefix from trusted entry inputs when supported | `resources.configure-access` |
 | `health` | HTTP health policy fields | `resources.configure-health` |
-| `configuration` | resource-scoped variable override differences when repository config or trusted flags target resource scope | `resources.set-variable` or `resources.unset-variable` |
+| `configuration` | resource-scoped effective configuration overrides that shadow repository config or trusted entry config keys | `resources.set-variable` or `resources.unset-variable` |
 
 Default CLI config deploy behavior for existing-resource drift is fail-first: if the normalized
 profile differs from the current Resource profile and the entrypoint is not explicitly applying the
 matching command step, the workflow returns `resource_profile_drift`, phase
 `resource-profile-resolution`, and does not dispatch `deployments.create`. The error details must
 include safe `resourceId`, drift `section`, `fieldPath`, optional config pointer, and suggested
-operation key or CLI command. Current Resource profile versus latest deployment snapshot drift is
-informational and must not block a config deploy when the normalized profile already matches the
-current Resource profile.
+operation key or CLI command. For config entries, the preflight reads masked effective Resource
+configuration through `resources.effective-config` and blocks only when a resource-scoped effective
+override would shadow an entry config key; raw config and secret values must not appear in the
+error. Current Resource profile versus latest deployment snapshot drift is informational and must
+not block a config deploy when the normalized profile already matches the current Resource profile.
 
 ## Secret And Credential Rules
 
@@ -702,7 +704,7 @@ Config-file errors use stable codes and phases:
 | `validation_error` | `source-link-resolution` | No | Source fingerprint is ambiguous, missing required stable identity, or points at another context without explicit relink. |
 | `validation_error` | `config-domain-resolution` | No | Config domain intent cannot map safely to server-applied or managed domain workflow state, including invalid host/path/TLS shape, missing redirect target, self-redirect, redirect loop, redirect-to-redirect, or unsupported redirect policy. |
 | `unsupported_config_field` | `config-capability-resolution` | No | Known future field such as CPU/memory/replicas or rollout policy is not enforceable by current workflow/resource/runtime target specs. |
-| `resource_profile_drift` | `resource-profile-resolution` | No | Existing resource differs from the normalized config/entry profile and the workflow did not explicitly dispatch the required resource configuration command before deployment. Details include resource id, section, field path, config pointer when known, and suggested command. |
+| `resource_profile_drift` | `resource-profile-resolution` | No | Existing resource differs from the normalized config/entry profile, including resource-scoped effective config overrides that would shadow entry config keys, and the workflow did not explicitly dispatch the required resource configuration command before deployment. Details include resource id, section, field path, config pointer when known, and suggested command; raw config and secret values are omitted. |
 | `infra_error` | `proxy-domain-realization` | Conditional | Server-applied proxy domain route could not be rendered, applied, reloaded, or verified on the target. |
 
 ## Current Implementation Notes And Migration Gaps

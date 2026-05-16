@@ -22,6 +22,7 @@ catalog entry and schemas.
 - [ADR-037: Source Event Auto Deploy Ownership](../decisions/ADR-037-source-event-auto-deploy-ownership.md)
 - [resources.configure-auto-deploy](../commands/resources.configure-auto-deploy.md)
 - [source-events.ingest](../commands/source-events.ingest.md)
+- [source-events.prune](../commands/source-events.prune.md)
 - [source-events.list](../queries/source-events.list.md)
 - [source-events.show](../queries/source-events.show.md)
 - [Source Event Auto Deploy Error Spec](../errors/source-events.md)
@@ -58,6 +59,13 @@ catalog entry and schemas.
 | --- | --- | --- | --- | --- |
 | `SRC-AUTO-QUERY-001` | Operator lists source events by Resource. | Query returns only safe scoped records with status, dedupe, ignored reasons, and created deployment ids. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts`; `packages/application/test/operation-catalog-boundary.test.ts`; package typechecks | Passing |
 | `SRC-AUTO-QUERY-002` | Operator shows one source event. | Query returns safe verification, policy result, ignored/blocked/failed reason, and created deployment details without raw payload or secrets. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts`; `packages/application/test/operation-catalog-boundary.test.ts`; package typechecks | Passing |
+| `SRC-AUTO-REPLAY-001` | Operator replays a retained safe source event delivery. | Command reloads the retained safe source facts, re-evaluates current Resource auto-deploy policy, dispatches through ordinary `deployments.create`, and updates source event outcome without raw payload/signature/secret access. | `packages/application/test/source-events.test.ts` | Passing |
+| `SRC-AUTO-REPLAY-002` | CLI and HTTP/oRPC replay entrypoints. | `appaloft source-event replay <sourceEventId> --resource <resourceId>` and `POST /api/source-events/{sourceEventId}/replay` dispatch `ReplaySourceEventCommand` through the command bus with shared schema. | `packages/adapters/cli/test/source-event-command.test.ts`; `packages/orpc/test/source-events.http.test.ts`; `packages/application/test/operation-catalog-boundary.test.ts` | Passing |
+| `SRC-AUTO-REPLAY-003` | Replay requires scoped lookup. | Missing project/resource scope fails with `source_event_scope_required`; missing retained record fails with `source_event_not_found`. | `packages/application/test/source-events.test.ts`; `packages/orpc/test/source-events.http.test.ts` | Passing |
+| `SRC-AUTO-REPLAY-004` | Public docs/help and future tool metadata. | Operation catalog, docs registry, CLI help, OpenAPI/SDK metadata, and generated future tool descriptors describe replay as safe delivery replay, not raw webhook replay. | `packages/docs-registry/test/operation-coverage.test.ts`; `packages/openapi/test/openapi-reference.test.ts`; `packages/sdk/test/generated-operations.test.ts`; `packages/application/test/operation-catalog-boundary.test.ts` | Passing |
+| `SRC-AUTO-PRUNE-001` | Operator dry-runs source event retention by cutoff and optional filters. | Command defaults to dry-run, returns matched counts by status/source kind, and deletes no retained delivery rows. | `packages/application/test/source-events.test.ts`; `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
+| `SRC-AUTO-PRUNE-002` | Operator explicitly prunes retained source events. | Only rows matching cutoff and optional project/resource/status/source-kind filters are deleted; newer or differently scoped events remain readable. | `packages/persistence/pg/test/source-events.pglite.test.ts` | Passing |
+| `SRC-AUTO-PRUNE-003` | CLI, HTTP/oRPC, catalog, public docs, and future tool metadata. | `appaloft source-event prune --before <iso>` and `POST /api/source-events/prune` dispatch `PruneSourceEventsCommand` through shared schema; operation catalog, docs registry, OpenAPI/SDK metadata, and help anchors describe retention cleanup as safe diagnostics cleanup, not webhook replay. | `packages/adapters/cli/test/source-event-command.test.ts`; `packages/orpc/test/source-events.http.test.ts`; `packages/application/test/operation-catalog-boundary.test.ts`; `packages/docs-registry/test/operation-coverage.test.ts`; `packages/openapi/test/openapi-reference.test.ts`; `packages/sdk/test/generated-operations.test.ts` | Passing |
 
 ## Entrypoint Coverage
 
@@ -75,9 +83,11 @@ Resource source binding, source fingerprint link state, manual deployment admiss
 Resource-owned auto-deploy policy state behavior, active configure command entrypoints, Web
 auto-deploy settings, and Resource repository persistence exist. Source-event command/query
 handling, generic signed source-event verification, durable source-event dedupe/read-model
-persistence, policy matching for ignored ref outcomes, and active CLI/HTTP/oRPC source event read
-surfaces also exist. Matching source events can dispatch through the existing deployment admission
-use case at the application boundary. The Resource-scoped generic signed HTTP route now dispatches
+persistence, policy matching for ignored ref outcomes, active CLI/HTTP/oRPC source event read
+surfaces, and operator-requested safe source-event replay also exist. Matching source events can
+dispatch through the existing deployment admission
+use case at the application boundary. Source-event retention prune is active as a dry-run-first
+operator command over retained safe delivery diagnostics. The Resource-scoped generic signed HTTP route now dispatches
 the internal `ResolveGenericSignedSourceEventSecretQuery`, which asks the Resource aggregate to
 resolve `resource-secret:<KEY>`, verifies `X-Appaloft-Signature`, dispatches `source-events.ingest` with
 `scopeResourceId`, and keeps dedupe scoped to the route Resource. Event dispatch, dedupe, Web

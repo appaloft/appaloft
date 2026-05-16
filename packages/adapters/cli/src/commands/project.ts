@@ -1,8 +1,12 @@
 import {
   ArchiveProjectCommand,
+  CheckProjectDeleteSafetyQuery,
   CreateProjectCommand,
+  DeleteProjectCommand,
   ListProjectsQuery,
   RenameProjectCommand,
+  RestoreProjectCommand,
+  SetProjectDescriptionCommand,
   ShowProjectQuery,
 } from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
@@ -47,6 +51,21 @@ const renameCommand = EffectCommand.make(
   ({ name, projectId }) => runCommand(RenameProjectCommand.create({ projectId, name })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectRename));
 
+const setDescriptionCommand = EffectCommand.make(
+  "set-description",
+  {
+    projectId: projectIdArg,
+    description: descriptionOption,
+  },
+  ({ description, projectId }) =>
+    runCommand(
+      SetProjectDescriptionCommand.create({
+        projectId,
+        description: optionalValue(description),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectSetDescription));
+
 const archiveCommand = EffectCommand.make(
   "archive",
   {
@@ -62,6 +81,37 @@ const archiveCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectArchive));
 
+const restoreCommand = EffectCommand.make(
+  "restore",
+  {
+    projectId: projectIdArg,
+  },
+  ({ projectId }) => runCommand(RestoreProjectCommand.create({ projectId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectRestore));
+
+const deleteCheckCommand = EffectCommand.make(
+  "delete-check",
+  {
+    projectId: projectIdArg,
+  },
+  ({ projectId }) => runQuery(CheckProjectDeleteSafetyQuery.create({ projectId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectDeleteCheck));
+
+const deleteCommand = EffectCommand.make(
+  "delete",
+  {
+    projectId: projectIdArg,
+    confirm: Options.text("confirm"),
+  },
+  ({ confirm, projectId }) =>
+    runCommand(
+      DeleteProjectCommand.create({
+        projectId,
+        confirmation: { projectId: confirm },
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectDelete));
+
 export const projectCommand = EffectCommand.make("project").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.project),
   EffectCommand.withSubcommands([
@@ -69,6 +119,10 @@ export const projectCommand = EffectCommand.make("project").pipe(
     listCommand,
     showCommand,
     renameCommand,
+    setDescriptionCommand,
     archiveCommand,
+    restoreCommand,
+    deleteCheckCommand,
+    deleteCommand,
   ]),
 );

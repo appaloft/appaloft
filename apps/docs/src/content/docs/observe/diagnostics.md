@@ -169,9 +169,15 @@ Docker build cache 和 unused image 清理必须显式选择 category：
 appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --category docker-build-cache --category unused-images
 ```
 
+旧 SSH remote-state marker archives 也必须显式选择 category：
+
+```bash title="Dry-run remote-state marker prune"
+appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --category remote-state-markers
+```
+
 破坏性 prune 仍然需要 `--dry-run false`。这个命令不会运行 broad `docker system prune`，
 也不会执行 Docker volume prune；它会保留 Appaloft state roots、active runtimes、rollback
-candidates、deployment snapshots、audit/events、logs 和业务状态。
+candidates、live remote state、deployment snapshots、audit/events、logs 和业务状态。
 
 <h2 id="scheduled-runtime-prune-policy">Scheduled runtime prune policy</h2>
 

@@ -13,6 +13,7 @@ import {
 import { err, ok, type Result } from "../shared/result";
 import { DeploymentStatusValue } from "../shared/state-machine";
 import {
+  type ArchivedAt,
   type CreatedAt,
   type FinishedAt,
   type GeneratedAt,
@@ -100,6 +101,7 @@ export interface DeploymentState {
   rollbackOfDeploymentId?: DeploymentId;
   supersedesDeploymentId?: DeploymentId;
   supersededByDeploymentId?: DeploymentId;
+  archivedAt?: ArchivedAt;
 }
 
 export interface DeploymentExecutionContinuation {
@@ -133,6 +135,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     rollbackOfDeploymentId?: DeploymentId;
     supersedesDeploymentId?: DeploymentId;
     supersededByDeploymentId?: DeploymentId;
+    archivedAt?: ArchivedAt;
   }): Result<Deployment> {
     if (!input.runtimePlan.hasSteps()) {
       return err(domainError.validation("Runtime plan must contain at least one step"));
@@ -166,6 +169,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
         ...(input.supersededByDeploymentId
           ? { supersededByDeploymentId: input.supersededByDeploymentId }
           : {}),
+        ...(input.archivedAt ? { archivedAt: input.archivedAt } : {}),
       }),
     );
   }
@@ -320,6 +324,37 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     return this.state.status.canRetryRecovery();
   }
 
+  canArchive(): boolean {
+    return this.state.status.isTerminal();
+  }
+
+  isArchived(): boolean {
+    return Boolean(this.state.archivedAt);
+  }
+
+  archive(at: ArchivedAt): Result<void> {
+    if (this.isArchived()) {
+      return ok(undefined);
+    }
+
+    if (!this.canArchive()) {
+      return err(
+        domainError.deploymentArchiveNotAllowed("Deployment must be terminal before archive", {
+          deploymentId: this.state.id.value,
+          status: this.state.status.value,
+        }),
+      );
+    }
+
+    this.state.archivedAt = at;
+    this.recordDomainEvent("deployment.archived", at, {
+      ...this.recoveryEventPayload(),
+      archivedAt: at.value,
+      status: this.state.status.value,
+    });
+    return ok(undefined);
+  }
+
   resolveExecutionContinuation(): DeploymentExecutionContinuation {
     const allowed =
       this.state.status.allowsExecutionContinuation() && !this.state.supersededByDeploymentId;
@@ -329,11 +364,20 @@ export class Deployment extends AggregateRoot<DeploymentState> {
       ...(this.state.supersededByDeploymentId
         ? { supersededByDeploymentId: this.state.supersededByDeploymentId }
         : {}),
+      ...(this.state.archivedAt ? { archivedAt: this.state.archivedAt } : {}),
     };
   }
 
   requiresRuntimeCancellationForSupersede(): boolean {
     return this.state.status.requiresRuntimeCancellationForSupersede();
+  }
+
+  canCancel(): boolean {
+    return this.state.status.canCancel();
+  }
+
+  requiresRuntimeCancellationForManualCancel(): boolean {
+    return this.state.status.requiresRuntimeCancellationForManualCancel();
   }
 
   hasRealizedAccessRoute(expectation: AccessRouteExpectation): boolean {

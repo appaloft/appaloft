@@ -29,7 +29,11 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft project list` - `projects.list`
 - `appaloft project show <projectId>` - `projects.show`
 - `appaloft project rename <projectId> --name <name>` - `projects.rename`
+- `appaloft project set-description <projectId> --description <description>` - `projects.set-description`
 - `appaloft project archive <projectId>` - `projects.archive`
+- `appaloft project restore <projectId>` - `projects.restore`
+- `appaloft project delete-check <projectId>` - `projects.delete-check`
+- `appaloft project delete <projectId> --confirm <projectId>` - `projects.delete`
 - `appaloft server register` - `servers.register`
 - `appaloft server credential <serverId>` - `servers.configure-credential`
 - `appaloft server credential-create` - `credentials.create-ssh`
@@ -62,6 +66,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource archive <resourceId>` - `resources.archive`
 - `appaloft resource delete <resourceId> --confirm-slug <slug>` - `resources.delete`
 - `appaloft resource configure-health <resourceId>` - `resources.configure-health`
+- `appaloft resource reset-health <resourceId>` - `resources.reset-health`
 - `appaloft resource configure-source <resourceId>` - `resources.configure-source`
 - `appaloft resource configure-runtime <resourceId>` - `resources.configure-runtime`
 - `appaloft resource configure-network <resourceId>` - `resources.configure-network`
@@ -70,6 +75,11 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource storage attach <resourceId>` - `resources.attach-storage`
 - `appaloft resource storage detach <resourceId> <attachmentId>` - `resources.detach-storage`
 - `appaloft resource set-variable <resourceId> <key> <value>` - `resources.set-variable`
+- `appaloft resource secrets create <resourceId> <key> <value>` - `resources.secrets.create`
+- `appaloft resource secrets rotate <resourceId> <key> <value>` - `resources.secrets.rotate`
+- `appaloft resource secrets delete <resourceId> <key>` - `resources.secrets.delete`
+- `appaloft resource secrets list <resourceId>` - `resources.secrets.list`
+- `appaloft resource secrets show <resourceId> <key>` - `resources.secrets.show`
 - `appaloft resource import-variables <resourceId> --content <dotenv>` - `resources.import-variables`
 - `appaloft resource unset-variable <resourceId> <key>` - `resources.unset-variable`
 - `appaloft resource effective-config <resourceId>` - `resources.effective-config`
@@ -86,6 +96,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource diagnose <resourceId>` - `resources.diagnostic-summary`
 - `appaloft resource access-failure <requestId>` - `resources.access-failure-evidence.lookup`
 - `appaloft resource health <resourceId>` - `resources.health`
+- `appaloft resource health-history <resourceId> --from <iso> --to <iso>` - `resources.health-history`
 - `appaloft resource proxy-config <resourceId>` - `resources.proxy-configuration.preview`
 - `appaloft dependency postgres provision` - `dependency-resources.provision-postgres`
 - `appaloft dependency postgres import` - `dependency-resources.import-postgres`
@@ -140,6 +151,9 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft deployments retry <deploymentId>` - `deployments.retry`
 - `appaloft deployments redeploy <resourceId>` - `deployments.redeploy`
 - `appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>` - `deployments.rollback`
+- `appaloft deployments cancel <deploymentId> --confirm <deploymentId>` - `deployments.cancel`
+- `appaloft deployments archive <deploymentId> --confirm <deploymentId>` - `deployments.archive`
+- `appaloft deployments prune --before <iso>` - `deployments.prune`
 - `appaloft resource runtime stop <resourceId>` - `resources.runtime.stop`
 - `appaloft resource runtime start <resourceId>` - `resources.runtime.start`
 - `appaloft resource runtime restart <resourceId>` - `resources.runtime.restart`
@@ -157,7 +171,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft work cancel <workId>` - `operator-work.cancel`
 - `appaloft work retry <workId>` - `operator-work.retry`
 - `appaloft work prune --before <iso>` - `operator-work.prune`
+- `appaloft source-links list` - `source-links.list`
+- `appaloft source-links show <sourceFingerprint>` - `source-links.show`
 - `appaloft source-links relink` - `source-links.relink`
+- `appaloft source-links delete <sourceFingerprint>` - `source-links.delete`
 - `appaloft audit-event list --aggregate <aggregateId>` - `audit-events.list`
 - `appaloft audit-event show <auditEventId> --aggregate <aggregateId>` - `audit-events.show`
 - `appaloft audit-event prune --before <iso>` - `audit-events.prune`
@@ -178,6 +195,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft provider-job-log prune --before <iso>` - `provider-job-logs.prune`
 - `appaloft source-event list --resource <resourceId> | --project <projectId>` - `source-events.list`
 - `appaloft source-event show <sourceEventId> --resource <resourceId> | --project <projectId>` - `source-events.show`
+- `appaloft source-event replay <sourceEventId> --resource <resourceId> | --project <projectId>` - `source-events.replay`
+- `appaloft source-event prune --before <iso>` - `source-events.prune`
 - `appaloft default-access configure` - `default-access-domain-policies.configure`
 - `appaloft default-access list` - `default-access-domain-policies.list`
 - `appaloft default-access show --scope system|deployment-target [--server <serverId>]` - `default-access-domain-policies.show`

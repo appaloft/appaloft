@@ -1,11 +1,20 @@
-import { RelinkSourceLinkCommand } from "@appaloft/application";
+import {
+  DeleteSourceLinkCommand,
+  ListSourceLinksQuery,
+  RelinkSourceLinkCommand,
+  ShowSourceLinkQuery,
+} from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
-import { optionalValue, runCommand } from "../runtime.js";
+import { optionalNumber, optionalValue, runCommand, runQuery } from "../runtime.js";
 import { type DeploymentStateBackendKind } from "./deployment-state.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const sourceFingerprintArg = Args.text({ name: "sourceFingerprint" });
+const listProjectOption = Options.text("project").pipe(Options.optional);
+const listResourceOption = Options.text("resource").pipe(Options.optional);
+const listServerOption = Options.text("server").pipe(Options.optional);
+const limitOption = Options.text("limit").pipe(Options.optional);
 const projectOption = Options.text("project");
 const environmentOption = Options.text("environment");
 const resourceOption = Options.text("resource");
@@ -35,6 +44,33 @@ const deploymentStateBackendKinds = [
 const stateBackendOption = Options.choice("state-backend", deploymentStateBackendKinds).pipe(
   Options.optional,
 );
+
+const listCommand = EffectCommand.make(
+  "list",
+  {
+    project: listProjectOption,
+    resource: listResourceOption,
+    server: listServerOption,
+    limit: limitOption,
+  },
+  ({ limit, project, resource, server }) =>
+    runQuery(
+      ListSourceLinksQuery.create({
+        projectId: optionalValue(project),
+        resourceId: optionalValue(resource),
+        serverId: optionalValue(server),
+        limit: optionalNumber(limit),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.sourceLinkList));
+
+const showCommand = EffectCommand.make(
+  "show",
+  {
+    sourceFingerprint: sourceFingerprintArg,
+  },
+  ({ sourceFingerprint }) => runQuery(ShowSourceLinkQuery.create({ sourceFingerprint })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.sourceLinkShow));
 
 const relinkCommand = EffectCommand.make(
   "relink",
@@ -95,7 +131,22 @@ const relinkCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.sourceLinkRelink));
 
+const deleteCommand = EffectCommand.make(
+  "delete",
+  {
+    sourceFingerprint: sourceFingerprintArg,
+    reason: reasonOption,
+  },
+  ({ reason, sourceFingerprint }) =>
+    runCommand(
+      DeleteSourceLinkCommand.create({
+        sourceFingerprint,
+        reason: optionalValue(reason),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.sourceLinkDelete));
+
 export const sourceLinksCommand = EffectCommand.make("source-links").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.sourceLinks),
-  EffectCommand.withSubcommands([relinkCommand]),
+  EffectCommand.withSubcommands([listCommand, showCommand, relinkCommand, deleteCommand]),
 );

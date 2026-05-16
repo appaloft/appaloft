@@ -19,6 +19,9 @@ import {
   type RegisterServerCommandInput,
   type ResourceDetail,
   type ResourceDetailProfileDiagnostic,
+  ResourceEffectiveConfigQuery,
+  type ResourceEffectiveConfigView,
+  type ResourceProfileConfigurationEntry,
   type ResourceSummary,
   resourceProfileFromResourceDetail,
   type ServerSummary,
@@ -1547,6 +1550,57 @@ function primaryProfileDrift(diagnostics: ResourceDetailProfileDiagnostic[]) {
   return diagnostics.find((diagnostic) => diagnostic.code === "resource_profile_drift");
 }
 
+function configurationIdentity(input: { key: string; exposure: string }): string {
+  return `${input.key}:${input.exposure}`;
+}
+
+function entryConfigurationFromSeed(
+  seed: DeploymentPromptSeed,
+): ResourceProfileConfigurationEntry[] | undefined {
+  if (!seed.environmentVariables || seed.environmentVariables.length === 0) {
+    return undefined;
+  }
+
+  return seed.environmentVariables.map((variable) => ({
+    key: variable.key,
+    value: variable.value,
+    kind: variable.kind,
+    exposure: variable.exposure,
+    scope: variable.scope ?? "environment",
+    isSecret: variable.isSecret ?? variable.kind === "secret",
+  }));
+}
+
+function resourceEffectiveConfigurationForEntryDrift(input: {
+  effectiveConfig: ResourceEffectiveConfigView;
+  entryConfiguration: ResourceProfileConfigurationEntry[] | undefined;
+}): ResourceProfileConfigurationEntry[] | undefined {
+  const entryIdentities = new Set(
+    (input.entryConfiguration ?? []).map((entry) => configurationIdentity(entry)),
+  );
+
+  if (entryIdentities.size === 0) {
+    return undefined;
+  }
+
+  const conflictingResourceOverrides = input.effectiveConfig.effectiveEntries.filter(
+    (entry) => entry.scope === "resource" && entryIdentities.has(configurationIdentity(entry)),
+  );
+
+  if (conflictingResourceOverrides.length === 0) {
+    return undefined;
+  }
+
+  return conflictingResourceOverrides.map((entry) => ({
+    key: entry.key,
+    value: entry.value,
+    kind: entry.kind,
+    exposure: entry.exposure,
+    scope: entry.scope,
+    isSecret: entry.isSecret,
+  }));
+}
+
 function profileDriftAdmissionError(
   diagnostics: ResourceDetailProfileDiagnostic[],
   resourceId: string,
@@ -1596,8 +1650,29 @@ function rejectExistingResourceProfileDriftIfNeeded(input: {
     const cli = yield* CliRuntime;
     const result = yield* Effect.promise(() => cli.executeQuery<ResourceDetail>(query));
     const detail = yield* resultToEffect(result);
+    const entryConfiguration = entryConfigurationFromSeed(input.seed);
+    const resourceConfiguration = yield* Effect.gen(function* () {
+      if (!entryConfiguration) {
+        return undefined;
+      }
+
+      const effectiveConfigQuery = yield* resultToEffect(
+        ResourceEffectiveConfigQuery.create({ resourceId }),
+      );
+      const effectiveConfigResult = yield* Effect.promise(() =>
+        cli.executeQuery<ResourceEffectiveConfigView>(effectiveConfigQuery),
+      );
+      const effectiveConfig = yield* resultToEffect(effectiveConfigResult);
+      return resourceEffectiveConfigurationForEntryDrift({
+        effectiveConfig,
+        entryConfiguration,
+      });
+    });
     const diagnostics = compareResourceProfileDrift({
-      resource: resourceProfileFromResourceDetail(detail),
+      resource: {
+        ...resourceProfileFromResourceDetail(detail),
+        ...(resourceConfiguration ? { configuration: resourceConfiguration } : {}),
+      },
       profile: {
         source: sourceBindingForDeploymentInput(
           input.sourceLocator,
@@ -1606,6 +1681,7 @@ function rejectExistingResourceProfileDriftIfNeeded(input: {
         ),
         runtimeProfile: input.runtimeProfile,
         networkProfile: input.networkProfile,
+        ...(entryConfiguration ? { configuration: entryConfiguration } : {}),
       },
       comparison: "resource-vs-entry-profile",
       comparedValueKey: "entryProfileValue",

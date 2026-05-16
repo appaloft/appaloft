@@ -177,7 +177,7 @@ export const publicDocsHelpTopics = {
     id: "project.lifecycle",
     title: "Project lifecycle",
     description:
-      "How to read, rename, and archive projects without turning deployments or runtime state into project-owned actions.",
+      "How to read, rename, describe, archive, restore, check delete safety, and delete projects without turning deployments or runtime state into project-owned actions.",
     page: {
       "zh-CN": "resources/projects",
       "en-US": "en/resources/projects",
@@ -192,7 +192,11 @@ export const publicDocsHelpTopics = {
     aliases: [
       "project show",
       "project rename",
+      "project set description",
       "project archive",
+      "project restore",
+      "project delete check",
+      "project delete",
       "project lifecycle",
       "project settings",
       "deployment snapshot",
@@ -203,7 +207,11 @@ export const publicDocsHelpTopics = {
       "docs/workflows/project-lifecycle.md",
       "docs/queries/projects.show.md",
       "docs/commands/projects.rename.md",
+      "docs/commands/projects.set-description.md",
       "docs/commands/projects.archive.md",
+      "docs/commands/projects.restore.md",
+      "docs/queries/projects.delete-check.md",
+      "docs/commands/projects.delete.md",
       "docs/testing/project-lifecycle-test-matrix.md",
       "docs/specs/008-project-lifecycle-settings-closure/spec.md",
     ],
@@ -522,7 +530,7 @@ export const publicDocsHelpTopics = {
       "en-US": "complete",
     },
     surfaces: ["web", "cli", "http-api", "mcp"],
-    relatedOperation: "source-events.show",
+    relatedOperation: "source-events.replay",
     aliases: [
       "auto deploy recovery",
       "source event failed",
@@ -533,12 +541,42 @@ export const publicDocsHelpTopics = {
     ],
     specReferences: [
       "docs/commands/source-events.ingest.md",
+      "docs/commands/source-events.replay.md",
       "docs/errors/source-events.md",
       "docs/queries/source-events.show.md",
       "docs/queries/deployments.recovery-readiness.md",
     ],
     webSurfaces: [
       "apps/web Resource detail source event diagnostics and deployment recovery links",
+    ],
+  },
+  "source.auto-deploy-retention": {
+    id: "source.auto-deploy-retention",
+    title: "Source event retention",
+    description:
+      "How to dry-run and prune retained safe source event deliveries without replaying raw webhook payloads.",
+    page: {
+      "zh-CN": "deploy/sources",
+      "en-US": "en/deploy/sources",
+    },
+    anchor: "source-auto-deploy-retention",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "source-events.prune",
+    aliases: [
+      "source event retention",
+      "source event prune",
+      "webhook delivery cleanup",
+      "自动部署保留",
+      "source event 清理",
+    ],
+    specReferences: [
+      "docs/commands/source-events.prune.md",
+      "docs/errors/source-events.md",
+      "docs/testing/source-binding-auto-deploy-test-matrix.md",
     ],
   },
   "deployment.source-relink": {
@@ -588,7 +626,7 @@ export const publicDocsHelpTopics = {
     id: "deployment.recovery-readiness",
     title: "Deployment recovery readiness",
     description:
-      "How to inspect retry, redeploy, rollback, and rollback candidate readiness before running recovery actions.",
+      "How to inspect retry, redeploy, cancel, rollback, and rollback candidate readiness before running recovery actions.",
     page: {
       "zh-CN": "deploy/recovery",
       "en-US": "en/deploy/recovery",
@@ -605,9 +643,11 @@ export const publicDocsHelpTopics = {
       "recovery readiness",
       "retry readiness",
       "rollback candidates",
+      "cancel deployment",
       "部署恢复",
       "恢复就绪",
       "回滚候选",
+      "取消部署",
     ],
     specReferences: [
       "docs/decisions/ADR-034-deployment-recovery-readiness.md",
@@ -616,6 +656,16 @@ export const publicDocsHelpTopics = {
       "docs/commands/deployments.retry.md",
       "docs/commands/deployments.redeploy.md",
       "docs/commands/deployments.rollback.md",
+      "docs/commands/deployments.cancel.md",
+      "docs/commands/deployments.archive.md",
+      "docs/commands/deployments.prune.md",
+      "docs/workflows/deployments.cancel.md",
+      "docs/workflows/deployment-archive-prune.md",
+      "docs/errors/deployments.cancel.md",
+      "docs/errors/deployments.archive-prune.md",
+      "docs/events/deployment-archived.md",
+      "docs/testing/deployments.cancel-test-matrix.md",
+      "docs/testing/deployment-archive-prune-test-matrix.md",
       "docs/testing/deployment-recovery-readiness-test-matrix.md",
     ],
     webSurfaces: ["apps/web deployment detail recovery panel"],
@@ -836,6 +886,7 @@ export const publicDocsHelpTopics = {
       "docs/decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md",
       "docs/decisions/ADR-020-resource-health-observation.md",
       "docs/commands/resources.configure-health.md",
+      "docs/commands/resources.reset-health.md",
       "docs/workflows/resource-profile-lifecycle.md",
       "docs/workflows/resource-health-observation.md",
       "docs/testing/resource-profile-lifecycle-test-matrix.md",
@@ -1380,6 +1431,11 @@ export const publicDocsHelpTopics = {
     specReferences: [
       "docs/queries/environments.effective-precedence.md",
       "docs/commands/resources.set-variable.md",
+      "docs/commands/resources.secrets.create.md",
+      "docs/commands/resources.secrets.rotate.md",
+      "docs/commands/resources.secrets.delete.md",
+      "docs/queries/resources.secrets.list.md",
+      "docs/queries/resources.secrets.show.md",
       "docs/commands/resources.import-variables.md",
       "docs/commands/resources.unset-variable.md",
       "docs/testing/environment-effective-precedence-test-matrix.md",
@@ -2552,7 +2608,11 @@ export const publicDocsOperationCoverage = [
   { operationKey: "projects.list", status: "documented", topicId: "project.concept" },
   { operationKey: "projects.show", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "projects.rename", status: "documented", topicId: "project.lifecycle" },
+  { operationKey: "projects.set-description", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "projects.archive", status: "documented", topicId: "project.lifecycle" },
+  { operationKey: "projects.restore", status: "documented", topicId: "project.lifecycle" },
+  { operationKey: "projects.delete-check", status: "documented", topicId: "project.lifecycle" },
+  { operationKey: "projects.delete", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "servers.register", status: "documented", topicId: "server.deployment-target" },
   {
     operationKey: "servers.configure-credential",
@@ -2800,6 +2860,11 @@ export const publicDocsOperationCoverage = [
     topicId: "resource.health-profile",
   },
   {
+    operationKey: "resources.reset-health",
+    status: "documented",
+    topicId: "resource.health-profile",
+  },
+  {
     operationKey: "resources.configure-source",
     status: "documented",
     topicId: "resource.source-profile",
@@ -3015,6 +3080,11 @@ export const publicDocsOperationCoverage = [
     topicId: "observability.health-summary",
   },
   {
+    operationKey: "resources.health-history",
+    status: "documented",
+    topicId: "observability.health-summary",
+  },
+  {
     operationKey: "resources.proxy-configuration.preview",
     status: "documented",
     topicId: "resource.network-profile",
@@ -3033,6 +3103,16 @@ export const publicDocsOperationCoverage = [
     operationKey: "source-events.show",
     status: "documented",
     topicId: "source.auto-deploy-ignored-events",
+  },
+  {
+    operationKey: "source-events.replay",
+    status: "documented",
+    topicId: "source.auto-deploy-recovery",
+  },
+  {
+    operationKey: "source-events.prune",
+    status: "documented",
+    topicId: "source.auto-deploy-retention",
   },
   {
     operationKey: "dependency-resources.provision-postgres",
@@ -3154,6 +3234,31 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "resources.set-variable",
+    status: "documented",
+    topicId: "environment.variable-precedence",
+  },
+  {
+    operationKey: "resources.secrets.create",
+    status: "documented",
+    topicId: "environment.variable-precedence",
+  },
+  {
+    operationKey: "resources.secrets.rotate",
+    status: "documented",
+    topicId: "environment.variable-precedence",
+  },
+  {
+    operationKey: "resources.secrets.delete",
+    status: "documented",
+    topicId: "environment.variable-precedence",
+  },
+  {
+    operationKey: "resources.secrets.list",
+    status: "documented",
+    topicId: "environment.variable-precedence",
+  },
+  {
+    operationKey: "resources.secrets.show",
     status: "documented",
     topicId: "environment.variable-precedence",
   },
@@ -3302,6 +3407,21 @@ export const publicDocsOperationCoverage = [
     status: "documented",
     topicId: "deployment.recovery-readiness",
   },
+  {
+    operationKey: "deployments.cancel",
+    status: "documented",
+    topicId: "deployment.recovery-readiness",
+  },
+  {
+    operationKey: "deployments.archive",
+    status: "documented",
+    topicId: "deployment.recovery-readiness",
+  },
+  {
+    operationKey: "deployments.prune",
+    status: "documented",
+    topicId: "deployment.recovery-readiness",
+  },
   { operationKey: "deployments.logs", status: "documented", topicId: "observability.runtime-logs" },
   {
     operationKey: "deployments.logs.prune",
@@ -3314,7 +3434,22 @@ export const publicDocsOperationCoverage = [
     topicId: "deployment.lifecycle",
   },
   {
+    operationKey: "source-links.list",
+    status: "documented",
+    topicId: "deployment.source-relink",
+  },
+  {
+    operationKey: "source-links.show",
+    status: "documented",
+    topicId: "deployment.source-relink",
+  },
+  {
     operationKey: "source-links.relink",
+    status: "documented",
+    topicId: "deployment.source-relink",
+  },
+  {
+    operationKey: "source-links.delete",
     status: "documented",
     topicId: "deployment.source-relink",
   },

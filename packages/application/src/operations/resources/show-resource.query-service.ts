@@ -41,6 +41,7 @@ import { tokens } from "../../tokens";
 import { type ListResourcesQueryService } from "./list-resources.query-service";
 import {
   compareResourceProfileDrift,
+  type ResourceProfileConfigurationEntry,
   resourceProfileFromDeploymentSnapshot,
 } from "./resource-profile-drift";
 import { type ShowResourceQuery } from "./show-resource.query";
@@ -228,6 +229,17 @@ function accessProfileFromState(
   };
 }
 
+function configurationFromResourceState(state: ResourceState): ResourceProfileConfigurationEntry[] {
+  return state.variables.toState().map((variable) => ({
+    key: variable.key.value,
+    value: variable.value.value,
+    kind: variable.kind.value,
+    exposure: variable.exposure.value,
+    scope: variable.scope.value,
+    isSecret: variable.isSecret,
+  }));
+}
+
 function storageAttachmentsFromState(state: ResourceState): ResourceStorageAttachmentSummary[] {
   return state.storageAttachments.map((attachment) => ({
     id: attachment.id.value,
@@ -342,6 +354,7 @@ function diagnosticsFromState(input: {
           ...(input.runtimeProfile ? { runtimeProfile: input.runtimeProfile } : {}),
           ...(input.networkProfile ? { networkProfile: input.networkProfile } : {}),
           ...(input.accessProfile ? { accessProfile: input.accessProfile } : {}),
+          configuration: configurationFromResourceState(input.state),
         },
         profile: resourceProfileFromDeploymentSnapshot(input.deployment),
         comparison: "resource-vs-latest-snapshot",

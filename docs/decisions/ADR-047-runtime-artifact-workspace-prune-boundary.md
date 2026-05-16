@@ -35,8 +35,10 @@ port.
 - preserve rollback candidates and any artifact/workspace that cannot prove it is outside rollback
   retention;
 - exclude Docker volumes and Appaloft state roots by default;
-- never prune remote `ssh-pglite` state, backups, migration journals, audit/events, deployment
+- never prune remote `ssh-pglite` live state, Appaloft state roots, audit/events, deployment
   snapshots, resource state, server state, dependency data, storage volumes, logs, or route state;
+- prune remote-state marker artifacts only when an explicit category selects bounded old journals,
+  backups, recovery markers, or recovered-lock archives under fixed state-root subdirectories;
 - return bounded diagnostic facts for inspected, matched, skipped, and pruned candidates;
 - keep raw shell output, credentials, environment values, and secret paths out of results and
   errors.
@@ -50,10 +52,10 @@ The first accepted prune categories are:
 | `stopped-containers` | Appaloft-managed stopped containers whose labels prove target ownership and no active runtime dependency. |
 | `preview-workspaces` | Preview-owned materialized source workspaces under the runtime source workspace root when ownership and cutoff can be proven. |
 | `source-workspaces` | Deployment-scoped materialized source workspaces under the runtime source workspace root when no active runtime, diagnostic capture, or rollback candidate depends on them. |
+| `remote-state-markers` | Explicit opt-in cleanup of old SSH remote-state journals, backup archives, recovery markers, and recovered-lock archives under fixed state-root subdirectories; the state root and live PGlite state remain excluded. |
 
-Docker build cache and unused images remain diagnostic-only in this first command. They may be added
-later only after local specs define rollback retention evidence and safe destructive behavior.
-Docker volume prune requires a separate explicit operation.
+Docker build cache and unused images are governed by ADR-050 as explicit opt-in categories. Docker
+volume prune requires a separate explicit operation.
 
 ## Consequences
 

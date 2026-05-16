@@ -233,7 +233,7 @@ async function recordSourceEventProcessAttempt(input: {
   void result;
 }
 
-interface SourceEventOutcome {
+export interface SourceEventOutcome {
   status: "accepted" | "ignored" | "blocked";
   projectId?: string;
   matchedResourceIds: string[];
@@ -254,7 +254,7 @@ function emptySourceEventOutcome(): SourceEventOutcome {
   };
 }
 
-async function evaluateSourceEventPolicyMatch(
+export async function evaluateSourceEventPolicyMatch(
   context: Parameters<SourceEventPolicyReader["listCandidates"]>[0],
   sourceEventPolicyReader: SourceEventPolicyReader,
   sourceKind: IngestSourceEventCommandPayload["sourceKind"],
@@ -352,7 +352,7 @@ async function evaluateSourceEventPolicyMatch(
   };
 }
 
-async function dispatchSourceEventDeployments(
+export async function dispatchSourceEventDeployments(
   context: ExecutionContext,
   sourceEventRecorder: SourceEventRecorder,
   sourceEventDeploymentDispatcher: SourceEventDeploymentDispatcher,
@@ -361,7 +361,7 @@ async function dispatchSourceEventDeployments(
   targets: SourceEventPolicyCandidate[],
 ): Promise<SourceEventRecord> {
   const dispatchResults = new Map<string, SourceEventPolicyResult>();
-  const createdDeploymentIds: string[] = [];
+  const createdDeploymentIds: string[] = [...record.createdDeploymentIds];
 
   for (const target of targets) {
     if (!target.serverId) {

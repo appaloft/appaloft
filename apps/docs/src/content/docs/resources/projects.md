@@ -15,7 +15,11 @@ relatedOperations:
   - projects.create
   - projects.show
   - projects.rename
+  - projects.set-description
   - projects.archive
+  - projects.restore
+  - projects.delete-check
+  - projects.delete
   - resources.create
 sidebar:
   label: "Projects and resources"
@@ -28,17 +32,29 @@ Project 是用户管理一组资源、环境和部署历史的边界。它不是
 
 <h2 id="project-lifecycle">项目生命周期</h2>
 
-项目可以被读取、重命名或归档。归档项目会保留项目、资源和部署历史，但会阻止在该项目下创建新的环境、资源或部署。
+项目可以被读取、重命名、设置描述、归档、恢复、执行删除预检，并在 blocker 清空后删除。归档项目会保留项目、资源和部署历史，但会阻止在该项目下创建新的环境、资源或部署。恢复项目会重新允许新的项目级创建和部署入口。
 
-项目设置里的重命名和归档只改变项目级生命周期。它们不会创建 deployment、不会改写历史 deployment snapshot，也不会立即停止、重启或删除正在运行的 runtime。
+项目设置里的重命名、描述、归档、恢复和删除只改变项目级元数据或生命周期。它们不会创建 deployment、不会改写历史 deployment snapshot，也不会立即停止、重启或删除正在运行的 runtime。
 
 <h3 id="project-rename">重命名项目</h3>
 
 使用 Web、CLI 或 API 重命名项目时，Appaloft 会根据新名称重新生成项目 slug。如果新 slug 已被其他项目使用，请选择另一个名称。
 
+<h3 id="project-description">设置项目描述</h3>
+
+项目描述只用于面向人的元数据。清空描述不会改变项目 slug、资源、环境、部署、访问路由或 runtime 状态。
+
 <h3 id="project-archive">归档项目</h3>
 
 归档适用于不再接收新部署的项目。归档不会删除资源、环境、域名、证书、日志或历史部署；这些对象仍可用于查看和排查。需要清理资源时，请使用对应资源的生命周期操作。
+
+<h3 id="project-restore">恢复项目</h3>
+
+恢复适用于需要重新接收新资源、环境或部署的归档项目。恢复只把项目生命周期改回 active，不会恢复已删除的子对象、重试 deployment、改变域名/证书、清理日志或触碰 runtime 状态。
+
+<h3 id="project-delete">删除项目</h3>
+
+删除归档项目之前先执行 delete-check。只有没有环境、资源、部署历史、source event、域名、证书、日志、审计或 runtime 支持记录依赖该项目时，删除才会启用。项目删除通过 tombstone 把项目从普通项目列表中移除；它不会级联清理，也不会抹掉保留历史。
 
 <h2 id="concept-resource">Resource</h2>
 

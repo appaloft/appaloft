@@ -48,6 +48,11 @@ export const mutationCoordinationPolicies = {
     scopeKind: "resource-runtime",
     mode: "serialize-with-bounded-wait",
   }),
+  cancelDeployment: policy({
+    operationKey: "deployments.cancel",
+    scopeKind: "resource-runtime",
+    mode: "serialize-with-bounded-wait",
+  }),
   stopResourceRuntime: policy({
     operationKey: "resources.runtime.stop",
     scopeKind: "resource-runtime",

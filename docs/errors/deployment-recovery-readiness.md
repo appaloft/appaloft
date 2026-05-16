@@ -4,7 +4,9 @@
 
 Error contract for active deployment recovery operations. These errors are public contracts for
 `deployments.recovery-readiness`, `deployments.retry`, `deployments.redeploy`, and
-`deployments.rollback`; remaining work is edge-case hardening, not boundary activation.
+`deployments.rollback`; `deployments.cancel` has its own command-specific error spec because it
+mutates an active attempt rather than creating a recovery attempt. Remaining work is edge-case
+hardening, not boundary activation.
 
 ## Governing Sources
 
@@ -14,6 +16,7 @@ Error contract for active deployment recovery operations. These errors are publi
 - [deployments.retry Command Spec](../commands/deployments.retry.md)
 - [deployments.redeploy Command Spec](../commands/deployments.redeploy.md)
 - [deployments.rollback Command Spec](../commands/deployments.rollback.md)
+- [deployments.cancel Error Spec](./deployments.cancel.md)
 - [Deployment Observation And Recovery Hardening](../specs/071-deployment-observation-and-recovery/spec.md)
 - [Deployment Recovery Readiness Test Matrix](../testing/deployment-recovery-readiness-test-matrix.md)
 
