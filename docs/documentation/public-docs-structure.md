@@ -64,6 +64,7 @@ The canonical IA v2 groups are:
 | Access, Domains And TLS | Generated access URLs, default access policy, custom domains, ownership, certificates, DNS troubleshooting. | Explain how deployed resources become reachable. | Operators |
 | Observe And Troubleshoot | Status, logs, health summaries, diagnostics, common failures, safe support payloads. | Explain what happened and how to recover safely. | Operators and support |
 | Integrations | GitHub repositories, providers, plugins. | Explain external systems and extension points. | Integrators and advanced operators |
+| Agent Workflows | Agent deploy skill and future tool/skill protocols. | Explain how AI agents should use existing Appaloft entrypoints safely. | Agent authors and automation users |
 | Reference | CLI, HTTP API, Web console, errors, statuses, configuration reference. | Provide exact commands, routes, fields, and status contracts. | Automation authors and integrators |
 | Self-Hosting And Operations | Binary bundle, Docker image, static asset overrides, database status/migration, backup/restore, upgrade. | Explain operating Appaloft itself. | Self-hosters and platform operators |
 

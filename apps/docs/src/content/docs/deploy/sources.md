@@ -57,6 +57,10 @@ CLI source 示例：
 appaloft deploy ./apps/web --method static --publish-dir build
 ```
 
+```bash title="已构建静态输出"
+appaloft deploy ./dist --as static-site
+```
+
 ```bash title="Git 仓库"
 appaloft deploy https://github.com/example/web \
   --method static \
@@ -73,6 +77,16 @@ appaloft resource configure-source res_web \
   --git-ref main \
   --base-directory apps/web
 ```
+
+<h2 id="local-static-output">本地静态输出</h2>
+
+当用户已经有 `dist`、`build` 或类似静态输出目录时，可以把这个目录作为 source 直接交给 Appaloft：
+
+```bash
+appaloft deploy ./dist --as static-site
+```
+
+这个入口只改变用户层交互：它会归一化为静态站点资源和普通部署请求，不会新增 `quick-deploy.create` 操作，也不会把目录上传到 Appaloft 托管云。除非用户显式选择托管功能，部署目标仍然是用户选择的服务器或环境。
 
 <h2 id="deployment-source-output">部署后会看到什么</h2>
 

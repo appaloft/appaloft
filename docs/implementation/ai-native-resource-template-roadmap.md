@@ -1,10 +1,13 @@
-# AI-Native Resource Template And MCP Roadmap
+# AI-Native Skill, Resource Template, And MCP Roadmap
 
 ## Status
 
-Future planning only. This document records product direction and source-of-truth constraints for
-later Spec Rounds. It does not define a current capability, does not authorize Code Round work, and
-does not replace accepted ADRs, command/query specs, workflow specs, or the operation catalog.
+This document records product direction and source-of-truth constraints for AI-native work.
+The pre-v1 agent deploy skill is now a required planning track governed by
+[Appaloft Agent Deploy Skill](../specs/072-appaloft-agent-deploy-skill/spec.md). Later Resource
+Template, MCP, gateway, and AgentOps tracks remain future planning only until their own Spec Rounds.
+This document does not authorize Code Round work and does not replace accepted ADRs,
+command/query specs, workflow specs, or the operation catalog.
 
 ## Source Of Truth
 
@@ -35,7 +38,7 @@ BYOS also means keeping tools, secrets, internal data, and agent actions under t
 
 ## Existing Foundation To Preserve
 
-Future template, MCP, and AI-native work must fit the existing Appaloft model:
+Future skill, template, MCP, and AI-native work must fit the existing Appaloft model:
 
 - `Resource` is the project/environment-scoped deployable unit. Applications, services, workers,
   static sites, databases, and Compose stacks already live under this language.
@@ -57,6 +60,13 @@ without an explicit decision.
 
 ## Core Principle
 
+For v1 usability, an agent deploy skill comes before MCP.
+
+The skill is not a transport and not a new business operation. It is an agent-readable deployment
+protocol over existing CLI/API/Web behavior: inspect source, exclude secrets, choose or create
+context, plan, deploy, observe, and return URL plus diagnostics. MCP remains the later formal tool
+transport generated from the operation catalog.
+
 MCP servers are deployable Resources or dependency-backed workloads with AI-tool capabilities, not a
 separate deployment engine.
 
@@ -73,20 +83,44 @@ features.
 ## Layered Roadmap
 
 Version labels are intentionally tentative. The current product roadmap reserves `0.10.0` for
-self-hosted auth and organization bootstrap, then moves toward `1.0.0-rc` and `1.0.0`. These tracks
-are post-`1.0.0` by default unless maintainers deliberately insert another pre-GA minor line after
-`0.10.0`.
+self-hosted auth and organization bootstrap, then moves toward `1.0.0-rc` and `1.0.0`.
+The Agent Deploy Skill is pre-v1 because it is the simplest AI-native user affordance. Resource
+Template, MCP, gateway, and AgentOps tracks are post-`1.0.0` by default unless maintainers
+deliberately insert another pre-GA minor line.
 
 | Order | Default target | If pulled before GA | Track | State |
 | --- | --- | --- | --- | --- |
-| 1 | Post-1.0 Track 1 | `0.11.0+` candidate after `0.10.0` | Resource Template / Workload Profile Foundation | Future Spec Round |
-| 2 | Post-1.0 Track 2 | `0.12.0+` candidate | Template Resolution And Deployment Planning | Future Spec Round |
-| 3 | Post-1.0 Track 3 | `0.13.0+` candidate | Template Catalog / Registry | Future Spec Round |
-| 4 | Post-1.0 Track 4 | `0.14.0+` candidate | AI Tool Server / MCP Capability | Future Spec Round |
-| 5 | Post-1.0 Track 5 | `0.15.0+` candidate | Appaloft-as-MCP Interface Planning | Future Spec Round |
-| 6 | Post-1.0 Track 6 | `0.16.0+` candidate | Curated AI Tool Server Templates | Future Spec Round |
-| 7 | Post-1.0 Track 7 | `0.17.0+` or later candidate | MCP Gateway / Tool Gateway | Future Spec Round |
+| 0 | Pre-1.0 GA readiness | Required before GA | Appaloft Agent Deploy Skill | Spec Round accepted candidate |
+| 1 | Post-1.0 Track 1 | Explicit pre-GA pull-forward only | Resource Template / Workload Profile Foundation | Future Spec Round |
+| 2 | Post-1.0 Track 2 | Explicit pre-GA pull-forward only | Template Resolution And Deployment Planning | Future Spec Round |
+| 3 | Post-1.0 Track 3 | Explicit pre-GA pull-forward only | Template Catalog / Registry | Future Spec Round |
+| 4 | Post-1.0 Track 4 | Explicit pre-GA pull-forward only | AI Tool Server / MCP Capability | Future Spec Round |
+| 5 | Post-1.0 Track 5 | Explicit pre-GA pull-forward only | Appaloft-as-MCP Interface Planning | Future Spec Round |
+| 6 | Post-1.0 Track 6 | Explicit pre-GA pull-forward only | Curated AI Tool Server Templates | Future Spec Round |
+| 7 | Post-1.0 Track 7 | Explicit pre-GA pull-forward only | MCP Gateway / Tool Gateway | Future Spec Round |
 | 8 | Later AI-native tracks | Post-1.0+ | Observability, AgentOps, cost governance, eval hooks, model gateway, agent runtime | Future discovery |
+
+### Track 0: Appaloft Agent Deploy Skill
+
+Goal: ship a v1-ready agent deploy skill before requiring MCP.
+
+Planning rules:
+
+- The skill explains how coding agents deploy through existing CLI/API behavior.
+- It must point to stable public docs anchors and reuse operation-catalog language without exposing
+  internal DDD/CQRS terminology.
+- It must include safe source inspection, secret/cache exclusion, local static output handling,
+  context selection/creation, plan/deploy/observe sequencing, URL-first outcome output, and
+  recovery guidance.
+- It must not add new commands, hidden API endpoints, hosted artifact storage, or MCP-only
+  semantics.
+- It may later link to MCP tools after Appaloft-as-MCP is productized, but MCP is not required for
+  the v1 skill path.
+
+Source of truth:
+
+- [Appaloft Agent Deploy Skill](../specs/072-appaloft-agent-deploy-skill/spec.md)
+- [URL-First Deployment Entry Experience](../specs/071-url-first-deployment-entry-experience/spec.md)
 
 ### Track 1: Resource Template / Workload Profile Foundation
 

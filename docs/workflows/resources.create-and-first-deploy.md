@@ -220,6 +220,13 @@ static draft fields and dispatch them through `resources.create`. Local Docker s
 verifies generated nginx packaging and runtime health, and generic-SSH Docker static smoke coverage
 is bound to the GitHub Actions secret-gated plus local explicit SSH gate.
 
+URL-first first-deploy and upload-like local static output entry are governed follow-ups, not new
+domain operations. Future entrypoints may accept a local static output directory as the user's
+starting input, but they must normalize it into Resource source/runtime/network profile state and
+then call `deployments.create(resourceId)`. The default path remains BYOS runtime execution; an
+Appaloft-hosted artifact store, CDN/gateway, or Appaloft-owned public route service would require a
+separate ADR/spec before implementation.
+
 Generated default access route display and route snapshot persistence are governed by
 [ADR-017](../decisions/ADR-017-default-access-domain-and-proxy-routing.md) and now surface through
 the first-class `ResourceAccessSummary` read-model projection. Remaining first-deploy gaps are
@@ -233,5 +240,8 @@ Deploy entrypoints, and resource detail should own deployment history/actions.
 
 - Resource source/runtime/network operation names are active:
   `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
+- URL-first deployment entry experience is governed by
+  [URL-First Deployment Entry Experience](../specs/071-url-first-deployment-entry-experience/spec.md)
+  and should remain a workflow/input/result improvement over the existing operation sequence.
   Access profile configuration remains a separate governed behavior under ADR-017 and the
   routing/domain/TLS specs.

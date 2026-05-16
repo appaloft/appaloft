@@ -322,6 +322,30 @@ export const publicDocsHelpTopics = {
     relatedOperation: "deployments.create",
     aliases: ["source", "pathOrSource", "repository", "docker image", "static site", "来源"],
   },
+  "agent.deploy-skill": {
+    id: "agent.deploy-skill",
+    title: "Agent deploy skill",
+    description:
+      "How AI agents safely deploy apps and static sites through Appaloft without bypassing existing operations.",
+    page: {
+      "zh-CN": "agent/deploy-skill",
+      "en-US": "en/agent/deploy-skill",
+    },
+    anchor: "agent-deploy-skill",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "repository-config", "mcp"],
+    relatedOperation: "deployments.create",
+    aliases: ["agent deploy", "AI deploy", "deploy skill", "skill", "AI 部署", "部署 skill"],
+    specReferences: [
+      "docs/specs/071-url-first-deployment-entry-experience/spec.md",
+      "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
+      "docs/agent/appaloft-deploy-skill.md",
+    ],
+    webSurfaces: ["apps/web Quick Deploy source-first entry and completion outcome links"],
+  },
   "source.auto-deploy-setup": {
     id: "source.auto-deploy-setup",
     title: "Source auto-deploy setup",
