@@ -20,12 +20,12 @@
 - [x] Add docs registry coverage for the skill anchor.
 - [x] Add text/contract checks that the skill contains no raw secret examples.
 - [x] Add checks that the skill references existing operation keys or CLI/API entrypoints only.
-- [x] Add installable package tests for `@appaloft/agent-skill`.
+- [x] Add installable package tests for `@appaloft/skills`.
 
 ## Code Round
 
 - [x] Add CLI help pointer if the deploy help should reference the skill.
-- [x] Add npm-installable skill packaging for `npx @appaloft/agent-skill install deploy`.
+- [x] Add npm-installable skill packaging for `npx @appaloft/skills install deploy`.
 - [x] Keep MCP integration optional and separate from the v1 skill path.
 
 ## Verification

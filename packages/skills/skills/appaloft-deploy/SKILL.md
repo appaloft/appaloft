@@ -1,14 +1,15 @@
 ---
 name: appaloft-deploy
-description: Deploy apps, services, Docker/Compose projects, and built static sites through Appaloft. Use when Codex or another coding agent is asked to deploy with Appaloft, publish a local static output directory, choose between Appaloft CLI/API/Web deploy entrypoints, inspect source safely before deployment, or report deployment URL, logs, diagnostics, and recovery readiness.
+description: Deploy the full range of Appaloft-supported workloads through Appaloft, including web apps, backend services, workers, Dockerfile apps, Docker Compose stacks, prebuilt images, and built static sites. Use when Codex or another coding agent is asked to deploy with Appaloft, choose between Appaloft CLI/API/Web deploy entrypoints, inspect source safely before deployment, or report deployment URL, logs, diagnostics, and recovery readiness.
 ---
 
 # Appaloft Deploy
 
 ## Workflow
 
-1. Inspect only safe source metadata: package scripts, framework hints, Dockerfile/Compose files,
-   static output directories, and Appaloft config.
+1. Inspect only safe source metadata: package scripts, framework hints, runtime ports,
+   Dockerfile/Compose files, prebuilt image references, static output directories, and Appaloft
+   config.
 2. Choose the smallest supported Appaloft entrypoint.
 3. Use existing Appaloft CLI/API/Web operations. Do not bypass Appaloft by mutating Docker, SSH,
    databases, or provider SDKs directly.
@@ -17,11 +18,12 @@ description: Deploy apps, services, Docker/Compose projects, and built static si
 
 ## Entry Selection
 
-- Built static output: `appaloft deploy ./dist --as static-site`.
-- Static source: `appaloft deploy <source> --method static --publish-dir <dir>`.
 - Existing Appaloft config: `appaloft deploy <source>`.
+- Docker/OCI image: `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
 - Compose: `appaloft deploy <source> --method docker-compose`.
 - Dockerfile: `appaloft deploy <source> --method dockerfile`.
+- Built static output: `appaloft deploy ./dist --as static-site`.
+- Static source: `appaloft deploy <source> --method static --publish-dir <dir>`.
 - Otherwise use workspace commands with explicit install, build, start, and port options.
 
 ## Guardrails

@@ -33,8 +33,8 @@ The skill may mention future MCP tools, but it must not depend on them for v1.
 The Code/Docs Round has chosen the v1 distribution location:
 
 - `docs/agent/appaloft-deploy-skill.md` is the canonical governing source;
-- `packages/agent-skill/skills/appaloft-deploy` is the installable skill folder;
-- `@appaloft/agent-skill` exposes `npx @appaloft/agent-skill install deploy`;
+- `packages/skills/skills/appaloft-deploy` is the installable skill folder;
+- `@appaloft/skills` exposes `npx @appaloft/skills install deploy`;
 - `.well-known` or public docs page export for copyable agent instructions;
 - generated `llms.txt` or equivalent summary derived from the same source.
 

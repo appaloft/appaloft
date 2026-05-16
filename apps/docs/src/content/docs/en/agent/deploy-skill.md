@@ -1,6 +1,6 @@
 ---
 title: "Agent deploy skill"
-description: "How AI agents safely deploy apps and static sites through Appaloft."
+description: "How AI agents safely deploy web apps, services, images, Compose stacks, workers, and static sites through Appaloft."
 docType: task
 localeState:
   zh-CN: complete
@@ -25,32 +25,33 @@ The Appaloft Deploy Skill is a pre-v1 capability. It is not a new deployment ope
 replacement for MCP; it is a user-layer protocol that tells an AI agent how to deploy through the
 existing CLI, HTTP API, or Web Quick Deploy surfaces.
 
-The skill keeps the result focused on what the user needs next: access URL, deployment status, logs,
-diagnostics, and recovery.
+The skill covers the full Appaloft deploy entry surface and keeps the result focused on what the
+user needs next: access URL, deployment status, logs, diagnostics, and recovery. Static output is
+one fast entrypoint, not the boundary of the skill.
 
 <h2 id="agent-deploy-install">Install the skill</h2>
 
 Codex-compatible skill hosts can install it directly:
 
 ```bash
-npx @appaloft/agent-skill install deploy
+npx @appaloft/skills install deploy
 ```
 
 By default this installs to `${CODEX_HOME:-~/.codex}/skills/appaloft-deploy`. To install into a
 repository-local or other agent skill directory:
 
 ```bash
-npx @appaloft/agent-skill install deploy --target directory --path ./.agents/skills
+npx @appaloft/skills install deploy --target directory --path ./.agents/skills
 ```
 
 Pass `--force` to replace an existing installed copy.
 
 <h2 id="agent-deploy-flow">Recommended flow</h2>
 
-1. Inspect the source safely: read only project structure, build scripts, Docker/Compose files,
-   static output directories, and Appaloft config.
-2. Choose the smallest entrypoint: built static output uses `appaloft deploy ./dist --as static-site`;
-   static source uses `--method static --publish-dir <dir>`.
+1. Inspect the source safely: read only project structure, build scripts, runtime ports, image
+   references, Docker/Compose files, static output directories, and Appaloft config.
+2. Choose the smallest entrypoint: Appaloft config first; then select prebuilt image, Compose,
+   Dockerfile, built static output, static source, or workspace commands from the evidence.
 3. Use existing operations: create or choose the project, server, environment, and resource, then
    request `deployments.create`.
 4. Return the outcome: access URL first, then deployment id, resource id, logs command, diagnostic
@@ -83,4 +84,4 @@ suggesting the next action.
 <h2 id="agent-deploy-reference">Source document</h2>
 
 The complete governing source lives in `docs/agent/appaloft-deploy-skill.md`. The installable skill
-is packaged in `@appaloft/agent-skill` under `skills/appaloft-deploy`.
+is packaged in `@appaloft/skills` under `skills/appaloft-deploy`.
