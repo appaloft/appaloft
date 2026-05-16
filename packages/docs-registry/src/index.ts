@@ -2246,6 +2246,31 @@ export const publicDocsHelpTopics = {
     specReferences: ["docs/PLUGINS.md", "docs/testing/system-diagnostics-test-matrix.md"],
     aliases: ["plugin", "extension", "compatibility", "configuration diagnostics", "插件"],
   },
+  "advanced.server-composition-extensions": {
+    id: "advanced.server-composition-extensions",
+    title: "Server composition extensions",
+    description:
+      "How integrators create and extend an Appaloft server composition through the public server package.",
+    page: {
+      "zh-CN": "integrations/plugins",
+      "en-US": "en/integrations/plugins",
+    },
+    anchor: "server-composition-extensions",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["http-api", "mcp"],
+    specReferences: ["docs/PLUGINS.md", "packages/server/src/index.ts"],
+    aliases: [
+      "@appaloft/server",
+      "server composition",
+      "server factory",
+      "runtime extension",
+      "middleware",
+      "server extension",
+    ],
+  },
   "http-api.openapi-reference": {
     id: "http-api.openapi-reference",
     title: "OpenAPI reference",

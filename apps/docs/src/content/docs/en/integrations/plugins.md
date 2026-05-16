@@ -27,3 +27,30 @@ Plugin docs should explain what the plugin can read, what it can change, how to 
 `appaloft plugins list` and `GET /api/plugins` expose safe plugin diagnostics. Each plugin can report manifest capability flags, human-readable capability details, enabled state, compatibility state, and configuration diagnostics.
 
 Incompatible plugins remain visible but inactive so operators can tell the difference between an unavailable extension and an unknown plugin. Plugin diagnostics should not expose plugin implementation internals, provider SDK objects, access tokens, private keys, secret references, or raw runtime output.
+
+<h2 id="server-composition-extensions">Server composition extensions</h2>
+
+Integrators that compose Appaloft with additional runtime behavior should import the public server factory instead of app source files:
+
+```ts
+import { createAppaloftServer } from "@appaloft/server";
+
+const server = await createAppaloftServer({
+  extensions: [
+    {
+      name: "health-extension",
+      http: {
+        routes: [
+          {
+            method: "GET",
+            path: "/extension/health",
+            handle: () => new Response("ok"),
+          },
+        ],
+      },
+    },
+  ],
+});
+```
+
+`@appaloft/server` creates the server composition, dependency container, HTTP app, and lifecycle methods. Extensions can add HTTP routes or middleware, provide system plugins, replace the auth runtime, and override provider, adapter, or runtime registrations through container hooks. Keep extension behavior provider-neutral and document any added routes, middleware, plugins, or adapters from the operator point of view.

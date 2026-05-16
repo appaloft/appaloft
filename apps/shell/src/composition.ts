@@ -1,7 +1,5 @@
 import "reflect-metadata";
 
-import { fileURLToPath } from "node:url";
-
 import {
   type ServerAppliedRouteDesiredStateStore as CliServerAppliedRouteStateStore,
   type CliSourceLinkStore,
@@ -9,48 +7,17 @@ import {
   SshRemoteStateLifecycle,
   sshRemoteStateTargetFromDecision,
 } from "@appaloft/adapter-cli";
-import { createHttpApp } from "@appaloft/adapter-http-elysia";
 import {
-  type ActionDeployTokenAuthorizationPort,
-  type AppLogger,
-  type AutomaticRouteContextLookup,
-  type CertificateHttpChallengeTokenStore,
-  type CertificateRetryScheduler,
-  type Clock,
   type CommandBus,
-  type DependencyResourceBackupPolicyRepository,
-  type DeployTokenRepository,
-  type EnvironmentReadModel,
-  type ExecutionContext,
-  type GitHubPreviewPullRequestWebhookVerifier,
-  type GitHubSourceEventWebhookVerifier,
+  type DeploymentProgressObserver,
   type IdGenerator,
-  type IntegrationAuthPort,
   MarkServerAppliedRouteAppliedSpec,
   MarkServerAppliedRouteFailedSpec,
-  type MutationCoordinator,
-  type PreviewCleanupRetryScheduler,
-  type PreviewExpiryCleanupScheduler,
-  type ProcessAttemptDeliveryCandidateReader,
-  type ProcessAttemptRetryCandidateReader,
-  type ProcessAttemptRetryGenerator,
-  type ProjectReadModel,
   type QueryBus,
-  type ResourceAccessFailureEvidenceRecorder,
-  type ResourceReadModel,
-  type RuntimeMonitoringCollectorService,
-  type ScheduledDependencyBackupService,
-  type ScheduledHistoryRetentionService,
-  type ScheduledRuntimePrunePolicyReadModel,
-  type ScheduledRuntimePruneService,
-  type ScheduledTaskRunWorker,
-  type ScheduledTaskScheduler,
   ServerAppliedRouteStateByRouteSetIdSpec,
   ServerAppliedRouteStateBySourceFingerprintSpec,
   ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
-  type ServerReadModel,
-  type SourceEventVerificationPort,
   SourceLinkBySourceFingerprintSpec,
   type SourceLinkRecord,
   type SourceLinkRepository,
@@ -59,75 +26,23 @@ import {
   UpsertServerAppliedRouteDesiredStateSpec,
   UpsertSourceLinkSpec,
 } from "@appaloft/application";
-import {
-  createBetterAuthRuntime,
-  PersistedActionDeployTokenAuthorizationPort,
-  StaticActionDeployTokenAuthorizationPort,
-} from "@appaloft/auth-better";
-import { type AppConfig, resolveConfig } from "@appaloft/config";
+import { type AppConfig } from "@appaloft/config";
 import { domainError, err, ok } from "@appaloft/core";
-import { createGitHubActionSourcePackageConfigReader } from "@appaloft/integration-github";
 import {
-  bootstrapOpenTelemetry,
-  createExecutionContextFactory,
-  createLogger,
-} from "@appaloft/observability";
-import {
-  createMigrator,
-  type PgliteRuntimeAssets,
-  PgServerAppliedRouteStateRepository,
-  PgSourceLinkRepository,
-} from "@appaloft/persistence-pg";
-import { type LocalPluginHost } from "@appaloft/plugin-host";
-import { container, type DependencyContainer } from "tsyringe";
-import { createCertificateRetrySchedulerRunner } from "./certificate-retry-scheduler-runner";
-import { writeBootstrapDeployTokenOutput } from "./deploy-token-bootstrap";
-import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
-import { writeBootstrapFirstAdminOutput } from "./first-admin-bootstrap";
-import { adoptLegacyPgliteState } from "./legacy-pglite-state-adoption";
-import {
-  createDisabledPreviewCleanupRetrySchedulerRunner,
-  createPreviewCleanupRetrySchedulerRunner,
-} from "./preview-cleanup-retry-scheduler-runner";
-import {
-  createDisabledPreviewExpiryCleanupSchedulerRunner,
-  createPreviewExpiryCleanupSchedulerRunner,
-} from "./preview-expiry-cleanup-scheduler-runner";
-import { registerApplicationServices } from "./register-application-services";
-import { registerRuntimeDependencies } from "./register-runtime-dependencies";
-import { createReloadableDatabase } from "./reloadable-database";
+  type AppaloftServer,
+  type AppaloftServerOptions,
+  createAppaloftServer,
+} from "@appaloft/server";
+import { type DependencyContainer } from "tsyringe";
 import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
-import { SshRemoteStateWorkReadModel } from "./remote-state-work-read-model";
-import { resourceAccessFailureRendererTargetForStartedServer } from "./resource-access-failure-renderer-target";
-import { createRuntimeMonitoringCollectorRunner } from "./runtime-monitoring-collector-runner";
-import { createScheduledDependencyBackupRunner } from "./scheduled-dependency-backup-runner";
-import { createScheduledHistoryRetentionRunner } from "./scheduled-history-retention-runner";
-import { createScheduledRuntimePruneRunner } from "./scheduled-runtime-prune-runner";
-import { createScheduledTaskRunner } from "./scheduled-task-runner";
 
-export interface AppComposition {
-  config: AppConfig;
-  logger: AppLogger;
-  container: DependencyContainer;
-  httpApp: ReturnType<typeof createHttpApp>;
+export interface AppComposition extends AppaloftServer {
   cliProgram: ReturnType<typeof createCliProgram>;
-  startServer(): Promise<void>;
-  shutdown(): Promise<void>;
 }
 
-export interface ShellRuntimeOptions {
-  embeddedWebAssets?: Readonly<Record<string, Blob>>;
-  embeddedDocsAssets?: Readonly<Record<string, Blob>>;
-  pgliteRuntimeAssets?: PgliteRuntimeAssets;
+export interface ShellRuntimeOptions
+  extends Omit<AppaloftServerOptions, "config" | "flags" | "remotePgliteStateSyncSession"> {
   remotePgliteStateSyncSession?: RemotePgliteStateSyncSession;
-}
-
-interface RequestContextRunner extends IntegrationAuthPort {
-  runWithRequest<T>(
-    request: Request,
-    context: ExecutionContext,
-    callback: () => Promise<T>,
-  ): Promise<T>;
 }
 
 function resolveToken<T>(dependencyContainer: DependencyContainer, token: symbol): T {
@@ -277,421 +192,44 @@ function createCliServerAppliedRouteStore(
   };
 }
 
-async function resolveWebStaticDir(
-  config: AppConfig,
-  options?: ShellRuntimeOptions,
-): Promise<string | undefined> {
-  if (
-    config.webStaticDir ||
-    options?.embeddedWebAssets ||
-    Bun.env.APPALOFT_DEV_DISABLE_LOCAL_WEB_STATIC_DIR === "true"
-  ) {
-    return config.webStaticDir;
-  }
-
-  const localWebBuildDir = new URL("../../web/build/", import.meta.url);
-  const localWebIndex = new URL("index.html", localWebBuildDir);
-
-  return (await Bun.file(localWebIndex).exists()) ? fileURLToPath(localWebBuildDir) : undefined;
-}
-
-async function resolveDocsStaticDir(
-  config: AppConfig,
-  options?: ShellRuntimeOptions,
-): Promise<string | undefined> {
-  if (
-    config.docsStaticDir ||
-    options?.embeddedDocsAssets ||
-    Bun.env.APPALOFT_DEV_DISABLE_LOCAL_DOCS_STATIC_DIR === "true"
-  ) {
-    return config.docsStaticDir;
-  }
-
-  const localDocsBuildDir = new URL("../../docs/dist/", import.meta.url);
-  const localDocsIndex = new URL("index.html", localDocsBuildDir);
-
-  return (await Bun.file(localDocsIndex).exists()) ? fileURLToPath(localDocsBuildDir) : undefined;
-}
-
 export async function createAppComposition(
   flags?: Partial<AppConfig>,
   options?: ShellRuntimeOptions,
 ): Promise<AppComposition> {
-  const config = resolveConfig(flags ? { flags } : {});
-  const logger = createLogger(config);
-  const telemetry = await bootstrapOpenTelemetry(config);
-  const database = await createReloadableDatabase({
-    driver: config.databaseDriver,
-    pgliteDataDir: config.pgliteDataDir,
-    ...(options?.pgliteRuntimeAssets ? { pgliteRuntimeAssets: options.pgliteRuntimeAssets } : {}),
-    ...(config.databaseUrl ? { databaseUrl: config.databaseUrl } : {}),
+  const server = await createAppaloftServer({
+    ...options,
+    ...(flags ? { flags } : {}),
   });
-  const migrator = createMigrator(database.db);
-  const deploymentProgressReporter = new ShellDeploymentProgressReporter();
-
-  if (config.databaseDriver === "pglite" || config.autoMigrate) {
-    await migrator.migrateToLatest();
-  }
-  const sourceLinkRepository = new PgSourceLinkRepository(database.db);
-  const serverAppliedRouteRepository = new PgServerAppliedRouteStateRepository(database.db);
-  const sourceLinkStore = createCliSourceLinkStore(sourceLinkRepository);
-  const serverAppliedRouteStore = createCliServerAppliedRouteStore(serverAppliedRouteRepository);
-  const remotePgliteStateSyncSession = options?.remotePgliteStateSyncSession;
-
-  if (config.databaseDriver === "pglite") {
-    await adoptLegacyPgliteState({
-      pgliteDataDir: config.pgliteDataDir,
-      sourceLinkStore,
-      serverAppliedRouteStore,
-      logger,
-    });
-  }
-  let resourceAccessFailureRendererTarget: ReturnType<
-    typeof resourceAccessFailureRendererTargetForStartedServer
-  >;
-
-  const authRuntime = createBetterAuthRuntime({
-    enabled: config.authProvider === "better-auth",
-    baseURL: config.betterAuthBaseUrl,
-    secret: config.betterAuthSecret,
-    database: {
-      db: database.db,
-      type: "postgres",
-    },
-    ...(config.githubClientId ? { githubClientId: config.githubClientId } : {}),
-    ...(config.githubClientSecret ? { githubClientSecret: config.githubClientSecret } : {}),
-    ...(config.githubRedirectUri ? { githubRedirectUri: config.githubRedirectUri } : {}),
-    ...(config.googleClientId ? { googleClientId: config.googleClientId } : {}),
-    ...(config.googleClientSecret ? { googleClientSecret: config.googleClientSecret } : {}),
-    ...(config.googleRedirectUri ? { googleRedirectUri: config.googleRedirectUri } : {}),
-    ...(config.oidcClientId ? { oidcClientId: config.oidcClientId } : {}),
-    ...(config.oidcClientSecret ? { oidcClientSecret: config.oidcClientSecret } : {}),
-    ...(config.oidcDiscoveryUrl ? { oidcDiscoveryUrl: config.oidcDiscoveryUrl } : {}),
-    ...(config.oidcIssuer ? { oidcIssuer: config.oidcIssuer } : {}),
-    ...(config.oidcRedirectUri ? { oidcRedirectUri: config.oidcRedirectUri } : {}),
-    trustedOrigins: [config.webOrigin],
-  });
-  const childContainer = container.createChildContainer();
-
-  registerRuntimeDependencies(childContainer, {
-    config,
-    logger,
-    database,
-    migrator,
-    authRuntime,
-    deploymentProgressReporter,
-    ...(remotePgliteStateSyncSession ? { remotePgliteStateSyncSession } : {}),
-    ...(remotePgliteStateSyncSession
-      ? {
-          refreshRemotePgliteState: async () => {
-            const refreshed = await remotePgliteStateSyncSession.refreshLocalMirror();
-            if (refreshed.isErr()) {
-              return refreshed;
-            }
-
-            await database.reload();
-            return ok(undefined);
-          },
-        }
-      : {}),
-    sourceLinkRepository,
-    serverAppliedRouteStateRepository: serverAppliedRouteRepository,
-    ...(remotePgliteStateSyncSession
-      ? {
-          remoteStateWorkReadModel: new SshRemoteStateWorkReadModel({
-            target: remotePgliteStateSyncSession.target,
-            dataRoot: remotePgliteStateSyncSession.dataRoot,
-          }),
-        }
-      : {}),
-    resourceAccessFailureRenderer: () => resourceAccessFailureRendererTarget,
-  });
-  registerApplicationServices(childContainer, { dataDir: config.dataDir });
-  const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
-  const commandBus = resolveToken<CommandBus>(childContainer, tokens.commandBus);
-  const queryBus = resolveToken<QueryBus>(childContainer, tokens.queryBus);
-  const sourceEventVerificationPort = resolveToken<SourceEventVerificationPort>(
-    childContainer,
-    tokens.sourceEventVerificationPort,
-  );
-  const githubSourceEventWebhookVerifier = resolveToken<GitHubSourceEventWebhookVerifier>(
-    childContainer,
-    tokens.githubSourceEventWebhookVerifier,
-  );
-  const githubPreviewPullRequestWebhookVerifier =
-    resolveToken<GitHubPreviewPullRequestWebhookVerifier>(
-      childContainer,
-      tokens.githubPreviewPullRequestWebhookVerifier,
-    );
-  const deployTokenRepository = resolveToken<DeployTokenRepository>(
-    childContainer,
-    tokens.deployTokenRepository,
-  );
-  const clock = resolveToken<Clock>(childContainer, tokens.clock);
-  const actionDeployTokenAuthorizationPort: ActionDeployTokenAuthorizationPort | undefined =
-    config.actionDeployToken
-      ? new StaticActionDeployTokenAuthorizationPort({
-          ...(config.actionDeployTokenScope ? { scope: config.actionDeployTokenScope } : {}),
-          token: config.actionDeployToken,
-        })
-      : new PersistedActionDeployTokenAuthorizationPort({
-          clock,
-          repository: deployTokenRepository,
-        });
-  const executionContextFactory = createExecutionContextFactory({
-    idGenerator,
-    tracer: telemetry.tracer,
-  });
-  if (config.bootstrapDeployTokenOutputFile) {
-    const bootstrapDeployTokenOutput = await writeBootstrapDeployTokenOutput({
-      config,
-      commandBus,
-      queryBus,
-      executionContextFactory,
-    });
-    if (bootstrapDeployTokenOutput.isErr()) {
-      throw new Error(bootstrapDeployTokenOutput.error.message);
-    }
-  }
-  const bootstrapFirstAdminOutput = await writeBootstrapFirstAdminOutput({
-    config,
-    commandBus,
-    queryBus,
-    executionContextFactory,
-  });
-  if (bootstrapFirstAdminOutput.isErr()) {
-    throw new Error(bootstrapFirstAdminOutput.error.message);
-  }
-  const pluginRuntime = resolveToken<LocalPluginHost>(childContainer, tokens.pluginRegistry);
-  const requestContextRunner = resolveToken<RequestContextRunner>(
-    childContainer,
-    tokens.integrationAuthPort,
-  );
+  const commandBus = resolveToken<CommandBus>(server.container, tokens.commandBus);
+  const queryBus = resolveToken<QueryBus>(server.container, tokens.queryBus);
+  const idGenerator = resolveToken<IdGenerator>(server.container, tokens.idGenerator);
   const terminalSessionGateway = resolveToken<TerminalSessionGateway>(
-    childContainer,
+    server.container,
     tokens.terminalSessionGateway,
   );
-  const certificateHttpChallengeTokenStore = resolveToken<CertificateHttpChallengeTokenStore>(
-    childContainer,
-    tokens.certificateHttpChallengeTokenStore,
+  const deploymentProgressObserver = resolveToken<DeploymentProgressObserver>(
+    server.container,
+    tokens.deploymentProgressReporter,
   );
-  const resourceAccessFailureEvidenceRecorder = resolveToken<ResourceAccessFailureEvidenceRecorder>(
-    childContainer,
-    tokens.resourceAccessFailureEvidenceRecorder,
+  const sourceLinkRepository = resolveToken<SourceLinkRepository>(
+    server.container,
+    tokens.sourceLinkRepository,
   );
-  const resourceAccessRouteContextLookup = resolveToken<AutomaticRouteContextLookup>(
-    childContainer,
-    tokens.automaticRouteContextLookupService,
+  const serverAppliedRouteStateRepository = resolveToken<ServerAppliedRouteStateRepository>(
+    server.container,
+    tokens.serverAppliedRouteStateRepository,
   );
-  const certificateRetryScheduler = resolveToken<CertificateRetryScheduler>(
-    childContainer,
-    tokens.certificateRetryScheduler,
-  );
-  const certificateRetrySchedulerRunner = createCertificateRetrySchedulerRunner({
-    config: config.certificateRetryScheduler,
-    scheduler: certificateRetryScheduler,
-    executionContextFactory,
-    logger,
-  });
-  const previewCleanupRetrySchedulerRunner = config.previewCleanupRetryScheduler.enabled
-    ? createPreviewCleanupRetrySchedulerRunner({
-        config: config.previewCleanupRetryScheduler,
-        scheduler: resolveToken<PreviewCleanupRetryScheduler>(
-          childContainer,
-          tokens.previewCleanupRetryScheduler,
-        ),
-        mutationCoordinator: resolveToken<MutationCoordinator>(
-          childContainer,
-          tokens.mutationCoordinator,
-        ),
-        executionContextFactory,
-        logger,
-      })
-    : createDisabledPreviewCleanupRetrySchedulerRunner();
-  const previewExpiryCleanupSchedulerRunner = config.previewExpiryCleanupScheduler.enabled
-    ? createPreviewExpiryCleanupSchedulerRunner({
-        config: config.previewExpiryCleanupScheduler,
-        scheduler: resolveToken<PreviewExpiryCleanupScheduler>(
-          childContainer,
-          tokens.previewExpiryCleanupScheduler,
-        ),
-        mutationCoordinator: resolveToken<MutationCoordinator>(
-          childContainer,
-          tokens.mutationCoordinator,
-        ),
-        executionContextFactory,
-        logger,
-      })
-    : createDisabledPreviewExpiryCleanupSchedulerRunner();
-  const scheduledTaskScheduler = resolveToken<ScheduledTaskScheduler>(
-    childContainer,
-    tokens.scheduledTaskScheduler,
-  );
-  const scheduledTaskRunWorker = resolveToken<ScheduledTaskRunWorker>(
-    childContainer,
-    tokens.scheduledTaskRunWorker,
-  );
-  const processAttemptDeliveryCandidateReader = resolveToken<ProcessAttemptDeliveryCandidateReader>(
-    childContainer,
-    tokens.processAttemptDeliveryCandidateReader,
-  );
-  const processAttemptRetryCandidateReader = resolveToken<ProcessAttemptRetryCandidateReader>(
-    childContainer,
-    tokens.processAttemptRetryCandidateReader,
-  );
-  const processAttemptRetryGenerator = resolveToken<ProcessAttemptRetryGenerator>(
-    childContainer,
-    tokens.processAttemptRetryGenerator,
-  );
-  const scheduledRuntimePruneService = resolveToken<ScheduledRuntimePruneService>(
-    childContainer,
-    tokens.scheduledRuntimePruneService,
-  );
-  const scheduledDependencyBackupService = resolveToken<ScheduledDependencyBackupService>(
-    childContainer,
-    tokens.scheduledDependencyBackupService,
-  );
-  const scheduledHistoryRetentionService = resolveToken<ScheduledHistoryRetentionService>(
-    childContainer,
-    tokens.scheduledHistoryRetentionService,
-  );
-  const runtimeMonitoringCollectorService = resolveToken<RuntimeMonitoringCollectorService>(
-    childContainer,
-    tokens.runtimeMonitoringCollectorService,
-  );
-  const serverReadModel = resolveToken<ServerReadModel>(childContainer, tokens.serverReadModel);
-  const projectReadModel = resolveToken<ProjectReadModel>(childContainer, tokens.projectReadModel);
-  const environmentReadModel = resolveToken<EnvironmentReadModel>(
-    childContainer,
-    tokens.environmentReadModel,
-  );
-  const resourceReadModel = resolveToken<ResourceReadModel>(
-    childContainer,
-    tokens.resourceReadModel,
-  );
-  const scheduledRuntimePrunePolicyReadModel = resolveToken<ScheduledRuntimePrunePolicyReadModel>(
-    childContainer,
-    tokens.scheduledRuntimePrunePolicyReadModel,
-  );
-  const dependencyResourceBackupPolicyRepository =
-    resolveToken<DependencyResourceBackupPolicyRepository>(
-      childContainer,
-      tokens.dependencyResourceBackupPolicyRepository,
-    );
-  const scheduledTaskRunner = createScheduledTaskRunner({
-    config: config.scheduledTaskRunner,
-    scheduler: scheduledTaskScheduler,
-    worker: scheduledTaskRunWorker,
-    processAttemptDeliveryCandidateReader,
-    processAttemptRetryCandidateReader,
-    processAttemptRetryGenerator,
-    executionContextFactory,
-    logger,
-  });
-  const scheduledRuntimePruneRunner = createScheduledRuntimePruneRunner({
-    config: config.scheduledRuntimePruneRunner,
-    policyReadModel: scheduledRuntimePrunePolicyReadModel,
-    service: scheduledRuntimePruneService,
-    executionContextFactory,
-    logger,
-  });
-  const scheduledDependencyBackupRunner = createScheduledDependencyBackupRunner({
-    config: config.scheduledDependencyBackupRunner,
-    policyRepository: dependencyResourceBackupPolicyRepository,
-    service: scheduledDependencyBackupService,
-    executionContextFactory,
-    logger,
-  });
-  const scheduledHistoryRetentionRunner = createScheduledHistoryRetentionRunner({
-    config: config.scheduledHistoryRetentionRunner,
-    service: scheduledHistoryRetentionService,
-    executionContextFactory,
-    logger,
-  });
-  const runtimeMonitoringCollectorRunner = createRuntimeMonitoringCollectorRunner({
-    config: config.runtimeMonitoringCollectorRunner,
-    serverReadModel,
-    projectReadModel,
-    environmentReadModel,
-    resourceReadModel,
-    service: runtimeMonitoringCollectorService,
-    executionContextFactory,
-    logger,
-  });
-  const webStaticDir = await resolveWebStaticDir(config, options);
-  const docsStaticDir = await resolveDocsStaticDir(config, options);
-
-  const httpApp = createHttpApp({
-    config: {
-      ...config,
-      ...(webStaticDir ? { webStaticDir } : {}),
-      ...(docsStaticDir ? { docsStaticDir } : {}),
-    },
-    commandBus,
-    queryBus,
-    logger,
-    executionContextFactory,
-    deploymentProgressObserver: deploymentProgressReporter,
-    terminalSessionGateway,
-    certificateHttpChallengeTokenStore,
-    resourceAccessFailureEvidenceRecorder,
-    resourceAccessRouteContextLookup,
-    sourceEventVerificationPort,
-    githubSourceEventWebhookVerifier,
-    githubPreviewPullRequestWebhookVerifier,
-    ...(actionDeployTokenAuthorizationPort ? { actionDeployTokenAuthorizationPort } : {}),
-    actionSourcePackageConfigReader: createGitHubActionSourcePackageConfigReader(),
-    pluginRuntime,
-    authRuntime,
-    requestContextRunner,
-    ...(options?.embeddedWebAssets ? { embeddedWebAssets: options.embeddedWebAssets } : {}),
-    ...(options?.embeddedDocsAssets ? { embeddedDocsAssets: options.embeddedDocsAssets } : {}),
-  });
-
-  let started = false;
-  let serverHandle: ReturnType<typeof httpApp.listen> | null = null;
-
-  const startServer = async (): Promise<void> => {
-    if (started) {
-      return;
-    }
-
-    serverHandle = httpApp.listen({
-      hostname: config.httpHost,
-      port: config.httpPort,
-    });
-    started = true;
-    resourceAccessFailureRendererTarget = resourceAccessFailureRendererTargetForStartedServer({
-      config,
-      ...(httpApp.server?.port ? { actualPort: httpApp.server.port } : {}),
-    });
-
-    logger.info("http_server.started", {
-      host: config.httpHost,
-      port: config.httpPort,
-      webOrigin: config.webOrigin,
-    });
-
-    certificateRetrySchedulerRunner.start();
-    previewExpiryCleanupSchedulerRunner.start();
-    previewCleanupRetrySchedulerRunner.start();
-    scheduledTaskRunner.start();
-    scheduledRuntimePruneRunner.start();
-    scheduledDependencyBackupRunner.start();
-    scheduledHistoryRetentionRunner.start();
-    runtimeMonitoringCollectorRunner.start();
-  };
 
   const cliProgram = createCliProgram({
-    version: config.appVersion,
-    startServer,
+    version: server.config.appVersion,
+    startServer: server.startServer,
     commandBus,
     queryBus,
-    executionContextFactory,
+    executionContextFactory: server.executionContextFactory,
     terminalSessionGateway,
-    deploymentProgressObserver: deploymentProgressReporter,
-    ...(sourceLinkStore ? { sourceLinkStore } : {}),
-    serverAppliedRouteStore,
+    deploymentProgressObserver,
+    sourceLinkStore: createCliSourceLinkStore(sourceLinkRepository),
+    serverAppliedRouteStore: createCliServerAppliedRouteStore(serverAppliedRouteStateRepository),
     prepareDeploymentStateBackend: async (decision) => {
       if (options?.remotePgliteStateSyncSession && decision.kind === "ssh-pglite") {
         return ok({
@@ -716,7 +254,7 @@ export async function createAppComposition(
 
       return await new SshRemoteStateLifecycle({
         target: target.value,
-        dataRoot: `${config.remoteRuntimeRoot.replace(/\/+$/, "")}/state`,
+        dataRoot: `${server.config.remoteRuntimeRoot.replace(/\/+$/, "")}/state`,
         owner: "appaloft-cli",
         correlationId: idGenerator.next("remote_state"),
       }).prepare();
@@ -724,24 +262,7 @@ export async function createAppComposition(
   });
 
   return {
-    config,
-    logger,
-    container: childContainer,
-    httpApp,
+    ...server,
     cliProgram,
-    startServer,
-    async shutdown(): Promise<void> {
-      certificateRetrySchedulerRunner.stop();
-      previewExpiryCleanupSchedulerRunner.stop();
-      previewCleanupRetrySchedulerRunner.stop();
-      scheduledTaskRunner.stop();
-      scheduledRuntimePruneRunner.stop();
-      scheduledDependencyBackupRunner.stop();
-      scheduledHistoryRetentionRunner.stop();
-      runtimeMonitoringCollectorRunner.stop();
-      serverHandle?.stop?.();
-      await telemetry.shutdown();
-      await database.close();
-    },
   };
 }
