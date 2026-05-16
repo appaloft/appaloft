@@ -243,9 +243,9 @@ For Appaloft:
   or access outcome behavior changes;
 - update `docs/agent/appaloft-skill.md`, public docs anchors, and docs registry/traceability when
   the install path, scope, help topic, or AI-facing semantics change;
-- keep `npx skills add appaloft` as the canonical skill-manager install path and
-  `npx @appaloft/skills install appaloft` as the direct package fallback unless a governing spec
-  changes that contract;
+- keep `npx skills add appaloft/appaloft` as the canonical skill-manager install path and
+  `npx @appaloft/skills install appaloft/appaloft` as the direct package fallback unless a
+  governing spec changes that contract;
 - add or update tests that prove full skill coverage stays synchronized with the operation catalog,
   especially every `transports.cli` entry.
 

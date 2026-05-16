@@ -49,6 +49,7 @@ surface available in the session.
 
 ## Installation Boundary
 
-`npx skills add appaloft` installs this skill into a skill host through the standard skill manager.
-It only copies skill files. It does not deploy, create resources, call APIs, or wrap the Appaloft
-CLI. Use `npx @appaloft/skills install appaloft` only as a direct package fallback.
+`npx skills add appaloft/appaloft` installs this skill into a skill host through the standard skill
+manager. It only copies skill files. It does not deploy, create resources, call APIs, or wrap the
+Appaloft CLI. Use `npx @appaloft/skills install appaloft/appaloft` only as a direct package
+fallback.

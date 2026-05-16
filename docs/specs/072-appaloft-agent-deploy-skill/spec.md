@@ -87,9 +87,9 @@ The deploy subprotocol must include:
 
 - Public docs: stable "Appaloft skill" and "Agent deploy skill" anchors before v1.
 - Repository artifacts: `packages/skills/skills/appaloft` and `packages/skills/skills/appaloft-deploy`.
-- standard install path: `npx skills add appaloft`, with direct package fallback
-  `npx @appaloft/skills install appaloft` and narrower deploy subprotocol
-  `npx @appaloft/skills install deploy`.
+- standard install path: `npx skills add appaloft/appaloft`, with direct package fallback
+  `npx @appaloft/skills install appaloft/appaloft` and narrower deploy subprotocol
+  `npx @appaloft/skills install appaloft/deploy`.
 - CLI help: short pointer from first-deploy or deploy help to the skill docs when agent deployment
   is documented.
 - MCP/tools: optional follow-up; not required for v1.

@@ -29,20 +29,20 @@ this protocol.
 Install the full Appaloft skill for Codex-compatible skill hosts:
 
 ```bash
-npx skills add appaloft
+npx skills add appaloft/appaloft
 ```
 
 Install only the deploy subprotocol when the host should receive a narrower deploy guide:
 
 ```bash
-npx @appaloft/skills install deploy
+npx @appaloft/skills install appaloft/deploy
 ```
 
 By default this installs to `${CODEX_HOME:-~/.codex}/skills/appaloft-deploy`. For repository-local
 or custom skill hosts, install into a directory:
 
 ```bash
-npx @appaloft/skills install deploy --target directory --path ./.agents/skills
+npx @appaloft/skills install appaloft/deploy --target directory --path ./.agents/skills
 ```
 
 Use `--force` to replace an existing installed copy and `--dry-run` to preview the destination.

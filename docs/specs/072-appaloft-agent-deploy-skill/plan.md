@@ -40,10 +40,10 @@ The Code/Docs Round has chosen the v1 distribution location:
   subprotocol;
 - `packages/skills/skills/appaloft` is the installable full skill folder;
 - `packages/skills/skills/appaloft-deploy` is the installable deploy subprotocol folder;
-- the standard install path is `npx skills add appaloft`;
+- the standard install path is `npx skills add appaloft/appaloft`;
 - `@appaloft/skills` exposes direct package fallbacks with
-  `npx @appaloft/skills install appaloft` and the narrower
-  `npx @appaloft/skills install deploy`;
+  `npx @appaloft/skills install appaloft/appaloft` and the narrower
+  `npx @appaloft/skills install appaloft/deploy`;
 - `.well-known` or public docs page export for copyable agent instructions;
 - generated `llms.txt` or equivalent summary derived from the same source.
 
