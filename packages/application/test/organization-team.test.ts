@@ -29,6 +29,7 @@ import {
   type OrganizationMemberListInput,
   type OrganizationMemberSummary,
   type OrganizationTeamManagementPort,
+  type OrganizationTeamRole,
   operationCatalog,
   RemoveOrganizationMemberCommand,
   RemoveOrganizationMemberCommandHandler,
@@ -333,6 +334,40 @@ describe("organization/team application boundary", () => {
       "updateMemberRole",
       "removeMember",
     ]);
+  });
+
+  test("[ORG-TEAM-ROLE-002] preserves full organization team roles at the application boundary", async () => {
+    const roles: OrganizationTeamRole[] = ["owner", "admin", "billing", "developer", "viewer"];
+    const port = new CapturingOrganizationTeamManagementPort();
+    const handler = new ChangeOrganizationMemberRoleCommandHandler(
+      new ChangeOrganizationMemberRoleUseCase(port),
+    );
+
+    for (const role of roles) {
+      const result = await handler.handle(
+        context,
+        ChangeOrganizationMemberRoleCommand.create({
+          organizationId: "org_self_hosted",
+          memberId: `om_${role}`,
+          role,
+        })._unsafeUnwrap(),
+      );
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap()).toMatchObject({
+        memberId: `om_${role}`,
+        role,
+      });
+    }
+
+    expect(
+      port.inputs
+        .filter(
+          (input): input is ChangeOrganizationMemberRoleInput =>
+            input !== null && typeof input === "object" && "memberId" in input && "role" in input,
+        )
+        .map((input) => input.role),
+    ).toEqual(roles);
   });
 
   test("operation catalog includes organization/team HTTP/oRPC transport entries", () => {

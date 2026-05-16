@@ -80,6 +80,7 @@ import { runtimeMonitoringThresholdPoliciesMigration } from "./migrations/071_ru
 import { resourceHealthObservationsMigration } from "./migrations/072_resource_health_observations";
 import { projectDeleteTombstoneMigration } from "./migrations/073_project_delete_tombstone";
 import { deploymentArchivePruneMigration } from "./migrations/074_deployment_archive_prune";
+import { projectOrganizationOwnershipMigration } from "./migrations/075_project_organization_ownership";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -250,6 +251,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "072_resource_health_observations": resourceHealthObservationsMigration,
       "073_project_delete_tombstone": projectDeleteTombstoneMigration,
       "074_deployment_archive_prune": deploymentArchivePruneMigration,
+      "075_project_organization_ownership": projectOrganizationOwnershipMigration,
     };
   }
 }

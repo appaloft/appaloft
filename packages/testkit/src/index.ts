@@ -63,6 +63,7 @@ import {
   type ManagedRedisRealizationResult,
   type MutationCoordinator,
   type MutationCoordinatorRunExclusiveInput,
+  type ProjectOwnershipReadModel,
   type ProjectReadModel,
   type ProjectRepository,
   type ProjectSummary,
@@ -552,19 +553,28 @@ export class MemoryProjectRepository implements ProjectRepository {
   }
 }
 
-export class MemoryProjectReadModel implements ProjectReadModel {
+export class MemoryProjectReadModel implements ProjectReadModel, ProjectOwnershipReadModel {
   constructor(private readonly repository: MemoryProjectRepository) {}
 
-  async list(context: RepositoryContext): Promise<ProjectSummary[]> {
+  async list(
+    context: RepositoryContext,
+    input?: { organizationId?: string },
+  ): Promise<ProjectSummary[]> {
     void context;
-    return [...this.repository.items.values()].flatMap((project) => {
-      const summary = projectSummaryFromState(project);
-      if (!summary) {
-        return [];
-      }
+    return [...this.repository.items.values()]
+      .filter((project) =>
+        input?.organizationId
+          ? project.toState().organizationId?.value === input.organizationId
+          : true,
+      )
+      .flatMap((project) => {
+        const summary = projectSummaryFromState(project);
+        if (!summary) {
+          return [];
+        }
 
-      return [summary];
-    });
+        return [summary];
+      });
   }
 
   async findOne(
@@ -595,6 +605,13 @@ export class MemoryProjectReadModel implements ProjectReadModel {
 
     return null;
   }
+
+  async findProjectOrganization(context: RepositoryContext, input: { projectId: string }) {
+    void context;
+    const project = this.repository.items.get(input.projectId);
+    const organizationId = project?.toState().organizationId?.value;
+    return project && organizationId ? { projectId: input.projectId, organizationId } : null;
+  }
 }
 
 function projectSummaryFromState(project: Project): ProjectSummary | null {
@@ -605,6 +622,7 @@ function projectSummaryFromState(project: Project): ProjectSummary | null {
 
   return {
     id: state.id.value,
+    ...(state.organizationId ? { organizationId: state.organizationId.value } : {}),
     name: state.name.value,
     slug: state.slug.value,
     ...(state.description ? { description: state.description.value } : {}),

@@ -10,6 +10,12 @@ export class ListProjectsQueryService {
   async execute(context: ExecutionContext): Promise<{
     items: Awaited<ReturnType<ProjectReadModel["list"]>>;
   }> {
-    return { items: await this.readModel.list(toRepositoryContext(context)) };
+    return {
+      items: await this.readModel.list(toRepositoryContext(context), {
+        ...(context.principal?.activeOrganization?.organizationId
+          ? { organizationId: context.principal.activeOrganization.organizationId }
+          : {}),
+      }),
+    };
   }
 }

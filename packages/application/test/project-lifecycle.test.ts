@@ -6,6 +6,7 @@ import {
   ArchiveReason,
   CreatedAt,
   DescriptionText,
+  type DomainErrorDetails,
   type DomainEvent,
   ok,
   Project,
@@ -26,11 +27,18 @@ import {
   SequenceIdGenerator,
 } from "@appaloft/testkit";
 
-import { createExecutionContext, toRepositoryContext } from "../src";
+import {
+  createExecutionContext,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
+  toRepositoryContext,
+} from "../src";
 import {
   ArchiveProjectUseCase,
   CheckProjectDeleteSafetyQueryService,
   CreateEnvironmentUseCase,
+  CreateProjectUseCase,
   DeleteProjectUseCase,
   RenameProjectUseCase,
   RestoreProjectUseCase,
@@ -95,6 +103,37 @@ class FakeProjectDeletionBlockerReader {
 
   async findBlockers() {
     return ok(this.blockers);
+  }
+}
+
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  constructor(private readonly details: DomainErrorDetails = {}) {}
+
+  async checkOperation(
+    _context: Parameters<OperationGuardPort["checkOperation"]>[0],
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.authorization",
+          kind: "authorization",
+          reason: "test-operation-denied",
+          details: this.details,
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.authorization",
+        kind: "authorization",
+      },
+      details: this.details,
+      reason: "test-operation-denied",
+    };
   }
 }
 
@@ -287,6 +326,72 @@ describe("project lifecycle operations", () => {
         projectId: "prj_demo",
       },
     });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[PROJ-LIFE-AUTHZ-001] create project can be denied by the generic operation guard", async () => {
+    const { clock, context, eventBus, logger, projects } = await createHarness([]);
+    const guard = new DenyingOperationGuardPort({
+      role: "viewer",
+    });
+    const useCase = new CreateProjectUseCase(
+      projects,
+      clock,
+      new SequenceIdGenerator(),
+      eventBus,
+      logger,
+      guard,
+    );
+
+    const result = await useCase.execute(context, {
+      name: "Customer API",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.authorization",
+        checkKind: "authorization",
+        operationKey: "projects.create",
+        reason: "test-operation-denied",
+        role: "viewer",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "projects.create",
+      organizationId: "org_self_hosted",
+    });
+  });
+
+  test("[PROJ-LIFE-AUTHZ-002] rename project can be denied by the generic operation guard", async () => {
+    const { clock, context, eventBus, logger, projects, repositoryContext } = await createHarness();
+    const guard = new DenyingOperationGuardPort();
+    const useCase = new RenameProjectUseCase(projects, clock, eventBus, logger, guard);
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      name: "Customer API",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.authorization",
+        checkKind: "authorization",
+        operationKey: "projects.rename",
+        projectId: "prj_demo",
+        reason: "test-operation-denied",
+      },
+    });
+    const persisted = await projects.findOne(
+      repositoryContext,
+      ProjectByIdSpec.create(ProjectId.rehydrate("prj_demo")),
+    );
+    expect(persisted?.toState().name.value).toBe("Demo Project");
     expect(eventBus.events).toHaveLength(0);
   });
 
@@ -601,6 +706,35 @@ describe("project lifecycle operations", () => {
         projectId: "prj_demo",
       },
     });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[PROJ-LIFE-AUTHZ-003] archive project can be denied by the generic operation guard", async () => {
+    const { clock, context, eventBus, logger, projects, repositoryContext } = await createHarness();
+    const guard = new DenyingOperationGuardPort();
+    const useCase = new ArchiveProjectUseCase(projects, clock, eventBus, logger, guard);
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      reason: "No longer needed",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.authorization",
+        checkKind: "authorization",
+        operationKey: "projects.archive",
+        projectId: "prj_demo",
+        reason: "test-operation-denied",
+      },
+    });
+    const persisted = await projects.findOne(
+      repositoryContext,
+      ProjectByIdSpec.create(ProjectId.rehydrate("prj_demo")),
+    );
+    expect(persisted?.toState().lifecycleStatus.value).toBe("active");
     expect(eventBus.events).toHaveLength(0);
   });
 

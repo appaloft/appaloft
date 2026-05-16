@@ -271,3 +271,10 @@ export function createRuntimeMonitoringCollectorRunner(
     },
   };
 }
+
+export function createDisabledRuntimeMonitoringCollectorRunner(): RuntimeMonitoringCollectorRunner {
+  return {
+    start(): void {},
+    stop(): void {},
+  };
+}

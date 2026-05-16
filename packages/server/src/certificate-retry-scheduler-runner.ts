@@ -86,3 +86,10 @@ export function createCertificateRetrySchedulerRunner(
     },
   };
 }
+
+export function createDisabledCertificateRetrySchedulerRunner(): CertificateRetrySchedulerRunner {
+  return {
+    start(): void {},
+    stop(): void {},
+  };
+}
