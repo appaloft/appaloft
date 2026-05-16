@@ -3,10 +3,10 @@
 ## Status
 
 - Round: Spec Round
-- Artifact state: readiness query implemented and synchronized; recovery write commands remain future
+- Artifact state: readiness query implemented and synchronized; recovery write commands are active
 - Roadmap target: Phase 7 Day-Two Production Controls (`0.9.0` beta target)
-- Compatibility impact: `pre-1.0-policy`; new public query/commands and user-visible recovery
-  guidance are planned but not yet active
+- Compatibility impact: `pre-1.0-policy`; public recovery query/commands and user-visible recovery
+  guidance are active, with remaining edge-case hardening tracked before `1.0.0-rc`
 
 ## Business Outcome
 
@@ -30,14 +30,14 @@ readiness a shared query contract rather than UI-local button logic.
 
 ## Recommended Public Operation Boundaries
 
-This Spec Round accepts five public operation boundaries as candidates:
+This Spec Round accepts five public operation boundaries:
 
 | Operation | Kind | Role | Code Round state |
 | --- | --- | --- | --- |
 | `deployments.recovery-readiness` | Query | Canonical shared readiness result for retry, redeploy, rollback, and candidates. | Active read-only operation. |
-| `deployments.retry` | Command | New attempt from the selected failed attempt's immutable snapshot. | Add after readiness query and command spec/test rows exist. |
-| `deployments.redeploy` | Command | New attempt from current Resource profile and current environment/resource configuration. | Add after readiness query and resource-profile drift gates exist. |
-| `deployments.rollback` | Command | New rollback attempt from a selected rollback candidate. | Add after artifact retention/candidate readiness is persisted. |
+| `deployments.retry` | Command | New attempt from the selected failed attempt's immutable snapshot. | Active write command. |
+| `deployments.redeploy` | Command | New attempt from current Resource profile and current environment/resource configuration. | Active write command. |
+| `deployments.rollback` | Command | New rollback attempt from a selected rollback candidate. | Active write command. |
 | `deployments.show` recovery summary | Query extension | Optional compact summary derived from `deployments.recovery-readiness`. | Allowed only when derived from same policy. |
 
 `deployments.rollback-candidates` is not recommended as a separate first operation. Candidate listing
@@ -181,8 +181,8 @@ must not appear in readiness output.
 
 ## Public Surfaces
 
-- Web: deployment detail recovery panel, derived from readiness, with action buttons hidden until
-  write commands are active.
+- Web: deployment detail recovery panel, derived from readiness, with action buttons gated by
+  readiness and active operation catalog entries.
 - CLI: active `appaloft deployments recovery-readiness <deploymentId>` query; failed deploy output
   may suggest show/events/readiness before suggesting writes.
 - HTTP/oRPC: active `GET /api/deployments/{deploymentId}/recovery-readiness` route and oRPC
@@ -204,7 +204,7 @@ must not appear in readiness output.
 ## Non-Goals
 
 - Do not implement code in this Spec Round.
-- Do not add active operation catalog entries in this round.
+- Do not add new operation catalog entries in this round.
 - Do not reintroduce public cancel.
 - Do not restore databases, volumes, external dependencies, secrets, or provider state.
 - Do not infer recovery readiness solely from client event-stream continuity.
@@ -212,14 +212,14 @@ must not appear in readiness output.
 
 ## Current Implementation Notes And Migration Gaps
 
-- Low-level rollback helpers and rollback model objects may exist but remain internal under ADR-016.
-- Runtime artifact retention and previous runtime identity are not complete enough for active
-  rollback.
-- `deployments.stream-events` is active, but remaining gap/cancellation tests are observation
-  hardening, not recovery blockers.
+- `deployments.recovery-readiness`, `deployments.retry`, `deployments.redeploy`, and
+  `deployments.rollback` are active under ADR-034.
+- Runtime artifact retention and previous runtime identity are sufficient for the active hermetic
+  paths, while broader backend-specific retention/prune horizon evidence remains a hardening gap.
+- `deployments.stream-events` is active, and remaining gap/cancellation tests are observation
+  hardening, not recovery admission blockers.
 - Public docs/help anchors for deployment recovery readiness, retry, redeploy, rollback, and rollback
-  candidates are registered on the recovery page. Future write-command docs remain tied to their
-  Code Rounds.
+  candidates are registered on the recovery page.
 
 ## Open Questions
 

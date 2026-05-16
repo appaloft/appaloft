@@ -134,6 +134,7 @@ const secretOption = Options.text("secret").pipe(Options.repeated);
 const optionalSecretOption = Options.text("optional-secret").pipe(Options.repeated);
 const appLogLinesOption = Options.text("app-log-lines").pipe(Options.withDefault("3"));
 const followEventsOption = Options.boolean("follow").pipe(Options.withDefault(false));
+const deploymentEventsJsonOption = Options.boolean("json").pipe(Options.withDefault(false));
 const deploymentCursorOption = Options.text("cursor").pipe(Options.optional);
 const deploymentHistoryLimitOption = Options.text("history-limit").pipe(Options.withDefault("100"));
 const includeHistoryOption = Options.boolean("include-history").pipe(Options.withDefault(true));
@@ -1659,10 +1660,12 @@ const streamDeploymentEventsCommand = EffectCommand.make(
     follow: followEventsOption,
     historyLimit: deploymentHistoryLimitOption,
     includeHistory: includeHistoryOption,
+    json: deploymentEventsJsonOption,
     untilTerminal: untilTerminalOption,
   },
-  ({ cursor, deploymentId, follow, historyLimit, includeHistory, untilTerminal }) =>
-    runDeploymentEventStreamQuery(
+  ({ cursor, deploymentId, follow, historyLimit, includeHistory, json, untilTerminal }) => {
+    void json;
+    return runDeploymentEventStreamQuery(
       StreamDeploymentEventsQuery.create({
         deploymentId,
         follow,
@@ -1671,7 +1674,8 @@ const streamDeploymentEventsCommand = EffectCommand.make(
         untilTerminal,
         ...(optionalValue(cursor) ? { cursor: optionalValue(cursor) } : {}),
       }),
-    ),
+    );
+  },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentEvents));
 
 export const deploymentsCommand = EffectCommand.make("deployments").pipe(
