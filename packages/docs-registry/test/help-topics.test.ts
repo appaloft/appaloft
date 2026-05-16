@@ -126,6 +126,7 @@ describe("public docs help registry", () => {
         "docs/specs/071-url-first-deployment-entry-experience/spec.md",
         "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
         "docs/agent/appaloft-deploy-skill.md",
+        "packages/agent-skill/package.json",
       ]),
     );
   });

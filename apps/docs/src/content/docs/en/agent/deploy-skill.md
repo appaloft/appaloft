@@ -28,6 +28,23 @@ existing CLI, HTTP API, or Web Quick Deploy surfaces.
 The skill keeps the result focused on what the user needs next: access URL, deployment status, logs,
 diagnostics, and recovery.
 
+<h2 id="agent-deploy-install">Install the skill</h2>
+
+Codex-compatible skill hosts can install it directly:
+
+```bash
+npx @appaloft/agent-skill install deploy
+```
+
+By default this installs to `${CODEX_HOME:-~/.codex}/skills/appaloft-deploy`. To install into a
+repository-local or other agent skill directory:
+
+```bash
+npx @appaloft/agent-skill install deploy --target directory --path ./.agents/skills
+```
+
+Pass `--force` to replace an existing installed copy.
+
 <h2 id="agent-deploy-flow">Recommended flow</h2>
 
 1. Inspect the source safely: read only project structure, build scripts, Docker/Compose files,
@@ -65,5 +82,5 @@ suggesting the next action.
 
 <h2 id="agent-deploy-reference">Source document</h2>
 
-The complete skill lives in `docs/agent/appaloft-deploy-skill.md` and is the governing source for v1
-agent deployment behavior.
+The complete governing source lives in `docs/agent/appaloft-deploy-skill.md`. The installable skill
+is packaged in `@appaloft/agent-skill` under `skills/appaloft-deploy`.

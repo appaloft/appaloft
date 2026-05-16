@@ -27,6 +27,22 @@ agent 使用的用户层协议，让 agent 使用现有 CLI、HTTP API 或 Web Q
 
 Skill 的目标是让 agent 优先回答用户真正关心的问题：访问地址、部署状态、日志、诊断摘要和恢复路径。
 
+<h2 id="agent-deploy-install">安装 skill</h2>
+
+Codex 兼容的 skill host 可以直接安装：
+
+```bash
+npx @appaloft/agent-skill install deploy
+```
+
+默认安装到 `${CODEX_HOME:-~/.codex}/skills/appaloft-deploy`。如果需要安装到仓库内或其他 agent 的 skill 目录：
+
+```bash
+npx @appaloft/agent-skill install deploy --target directory --path ./.agents/skills
+```
+
+已有同名 skill 时需要显式传 `--force`。
+
 <h2 id="agent-deploy-flow">推荐流程</h2>
 
 1. 安全检查来源：只读取项目结构、构建脚本、Docker/Compose 配置、静态输出目录和 Appaloft 配置。
@@ -57,4 +73,4 @@ Agent 应返回一份短结果：
 
 <h2 id="agent-deploy-reference">规范文档</h2>
 
-完整 skill 文档位于仓库内的 `docs/agent/appaloft-deploy-skill.md`。它是 v1 agent 部署行为的规范来源。
+完整规范位于仓库内的 `docs/agent/appaloft-deploy-skill.md`，可安装 skill 位于 npm 包 `@appaloft/agent-skill` 的 `skills/appaloft-deploy` 目录。

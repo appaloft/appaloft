@@ -9,7 +9,8 @@
 ## Purpose
 
 The skill turns a user request such as "deploy this app" or "publish this static output" into the
-same Appaloft flow a human would use:
+same Appaloft flow a human would use. The canonical source lives in this document and the packaged
+installable skill lives at `packages/agent-skill/skills/appaloft-deploy`.
 
 1. Inspect the source safely.
 2. Choose the smallest supported entrypoint.
@@ -19,6 +20,23 @@ same Appaloft flow a human would use:
 The skill is more important than MCP for v1 because it can guide any capable coding agent today.
 MCP descriptors should later expose the same operation keys and documentation anchors, not replace
 this protocol.
+
+## Install
+
+Install the skill for Codex-compatible skill hosts:
+
+```bash
+npx @appaloft/agent-skill install deploy
+```
+
+By default this installs to `${CODEX_HOME:-~/.codex}/skills/appaloft-deploy`. For repository-local
+or custom skill hosts, install into a directory:
+
+```bash
+npx @appaloft/agent-skill install deploy --target directory --path ./.agents/skills
+```
+
+Use `--force` to replace an existing installed copy and `--dry-run` to preview the destination.
 
 ## Guardrails
 
