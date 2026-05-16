@@ -51,5 +51,5 @@ surface available in the session.
 
 `npx skills add appaloft/appaloft` installs this skill into a skill host through the standard skill
 manager. It only copies skill files. It does not deploy, create resources, call APIs, or wrap the
-Appaloft CLI. Use `npx @appaloft/skills install appaloft/appaloft` only as a direct package
-fallback.
+Appaloft CLI. Appaloft does not ship a separate npm skill installer; AI-facing behavior enters
+through the standard skill manager only.

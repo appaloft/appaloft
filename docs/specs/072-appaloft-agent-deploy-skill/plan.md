@@ -39,13 +39,10 @@ The Code/Docs Round has chosen the v1 distribution location:
 - `docs/agent/appaloft-deploy-skill.md` is the canonical governing source for the deploy
   subprotocol;
 - `skills/appaloft` is the standard discoverable full skill folder;
-- `skills/appaloft-deploy` is the standard discoverable deploy subprotocol folder;
-- `packages/skills/skills/appaloft` and `packages/skills/skills/appaloft-deploy` mirror the same
-  content for the npm fallback installer;
+- deploy is an internal subprotocol in `skills/appaloft/references/deploy-protocol.md`;
 - the standard install path is `npx skills add appaloft/appaloft`;
-- `@appaloft/skills` exposes direct package fallbacks with
-  `npx @appaloft/skills install appaloft/appaloft` and the narrower
-  `npx @appaloft/skills install appaloft/deploy`;
+- Appaloft does not expose an npm skill installer because that would blur the boundary with the
+  Appaloft CLI;
 - `.well-known` or public docs page export for copyable agent instructions;
 - generated `llms.txt` or equivalent summary derived from the same source.
 

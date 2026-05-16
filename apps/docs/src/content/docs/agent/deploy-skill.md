@@ -36,20 +36,8 @@ Skill 的目标是覆盖完整 Appaloft 部署入口，让 agent 优先回答用
 npx skills add appaloft/appaloft
 ```
 
-只需要部署子协议的特殊 host 可以使用直连 npm 包备用写法：
-
-```bash
-npx @appaloft/skills install appaloft/deploy
-```
-
-默认安装到 `${CODEX_HOME:-~/.codex}/skills/appaloft-deploy`。如果需要安装到仓库内或其他 agent 的 skill 目录：
-
-```bash
-npx @appaloft/skills install appaloft/deploy --target directory --path ./.agents/skills
-```
-
-已有同名 skill 时需要显式传 `--force`。这个安装命令只复制 skill 文件，不会部署应用、创建资源、调用部署 API，也不是
-`appaloft deploy` 的包装器。真正的部署发生在 agent host 加载该 skill 后，用户让 agent 执行部署任务时。
+安装命令只复制完整 Appaloft skill，不会部署应用、创建资源、调用部署 API，也不是
+`appaloft deploy` 的包装器。部署子协议属于完整 skill 内部能力，不提供单独的 npm installer。
 
 <h2 id="agent-deploy-flow">推荐流程</h2>
 

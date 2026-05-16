@@ -38,19 +38,9 @@ Install the full Appaloft skill:
 npx skills add appaloft/appaloft
 ```
 
-Direct package fallback:
-
-```bash
-npx @appaloft/skills install appaloft/appaloft
-```
-
 The installer only copies skill files. It does not deploy an app, create resources, call APIs, or
-wrap the CLI. The deploy subprotocol remains available as a direct npm package fallback for
-specialized hosts:
-
-```bash
-npx @appaloft/skills install appaloft/deploy
-```
+wrap the CLI. Appaloft does not provide a separate npm skill installer, which keeps the boundary
+clear between skill installation and the `appaloft` CLI.
 
 <h2 id="appaloft-skill-scope">Scope</h2>
 

@@ -24,14 +24,13 @@
 - [x] Add checks that the full skill includes every CLI transport entrypoint from the operation
   catalog.
 - [x] Add checks that the skill references existing operation keys or CLI/API entrypoints only.
-- [x] Add installable package tests for `@appaloft/skills`.
+- [x] Add skill source validation through docs registry and operation coverage tests.
 
 ## Code Round
 
 - [x] Add CLI help pointer if the deploy help should reference the skill.
 - [x] Document standard full skill install with `npx skills add appaloft/appaloft`.
-- [x] Add npm-installable full skill fallback for `npx @appaloft/skills install appaloft/appaloft`.
-- [x] Keep narrower deploy subprotocol packaging for `npx @appaloft/skills install appaloft/deploy`.
+- [x] Remove npm skill installer fallback and keep deploy as an internal full-skill subprotocol.
 - [x] Keep MCP integration optional and separate from the v1 skill path.
 
 ## Verification

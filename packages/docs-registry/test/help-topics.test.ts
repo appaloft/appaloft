@@ -126,9 +126,7 @@ describe("public docs help registry", () => {
         "docs/specs/071-url-first-deployment-entry-experience/spec.md",
         "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
         "docs/agent/appaloft-deploy-skill.md",
-        "skills/appaloft-deploy/SKILL.md",
-        "packages/skills/skills/appaloft-deploy/SKILL.md",
-        "packages/skills/package.json",
+        "skills/appaloft/references/deploy-protocol.md",
       ]),
     );
   });
@@ -149,7 +147,7 @@ describe("public docs help registry", () => {
         "docs/agent/appaloft-skill.md",
         "skills/appaloft/SKILL.md",
         "skills/appaloft/references/cli-entrypoints.md",
-        "packages/skills/skills/appaloft/SKILL.md",
+        "skills/appaloft/references/deploy-protocol.md",
       ]),
     );
   });

@@ -26,8 +26,8 @@ remains the formal tool transport; the skill is the first agent-facing product a
 
 | Term | Meaning | Boundary |
 | --- | --- | --- |
-| Appaloft Skill | Complete AI-facing Appaloft entrypoint over the same operation catalog exposed through CLI, HTTP/API, Web, and future MCP surfaces. | Public docs / `@appaloft/skills` package |
-| Agent Deploy Skill | Agent-readable instructions, examples, checks, and recovery rules for deploying with Appaloft. | Public docs / `@appaloft/skills` package |
+| Appaloft Skill | Complete AI-facing Appaloft entrypoint over the same operation catalog exposed through CLI, HTTP/API, Web, and future MCP surfaces. | Public docs / standard `skills/appaloft` source |
+| Agent Deploy Protocol | Agent-readable instructions, examples, checks, and recovery rules for deploying with Appaloft. | Public docs / full Appaloft skill reference |
 | Agent Deploy Protocol | Ordered deploy workflow an agent follows before calling CLI/API operations. | Quick Deploy / first deploy |
 | Safe Source Inspection | Read-only project inspection that avoids uploading secrets, dependency caches, local state, and credentials. | Agent workflow |
 | Outcome Packet | Final response shape containing URL/access state, resource/deployment ids, logs, diagnostics, and recovery hints. | CLI/Web/docs/tool guidance |
@@ -86,12 +86,10 @@ The deploy subprotocol must include:
 ## Public Surfaces
 
 - Public docs: stable "Appaloft skill" and "Agent deploy skill" anchors before v1.
-- Repository artifacts: standard sources `skills/appaloft` and `skills/appaloft-deploy`, mirrored
-  into `packages/skills/skills/appaloft` and `packages/skills/skills/appaloft-deploy` for the npm
-  fallback.
-- standard install path: `npx skills add appaloft/appaloft`, with direct package fallback
-  `npx @appaloft/skills install appaloft/appaloft` and narrower deploy subprotocol
-  `npx @appaloft/skills install appaloft/deploy`.
+- Repository artifact: standard source `skills/appaloft`.
+- standard install path: `npx skills add appaloft/appaloft`.
+- no Appaloft-owned npm skill installer; this keeps skill installation distinct from the Appaloft
+  CLI.
 - CLI help: short pointer from first-deploy or deploy help to the skill docs when agent deployment
   is documented.
 - MCP/tools: optional follow-up; not required for v1.
