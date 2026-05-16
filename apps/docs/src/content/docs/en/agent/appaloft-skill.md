@@ -35,20 +35,20 @@ agent environment.
 Install the full Appaloft skill:
 
 ```bash
-npx skills add appaloft
+npx skills add appaloft/appaloft
 ```
 
 Direct package fallback:
 
 ```bash
-npx @appaloft/skills install appaloft
+npx @appaloft/skills install appaloft/appaloft
 ```
 
 The installer only copies skill files. It does not deploy an app, create resources, call APIs, or
 wrap the CLI. Hosts that only need the deploy subprotocol can still install:
 
 ```bash
-npx @appaloft/skills install deploy
+npx @appaloft/skills install appaloft/deploy
 ```
 
 <h2 id="appaloft-skill-scope">Scope</h2>

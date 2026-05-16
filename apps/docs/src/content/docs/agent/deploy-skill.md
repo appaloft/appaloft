@@ -33,19 +33,19 @@ Skill 的目标是覆盖完整 Appaloft 部署入口，让 agent 优先回答用
 推荐安装完整 Appaloft skill：
 
 ```bash
-npx skills add appaloft
+npx skills add appaloft/appaloft
 ```
 
 只需要部署子协议的 Codex 兼容 skill host 也可以直接安装：
 
 ```bash
-npx @appaloft/skills install deploy
+npx @appaloft/skills install appaloft/deploy
 ```
 
 默认安装到 `${CODEX_HOME:-~/.codex}/skills/appaloft-deploy`。如果需要安装到仓库内或其他 agent 的 skill 目录：
 
 ```bash
-npx @appaloft/skills install deploy --target directory --path ./.agents/skills
+npx @appaloft/skills install appaloft/deploy --target directory --path ./.agents/skills
 ```
 
 已有同名 skill 时需要显式传 `--force`。这个安装命令只复制 skill 文件，不会部署应用、创建资源、调用部署 API，也不是

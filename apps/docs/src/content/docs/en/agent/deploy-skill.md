@@ -35,20 +35,20 @@ one fast entrypoint, not the boundary of the skill.
 Install the full Appaloft skill:
 
 ```bash
-npx skills add appaloft
+npx skills add appaloft/appaloft
 ```
 
 Codex-compatible skill hosts that only need the deploy subprotocol can install it directly:
 
 ```bash
-npx @appaloft/skills install deploy
+npx @appaloft/skills install appaloft/deploy
 ```
 
 By default this installs to `${CODEX_HOME:-~/.codex}/skills/appaloft-deploy`. To install into a
 repository-local or other agent skill directory:
 
 ```bash
-npx @appaloft/skills install deploy --target directory --path ./.agents/skills
+npx @appaloft/skills install appaloft/deploy --target directory --path ./.agents/skills
 ```
 
 Pass `--force` to replace an existing installed copy.

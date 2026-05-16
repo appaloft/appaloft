@@ -21,13 +21,13 @@ semantics aligned with `docs/CORE_OPERATIONS.md` and `packages/application/src/o
 Install the full AI-facing Appaloft entrypoint:
 
 ```bash
-npx skills add appaloft
+npx skills add appaloft/appaloft
 ```
 
 Direct package fallback:
 
 ```bash
-npx @appaloft/skills install appaloft
+npx @appaloft/skills install appaloft/appaloft
 ```
 
 This only copies skill files into the target skill host. It does not deploy, create resources, call
@@ -36,7 +36,7 @@ Appaloft APIs, or wrap the Appaloft CLI.
 The narrower deploy subprotocol remains installable for hosts that want only deploy guidance:
 
 ```bash
-npx @appaloft/skills install deploy
+npx @appaloft/skills install appaloft/deploy
 ```
 
 ## Entry Surface

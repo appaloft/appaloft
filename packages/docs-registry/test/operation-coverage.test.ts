@@ -276,7 +276,7 @@ describe("public docs operation coverage", () => {
     }
 
     expect(skill).toContain("appaloft deploy ./dist --as static-site");
-    expect(fullSkill).toContain("npx skills add appaloft");
+    expect(fullSkill).toContain("npx skills add appaloft/appaloft");
     expect(packagedSkill).toContain("AI-facing Appaloft entrypoint");
     for (const operation of operationCatalog) {
       if (operation.transports.cli) {

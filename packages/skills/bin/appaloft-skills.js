@@ -9,23 +9,25 @@ const bundledSkillsRoot = join(packageRoot, "skills");
 
 const skillAliases = new Map([
   ["appaloft", "appaloft"],
+  ["appaloft/appaloft", "appaloft"],
   ["all", "appaloft"],
   ["deploy", "appaloft-deploy"],
+  ["appaloft/deploy", "appaloft-deploy"],
   ["appaloft-deploy", "appaloft-deploy"],
 ]);
 
 const helpText = `Installs Appaloft agent skills. This command copies skill files only; it does not run deployments.
 
 Usage:
-  appaloft-skills install appaloft [--target codex|directory] [--path <dir>] [--force] [--dry-run]
-  appaloft-skills install deploy [--target codex|directory] [--path <dir>] [--force] [--dry-run]
+  appaloft-skills install appaloft/appaloft [--target codex|directory] [--path <dir>] [--force] [--dry-run]
+  appaloft-skills install appaloft/deploy [--target codex|directory] [--path <dir>] [--force] [--dry-run]
   appaloft-skills list
 
 Examples:
-  npx skills add appaloft
-  npx @appaloft/skills install appaloft --target codex --force
-  npx @appaloft/skills install appaloft --target directory --path ./.agents/skills
-  npx @appaloft/skills install deploy
+  npx skills add appaloft/appaloft
+  npx @appaloft/skills install appaloft/appaloft --target directory --path ./.agents/skills
+  npx @appaloft/skills install appaloft/appaloft --target codex --force
+  npx @appaloft/skills install appaloft/deploy
 `;
 
 function parseArgs(argv) {

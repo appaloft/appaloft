@@ -17,7 +17,14 @@ describe("@appaloft/skills installer", () => {
   test("[APPALOFT-SKILL-INSTALL-001] installs the full Appaloft skill through the direct fallback", async () => {
     const target = mkdtempSync(join(tmpdir(), "appaloft-skill-"));
     try {
-      const result = runCli(["install", "appaloft", "--target", "directory", "--path", target]);
+      const result = runCli([
+        "install",
+        "appaloft/appaloft",
+        "--target",
+        "directory",
+        "--path",
+        target,
+      ]);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout.toString()).toContain("Installed skill appaloft");
@@ -35,7 +42,14 @@ describe("@appaloft/skills installer", () => {
   test("[AGENT-SKILL-INSTALL-001] installs the deploy skill into a directory target", async () => {
     const target = mkdtempSync(join(tmpdir(), "appaloft-agent-skill-"));
     try {
-      const result = runCli(["install", "deploy", "--target", "directory", "--path", target]);
+      const result = runCli([
+        "install",
+        "appaloft/deploy",
+        "--target",
+        "directory",
+        "--path",
+        target,
+      ]);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout.toString()).toContain("Installed skill appaloft-deploy");
@@ -86,7 +100,7 @@ describe("@appaloft/skills installer", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout.toString()).toContain("copies skill files only");
     expect(result.stdout.toString()).toContain("does not run deployments");
-    expect(result.stdout.toString()).toContain("npx skills add appaloft");
+    expect(result.stdout.toString()).toContain("npx skills add appaloft/appaloft");
   });
 
   test("[APPALOFT-SKILL-CATALOG-001] full skill covers every CLI catalog entry", async () => {
