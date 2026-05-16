@@ -34,6 +34,7 @@
       "@appaloft/orpc": ["./packages/orpc/src/index.ts"],
       "@appaloft/orpc/client": ["./packages/orpc/src/client.ts"],
       "@appaloft/openapi": ["./packages/openapi/src/index.ts"],
+      "@appaloft/server": ["./packages/server/src/index.ts"],
       "@appaloft/sdk": ["./packages/sdk/src/index.ts"],
       "@appaloft/sdk-generator": ["./packages/sdk-generator/src/index.ts"],
       "@appaloft/persistence-pg": ["./packages/persistence/pg/src/index.ts"],
