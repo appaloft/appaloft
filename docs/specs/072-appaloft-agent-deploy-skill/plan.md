@@ -42,7 +42,7 @@ The Code/Docs Round has chosen the v1 distribution location:
 - `skills/appaloft-deploy` is the standard discoverable deploy subprotocol folder;
 - `packages/skills/skills/appaloft` and `packages/skills/skills/appaloft-deploy` mirror the same
   content for the npm fallback installer;
-- the standard install path is `npx skills add appaloft/appaloft/skills/appaloft`;
+- the standard install path is `npx skills add appaloft/appaloft`;
 - `@appaloft/skills` exposes direct package fallbacks with
   `npx @appaloft/skills install appaloft/appaloft` and the narrower
   `npx @appaloft/skills install appaloft/deploy`;

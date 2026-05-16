@@ -26,13 +26,13 @@ this protocol.
 
 ## Install
 
-Install the deploy subprotocol for Codex-compatible skill hosts:
+Install the full Appaloft skill for Codex-compatible skill hosts:
 
 ```bash
-npx skills add appaloft/appaloft/skills/appaloft-deploy
+npx skills add appaloft/appaloft
 ```
 
-Direct package fallback:
+Direct package fallback for specialized hosts that only want the deploy subprotocol:
 
 ```bash
 npx @appaloft/skills install appaloft/deploy

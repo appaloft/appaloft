@@ -1,6 +1,8 @@
 ---
 name: appaloft-deploy
 description: Deploy the full range of Appaloft-supported workloads through Appaloft, including web apps, backend services, workers, Dockerfile apps, Docker Compose stacks, prebuilt images, and built static sites. Use when Codex or another coding agent is asked to deploy with Appaloft, choose between Appaloft CLI/API/Web deploy entrypoints, inspect source safely before deployment, or report deployment URL, logs, diagnostics, and recovery readiness.
+metadata:
+  internal: true
 ---
 
 # Appaloft Deploy

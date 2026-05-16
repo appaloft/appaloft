@@ -21,7 +21,7 @@ semantics aligned with `docs/CORE_OPERATIONS.md` and `packages/application/src/o
 Install the full AI-facing Appaloft entrypoint:
 
 ```bash
-npx skills add appaloft/appaloft/skills/appaloft
+npx skills add appaloft/appaloft
 ```
 
 Direct package fallback:
@@ -33,13 +33,7 @@ npx @appaloft/skills install appaloft/appaloft
 This only copies skill files into the target skill host. It does not deploy, create resources, call
 Appaloft APIs, or wrap the Appaloft CLI.
 
-The narrower deploy subprotocol remains installable for hosts that want only deploy guidance:
-
-```bash
-npx skills add appaloft/appaloft/skills/appaloft-deploy
-```
-
-The direct package fallback for the deploy-only skill is:
+The deploy-only skill stays available as a direct package fallback for specialized hosts:
 
 ```bash
 npx @appaloft/skills install appaloft/deploy

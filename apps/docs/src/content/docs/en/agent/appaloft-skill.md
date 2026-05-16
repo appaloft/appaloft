@@ -35,7 +35,7 @@ agent environment.
 Install the full Appaloft skill:
 
 ```bash
-npx skills add appaloft/appaloft/skills/appaloft
+npx skills add appaloft/appaloft
 ```
 
 Direct package fallback:
@@ -45,13 +45,8 @@ npx @appaloft/skills install appaloft/appaloft
 ```
 
 The installer only copies skill files. It does not deploy an app, create resources, call APIs, or
-wrap the CLI. Hosts that only need the deploy subprotocol can still install:
-
-```bash
-npx skills add appaloft/appaloft/skills/appaloft-deploy
-```
-
-Direct npm package fallback for the deploy subprotocol:
+wrap the CLI. The deploy subprotocol remains available as a direct npm package fallback for
+specialized hosts:
 
 ```bash
 npx @appaloft/skills install appaloft/deploy
