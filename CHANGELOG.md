@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.12.5](https://github.com/appaloft/appaloft/compare/v0.12.4...v0.12.5) (2026-05-16)
+
+
+### Features
+
+* add full appaloft skill ([1c6c7e5](https://github.com/appaloft/appaloft/commit/1c6c7e5c7392ad7bcd0a1c4b68d9f277c912b2c5))
+* add installable deploy skill package ([94663b6](https://github.com/appaloft/appaloft/commit/94663b6f000b533ac7c9588f9c23709e316e8578))
+* add runtime monitoring observations ([2c2de5b](https://github.com/appaloft/appaloft/commit/2c2de5bd27925b08f1e05b8955d3d6225dea2153))
+* add scheduled dependency backup policies ([#250](https://github.com/appaloft/appaloft/issues/250)) ([d81a933](https://github.com/appaloft/appaloft/commit/d81a9334bdcc29a01bb8b24e66fc9154049181da))
+* add url-first deploy entry skill ([d5a2f21](https://github.com/appaloft/appaloft/commit/d5a2f2149d5da0eba25a5f4e702e77ff9f697c79))
+* close dependency and storage runtime loops ([6548f60](https://github.com/appaloft/appaloft/commit/6548f60fc318adb6ecbc0adbe7d0bb38d32cb7b5))
+* close runtime and web affordances ([bd0b484](https://github.com/appaloft/appaloft/commit/bd0b484370d6f1774c433ce21c97dba0528fdd8b))
+* close workload catalog real-target coverage ([c8dda5b](https://github.com/appaloft/appaloft/commit/c8dda5b6bfa905d7ec2f7b9087559220b72496d6))
+* execute scheduled tasks on runtime targets ([5f2af95](https://github.com/appaloft/appaloft/commit/5f2af95327436cf8bb4ac7d8204044239d2bf8fd))
+* expose server factory extensions ([e7b7b1c](https://github.com/appaloft/appaloft/commit/e7b7b1c209676f1649e3d1f75b4c5bb0b3c2420b))
+* harden preview control-plane delivery ([175d56f](https://github.com/appaloft/appaloft/commit/175d56f180db898301e653d4a6cacecf48904ca2))
+* **release:** add pre-rc lifecycle operations ([8528a58](https://github.com/appaloft/appaloft/commit/8528a58c49776d17ef608adfaa11ef878f59fcec))
+* **runtime:** broaden framework and capacity coverage ([522ba30](https://github.com/appaloft/appaloft/commit/522ba3088198fe35481e17c4da8173da696a5ae2))
+* wire platform operation surfaces ([7185374](https://github.com/appaloft/appaloft/commit/718537474dd6d80c096acc7c08ce8c7405e417fe))
+
+
+### Bug Fixes
+
+* align appaloft skill install path ([52d546e](https://github.com/appaloft/appaloft/commit/52d546e901121465bb2a6106f17c578843ac8fad))
+* align skill source formats ([31fada7](https://github.com/appaloft/appaloft/commit/31fada75e0348d218140cc7f6017e6a8acf780df))
+* clarify skill installer boundary ([bccd9f1](https://github.com/appaloft/appaloft/commit/bccd9f1345dea3e343d20e05706b019fddba5c2e))
+* **release:** close pre-rc blocker evidence ([ca500ec](https://github.com/appaloft/appaloft/commit/ca500ecdc0c91bc7a64e833aaa614a6e5d1bba37))
+* remove npm skill installer fallback ([ead6ab3](https://github.com/appaloft/appaloft/commit/ead6ab301128a46b6a1c72fb3fcba87567913495))
+* shorten appaloft skill install path ([0eda0e3](https://github.com/appaloft/appaloft/commit/0eda0e34f79f25ed053917bf3d199ed7c5be562a))
+* sync appaloft skill references ([69aac82](https://github.com/appaloft/appaloft/commit/69aac824a4a6884a7af86aaf0adb9aeb909c6bec))
+* use path-based skill coordinates ([22cda93](https://github.com/appaloft/appaloft/commit/22cda93ceadc93fc46684872257034c925fa7a2e))
+
+
+### Documentation
+
+* mark url-first entry complete ([49eb092](https://github.com/appaloft/appaloft/commit/49eb092a8f977c58305e4d644edf0032eef0e1da))
+* **release:** add pre-rc closure audit ([f8f47a0](https://github.com/appaloft/appaloft/commit/f8f47a0477176d3278ac7840c3dcdf92ce894ed9))
+* **release:** sync pre-rc operation evidence ([043657f](https://github.com/appaloft/appaloft/commit/043657f9ad7ed12e5567be3cf567dbb48b92876f))
+* sync platform closure source of truth ([e944ce7](https://github.com/appaloft/appaloft/commit/e944ce7e61ec44d2f7202bf95265875fb7ce8db8))
+
 ## [0.12.4](https://github.com/appaloft/appaloft/compare/v0.12.3...v0.12.4) (2026-05-14)
 
 
