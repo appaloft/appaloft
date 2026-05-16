@@ -16,7 +16,7 @@ source lives in this document and the packaged installable skill lives at
 
 1. Inspect the source safely.
 2. Choose the smallest supported entrypoint.
-3. Dispatch existing CLI or HTTP/API operations.
+3. Dispatch existing CLI, HTTP/API, or Web operations through the active Appaloft surface.
 4. Report the deployment outcome by URL, status, logs, diagnostics, and recovery commands.
 
 The skill is more important than MCP for v1 because it can guide any capable coding agent today.
@@ -39,6 +39,10 @@ npx @appaloft/skills install deploy --target directory --path ./.agents/skills
 ```
 
 Use `--force` to replace an existing installed copy and `--dry-run` to preview the destination.
+
+The install command only copies the skill package into a skill host. It does not deploy an app,
+create resources, call Appaloft deployment APIs, or wrap `appaloft deploy`. Deployment starts later,
+when the installed skill is loaded by an agent and the user asks that agent to deploy something.
 
 ## Guardrails
 
@@ -76,6 +80,9 @@ needed, ask the user to register or reference them through Appaloft.
 ## Entrypoint Selection
 
 Use this order:
+
+In a shell-capable agent session, the following are the CLI forms. In Web or HTTP/API contexts, use
+the equivalent Resource and Deployment operation flow instead of shelling out.
 
 1. If the repository has an Appaloft deployment config, run `appaloft deploy <source>`.
 2. If the user names a prebuilt image, run `appaloft deploy image://<image>:<tag> --method prebuilt-image`.

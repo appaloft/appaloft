@@ -2,6 +2,11 @@
 
 ## Entrypoint Selection
 
+The `@appaloft/skills` npm command installs this skill only. It does not deploy. Once an agent host
+loads the skill and the user asks for deployment, choose the active Appaloft surface. Use the CLI
+forms below in shell contexts and the equivalent Resource/Deployment operations in Web or HTTP/API
+contexts.
+
 Use this order:
 
 1. Appaloft config present: `appaloft deploy <source>`.

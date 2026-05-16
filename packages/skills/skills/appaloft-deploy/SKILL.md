@@ -7,6 +7,9 @@ description: Deploy the full range of Appaloft-supported workloads through Appal
 
 ## Workflow
 
+This skill is loaded by an agent host after installation. The installer only copies the skill into
+the host's skill directory; it is not a deployment command and must not be treated as one.
+
 1. Inspect only safe source metadata: package scripts, framework hints, runtime ports,
    Dockerfile/Compose files, prebuilt image references, static output directories, and Appaloft
    config.
@@ -17,6 +20,9 @@ description: Deploy the full range of Appaloft-supported workloads through Appal
    readiness.
 
 ## Entry Selection
+
+When the active surface is a shell, these are the equivalent Appaloft CLI forms. When the active
+surface is Web or HTTP/API, use the matching Resource and Deployment operations instead.
 
 - Existing Appaloft config: `appaloft deploy <source>`.
 - Docker/OCI image: `appaloft deploy image://<image>:<tag> --method prebuilt-image`.

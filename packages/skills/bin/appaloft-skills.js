@@ -12,7 +12,9 @@ const skillAliases = new Map([
   ["appaloft-deploy", "appaloft-deploy"],
 ]);
 
-const helpText = `Usage:
+const helpText = `Installs Appaloft agent skills. This command copies skill files only; it does not run deployments.
+
+Usage:
   appaloft-skills install deploy [--target codex|directory] [--path <dir>] [--force] [--dry-run]
   appaloft-skills list
 
@@ -159,7 +161,7 @@ function run(argv = process.argv.slice(2)) {
   if (options.command === "install") {
     const result = installSkill(options);
     const action = result.installed ? "Installed" : "Would install";
-    console.log(`${action} ${result.skillName} to ${result.destination}`);
+    console.log(`${action} skill ${result.skillName} to ${result.destination}`);
     return 0;
   }
 

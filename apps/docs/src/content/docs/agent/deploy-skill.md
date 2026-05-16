@@ -41,13 +41,15 @@ npx @appaloft/skills install deploy
 npx @appaloft/skills install deploy --target directory --path ./.agents/skills
 ```
 
-已有同名 skill 时需要显式传 `--force`。
+已有同名 skill 时需要显式传 `--force`。这个安装命令只复制 skill 文件，不会部署应用、创建资源、调用部署 API，也不是
+`appaloft deploy` 的包装器。真正的部署发生在 agent host 加载该 skill 后，用户让 agent 执行部署任务时。
 
 <h2 id="agent-deploy-flow">推荐流程</h2>
 
 1. 安全检查来源：只读取项目结构、构建脚本、运行端口、镜像引用、Docker/Compose 配置、静态输出目录和 Appaloft 配置。
 2. 选择最小入口：Appaloft config 优先；然后根据证据选择 prebuilt image、Compose、Dockerfile、静态输出、静态源码或 workspace commands。
-3. 使用既有操作：创建或选择项目、服务器、环境和资源，然后发起 `deployments.create`。
+3. 使用既有操作：在当前可用的 Appaloft 表面中创建或选择项目、服务器、环境和资源，然后发起 `deployments.create`。Shell
+   场景可以使用 CLI；Web 或 HTTP/API 场景使用等价的 Resource/Deployment 操作。
 4. 输出结果：优先给访问 URL，其次给 deployment id、resource id、日志命令、诊断命令和 recovery readiness 命令。
 
 <h2 id="agent-deploy-safety">安全边界</h2>
