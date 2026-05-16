@@ -21,10 +21,10 @@ semantics aligned with `docs/CORE_OPERATIONS.md` and `packages/application/src/o
 Install the full AI-facing Appaloft entrypoint:
 
 ```bash
-npx @appaloft/skills add appaloft
+npx skills add appaloft
 ```
 
-Equivalent explicit form:
+Direct package fallback:
 
 ```bash
 npx @appaloft/skills install appaloft

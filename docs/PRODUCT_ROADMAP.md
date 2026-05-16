@@ -128,8 +128,9 @@ The 1.0.0 product is ready only when all of these are checked:
 - [ ] A published TypeScript SDK consumes the same HTTP/oRPC operation contracts as Web and
   external automation, without importing `core`, `application`, repositories, handlers, or use
   cases.
-- [ ] A v1 Appaloft skill is installable with `npx @appaloft/skills add appaloft`, covers every
+- [ ] A v1 Appaloft skill is installable with `npx skills add appaloft`, covers every
   CLI operation entrypoint as an AI-facing Appaloft surface, and keeps
+  `npx @appaloft/skills install appaloft` as the direct package fallback and
   `npx @appaloft/skills install deploy` as the narrower deploy subprotocol before MCP is required.
 - [x] Future MCP/tool contracts can be generated from the same operation catalog without inventing
   parallel behavior.
@@ -2751,10 +2752,11 @@ External baseline research points to this practical minimum:
   frameworks.
 - [ ] AI-agent safe deployment protocol and outcome-first completion output generated from the same
   operation catalog, public docs, and future MCP/tool descriptors.
-- [ ] Pre-v1 Appaloft skill: publish `@appaloft/skills` so coding agents can run
-  `npx @appaloft/skills add appaloft` and use the complete operation catalog safely before the full
-  MCP product surface exists. `npx @appaloft/skills install deploy` remains the narrower deploy
-  subprotocol. Governed by
+- [ ] Pre-v1 Appaloft skill: publish a standard skill-manager install path so coding agents can run
+  `npx skills add appaloft` and use the complete operation catalog safely before the full MCP
+  product surface exists. `npx @appaloft/skills install appaloft` remains the direct package
+  fallback, and `npx @appaloft/skills install deploy` remains the narrower deploy subprotocol.
+  Governed by
   [Appaloft Agent Deploy Skill](./specs/072-appaloft-agent-deploy-skill/spec.md).
 
 ## Immediate Spec-Round Todo

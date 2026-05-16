@@ -29,7 +29,8 @@
 ## Code Round
 
 - [x] Add CLI help pointer if the deploy help should reference the skill.
-- [x] Add npm-installable full skill packaging for `npx @appaloft/skills add appaloft`.
+- [x] Document standard full skill install with `npx skills add appaloft`.
+- [x] Add npm-installable full skill fallback for `npx @appaloft/skills install appaloft`.
 - [x] Keep narrower deploy subprotocol packaging for `npx @appaloft/skills install deploy`.
 - [x] Keep MCP integration optional and separate from the v1 skill path.
 

@@ -33,7 +33,7 @@ Skill 的目标是覆盖完整 Appaloft 部署入口，让 agent 优先回答用
 推荐安装完整 Appaloft skill：
 
 ```bash
-npx @appaloft/skills add appaloft
+npx skills add appaloft
 ```
 
 只需要部署子协议的 Codex 兼容 skill host 也可以直接安装：

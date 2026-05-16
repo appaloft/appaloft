@@ -366,7 +366,7 @@ export const publicDocsHelpTopics = {
       "appaloft skill",
       "AI entrypoint",
       "full skill",
-      "skills add appaloft",
+      "npx skills add appaloft",
       "完整 skill",
       "AI 入口",
     ],
