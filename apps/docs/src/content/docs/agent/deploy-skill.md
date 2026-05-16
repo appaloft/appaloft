@@ -30,13 +30,13 @@ Skill 的目标是覆盖完整 Appaloft 部署入口，让 agent 优先回答用
 
 <h2 id="agent-deploy-install">安装 skill</h2>
 
-推荐安装完整 Appaloft skill：
+推荐安装部署子协议 skill：
 
 ```bash
-npx skills add appaloft/appaloft
+npx skills add appaloft/appaloft/skills/appaloft-deploy
 ```
 
-只需要部署子协议的 Codex 兼容 skill host 也可以直接安装：
+直连 npm 包的备用写法：
 
 ```bash
 npx @appaloft/skills install appaloft/deploy
@@ -82,4 +82,5 @@ Agent 应返回一份短结果：
 
 <h2 id="agent-deploy-reference">规范文档</h2>
 
-完整规范位于仓库内的 `docs/agent/appaloft-deploy-skill.md`，可安装 skill 位于 npm 包 `@appaloft/skills` 的 `skills/appaloft-deploy` 目录。
+完整规范位于仓库内的 `docs/agent/appaloft-deploy-skill.md`，标准 skill source 位于
+`skills/appaloft-deploy`，npm 备用安装包内也镜像到 `skills/appaloft-deploy` 目录。

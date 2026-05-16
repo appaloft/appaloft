@@ -35,7 +35,7 @@ agent environment.
 Install the full Appaloft skill:
 
 ```bash
-npx skills add appaloft/appaloft
+npx skills add appaloft/appaloft/skills/appaloft
 ```
 
 Direct package fallback:
@@ -46,6 +46,12 @@ npx @appaloft/skills install appaloft/appaloft
 
 The installer only copies skill files. It does not deploy an app, create resources, call APIs, or
 wrap the CLI. Hosts that only need the deploy subprotocol can still install:
+
+```bash
+npx skills add appaloft/appaloft/skills/appaloft-deploy
+```
+
+Direct npm package fallback for the deploy subprotocol:
 
 ```bash
 npx @appaloft/skills install appaloft/deploy
@@ -78,5 +84,5 @@ The complete CLI map ships with the package at `skills/appaloft/references/cli-e
 
 <h2 id="appaloft-skill-reference">Source document</h2>
 
-The complete governing source lives in `docs/agent/appaloft-skill.md`. The installable skill is
-packaged in `@appaloft/skills` under `skills/appaloft`.
+The complete governing source lives in `docs/agent/appaloft-skill.md`. The standard skill source is
+`skills/appaloft`; the npm fallback package mirrors it under `skills/appaloft`.

@@ -126,6 +126,8 @@ describe("public docs help registry", () => {
         "docs/specs/071-url-first-deployment-entry-experience/spec.md",
         "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
         "docs/agent/appaloft-deploy-skill.md",
+        "skills/appaloft-deploy/SKILL.md",
+        "packages/skills/skills/appaloft-deploy/SKILL.md",
         "packages/skills/package.json",
       ]),
     );
@@ -141,12 +143,15 @@ describe("public docs help registry", () => {
     expect(topic.surfaces).toEqual(
       expect.arrayContaining(["cli", "http-api", "web", "repository-config", "mcp"]),
     );
-    expect(topic.aliases).toEqual(expect.arrayContaining(["npx skills add appaloft/appaloft"]));
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining(["npx skills add appaloft/appaloft/skills/appaloft"]),
+    );
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
         "docs/agent/appaloft-skill.md",
+        "skills/appaloft/SKILL.md",
+        "skills/appaloft/references/cli-entrypoints.md",
         "packages/skills/skills/appaloft/SKILL.md",
-        "packages/skills/skills/appaloft/references/cli-entrypoints.md",
       ]),
     );
   });

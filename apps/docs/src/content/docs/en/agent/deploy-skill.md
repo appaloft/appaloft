@@ -32,13 +32,13 @@ one fast entrypoint, not the boundary of the skill.
 
 <h2 id="agent-deploy-install">Install the skill</h2>
 
-Install the full Appaloft skill:
+Install the deploy subprotocol skill:
 
 ```bash
-npx skills add appaloft/appaloft
+npx skills add appaloft/appaloft/skills/appaloft-deploy
 ```
 
-Codex-compatible skill hosts that only need the deploy subprotocol can install it directly:
+Direct npm package fallback:
 
 ```bash
 npx @appaloft/skills install appaloft/deploy
@@ -90,5 +90,6 @@ suggesting the next action.
 
 <h2 id="agent-deploy-reference">Source document</h2>
 
-The complete governing source lives in `docs/agent/appaloft-deploy-skill.md`. The installable skill
-is packaged in `@appaloft/skills` under `skills/appaloft-deploy`.
+The complete governing source lives in `docs/agent/appaloft-deploy-skill.md`. The standard skill
+source is `skills/appaloft-deploy`; the npm fallback package mirrors it under
+`skills/appaloft-deploy`.
