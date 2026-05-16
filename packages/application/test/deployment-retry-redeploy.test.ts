@@ -38,6 +38,7 @@ import {
   SourceDescriptor,
   SourceKindValue,
   SourceLocator,
+  StartedAt,
   TargetKindValue,
 } from "@appaloft/core";
 import {
@@ -52,12 +53,16 @@ import {
 import { createExecutionContext, type ExecutionContext, type RepositoryContext } from "../src";
 import {
   type ExecutionBackend,
+  type MutationCoordinator,
+  type MutationCoordinatorRunExclusiveInput,
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
 } from "../src/ports";
 import {
+  type CreateDeploymentUseCase,
   DeploymentFactory,
   DeploymentLifecycleService,
+  RedeployDeploymentUseCase,
   RetryDeploymentUseCase,
 } from "../src/use-cases";
 
@@ -123,6 +128,43 @@ class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
   }
 }
 
+class BlockingMutationCoordinator implements MutationCoordinator {
+  calls: Array<MutationCoordinatorRunExclusiveInput<unknown>> = [];
+
+  async runExclusive<T>(input: MutationCoordinatorRunExclusiveInput<T>): Promise<Result<T>> {
+    this.calls.push(input as MutationCoordinatorRunExclusiveInput<unknown>);
+    return err({
+      code: "coordination_timeout",
+      category: "timeout",
+      message: "Resource runtime is already owned by another operation",
+      retryable: true,
+      details: {
+        phase: "operation-coordination",
+        coordinationScopeKind: input.scope.kind,
+        coordinationScope: input.scope.key,
+      },
+    });
+  }
+}
+
+class RecordingCreateDeploymentUseCase {
+  calls: Array<{
+    input: Parameters<CreateDeploymentUseCase["execute"]>[1];
+    recovery: Parameters<CreateDeploymentUseCase["execute"]>[2];
+  }> = [];
+
+  constructor(private readonly result: Result<{ id: string }> = ok({ id: "dep_redeploy" })) {}
+
+  async execute(
+    _context: ExecutionContext,
+    input: Parameters<CreateDeploymentUseCase["execute"]>[1],
+    recovery: Parameters<CreateDeploymentUseCase["execute"]>[2],
+  ): Promise<Result<{ id: string }>> {
+    this.calls.push({ input, recovery });
+    return this.result;
+  }
+}
+
 function runtimePlan() {
   return RuntimePlan.rehydrate({
     id: RuntimePlanId.rehydrate("rpl_demo"),
@@ -147,7 +189,7 @@ function runtimePlan() {
   });
 }
 
-function sourceDeployment(status: "failed" | "succeeded") {
+function sourceDeployment(status: "failed" | "succeeded" | "running") {
   return Deployment.rehydrate({
     id: DeploymentId.rehydrate("dep_source"),
     projectId: ProjectId.rehydrate("prj_demo"),
@@ -167,12 +209,18 @@ function sourceDeployment(status: "failed" | "succeeded") {
     dependencyBindingReferences: [],
     logs: [],
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
-    finishedAt: FinishedAt.rehydrate("2026-01-01T00:00:10.000Z"),
+    ...(status === "running"
+      ? { startedAt: StartedAt.rehydrate("2026-01-01T00:00:02.000Z") }
+      : { finishedAt: FinishedAt.rehydrate("2026-01-01T00:00:10.000Z") }),
     triggerKind: DeploymentTriggerKindValue.createDefault(),
   });
 }
 
-function createUseCase(input?: { deployment?: Deployment; executionBackend?: ExecutionBackend }) {
+function createUseCase(input?: {
+  deployment?: Deployment;
+  executionBackend?: ExecutionBackend;
+  mutationCoordinator?: MutationCoordinator;
+}) {
   const clock = new FixedClock("2026-01-01T00:00:15.000Z");
   const repository = new MemoryDeploymentRepository();
   const processAttemptRecorder = new RecordingProcessAttemptRecorder();
@@ -192,7 +240,7 @@ function createUseCase(input?: { deployment?: Deployment; executionBackend?: Exe
       new NoopLogger(),
       new DeploymentFactory(clock, new SequenceIdGenerator()),
       new DeploymentLifecycleService(clock),
-      new PassThroughMutationCoordinator(),
+      input?.mutationCoordinator ?? new PassThroughMutationCoordinator(),
       processAttemptRecorder,
     ),
     processAttemptRecorder,
@@ -331,6 +379,177 @@ describe("RetryDeploymentUseCase", () => {
     expect(result._unsafeUnwrapErr()).toMatchObject({
       code: "deployment_not_retryable",
     });
+  });
+
+  test("[DEP-RETRY-002] rejects active source attempts without admitting retry work", async () => {
+    const { context, repository, useCase } = createUseCase({
+      deployment: sourceDeployment("running"),
+    });
+
+    const result = await useCase.execute(context, {
+      deploymentId: "dep_source",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "deployment_not_retryable",
+      details: {
+        causeCode: "attempt_not_terminal",
+      },
+    });
+    expect([...repository.items.keys()]).toEqual(["dep_source"]);
+  });
+
+  test("[DEP-RETRY-004] rejects retry when resource-runtime coordination is already owned", async () => {
+    const mutationCoordinator = new BlockingMutationCoordinator();
+    const { context, repository, useCase } = createUseCase({ mutationCoordinator });
+
+    const result = await useCase.execute(context, {
+      deploymentId: "dep_source",
+      readinessGeneratedAt: "2026-01-01T00:00:12.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "coordination_timeout",
+      details: {
+        phase: "operation-coordination",
+        coordinationScopeKind: "resource-runtime",
+      },
+    });
+    expect(mutationCoordinator.calls).toHaveLength(1);
+    expect([...repository.items.keys()]).toEqual(["dep_source"]);
+  });
+});
+
+describe("RedeployDeploymentUseCase", () => {
+  test("[DEP-REDEPLOY-002] creates a current-profile redeploy without reusing old snapshot truth", async () => {
+    const repository = new MemoryDeploymentRepository();
+    repository.items.set("dep_source", sourceDeployment("failed"));
+    const createDeploymentUseCase = new RecordingCreateDeploymentUseCase();
+    const context = createExecutionContext({
+      requestId: "req_redeploy_deployment_test",
+      entrypoint: "system",
+    });
+    const useCase = new RedeployDeploymentUseCase(
+      repository,
+      createDeploymentUseCase as unknown as CreateDeploymentUseCase,
+    );
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_demo",
+      projectId: "prj_current",
+      environmentId: "env_current",
+      serverId: "srv_current",
+      destinationId: "dst_current",
+      sourceDeploymentId: "dep_source",
+      readinessGeneratedAt: "2026-01-01T00:00:12.000Z",
+    });
+
+    expect(result).toEqual(ok({ id: "dep_redeploy" }));
+    expect(createDeploymentUseCase.calls).toHaveLength(1);
+    expect(createDeploymentUseCase.calls[0]).toMatchObject({
+      input: {
+        projectId: "prj_current",
+        environmentId: "env_current",
+        serverId: "srv_current",
+        destinationId: "dst_current",
+        resourceId: "res_demo",
+      },
+    });
+    expect(createDeploymentUseCase.calls[0]?.recovery?.triggerKind.value).toBe("redeploy");
+    expect(createDeploymentUseCase.calls[0]?.recovery).toMatchObject({
+      sourceDeploymentId: "dep_source",
+      ownerLabel: "deployments.redeploy",
+    });
+  });
+
+  test("[DEP-REDEPLOY-003] rejects invalid current profile without falling back to retry", async () => {
+    const repository = new MemoryDeploymentRepository();
+    repository.items.set("dep_source", sourceDeployment("failed"));
+    const createDeploymentUseCase = new RecordingCreateDeploymentUseCase(
+      err(
+        domainError.deploymentNotRedeployable("Current resource profile is invalid", {
+          commandName: "deployments.redeploy",
+          phase: "redeploy-admission",
+          resourceId: "res_demo",
+          causeCode: "resource_profile_invalid",
+        }),
+      ),
+    );
+    const useCase = new RedeployDeploymentUseCase(
+      repository,
+      createDeploymentUseCase as unknown as CreateDeploymentUseCase,
+    );
+
+    const result = await useCase.execute(
+      createExecutionContext({
+        requestId: "req_redeploy_invalid_profile_test",
+        entrypoint: "system",
+      }),
+      {
+        resourceId: "res_demo",
+        projectId: "prj_current",
+        environmentId: "env_current",
+        serverId: "srv_current",
+        sourceDeploymentId: "dep_source",
+      },
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "deployment_not_redeployable",
+      details: {
+        causeCode: "resource_profile_invalid",
+      },
+    });
+    expect(createDeploymentUseCase.calls).toHaveLength(1);
+    expect(createDeploymentUseCase.calls[0]?.recovery?.triggerKind.value).toBe("redeploy");
+  });
+
+  test("[DEP-REDEPLOY-004] rejects redeploy when resource-runtime coordination is already owned", async () => {
+    const repository = new MemoryDeploymentRepository();
+    repository.items.set("dep_source", sourceDeployment("failed"));
+    const createDeploymentUseCase = new RecordingCreateDeploymentUseCase(
+      err({
+        code: "coordination_timeout",
+        category: "timeout",
+        message: "Resource runtime is already owned by another operation",
+        retryable: true,
+        details: {
+          phase: "operation-coordination",
+          coordinationScopeKind: "resource-runtime",
+        },
+      }),
+    );
+    const useCase = new RedeployDeploymentUseCase(
+      repository,
+      createDeploymentUseCase as unknown as CreateDeploymentUseCase,
+    );
+
+    const result = await useCase.execute(
+      createExecutionContext({
+        requestId: "req_redeploy_coordination_test",
+        entrypoint: "system",
+      }),
+      {
+        resourceId: "res_demo",
+        projectId: "prj_current",
+        environmentId: "env_current",
+        serverId: "srv_current",
+        sourceDeploymentId: "dep_source",
+      },
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "coordination_timeout",
+      details: {
+        phase: "operation-coordination",
+        coordinationScopeKind: "resource-runtime",
+      },
+    });
+    expect(createDeploymentUseCase.calls[0]?.recovery?.triggerKind.value).toBe("redeploy");
   });
 });
 

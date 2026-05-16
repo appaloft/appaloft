@@ -2,8 +2,9 @@
 
 ## Status
 
-Spec Round error contract for accepted candidate recovery operations. These errors are public
-contract candidates and become active only when their owning query/command slices are implemented.
+Error contract for active deployment recovery operations. These errors are public contracts for
+`deployments.recovery-readiness`, `deployments.retry`, `deployments.redeploy`, and
+`deployments.rollback`; remaining work is edge-case hardening, not boundary activation.
 
 ## Governing Sources
 
@@ -13,6 +14,7 @@ contract candidates and become active only when their owning query/command slice
 - [deployments.retry Command Spec](../commands/deployments.retry.md)
 - [deployments.redeploy Command Spec](../commands/deployments.redeploy.md)
 - [deployments.rollback Command Spec](../commands/deployments.rollback.md)
+- [Deployment Observation And Recovery Hardening](../specs/071-deployment-observation-and-recovery/spec.md)
 - [Deployment Recovery Readiness Test Matrix](../testing/deployment-recovery-readiness-test-matrix.md)
 
 ## Stable Error Codes

@@ -3,6 +3,7 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   createExecutionContext,
+  type DeploymentEventStreamEnvelope,
   type DeploymentReadModel,
   type DeploymentSummary,
 } from "@appaloft/application";
@@ -185,5 +186,148 @@ describe("shell deployment event observer", () => {
 
     expect(opened.isErr()).toBe(true);
     expect(opened._unsafeUnwrapErr().code).toBe("deployment_event_cursor_invalid");
+  });
+
+  test("[DEP-EVENTS-QRY-004] resumes replay strictly after a known cursor", async () => {
+    const context = createExecutionContext({
+      requestId: "req_shell_cursor_continuation",
+      entrypoint: "system",
+    });
+    const observer = new ShellDeploymentEventObserver(
+      new StaticDeploymentReadModel(deploymentSummary(), [
+        {
+          timestamp: "2026-01-01T00:00:01.000Z",
+          source: "appaloft",
+          phase: "detect",
+          level: "info",
+          message: "Deployment requested",
+        },
+        {
+          timestamp: "2026-01-01T00:00:02.000Z",
+          source: "appaloft",
+          phase: "deploy",
+          level: "info",
+          message: "Deployment started",
+        },
+        {
+          timestamp: "2026-01-01T00:00:03.000Z",
+          source: "appaloft",
+          phase: "verify",
+          level: "info",
+          message: "Verifying deployment",
+        },
+      ]),
+      new ShellDeploymentProgressReporter(),
+    );
+
+    const opened = await observer.open(
+      context,
+      { deployment: deploymentSummary() },
+      {
+        cursor: "dep_demo:1",
+        historyLimit: 10,
+        includeHistory: true,
+        follow: false,
+        untilTerminal: true,
+      },
+      new AbortController().signal,
+    );
+
+    expect(opened.isOk()).toBe(true);
+    const envelopes: DeploymentEventStreamEnvelope[] = [];
+    for await (const envelope of opened._unsafeUnwrap()) {
+      envelopes.push(envelope);
+    }
+
+    const events = envelopes.filter((envelope) => envelope.kind === "event");
+    expect(
+      events.map((envelope) => (envelope.kind === "event" ? envelope.event.sequence : 0)),
+    ).toEqual([2, 3]);
+    expect(envelopes.at(-1)).toMatchObject({
+      kind: "closed",
+      reason: "source-ended",
+      cursor: "dep_demo:3",
+    });
+  });
+
+  test("[DEP-EVENTS-STREAM-003] terminal deployment closes follow mode as completed", async () => {
+    const context = createExecutionContext({
+      requestId: "req_shell_terminal_close",
+      entrypoint: "system",
+    });
+    const observer = new ShellDeploymentEventObserver(
+      new StaticDeploymentReadModel(deploymentSummary({ status: "succeeded" }), [
+        {
+          timestamp: "2026-01-01T00:00:01.000Z",
+          source: "appaloft",
+          phase: "verify",
+          level: "info",
+          message: "Deployment succeeded",
+        },
+      ]),
+      new ShellDeploymentProgressReporter(),
+    );
+
+    const opened = await observer.open(
+      context,
+      { deployment: deploymentSummary({ status: "succeeded" }) },
+      {
+        historyLimit: 10,
+        includeHistory: true,
+        follow: true,
+        untilTerminal: true,
+      },
+      new AbortController().signal,
+    );
+
+    expect(opened.isOk()).toBe(true);
+    const envelopes: DeploymentEventStreamEnvelope[] = [];
+    for await (const envelope of opened._unsafeUnwrap()) {
+      envelopes.push(envelope);
+    }
+
+    expect(envelopes.at(-1)).toMatchObject({
+      kind: "closed",
+      reason: "completed",
+      cursor: "dep_demo:1",
+    });
+  });
+
+  test("[DEP-EVENTS-STREAM-004] caller cancellation closes follow mode without orphaning the source", async () => {
+    const context = createExecutionContext({
+      requestId: "req_shell_cancel_follow",
+      entrypoint: "system",
+    });
+    const abortController = new AbortController();
+    const observer = new ShellDeploymentEventObserver(
+      new StaticDeploymentReadModel(deploymentSummary(), []),
+      new ShellDeploymentProgressReporter(),
+    );
+
+    const opened = await observer.open(
+      context,
+      { deployment: deploymentSummary() },
+      {
+        historyLimit: 10,
+        includeHistory: false,
+        follow: true,
+        untilTerminal: true,
+      },
+      abortController.signal,
+    );
+
+    expect(opened.isOk()).toBe(true);
+    const iterator = opened._unsafeUnwrap()[Symbol.asyncIterator]();
+    const nextEnvelope = iterator.next();
+    abortController.abort();
+
+    await expect(nextEnvelope).resolves.toMatchObject({
+      done: false,
+      value: {
+        kind: "closed",
+        reason: "cancelled",
+      },
+    });
+    await iterator.return?.();
   });
 });

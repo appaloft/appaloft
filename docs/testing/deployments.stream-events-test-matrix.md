@@ -17,6 +17,7 @@ This test matrix inherits:
 - [deployments.stream-events Query Spec](../queries/deployments.stream-events.md)
 - [Deployment Event Stream Error Spec](../errors/deployments.stream-events.md)
 - [Deployment Event Stream Implementation Plan](../implementation/deployments.stream-events-plan.md)
+- [Deployment Observation And Recovery Hardening](../specs/071-deployment-observation-and-recovery/spec.md)
 - [Deployment Detail And Observation Workflow Spec](../workflows/deployment-detail-and-observation.md)
 - [deployments.show Query Spec](../queries/deployments.show.md)
 - [deployments.logs Query/operation boundary](../CORE_OPERATIONS.md)
@@ -108,11 +109,23 @@ Automated coverage now exists for:
 - `DEP-EVENTS-QRY-001` in `packages/application/test/stream-deployment-events.test.ts`;
 - `DEP-EVENTS-QRY-002` in `packages/application/test/stream-deployment-events.test.ts`;
 - `DEP-EVENTS-QRY-003` in `apps/shell/test/deployment-event-observer.test.ts`;
+- `DEP-EVENTS-QRY-004` in `apps/shell/test/deployment-event-observer.test.ts`;
+- `DEP-EVENTS-QRY-005` in `packages/application/test/stream-deployment-events.test.ts`;
 - `DEP-EVENTS-QRY-006` in `apps/shell/test/deployment-event-observer.test.ts`;
+- `DEP-EVENTS-QRY-007` in `packages/application/test/stream-deployment-events.test.ts`;
+- `DEP-EVENTS-QRY-008` in `packages/application/test/stream-deployment-events.test.ts`;
 - `DEP-EVENTS-STREAM-001` service-mode coverage in
+  `packages/application/test/stream-deployment-events.test.ts`;
+- `DEP-EVENTS-STREAM-002` in `packages/application/test/stream-deployment-events.test.ts`;
+- `DEP-EVENTS-STREAM-003` in `apps/shell/test/deployment-event-observer.test.ts`;
+- `DEP-EVENTS-STREAM-004` in `apps/shell/test/deployment-event-observer.test.ts`;
+- `DEP-EVENTS-STREAM-005` in `packages/application/test/stream-deployment-events.test.ts`;
+- `DEP-EVENTS-STREAM-006` in `packages/application/test/stream-deployment-events.test.ts`;
+- `DEP-EVENTS-OWN-001` through `DEP-EVENTS-OWN-004` in
   `packages/application/test/stream-deployment-events.test.ts`;
 - envelope merge, cursor extraction, heartbeat/gap/error rendering, and summary mapping in
   `apps/web/src/lib/console/deployment-progress.test.ts`;
+- `DEP-EVENTS-ENTRY-003` in `packages/adapters/cli/test/deployment-events-command.test.ts`;
 - `DEP-EVENTS-ENTRY-004` bounded HTTP/oRPC dispatch in
   `packages/orpc/test/deployment-event-stream.http.test.ts`;
 - `DEP-EVENTS-ENTRY-005` Web deployment detail replay/follow behavior in
@@ -120,20 +133,14 @@ Automated coverage now exists for:
 
 Remaining executable coverage gaps:
 
-- `DEP-EVENTS-QRY-004` cursor continuation after a known envelope;
-- `DEP-EVENTS-QRY-005` source-unavailable startup error;
-- `DEP-EVENTS-QRY-007` finite historical-only close behavior at the query-service boundary;
-- `DEP-EVENTS-QRY-008` detail/log separation at the query-service boundary;
-- `DEP-EVENTS-STREAM-002` heartbeat behavior;
-- `DEP-EVENTS-STREAM-003` terminal close behavior beyond service-mode smoke coverage;
-- `DEP-EVENTS-STREAM-004` caller cancellation and cleanup;
-- `DEP-EVENTS-STREAM-005` explicit gap-envelope scenario;
-- `DEP-EVENTS-STREAM-006` post-open follow-source failure;
-- `DEP-EVENTS-OWN-001` through `DEP-EVENTS-OWN-004` as explicit boundary assertions;
 - `DEP-EVENTS-ENTRY-001` and `DEP-EVENTS-ENTRY-002` as standalone Web timeline/reconnect rows
-  separate from the Quick Deploy handoff row;
-- `DEP-EVENTS-ENTRY-003` CLI follow/cancellation coverage.
+  separate from the Quick Deploy handoff row.
+
+The `0.12.x` hardening round closed the application, shell, CLI, gap, cancellation, heartbeat, and
+boundary rows. Remaining Web-specific standalone rows are explicit deferred e2e quality coverage,
+not the active deployment observation/recovery blocker.
 
 ## Open Questions
 
-- None for the active first implementation. Cursor reconnect remains a named executable coverage gap.
+- None for the active implementation. Standalone Web reconnect rows remain named executable coverage
+  gaps.
