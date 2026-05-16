@@ -41,6 +41,18 @@ describe("release build workflow", () => {
     expect(workflow).toContain("dist/release/release-manifest.json");
     expect(workflow).toContain("dist/release/checksums.txt");
     expect(workflow).toContain("Generate Homebrew Formula");
+    expect(workflow).toContain('[[ "$version" == *-* ]]');
+    expect(workflow).toContain("npm_tag=next");
+    expect(workflow).toContain("APPALOFT_RELEASE_PRERELEASE");
+    expect(workflow).toContain("release_flags+=(--prerelease)");
+    expect(workflow).toContain("release_flags+=(--latest)");
+    expect(workflow).toContain(
+      [
+        "type=raw,value=latest,enable=",
+        "$",
+        "{{ needs.resolve.outputs.prerelease == 'false' }}",
+      ].join(""),
+    );
   });
 
   test("[RELEASE-HARDENING-006] keeps release-readiness smoke commands first-class", async () => {
@@ -979,6 +991,34 @@ describe("release build workflow", () => {
     expect(result.exitCode).toBe(0);
     expect(output).toContain("docs/PRODUCT_ROADMAP.md release alignment is valid for 0.11.0");
     expect(output).not.toContain("Roadmap gate rejects release 0.11.0");
+  });
+
+  test("[RELEASE-HARDENING-006] allows the 1.0.0-rc release gate as a prerelease target", () => {
+    const result = Bun.spawnSync(
+      [
+        "bun",
+        "run",
+        "scripts/release/align-roadmap-for-release.ts",
+        "--target-version",
+        "1.0.0-rc",
+        "--current-version",
+        "0.12.4",
+        "--latest-release-tag",
+        "v0.12.4",
+        "--check",
+      ],
+      {
+        cwd: root,
+        stderr: "pipe",
+        stdout: "pipe",
+      },
+    );
+
+    const output = `${result.stdout.toString()}\n${result.stderr.toString()}`;
+    expect(result.exitCode).toBe(0);
+    expect(output).toContain("docs/PRODUCT_ROADMAP.md release alignment is valid for 1.0.0-rc");
+    expect(output).not.toContain("Expected a stable SemVer version");
+    expect(output).not.toContain("Roadmap gate rejects release 1.0.0-rc");
   });
 
   test("[RELEASE-HARDENING-006] keeps local smoke control-plane and cleanup isolated", async () => {
