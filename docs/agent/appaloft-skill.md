@@ -21,7 +21,7 @@ semantics aligned with `docs/CORE_OPERATIONS.md` and `packages/application/src/o
 Install the full AI-facing Appaloft entrypoint:
 
 ```bash
-npx skills add appaloft/appaloft
+npx skills add appaloft/appaloft/skills/appaloft
 ```
 
 Direct package fallback:
@@ -34,6 +34,12 @@ This only copies skill files into the target skill host. It does not deploy, cre
 Appaloft APIs, or wrap the Appaloft CLI.
 
 The narrower deploy subprotocol remains installable for hosts that want only deploy guidance:
+
+```bash
+npx skills add appaloft/appaloft/skills/appaloft-deploy
+```
+
+The direct package fallback for the deploy-only skill is:
 
 ```bash
 npx @appaloft/skills install appaloft/deploy
@@ -77,7 +83,9 @@ The installable `appaloft` skill must include:
 
 ## Packaged Artifact
 
-- Full skill: `packages/skills/skills/appaloft`.
-- Complete CLI operation reference: `packages/skills/skills/appaloft/references/cli-entrypoints.md`.
-- Deploy subprotocol: `packages/skills/skills/appaloft/references/deploy-protocol.md`.
-- Narrow deploy skill: `packages/skills/skills/appaloft-deploy`.
+- Full skill source: `skills/appaloft`.
+- Complete CLI operation reference: `skills/appaloft/references/cli-entrypoints.md`.
+- Deploy subprotocol: `skills/appaloft/references/deploy-protocol.md`.
+- Narrow deploy skill source: `skills/appaloft-deploy`.
+- npm fallback mirrors: `packages/skills/skills/appaloft` and
+  `packages/skills/skills/appaloft-deploy`.

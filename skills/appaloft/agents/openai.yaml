@@ -1,0 +1,4 @@
+interface:
+  display_name: "Appaloft"
+  short_description: "Operate the full Appaloft platform safely."
+  default_prompt: "Use the Appaloft skill as the AI-facing entrypoint for Appaloft. Classify the user's intent, choose CLI/API/Web/MCP based on the active surface, use existing Appaloft operations only, protect secrets, and return outcome-first results with logs, diagnostics, and recovery guidance."

@@ -38,9 +38,11 @@ The Code/Docs Round has chosen the v1 distribution location:
 - `docs/agent/appaloft-skill.md` is the canonical governing source for the full AI-facing entrypoint;
 - `docs/agent/appaloft-deploy-skill.md` is the canonical governing source for the deploy
   subprotocol;
-- `packages/skills/skills/appaloft` is the installable full skill folder;
-- `packages/skills/skills/appaloft-deploy` is the installable deploy subprotocol folder;
-- the standard install path is `npx skills add appaloft/appaloft`;
+- `skills/appaloft` is the standard discoverable full skill folder;
+- `skills/appaloft-deploy` is the standard discoverable deploy subprotocol folder;
+- `packages/skills/skills/appaloft` and `packages/skills/skills/appaloft-deploy` mirror the same
+  content for the npm fallback installer;
+- the standard install path is `npx skills add appaloft/appaloft/skills/appaloft`;
 - `@appaloft/skills` exposes direct package fallbacks with
   `npx @appaloft/skills install appaloft/appaloft` and the narrower
   `npx @appaloft/skills install appaloft/deploy`;

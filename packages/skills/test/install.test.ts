@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const cliPath = join(import.meta.dir, "../bin/appaloft-skills.js");
+const repositorySkillsRoot = join(import.meta.dir, "../../../skills");
+const packageSkillsRoot = join(import.meta.dir, "../skills");
 
 function runCli(args: string[], env: Record<string, string> = {}) {
   return Bun.spawnSync(["node", cliPath, ...args], {
@@ -13,13 +15,40 @@ function runCli(args: string[], env: Record<string, string> = {}) {
   });
 }
 
+function listFiles(root: string, prefix = ""): string[] {
+  return readdirSync(join(root, prefix))
+    .flatMap((entry) => {
+      const relativePath = join(prefix, entry);
+      const absolutePath = join(root, relativePath);
+      if (statSync(absolutePath).isDirectory()) {
+        return listFiles(root, relativePath);
+      }
+      return [relativePath];
+    })
+    .sort();
+}
+
+function expectSkillMirror(skillName: string) {
+  const repositorySkill = join(repositorySkillsRoot, skillName);
+  const packageSkill = join(packageSkillsRoot, skillName);
+  const repositoryFiles = listFiles(repositorySkill);
+  const packageFiles = listFiles(packageSkill);
+
+  expect(packageFiles).toEqual(repositoryFiles);
+  for (const relativePath of repositoryFiles) {
+    expect(readFileSync(join(packageSkill, relativePath), "utf8")).toBe(
+      readFileSync(join(repositorySkill, relativePath), "utf8"),
+    );
+  }
+}
+
 describe("@appaloft/skills installer", () => {
-  test("[APPALOFT-SKILL-INSTALL-001] installs the full Appaloft skill through the direct fallback", async () => {
+  test("[APPALOFT-SKILL-INSTALL-001] installs the full Appaloft skill through the source-format alias", async () => {
     const target = mkdtempSync(join(tmpdir(), "appaloft-skill-"));
     try {
       const result = runCli([
         "install",
-        "appaloft/appaloft",
+        "appaloft/appaloft/skills/appaloft",
         "--target",
         "directory",
         "--path",
@@ -44,7 +73,7 @@ describe("@appaloft/skills installer", () => {
     try {
       const result = runCli([
         "install",
-        "appaloft/deploy",
+        "appaloft/appaloft/skills/appaloft-deploy",
         "--target",
         "directory",
         "--path",
@@ -100,7 +129,12 @@ describe("@appaloft/skills installer", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout.toString()).toContain("copies skill files only");
     expect(result.stdout.toString()).toContain("does not run deployments");
-    expect(result.stdout.toString()).toContain("npx skills add appaloft/appaloft");
+    expect(result.stdout.toString()).toContain("npx skills add appaloft/appaloft/skills/appaloft");
+  });
+
+  test("[AGENT-SKILL-SOURCE-001] mirrors standard repository skill sources into the npm fallback package", () => {
+    expectSkillMirror("appaloft");
+    expectSkillMirror("appaloft-deploy");
   });
 
   test("[APPALOFT-SKILL-CATALOG-001] full skill covers every CLI catalog entry", async () => {
@@ -108,7 +142,7 @@ describe("@appaloft/skills installer", () => {
       join(import.meta.dir, "../../application/src/operation-catalog.ts"),
     ).text();
     const cliEntryReference = await Bun.file(
-      join(import.meta.dir, "../skills/appaloft/references/cli-entrypoints.md"),
+      join(repositorySkillsRoot, "appaloft/references/cli-entrypoints.md"),
     ).text();
     const cliCommands = [...operationCatalogSource.matchAll(/cli: "([^"]+)"/g)].map(
       (match) => match[1],

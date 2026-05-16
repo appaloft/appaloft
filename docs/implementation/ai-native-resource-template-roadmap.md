@@ -109,10 +109,10 @@ Planning rules:
 
 - The skill explains how coding agents use existing CLI/API/Web behavior across the complete
   operation catalog.
-- It uses the standard skill-manager path `npx skills add appaloft/appaloft` for Codex-compatible
-  skill hosts; `npx @appaloft/skills install appaloft/appaloft` remains the direct package
-  fallback, and `npx @appaloft/skills install appaloft/deploy` remains a narrower deploy
-  subprotocol.
+- It uses the standard skill-manager path `npx skills add appaloft/appaloft/skills/appaloft` for
+  Codex-compatible skill hosts; `npx @appaloft/skills install appaloft/appaloft` remains the direct
+  package fallback, and `npx skills add appaloft/appaloft/skills/appaloft-deploy` remains a
+  narrower deploy subprotocol.
 - It must point to stable public docs anchors and reuse operation-catalog language without exposing
   internal DDD/CQRS terminology.
 - It must include every CLI transport entrypoint, operation keys, safe source inspection,

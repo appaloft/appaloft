@@ -258,10 +258,8 @@ describe("public docs operation coverage", () => {
   test("[AGENT-DEPLOY-SKILL-001][AGENT-DEPLOY-SKILL-002] deploy skill is safe and operation-backed", async () => {
     const skill = await Bun.file("docs/agent/appaloft-deploy-skill.md").text();
     const fullSkill = await Bun.file("docs/agent/appaloft-skill.md").text();
-    const packagedSkill = await Bun.file("packages/skills/skills/appaloft/SKILL.md").text();
-    const cliEntrypoints = await Bun.file(
-      "packages/skills/skills/appaloft/references/cli-entrypoints.md",
-    ).text();
+    const packagedSkill = await Bun.file("skills/appaloft/SKILL.md").text();
+    const cliEntrypoints = await Bun.file("skills/appaloft/references/cli-entrypoints.md").text();
     const operationKeys = new Set(operationCatalog.map((operation) => operation.key));
 
     for (const operationKey of [
@@ -276,7 +274,7 @@ describe("public docs operation coverage", () => {
     }
 
     expect(skill).toContain("appaloft deploy ./dist --as static-site");
-    expect(fullSkill).toContain("npx skills add appaloft/appaloft");
+    expect(fullSkill).toContain("npx skills add appaloft/appaloft/skills/appaloft");
     expect(packagedSkill).toContain("AI-facing Appaloft entrypoint");
     for (const operation of operationCatalog) {
       if (operation.transports.cli) {

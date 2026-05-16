@@ -12,8 +12,8 @@ The full [Appaloft Skill](./appaloft-skill.md) is the AI-facing product entrypoi
 subprotocol turns a user request such as "deploy this app", "deploy this API", "deploy this Compose
 stack", "deploy this image", or "publish this static output" into the same Appaloft flow a human
 would use. Static output is one low-friction entrypoint, not the scope of the skill. The canonical
-source lives in this document and the packaged installable skill lives at
-`packages/skills/skills/appaloft-deploy`.
+source lives in this document and the standard installable skill source lives at
+`skills/appaloft-deploy`.
 
 1. Inspect the source safely.
 2. Choose the smallest supported entrypoint.
@@ -26,13 +26,13 @@ this protocol.
 
 ## Install
 
-Install the full Appaloft skill for Codex-compatible skill hosts:
+Install the deploy subprotocol for Codex-compatible skill hosts:
 
 ```bash
-npx skills add appaloft/appaloft
+npx skills add appaloft/appaloft/skills/appaloft-deploy
 ```
 
-Install only the deploy subprotocol when the host should receive a narrower deploy guide:
+Direct package fallback:
 
 ```bash
 npx @appaloft/skills install appaloft/deploy

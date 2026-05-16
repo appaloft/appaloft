@@ -1,6 +1,8 @@
 ---
 name: analyze-appaloft-trace
 description: Analyze Appaloft OpenTelemetry traces from Jaeger trace URLs, Jaeger API JSON, local trace JSON files, or trace IDs. Use when Codex needs to fetch a Jaeger trace, extract the trace ID, summarize latency, identify the critical path, group spans by Appaloft command/query/repository/read-model/adapter/database/http categories, or explain performance/errors using Appaloft span naming and attributes.
+metadata:
+  internal: true
 ---
 
 # Analyze Appaloft Trace

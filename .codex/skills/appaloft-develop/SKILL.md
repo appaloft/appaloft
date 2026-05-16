@@ -1,6 +1,8 @@
 ---
 name: appaloft-develop
 description: Appaloft project-specific Domain Driven Develop profile. Use with the installed domain-driven-develop skill when Codex works on Appaloft business behavior, roadmap/version-based next behavior selection, event-storming discovery, future docs/specs feature artifacts, ADR/decision alignment, source-of-truth specs, public docs, tests, Web/API/CLI entrypoints, operation catalog alignment, release-sensitive compatibility impact, or Code Round implementation. This profile only binds Appaloft business facts and repository paths; use domain-driven-develop for the generic Init/Discover/Spec/Docs/Test-First/Code/Sync/Next-Behavior/Post-Implementation workflow and DDD tactical rules.
+metadata:
+  internal: true
 ---
 
 # Appaloft Develop
@@ -56,10 +58,11 @@ Read Appaloft governing sources in this order before non-trivial behavior work:
 15. AI-facing skill artifacts when user-visible behavior, entrypoints, operations, diagnostics, or
     recovery guidance change:
    - `docs/agent/appaloft-skill.md`
-   - `packages/skills/skills/appaloft/SKILL.md`
-   - `packages/skills/skills/appaloft/references/**`
-   - `docs/agent/appaloft-deploy-skill.md` and `packages/skills/skills/appaloft-deploy/**` when
-     deployment behavior changes
+   - `skills/appaloft/SKILL.md`
+   - `skills/appaloft/references/**`
+   - `packages/skills/skills/appaloft/**` as the npm fallback mirror
+   - `docs/agent/appaloft-deploy-skill.md`, `skills/appaloft-deploy/**`, and
+     `packages/skills/skills/appaloft-deploy/**` when deployment behavior changes
 
 Use `docs/ai/**` only as background analysis. It must not override accepted ADRs, the business operation map, global contracts, local specs, public documentation specs, or implementation plans.
 
@@ -233,17 +236,21 @@ behavior, or future MCP/tool descriptions.
 
 For Appaloft:
 
-- update `packages/skills/skills/appaloft/SKILL.md` when the agent-facing workflow, safety rule,
+- update `skills/appaloft/SKILL.md` and the mirrored
+  `packages/skills/skills/appaloft/SKILL.md` when the agent-facing workflow, safety rule,
   operation area, or outcome shape changes;
-- update `packages/skills/skills/appaloft/references/cli-entrypoints.md` whenever
+- update `skills/appaloft/references/cli-entrypoints.md` and the mirrored
+  `packages/skills/skills/appaloft/references/cli-entrypoints.md` whenever
   `packages/application/src/operation-catalog.ts` adds, removes, or changes a CLI transport;
-- update `packages/skills/skills/appaloft/references/deploy-protocol.md`,
-  `docs/agent/appaloft-deploy-skill.md`, and `packages/skills/skills/appaloft-deploy/**` when
-  deployment, preview cleanup, plan, observe, retry, redeploy, rollback, static/local source, BYOS,
-  or access outcome behavior changes;
+- update `skills/appaloft/references/deploy-protocol.md`, the mirrored
+  `packages/skills/skills/appaloft/references/deploy-protocol.md`,
+  `docs/agent/appaloft-deploy-skill.md`, `skills/appaloft-deploy/**`, and
+  `packages/skills/skills/appaloft-deploy/**` when deployment, preview cleanup, plan, observe,
+  retry, redeploy, rollback, static/local source, BYOS, or access outcome behavior changes;
 - update `docs/agent/appaloft-skill.md`, public docs anchors, and docs registry/traceability when
   the install path, scope, help topic, or AI-facing semantics change;
-- keep `npx skills add appaloft/appaloft` as the canonical skill-manager install path and
+- keep `npx skills add appaloft/appaloft/skills/appaloft` as the canonical skill-manager install
+  path and
   `npx @appaloft/skills install appaloft/appaloft` as the direct package fallback unless a
   governing spec changes that contract;
 - add or update tests that prove full skill coverage stays synchronized with the operation catalog,

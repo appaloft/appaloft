@@ -1,6 +1,8 @@
 ---
 name: ui-ux-pro-max
 description: UI/UX design intelligence with searchable database
+metadata:
+  internal: true
 ---
 # ui-ux-pro-max
 
