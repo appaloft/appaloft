@@ -27,6 +27,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       npm_tag: ${{ steps.version.outputs.npm_tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
       image: ghcr.io/${{ github.repository }}
     steps:
       - id: version
@@ -34,9 +35,11 @@ jobs:
         run: |
           version="${TAG_NAME#v}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          if [ "${PRERELEASE}" = "true" ]; then
+          if [ "${PRERELEASE}" = "true" ] || [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
             echo "npm_tag=next" >> "$GITHUB_OUTPUT"
           else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
             echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
           fi
         env:
@@ -294,7 +297,7 @@ jobs:
             type=raw,value=${{ inputs.tag_name }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag_name }}
             type=semver,pattern={{major}},value=${{ inputs.tag_name }}
-            type=raw,value=latest,enable=${{ inputs.prerelease == false }}
+            type=raw,value=latest,enable=${{ needs.resolve.outputs.prerelease == 'false' }}
 
       - id: build
         uses: docker/build-push-action@v6
@@ -436,9 +439,18 @@ jobs:
             --release-dir dist/release \
             --repository "${GITHUB_REPOSITORY}" \
             --out "${RUNNER_TEMP}/release-notes.md"
+          release_flags=()
+          if [ "${APPALOFT_RELEASE_PRERELEASE}" = "true" ]; then
+            release_flags+=(--prerelease)
+          else
+            release_flags+=(--latest)
+          fi
           gh release edit "${{ inputs.tag_name }}" \
             --title "Appaloft ${APPALOFT_APP_VERSION}" \
-            --notes-file "${RUNNER_TEMP}/release-notes.md"
+            --notes-file "${RUNNER_TEMP}/release-notes.md" \
+            "${release_flags[@]}"
+        env:
+          APPALOFT_RELEASE_PRERELEASE: ${{ needs.resolve.outputs.prerelease }}
 
       - name: Upload Final Release Metadata
         uses: actions/upload-artifact@v4

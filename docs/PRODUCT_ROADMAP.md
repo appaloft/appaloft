@@ -43,7 +43,7 @@ Version plan:
   backwards-compatible corrections only.
 - [x] `0.11.0` is Phase 9: Operator/Internal State Closure And Interface Parity.
 - [x] `0.12.0` is Phase 10: Runtime Usage Attribution And Monitoring.
-- [ ] `1.0.0-rc` is the GA release-candidate gate after `0.12.0`, not a separate feature phase.
+- [x] `1.0.0-rc` is the GA release-candidate gate after `0.12.0`, not a separate feature phase.
 - [ ] `1.0.0` is GA.
 - [x] Post-`1.0.0` tracks do not reserve `0.x` versions. If maintainers deliberately pull a
   post-`1.0.0` track before GA, first retarget this roadmap by adding or replacing an explicit
@@ -52,11 +52,11 @@ Version plan:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-05-14, the latest public release is `v0.12.3`; root package
-  and Release Please manifest on `main` are `0.12.3`; the release PR target is
-  `0.12.4`.
-- [x] On 2026-05-14, the roadmap gate allows `Release-As: 0.12.4` because
-  Phase 0 through Phase 10 release rules, required items, and exit criteria are checked.
+- [x] On 2026-05-16, the latest public release is `v0.12.4`; root package
+  and Release Please manifest on `main` are `0.12.4`; the release PR target is
+  `1.0.0-rc`.
+- [x] On 2026-05-16, the roadmap gate allows `Release-As: 1.0.0-rc` because
+  Phase 0 through Phase 11 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
 Historical alignment notes:
@@ -2428,25 +2428,25 @@ Post-`0.12.0` monitoring boundary:
 Target: `1.0.0-rc`.
 
 Release rule:
-- [ ] Select `1.0.0-rc` only after `0.12.0` is complete or explicitly deferred, no unchecked
+- [x] Select `1.0.0-rc` only after `0.12.0` is complete or explicitly deferred, no unchecked
   pre-rc release blocker
   remains, and the candidate is being used for GA hardening rather than new feature scope.
-- [ ] If release-candidate verification finds feature gaps, return the gap to the owning roadmap
+- [x] If release-candidate verification finds feature gaps, return the gap to the owning roadmap
   phase or release a `0.12.x` patch instead of expanding `1.0.0-rc` scope.
 
 Required:
-- [ ] Re-run the full `1.0.0 Definition Of Done` against current implementation, specs, operation
+- [x] Re-run the full `1.0.0 Definition Of Done` against current implementation, specs, operation
   catalog, docs, migration gaps, and release artifacts.
-- [ ] Verify installer, upgrade, static console serving, docs packaging, CLI, HTTP/oRPC, Web,
+- [x] Verify installer, upgrade, static console serving, docs packaging, CLI, HTTP/oRPC, Web,
   generated SDK, and generated MCP/tool contract surfaces use the same operation catalog semantics.
-- [ ] Verify all GA-blocking smoke suites pass or have accepted release notes and explicit
+- [x] Verify all GA-blocking smoke suites pass or have accepted release notes and explicit
   migration gaps.
-- [ ] Freeze release-candidate scope to hardening, compatibility, packaging, documentation,
+- [x] Freeze release-candidate scope to hardening, compatibility, packaging, documentation,
   migration, and support-readiness fixes only.
 
 Exit criteria:
-- [ ] The release candidate can be promoted to `1.0.0` without adding new product behavior.
-- [ ] Remaining gaps are either closed or explicitly accepted as non-GA-blocking in the roadmap,
+- [x] The release candidate can be promoted to `1.0.0` without adding new product behavior.
+- [x] Remaining gaps are either closed or explicitly accepted as non-GA-blocking in the roadmap,
   specs, public docs, and release notes.
 
 ## Phase 12: 1.0.0 GA
