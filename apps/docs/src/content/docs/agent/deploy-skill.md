@@ -22,14 +22,21 @@ sidebar:
 
 <h2 id="agent-deploy-skill">Agent 部署协议</h2>
 
-Appaloft Deploy Skill 是 v1 前置能力。它不是新的部署操作，也不是 MCP 的替代实现；它是一套给 AI
-agent 使用的用户层协议，让 agent 使用现有 CLI、HTTP API 或 Web Quick Deploy 完成部署。
+Appaloft Deploy Skill 是完整 [Appaloft Skill](/docs/agent/appaloft-skill/#appaloft-skill)
+中的部署子协议。它不是新的部署操作，也不是 MCP 的替代实现；它是一套给 AI agent 使用的用户层协议，让 agent
+使用现有 CLI、HTTP API 或 Web Quick Deploy 完成部署。
 
 Skill 的目标是覆盖完整 Appaloft 部署入口，让 agent 优先回答用户真正关心的问题：访问地址、部署状态、日志、诊断摘要和恢复路径。静态输出只是最快的入口之一，不是 skill 的边界。
 
 <h2 id="agent-deploy-install">安装 skill</h2>
 
-Codex 兼容的 skill host 可以直接安装：
+推荐安装完整 Appaloft skill：
+
+```bash
+npx @appaloft/skills add appaloft
+```
+
+只需要部署子协议的 Codex 兼容 skill host 也可以直接安装：
 
 ```bash
 npx @appaloft/skills install deploy

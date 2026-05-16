@@ -14,6 +14,24 @@ function runCli(args: string[], env: Record<string, string> = {}) {
 }
 
 describe("@appaloft/skills installer", () => {
+  test("[APPALOFT-SKILL-INSTALL-001] installs the full Appaloft skill with add alias", async () => {
+    const target = mkdtempSync(join(tmpdir(), "appaloft-skill-"));
+    try {
+      const result = runCli(["add", "appaloft", "--target", "directory", "--path", target]);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.toString()).toContain("Installed skill appaloft");
+      expect(await Bun.file(join(target, "appaloft", "SKILL.md")).text()).toContain(
+        "name: appaloft",
+      );
+      expect(
+        await Bun.file(join(target, "appaloft", "references", "cli-entrypoints.md")).text(),
+      ).toContain("appaloft deploy [path-or-source]");
+    } finally {
+      rmSync(target, { recursive: true, force: true });
+    }
+  });
+
   test("[AGENT-SKILL-INSTALL-001] installs the deploy skill into a directory target", async () => {
     const target = mkdtempSync(join(tmpdir(), "appaloft-agent-skill-"));
     try {
@@ -68,5 +86,23 @@ describe("@appaloft/skills installer", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout.toString()).toContain("copies skill files only");
     expect(result.stdout.toString()).toContain("does not run deployments");
+    expect(result.stdout.toString()).toContain("npx @appaloft/skills add appaloft");
+  });
+
+  test("[APPALOFT-SKILL-CATALOG-001] full skill covers every CLI catalog entry", async () => {
+    const operationCatalogSource = await Bun.file(
+      join(import.meta.dir, "../../application/src/operation-catalog.ts"),
+    ).text();
+    const cliEntryReference = await Bun.file(
+      join(import.meta.dir, "../skills/appaloft/references/cli-entrypoints.md"),
+    ).text();
+    const cliCommands = [...operationCatalogSource.matchAll(/cli: "([^"]+)"/g)].map(
+      (match) => match[1],
+    );
+
+    expect(cliCommands.length).toBeGreaterThan(150);
+    for (const command of cliCommands) {
+      expect(cliEntryReference).toContain(command);
+    }
   });
 });

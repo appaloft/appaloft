@@ -8,6 +8,8 @@ const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const bundledSkillsRoot = join(packageRoot, "skills");
 
 const skillAliases = new Map([
+  ["appaloft", "appaloft"],
+  ["all", "appaloft"],
   ["deploy", "appaloft-deploy"],
   ["appaloft-deploy", "appaloft-deploy"],
 ]);
@@ -15,19 +17,26 @@ const skillAliases = new Map([
 const helpText = `Installs Appaloft agent skills. This command copies skill files only; it does not run deployments.
 
 Usage:
+  appaloft-skills add appaloft [--target codex|directory] [--path <dir>] [--force] [--dry-run]
+  appaloft-skills install appaloft [--target codex|directory] [--path <dir>] [--force] [--dry-run]
   appaloft-skills install deploy [--target codex|directory] [--path <dir>] [--force] [--dry-run]
   appaloft-skills list
 
 Examples:
+  npx @appaloft/skills add appaloft
+  npx @appaloft/skills install appaloft --target codex --force
+  npx @appaloft/skills install appaloft --target directory --path ./.agents/skills
   npx @appaloft/skills install deploy
-  npx @appaloft/skills install deploy --target codex --force
-  npx @appaloft/skills install deploy --target directory --path ./.agents/skills
 `;
 
 function parseArgs(argv) {
   const [command, skill = "", ...rest] = argv;
+  const normalizedCommand = command === "add" ? "install" : command;
   const options = {
-    command: !command || command === "--help" || command === "-h" ? "help" : command,
+    command:
+      !normalizedCommand || normalizedCommand === "--help" || normalizedCommand === "-h"
+        ? "help"
+        : normalizedCommand,
     skill,
     target: "codex",
     force: false,

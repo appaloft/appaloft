@@ -100,20 +100,23 @@ deliberately insert another pre-GA minor line.
 | 7 | Post-1.0 Track 7 | Explicit pre-GA pull-forward only | MCP Gateway / Tool Gateway | Future Spec Round |
 | 8 | Later AI-native tracks | Post-1.0+ | Observability, AgentOps, cost governance, eval hooks, model gateway, agent runtime | Future discovery |
 
-### Track 0: Appaloft Agent Deploy Skill
+### Track 0: Appaloft Skill
 
-Goal: ship a v1-ready agent deploy skill before requiring MCP.
+Goal: ship a v1-ready full Appaloft skill before requiring MCP, with deploy as the first
+high-frequency subprotocol.
 
 Planning rules:
 
-- The skill explains how coding agents deploy through existing CLI/API behavior.
-- It ships as `@appaloft/skills` with `npx @appaloft/skills install deploy` for
-  Codex-compatible skill hosts and directory-based installs.
+- The skill explains how coding agents use existing CLI/API/Web behavior across the complete
+  operation catalog.
+- It ships as `@appaloft/skills` with `npx @appaloft/skills add appaloft` for Codex-compatible
+  skill hosts and directory-based installs; `npx @appaloft/skills install deploy` remains a
+  narrower deploy subprotocol.
 - It must point to stable public docs anchors and reuse operation-catalog language without exposing
   internal DDD/CQRS terminology.
-- It must include safe source inspection, secret/cache exclusion, local static output handling,
-  context selection/creation, plan/deploy/observe sequencing, URL-first outcome output, and
-  recovery guidance.
+- It must include every CLI transport entrypoint, operation keys, safe source inspection,
+  secret/cache exclusion, local static output handling, context selection/creation,
+  plan/deploy/observe sequencing, URL-first outcome output, and recovery guidance.
 - It must not add new commands, hidden API endpoints, hosted artifact storage, or MCP-only
   semantics.
 - It may later link to MCP tools after Appaloft-as-MCP is productized, but MCP is not required for

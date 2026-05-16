@@ -14,10 +14,13 @@
 
 The v1 ordering is skill first, MCP later:
 
-1. Agent Deploy Skill: human- and agent-readable protocol over existing CLI/API/Web behavior.
-2. Generated MCP/tool descriptors: formal transport metadata from the operation catalog.
-3. Appaloft-as-MCP server: future packaged server and handler coverage.
-4. AI tool server templates/gateway: later AI-native product tracks.
+1. Appaloft Skill: complete AI-facing entrypoint over existing CLI/API/Web behavior and all CLI
+   operation catalog entries.
+2. Agent Deploy Skill: deploy subprotocol inside the full skill for first-deploy and URL-first
+   outcomes.
+3. Generated MCP/tool descriptors: formal transport metadata from the operation catalog.
+4. Appaloft-as-MCP server: future packaged server and handler coverage.
+5. AI tool server templates/gateway: later AI-native product tracks.
 
 The skill may mention future MCP tools, but it must not depend on them for v1.
 
@@ -32,9 +35,13 @@ The skill may mention future MCP tools, but it must not depend on them for v1.
 
 The Code/Docs Round has chosen the v1 distribution location:
 
-- `docs/agent/appaloft-deploy-skill.md` is the canonical governing source;
-- `packages/skills/skills/appaloft-deploy` is the installable skill folder;
-- `@appaloft/skills` exposes `npx @appaloft/skills install deploy`;
+- `docs/agent/appaloft-skill.md` is the canonical governing source for the full AI-facing entrypoint;
+- `docs/agent/appaloft-deploy-skill.md` is the canonical governing source for the deploy
+  subprotocol;
+- `packages/skills/skills/appaloft` is the installable full skill folder;
+- `packages/skills/skills/appaloft-deploy` is the installable deploy subprotocol folder;
+- `@appaloft/skills` exposes `npx @appaloft/skills add appaloft` and the narrower
+  `npx @appaloft/skills install deploy`;
 - `.well-known` or public docs page export for copyable agent instructions;
 - generated `llms.txt` or equivalent summary derived from the same source.
 

@@ -9,7 +9,9 @@
 
 ## Business Outcome
 
-Coding agents can deploy an Appaloft project safely without first needing a full MCP integration.
+Coding agents can use Appaloft safely without first needing a full MCP integration. The top-level
+skill is an AI-facing Appaloft entrypoint over the complete operation catalog, and deploy is the
+first high-frequency subprotocol.
 
 The skill gives agents a short, installable or copyable protocol for the first-deploy loop:
 
@@ -24,6 +26,7 @@ remains the formal tool transport; the skill is the first agent-facing product a
 
 | Term | Meaning | Boundary |
 | --- | --- | --- |
+| Appaloft Skill | Complete AI-facing Appaloft entrypoint over the same operation catalog exposed through CLI, HTTP/API, Web, and future MCP surfaces. | Public docs / `@appaloft/skills` package |
 | Agent Deploy Skill | Agent-readable instructions, examples, checks, and recovery rules for deploying with Appaloft. | Public docs / `@appaloft/skills` package |
 | Agent Deploy Protocol | Ordered deploy workflow an agent follows before calling CLI/API operations. | Quick Deploy / first deploy |
 | Safe Source Inspection | Read-only project inspection that avoids uploading secrets, dependency caches, local state, and credentials. | Agent workflow |
@@ -40,12 +43,23 @@ remains the formal tool transport; the skill is the first agent-facing product a
 | AGENT-SKILL-005 | URL-first outcome packet | Deployment is accepted and access state is available or unavailable | The agent responds to the user | The response leads with URL or structured access-unavailable reason, then Resource, Deployment, logs, diagnostics, and recovery commands. |
 | AGENT-SKILL-006 | Failure recovery is agent-readable | Deployment planning, execution, access, or verification fails | The agent follows structured errors and docs links | It reports stable error code/phase, next action, log/diagnostic command, and whether retry/redeploy/rollback is available. |
 | AGENT-SKILL-007 | MCP remains optional | MCP descriptors exist or later become available | The agent uses Appaloft before MCP setup | The skill remains useful through CLI/API and can later point to MCP tools without changing business semantics. |
+| AGENT-SKILL-008 | Full Appaloft skill is the AI entrypoint | A user asks an agent to configure, observe, recover, administer, or maintain Appaloft beyond deployment | The agent follows the installed Appaloft skill | The skill maps the request to existing operation-catalog entries and includes every CLI transport command as an AI-readable reference. |
 
 ## Required Skill Content
 
-The v1 skill must include:
+The v1 full Appaloft skill must include:
 
 - install or copy instructions for the supported agent environments;
+- every CLI transport entry from `packages/application/src/operation-catalog.ts`, with operation
+  keys beside CLI forms;
+- guidance that the skill is a first-class AI entrypoint, peer to CLI/HTTP/API/Web/future MCP but
+  not an agent-only business surface;
+- coverage for deploy, observe, recover, configure, administer, and maintenance workflows;
+- safety and redaction rules for logs, diagnostics, env vars, keys, tokens, SSH material, local
+  paths, cookies, and credentials.
+
+The deploy subprotocol must include:
+
 - prerequisites and authentication assumptions;
 - safe source inspection checklist;
 - local static output rules for `dist`, `build`, and equivalent directories;
@@ -53,13 +67,14 @@ The v1 skill must include:
 - plan/deploy/observe command sequence;
 - expected URL-first outcome packet;
 - failure and recovery decision tree;
-- redaction rules for logs, diagnostics, env vars, keys, tokens, SSH material, and local paths;
 - links to first deployment, source, errors/statuses, logs/health, and recovery docs;
 - explicit statement that MCP is optional and not required for the v1 skill path.
 
 ## Domain Ownership
 
 - The skill is not a domain aggregate, command, query, or adapter.
+- The skill is an AI-facing content entrypoint over the operation catalog, not a separate business
+  surface with its own semantics.
 - The skill must not introduce a `quick-deploy.create` operation or agent-only business endpoint.
 - The skill may call CLI commands or HTTP/API operations, but those calls must map to existing
   operation catalog entries.
@@ -70,9 +85,10 @@ The v1 skill must include:
 
 ## Public Surfaces
 
-- Public docs: a stable "Agent deploy skill" anchor before v1.
-- Repository artifact: `packages/skills/skills/appaloft-deploy`.
-- npm install path: `npx @appaloft/skills install deploy`.
+- Public docs: stable "Appaloft skill" and "Agent deploy skill" anchors before v1.
+- Repository artifacts: `packages/skills/skills/appaloft` and `packages/skills/skills/appaloft-deploy`.
+- npm install path: `npx @appaloft/skills add appaloft`, with
+  `npx @appaloft/skills install deploy` as the narrower deploy subprotocol.
 - CLI help: short pointer from first-deploy or deploy help to the skill docs when agent deployment
   is documented.
 - MCP/tools: optional follow-up; not required for v1.

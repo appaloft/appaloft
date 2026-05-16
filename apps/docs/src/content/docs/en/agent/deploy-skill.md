@@ -21,9 +21,10 @@ sidebar:
 
 <h2 id="agent-deploy-skill">Agent deploy protocol</h2>
 
-The Appaloft Deploy Skill is a pre-v1 capability. It is not a new deployment operation and not a
-replacement for MCP; it is a user-layer protocol that tells an AI agent how to deploy through the
-existing CLI, HTTP API, or Web Quick Deploy surfaces.
+The Appaloft Deploy Skill is the deploy subprotocol inside the full
+[Appaloft Skill](/docs/en/agent/appaloft-skill/#appaloft-skill). It is not a new deployment
+operation and not a replacement for MCP; it is a user-layer protocol that tells an AI agent how to
+deploy through the existing CLI, HTTP API, or Web Quick Deploy surfaces.
 
 The skill covers the full Appaloft deploy entry surface and keeps the result focused on what the
 user needs next: access URL, deployment status, logs, diagnostics, and recovery. Static output is
@@ -31,7 +32,13 @@ one fast entrypoint, not the boundary of the skill.
 
 <h2 id="agent-deploy-install">Install the skill</h2>
 
-Codex-compatible skill hosts can install it directly:
+Install the full Appaloft skill:
+
+```bash
+npx @appaloft/skills add appaloft
+```
+
+Codex-compatible skill hosts that only need the deploy subprotocol can install it directly:
 
 ```bash
 npx @appaloft/skills install deploy

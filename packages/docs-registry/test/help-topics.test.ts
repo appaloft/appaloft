@@ -131,6 +131,26 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[APPALOFT-SKILL-001] full Appaloft skill resolves to public docs and packaged source", () => {
+    const topic = publicDocsHelpTopics["agent.appaloft-skill"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe("/docs/agent/appaloft-skill/#appaloft-skill");
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/agent/appaloft-skill/#appaloft-skill",
+    );
+    expect(topic.surfaces).toEqual(
+      expect.arrayContaining(["cli", "http-api", "web", "repository-config", "mcp"]),
+    );
+    expect(topic.aliases).toEqual(expect.arrayContaining(["skills add appaloft"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/agent/appaloft-skill.md",
+        "packages/skills/skills/appaloft/SKILL.md",
+        "packages/skills/skills/appaloft/references/cli-entrypoints.md",
+      ]),
+    );
+  });
+
   test("[PUB-DOCS-016] traceable topics point to spec files and product surfaces", () => {
     const defaultAccessTopic = publicDocsHelpTopics["default-access.policy"];
 

@@ -29,7 +29,9 @@ sidebar:
 - Web console 适合交互式配置和观察状态。
 - CLI 适合本地开发、服务器内运行和 GitHub Actions。
 - HTTP API 适合集成系统和自动化控制面。
-- AI agent 应使用 [Agent deploy skill](/docs/agent/deploy-skill/#agent-deploy-skill)，先安全识别来源，再调用现有 CLI/API/Web 入口。
+- AI agent 应优先安装 [Appaloft skill](/docs/agent/appaloft-skill/#appaloft-skill)，再按
+  [Agent deploy skill](/docs/agent/deploy-skill/#agent-deploy-skill) 子协议安全识别来源并调用现有
+  CLI/API/Web 入口。
 
 <h2 id="agent-deploy-skill">AI agent 部署</h2>
 

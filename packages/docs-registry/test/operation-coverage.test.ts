@@ -257,6 +257,11 @@ describe("public docs operation coverage", () => {
 
   test("[AGENT-DEPLOY-SKILL-001][AGENT-DEPLOY-SKILL-002] deploy skill is safe and operation-backed", async () => {
     const skill = await Bun.file("docs/agent/appaloft-deploy-skill.md").text();
+    const fullSkill = await Bun.file("docs/agent/appaloft-skill.md").text();
+    const packagedSkill = await Bun.file("packages/skills/skills/appaloft/SKILL.md").text();
+    const cliEntrypoints = await Bun.file(
+      "packages/skills/skills/appaloft/references/cli-entrypoints.md",
+    ).text();
     const operationKeys = new Set(operationCatalog.map((operation) => operation.key));
 
     for (const operationKey of [
@@ -271,9 +276,18 @@ describe("public docs operation coverage", () => {
     }
 
     expect(skill).toContain("appaloft deploy ./dist --as static-site");
+    expect(fullSkill).toContain("npx @appaloft/skills add appaloft");
+    expect(packagedSkill).toContain("AI-facing Appaloft entrypoint");
+    for (const operation of operationCatalog) {
+      if (operation.transports.cli) {
+        expect(cliEntrypoints).toContain(operation.transports.cli);
+      }
+    }
     expect(skill).not.toMatch(/-----BEGIN [A-Z ]+PRIVATE KEY-----/);
+    expect(packagedSkill).not.toMatch(/-----BEGIN [A-Z ]+PRIVATE KEY-----/);
     expect(skill).not.toMatch(/(?:password|token|secret|privateKey)\s*=/i);
     expect(skill).not.toContain("Run quick-deploy.create");
+    expect(packagedSkill).not.toContain("Run quick-deploy.create");
   });
 
   test("[OP-WORK-DOCS-001] operator work queries record read-only docs coverage", async () => {

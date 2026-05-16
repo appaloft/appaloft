@@ -2,13 +2,14 @@
 
 > GOVERNING DOCUMENT
 >
-> This is the canonical v1 agent-facing deploy skill. It teaches an AI agent how to
+> This is the canonical v1 agent-facing deploy subprotocol. It teaches an AI agent how to
 > deploy through Appaloft without bypassing Appaloft operations, leaking secrets, or
 > inventing unsupported MCP/tool behavior before the product exposes it.
 
 ## Purpose
 
-The skill turns a user request such as "deploy this app", "deploy this API", "deploy this Compose
+The full [Appaloft Skill](./appaloft-skill.md) is the AI-facing product entrypoint. This deploy
+subprotocol turns a user request such as "deploy this app", "deploy this API", "deploy this Compose
 stack", "deploy this image", or "publish this static output" into the same Appaloft flow a human
 would use. Static output is one low-friction entrypoint, not the scope of the skill. The canonical
 source lives in this document and the packaged installable skill lives at
@@ -25,7 +26,13 @@ this protocol.
 
 ## Install
 
-Install the skill for Codex-compatible skill hosts:
+Install the full Appaloft skill for Codex-compatible skill hosts:
+
+```bash
+npx @appaloft/skills add appaloft
+```
+
+Install only the deploy subprotocol when the host should receive a narrower deploy guide:
 
 ```bash
 npx @appaloft/skills install deploy

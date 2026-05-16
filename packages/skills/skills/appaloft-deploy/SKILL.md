@@ -5,6 +5,10 @@ description: Deploy the full range of Appaloft-supported workloads through Appal
 
 # Appaloft Deploy
 
+This is the deploy subprotocol of the full `appaloft` skill. Prefer installing the full skill when
+the host should operate all Appaloft capabilities; use this narrower skill when the host only needs
+deployment guidance.
+
 ## Workflow
 
 This skill is loaded by an agent host after installation. The installer only copies the skill into
