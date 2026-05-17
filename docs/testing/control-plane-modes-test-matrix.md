@@ -66,6 +66,25 @@ This matrix inherits:
 | CONTROL-PLANE-HANDSHAKE-016 | HTTP/application contract | Server config deploy rejects identity and secrets in config | Source package contains committed config with project/resource/server/destination ids, tokens, database URLs, raw secrets, or credential material | Server-side config bootstrap fails before source-link, resource profile, route, or deployment mutation | `validation_error`, `unsupported_config_field`, or `raw_secret_config_field`, phase `config-bootstrap` or `config-identity` | Package validated -> config parsed -> validation failure -> no mutation |
 | CONTROL-PLANE-HANDSHAKE-017 | integration | Server config deploy applies config through explicit operations | Source package and config are valid and trusted source context resolves existing or bootstrap-allowed identity; GitHub Action trusted context may include repository/ref/revision metadata in addition to Appaloft identity ids | Server resolves context through `ResolveActionServerConfigDeploymentTargetCommand`, accepts trusted GitHub metadata without treating it as source-link identity, applies resource/environment/profile changes, plain env values, resolved `ci-env:` secret references, managed domains, and pull request preview transient env/route values through explicit commands, then dispatches ids-only `deployments.create`; preview route requests do not apply committed production domains | Missing required `ci-env:` values or unsupported secret resolvers fail before mutation with `validation_error`, phase `config-secret-resolution`; preview route without pull request context fails with `validation_error`, phase `preview-config-resolution` | Handshake -> package accepted -> config bootstrap -> source-link target command -> profile/env/secret/route operations -> `deployments.create` |
 
+## CLI Remote Client Matrix
+
+These rows are governed by
+[CLI Remote Control-Plane Client](../specs/074-cli-remote-control-plane-client/spec.md).
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONTROL-PLANE-CLI-001 | CLI/unit | Login writes safe profile after handshake | A self-hosted URL is supplied, `/api/version` is reachable, and accepted auth/session verification succeeds | `appaloft login --url` or `appaloft auth login --url` writes a local uncommitted profile, marks it active, and prints sanitized endpoint/profile/current-context details | None | URL validation -> version discovery -> auth/session verification -> profile store write |
+| CONTROL-PLANE-CLI-002 | CLI/unit | Failed login leaves profile store unchanged | URL validation, version discovery, compatibility check, or auth/session verification fails | The CLI returns a structured error and does not create, update, or activate a profile | `validation_error`, `control_plane_unavailable`, `control_plane_handshake_failed`, `product_auth_missing`, or `product_auth_invalid` with phase `cli-profile-input`, `control-plane-connect`, `control-plane-handshake`, or `control-plane-auth` | URL/handshake/auth failure -> no profile write |
+| CONTROL-PLANE-CLI-003 | CLI/unit | Logout removes only local credential state | A profile exists and may be active | `appaloft logout` or `appaloft auth logout` removes or invalidates local credential/session material without revoking deploy tokens or mutating remote project/resource/deployment state | None or profile not found validation | Profile resolution -> local credential removal -> optional safe metadata update |
+| CONTROL-PLANE-CLI-004 | CLI/unit | Status and context output are redacted | A profile contains token/session material | `appaloft auth status`, `appaloft context show`, or `appaloft context list` runs | Output includes safe profile, URL, mode, current user/org summary, token safe suffix/reference metadata, and handshake status only | None or auth/profile error | Profile read -> optional status refresh -> redacted output |
+| CONTROL-PLANE-CLI-005 | CLI/unit | Context use switches active profile locally | Multiple profiles exist | `appaloft context use <profile>` runs | The active context switches locally and no business operation is dispatched except optional status refresh | None or `validation_error`, phase `cli-profile-resolution` | Profile resolution -> active context write |
+| CONTROL-PLANE-CLI-006 | shell/CLI integration | Remote project list/show dispatch | A compatible authenticated profile is active and `projects.list/show` are remote-capable | `appaloft project list` or `appaloft project show <projectId>` calls the typed remote API client, sends auth, returns the HTTP/oRPC-compatible shape, and does not create local shell composition or SSH PGlite sync | Remote structured errors pass through with sanitized details | Target resolution -> handshake/cache validation -> typed remote query -> render output |
+| CONTROL-PLANE-CLI-007 | shell/CLI integration | No trusted remote source preserves local default | No profile, URL, token, or adoption marker exists, and mode is omitted or `auto` | Ordinary CLI commands use local dispatch; SSH-targeted deploys keep `ssh-pglite` defaults | None | Target resolution -> local dispatch and local state backend rules |
+| CONTROL-PLANE-CLI-008 | CLI/integration | Unsupported remote operation fails before local mutation | Remote mode/profile is selected for a command not remote-capable in the current slice | The CLI fails before local bus dispatch, shell composition mutation, SSH state sync, or API mutation | `control_plane_unsupported`, phase `remote-operation-dispatch` | Target resolution -> remote capability check -> no local mutation |
+| CONTROL-PLANE-CLI-009 | unit/import-boundary | Profile store secret boundary | Profile commands run inside a repository with `appaloft.yml` | No token, database URL, SSH key, credential id, tenant/org secret identity, provider account id, or raw secret is written to committed config, logs, diagnostics, or JSON output | `infra_error`, phase `cli-profile-store` only when local secure storage fails | Profile store read/write -> redacted diagnostics |
+| CONTROL-PLANE-CLI-010 | import-boundary/contract | Remote dispatch reuses typed client contracts | A CLI command is marked remote-capable | The remote dispatcher uses `@appaloft/sdk` generated operation descriptors or authenticated `@appaloft/orpc/client` contract metadata and does not define parallel CLI schemas | Boundary violation test failure | Operation key/input -> typed client descriptor -> remote request |
+| CONTROL-PLANE-CLI-011 | contract | Remote auth and handshake errors remain structured | Stored profile auth is missing/invalid or endpoint versions/features are incompatible | The CLI returns structured server/client error code, category, phase, retriable flag, and sanitized details without falling back to local dispatch | `product_auth_missing`, `product_auth_invalid`, `control_plane_handshake_failed`, or `control_plane_unsupported` | Target resolution -> handshake/auth -> structured error -> no local mutation |
+
 ## Self-Hosted Install Matrix
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
@@ -142,6 +161,26 @@ CLI fallback separate.
 Existing tests in `deployment-state.test.ts` and `remote-pglite-state-sync.test.ts` partially cover
 the older `postgres-control-plane` backend selection branch. Those tests should be renamed or
 extended with the IDs above during Phase 1 Code Round.
+
+`packages/adapters/cli/test/control-plane-client.test.ts` now covers the first CLI remote
+control-plane client slice:
+
+- `CONTROL-PLANE-CLI-001`, `CONTROL-PLANE-CLI-002`, `CONTROL-PLANE-CLI-003`,
+  `CONTROL-PLANE-CLI-004`, `CONTROL-PLANE-CLI-005`, `CONTROL-PLANE-CLI-007`,
+  `CONTROL-PLANE-CLI-008`, `CONTROL-PLANE-CLI-009`, `CONTROL-PLANE-CLI-010`, and
+  `CONTROL-PLANE-CLI-011`;
+- the adapter-level `CONTROL-PLANE-CLI-006` binding for typed SDK `projects.list/show` remote
+  dispatch.
+
+`apps/shell/test/run-control-plane-cli.test.ts` covers the shell pre-dispatch portion of
+`CONTROL-PLANE-CLI-006`, proving remote `project list` returns before local shell composition or
+SSH PGlite sync. The implemented slice has a CLI-adapter-local profile store, login/logout/status
+commands, context command, self-hosted token/cookie handshake, and ordinary CLI remote dispatcher
+for `projects.list/show`.
+
+Full flags/env/config/`auto` target resolution, Cloud browser/device/OIDC login, OS keychain
+credential storage, remote mutations, remote streaming, MCP exposure, and SSH PGlite adoption
+remain governed follow-ups.
 
 `remote-pglite-state-sync.test.ts` now also covers SSH `ssh-pglite` final upload refresh/merge
 behavior after remote revision conflict. That coverage belongs to the SSH state-backend path under

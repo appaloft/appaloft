@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { runStandaloneControlPlaneCli } from "@appaloft/adapter-cli";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { type AppComposition, createAppComposition, type ShellRuntimeOptions } from "./composition";
 import {
@@ -222,6 +223,17 @@ function readExitCode(): number {
 }
 
 export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> {
+  const controlPlaneCli = await runStandaloneControlPlaneCli({
+    argv: process.argv,
+    env: process.env,
+  });
+  if (controlPlaneCli.handled) {
+    if (controlPlaneCli.exitCode !== 0) {
+      process.exit(controlPlaneCli.exitCode);
+    }
+    return;
+  }
+
   const remotePgliteStateSync = await prepareRemotePgliteStateSync({
     argv: process.argv,
     env: process.env,
