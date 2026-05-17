@@ -1040,14 +1040,19 @@ describe("deployment create HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
+    let capturedReadConfigInput:
+      | Parameters<ActionSourcePackageConfigReader["readConfig"]>[0]
+      | undefined;
     const actionSourcePackageConfigReader = {
-      readConfig: async () =>
-        ok({
+      readConfig: async (input) => {
+        capturedReadConfigInput = input;
+        return ok({
           text: ["controlPlane:", "  mode: self-hosted", "  url: https://console.example.com"].join(
             "\n",
           ),
           fileName: "appaloft.yml",
-        }),
+        });
+      },
     } satisfies ActionSourcePackageConfigReader;
     const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
@@ -1078,6 +1083,9 @@ describe("deployment create HTTP route", () => {
             revision: "abc123",
             repositoryFullName: "appaloft/www",
           },
+          sourcePackageCredentials: {
+            githubToken: "github-token-fixture",
+          },
           trustedContext: {
             projectId: "prj_console",
             environmentId: "env_prod",
@@ -1101,6 +1109,9 @@ describe("deployment create HTTP route", () => {
       resourceId: "res_www",
       serverId: "srv_prod",
       destinationId: "dst_prod",
+    });
+    expect(capturedReadConfigInput?.credentials).toEqual({
+      githubToken: "github-token-fixture",
     });
   });
 

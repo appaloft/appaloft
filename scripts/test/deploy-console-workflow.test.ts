@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 const root = resolve(import.meta.dir, "../..");
 const workflow = readFileSync(join(root, ".github/workflows/deploy-console.yml"), "utf8");
 const expression = (value: string) => ["$", "{{ ", value, " }}"].join("");
+const shellExpansion = (value: string) => ["$", "{", value, "}"].join("");
 
 test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow installs self-hosted Appaloft over SSH", () => {
   expect(workflow).toContain("name: Deploy Console");
@@ -38,8 +39,8 @@ test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow defaults to production
   expect(workflow).toContain(`console-database: ${expression("inputs.database")}`);
   expect(workflow).toContain(`console-url: ${expression("vars.APPALOFT_CONSOLE_ORIGIN")}`);
   expect(workflow).toContain("APPALOFT_CONSOLE_DOMAIN");
-  expect(workflow).toContain('domain="${APPALOFT_CONSOLE_ORIGIN#http://}"');
-  expect(workflow).toContain('domain="${domain#https://}"');
+  expect(workflow).toContain(`domain="${shellExpansion("APPALOFT_CONSOLE_ORIGIN#http://")}"`);
+  expect(workflow).toContain(`domain="${shellExpansion("domain#https://")}"`);
   expect(workflow).toContain(`console-domain: ${expression("steps.settings.outputs.domain")}`);
   expect(workflow).toContain(`url: ${expression("steps.console.outputs.console-url")}`);
 });
