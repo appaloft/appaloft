@@ -28,6 +28,11 @@ sidebar:
 
 Action-only previews run from a GitHub Actions workflow that you own. The workflow checks out a pull request, maps trusted GitHub context into Appaloft preview flags, deploys through the normal deployment path, and optionally publishes a preview URL.
 
+The simplest BYOS shape is Pure SSH Action: default `control-plane-mode: none`; the Action
+installs/runs the CLI, deploys over SSH, and uses server-owned `ssh-pglite` state on the SSH
+target. This path does not require an Appaloft console, deploy token, project id, resource id, or
+server id. After the first deploy creates source-link state, later deploys reuse it automatically.
+
 Use this path when:
 
 - your repository can run a workflow on `pull_request`;
@@ -53,7 +58,10 @@ The public `appaloft/deploy-action` wrapper maps trusted workflow inputs to the 
 
 <h2 id="deployment-action-self-hosted-server-mode">Self-hosted server Action mode</h2>
 
-For normal deployments, `appaloft/deploy-action` can trigger an existing self-hosted Appaloft server instead of running CLI/SSH from the GitHub runner:
+For repositories that already have a self-hosted Appaloft console/API,
+`appaloft/deploy-action` can trigger the server API instead of running CLI/SSH from the GitHub
+runner. `control-plane-url` must explicitly select the Appaloft instance, and `appaloft-token`
+must authenticate the Action mutation endpoint:
 
 ```yaml
 - uses: appaloft/deploy-action@v1
@@ -62,16 +70,25 @@ For normal deployments, `appaloft/deploy-action` can trigger an existing self-ho
     control-plane-mode: self-hosted
     control-plane-url: https://console.example.com
     appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
-    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
-    environment-id: ${{ secrets.APPALOFT_ENVIRONMENT_ID }}
-    resource-id: ${{ secrets.APPALOFT_RESOURCE_ID }}
-    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
+    server-config-deploy: true
+    config: appaloft.yml
+    secret-variables: |
+      APP_SECRET=ci-env:APP_SECRET
 ```
 
-Without `server-config-deploy`, this server API slice requires the project, environment, resource, and deployment target to already exist in the Appaloft server. The Action calls the server source-link deployment route. When explicit ids are supplied, the server can bootstrap a missing source link; later runs can omit the ids and let the server resolve context from its source-link state using the GitHub repository, ref, config path, and source base directory fingerprint. That path does not apply `appaloft.yml`, upload a source archive, create resources, open SSH, or mutate SSH-server PGlite state.
+Prefer `server-config-deploy: true`. In this mode the Action performs the server handshake, sends a
+bounded GitHub source/config reference, resolves `ci-env:` secrets from the runner environment, and
+calls the server API. The deployment path does not invoke the CLI, open SSH, select a state backend,
+or mutate SSH-server PGlite state. The current composite wrapper may still run shared binary setup
+before dispatch, but self-hosted deployment and cleanup mutations are API calls to the selected
+control plane. The server validates committed config, applies
+runtime/network/health/env/domain settings through Appaloft operations, resolves source-link or
+repository binding context, then dispatches ids-only deployment admission.
 
-Use `server-config-deploy: true` when the self-hosted server should read the selected repository
-config and apply it before creating the deployment:
+Project, environment, resource, and server ids should not be the default user mental model. Prefer
+server resolution from source-link state, repository binding, deploy-token scope, and GitHub
+repository/config fingerprints. When no binding exists, use one trusted bootstrap or advanced
+override:
 
 ```yaml
 - uses: appaloft/deploy-action@v1
@@ -90,12 +107,11 @@ config and apply it before creating the deployment:
       APP_SECRET=ci-env:APP_SECRET
 ```
 
-In this mode the Action performs the server handshake, sends a bounded GitHub source/config
-reference, resolves `ci-env:` secrets from the runner environment, and calls the server API. The
-runner still does not install the CLI, open SSH, select a state backend, or mutate SSH-server PGlite
-state. The server validates the committed config, rejects identity and raw secret fields, applies
-runtime/network/health/env/domain settings through Appaloft operations, then dispatches ids-only
-deployment admission.
+Without `server-config-deploy`, server source-link trigger mode remains available for resources
+whose profile already exists. It calls the source-link deployment route and does not apply
+`appaloft.yml`, upload a source archive, create resources, open SSH, or mutate SSH-server PGlite
+state. Explicit ids are bootstrap/debug context; later runs should let the server resolve from
+source-link state.
 
 Self-hosted server mode can also trigger PR preview deploys:
 
@@ -106,15 +122,21 @@ Self-hosted server mode can also trigger PR preview deploys:
     control-plane-mode: self-hosted
     control-plane-url: https://console.example.com
     appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    server-config-deploy: true
+    config: appaloft.preview.yml
     preview: pull-request
     preview-id: pr-${{ github.event.pull_request.number }}
-    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
-    environment-id: ${{ secrets.APPALOFT_PREVIEW_ENVIRONMENT_ID }}
-    resource-id: ${{ secrets.APPALOFT_PREVIEW_RESOURCE_ID }}
-    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
+    preview-domain-template: pr-${{ github.event.pull_request.number }}.preview.example.com
+    preview-tls-mode: disabled
+    require-preview-url: true
 ```
 
-Server-mode preview deploys use a preview-scoped source fingerprint and write `preview-id`, `deployment-id`, `console-url`, and, when configured, `preview-url` outputs. `preview-domain-template` and `preview-tls-mode` are applied as server-side preview route intent; `environment-variables` and `secret-variables` can carry preview-specific runtime values.
+Server-mode preview deploys use a preview-scoped source fingerprint and write `preview-id`,
+`deployment-id`, `console-url`, and, when configured, `preview-url` outputs.
+`preview-domain-template` and `preview-tls-mode` are applied as transient server-side preview route
+intent; `environment-variables` and `secret-variables` can carry preview-specific runtime values.
+Preview cleanup resolves context from preview source-link state and does not accept
+project/resource/server ids.
 
 The non-secret control-plane connection policy may also live in `appaloft.yml`:
 
@@ -125,6 +147,9 @@ controlPlane:
 ```
 
 Keep project, environment, resource, server, token, SSH, and database identity out of committed config. Those values must come from trusted workflow inputs, variables, secrets, existing source links, or the Appaloft server.
+`controlPlane.deploymentContext` is a narrow bootstrap/advanced override exception for intentionally
+binding a repository to an existing self-hosted project/environment/resource/server. It is not a
+default set of ids every workflow should maintain.
 
 <h2 id="deployment-pr-preview-output">Preview URL output</h2>
 
@@ -149,11 +174,11 @@ Cleanup is idempotent. It stops preview-owned runtime state when present, remove
 
 Do not expose deployment credentials to untrusted fork pull requests. The default safe pattern is to skip fork previews unless you have an explicit reduced-credential policy.
 
-Secrets should come from GitHub Secrets or another trusted workflow secret store and be passed as secret references such as `ci-env:NAME`. Do not commit SSH keys, tokens, database URLs, production secret values, or Appaloft project/resource/server identity into `appaloft.yml`.
+Secrets should come from GitHub Secrets or another trusted workflow secret store and be passed as secret references such as `ci-env:NAME`. Do not commit SSH keys, tokens, database URLs, production secret values, or Appaloft project/resource/server identity into `appaloft.yml`. Use narrow `controlPlane.deploymentContext` only for one-time bootstrap or advanced override.
 
 <h2 id="product-grade-preview-deployments">Product-grade control-plane previews</h2>
 
-Product-grade previews are an Appaloft Cloud or self-hosted control-plane workflow. They are not the same as Action-only previews.
+Product-grade previews are an Appaloft Cloud or self-hosted control-plane workflow. They are not the same as Action-only previews maintained by each repository's workflow file.
 
 That product line uses signed GitHub webhooks, preview policy, fork and secret policy, preview environment list/show/delete, comments/checks/status feedback, cleanup retries, quotas, audit, and managed domain follow-up. It still must deploy through ids-only `deployments.create` after the control plane selects or creates the preview context.
 

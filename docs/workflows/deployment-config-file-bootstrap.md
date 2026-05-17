@@ -688,7 +688,7 @@ Config-file errors use stable codes and phases:
 | `validation_error` | `config-discovery` | No | Explicit path missing, ambiguous discovery, or unsupported extension. |
 | `validation_error` | `config-parse` | No | JSON/YAML parse failed. |
 | `validation_error` | `config-schema` | No | Unknown field or invalid field shape. |
-| `validation_error` | `config-identity` | No | File attempted to select project/resource/server/destination/credential identity. |
+| `validation_error` | `config-identity` | No | File attempted to select project/resource/server/destination/credential identity outside the narrow self-hosted `controlPlane.deploymentContext` bootstrap/advanced override. |
 | `validation_error` | `config-secret-validation` | No | File contained raw secret material. |
 | `validation_error` | `config-secret-resolution` | No | Required secret reference could not be resolved from the configured entrypoint resolver. |
 | `validation_error` | `control-plane-config` | No | Config declares an invalid mode, unsafe URL, identity selector, or secret-bearing control-plane field. |
@@ -712,7 +712,8 @@ Config-file errors use stable codes and phases:
 Current code has a deployment-config package and JSON schema for the supported JSON/YAML target
 names listed above.
 
-Current config parsing accepts `controlPlane.mode` and non-secret `controlPlane.url`, while rejecting
+Current config parsing accepts `controlPlane.mode`, non-secret `controlPlane.url`, and the narrow
+self-hosted `controlPlane.deploymentContext` bootstrap/advanced override, while rejecting broad
 identity and secret fields under `controlPlane`. The CLI state backend resolver can observe
 `APPALOFT_CONTROL_PLANE_URL` and `APPALOFT_DATABASE_URL` as a partial backend selection hint.
 Cloud-assisted mode, adoption markers, and full API-mode deploy execution remain Phase 1+ work under

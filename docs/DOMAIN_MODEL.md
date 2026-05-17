@@ -241,10 +241,13 @@ Transport compatibility note:
 - execution owner and control-plane/state owner are independent. GitHub Actions, CLI, a
   local-Web-agent, or a future MCP tool may execute an entry workflow while a Cloud or self-hosted
   control plane owns source links, locks, identity, audit, and managed domain workflow state.
-- repository config may express non-secret control-plane connection policy, but it must not select
-  project, resource, server, destination, credential, organization, or tenant identity. Those
-  identities come from trusted entrypoint inputs, authenticated control-plane state, source
-  fingerprint links, adoption markers, or explicit relink/adoption operations.
+- repository config may express non-secret control-plane connection policy. In self-hosted server
+  config deploy it may also carry the narrow `controlPlane.deploymentContext` bootstrap/advanced
+  override for project, environment, resource, server, and destination ids. It must not select
+  credential, organization, tenant, provider account, token, database, or secret identity. Ordinary
+  deployment context should still come from trusted entrypoint inputs, authenticated control-plane
+  state, source fingerprint links, repository binding, deploy-token scope, adoption markers, or
+  explicit relink/adoption operations.
 - `access.domains[]` from repository config expresses provider-neutral custom domain route intent.
   In pure CLI/SSH mode it becomes target-local server-applied route state owned by the selected
   deployment target and edge proxy provider; in control-plane mode it may be mapped to managed

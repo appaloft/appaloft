@@ -42,6 +42,17 @@ Treat the skill as an AI-oriented peer to these Appaloft surfaces:
 The skill chooses among those surfaces based on the current agent environment. It must not invent
 agent-only operations.
 
+For GitHub Actions, the skill must keep three deployment shapes distinct:
+
+- Pure SSH Action: fastest BYOS deploy, `control-plane-mode: none`, CLI runs in the Action, SSH
+  target owns `ssh-pglite` state, and source-link context is reused without asking for console ids.
+- Self-hosted Server Action: existing self-hosted Appaloft console/API owns state; the Action calls
+  `control-plane-url` with `appaloft-token`, does not SSH or run the CLI, and should prefer
+  `server-config-deploy: true`.
+- Product-grade Preview: Appaloft Cloud or self-hosted control plane owns preview policy, GitHub
+  App webhook intake, comments/checks, cleanup retry, scheduler, audit, and quota. This is separate
+  from Action-only PR preview workflow files.
+
 ## Coverage Contract
 
 The installable `appaloft` skill must include:

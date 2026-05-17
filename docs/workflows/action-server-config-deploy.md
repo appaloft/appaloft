@@ -28,8 +28,10 @@ GitHub Action
   -> Action publishes deployment id, deployment URL, console URL, and optional PR feedback
 ```
 
-The Action must not install or invoke the CLI, open SSH, select `state-backend`, or mutate
-SSH-server PGlite in this workflow. It is a trigger and package handoff client only.
+The deployment path must not invoke the CLI, open SSH, select `state-backend`, or mutate
+SSH-server PGlite in this workflow. It is a trigger and package handoff client only. Current
+composite wrapper setup may still install the released binary before dispatch, but this workflow
+does not use it as the deployment executor.
 
 ## Global References
 

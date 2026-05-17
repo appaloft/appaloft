@@ -11,9 +11,9 @@ Secrets into runner-local files or environment variables, and invokes the existi
 `appaloft deploy` config workflow. It must not introduce a new deployment command, hidden hosted
 service requirement, or parallel config schema.
 
-The first self-hosted server API slice is narrower: the wrapper does not install or invoke the CLI,
-does not open SSH, and does not read or write SSH-server PGlite state. It performs a lightweight
-`/api/version` compatibility check against the self-hosted Appaloft server and calls
+The first self-hosted server API slice is narrower: the wrapper does not invoke the CLI deployment
+path, does not open SSH, and does not read or write SSH-server PGlite state. It performs a
+lightweight `/api/version` compatibility check against the self-hosted Appaloft server and calls
 `POST /api/action/deployments/from-source-link` for deploy or
 `POST /api/deployments/cleanup-preview` for PR close cleanup with a derived source fingerprint.
 Trusted project/environment/resource/server ids supplied by the workflow may bootstrap a missing
@@ -57,7 +57,7 @@ It must follow these boundaries:
   backend selection. Deploy may pass explicit trusted ids or ask the server to resolve an existing
   source link by source fingerprint; preview cleanup must resolve context from preview source-link
   state and must not accept deployment target ids.
-- future server config deploy mode keeps the Action as a trigger and the self-hosted server as the
+- active server config deploy mode keeps the Action as a trigger and the self-hosted server as the
   owner of config bootstrap/source package handling. It must not add config/source fields to
   `deployments.create` and must keep committed config free of identity and secret material.
 
@@ -233,13 +233,13 @@ Initial inputs:
 | `state-backend` | No | Optional explicit backend: `ssh-pglite`, `local-pglite`, or `postgres-control-plane`. |
 | `control-plane-mode` | No | Explicit mode: `none` for pure SSH CLI mode or `self-hosted` for the first server API trigger slice. `auto` and `cloud` remain future and must fail before mutation. |
 | `control-plane-url` | Required for `self-hosted` | Trusted endpoint for the self-hosted Appaloft server, mapped outside committed config. |
-| `appaloft-token` | No | Optional bearer token for self-hosted API mode; must never be logged or written to config. |
+| `appaloft-token` | Required for self-hosted mutation endpoints | Deploy-token bearer credential for self-hosted API mode; must never be logged or written to config. |
 | `use-oidc` | No | Future boolean for GitHub OIDC exchange when the Cloud auth ADR accepts it. |
-| `project-id` | Optional | Trusted project id for source-link bootstrap; must be supplied by workflow input or secrets, not committed config. Required only when any explicit deployment id is supplied. |
-| `environment-id` | Optional | Trusted environment id for source-link bootstrap. Required only when any explicit deployment id is supplied. |
-| `resource-id` | Optional | Trusted resource id for source-link bootstrap. Required only when any explicit deployment id is supplied. |
-| `server-id` | Optional | Trusted deployment target id for source-link bootstrap. Required only when any explicit deployment id is supplied. |
-| `destination-id` | No | Optional trusted destination id for source-link bootstrap. |
+| `project-id` | Advanced/bootstrap only | Trusted project id for first source-link bootstrap, advanced override, or debugging. Prefer source-link/repository binding and deploy-token scope for normal runs. Required only when any explicit deployment id is supplied. |
+| `environment-id` | Advanced/bootstrap only | Trusted environment id for first source-link bootstrap, advanced override, or debugging. Required only when any explicit deployment id is supplied. |
+| `resource-id` | Advanced/bootstrap only | Trusted resource id for first source-link bootstrap, advanced override, or debugging. Required only when any explicit deployment id is supplied. |
+| `server-id` | Advanced/bootstrap only | Trusted deployment target id for first source-link bootstrap, advanced override, or debugging. Required only when any explicit deployment id is supplied. |
+| `destination-id` | Advanced/bootstrap only | Optional trusted destination id for first source-link bootstrap, advanced override, or debugging. |
 | `preview` | No | Accepted value `pull-request` enables preview-scoped source link and environment/resource identity behavior. |
 | `preview-id` | Required when `preview=pull-request` | Trusted preview scope such as `pr-123`; examples derive it from `github.event.pull_request.number`. |
 | `preview-domain-template` | No | Trusted preview hostname template rendered by the workflow/action, for example `pr-123.preview.example.com`; requires user-owned DNS in Action-only mode. |
@@ -468,6 +468,10 @@ The main repository now also contains a reference composite action under
 - `.github/workflows/ci.yml` under the exported wrapper layout validates shell script syntax,
   dry-run PR preview argument/output mapping, and a GitHub Actions variable-gated exact-version
   install smoke controlled by the public repository's `APPALOFT_INSTALL_SMOKE_VERSION` variable.
+
+Current self-hosted implementation note: the composite wrapper still runs its shared binary
+install/setup step before dispatch. In self-hosted server API mode that binary is not used as the
+deployment executor; deployment and cleanup mutations are API calls to the selected control plane.
 
 Remaining public wrapper release follow-ups:
 
