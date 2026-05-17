@@ -1062,6 +1062,87 @@ describe("deploy-action wrapper reference", () => {
     }
   });
 
+  test("[SELF-AUTH-ACTION-004] self-hosted deploy surfaces structured action auth denial details", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-auth-denied-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'args="$*"',
+        'output_file=""',
+        'while [ "$#" -gt 0 ]; do',
+        '  if [ "$1" = "-o" ]; then',
+        "    shift",
+        '    output_file="$1"',
+        "  fi",
+        "  shift || true",
+        "done",
+        'case "$args" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackage":true,"serverSideConfigBootstrap":true}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        "    cat > \"$output_file\" <<'JSON'",
+        '{"error":{"code":"action_auth_forbidden","message":"Action deploy token is not authorized for this request","details":{"deniedScope":"repository","missingScope":"repository","reasonCode":"scope_value_not_allowed","workflow":"server-config-deploy","repositoryFullName":"appaloft/appaloft-cloud"}}}',
+        "JSON",
+        "    printf '403'",
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        GITHUB_OUTPUT: outputPath,
+        GITHUB_REPOSITORY: "appaloft/appaloft-cloud",
+        GITHUB_SHA: "abc123",
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_APPALOFT_TOKEN: "action-token-fixture",
+        INPUT_CONFIG: "appaloft.cloud-preview.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_PREVIEW: "pull-request",
+        INPUT_PREVIEW_ID: "cloud-pr-263",
+        INPUT_PREVIEW_DOMAIN_TEMPLATE: "cloud-pr-263.appalofttest.xyz",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(22);
+      const stderr = result.stderr.toString();
+      expect(stderr).toContain("Action deploy token is not authorized for this request");
+      expect(stderr).toContain("status=403");
+      expect(stderr).toContain("code=action_auth_forbidden");
+      expect(stderr).toContain("deniedScope=repository");
+      expect(stderr).toContain("reasonCode=scope_value_not_allowed");
+      expect(stderr).toContain("workflow=server-config-deploy");
+      expect(stderr).toContain("repositoryFullName=appaloft/appaloft-cloud");
+      expect(stderr).not.toContain("action-token-fixture");
+      expect(existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "").not.toContain(
+        "deployment-id=",
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   test("[CONTROL-PLANE-HANDSHAKE-017] self-hosted server config preview fails without server-confirmed route", () => {
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-preview-"));
     const outputPath = join(workspace, "github-output.txt");
